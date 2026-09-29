@@ -82,6 +82,10 @@ echo "✓ Backup complete: $(du -h "$OUT" | cut -f1)"
 # makes a missing key an empty string, not a fatal error.
 read_env() { grep -E "^$1=" "$ENV_FILE" 2>/dev/null | tail -1 | cut -d= -f2- || true; }
 
+# Whether the off-site copy ended up in object storage. Starts pessimistic:
+# "false" until a successful rclone run flips it. Written to Redis at the end.
+S3_SYNC_STATUS="false"
+
 S3_ENDPOINT_VAL="$(read_env BACKUP_S3_ENDPOINT)"
 S3_BUCKET_VAL="$(read_env BACKUP_S3_BUCKET)"
 S3_ACCESS_KEY_ID_VAL="$(read_env BACKUP_S3_ACCESS_KEY_ID)"
@@ -117,7 +121,36 @@ else
 
   if rclone copy "$OUT" "R2:${S3_BUCKET_VAL}/db-backups/"; then
     echo "✓ Off-site copy OK: R2:${S3_BUCKET_VAL}/db-backups/$(basename "$OUT")"
+    S3_SYNC_STATUS="true"
   else
     echo "WARNING: off-site copy to R2 failed — local backup is still intact" >&2
   fi
+fi
+
+# ------------------------------------------------------------
+# Backup metadata → Redis (health-tracker + /api/metrics).
+# ------------------------------------------------------------
+# The backup service on prod runs THIS script, not scripts/backup.sh — so the
+# keys the health-tracker reads (system:backup:*) were never written and
+# backup_s3_synced stayed 0 forever. Record them here, best-effort: a Redis
+# hiccup must not change this script's exit code or the local backup's success.
+#
+# Redis auth is passed as REDISCLI_AUTH to the container (never as -a, never
+# echoed or logged). Empty REDIS_PASSWORD → skip with one log line.
+REDIS_PASSWORD_VAL="$(read_env REDIS_PASSWORD)"
+BACKUP_TS="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+BACKUP_SIZE_BYTES="$(stat -c %s "$OUT" 2>/dev/null || echo 0)"
+
+redis_set() {
+  docker compose --env-file "$ENV_FILE" exec -T \
+    -e REDISCLI_AUTH="$REDIS_PASSWORD_VAL" redis \
+    redis-cli SET "$1" "$2" EX 172800 >/dev/null 2>&1 || true
+}
+
+if [ -n "$REDIS_PASSWORD_VAL" ]; then
+  redis_set "system:backup:last_timestamp" "$BACKUP_TS"
+  redis_set "system:backup:last_size" "$BACKUP_SIZE_BYTES"
+  redis_set "system:backup:s3_synced" "$S3_SYNC_STATUS"
+else
+  echo "Backup metadata not recorded in Redis (REDIS_PASSWORD not set in $ENV_FILE)"
 fi

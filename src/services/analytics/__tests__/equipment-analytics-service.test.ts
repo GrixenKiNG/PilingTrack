@@ -171,3 +171,55 @@ describe('getEquipmentAnalytics — pile meters source', () => {
     expect(sql).not.toContain('SitePilePlan');
   });
 });
+
+/**
+ * F-ANALYTICS-TENANT-SQL (F-20): тенант проверяется строгим равенством в КАЖДОМ
+ * сыром запросе сервиса (агрегат по установкам + парето простоев), а
+ * отсутствующий tenantId падает ДО $queryRaw. `IS NULL OR` встречается только в
+ * необязательном фильтре объекта и привязан к siteId, не к tenantId.
+ */
+describe('getEquipmentAnalytics — tenant isolation in every raw query (F-ANALYTICS-TENANT-SQL)', () => {
+  beforeEach(() => {
+    queryRaw.mockReset();
+    groupBy.mockReset();
+    queryRaw.mockResolvedValue([]);
+    groupBy.mockResolvedValue([]);
+  });
+
+  it('scopes both raw queries by strict tenant equality, never `tenantId … IS NULL`', async () => {
+    await getEquipmentAnalytics({
+      dateFrom: '2026-01-01',
+      dateTo: '2026-12-31',
+      tenantId: 'orion',
+      siteId: 'site_A',
+    });
+
+    // 0 — агрегат по установкам, 1 — парето простоев.
+    expect(queryRaw).toHaveBeenCalledTimes(2);
+
+    for (const [strings, ...values] of queryRaw.mock.calls) {
+      const sql = (strings as string[]).join('?');
+
+      expect(sql).toContain('r."tenantId" = ?');
+      expect(sql).not.toMatch(/tenantId"?\s*(::text\s*)?IS NULL/i);
+      expect(values).toContain('orion');
+
+      // Единственное IS NULL OR — необязательный фильтр объекта.
+      expect(sql.match(/IS NULL OR/g) ?? []).toHaveLength(1);
+      expect(sql).toMatch(/\?::text IS NULL OR r\."siteId" = \?/);
+    }
+
+    // Внешняя выборка техники (не только CTE отчётов) тоже тенантная.
+    const [outerStrings] = queryRaw.mock.calls[0];
+    expect((outerStrings as string[]).join('?')).toContain('e."tenantId" = ?');
+  });
+
+  it('throws when tenantId is absent and never reaches $queryRaw or telemetry', async () => {
+    await expect(
+      getEquipmentAnalytics({ dateFrom: '2026-01-01', dateTo: '2026-12-31' }),
+    ).rejects.toThrow(/tenantId/i);
+
+    expect(queryRaw).not.toHaveBeenCalled();
+    expect(groupBy).not.toHaveBeenCalled();
+  });
+});

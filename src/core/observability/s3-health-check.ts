@@ -34,18 +34,25 @@ function getHealthCheckS3Client(): S3Client | null {
  * Probe S3 connectivity with a cheap ListObjectsV2 call.
  * Returns true if S3 is reachable.
  */
-export async function getS3ClientForHealth(): Promise<boolean> {
+export async function getS3ClientForHealth(signal?: AbortSignal): Promise<boolean> {
   const s3 = getHealthCheckS3Client();
   if (!s3) return false;
 
   try {
-    await s3.send(new ListObjectsV2Command({
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: env var is validated at startup (validate-env)
-      Bucket: process.env.S3_BUCKET!,
-      MaxKeys: 1,
-    }));
+    await s3.send(
+      new ListObjectsV2Command({
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: env var is validated at startup (validate-env)
+        Bucket: process.env.S3_BUCKET!,
+        MaxKeys: 1,
+      }),
+      signal ? { abortSignal: signal } : undefined,
+    );
     return true;
   } catch (err) {
+    // Отмену по таймауту не глотаем: вызывающий должен отличить «медленно»
+    // (degraded) от «упало» (down).
+    if (signal?.aborted) throw err;
+
     const msg = err instanceof Error ? err.message : String(err);
     // NoSuchBucket is still "reachable" — bucket config issue, not connectivity
     if (msg.includes('NoSuchBucket')) {

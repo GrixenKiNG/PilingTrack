@@ -222,3 +222,95 @@ describe('logProduction — след записи выработки в исто
     expect(auditTx.reportAudit.create).not.toHaveBeenCalled();
   });
 });
+
+/*
+  ПОСЛЕ «ЗАВЕРШИТЬ РАБОТУ» ВЫРАБОТКА БОЛЬШЕ НЕ ЗАПИСЫВАЕТСЯ, А ПРОСТОЙ — ЗАПИСЫВАЕТСЯ.
+
+  `finishWork` переводит смену в HANDOVER_PENDING, и на экране кнопки выработки
+  исчезают. Прямой запрос к API их не спрашивал: после «Завершить работу» сваи
+  продолжали ложиться в уже сдаваемую смену. Правило стоит в самой команде:
+  `requireOpenShift` пропускает HANDOVER_PENDING сознательно (в этом состоянии
+  ещё сдают ЕО после работы и закрывают смену), поэтому запрет на выработку
+  живёт здесь, а не там. Простой не запрещён: им машинист объясняет остановку,
+  и последний отрезок обычно вносится уже при сдаче.
+*/
+describe('logProduction — после завершения работы принимается только простой', () => {
+  const finishTx = {
+    shift: {findFirst: vi.fn()},
+    report: {findFirst: vi.fn(), upsert: vi.fn(), findUnique: vi.fn(), findUniqueOrThrow: vi.fn()},
+    crew: {findFirst: vi.fn()},
+    pileWork: {findUnique: vi.fn(), create: vi.fn()},
+    leaderDrilling: {findUnique: vi.fn(), create: vi.fn()},
+    reportDowntime: {findUnique: vi.fn(), findMany: vi.fn(), create: vi.fn()},
+    downtimeReason: {findFirst: vi.fn()},
+    reportAudit: {create: vi.fn()},
+  };
+
+  const shiftRow = (state: string) => ({
+    id: 'shift-1234-5678', state, equipmentId: 'equipment-1',
+    productionDate: new Date('2026-09-26T00:00:00.000Z'), type: 'DAY',
+    startedAt: new Date('2026-09-26T07:00:00.000Z'), timezone: 'Europe/Moscow',
+    starter: {id: 'operator-a', role: 'OPERATOR'},
+  });
+
+  const base = {
+    tenantId: 'tenant-a', operatorId: 'operator-a', shiftId: 'shift-1234-5678',
+    now: new Date('2026-09-26T10:00:00.000Z'),
+  };
+
+  const workEntries: Record<'PILES' | 'DRILLING', Parameters<typeof logProduction>[0]['entry']> = {
+    PILES: {kind: 'PILES', pileGradeId: 'grade-1', count: 1},
+    DRILLING: {kind: 'DRILLING', typeId: 'type-1', count: 1, metersPerUnit: 5},
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    finishTx.shift.findFirst.mockResolvedValue(shiftRow('HANDOVER_PENDING'));
+    finishTx.report.findFirst.mockResolvedValue(null);
+    finishTx.crew.findFirst.mockResolvedValue({id: 'crew-1', siteId: 'site-1'});
+    finishTx.pileWork.findUnique.mockResolvedValue(null);
+    finishTx.leaderDrilling.findUnique.mockResolvedValue(null);
+    finishTx.report.upsert.mockResolvedValue({id: 'report-1'});
+    finishTx.report.findUnique.mockResolvedValue({status: 'draft'});
+    finishTx.report.findUniqueOrThrow.mockResolvedValue({reportId: 'RM-shift-12-2026-09-26'});
+    finishTx.reportAudit.create.mockResolvedValue({});
+    withReadinessTenantTransaction.mockImplementation(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test: фиктивный клиент транзакции вместо Prisma
+      async (_tenantId: string, work: (client: any) => Promise<unknown>) => work(finishTx),
+    );
+  });
+
+  it.each(['PILES', 'DRILLING'] as const)('отказывает в выработке %s с понятным текстом', async (kind) => {
+    await expect(logProduction({
+      ...base, clientCommandId: 'cmd-1', entry: workEntries[kind],
+    })).rejects.toThrow(/Работа по смене завершена/);
+
+    expect(finishTx.pileWork.create).not.toHaveBeenCalled();
+    expect(finishTx.leaderDrilling.create).not.toHaveBeenCalled();
+  });
+
+  it('в смену, которая ещё не начата, отвечает про приём установки, а не про завершение', async () => {
+    finishTx.shift.findFirst.mockResolvedValue(shiftRow('PLANNED'));
+
+    await expect(logProduction({
+      ...base, clientCommandId: 'cmd-1', entry: workEntries.PILES,
+    })).rejects.toThrow(/Смена ещё не начата/);
+  });
+
+  it('простой после завершения работы записывается', async () => {
+    finishTx.reportDowntime.findUnique.mockResolvedValue(null);
+    finishTx.reportDowntime.findMany.mockResolvedValue([]);
+    finishTx.downtimeReason.findFirst.mockResolvedValue({id: 'reason-1', name: 'Ожидание механика'});
+    finishTx.reportDowntime.create.mockResolvedValue({});
+
+    await expect(logProduction({
+      ...base, clientCommandId: 'cmd-dt-1',
+      entry: {
+        kind: 'DOWNTIME', reasonId: 'reason-1',
+        startedAt: '2026-09-26T08:00:00.000Z', endedAt: '2026-09-26T09:00:00.000Z',
+      },
+    })).resolves.toEqual({reportId: 'report-1'});
+
+    expect(finishTx.reportDowntime.create).toHaveBeenCalledTimes(1);
+  });
+});

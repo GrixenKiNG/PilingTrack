@@ -2,6 +2,7 @@ export type ComponentStatus = 'up' | 'down' | 'slow';
 export type OutboxStatus = 'ok' | 'backlog' | 'stalled';
 export type WorkerStatus = 'running' | 'stopped';
 export type StorageProvider = 's3' | 'local';
+export type StorageStatus = 'up' | 'down' | 'degraded';
 export type OverallStatus = 'healthy' | 'degraded' | 'unhealthy';
 
 export interface ComponentHealth {
@@ -25,7 +26,7 @@ export interface WorkerHealth {
 }
 
 export interface StorageHealth {
-  status: ComponentStatus;
+  status: StorageStatus;
   provider: StorageProvider;
 }
 

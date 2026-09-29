@@ -14,6 +14,7 @@ function row(over: Partial<DashboardAnalyticsRow>): DashboardAnalyticsRow {
   return {
     actualPiles: 0, actualPileMeters: 0, plannedPiles: 0, plannedPileMeters: 0,
     actualDrillingCount: 0, actualDrilling: 0, plannedDrillingCount: 0, plannedDrilling: 0,
+    actualPileMetersAllTime: 0, actualDrillingAllTime: 0,
     totalDowntime: 0, totalReports: 0,
     ...over,
   };
@@ -40,6 +41,26 @@ describe('computeDashboardKpis', () => {
     expect(k.downtime).toBe(2);
     expect(k.sitesTotal).toBe(2);
     expect(k.sitesActive).toBe(1); // only the row with totalReports > 0
+  });
+
+  it('sums the all-time actuals separately from the period actuals (F-R52)', () => {
+    const k = computeDashboardKpis(
+      [
+        // За период — почти ничего, за всё время — почти весь объём.
+        row({ actualPiles: 20, actualPileMeters: 100, actualDrilling: 5,
+          actualPileMetersAllTime: 4750, actualDrillingAllTime: 940,
+          plannedPileMeters: 5000, plannedDrilling: 1000 }),
+        row({ actualPiles: 0, actualPileMeters: 0, actualDrilling: 0,
+          actualPileMetersAllTime: 250, actualDrillingAllTime: 60 }),
+      ],
+      null,
+      new Map(),
+      [],
+    );
+    expect(k.actualPileMeters).toBe(100); // «за период» не изменился
+    expect(k.actualDrilling).toBe(5);
+    expect(k.actualPileMetersAllTime).toBe(5000);
+    expect(k.actualDrillingAllTime).toBe(1000);
   });
 
   it('treats null totalDowntime as zero', () => {

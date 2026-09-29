@@ -33,7 +33,7 @@
  *   await service.confirmUpload(mediaId);
  */
 
-import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand, type GetObjectCommandOutput } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { logger } from '@/lib/logger';
 import { ServiceError } from '@/lib/service-error';
@@ -65,6 +65,15 @@ async function getDbClient() {
   const { db } = await import('@/lib/db');
   return db;
 }
+
+/**
+ * F-R50-2: upper bound on the object download inside confirmUpload. Without
+ * it a slow/unresponsive S3/R2 hung the confirm request indefinitely (the
+ * SDK keeps retrying) while the media row stayed 'pending'. 30s is generous
+ * for a post-upload HEAD+GET; on expiry we abort the request and fail with
+ * a retryable 504.
+ */
+const DOWNLOAD_TIMEOUT_MS = 30_000;
 
 // ============================================================
 // Media Service
@@ -184,96 +193,132 @@ export class MediaService {
 
     // Download to verify the upload landed AND to feed the thumbnail step
     // in one round-trip. We need the bytes either way for sharp.
-    const fetched = await s3CircuitBreaker.execute(async () => {
-      const command = new GetObjectCommand({ Bucket: this.config.bucket, Key: media.key });
-      return this.s3Client.send(command);
-    });
-
-    // SEC-02: enforce the size limit on the REAL uploaded object, before
-    // reading its body into memory. ContentLength arrives in the GetObject
-    // response headers, so an oversized payload is rejected without an
-    // unbounded download. A missing/unreadable size fails closed too.
-    const realSize = fetched.ContentLength;
-    if (
-      typeof realSize !== 'number' ||
-      !Number.isFinite(realSize) ||
-      realSize > this.config.maxFileSize
-    ) {
-      // Тело не читаем — закрываем поток, иначе соединение с хранилищем
-      // висит до сборки мусора.
-      (fetched.Body as { destroy?: () => void } | undefined)?.destroy?.();
-      await db.media.update({ where: { id: mediaId }, data: { uploadStatus: 'failed' } });
-      throw new ServiceError(
-        realSize
-          ? `Размер загруженного файла ${realSize} превышает максимум ${this.config.maxFileSize}`
-          : 'Размер загруженного файла не определён',
-        413,
-      );
-    }
-
-    if (!fetched.Body) {
-      await db.media.update({ where: { id: mediaId }, data: { uploadStatus: 'failed' } });
-      throw new ServiceError('Загруженный файл пуст или недоступен', 422);
-    }
-    const sourceBytes = Buffer.from(await fetched.Body.transformToByteArray());
-
-    // Content-Type is entirely client-declared at getPresignedUrl() time and
-    // was, until now, never checked against the actual bytes — a caller
-    // could declare "image/jpeg" and upload arbitrary bytes straight through
-    // (media review, 2026-07-04). Reject instead of silently completing.
-    if (!contentMatchesMagicBytes(media.contentType, sourceBytes)) {
-      await db.media.update({ where: { id: mediaId }, data: { uploadStatus: 'failed' } });
-      throw new ServiceError(
-        `Содержимое файла не соответствует заявленному типу ${media.contentType}`,
-        422,
-      );
-    }
-
-    let thumbnailKey: string | null = null;
-    if (media.contentType.startsWith('image/')) {
+    // F-R50-2 / F-R50-2b: bound the whole download — response headers AND
+    // body — with an AbortSignal so a hanging R2 cannot hold the request
+    // (and the media row) in 'pending' forever. The 30s timer must NOT be
+    // cleared when the headers arrive: a storage that answers fast but then
+    // stalls mid-body would otherwise read unbounded. On timeout we throw
+    // 504 and leave the row unchanged, so a repeat confirm of the same
+    // photoId simply retries the download; the 413/422 early exits release
+    // the timer through the same finally.
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), DOWNLOAD_TIMEOUT_MS);
+    try {
+      let fetched: GetObjectCommandOutput;
       try {
-        const { default: sharp } = await import('sharp');
-        const thumbBuffer = await sharp(sourceBytes)
-          .rotate() // honour EXIF orientation — phone photos otherwise come out sideways
-          .resize(this.config.thumbnailWidth, this.config.thumbnailWidth, {
-            fit: 'inside',
-            withoutEnlargement: true,
-          })
-          .jpeg({ quality: 80 })
-          .toBuffer();
-
-        thumbnailKey = `${media.key}.thumb.jpg`;
-        await s3CircuitBreaker.execute(async () => {
-          const putCommand = new PutObjectCommand({
-            Bucket: this.config.bucket,
-            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null invariant established earlier in this function
-            Key: thumbnailKey!,
-            Body: thumbBuffer,
-            ContentType: 'image/jpeg',
-          });
-          await this.s3Client.send(putCommand);
+        fetched = await s3CircuitBreaker.execute(async () => {
+          const command = new GetObjectCommand({ Bucket: this.config.bucket, Key: media.key });
+          return this.s3Client.send(command, { abortSignal: controller.signal });
         });
       } catch (error) {
-        // Thumbnail failure must not break the confirm flow — original is uploaded.
-        logger.warn('Thumbnail generation failed, continuing without thumbnail', { mediaId, error });
-        thumbnailKey = null;
+        if (controller.signal.aborted) {
+          throw new ServiceError('Хранилище не ответило, повторите отправку фото', 504);
+        }
+        throw error;
       }
+
+      // SEC-02: enforce the size limit on the REAL uploaded object, before
+      // reading its body into memory. ContentLength arrives in the GetObject
+      // response headers, so an oversized payload is rejected without an
+      // unbounded download. A missing/unreadable size fails closed too.
+      const realSize = fetched.ContentLength;
+      if (
+        typeof realSize !== 'number' ||
+        !Number.isFinite(realSize) ||
+        realSize > this.config.maxFileSize
+      ) {
+        // Тело не читаем — закрываем поток, иначе соединение с хранилищем
+        // висит до сборки мусора.
+        (fetched.Body as { destroy?: () => void } | undefined)?.destroy?.();
+        await db.media.update({ where: { id: mediaId }, data: { uploadStatus: 'failed' } });
+        throw new ServiceError(
+          realSize
+            ? `Размер загруженного файла ${realSize} превышает максимум ${this.config.maxFileSize}`
+            : 'Размер загруженного файла не определён',
+          413,
+        );
+      }
+
+      if (!fetched.Body) {
+        await db.media.update({ where: { id: mediaId }, data: { uploadStatus: 'failed' } });
+        throw new ServiceError('Загруженный файл пуст или недоступен', 422);
+      }
+
+      // F-R50-2b: receiving the headers is not the end of the download. Race
+      // the body read against the abort signal so a stream that stalls after
+      // its headers fails with the same retryable 504 instead of hanging.
+      const bodyRead = fetched.Body.transformToByteArray();
+      const timedOut = new Promise<never>((_resolve, reject) => {
+        const fail = () =>
+          reject(new ServiceError('Хранилище не ответило, повторите отправку фото', 504));
+        if (controller.signal.aborted) {
+          fail();
+        } else {
+          controller.signal.addEventListener('abort', fail, { once: true });
+        }
+      });
+      const sourceBytes = Buffer.from(await Promise.race([bodyRead, timedOut]));
+
+      // Content-Type is entirely client-declared at getPresignedUrl() time and
+      // was, until now, never checked against the actual bytes — a caller
+      // could declare "image/jpeg" and upload arbitrary bytes straight through
+      // (media review, 2026-07-04). Reject instead of silently completing.
+      if (!contentMatchesMagicBytes(media.contentType, sourceBytes)) {
+        await db.media.update({ where: { id: mediaId }, data: { uploadStatus: 'failed' } });
+        throw new ServiceError(
+          `Содержимое файла не соответствует заявленному типу ${media.contentType}`,
+          422,
+        );
+      }
+
+      let thumbnailKey: string | null = null;
+      if (media.contentType.startsWith('image/')) {
+        try {
+          const { default: sharp } = await import('sharp');
+          const thumbBuffer = await sharp(sourceBytes)
+            .rotate() // honour EXIF orientation — phone photos otherwise come out sideways
+            .resize(this.config.thumbnailWidth, this.config.thumbnailWidth, {
+              fit: 'inside',
+              withoutEnlargement: true,
+            })
+            .jpeg({ quality: 80 })
+            .toBuffer();
+
+          thumbnailKey = `${media.key}.thumb.jpg`;
+          await s3CircuitBreaker.execute(async () => {
+            const putCommand = new PutObjectCommand({
+              Bucket: this.config.bucket,
+              // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null invariant established earlier in this function
+              Key: thumbnailKey!,
+              Body: thumbBuffer,
+              ContentType: 'image/jpeg',
+            });
+            await this.s3Client.send(putCommand);
+          });
+        } catch (error) {
+          // Thumbnail failure must not break the confirm flow — original is uploaded.
+          logger.warn('Thumbnail generation failed, continuing without thumbnail', { mediaId, error });
+          thumbnailKey = null;
+        }
+      }
+
+      // Update media record
+      const updated = await db.media.update({
+        where: { id: mediaId },
+        data: {
+          uploadStatus: 'completed',
+          fileSize: realSize,
+          thumbnailKey,
+          cdnUrl: this.config.cdnBaseUrl
+            ? `${this.config.cdnBaseUrl}/${media.key}`
+            : null,
+        },
+      });
+
+      return this.toMediaRecord(updated);
+    } finally {
+      clearTimeout(timeoutId);
     }
-
-    // Update media record
-    const updated = await db.media.update({
-      where: { id: mediaId },
-      data: {
-        uploadStatus: 'completed',
-        fileSize: realSize,
-        thumbnailKey,
-        cdnUrl: this.config.cdnBaseUrl
-          ? `${this.config.cdnBaseUrl}/${media.key}`
-          : null,
-      },
-    });
-
-    return this.toMediaRecord(updated);
   }
 
   /**

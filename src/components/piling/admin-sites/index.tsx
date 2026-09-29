@@ -253,7 +253,7 @@ export function AdminSites() {
       countLabel={`${filtered.length} ${pluralizeRu(filtered.length, ['объект', 'объекта', 'объектов'])}`}
       subtitle="План/факт стройки: прогресс, бригады, простои, отчёты"
       actions={canManage &&
-        <Button onClick={() => setShowCreate(true)} className="h-10 bg-signal text-white hover:bg-signal-strong">
+        <Button onClick={() => setShowCreate(true)} className="h-11 bg-signal text-white hover:bg-signal-strong sm:h-10">
           <Plus className="mr-1.5 h-4 w-4" />
           Новый объект
         </Button>

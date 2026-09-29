@@ -101,6 +101,51 @@ describe('GET /api/health/deep', () => {
     expect(body.components.database).toBe('down');
   });
 
+  it('отдаёт storage «degraded» и всё равно 200 при медленном хранилище', async () => {
+    getFreshStatusMock.mockResolvedValue(
+      makeStatus({
+        status: 'degraded',
+        components: {
+          database: { status: 'up', latencyMs: 5 },
+          redis: { status: 'up' },
+          outbox: { status: 'ok', pendingCount: 0 },
+          workers: { status: 'running' },
+          storage: { status: 'degraded', provider: 's3' },
+          backup: { status: 'up' },
+        },
+      }),
+    );
+
+    const res = await GET(req());
+    expect(res.status).toBe(200);
+
+    const body = await res.json();
+    expect(body.status).toBe('degraded');
+    expect(body.components.storage).toBe('degraded');
+  });
+
+  it('отдаёт storage «down» при отказе хранилища', async () => {
+    getFreshStatusMock.mockResolvedValue(
+      makeStatus({
+        status: 'unhealthy',
+        components: {
+          database: { status: 'up', latencyMs: 5 },
+          redis: { status: 'up' },
+          outbox: { status: 'ok', pendingCount: 0 },
+          workers: { status: 'running' },
+          storage: { status: 'down', provider: 's3' },
+          backup: { status: 'up' },
+        },
+      }),
+    );
+
+    const res = await GET(req());
+    expect(res.status).toBe(503);
+
+    const body = await res.json();
+    expect(body.components.storage).toBe('down');
+  });
+
   it('returns 503 when overall status is unhealthy', async () => {
     getFreshStatusMock.mockResolvedValue(
       makeStatus({

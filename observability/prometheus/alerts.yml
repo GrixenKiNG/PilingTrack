@@ -222,3 +222,16 @@ groups:
           summary: "CRITICAL: Host disk free < 2 GB"
           description: "Only {{ $value | humanize1024 }}B free on / — Prometheus TSDB / docker builds will fail"
 
+      - alert: OffsiteBackupNotSynced
+        # `and on()` gates on backup_age_hours > 0: when backup monitoring is
+        # off, the health-tracker returns source:'disabled' with no age (0) and
+        # no s3Synced, so the metric must not fire. See F-OFFSITE-SIGNAL.
+        expr: backup_s3_synced == 0 and on() backup_age_hours > 0
+        for: 26h
+        labels:
+          severity: warning
+          service: backup
+        annotations:
+          summary: "Облачная копия базы не обновлялась больше суток"
+          description: "Облачная копия базы не обновлялась больше суток — проверить rclone/R2"
+

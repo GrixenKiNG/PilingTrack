@@ -7,9 +7,10 @@ import {
   addReportBreakdown,
   addSectionTitle,
 } from './components';
-import { formatMeters, formatNumber, formatRuDate } from './format';
+import { formatRuDate } from './format';
 import { toPeriodReportRow } from './period-row';
 import { renderPdf } from './render';
+import { formatCountMeters } from '@/lib/format';
 import { formatDowntimeHours } from '@/lib/downtime-hours';
 import { pileLengthMeters } from '@/lib/pile-length';
 import type { PeriodPdfData } from './types';
@@ -37,8 +38,8 @@ export async function generatePeriodPdf(data: PeriodPdfData): Promise<Buffer> {
     addHeader(doc, 'СВОДНЫЙ ОТЧЁТ ЗА ПЕРИОД', `${formatRuDate(data.dateFrom)} - ${formatRuDate(data.dateTo)}`, data.companyName, data.equipmentLabel);
     addMetricStrip(doc, [
       ['Отчётов', String(reports.length), 'шт'],
-      ['Свай забито', `${formatNumber(data.totalPiles)} / ${formatMeters(totalPileMeters)}`, 'шт/м.п.', hasPilesWithoutLength ? PILE_METERS_INCOMPLETE_NOTE : undefined],
-      ['Бурение', `${formatNumber(totalDrillingCount)} / ${formatMeters(data.totalDrilling)}`, 'шт/м.п.'],
+      ['Свай забито', formatCountMeters(data.totalPiles, totalPileMeters), '', hasPilesWithoutLength ? PILE_METERS_INCOMPLETE_NOTE : undefined],
+      ['Бурение', formatCountMeters(totalDrillingCount, data.totalDrilling), ''],
       ['Простои', formatDowntimeHours(data.totalDowntime), ''],
     ]);
 

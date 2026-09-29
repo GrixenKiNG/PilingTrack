@@ -564,6 +564,9 @@ export function ReadinessCentre(props: ReferenceUiProps) {
                   ? `Балл готовности ${presentation.score} из 100`
                   : 'Авторитетной оценки ещё нет'}
               </div>
+              <div className="mt-0.5 text-2xs leading-relaxed text-muted-foreground">
+                Взвешенная оценка состояния узлов. Пуск разрешают не баллы, а блокирующие правила.
+              </div>
             </div>
           </div>
           {/*
@@ -665,13 +668,20 @@ export function ReadinessCentre(props: ReferenceUiProps) {
             приходилось пересчитывать глазами, чтобы понять, далеко ли до смены.
           */}
           <div className="mt-auto pt-4">
+            {/*
+              «Готовность чек-листа смены» стояла рядом с баллом готовности и
+              читалась как второй балл: совпадение «3 из 5 · 60 %» с баллом
+              случайно. Здесь доля процедуры, а не оценка узлов, и подпись
+              говорит, что это именно этапы предсменного контроля.
+            */}
+            <div className="text-2xs font-semibold">Пройдено шагов процедуры</div>
             <div
-              className="h-1.5 overflow-hidden rounded-full bg-muted"
+              className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted"
               role="progressbar"
               aria-valuenow={stageProgress}
               aria-valuemin={0}
               aria-valuemax={100}
-              aria-label="Готовность чек-листа смены"
+              aria-label="Пройдено шагов процедуры"
             >
               <div
                 className={cn('h-full rounded-full', stageProgress === 100 ? 'bg-success-strong' : 'bg-signal')}
@@ -682,6 +692,9 @@ export function ReadinessCentre(props: ReferenceUiProps) {
               <span>Выполнено {doneStages} из {presentation.stages.length} шагов</span>
               <span className="font-semibold tabular-nums">{stageProgress}%</span>
             </div>
+            <p className="mt-1 text-2xs leading-relaxed text-muted-foreground">
+              Сколько этапов предсменного контроля уже пройдено. Это не балл готовности.
+            </p>
           </div>
         </div>
       </section>
@@ -694,8 +707,11 @@ export function ReadinessCentre(props: ReferenceUiProps) {
               <div className="mt-4 flex flex-wrap items-center gap-4 sm:gap-8">
                 <ReadinessRing value={presentation.score} />
                 <div>
-                  <div className="text-xs text-muted-foreground">Итоговый балл готовности</div>
+                  <div className="text-xs text-muted-foreground">Балл готовности</div>
                   <div className="mt-1 font-mono text-2xl font-bold">{presentation.score ?? '—'} <span className="text-sm font-normal text-muted-foreground">/100</span></div>
+                  <p className="mt-1 text-2xs leading-relaxed text-muted-foreground">
+                    Взвешенная оценка состояния узлов. Пуск разрешают не баллы, а блокирующие правила.
+                  </p>
                   <div className="mt-3 flex gap-4 text-xs">
                     <span>Критические блокеры <b className="ml-1 rounded bg-destructive/10 px-1.5 py-0.5 text-destructive-strong">{blockers}</b></span>
                     <span>Замечания <b className="ml-1 rounded bg-signal/10 px-1.5 py-0.5 text-signal-strong">{warnings}</b></span>

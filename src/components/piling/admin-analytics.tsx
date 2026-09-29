@@ -320,7 +320,7 @@ export function AdminAnalytics() {
             key={t.key}
             onClick={() => setTab(t.key)}
             className={cn(
-              'px-3 py-1.5 text-xs font-medium rounded-full border transition-colors flex items-center gap-1.5',
+              'px-3 py-1.5 text-xs font-medium rounded-full border transition-colors flex items-center gap-1.5 min-h-11 sm:min-h-0',
               tab === t.key
                 ? 'bg-info/10 text-info-strong border-info/30'
                 : 'bg-card text-muted-foreground border-border hover:bg-muted'
@@ -380,7 +380,7 @@ export function AdminAnalytics() {
                   {operators.length > 5 && (
                     <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground">
                       <span>Показано {showAllOperators ? operators.length : 5} из {operators.length} операторов</span>
-                      <button type="button" onClick={() => setShowAllOperators((v) => !v)} className="font-medium text-info-strong hover:underline">
+                      <button type="button" onClick={() => setShowAllOperators((v) => !v)} className="min-h-11 font-medium text-info-strong hover:underline sm:min-h-0">
                         {showAllOperators ? 'Свернуть' : 'Смотреть всех'}
                       </button>
                     </div>
@@ -416,7 +416,7 @@ export function AdminAnalytics() {
                       type="button"
                       onClick={() => setTrendSiteId(site.id)}
                       className={cn(
-                        'rounded-md border px-2 py-0.5 text-2xs transition-colors',
+                        'min-h-11 rounded-md border px-2 py-0.5 text-2xs transition-colors sm:min-h-0',
                         trendSiteId === site.id
                           ? 'border-info/30 bg-info/10 font-semibold text-info-strong'
                           : 'border-border bg-card text-muted-foreground hover:bg-muted',

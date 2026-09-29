@@ -12,6 +12,9 @@ interface SiteAnalyticsRow {
   actualDrillingCount: number;
   plannedDrilling: number;
   actualDrilling: number;
+  actualPilesAllTime: number;
+  actualPileMetersAllTime: number;
+  actualDrillingAllTime: number;
   totalDowntime: number;
   totalReports: number;
 }
@@ -40,6 +43,10 @@ export interface SiteAnalyticsOptions {
  * Plans (`plannedPiles`/`plannedDrilling`) are the whole-site targets and are
  * never sliced by the period — only the *actuals* (work done) are. When no
  * period is given the actuals cover all time (previous behaviour preserved).
+ * `pileProgress`/`drillingProgress` are therefore always cumulative (all-time
+ * actual vs the whole-site plan); the period only affects the «за период»
+ * figures. The all-time actuals are returned as `actualPilesAllTime`,
+ * `actualPileMetersAllTime`, `actualDrillingAllTime`.
  *
  * Site selection: a deactivated site is still a real object of the tenant, so
  * it must not vanish from the KPI of a past period. Rows are therefore taken
@@ -81,6 +88,9 @@ export async function getSiteAnalytics(opts: SiteAnalyticsOptions) {
       COALESCE(d.total_meters, 0)::float    AS "actualDrilling",
       COALESCE(d.total_count, 0)::int       AS "actualDrillingCount",
       COALESCE(dt.total_duration, 0)::float AS "totalDowntime",
+      COALESCE(p_all.total_piles, 0)::int   AS "actualPilesAllTime",
+      COALESCE(p_all.total_pile_meters, 0)::float AS "actualPileMetersAllTime",
+      COALESCE(d_all.total_meters, 0)::float AS "actualDrillingAllTime",
       COALESCE(rc.report_count, 0)::int     AS "totalReports"
     FROM "Site" s
     LEFT JOIN (
@@ -89,7 +99,7 @@ export async function getSiteAnalytics(opts: SiteAnalyticsOptions) {
         SUM(
           spp.count * COALESCE(
             NULLIF(spp."metersPerUnit", 0),
-            substring(pg.name from '[0-9]{3}')::float / 10,
+            pg."lengthMm"::float / 1000,
             0
           )
         )::float AS total_pile_meters
@@ -136,6 +146,24 @@ export async function getSiteAnalytics(opts: SiteAnalyticsOptions) {
       WHERE r.date >= ${dateFrom} AND r.date <= ${dateTo} AND r.status = 'submitted'
       GROUP BY r."siteId"
     ) dt ON dt."siteId" = s.id
+    LEFT JOIN (
+      SELECT
+        r."siteId",
+        SUM(pw.count)::int AS total_piles,
+        SUM(pw.count * (COALESCE(pg."lengthMm", 0)::float / 1000))::float AS total_pile_meters
+      FROM "Report" r
+      JOIN "PileWork" pw ON pw."reportId" = r.id
+      JOIN "PileGrade" pg ON pg.id = pw."pileGradeId"
+      WHERE r.status = 'submitted'
+      GROUP BY r."siteId"
+    ) p_all ON p_all."siteId" = s.id
+    LEFT JOIN (
+      SELECT r."siteId", SUM(ld.meters)::float AS total_meters
+      FROM "Report" r
+      JOIN "LeaderDrilling" ld ON ld."reportId" = r.id
+      WHERE r.status = 'submitted'
+      GROUP BY r."siteId"
+    ) d_all ON d_all."siteId" = s.id
     WHERE (
         s."isActive" = true
         OR EXISTS (
@@ -162,11 +190,17 @@ export async function getSiteAnalytics(opts: SiteAnalyticsOptions) {
     actualDrillingCount: row.actualDrillingCount,
     plannedDrilling: row.plannedDrilling,
     actualDrilling: parseFloat(row.actualDrilling.toFixed(1)),
+    actualPilesAllTime: row.actualPilesAllTime,
+    actualPileMetersAllTime: parseFloat(row.actualPileMetersAllTime.toFixed(1)),
+    actualDrillingAllTime: parseFloat(row.actualDrillingAllTime.toFixed(1)),
+    // Процент выполнения — всегда накопительный (с начала объекта): план это
+    // цель всего объекта, дробить её по календарю нечем. Период влияет только
+    // на числа «за период», поэтому числитель берётся из *AllTime-подзапросов.
     pileProgress:
-      row.plannedPiles > 0 ? Math.min(100, (row.actualPiles / row.plannedPiles) * 100) : 0,
+      row.plannedPiles > 0 ? Math.min(100, (row.actualPilesAllTime / row.plannedPiles) * 100) : 0,
     drillingProgress:
       row.plannedDrilling > 0
-        ? Math.min(100, (row.actualDrilling / row.plannedDrilling) * 100)
+        ? Math.min(100, (row.actualDrillingAllTime / row.plannedDrilling) * 100)
         : 0,
     totalReports: row.totalReports,
     totalDowntime: parseFloat(row.totalDowntime.toFixed(1)),

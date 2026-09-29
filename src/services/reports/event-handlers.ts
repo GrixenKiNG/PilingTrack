@@ -11,7 +11,9 @@
 import { ReportDomainEvent, REPORT_DOMAIN_EVENT_TYPES } from '@/modules/reports/domain';
 import { on } from '@/services/reports/domain-events';
 import { logger } from '@/lib/logger';
+import { formatCountMeters } from '@/lib/format';
 import { formatDowntimeHours } from '@/lib/downtime-hours';
+import { pileLengthMeters } from '@/lib/pile-length';
 import { getRedisClient } from '@/lib/redis-cache';
 // Статически (в отличие от обработчиков ниже): динамический import этого
 // модуля не подменяется моком в юнит-тесте, и путь «тенант из отчёта» иначе
@@ -482,10 +484,6 @@ function escapeHtml(value: string): string {
   return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
-function fmtNum(n: number): string {
-  return new Intl.NumberFormat('ru-RU').format(n);
-}
-
 /**
  * Тип события доставки PDF отчёта. Отправка идёт через outbox, как тревоги
  * (core/notifications/durable-alert): раньше PDF слался прямо из обработчика,
@@ -579,6 +577,11 @@ export async function deliverReportPdf(event: { id?: string; aggregateId: string
   const operatorName = (ctx.report?.lastEditedByName) || d.user?.name || '—';
 
   const totalPiles = d.piles.reduce((s, p) => s + (p.count || 0), 0);
+  const totalPileMeters = d.piles.reduce(
+    (s, p) => s + (p.count || 0) * pileLengthMeters({ gradeLengthMm: p.pileGrade?.lengthMm }),
+    0
+  );
+  const totalDrillingCount = d.drillings.reduce((s, x) => s + (x.count || 1), 0);
   const totalDrilling = d.drillings.reduce((s, x) => s + (x.meters || 0), 0);
   const totalDowntime = d.downtimes.reduce((s, x) => s + (x.duration || 0), 0);
 
@@ -599,8 +602,8 @@ export async function deliverReportPdf(event: { id?: string; aggregateId: string
     ...(isCorrection ? [`🖊 Изменил: <b>${escapeHtml(operatorName)}</b>`] : []),
     `🛠 Оборудование: ${escapeHtml(d.equipmentName || '—')}`,
     '',
-    `🔩 Свай забито: <b>${fmtNum(totalPiles)}</b> шт`,
-    `🌀 Бурение: <b>${fmtNum(totalDrilling)}</b> м.п.`,
+    `🔩 Свай забито: <b>${formatCountMeters(totalPiles, totalPileMeters)}</b>`,
+    `🌀 Бурение: <b>${formatCountMeters(totalDrillingCount, totalDrilling)}</b>`,
     `⏸ Простои: <b>${formatDowntimeHours(totalDowntime)}</b>`,
   ];
   const caption = lines.join('\n');

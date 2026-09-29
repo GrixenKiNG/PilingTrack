@@ -212,7 +212,7 @@ export function WorkspaceSettings() {
         ] as const).map((tab) => {
           const Icon = tab.icon;
           return (
-            <button key={tab.id} type="button" onClick={() => setActiveTab(tab.id)} className={`flex shrink-0 items-center gap-1.5 ${activeTab === tab.id ? 'border-b-2 border-lime-500 pb-3 text-foreground' : 'pb-3 text-muted-foreground'}`}><Icon className="h-4 w-4" />{tab.label}</button>
+            <button key={tab.id} type="button" onClick={() => setActiveTab(tab.id)} className={`flex min-h-11 shrink-0 items-center gap-1.5 sm:min-h-0 ${activeTab === tab.id ? 'border-b-2 border-lime-500 pb-3 text-foreground' : 'pb-3 text-muted-foreground'}`}><Icon className="h-4 w-4" />{tab.label}</button>
           );
         })}
       </nav>

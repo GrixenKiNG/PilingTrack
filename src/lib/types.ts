@@ -360,6 +360,10 @@ export interface SiteAnalyticsDTO {
   actualDrillingCount: number;
   plannedDrilling: number;
   actualDrilling: number;
+  /** Накопительный факт (весь объект, без фильтра периода) — база для % выполнения. */
+  actualPilesAllTime: number;
+  actualPileMetersAllTime: number;
+  actualDrillingAllTime: number;
   pileProgress: number;
   drillingProgress: number;
   totalReports: number;

@@ -60,7 +60,14 @@ vi.mock('@/services/audit/audit-service', () => ({
 vi.mock('@/lib/pdf-data', () => ({
   loadSingleReportPdfContext: vi.fn().mockResolvedValue({
     report: { version: 1 },
-    pdfData: { date: '2026-09-25', user: { name: 'Иванов' }, site: { name: 'Объект' }, piles: [], drillings: [], downtimes: [] },
+    pdfData: {
+      date: '2026-09-25',
+      user: { name: 'Иванов' },
+      site: { name: 'Объект' },
+      piles: [{ pileGrade: { name: 'С300', lengthMm: 12000 }, count: 2 }],
+      drillings: [{ type: { name: 'Лидерное' }, count: 3, meters: 36 }],
+      downtimes: [],
+    },
   }),
 }));
 vi.mock('@/lib/pdf-generator', () => ({ generateSinglePdf: vi.fn().mockResolvedValue(Buffer.from('pdf')) }));
@@ -116,6 +123,27 @@ describe('deliverReportPdf', () => {
 
     await deliverReportPdf({ id: 'ev-1', aggregateId: 'r-1' });
     expect(sendDocument).not.toHaveBeenCalled();
+  });
+
+  // F-R51-FORMAT: и сваи, и бурение в подписи — «N шт. / M м.п.», а не
+  // голые метры бурения и голые штуки свай (решение владельца 28.09).
+  it('подпись Telegram печатает сваи и бурение как «шт. / м.п.» (F-R51-FORMAT)', async () => {
+    outboxFindUnique.mockResolvedValue({ published: false });
+    sendDocument.mockResolvedValue(true);
+
+    await deliverReportPdf({ id: 'ev-fmt', aggregateId: 'r-fmt' });
+
+    const caption = sendDocument.mock.calls[0][2] as string;
+    const lines = caption.split('\n');
+    const pilesLine = lines.find((line) => line.includes('Свай забито')) ?? '';
+    const drillingLine = lines.find((line) => line.includes('Бурение')) ?? '';
+    for (const line of [pilesLine, drillingLine]) {
+      expect(line).toContain('шт. / ');
+      expect(line).toContain('м.п.');
+    }
+    // 2 сваи × 12 м = 24 м.п.; 3 бурения = 36 м.п.
+    expect(pilesLine).toContain('2 шт. / 24 м.п.');
+    expect(drillingLine).toContain('3 шт. / 36 м.п.');
   });
 });
 

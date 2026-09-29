@@ -1,3 +1,5 @@
+> **УСТАРЕЛ:** сервис ws удалён 26.09.2026 (a8567732), ранбук сохранён для истории.
+
 # Runbook: WebSocket Server Crash
 
 | Metadata | Value |
