@@ -136,21 +136,28 @@ fi
 # hiccup must not change this script's exit code or the local backup's success.
 #
 # Redis auth is passed as REDISCLI_AUTH to the container (never as -a, never
-# echoed or logged). Empty REDIS_PASSWORD → skip with one log line.
+# echoed or logged). The `-e` flag names the variable only; its VALUE is taken
+# from this client's environment, so no password ever appears in a process
+# argument list — unlike `-e REDISCLI_AUTH="$REDIS_PASSWORD_VAL"`, which the
+# shell expands and exposes to `ps` on the host (audit 2026-09-30).
+# Empty REDIS_PASSWORD → skip with one log line.
 REDIS_PASSWORD_VAL="$(read_env REDIS_PASSWORD)"
 BACKUP_TS="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 BACKUP_SIZE_BYTES="$(stat -c %s "$OUT" 2>/dev/null || echo 0)"
 
-redis_set() {
-  docker compose --env-file "$ENV_FILE" exec -T \
-    -e REDISCLI_AUTH="$REDIS_PASSWORD_VAL" redis \
-    redis-cli SET "$1" "$2" EX 172800 >/dev/null 2>&1 || true
-}
-
+# All three keys go in ONE MULTI/EXEC transaction: written separately, a lost
+# SET (e.g. s3_synced=false) would leave a fresh timestamp next to a stale
+# s3_synced=true — a failed off-site copy going unnoticed. Values carry no
+# spaces (ISO timestamp, byte count, true/false), so one line per SET is safe.
 if [ -n "$REDIS_PASSWORD_VAL" ]; then
-  redis_set "system:backup:last_timestamp" "$BACKUP_TS"
-  redis_set "system:backup:last_size" "$BACKUP_SIZE_BYTES"
-  redis_set "system:backup:s3_synced" "$S3_SYNC_STATUS"
+  printf '%s\n' \
+    MULTI \
+    "SET system:backup:last_timestamp $BACKUP_TS EX 172800" \
+    "SET system:backup:last_size $BACKUP_SIZE_BYTES EX 172800" \
+    "SET system:backup:s3_synced $S3_SYNC_STATUS EX 172800" \
+    EXEC \
+    | REDISCLI_AUTH="$REDIS_PASSWORD_VAL" docker compose --env-file "$ENV_FILE" exec -T \
+        -e REDISCLI_AUTH redis redis-cli >/dev/null 2>&1 || true
 else
   echo "Backup metadata not recorded in Redis (REDIS_PASSWORD not set in $ENV_FILE)"
 fi
