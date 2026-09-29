@@ -14,7 +14,7 @@
  * confirmUpload must reject (mark 'failed', throw) when the downloaded
  * bytes don't match the declared content type's file signature.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 const { sendMock, sharpMock } = vi.hoisted(() => ({
   sendMock: vi.fn(),
@@ -304,5 +304,62 @@ describe('MediaService SEC-02 — upload size limit enforcement', () => {
 
     expect(result.fileSize).toBe(10);
     expect(mediaTable.get('media-1')?.fileSize).toBe(10);
+  });
+});
+
+describe('MediaService.confirmUpload — F-R50-2 download timeout', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mediaTable.clear();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('aborts a hanging object download after 30s with a retryable 504, leaves the row pending, and a repeat confirm then succeeds', async () => {
+    vi.useFakeTimers();
+    seedMedia({ contentType: 'application/pdf', fileName: 'doc.pdf', uploadStatus: 'pending' });
+
+    let receivedSignal: AbortSignal | undefined;
+    let aborted = false;
+    sendMock.mockImplementation(
+      (command: { __type: string }, options?: { abortSignal?: AbortSignal }) => {
+        if (command.__type !== 'GetObjectCommand') return Promise.resolve({});
+        receivedSignal = options?.abortSignal;
+        // A real R2 that never answers: this promise only settles on abort.
+        return new Promise((_resolve, reject) => {
+          options?.abortSignal?.addEventListener('abort', () => {
+            aborted = true;
+            reject(new Error('aborted'));
+          });
+        });
+      },
+    );
+
+    const service = makeService();
+    const assertion = expect(service.confirmUpload('media-1')).rejects.toMatchObject({
+      status: 504,
+      message: 'Хранилище не ответило, повторите отправку фото',
+    });
+
+    await vi.advanceTimersByTimeAsync(30_000);
+    await assertion;
+
+    // The request must carry an AbortSignal and actually have been aborted.
+    expect(receivedSignal).toBeInstanceOf(AbortSignal);
+    expect(aborted).toBe(true);
+    // Unlike a size/type rejection ('failed'), a timeout must leave the row
+    // 'pending' so the id stays retryable.
+    expect(mediaTable.get('media-1')?.uploadStatus).toBe('pending');
+
+    // Retry of the SAME photoId now that the storage answers again.
+    vi.useRealTimers();
+    mockDownload(Buffer.from('%PDF-1.4\n', 'ascii'));
+
+    const result = await service.confirmUpload('media-1');
+
+    expect(result.id).toBe('media-1');
+    expect(mediaTable.get('media-1')?.uploadStatus).toBe('completed');
   });
 });

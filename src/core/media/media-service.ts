@@ -33,7 +33,7 @@
  *   await service.confirmUpload(mediaId);
  */
 
-import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand, type GetObjectCommandOutput } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { logger } from '@/lib/logger';
 import { ServiceError } from '@/lib/service-error';
@@ -65,6 +65,15 @@ async function getDbClient() {
   const { db } = await import('@/lib/db');
   return db;
 }
+
+/**
+ * F-R50-2: upper bound on the object download inside confirmUpload. Without
+ * it a slow/unresponsive S3/R2 hung the confirm request indefinitely (the
+ * SDK keeps retrying) while the media row stayed 'pending'. 30s is generous
+ * for a post-upload HEAD+GET; on expiry we abort the request and fail with
+ * a retryable 504.
+ */
+const DOWNLOAD_TIMEOUT_MS = 30_000;
 
 // ============================================================
 // Media Service
@@ -184,10 +193,26 @@ export class MediaService {
 
     // Download to verify the upload landed AND to feed the thumbnail step
     // in one round-trip. We need the bytes either way for sharp.
-    const fetched = await s3CircuitBreaker.execute(async () => {
-      const command = new GetObjectCommand({ Bucket: this.config.bucket, Key: media.key });
-      return this.s3Client.send(command);
-    });
+    // F-R50-2: bound the fetch with an AbortSignal so a hanging R2 cannot
+    // hold the request (and the media row) in 'pending' forever. On timeout
+    // we throw 504 and leave the row unchanged, so a repeat confirm of the
+    // same photoId simply retries the download.
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), DOWNLOAD_TIMEOUT_MS);
+    let fetched: GetObjectCommandOutput;
+    try {
+      fetched = await s3CircuitBreaker.execute(async () => {
+        const command = new GetObjectCommand({ Bucket: this.config.bucket, Key: media.key });
+        return this.s3Client.send(command, { abortSignal: controller.signal });
+      });
+    } catch (error) {
+      if (controller.signal.aborted) {
+        throw new ServiceError('Хранилище не ответило, повторите отправку фото', 504);
+      }
+      throw error;
+    } finally {
+      clearTimeout(timeoutId);
+    }
 
     // SEC-02: enforce the size limit on the REAL uploaded object, before
     // reading its body into memory. ContentLength arrives in the GetObject
