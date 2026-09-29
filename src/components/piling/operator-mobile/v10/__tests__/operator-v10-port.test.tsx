@@ -2,14 +2,14 @@
  * F-V10-PORT: доработки прежнего экрана v10, перенесённые на новый.
  *
  * Экран переписан 28.09.2026 (смена строго по шагам, общий экран чек-листа), и
- * вместе со старой разметкой пропали четыре правила, за которые экран уже
- * получал замечания владельца: раздел с незакрытыми пунктами, итог допуска,
- * границы простоя до отправки и закрытие смены при непустой очереди. Здесь —
- * те же правила на новой разметке: поведение проверяется, структура — нет.
+ * вместе со старой разметкой пропали правила, за которые экран уже получал
+ * замечания владельца: итог допуска, границы простоя до отправки и закрытие
+ * смены при непустой очереди. Здесь — те же правила на новой разметке:
+ * поведение проверяется, структура — нет.
  */
 import {fireEvent, render, screen, waitFor} from '@testing-library/react';
 import {beforeEach, describe, expect, it, vi} from 'vitest';
-import type {ChecklistView, OperatorMobileState} from '@/modules/operator-mobile/contracts';
+import type {OperatorMobileState} from '@/modules/operator-mobile/contracts';
 import {PPE_ITEMS} from '@/modules/operator-mobile/contracts';
 
 const api = vi.hoisted(() => ({
@@ -38,24 +38,9 @@ vi.mock('@/components/piling/operator-mobile/use-offline-queue', () => ({
   }),
 }));
 vi.mock('../../operator-concept.css', () => ({}));
-/**
- * Общий экран чек-листа подменён намеренно: сам он сдачу с пробелами не
- * пропускает, но его подсказка называет ПЕРВЫЙ незаполненный пункт, а не
- * раздел с их числом. Проверяем, что и у экрана v10 есть своя проверка перед
- * отправкой — она сработает, если общий экран когда-нибудь пропустит пробелы.
- */
-vi.mock('@/components/piling/operator-mobile/screens/checklist-screen', () => ({
-  ChecklistScreen: ({onSubmit}: {onSubmit: (answers: {itemId: string; answer: string}[]) => void}) => (
-    <button type="button" onClick={() => onSubmit([{itemId: 'чужой-пункт', answer: 'OK'}])}>
-      Сдать осмотр
-    </button>
-  ),
-}));
 
 import {ApiError} from '@/components/piling/operator-mobile/api';
-import {
-  downtimeWindowProblem, gapsBySection, gapsNote, OperatorV10App, ppeOutcome,
-} from '../operator-v10-app';
+import {downtimeWindowProblem, OperatorV10App, ppeOutcome} from '../operator-v10-app';
 
 /* ------------------------------------------------------------- состояние --- */
 
@@ -135,88 +120,7 @@ beforeEach(() => {
   }), {status: 200})));
 });
 
-/* --------------------------- 1. незаполненные пункты чек-листа (по разделам) --- */
-
-/**
- * Сервер отвечает общей строкой «Чек-лист заполнен не полностью», и по ней не
- * видно, какой из блоков незаполнен (D-20260927-002). Отдельно проверяем замер:
- * на ЕО после работы отказ приходил из-за незаполненных моточасов и остатка
- * топлива, а ответы «норма» уже стояли.
- */
-const list: ChecklistView = {
-  stage: 'EO_AFTER',
-  title: 'ЕО после работы',
-  purpose: 'Осмотр после смены',
-  version: 'test-1',
-  done: false,
-  period: null,
-  sections: [
-    {
-      id: 'park',
-      title: 'Постановка',
-      items: [{id: 'park-1', text: 'Мачта опущена на землю', severity: 'NOTE'}],
-    },
-    {
-      id: 'fuel',
-      title: 'Заправка и заглушение',
-      items: [
-        {id: 'fuel-1', text: 'Двигатель заглушен', severity: 'NOTE'},
-        {id: 'fuel-2', text: 'Кабина закрыта', severity: 'NOTE'},
-      ],
-    },
-  ],
-};
-
-describe('v10: незаполненные пункты чек-листа', () => {
-  it('называет раздел и число незакрытых пунктов', () => {
-    const gaps = gapsBySection(list, {}, {});
-    expect(gapsNote(gaps)).toBe('Не заполнено: «Постановка» — 1 пункт; «Заправка и заглушение» — 2 пункта');
-  });
-
-  it('считает незаполненный обязательный замер незакрытым пунктом', () => {
-    const measured: ChecklistView = {
-      ...list,
-      sections: [{
-        id: 'counters',
-        title: 'Заправка и заглушение',
-        items: [
-          {
-            id: 'hours',
-            text: 'Моточасы на конец смены сняты',
-            severity: 'NOTE',
-            measure: {key: 'engineHours', label: 'Моточасы', unit: 'м/ч'},
-          },
-          {
-            id: 'fuel-left',
-            text: 'Остаток топлива снят с указателя',
-            severity: 'NOTE',
-            measure: {key: 'fuelPercent', label: 'Остаток топлива', unit: '%', min: 0, max: 100},
-          },
-        ],
-      }],
-    };
-
-    const empty = gapsBySection(measured, {hours: 'OK', 'fuel-left': 'OK'}, {});
-    expect(gapsNote(empty)).toBe('Не заполнено: «Заправка и заглушение» — 2 пункта');
-
-    // Заполненный замер пункт закрывает.
-    const filled = gapsBySection(measured, {hours: 'OK', 'fuel-left': 'OK'}, {engineHours: '1240', fuelPercent: '55'});
-    expect(filled).toEqual([]);
-  });
-
-  it('при попытке сдать называет раздел и не отправляет список', async () => {
-    api.fetchState.mockResolvedValue(makeState('PRESHIFT_INSPECTION'));
-    render(<OperatorV10App />);
-
-    fireEvent.click(await screen.findByRole('button', {name: 'Дальше: Предсменный осмотр'}));
-    fireEvent.click(await screen.findByRole('button', {name: 'Сдать осмотр'}));
-
-    expect(await screen.findByText(/Не записано: Не заполнено: «Ходовая часть» — 1 пункт/)).toBeInTheDocument();
-    expect(api.sendCommand).not.toHaveBeenCalled();
-  });
-});
-
-/* ------------------------------------------- 2. итог подтверждения СИЗ --- */
+/* ------------------------------------------- 1. итог подтверждения СИЗ --- */
 
 /**
  * D-20260927-003: подтверждение СИЗ не заканчивало допуск на экране.
@@ -298,7 +202,7 @@ describe('v10: итог подтверждения СИЗ', () => {
   });
 });
 
-/* --------------------------------------- 3. окно простоя до отправки --- */
+/* --------------------------------------- 2. окно простоя до отправки --- */
 
 /**
  * D-20260927-004: окно смены проверял только сервер, и отказ «Простой не может
@@ -345,7 +249,7 @@ describe('v10: окно простоя до отправки', () => {
   });
 });
 
-/* ------------------- 4. закрытие смены при непустой очереди устройства --- */
+/* ------------------- 3. закрытие смены при непустой очереди устройства --- */
 
 /**
  * F-R43-1: смену нельзя закрыть, пока на телефоне лежат неотправленные записи.
@@ -390,7 +294,7 @@ describe('v10: закрытие смены и очередь устройств�
   });
 });
 
-/* ------------- 5–6. кнопка записи занята, форма чистится по принятию --- */
+/* ------------- 4–5. кнопка записи занята, форма чистится по принятию --- */
 
 /** Обещание, которым тест сам решает, когда закончится перечитывание экрана. */
 function deferred<T>() {

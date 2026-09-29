@@ -4,13 +4,13 @@ import {OperatorWorkOverview, type WorkAction} from '../operator-work-overview';
 import {useCallback, useEffect, useRef, useState} from 'react';
 import {DOWNTIME_MAX_HOURS, formatDowntimeHours} from '@/lib/downtime-hours';
 import type {
-  ChecklistAnswer, ChecklistStage, ChecklistView, DocumentVerdict, IncidentCategory, IncidentSign,
-  OperatorAnswer, OperatorMobileState,
+  ChecklistAnswer, ChecklistStage, DocumentVerdict, IncidentCategory, IncidentSign,
+  OperatorMobileState,
 } from '@/modules/operator-mobile/contracts';
 import {
   INCIDENT_CATEGORIES, INCIDENT_CATEGORY_LABELS, INCIDENT_DESCRIPTION_MIN,
   INCIDENT_SIGN_LABELS, INCIDENT_SIGNS,
-  PPE_ITEMS, SAFETY_BRIEFING, TOPIC_LABELS, measureRequired,
+  PPE_ITEMS, SAFETY_BRIEFING, TOPIC_LABELS,
 } from '@/modules/operator-mobile/contracts';
 import {ChecklistScreen} from '../screens/checklist-screen';
 import {knownAnswers} from '../safety/known-answers';
@@ -367,50 +367,6 @@ function ScreenAccept({state, busy, onAccept, go}: {
 
 /** Допуск на расхождение часов телефона и сервера — тот же, что у сервера. */
 const CLOCK_SKEW_MIN = 5;
-
-/**
- * Незакрытые пункты чек-листа — по разделам.
- *
- * Пункт закрыт, когда есть ответ И заполнен обязательный замер: сервер требует
- * замер тем же правилом `measureRequired`, а «Чек-лист заполнен не полностью»
- * приходило именно из-за незаполненных моточасов и остатка топлива, а не из-за
- * ответов, — и сказать человеку, какой раздел смотреть, было нечем.
- */
-export function gapsBySection(
-  list: ChecklistView,
-  answers: Record<string, OperatorAnswer>,
-  measures: Record<string, string>,
-): {title: string; left: number}[] {
-  return list.sections
-    .map((section) => ({
-      title: section.title,
-      left: section.items.filter((item) => {
-        const answer = answers[item.id];
-        if (!answer) return true;
-        if (!item.measure || !measureRequired(item, answer)) return false;
-        const value = (measures[item.measure.key] ?? '').trim();
-        return value === '' || !Number.isFinite(Number(value.replace(',', '.')));
-      }).length,
-    }))
-    .filter((section) => section.left > 0);
-}
-
-/** «1 пункт», «2 пункта», «5 пунктов». */
-function pointsRu(count: number): string {
-  const last = count % 10;
-  const tail = count % 100;
-  if (tail >= 11 && tail <= 14) return 'пунктов';
-  if (last === 1) return 'пункт';
-  if (last >= 2 && last <= 4) return 'пункта';
-  return 'пунктов';
-}
-
-/** «Не заполнено: «Заправка и заглушение» — 2 пункта». */
-export function gapsNote(gaps: {title: string; left: number}[]): string {
-  return `Не заполнено: ${gaps
-    .map((gap) => `«${gap.title}» — ${gap.left} ${pointsRu(gap.left)}`)
-    .join('; ')}`;
-}
 
 /**
  * ОКНО ПРОСТОЯ ВИДНО ДО ОТПРАВКИ (D-20260927-004). Раньше границы проверял
@@ -1601,21 +1557,6 @@ export function OperatorV10App() {
     const list = state?.checklists.find((item) => item.stage === stage);
     if (!shiftId || !equipmentId || !list) {
       setActionError('Список недоступен: сначала примите установку.');
-      return false;
-    }
-    /* Проверка ДО отправки и с названием раздела: сервер отвечает общей строкой
-       «Чек-лист заполнен не полностью», по которой не видно, куда смотреть.
-       Незаполненный обязательный замер — такой же незакрытый пункт, как и
-       пункт без ответа. */
-    const answersByItem: Record<string, OperatorAnswer> = {};
-    const measures: Record<string, string> = {};
-    for (const answer of checklistAnswers) {
-      answersByItem[answer.itemId] = answer.answer;
-      for (const [key, value] of Object.entries(answer.measures ?? {})) measures[key] = String(value);
-    }
-    const gaps = gapsBySection(list, answersByItem, measures);
-    if (gaps.length > 0) {
-      setActionError(gapsNote(gaps));
       return false;
     }
     return run(() => sendCommand({
