@@ -1,0 +1,39 @@
+Revert-checks r6 (review No.5): каждый тест должен падать без своей правки.
+Дата: 2026-09-29T18:13:30.607Z. Стенд: vitest, модуль src/components/piling/operator-next; уборка — eslint (--max-warnings 0).
+
+### Д1 — гейт «документ загружен» снят — автосохранение снова может писать поверх непрочитанного
+- Откат: src/components/piling/operator-next/operator-next-app.tsx — вернул строку: "    // ОТКАТ: гейт загрузки снят"
+- Прогон: `npx vitest run <файл> -t "отказ первого чтения"`
+- Результат: EXIT=1; ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯; упали: отказ первого чтения не перезаписывает документ; успешное перечтение возвращает его на экран 322ms
+  Первое сообщение: AssertionError: expected '{"work":{"mode":"NONE","forms":{"PILE…' to contain 'С-717'
+
+### Д2-статус — reload снова снимает предупреждение по признаку доступности хранилища
+- Откат: src/components/piling/operator-next/operator-next-app.tsx — вернул строку: "      setStorageOk(canStore); // ОТКАТ: доступность = сохранность"
+- Прогон: `npx vitest run <файл> -t "успешное перечитывание не снимает"`
+- Результат: EXIT=1; ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯; упали: успешное перечитывание не снимает предупреждение об отказе записи — только новая запись 475ms
+  Первое сообщение: TestingLibraryElementError: Unable to find an element with the text: /Черновик не сохранится при перезагрузке страницы/. This could be because the text is broken up by mu
+
+### Д2-очистка — подсказка об отказе очистки убрана с экрана списка
+- Откат: src/components/piling/operator-next/work.tsx — вернул строку: "      {/* ОТКАТ: подсказка на списке убрана */}"
+- Прогон: `npx vitest run <файл> -t "отказ очистки подтверждённого"`
+- Результат: EXIT=1; ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯; упали: отказ очистки подтверждённого паспорта — видимая ошибка, не молчание 1391ms
+  Первое сообщение: TestingLibraryElementError: Unable to find an element with the text: /Черновик не сохранится при перезагрузке страницы/. This could be because the text is broken up by mu
+
+### Д3 — сверка принадлежности перед командой закрытия убрана
+- Откат: src/components/piling/operator-next/operator-next-app.tsx — вернул строку: "        // ОТКАТ: без сверки принадлежности"
+- Прогон: `npx vitest run <файл> -t "чужая смена не закрывается"`
+- Результат: EXIT=1; ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯; упали: смена пользователя во время задержанного flush — чужая смена не закрывается 349ms
+  Первое сообщение: AssertionError: expected [ { command: 'close-shift', …(2) } ] to have a length of +0 but got 1
+
+### B5 — замок повторного входа снят — второй flush снова возможен
+- Откат: src/components/piling/operator-next/single-flight.ts — вернул строку: "      if (false && busy) return {started: false, value: undefined}; // ОТКАТ"
+- Прогон: `npx vitest run <файл> -t "B5"`
+- Результат: EXIT=1; ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯; упали: двойное нажатие — одна подготовка; правка заметки доходит до отправки 238ms
+  Первое сообщение: AssertionError: expected 2 to be 1 // Object.is equality
+
+### уборка — отладочный console.log возвращён
+- Откат: src/components/piling/operator-next/operator-next-app.tsx — вернул строку: "  const closeShift = async () => {\n    console.log('[close] debug'); // ОТКАТ\n    if (!shift) return;"
+- Прогон: `npx eslint src/components/piling/operator-next --max-warnings 0`
+- Результат: EXIT=1; 571:5  warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+
+DONE. Все откаты возвращены; целевые проверки падают без своих правок (проверено).
