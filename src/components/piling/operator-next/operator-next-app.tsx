@@ -144,6 +144,12 @@ export function OperatorNextApp() {
    */
   const draftsLoadedRef = useRef<string | null>(null);
 
+  /** Живая копия памяти черновиков — для обработчиков, читающих её вне рендера. */
+  const draftsRef = useRef<Drafts>(drafts);
+  useEffect(() => {
+    draftsRef.current = drafts;
+  }, [drafts]);
+
   /**
    * Правка черновиков пары «пользователь + смена» с проверкой поколения.
    *
@@ -214,7 +220,10 @@ export function OperatorNextApp() {
       const scopeKey = draftScopeKey(userId, nextShiftId);
       const wasLoaded = draftsLoadedRef.current === scopeKey;
       draftsLoadedRef.current = readOk ? scopeKey : null;
-      setStorageOk(canStore);
+      // Доступность хранилища ≠ сохранность текущей памяти (ревью №5, Д2):
+      // успешное перечитывание НЕ снимает предупреждение — снять его может
+      // только новая успешная запись.
+      if (!canStore) setStorageOk(false);
       setDrafts((current) => {
         if (current.userId === userId && current.shiftId === nextShiftId && wasLoaded) return current;
         return stored
@@ -374,7 +383,12 @@ export function OperatorNextApp() {
       closeNote: drafts.closeNote,
       passport: drafts.passport ?? null,
     });
-    setStorageOk((previous) => (previous === ok ? previous : ok));
+    // Статус обновляем асинхронно: синхронный setState в эффекте — каскадные
+    // рендеры (правила проекта). Снятие предупреждения — только по успешной
+    // записи актуальной памяти (ревью №5, Д2).
+    queueMicrotask(() => {
+      setStorageOk((previous) => (previous === ok ? previous : ok));
+    });
   }, [drafts, shiftId, userId]);
 
   const draftsAreCurrent = drafts.userId === userId && drafts.shiftId === shiftId;
@@ -404,10 +418,20 @@ export function OperatorNextApp() {
    */
   const clearSubmittedEntry = (entry: ProductionEntryInput) => {
     if (entry.kind === 'PILE_PASSPORT') {
-      mutateDraftsForScope(userId, shiftId, (base) => ({
-        ...base,
-        passport: passportAfterSubmit(base.passport ?? emptyPassportDraft()),
-      }));
+      const base = draftsForScope(draftsRef.current, userId, shiftId);
+      const cleared: Drafts = {...base, passport: passportAfterSubmit(base.passport ?? emptyPassportDraft())};
+      mutateDraftsForScope(userId, shiftId, () => cleared);
+      // Очистка подтверждённого черновика должна лечь в хранилище сразу; отказ
+      // записи — видимая ошибка, а не молчание (ревью №4, A3; №5, Д2).
+      if (userId && shiftId && draftsLoadedRef.current === draftScopeKey(userId, shiftId)) {
+        const ok = saveShellDrafts(userId, shiftId, {
+          work: cleared.work,
+          checklists: cleared.checklists,
+          closeNote: cleared.closeNote,
+          passport: cleared.passport ?? null,
+        });
+        if (!ok) setStorageOk(false);
+      }
       return;
     }
     const form: FormMode = entry.kind;
@@ -806,6 +830,7 @@ export function OperatorNextApp() {
             closeNote={closeNote}
             onCloseNoteChange={updateCloseNote}
             noteLocked={closeSending}
+            storageOk={storageOk}
             onOpenService={() => setDetour({kind: 'CHECKLIST', stage: 'EO_AFTER'})}
             onFlushQueued={() => void flush()}
             onReload={() => void reload()}

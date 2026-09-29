@@ -1465,6 +1465,66 @@ describe('ревью №3, C: черновики переживают перез
     }
   });
 
+  it('успешное перечитывание не снимает предупреждение об отказе записи — только новая запись', async () => {
+    let stateCalls = 0;
+    stateImpl = () => { stateCalls += 1; return json({data: makeState({phase: 'WORK'})}); };
+    render(<OperatorNextApp />);
+    await openPileForm();
+
+    // Запись черновика отказала (например, квота), при этом чтение работает.
+    const origSet = globalThis.localStorage.setItem.bind(globalThis.localStorage);
+    const setSpy = vi.spyOn(globalThis.localStorage, 'setItem').mockImplementation((key, value) => {
+      if (String(key).includes(':user-a:')) throw new Error('quota');
+      return origSet(key, value);
+    });
+    try {
+      fireEvent.change(screen.getByLabelText('Сколько свай забито, шт'), {target: {value: '6'}});
+      expect(await screen.findByText(/Черновик не сохранится при перезагрузке страницы/)).toBeInTheDocument();
+
+      // Успешное перечитывание той же смены (черновик не менялся): предупреждение
+      // обязано остаться — последняя запись так и не прошла.
+      globalThis.localStorage.setItem(STORAGE_KEY, JSON.stringify([queueEntry('q-d2')]));
+      await act(async () => { globalThis.dispatchEvent(new Event('online')); await Promise.resolve(); });
+      await waitFor(() => expect(sent.some((item) => item.clientCommandId === 'q-d2')).toBe(true));
+      // Перечитывание после отправки действительно прошло…
+      await waitFor(() => expect(stateCalls).toBeGreaterThan(1));
+      await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+      // …и предупреждение всё равно на месте — последняя запись так и не прошла.
+      expect(screen.getByText(/Черновик не сохранится при перезагрузке страницы/)).toBeInTheDocument();
+
+      // Следующая УСПЕШНАЯ запись актуальной памяти — предупреждение уходит.
+      setSpy.mockRestore();
+      fireEvent.change(screen.getByLabelText('Сколько свай забито, шт'), {target: {value: '7'}});
+      await waitFor(() => expect(screen.queryByText(/Черновик не сохранится при перезагрузке страницы/)).toBeNull());
+    } finally {
+      setSpy.mockRestore();
+    }
+  });
+
+  it('отказ очистки подтверждённого паспорта — видимая ошибка, не молчание', async () => {
+    stateImpl = () => json({data: makeState({phase: 'WORK'})});
+    render(<OperatorNextApp />);
+    await screen.findByText('Запишите результат работы');
+    fireEvent.click(screen.getByRole('button', {name: /Сваи с паспортом/}));
+    fireEvent.change(await screen.findByLabelText('Марка сваи'), {target: {value: 'g1'}});
+    fireEvent.change(screen.getByPlaceholderText('С-130'), {target: {value: 'С-818'}});
+
+    // Очистка при подтверждении не сможет записаться — это должно быть видно.
+    const origSet = globalThis.localStorage.setItem.bind(globalThis.localStorage);
+    const setSpy = vi.spyOn(globalThis.localStorage, 'setItem').mockImplementation((key, value) => {
+      if (String(key).includes(':user-a:')) throw new Error('denied');
+      return origSet(key, value);
+    });
+    try {
+      fireEvent.click(screen.getByRole('button', {name: /Записать сваю с паспортом/}));
+      await waitFor(() => expect(sent.some((item) => item.command === 'log-production')).toBe(true));
+      // Форма закрылась (список), а очистка не сохранилась — видимая ошибка.
+      expect(await screen.findByText(/Черновик не сохранится при перезагрузке страницы/)).toBeInTheDocument();
+    } finally {
+      setSpy.mockRestore();
+    }
+  });
+
   it('отказ записи после успешного старта — честный статус на экране формы', async () => {
     stateImpl = () => json({data: makeState({phase: 'WORK'})});
     render(<OperatorNextApp />);

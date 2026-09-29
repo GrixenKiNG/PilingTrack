@@ -26,7 +26,7 @@ import {WORDS} from './words';
  * ревью). Теперь про это сказано прямо и рядом рабочая кнопка «Обновить».
  */
 export function ReportSendScreen({
-  state, busy, error, tabs, unsentCount, closeNote, onCloseNoteChange, noteLocked = false,
+  state, busy, error, tabs, unsentCount, closeNote, onCloseNoteChange, noteLocked = false, storageOk = true,
   onOpenService, onFlushQueued, onReload, onClose,
 }: {
   state: OperatorMobileState;
@@ -43,6 +43,8 @@ export function ReportSendScreen({
    * текст, прочитанный в момент отправки (ревью №4, B5).
    */
   noteLocked?: boolean;
+  /** Доступно ли хранилище черновиков — от этого зависит честная подсказка. */
+  storageOk?: boolean;
   onOpenService: () => void;
   onFlushQueued: () => void;
   onReload: () => void;
@@ -189,6 +191,11 @@ export function ReportSendScreen({
             placeholder="Например: осталось 4 сваи у оси Б, вывезти грунт"
             className="w-full rounded-md border bg-card p-3 text-sm shadow-xs"
           />
+          {!storageOk ? (
+            <p className="mt-1 text-2xs text-muted-foreground">
+              Черновик не сохранится при перезагрузке страницы: память браузера недоступна.
+            </p>
+          ) : null}
         </div>
       ) : null}
 

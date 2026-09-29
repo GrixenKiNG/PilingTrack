@@ -157,6 +157,11 @@ export function WorkScreenNext({
         />
       ) : undefined}
     >
+      {mode === 'NONE' && !storageOk ? (
+        <p className="text-2xs text-muted-foreground">
+          Черновик не сохранится при перезагрузке страницы: память браузера недоступна.
+        </p>
+      ) : null}
       {mode === 'NONE' ? (
         <>
           <NextActionCard
