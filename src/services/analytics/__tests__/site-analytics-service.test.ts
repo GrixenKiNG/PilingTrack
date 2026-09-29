@@ -156,3 +156,41 @@ describe('getSiteAnalytics — cumulative progress (F-R52)', () => {
     expect(allTimeBlock).not.toContain('r.date');
   });
 });
+
+/**
+ * F-ANALYTICS-TENANT-SQL (F-20): тенант — только строгое равенство по
+ * `s."tenantId"`, а отсутствующий tenantId падает ДО запроса. Единственный
+ * `IS NULL OR` в этом запросе — необязательный фильтр объекта интерфейса
+ * (siteId); если он когда-нибудь переедет на tenantId, запрос начнёт отдавать
+ * строки всех организаций.
+ */
+describe('getSiteAnalytics — tenant isolation (F-ANALYTICS-TENANT-SQL)', () => {
+  beforeEach(() => {
+    queryRaw.mockReset();
+    queryRaw.mockResolvedValue([]);
+  });
+
+  it('scopes the raw query by strict tenant equality, never `tenantId … IS NULL`', async () => {
+    await getSiteAnalytics({ tenantId: 'orion', siteId: 'site_A' });
+
+    const [strings, ...params] = queryRaw.mock.calls[0];
+    const sql = (strings as string[]).join('?');
+
+    expect(sql).toContain('s."tenantId" = ?');
+    expect(sql).not.toMatch(/tenantId"?\s*(::text\s*)?IS NULL/i);
+    expect(params).toContain('orion');
+
+    // Единственное IS NULL OR — фильтр объекта, и он привязан к s.id, не к тенанту.
+    expect(sql.match(/IS NULL OR/g) ?? []).toHaveLength(1);
+    expect(sql).toMatch(/\?::text IS NULL OR s\.id = \?/);
+  });
+
+  it('throws on a missing tenantId and never reaches $queryRaw', async () => {
+    const withoutTenant = {} as Parameters<typeof getSiteAnalytics>[0];
+
+    await expect(getSiteAnalytics(withoutTenant)).rejects.toThrow(/tenantId/i);
+    await expect(getSiteAnalytics({ tenantId: '' })).rejects.toThrow(/tenantId/i);
+
+    expect(queryRaw).not.toHaveBeenCalled();
+  });
+});
