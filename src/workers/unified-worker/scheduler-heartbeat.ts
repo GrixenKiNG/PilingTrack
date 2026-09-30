@@ -13,13 +13,18 @@
  * истекает и отсутствие свежего пульса становится видимым.
  *
  * Запись — вспомогательная: её сбой не должен ломать прогон планировщика.
+ *
+ * Формат ключа и список имён — в core (`health-tracker/scheduler-registry`):
+ * по нему читает пульс health-tracker, и core не имеет права зависеть от workers
+ * (scripts/check-layer-boundaries.ts), поэтому общий источник живёт там.
  */
 
+import { SCHEDULER_HEARTBEAT_PREFIX } from '@/core/observability/health-tracker/scheduler-registry';
 import { getStateRedisClient } from '@/lib/redis-cache';
 import { logger } from '@/lib/logger';
 
 /** Префикс ключей пульса. Планировщики дописывают к нему своё имя. */
-export const SCHEDULER_HEARTBEAT_PREFIX = 'system:scheduler:';
+export { SCHEDULER_HEARTBEAT_PREFIX };
 
 /**
  * Отметить успешный проход планировщика.

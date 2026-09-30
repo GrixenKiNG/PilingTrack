@@ -3,6 +3,7 @@ export type OutboxStatus = 'ok' | 'backlog' | 'stalled';
 export type WorkerStatus = 'running' | 'stopped';
 export type StorageProvider = 's3' | 'local';
 export type StorageStatus = 'up' | 'down' | 'degraded';
+export type SchedulerStatus = 'ok' | 'stale';
 export type OverallStatus = 'healthy' | 'degraded' | 'unhealthy';
 
 export interface ComponentHealth {
@@ -39,11 +40,18 @@ export interface BackupHealth {
   source?: 'disabled' | 'redis' | 'filesystem' | 'missing';
 }
 
+export interface SchedulerHealth {
+  status: SchedulerStatus;
+  /** Имена планировщиков, чей пульс истёк. Пусто при status 'ok'. */
+  stale: string[];
+}
+
 export interface SystemComponents {
   database: ComponentHealth;
   redis: RedisHealth;
   outbox: OutboxHealth;
   workers: WorkerHealth;
+  schedulers: SchedulerHealth;
   storage: StorageHealth;
   backup: BackupHealth;
 }

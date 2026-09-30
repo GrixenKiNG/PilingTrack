@@ -75,6 +75,7 @@ function startBackgroundTracker(): void {
           redis: status.components.redis.status,
           outbox: status.components.outbox.status,
           workers: status.components.workers.status,
+          schedulers: status.components.schedulers.status,
           storage: status.components.storage.status,
           backup: status.components.backup.status,
         };
