@@ -18,6 +18,7 @@ const {
   deleteMaintenanceMock,
   recordAuditEventMock,
   loggerErrorMock,
+  loggerWarnMock,
 } = vi.hoisted(() => ({
   requireAuthMock: vi.fn(),
   findFirstMock: vi.fn(),
@@ -26,6 +27,7 @@ const {
   deleteMaintenanceMock: vi.fn(),
   recordAuditEventMock: vi.fn(),
   loggerErrorMock: vi.fn(),
+  loggerWarnMock: vi.fn(),
 }));
 
 vi.mock('@/lib/auth', () => ({ requireAuth: requireAuthMock }));
@@ -42,7 +44,7 @@ vi.mock('@/modules/equipment', () => ({
 }));
 vi.mock('@/services/audit/audit-service', () => ({ recordAuditEvent: recordAuditEventMock }));
 vi.mock('@/lib/logger', () => ({
-  logger: { error: loggerErrorMock, warn: vi.fn(), info: vi.fn(), debug: vi.fn() },
+  logger: { error: loggerErrorMock, warn: loggerWarnMock, info: vi.fn(), debug: vi.fn() },
 }));
 
 import { PUT, DELETE } from '../route';
@@ -242,5 +244,37 @@ describe('DELETE /api/equipment/[id]/maintenance/[recordId] — след уда�
         metadata: expect.objectContaining({ name: 'Замена РВД', before: expect.objectContaining({ equipmentName: undefined }) }),
       }),
     );
+  });
+
+  // Наряд к этому моменту уже удалён: сбой дообогащения не должен превращать
+  // успех в 500 (F-R72-FEED-c) — повтор запроса дал бы 404, а следа в ленте не
+  // было бы вовсе.
+  it('остаётся успешным, когда чтение установки упало, и пишет событие без названия', async () => {
+    equipmentFindFirstMock.mockRejectedValue(new Error('db down'));
+
+    const res = await DELETE(deleteReq(), params());
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true });
+    expect(loggerWarnMock).toHaveBeenCalledWith(
+      'maintenance.record.deleted.enrichment_failed',
+      expect.objectContaining({ recordId: 'rec-1', error: 'db down' }),
+    );
+    expect(recordAuditEventMock).toHaveBeenCalledWith({
+      action: 'maintenance.record.deleted',
+      scope: 'equipment',
+      actorId: 'admin-1',
+      targetId: 'rec-1',
+      tenantId: 'tenant-a',
+      metadata: {
+        name: 'Замена РВД',
+        before: {
+          type: 'REPAIR',
+          status: 'IN_PROGRESS',
+          scheduledAt: REMOVED.scheduledAt,
+          equipmentName: undefined,
+        },
+      },
+    });
   });
 });

@@ -138,10 +138,22 @@ export const DELETE = withMutation(
 
     // Название установки команда не возвращает и от гонки не зависит — читается
     // отдельно, строго по тенанту и установке.
-    const equipment = await db.equipment.findFirst({
-      where: { id, tenantId },
-      select: { name: true },
-    });
+    //
+    // Наряд к этому моменту уже удалён, поэтому сбой дообогащения не должен
+    // превращать успех в 500 (F-R72-FEED-c): событие пишется с тем, что есть,
+    // название установки просто не попадает в него, а повтор даёт не 404.
+    let equipment: { name: string } | null = null;
+    try {
+      equipment = await db.equipment.findFirst({
+        where: { id, tenantId },
+        select: { name: true },
+      });
+    } catch (err) {
+      logger.warn('maintenance.record.deleted.enrichment_failed', {
+        recordId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
 
     // Удаление наряда ТО не оставляло следа нигде, хотя создание, правка и
     // приёмка того же наряда писались (F-R72-FEED-METER-MAINT). Пишется только
