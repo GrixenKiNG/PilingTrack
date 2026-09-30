@@ -7,6 +7,7 @@ import { completeInspection } from '@/modules/inspections';
 import { withMutation, readJsonBody } from '@/core/api-wrapper';
 import { ServiceError } from '@/services/service-error';
 import { db } from '@/lib/db';
+import { logger } from '@/lib/logger';
 import { recordAuditEvent } from '@/services/audit/audit-service';
 
 export const runtime = 'nodejs';
@@ -38,12 +39,27 @@ export const POST = withMutation(
     // а следа в ленте не было вовсе (F-R72-FEED-INSPECTION). Название установки
     // и число заведённых дефектов команда не возвращает, поэтому читаются
     // отдельно — строго по тенанту и только после успешной команды.
-    const [equipment, defectCount] = await Promise.all([
-      inspection
-        ? db.equipment.findFirst({ where: { id: inspection.equipmentId, tenantId }, select: { name: true } })
-        : null,
-      db.equipmentDefect.count({ where: { tenantId, inspectionId: id } }),
-    ]);
+    //
+    // Осмотр к этому моменту уже завершён, поэтому сбой дообогащения не должен
+    // превращать успех в 500 (F-R72-FEED-b): событие пишется с тем, что есть,
+    // а неизвестное число дефектов остаётся null, а не нулём.
+    let equipment: { name: string } | null = null;
+    let defectCount: number | null = null;
+    try {
+      const [found, count] = await Promise.all([
+        inspection
+          ? db.equipment.findFirst({ where: { id: inspection.equipmentId, tenantId }, select: { name: true } })
+          : null,
+        db.equipmentDefect.count({ where: { tenantId, inspectionId: id } }),
+      ]);
+      equipment = found;
+      defectCount = count;
+    } catch (err) {
+      logger.warn('inspection.completed.enrichment_failed', {
+        inspectionId: id,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
 
     await recordAuditEvent({
       action: 'inspection.completed',

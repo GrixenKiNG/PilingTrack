@@ -124,27 +124,24 @@ export const DELETE = withMutation(
     const actor = user!;
     const tenantId = requireTenantId(actor);
 
-    // Снимок удаляемого наряда читается ДО удаления (F-R72-FEED-METER-MAINT):
-    // строки после `delete` уже нет, а наряд держит критерий «Обслуживание» и
-    // блокер по открытому ремонту. Строго по тенанту и по установке — как
-    // команда.
-    const snapshot = await db.maintenanceRecord.findFirst({
-      where: { id: recordId, equipmentId: id, tenantId },
-      select: {
-        title: true,
-        type: true,
-        status: true,
-        scheduledAt: true,
-        equipment: { select: { name: true } },
-      },
-    });
-
+    // Снимок удаляемого наряда берётся из результата команды: `delete`
+    // возвращает снятую строку (DELETE … RETURNING), поэтому отдельное чтение
+    // ДО удаления не нужно — между ним и удалением наряд могли изменить, и в
+    // ленту ушли бы старые значения (F-R72-FEED-b).
+    let removed;
     try {
-      await deleteMaintenance(id, recordId, { tenantId });
+      removed = await deleteMaintenance(id, recordId, { tenantId });
     } catch (err) {
       if (err instanceof ServiceError) return NextResponse.json({ error: err.message }, { status: err.status });
       throw err;
     }
+
+    // Название установки команда не возвращает и от гонки не зависит — читается
+    // отдельно, строго по тенанту и установке.
+    const equipment = await db.equipment.findFirst({
+      where: { id, tenantId },
+      select: { name: true },
+    });
 
     // Удаление наряда ТО не оставляло следа нигде, хотя создание, правка и
     // приёмка того же наряда писались (F-R72-FEED-METER-MAINT). Пишется только
@@ -155,17 +152,15 @@ export const DELETE = withMutation(
       actorId: actor.id,
       targetId: recordId,
       tenantId,
-      metadata: snapshot
-        ? {
-            name: snapshot.title,
-            before: {
-              type: snapshot.type,
-              status: snapshot.status,
-              scheduledAt: snapshot.scheduledAt,
-              equipmentName: snapshot.equipment.name,
-            },
-          }
-        : undefined,
+      metadata: {
+        name: removed.title,
+        before: {
+          type: removed.type,
+          status: removed.status,
+          scheduledAt: removed.scheduledAt,
+          equipmentName: equipment?.name,
+        },
+      },
     });
 
     return NextResponse.json({ ok: true });

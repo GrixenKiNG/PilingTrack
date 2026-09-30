@@ -19,16 +19,21 @@ const {
   recordAuditEventMock,
   equipmentFindFirstMock,
   defectCountMock,
+  loggerWarnMock,
 } = vi.hoisted(() => ({
   requireAuthMock: vi.fn(),
   completeInspectionMock: vi.fn(),
   recordAuditEventMock: vi.fn(),
   equipmentFindFirstMock: vi.fn(),
   defectCountMock: vi.fn(),
+  loggerWarnMock: vi.fn(),
 }));
 
 vi.mock('@/lib/auth', () => ({ requireAuth: requireAuthMock }));
 vi.mock('@/lib/csrf-protection', () => ({ withCsrf: () => null }));
+vi.mock('@/lib/logger', () => ({
+  logger: { warn: loggerWarnMock, error: vi.fn(), info: vi.fn(), debug: vi.fn() },
+}));
 vi.mock('@/lib/db', () => ({
   db: {
     equipment: { findFirst: equipmentFindFirstMock },
@@ -113,6 +118,24 @@ describe('POST /api/inspections/[id]/complete — след завершения 
       expect.objectContaining({
         action: 'inspection.completed',
         metadata: { after: { level: 'EO', healthScore: 82, defectCount: 2 } },
+      }),
+    );
+  });
+
+  // Осмотр к этому моменту уже завершён: сбой дообогащения не должен
+  // превращать успех в 500, а неизвестное число дефектов — выдавать себя за 0
+  // (F-R72-FEED-b).
+  it('остаётся успешным, когда чтение дефектов упало, и пишет defectCount null', async () => {
+    defectCountMock.mockRejectedValue(new Error('db down'));
+
+    const res = await POST(post(), params());
+
+    expect(res.status).toBe(200);
+    expect(loggerWarnMock).toHaveBeenCalled();
+    expect(recordAuditEventMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'inspection.completed',
+        metadata: { after: { level: 'EO', healthScore: 82, defectCount: null } },
       }),
     );
   });

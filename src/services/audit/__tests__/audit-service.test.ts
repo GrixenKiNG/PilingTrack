@@ -1194,4 +1194,24 @@ describe('recordAuditEvent — завершение осмотра', () => {
       }),
     );
   });
+
+  // Число дефектов может быть неизвестно (чтение упало после завершения осмотра).
+  // Тогда в ленте не должно быть «дефектов 0»: ноль — это утверждение, что
+  // дефектов нет, а не отсутствие данных (F-R72-FEED-b).
+  it('не пишет «дефектов 0», когда число дефектов неизвестно', async () => {
+    await recordAuditEvent({
+      action: 'inspection.completed',
+      scope: 'inspections',
+      actorId: 'operator-1',
+      metadata: { name: 'ЭО-5111', after: { level: 'EO', healthScore: 82, defectCount: null } },
+    });
+
+    expect(mocks.recordFeedbackEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        level: 'warn',
+        title: 'Осмотр завершён',
+        message: 'Осмотр завершён — «ЭО-5111»: ЕО, балл 82%.',
+      }),
+    );
+  });
 });

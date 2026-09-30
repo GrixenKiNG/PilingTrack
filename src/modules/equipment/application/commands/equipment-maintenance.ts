@@ -342,19 +342,24 @@ export async function deleteMaintenance(
   if (existing.acceptedById) {
     throw new ServiceError('Наряд принят, удалить его нельзя', 409);
   }
-  const wasOpen = OPEN_MAINTENANCE_STATUSES.has(existing.status);
-  await db.$transaction(async (tx) => {
-    await tx.maintenanceRecord.delete({ where: { id: recordId, acceptedById: null } })
-      .catch(rethrowConcurrentChange);
+  return db.$transaction(async (tx) => {
+    // `delete` возвращает удалённую строку (DELETE … RETURNING): это и снимок
+    // для ленты, и единственный достоверный ответ на «был ли наряд открыт» —
+    // статус могли поменять между чтением выше и удалением (F-R72-FEED-b).
+    const removed = await tx.maintenanceRecord.delete({
+      where: { id: recordId, acceptedById: null },
+      select: { id: true, title: true, type: true, status: true, scheduledAt: true },
+    }).catch(rethrowConcurrentChange);
     // Удаление закрытого наряда на готовность не влияет — она смотрит только
     // на открытые. Удаление открытого снимает нагрузку, снимок нужен.
-    if (wasOpen) {
+    if (OPEN_MAINTENANCE_STATUSES.has(removed.status)) {
       await requestMaintenanceSnapshot(
         tx as typeof db,
-        { id: recordId, equipmentId, updatedAt: new Date() },
+        { id: removed.id, equipmentId, updatedAt: new Date() },
         ctx.tenantId,
         'deleted',
       );
     }
+    return removed;
   });
 }
