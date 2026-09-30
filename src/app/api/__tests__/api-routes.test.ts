@@ -8,6 +8,7 @@
 import { describe, it, expect } from 'vitest';
 import { readdirSync, statSync, existsSync, readFileSync } from 'fs';
 import { join, relative, sep } from 'path';
+import * as ts from 'typescript';
 
 function findRouteFiles(dir: string): string[] {
   const results: string[] = [];
@@ -207,6 +208,7 @@ const PUBLIC_METHODS: Record<string, string> = {
   'route.ts#GET': 'корень /api — отдаёт версию, данных не касается',
   'orion/lead/route.ts#POST': 'форма заявки публичного сайта; закрыта иначе — лимит по IP, ловушка для ботов, экранирование',
   'telemetry/ingest/route.ts#GET': 'справка для контроллера: статус, версия и точки входа, данных не касается. R80: разобрать — проверка по методу показала его впервые',
+  'alerts/webhook/route.ts#POST': 'T-API-CONTRACT-b: разобрать — токен вебхука сверяет локальная isAuthorized, но это не вызов известной функции проверки, поэтому одним вызовом защита не доказывается',
 };
 
 /**
@@ -252,14 +254,15 @@ interface RouteMethod {
   key: string;
   path: string;
   method: string;
-  /** Объявление метода: от его export до следующего export в файле. */
+  /** Объявление метода — исходный текст экспортируемой строки. */
   declaration: string;
   /**
-   * Тело обработчика: объявление плюс тела локальных функций и констант этого
-   * же файла, названных в объявлении, — то, что реально исполняется на запрос.
-   * Нужно, чтобы объявление вида `withApi(handleGet)` не выглядело незакрытым.
+   * Имена, которые обработчик вызывает как функцию, — в своём теле и в телах
+   * локальных функций, которые он действительно запускает. Собраны по AST,
+   * поэтому упоминание имени в комментарии, строке или объекте-литерале
+   * (`{ isAuthorized: false }`) вызовом не считается.
    */
-  handlerText: string;
+  calls: Set<string>;
   wrapped: boolean;
 }
 
@@ -270,169 +273,131 @@ interface RouteFacts {
 }
 
 /**
- * Вырезать объявление одного метода: от его export до следующего export.
- * Так проверка не засчитывает соседнему методу защиту, стоящую в этом.
+ * Разбор ведётся по AST (пакет typescript уже в node_modules): текстовый поиск
+ * принимал за вызов упоминание имени — в комментарии, строке, недостижимом
+ * коде или объекте-литерале (`{ isAuthorized: false }`) — и приписывал методу
+ * проверку личности, которой в нём нет. Узел вызова (CallExpression) от
+ * упоминания неотличим только текстом; в дереве он виден явно.
  */
-function sliceMethod(source: string, method: string): string | null {
-  const asConst = source.indexOf('export const ' + method + ' ');
-  const asFn = source.indexOf('export async function ' + method + '(');
-  const start = asConst >= 0 ? asConst : asFn;
-  if (start < 0) return null;
-
-  const nextExports = HTTP_METHODS.flatMap((m) => [
-    source.indexOf('export const ' + m + ' ', start + 1),
-    source.indexOf('export async function ' + m + '(', start + 1),
-  ]).filter((i) => i > start);
-
-  return source.slice(start, nextExports.length > 0 ? Math.min(...nextExports) : undefined);
+function isExported(node: ts.Node): boolean {
+  const modifiers = ts.canHaveModifiers(node) ? ts.getModifiers(node) : undefined;
+  return modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword) ?? false;
 }
 
-/**
- * Конец строкового литерала или комментария, начавшегося в позиции i; -1,
- * если там обычный код. Нужно дважды: чтобы найти закрывающую скобку тела, не
- * споткнувшись о скобку внутри строки, и чтобы не принимать имена из строк за
- * вызовы. Без второго сканер тянул в помощники чужой метод — в телеметрии
- * строка «POST /api/telemetry/ingest» называла экспортированный POST.
- */
-function literalEnd(source: string, i: number): number {
-  const char = source[i];
-  if (char === '/' && source[i + 1] === '/') {
-    const newline = source.indexOf('\n', i);
-    return newline < 0 ? source.length : newline;
-  }
-  if (char === '/' && source[i + 1] === '*') {
-    const close = source.indexOf('*/', i);
-    return close < 0 ? source.length : close + 2;
-  }
-  if (char === "'" || char === '"' || char === '`') {
-    for (let j = i + 1; j < source.length; j++) {
-      if (source[j] === '\\') { j++; continue; }
-      if (source[j] === char) return j + 1;
-    }
-    return source.length;
-  }
-  return -1;
-}
-
-/** Тот же текст, но содержимое строк и комментариев заменено пробелами. */
-function withoutLiterals(source: string): string {
-  let plain = '';
-  for (let i = 0; i < source.length; i++) {
-    const end = literalEnd(source, i);
-    if (end >= 0) {
-      plain += ' '.repeat(end - i);
-      i = end - 1;
-      continue;
-    }
-    plain += source[i];
-  }
-  return plain;
-}
-
-/**
- * Объявление локальной — не экспортируемой — функции или константы: от имени до
- * закрывающей скобки тела. Экспортированные обработчики сюда не попадают:
- * `export const GET = …` стоит на своём месте, а не в помощниках соседа.
- */
-function localDefinition(source: string, name: string): string | null {
-  let start = -1;
-  for (const pattern of ['function ' + name + '(', 'const ' + name + ' = ']) {
-    let from = 0;
-    while (start < 0) {
-      const found = source.indexOf(pattern, from);
-      if (found < 0) break;
-      // Перед объявлением на строке — только пробелы и, может быть, `async`.
-      if (/^(async\s+)?$/.test(source.slice(source.lastIndexOf('\n', found) + 1, found))) {
-        start = found;
-        break;
+/** Тела локальных — не экспортируемых — функций файла: имя → узел тела. */
+function localFunctionBodies(sf: ts.SourceFile): Map<string, ts.Node> {
+  const bodies = new Map<string, ts.Node>();
+  for (const statement of sf.statements) {
+    if (ts.isFunctionDeclaration(statement) && statement.name && statement.body) {
+      bodies.set(statement.name.text, statement.body);
+    } else if (ts.isVariableStatement(statement)) {
+      for (const declaration of statement.declarationList.declarations) {
+        if (!ts.isIdentifier(declaration.name) || declaration.initializer === undefined) continue;
+        const { initializer } = declaration;
+        if (ts.isArrowFunction(initializer) || ts.isFunctionExpression(initializer)) {
+          bodies.set(declaration.name.text, initializer.body);
+        }
       }
-      from = found + 1;
-    }
-    if (start >= 0) break;
-  }
-  if (start < 0) return null;
-
-  // От конца списка параметров — до открывающей скобки тела. Строки и
-  // комментарии пропускаем: в типах параметров бывают фигурные скобки
-  // (`{params: Promise<{id: string}>}`), и без пропуска счёт сошёл бы с ума.
-  let cursor = start + source.slice(start).indexOf(name) + name.length;
-  if (source[cursor] === '(' || /^\s*=\s*(async\s*)?\(/.test(source.slice(cursor, cursor + 20))) {
-    let parens = 0;
-    while (cursor < source.length) {
-      const end = literalEnd(source, cursor);
-      if (end >= 0) { cursor = end; continue; }
-      if (source[cursor] === '(') parens++;
-      else if (source[cursor] === ')') { parens--; if (parens === 0) { cursor++; break; } }
-      cursor++;
     }
   }
-  // Между списком параметров и телом бывает аннотация типа возврата
-  // (`function isAuthorized(...): boolean {`), поэтому ищем открывающую скобку,
-  // а не требуем её сразу за скобкой параметров. До `;` — иначе константа со
-  // значением не-функцией (`const X = (a) => a;`) была бы принята за функцию.
-  const body = /^\s*(=>\s*)?[^{;]*\{/.exec(source.slice(cursor));
-  if (body === null) return null;
-  const bodyStart = cursor + (body[0].length - 1);
+  return bodies;
+}
 
-  let depth = 0;
-  for (let j = bodyStart; j < source.length; j++) {
-    const end = literalEnd(source, j);
-    if (end >= 0) { j = end - 1; continue; }
-    if (source[j] === '{') depth++;
-    else if (source[j] === '}') { depth--; if (depth === 0) return source.slice(start, j + 1); }
-  }
-  return source.slice(start);
+interface HandlerSite {
+  /** Узел, с которого начинается разбор вызовов: тело или обёртка обработчика. */
+  node: ts.Node;
+  /** Исходный текст объявления — для проверок обёртки и CSRF. */
+  text: string;
 }
 
 /**
- * Имена, названные в тексте, — кандидаты в помощники обработчика. Достаточно
- * самого имени: если локального объявления с ним нет, кандидат просто не
- * найдётся. Точка перед именем исключена — `obj.method` это не помощник.
+ * Объявление обработчика по AST: `export const GET = withApi(handleGet)`,
+ * `export async function GET(...)` и псевдоним `export const PATCH = POST;`.
+ * Тело берётся из дерева, поэтому скобка в аннотации типа возврата
+ * (`Promise<{ user: User }>`) больше не принимается за начало тела.
+ * `null` — метода в файле нет.
  */
-function referencedNames(text: string): Set<string> {
-  const names = new Set<string>();
-  const pattern = /(?<![.\w$])([A-Za-z_$][\w$]*)/g;
-  let match = pattern.exec(text);
-  while (match !== null) {
-    names.add(match[1]);
-    match = pattern.exec(text);
+function handlerSite(sf: ts.SourceFile, bodies: Map<string, ts.Node>, method: string): HandlerSite | null {
+  for (const statement of sf.statements) {
+    if (!isExported(statement)) continue;
+
+    let node: ts.Node | null = null;
+    if (ts.isFunctionDeclaration(statement) && statement.name?.text === method) {
+      node = statement.body ?? statement;
+    } else if (ts.isVariableStatement(statement)) {
+      for (const declaration of statement.declarationList.declarations) {
+        if (ts.isIdentifier(declaration.name) && declaration.name.text === method && declaration.initializer) {
+          node = declaration.initializer;
+          break;
+        }
+      }
+    }
+    if (node === null) continue;
+
+    // `export const PATCH = POST;` — псевдоним, а не отдельный обработчик:
+    // защита стоит на том методе, на который он указывает.
+    if (ts.isIdentifier(node)) {
+      const aliased = handlerSite(sf, bodies, node.text);
+      if (aliased !== null) return aliased;
+      const local = bodies.get(node.text);
+      if (local !== undefined) return { node: local, text: local.getText(sf) };
+    }
+
+    return { node, text: statement.getText(sf) };
   }
-  return names;
+  return null;
+}
+
+/** Имена, вызываемые как функции (`f(...)`), внутри узла — только по AST. */
+function calledIdentifiers(node: ts.Node, calls: Set<string>): void {
+  if (ts.isCallExpression(node) && ts.isIdentifier(node.expression)) {
+    calls.add(node.expression.text);
+  }
+  ts.forEachChild(node, (child) => calledIdentifiers(child, calls));
 }
 
 /**
- * Тело обработчика: его объявление и, рекурсивно, тела локальных функций и
- * констант, которые в объявлении названы. Проверка личности идёт по нему, а не
- * по файлу, — но и не только по одной строке `export const DELETE = withMutation(
- * handleDelete)`: сама проверка живёт в handleDelete, и без достройки
- * незакрытым выглядел бы каждый маршрут с вынесенным обработчиком
- * (readiness/*: `withApi(handleGet)`).
+ * Локальные функции, которые узел действительно запускает: вызванные по имени
+ * (`helper()`) или переданные обёртке аргументом-идентификатором
+ * (`withApi(handleGet)` — обёртка вызовет handleGet).
  */
-function handlerText(source: string, declaration: string): string {
-  const chunks = [declaration];
+function invokedLocalNames(node: ts.Node, names: Set<string>): void {
+  if (ts.isCallExpression(node)) {
+    if (ts.isIdentifier(node.expression)) names.add(node.expression.text);
+    for (const argument of node.arguments) {
+      if (ts.isIdentifier(argument)) names.add(argument.text);
+    }
+  }
+  ts.forEachChild(node, (child) => invokedLocalNames(child, names));
+}
+
+/**
+ * Вызовы, досягаемые из обработчика: прямо в его теле и в телах локальных
+ * функций, которые он запускает, — на два уровня вглубь. Дальше не ходим:
+ * цепочка вызовов ушла бы в половину файла и перестала что-либо доказывать.
+ */
+function reachableCalls(site: ts.Node, bodies: Map<string, ts.Node>): Set<string> {
+  const calls = new Set<string>();
   const seen = new Set<string>();
-  let level = [declaration];
+  let level: ts.Node[] = [site];
 
-  // Три уровня: обработчик → его помощник → помощник помощника. Дальше не
-  // ходим — цепочка вызовов ушла бы в половину файла и перестала что-либо
-  // доказывать.
   for (let depth = 0; depth < 3 && level.length > 0; depth++) {
-    const next: string[] = [];
-    for (const chunk of level) {
-      for (const name of referencedNames(withoutLiterals(chunk))) {
+    const next: ts.Node[] = [];
+    for (const node of level) {
+      calledIdentifiers(node, calls);
+      const invoked = new Set<string>();
+      invokedLocalNames(node, invoked);
+      for (const name of invoked) {
         if (seen.has(name)) continue;
         seen.add(name);
-        const definition = localDefinition(source, name);
-        if (definition !== null && !chunks.includes(definition)) {
-          chunks.push(definition);
-          next.push(definition);
-        }
+        const body = bodies.get(name);
+        if (body !== undefined) next.push(body);
       }
     }
     level = next;
   }
 
-  return chunks.join('\n');
+  return calls;
 }
 
 function collectRouteFacts(): RouteFacts[] {
@@ -443,30 +408,92 @@ function collectRouteFacts(): RouteFacts[] {
     // единому виду, иначе списки исключений пришлось бы держать в двух.
     const path = rel.split(sep).slice(2).join('/');
 
+    const sourceFile = ts.createSourceFile(path, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+    const bodies = localFunctionBodies(sourceFile);
+
     const methods: RouteMethod[] = [];
     for (const method of HTTP_METHODS) {
-      let declaration = sliceMethod(source, method);
-      if (declaration === null) continue;
-
-      // `export const PATCH = POST;` — псевдоним, а не отдельный обработчик:
-      // защита стоит на том методе, на который он указывает. Без этой ветки
-      // тест требовал бы замок там, где нет и тела.
-      const alias = HTTP_METHODS.find((m) => declaration?.startsWith('export const ' + method + ' = ' + m + ';'));
-      if (alias !== undefined) declaration = sliceMethod(source, alias) ?? declaration;
+      const site = handlerSite(sourceFile, bodies, method);
+      if (site === null) continue;
 
       methods.push({
         key: path + '#' + method,
         path,
         method,
-        declaration,
-        handlerText: handlerText(source, declaration),
-        wrapped: WRAPPERS.some((w) => declaration.includes('= ' + w + '(')),
+        declaration: site.text,
+        calls: reachableCalls(site.node, bodies),
+        wrapped: WRAPPERS.some((w) => site.text.includes('= ' + w + '(')),
       });
     }
 
     return { path, source, methods };
   });
 }
+
+/**
+ * Проверки разбора на синтетических исходниках: настоящие маршруты обязаны
+ * оставаться закрытыми, но убедиться, что разбор не путает вызов с упоминанием,
+ * можно только на исходнике, где упоминание и есть. Тексты — строкой в тесте.
+ */
+describe('Контракт маршрутов — разбор тела обработчика', () => {
+  function callsOf(source: string, method: string): Set<string> | null {
+    const sf = ts.createSourceFile('synthetic.ts', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+    const bodies = localFunctionBodies(sf);
+    const site = handlerSite(sf, bodies, method);
+    return site === null ? null : reachableCalls(site.node, bodies);
+  }
+
+  it('упоминание имени проверки без вызова защитой не считается', () => {
+    const source = [
+      "import { withApi } from '@/core/api-wrapper';",
+      "import { requireAuth } from '@/lib/auth';",
+      'async function isAuthorized(request: Request) {',
+      '  const { error } = await requireAuth(request);',
+      '  return error === null;',
+      '}',
+      'export const GET = withApi(async (request: Request) => {',
+      '  const flags = { isAuthorized: false };',
+      '  return Response.json(flags);',
+      '});',
+    ].join('\n');
+
+    const calls = callsOf(source, 'GET');
+    // GET лишь упоминает isAuthorized как поле объекта: тело помощника не
+    // достраивается, requireAuth в него не протекает.
+    expect(calls?.has('isAuthorized')).toBe(false);
+    expect(calls?.has('requireAuth')).toBe(false);
+  });
+
+  it('проверка личности только в комментарии или строке защитой не считается', () => {
+    const source = [
+      "import { withApi } from '@/core/api-wrapper';",
+      'export const GET = withApi(async (request: Request) => {',
+      '  // requireAuth(request) — так было бы закрыто, но вызова нет',
+      "  const note = 'requireAuth(request)';",
+      '  return Response.json({ note });',
+      '});',
+    ].join('\n');
+
+    expect(callsOf(source, 'GET')?.has('requireAuth')).toBe(false);
+  });
+
+  it('аннотация типа возврата с объектом не мешает найти тело', () => {
+    const source = [
+      "import { withApi } from '@/core/api-wrapper';",
+      "import { requireAuth } from '@/lib/auth';",
+      'async function loadUser(request: Request): Promise<{ user: unknown }> {',
+      '  const { user, error } = await requireAuth(request);',
+      '  if (error) throw error;',
+      '  return { user };',
+      '}',
+      'export const GET = withApi(loadUser);',
+    ].join('\n');
+
+    // Раньше первая «{» из `Promise<{ user: unknown }>` принималась за начало
+    // тела, и помощник с проверкой не достраивался.
+    expect(callsOf(source, 'GET')?.has('requireAuth')).toBe(true);
+  });
+});
 
 describe('Контракт маршрутов — у каждого есть замок', () => {
   const routes = collectRouteFacts();
@@ -479,7 +506,7 @@ describe('Контракт маршрутов — у каждого есть з�
 
   it('каждый метод либо проверяет личность, либо назван публичным с причиной', () => {
     const unguarded = allMethods
-      .filter((m) => !AUTH_GATES.some((gate) => m.handlerText.includes(gate)))
+      .filter((m) => !AUTH_GATES.some((gate) => m.calls.has(gate)))
       .filter((m) => !(m.key in PUBLIC_METHODS))
       .map((m) => m.key);
 
@@ -529,7 +556,7 @@ describe('Контракт маршрутов — списки исключен�
   it('в списке публичных нет методов, куда защиту уже вернули', () => {
     const stale = Object.keys(PUBLIC_METHODS).filter((k) => {
       const method = byKey.get(k);
-      return method !== undefined && AUTH_GATES.some((gate) => method.handlerText.includes(gate));
+      return method !== undefined && AUTH_GATES.some((gate) => method.calls.has(gate));
     });
 
     expect(stale).toEqual([]);
