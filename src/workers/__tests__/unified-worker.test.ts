@@ -165,7 +165,10 @@ vi.mock('http', () => ({
 // Tests
 // ============================================================
 
-describe('Unified Worker Service', () => {
+// Каждому тесту нужен запас 30 с: после vi.resetModules() (см. beforeEach) каждый
+// тест заново импортирует холодный граф воркера, поэтому таймаут вынесен на
+// describe, а не на один тест (R70, находка 1).
+describe('Unified Worker Service', { timeout: 30_000 }, () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.resetModules();
@@ -191,13 +194,14 @@ describe('Unified Worker Service', () => {
   });
 
   describe('Health check endpoint', () => {
-    // 15s timeout, not the default 5s: this is the FIRST test in the file, so its
+    // 30s timeout, not the default 5s: this is the FIRST test in the file, so its
     // `import('@/workers/unified-worker')` is the one that pays Vite's transform
     // cost for the whole worker module graph (unified-worker/* → @/lib/db,
     // @/modules/equipment, @/modules/reports/.../rebuild, @/lib/pdf-generator —
     // only the leaf modules are mocked, the graph itself is still transformed).
-    // The later tests re-import after vi.resetModules(), but the transform cache
-    // is already warm, so they cost ~0 and need no extra timeout.
+    // The later tests re-import after vi.resetModules(); the transform cache is
+    // warm by then, so they cost ~0 — but they carry the same 30s budget through
+    // the describe-level timeout, since it is the same class of cost.
     //
     // That cost scales with how many vitest workers compete for the transform
     // pipeline — measured on a 16-core box: 1 worker 376ms, 8 → 608ms,
@@ -209,8 +213,9 @@ describe('Unified Worker Service', () => {
     // Лимит стоит на тесте, а не на vi.waitFor ниже: дорогой здесь сам import,
     // и он выполняется ДО ожидания — таймаут внутри waitFor до него не дошёл бы.
     //
-    // If a test is ever added *before* this one, move this timeout to it: the cost
-    // belongs to whichever test imports the graph first, not to this test's assertions.
+    // Here the cold-import cost is documented on this test (the explicit 30_000
+    // duplicates the describe-level timeout); the timeout belongs to whichever
+    // test imports the graph first, not to this test's assertions.
     it('returns health status with worker information', async () => {
       // Import to trigger server creation
       await import('@/workers/unified-worker');
@@ -225,7 +230,7 @@ describe('Unified Worker Service', () => {
         3102, // WORKER_HEALTH_PORT
         expect.any(Function)
       );
-    }, 15_000);
+    }, 30_000);
   });
 
   describe('Worker lifecycle', () => {
