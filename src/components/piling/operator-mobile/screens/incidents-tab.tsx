@@ -8,7 +8,7 @@ import {
   type IncidentCategory, type IncidentSign, type OperatorMobileState,
 } from '@/modules/operator-mobile/contracts';
 import {cn} from '@/lib/utils';
-import {uploadPhoto} from '../api';
+import {operatorErrorText, uploadPhoto} from '../api';
 import {BigButton, ErrorNote, Panel, PanelTitle, Sign} from '../ui';
 
 /**
@@ -70,7 +70,7 @@ export function IncidentsTab({state, busy, error, commandId, onReport}: {
       const mediaId = await uploadPhoto({file, clientCommandId: commandId, entityType: 'safety_incident'});
       setMediaIds((current) => [...current, mediaId]);
     } catch (uploadError) {
-      setPhotoError(uploadError instanceof Error ? uploadError.message : 'Снимок не загрузился');
+      setPhotoError(operatorErrorText(uploadError));
     } finally {
       setUploading(false);
     }

@@ -57,6 +57,10 @@ describe('v1: загрузка состояния не удалась', () => {
 
     expect(await screen.findByText('Нет связи')).toBeInTheDocument();
     expect(screen.getByText(/Восстановите связь и повторите/)).toBeInTheDocument();
+    // Текст браузера («Failed to fetch») на экран не попадает — вместо него
+    // русская строка (R76, находка 5).
+    expect(screen.getByText('Нет связи с сервером. Проверьте интернет и повторите.')).toBeInTheDocument();
+    expect(screen.queryByText(/Failed to fetch/)).not.toBeInTheDocument();
     expect(screen.queryByText('Сервер не отвечает')).not.toBeInTheDocument();
     expect(screen.getByRole('button', {name: 'Повторить'})).toBeInTheDocument();
   });

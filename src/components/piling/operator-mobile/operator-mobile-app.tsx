@@ -6,7 +6,7 @@ import type {
   ChecklistAnswer, ChecklistStage, OperatorMobileState, OperatorPhase,
 } from '@/modules/operator-mobile/contracts';
 import {
-  ApiError, currentPosition, fetchState, newCommandId, QueuedOffline, sendCommand,
+  ApiError, currentPosition, fetchState, newCommandId, operatorErrorText, QueuedOffline, sendCommand,
   type ProductionEntryInput,
 } from './api';
 import {OfflineQueueBanner} from './offline-queue-banner';
@@ -149,7 +149,7 @@ export function OperatorMobileApp() {
       // 5xx — сломан сервер, а не связь: совет «восстановите связь» здесь врёт,
       // и машинист ищет причину не там.
       setServerFault(error instanceof ApiError && error.status >= 500);
-      setLoadError(error instanceof Error ? error.message : 'Не удалось загрузить смену');
+      setLoadError(operatorErrorText(error));
     }
   }, [equipmentId]);
 
@@ -207,7 +207,7 @@ export function OperatorMobileApp() {
         setActionError(null);
         return true;
       }
-      setActionError(error instanceof Error ? error.message : 'Команда не выполнена');
+      setActionError(operatorErrorText(error));
       // Просроченная попытка проверки знаний — единственный отказ, который
       // повтором не лечится: экран предложит новую попытку вместо кнопки
       // повторной отправки. Признак считает `isKnowledgeAttemptExpired` (400 и

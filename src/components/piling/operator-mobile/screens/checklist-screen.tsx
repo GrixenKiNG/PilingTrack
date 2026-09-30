@@ -7,7 +7,7 @@ import {
   type OperatorAnswer, type WorkWarning,
 } from '@/modules/operator-mobile/contracts';
 import {cn} from '@/lib/utils';
-import {uploadPhoto} from '../api';
+import {operatorErrorText, uploadPhoto} from '../api';
 import {BigButton, ErrorNote, Panel, PanelTitle, Screen} from '../ui';
 import {WarningsPanel} from '../warnings-panel';
 import type {KnownAnswer} from '../safety/known-answers';
@@ -324,7 +324,7 @@ function ItemCard({item, draft, commandId, onChange, lastMeter, known}: {
       const mediaId = await uploadPhoto({file, clientCommandId: commandId, itemId: item.id});
       onChange({mediaIds: [...draft.mediaIds, mediaId], uploading: false});
     } catch (error) {
-      setPhotoError(error instanceof Error ? error.message : 'Снимок не загрузился');
+      setPhotoError(operatorErrorText(error));
       onChange({uploading: false});
     }
   };

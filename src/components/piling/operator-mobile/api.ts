@@ -27,6 +27,25 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * Текст ошибки для машиниста.
+ *
+ * ПОЧЕМУ НЕ `error.message`. Сетевой сбой в браузере — это `TypeError` с
+ * англоязычной строкой: «Failed to fetch» (Chrome/Firefox), «NetworkError when
+ * attempting to fetch resource», «Load failed» (Safari). Отдавать её в русский
+ * интерфейс нельзя: машинист читает «Failed to fetch» как поломку приложения и
+ * звонит диспетчеру вместо того, чтобы проверить связь (аудит R76, находка 5;
+ * тот же класс уже закрыт в форме входа, `login-page.tsx:44-48`).
+ *
+ * Отказ сервера (`ApiError`) несёт русский текст от сервера — его и показываем:
+ * «Смена закрыта» объясняет положение лучше любой общей фразы.
+ */
+export function operatorErrorText(error: unknown): string {
+  if (error instanceof ApiError) return error.message;
+  if (error instanceof TypeError) return 'Нет связи с сервером. Проверьте интернет и повторите.';
+  return 'Не удалось выполнить действие. Повторите.';
+}
+
 async function parse<T>(response: Response): Promise<T> {
   const payload = await response.json().catch(() => null) as
     {data?: T; error?: string; details?: unknown} | null;
