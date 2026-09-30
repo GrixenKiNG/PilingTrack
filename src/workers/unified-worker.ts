@@ -17,6 +17,8 @@
 import 'dotenv/config';
 import http from 'http';
 import { logger } from '@/lib/logger';
+import { db } from '@/lib/db';
+import { closeRedisConnection } from '@/lib/redis-cache';
 import { ENABLED_WORKERS, HEALTH_PORT } from './unified-worker/config';
 import { startHealthServer } from './unified-worker/health-server';
 import { startOutbox } from './unified-worker/outbox';
@@ -36,6 +38,12 @@ let stopProjectionRebuild: (() => void) | null = null;
 let stopReadinessScheduler: (() => void) | null = null;
 let stopIdempotencyCleanup: (() => void) | null = null;
 
+// Предел на остановку. Docker после SIGTERM ждёт 10 с (stop_grace_period не
+// задан) и присылает SIGKILL, поэтому свой дедлайн держим короче: зависшая
+// stop-функция (задача PDF в работе, недоступный Redis) не должна превращать
+// остановку в жёсткое убийство процесса.
+const SHUTDOWN_TIMEOUT_MS = parseInt(process.env.WORKER_SHUTDOWN_TIMEOUT_MS || '8000', 10);
+
 async function gracefulShutdown(signal: string): Promise<void> {
   if (isShuttingDown) {
     logger.warn('Shutdown already in progress', { signal });
@@ -44,6 +52,14 @@ async function gracefulShutdown(signal: string): Promise<void> {
 
   isShuttingDown = true;
   logger.info('Received shutdown signal', { signal });
+
+  const deadline = setTimeout(() => {
+    logger.error('Shutdown deadline exceeded, forcing exit', {
+      signal,
+      timeoutMs: SHUTDOWN_TIMEOUT_MS,
+    });
+    process.exit(1);
+  }, SHUTDOWN_TIMEOUT_MS);
 
   const stops = Object.values(workerStates)
     .filter((worker) => worker.stop && worker.status !== 'stopped')
@@ -87,6 +103,26 @@ async function gracefulShutdown(signal: string): Promise<void> {
     });
   }
 
+  // Соединения закрываем последними: воркеры и планировщики уже остановлены и
+  // в Redis/БД не ходят. Иначе новый контейнер подхватит оборванные соединения
+  // по таймауту, а не по чистому QUIT.
+  try {
+    await closeRedisConnection();
+  } catch (error) {
+    logger.error('Redis shutdown failed', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+
+  try {
+    await db.$disconnect();
+  } catch (error) {
+    logger.error('Prisma shutdown failed', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+
+  clearTimeout(deadline);
   logger.info('Unified worker shutdown complete');
   process.exit(0);
 }
