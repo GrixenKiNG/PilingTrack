@@ -236,6 +236,30 @@ groups:
           summary: "CRITICAL: контейнер воркеров недоступен"
           description: "{{ $labels.instance }} не отвечает 5 минут — смены не закрываются, наряды не истекают, PDF-задачи стоят в очереди"
 
+      - alert: AlertmanagerDown
+        # F-ALERTMANAGER-WATCH (R69 #4): job `alertmanager` заведён в
+        # prometheus-prod.yml, порт 9093 (docker-compose.monitoring-prod.yml:118-149).
+        expr: up{job="alertmanager"} == 0
+        for: 5m
+        labels:
+          severity: critical
+          service: alertmanager
+        annotations:
+          summary: "CRITICAL: Alertmanager недоступен"
+          description: "{{ $labels.instance }} не отвечает 5 минут — доставлять тревоги некому. Важно: это правило само уходит наружу через тот же Alertmanager, поэтому при его полном падении сообщение не придёт — такой отказ ловит внешний сторож (F-APP-GUARD), пингуя стек снаружи."
+
+      - alert: AlertmanagerNotificationsFailing
+        # F-ALERTMANAGER-WATCH (R69 #4): метрика появилась вместе с job'ом `alertmanager`
+        # в prometheus-prod.yml; до этого скрейпа Alertmanager не было вообще.
+        expr: rate(alertmanager_notifications_failed_total[15m]) > 0
+        for: 15m
+        labels:
+          severity: warning
+          service: alertmanager
+        annotations:
+          summary: "Alertmanager не может доставить уведомления"
+          description: "Alertmanager уже 15 минут стабильно получает отказы доставки ({{ $value | humanize }} сбоев/с) — тревоги не доходят до вебхука приложения/Telegram. Проверьте вебхук /api/alerts/webhook и канал Telegram."
+
       - alert: RedisHighMemory
         expr: redis_memory_used_bytes / redis_memory_max_bytes > 0.8
         for: 5m
