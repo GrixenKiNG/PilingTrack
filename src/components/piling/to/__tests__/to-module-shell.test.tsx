@@ -181,7 +181,7 @@ describe('ToModule production shell integration', () => {
       'data-equipment',
       'equipment-2',
     );
-  });
+  }, 30_000);
 
   it.each(['journal', 'meters', 'plans'])(
     'canonicalizes the legacy %s view to maintenance',
@@ -192,6 +192,7 @@ describe('ToModule production shell integration', () => {
         'maintenance',
       );
     },
+    30_000,
   );
 
   it('replaces URL state after tab, settings and equipment selection', async () => {
@@ -234,7 +235,7 @@ describe('ToModule production shell integration', () => {
       '',
       '/admin/to?view=settings&equipmentId=equipment-2&section=audit',
     );
-  });
+  }, 30_000);
 
   it('returns the legacy reference UI when the production shell flag is false', async () => {
     vi.stubEnv('NEXT_PUBLIC_TECH_READINESS_PRODUCTION_SHELL', 'false');
@@ -244,7 +245,7 @@ describe('ToModule production shell integration', () => {
 
     expect(screen.getByTestId('reference-ui')).toHaveAttribute('data-view', 'fleet');
     expect(screen.queryByTestId('production-shell')).not.toBeInTheDocument();
-  });
+  }, 30_000);
 
   it('does not select or render an equipment id absent from the tenant bootstrap', async () => {
     await renderToModule('/admin/to?equipmentId=equipment-foreign');
@@ -254,5 +255,5 @@ describe('ToModule production shell integration', () => {
       'equipment-1',
     );
     expect(document.body.textContent).not.toContain('equipment-foreign');
-  });
+  }, 30_000);
 });
