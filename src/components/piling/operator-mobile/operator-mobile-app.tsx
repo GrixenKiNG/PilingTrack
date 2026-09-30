@@ -15,7 +15,7 @@ import {OperatorStatusStrip} from './operator-status-strip';
 import {BigButton, Panel, PanelTitle, PhaseBar, Screen, TabBar} from './ui';
 import {IdentityScreen} from './screens/identity-screen';
 import {BriefingScreen} from './screens/briefing-screen';
-import {KnowledgeScreen} from './screens/knowledge-screen';
+import {KnowledgeScreen, isKnowledgeAttemptExpired} from './screens/knowledge-screen';
 import {PpeScreen} from './screens/ppe-screen';
 import {AdmissionScreen} from './screens/admission-screen';
 import {ChecklistScreen} from './screens/checklist-screen';
@@ -69,6 +69,17 @@ export function OperatorMobileApp() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [forbidden, setForbidden] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  /**
+   * Отказ проверки знаний из-за просроченной попытки. Держится отдельно от
+   * `actionError`: экрану мало текста отказа, ему нужно знать, что повтор
+   * бесполезен и что выход один — взять новый набор вопросов. У самого экрана
+   * ответа сервера нет, поэтому примету считает рабочее место.
+   *
+   * Снимается началом нового действия или кнопкой «Начать заново», и этого
+   * достаточно: попасть в это состояние можно только на итоговом экране
+   * проверки, а там других кнопок нет.
+   */
+  const [knowledgeExpired, setKnowledgeExpired] = useState(false);
   const [busy, setBusy] = useState(false);
   const [online, setOnline] = useState(true);
   const [detour, setDetour] = useState<Detour | null>(null);
@@ -160,6 +171,7 @@ export function OperatorMobileApp() {
   const run = useCallback(async (work: () => Promise<unknown>): Promise<boolean> => {
     setBusy(true);
     setActionError(null);
+    setKnowledgeExpired(false);
     try {
       await work();
       setChecklistCommandId(newCommandId());
@@ -184,6 +196,11 @@ export function OperatorMobileApp() {
         return true;
       }
       setActionError(error instanceof Error ? error.message : 'Команда не выполнена');
+      // Просроченная попытка проверки знаний — единственный отказ, который
+      // повтором не лечится: экран предложит новую попытку вместо кнопки
+      // повторной отправки. Признак считает `isKnowledgeAttemptExpired` (400 и
+      // текст отказа `admission.ts:314`).
+      if (error instanceof ApiError && isKnowledgeAttemptExpired(error)) setKnowledgeExpired(true);
       // 409 — сервер уже в другом состоянии (ответ на прошлое нажатие
       // потерялся, смена закрыта): перечитываем, чтобы экран не спорил с ним.
       // Другие ошибки не перечитываем: без связи это сменило бы экран с
@@ -425,6 +442,10 @@ export function OperatorMobileApp() {
         <KnowledgeScreen
           busy={busy}
           error={actionError}
+          expired={knowledgeExpired}
+          // Новая попытка начата: прежний отказ снимаем, иначе он висел бы на
+          // экране поверх новых вопросов.
+          onRestart={() => { setActionError(null); setKnowledgeExpired(false); }}
           onDone={(picks, attemptToken) => void run(() => sendCommand({command: 'submit-knowledge', picks, attemptToken}))}
           onBack={() => setDetour(null)}
         />
