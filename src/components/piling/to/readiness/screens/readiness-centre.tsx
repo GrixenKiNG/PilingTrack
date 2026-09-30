@@ -586,7 +586,8 @@ export function ReadinessCentre(props: ReferenceUiProps) {
                 <div className="mt-2 font-bold">
                   {blockers === 0 && nextStage ? `Завершить шаг «${nextStage.label}»` : presentation.nextAction}
                 </div>
-                <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                {/* 14px на телефоне — норма служебного текста (QA F-MOB-READINESS-TEXT); на компьютере размер прежний. */}
+                <p className="mt-1 text-sm sm:text-xs leading-relaxed text-muted-foreground">
                   {props.authoritativeReadinessError
                     ?? (blockers === 0 && nextStage
                       ? `${nextStage.value}. Ход за: ${stageOwner ?? 'не назначен'}.`
@@ -692,7 +693,8 @@ export function ReadinessCentre(props: ReferenceUiProps) {
               <span>Выполнено {doneStages} из {presentation.stages.length} шагов</span>
               <span className="font-semibold tabular-nums">{stageProgress}%</span>
             </div>
-            <p className="mt-1 text-2xs leading-relaxed text-muted-foreground">
+            {/* 14px на телефоне — норма служебного текста (QA F-MOB-READINESS-TEXT); на компьютере размер прежний. */}
+            <p className="mt-1 text-sm sm:text-2xs leading-relaxed text-muted-foreground">
               Сколько этапов предсменного контроля уже пройдено. Это не балл готовности.
             </p>
           </div>
@@ -709,7 +711,8 @@ export function ReadinessCentre(props: ReferenceUiProps) {
                 <div>
                   <div className="text-xs text-muted-foreground">Балл готовности</div>
                   <div className="mt-1 font-mono text-2xl font-bold">{presentation.score ?? '—'} <span className="text-sm font-normal text-muted-foreground">/100</span></div>
-                  <p className="mt-1 text-2xs leading-relaxed text-muted-foreground">
+                  {/* 14px на телефоне — норма служебного текста (QA F-MOB-READINESS-TEXT); на компьютере размер прежний. */}
+                  <p className="mt-1 text-sm sm:text-2xs leading-relaxed text-muted-foreground">
                     Взвешенная оценка состояния узлов. Пуск разрешают не баллы, а блокирующие правила.
                   </p>
                   <div className="mt-3 flex gap-4 text-xs">
