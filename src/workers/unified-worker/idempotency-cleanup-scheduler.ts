@@ -16,11 +16,16 @@
  *
  * Идемпотентно (повторный проход удалит ноль), поэтому выбора лидера не
  * требует — как pm-scheduler и projection-rebuild.
+ *
+ * Имя берётся из реестра (`health-tracker/scheduler-registry`): тем же именем
+ * health-tracker решает, чей пульс истёк. Литерал, продублированный в воркере,
+ * мог бы разойтись с реестром молча (F-SCHED-REGISTRY-IDEMP).
  */
 
 import * as Sentry from '@sentry/nextjs';
 import { logger } from '@/lib/logger';
 import { cleanupExpiredKeys } from '@/core/security/idempotency';
+import { IDEMPOTENCY_CLEANUP_SCHEDULER_NAME } from '@/core/observability/health-tracker/scheduler-registry';
 import { recordSchedulerHeartbeat } from './scheduler-heartbeat';
 
 const CLEANUP_INTERVAL = parseInt(
@@ -36,12 +41,12 @@ async function runOnce(): Promise<void> {
   try {
     const deleted = await cleanupExpiredKeys();
     logger.info('Idempotency keys cleanup pass', { deleted });
-    await recordSchedulerHeartbeat('idempotency-cleanup', CLEANUP_INTERVAL);
+    await recordSchedulerHeartbeat(IDEMPOTENCY_CLEANUP_SCHEDULER_NAME, CLEANUP_INTERVAL);
   } catch (error) {
     logger.error('Idempotency keys cleanup pass failed', {
       error: error instanceof Error ? error.message : String(error),
     });
-    Sentry.captureException(error, { tags: { task: 'idempotency-cleanup' } });
+    Sentry.captureException(error, { tags: { task: IDEMPOTENCY_CLEANUP_SCHEDULER_NAME } });
   }
 }
 

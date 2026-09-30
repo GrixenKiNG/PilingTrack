@@ -403,7 +403,7 @@ describe('storage health: медленный S3 ≠ упавший S3 (F-R50-1)'
 /*
   Пульс планировщиков (F-HEALTH-SCHEDULERS).
 
-  F-SCHEDULER-HEARTBEAT научил три суточных/часовых планировщика писать
+  F-SCHEDULER-HEARTBEAT научил суточные/часовые планировщики писать
   `system:scheduler:<имя>` с TTL в три интервала, но читать эти ключи было
   некому: остановка контейнера workers означала тихое прекращение суточной
   рутины, невидимое ни /api/health, ни метрикам (R59 #1, #2).
@@ -487,6 +487,7 @@ describe('планировщики: истёкший пульс виден и д
       'pm-scheduler',
       'projection-rebuild',
       'readiness-scheduler',
+      'idempotency-cleanup',
     ]);
   });
 });

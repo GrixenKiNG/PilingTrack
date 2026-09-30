@@ -14,9 +14,20 @@
 /** Префикс ключей пульса. Планировщики дописывают к нему своё имя. */
 export const SCHEDULER_HEARTBEAT_PREFIX = 'system:scheduler:';
 
+/**
+ * Имя планировщика уборки ключей идемпотентности.
+ *
+ * Одна константа на два слоя: по ней работник пишет пульс и тег Sentry
+ * (workers/unified-worker/idempotency-cleanup-scheduler.ts), по ней же имя
+ * попадает в SCHEDULER_NAMES для health-tracker. Литерал в двух местах
+ * разошёлся бы молча — ровно то, что закрывает F-SCHED-REGISTRY-IDEMP.
+ */
+export const IDEMPOTENCY_CLEANUP_SCHEDULER_NAME = 'idempotency-cleanup';
+
 /** Имена планировщиков (совпадают с тегами задач в Sentry). */
 export const SCHEDULER_NAMES = [
   'pm-scheduler',
   'projection-rebuild',
   'readiness-scheduler',
+  IDEMPOTENCY_CLEANUP_SCHEDULER_NAME,
 ] as const;
