@@ -132,11 +132,11 @@ export function PileDetail({ row, busy, onDecide }: {
           className="w-full rounded-md border bg-card px-3 py-2 text-sm shadow-xs"
         />
         <div className="flex flex-wrap gap-2">
-          <Button size="sm" className="h-8 text-xs" disabled={busy}
+          <Button size="sm" className="h-11 text-xs sm:h-8" disabled={busy}
             onClick={() => onDecide('ACCEPTED', note)}>
             Принять сваю
           </Button>
-          <Button size="sm" variant="outline" className="h-8 text-xs" disabled={busy}
+          <Button size="sm" variant="outline" className="h-11 text-xs sm:h-8" disabled={busy}
             onClick={() => onDecide('NEEDS_REDRIVE', note)}>
             На добивку
           </Button>
