@@ -8,7 +8,7 @@ import {ErrorNote, Fact, Panel, PanelTitle, Screen, VolumeFact} from '@/componen
 import {WarningsPanel} from '@/components/piling/operator-mobile/warnings-panel';
 import {EntriesList} from '@/components/piling/operator-mobile/screens/entries-list';
 import {
-  downtimeInterval, formatIntervalMinutes, hhmmAgo,
+  downtimeInterval, formatIntervalMinutes, hhmm, hhmmAgo,
 } from '@/components/piling/operator-mobile/downtime-interval';
 import {ActionButton, ChoiceButton, NextActionCard, ReasonNote, StageTitle} from './parts';
 import {PassportForm} from './passport-form';
@@ -89,6 +89,15 @@ export function WorkScreenNext({
   const grade = state.dictionaries.pileGrades.find((item) => item.id === fields.reference);
   const pileMeters = grade?.lengthMm ? (Number(fields.count || 0) * grade.lengthMm) / 1000 : 0;
   const interval = mode === 'DOWNTIME' ? downtimeInterval(fields.started, fields.ended) : null;
+
+  /**
+   * Быстрый простой «за последние 30 минут» не имеет права начаться раньше
+   * смены (№10, Ж1): если смена начата меньше 30 минут назад, окно обрезается
+   * до её начала, и кнопка честно называет, что именно запишется.
+   */
+  const shiftStart = state.shift?.startedAt ? new Date(state.shift.startedAt) : null;
+  const shiftMinutes = shiftStart ? Math.max(0, Math.floor((Date.now() - shiftStart.getTime()) / 60_000)) : null;
+  const quickTruncated = shiftStart !== null && shiftMinutes !== null && shiftMinutes < 30;
 
   /** Что мешает записать — одной строкой, чтобы кнопка не гасла молча (находка №5). */
   const blockReason = (): string | undefined => {
@@ -358,10 +367,15 @@ export function WorkScreenNext({
                 onClick={() => {
                   // Начало и конец считаются от «сейчас»: дату машинист не вводит,
                   // переход через полночь разбирает общий модуль интервала.
-                  patchFields({ended: hhmmAgo(0), started: hhmmAgo(30)});
+                  // Обрезанный вариант начинает отсчёт от начала смены (№10, Ж1).
+                  patchFields(quickTruncated && shiftStart
+                    ? {ended: hhmmAgo(0), started: hhmm(shiftStart)}
+                    : {ended: hhmmAgo(0), started: hhmmAgo(30)});
                 }}
               >
-                Простой за последние 30 минут
+                {quickTruncated && shiftMinutes !== null
+                  ? `Простой с начала смены, ${shiftMinutes} мин`
+                  : 'Простой за последние 30 минут'}
               </button>
               {interval ? (
                 <p className="rounded-md bg-info/10 px-3 py-2 text-sm font-medium text-info-strong">

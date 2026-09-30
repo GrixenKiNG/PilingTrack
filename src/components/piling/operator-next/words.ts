@@ -41,11 +41,26 @@ export const SHIFT_TYPE_LABELS: Record<'DAY' | 'NIGHT', {title: string; window: 
  * он не говорит, что делать. Здесь у каждой группы кодов есть фраза о том,
  * что произошло и что дальше.
  */
+/** Служебные ответы, от которых машинисту нечего делать: показывать нечего. */
+const TECHNICAL_MESSAGES = new Set(['Некорректная команда', 'Сервер не ответил']);
+
+/** Понятная деталь сервера — фраза с объяснением, а не техническая отписка. */
+function serverDetail(message: string): string | null {
+  const text = message.trim();
+  if (!text || text.length > 300) return null;
+  if (TECHNICAL_MESSAGES.has(text)) return null;
+  return /[А-ЯЁа-яё]/.test(text) ? text : null;
+}
+
 export function humanError(error: unknown): string {
   // Запись легла в очередь — это не отказ, а принятая к отправке запись.
   if (error instanceof QueuedOffline) return error.message;
   if (error instanceof ApiError) {
-    if (error.status === 400) return 'Сервер не принял данные: проверьте заполненное и попробуйте ещё раз.';
+    if (error.status === 400) {
+      // 400 с понятной деталью показываем как есть (№10, Ж1): сервер уже
+      // сказал по-русски, что именно не так. Без детали — прежний общий текст.
+      return serverDetail(error.message) ?? 'Сервер не принял данные: проверьте заполненное и попробуйте ещё раз.';
+    }
     if (error.status === 401) return 'Вход истёк. Войдите снова — запись на устройстве не пропадёт.';
     if (error.status === 403) return 'Это действие вам недоступно. Обратитесь к диспетчеру.';
     if (error.status === 404) return 'Смена или установка на сервере не найдены. Обновите экран.';
