@@ -202,13 +202,16 @@ export function OperatorNextApp() {
       shiftIdRef.current = nextShiftId;
       // Читаем черновик пары только при известном пользователе: общего «anon»
       // больше нет, а ошибка чтения — это не «пусто» (ревью №4, A2 и Д3).
-      let canStore = storageAvailable() && userId != null && nextShiftId != null;
+      const storageReady = storageAvailable();
+      let canStore = storageReady && userId != null && nextShiftId != null;
       let stored: ShellDraftsData | null = null;
       let readOk = false;
+      let readFailed = false;
       if (canStore) {
         const read = loadShellDrafts(userId, nextShiftId);
         if (read.status === 'error') {
           canStore = false;
+          readFailed = true;
         } else {
           stored = read.value;
           readOk = true;
@@ -226,8 +229,11 @@ export function OperatorNextApp() {
       if (!wasLoaded) draftsLoadedRef.current = readOk ? scopeKey : null;
       // Доступность хранилища ≠ сохранность текущей памяти (ревью №5, Д2):
       // успешное перечитывание НЕ снимает предупреждение — снять его может
-      // только новая успешная запись.
-      if (!canStore) setStorageOk(false);
+      // только новая успешная запись. И «нет пары» — не отказ хранилища
+      // (№10, Ж2): пока не известны пользователь или смена, черновиков нет
+      // вовсе, и «память браузера недоступна» было бы ложью. Статус понижают
+      // только реальный отказ хранилища или чтения.
+      if (!storageReady || readFailed) setStorageOk(false);
       setDrafts((current) => {
         if (current.userId === userId && current.shiftId === nextShiftId && wasLoaded) return current;
         return stored
