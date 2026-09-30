@@ -102,11 +102,11 @@ describe('журнал забивки: цель нажатия на телефо
     }
     expect(screen.getByRole('button', { name: 'Сбросить' })).toHaveClass('min-h-11', 'text-xs', 'sm:min-h-8');
 
-    expect(screen.getByRole('combobox')).toHaveClass('min-h-11', 'text-xs', 'sm:h-8');
+    expect(screen.getByRole('combobox')).toHaveClass('min-h-11', 'text-xs', 'sm:min-h-8', 'sm:h-8');
     for (const input of container.querySelectorAll('input[type="date"]')) {
-      expect(input).toHaveClass('min-h-11', 'text-xs', 'sm:h-8');
+      expect(input).toHaveClass('min-h-11', 'text-xs', 'sm:min-h-8', 'sm:h-8');
     }
-    expect(screen.getByPlaceholderText('С-130')).toHaveClass('min-h-11', 'text-xs', 'sm:h-8');
+    expect(screen.getByPlaceholderText('С-130')).toHaveClass('min-h-11', 'text-xs', 'sm:min-h-8', 'sm:h-8');
   });
 
   it('решение по свае («Принять сваю» / «На добивку») на телефоне — 44px', async () => {

@@ -225,7 +225,7 @@ export function PileJournal() {
           <select
             value={filters.siteId}
             onChange={(event) => patch({ siteId: event.target.value })}
-            className="mt-0.5 block min-h-11 rounded-md border bg-card px-2 text-xs sm:h-8"
+            className="mt-0.5 block min-h-11 rounded-md border bg-card px-2 text-xs sm:min-h-8 sm:h-8"
           >
             <option value="all">Все объекты</option>
             {sites.map((site) => (
@@ -240,7 +240,7 @@ export function PileJournal() {
             type="date"
             value={filters.dateFrom}
             onChange={(event) => patch({ dateFrom: event.target.value })}
-            className="mt-0.5 block min-h-11 rounded-md border bg-card px-2 text-xs sm:h-8"
+            className="mt-0.5 block min-h-11 rounded-md border bg-card px-2 text-xs sm:min-h-8 sm:h-8"
           />
         </label>
         <label className="text-2xs text-muted-foreground">
@@ -249,7 +249,7 @@ export function PileJournal() {
             type="date"
             value={filters.dateTo}
             onChange={(event) => patch({ dateTo: event.target.value })}
-            className="mt-0.5 block min-h-11 rounded-md border bg-card px-2 text-xs sm:h-8"
+            className="mt-0.5 block min-h-11 rounded-md border bg-card px-2 text-xs sm:min-h-8 sm:h-8"
           />
         </label>
 
@@ -259,7 +259,7 @@ export function PileJournal() {
             value={filters.pileNumber}
             onChange={(event) => patch({ pileNumber: event.target.value })}
             placeholder="С-130"
-            className="mt-0.5 block min-h-11 w-28 rounded-md border bg-card px-2 text-xs sm:h-8"
+            className="mt-0.5 block min-h-11 w-28 rounded-md border bg-card px-2 text-xs sm:min-h-8 sm:h-8"
           />
         </label>
 
