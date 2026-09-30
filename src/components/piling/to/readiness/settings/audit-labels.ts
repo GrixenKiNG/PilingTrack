@@ -27,6 +27,9 @@ const ACTION_LABEL: Record<string, string> = {
   // было — в журнале он показывался сырым `shift.start-waived`.
   'shift.start-waived': 'Выдано разрешение на пуск',
   'shift.cancelled': 'Смена отменена',
+  // Планировщик техготовности (`runReadinessScheduler`) — код выдаёт только он,
+  // в журнале показывался сырым.
+  'shift.auto-closed': 'Смена закрыта автоматически',
   'handover.submitted': 'Смена передана диспетчеру',
   'handover.resubmitted': 'Передача сдана повторно',
   'handover.accepted': 'Передача принята',
@@ -40,11 +43,18 @@ const ACTION_LABEL: Record<string, string> = {
   'work-permit.approved-dispatcher': 'Наряд согласован диспетчером',
   'work-permit.approved-admin': 'Наряд согласован администратором',
   'work-permit.revoke': 'Наряд отозван',
+  // Планировщик техготовности (`runReadinessScheduler`) — код выдаёт только он,
+  // в журнале показывался сырым.
+  'work-permit.expired': 'Наряд-допуск истёк',
   'defect.reported': 'Зафиксировано замечание',
   'defect.triage': 'Замечание разобрано',
   'defect.resolve': 'Замечание закрыто',
   'defect.reject': 'Замечание отклонено',
   'readiness.exported': 'Выгрузка данных готовности',
+  // Пишут и правила готовности (`readiness-rules-service`), и матрица доступов
+  // (`access-matrix-service`) — код один на две сущности, поэтому подпись без
+  // имени объекта: в журнале он показывался сырым.
+  draft_saved: 'Черновик сохранён',
   published: 'Опубликованы правила готовности',
   // Код действия исторический: замещать можно любую из пяти ролей, и какую
   // именно — записано в самом событии. Подпись «за механика» врала бы на
