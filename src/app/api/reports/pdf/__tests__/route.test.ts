@@ -2,13 +2,18 @@
  * POST /api/reports/pdf — the queued (default) path must carry the tenant id,
  * otherwise the worker builds the period PDF without the organisation name
  * while the synchronous path prints it (audit 44, finding №4).
+ *
+ * GET /api/reports/pdf — sync generation must be rate limited per user
+ * (audit R67, F-PDF-GET-LIMIT): a top-level navigation from a foreign site
+ * carries the SameSite=Lax session cookie and fires the heavy synchronous
+ * render in the victim's browser session.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
 
 const {
   requireAuthMock, assertCanMock, buildPeriodPdfDataMock, enqueuePdfGenerationMock,
-  generatePeriodPdfMock, getPdfJobStatusMock, downloadPdfMock,
+  generatePeriodPdfMock, getPdfJobStatusMock, downloadPdfMock, rateLimiterCheckMock,
 } = vi.hoisted(() => ({
   requireAuthMock: vi.fn(),
   assertCanMock: vi.fn(),
@@ -17,6 +22,11 @@ const {
   generatePeriodPdfMock: vi.fn(),
   getPdfJobStatusMock: vi.fn(),
   downloadPdfMock: vi.fn(),
+  // По умолчанию запрос разрешён: POST/статус-ветки ходят в тот же лимитер.
+  rateLimiterCheckMock: vi.fn(async (_key: string, _config: { maxAttempts: number }) => ({
+    allowed: true,
+    remaining: 20,
+  })),
 }));
 
 vi.mock('@/lib/auth', () => ({ requireAuth: requireAuthMock }));
@@ -30,8 +40,12 @@ vi.mock('@/lib/pdf-queue', () => ({
 vi.mock('@/lib/pdf-generator', () => ({ generatePeriodPdf: generatePeriodPdfMock }));
 vi.mock('@/services/feedback/feedback-event-service', () => ({ recordFeedbackEvent: vi.fn() }));
 vi.mock('@/lib/csrf-protection', () => ({ withCsrf: () => null }));
+vi.mock('@/lib/rate-limiter', () => ({
+  rateLimiter: { check: rateLimiterCheckMock },
+  getRateLimitIdentifier: () => 'test-ip',
+}));
 
-import { POST } from '../route';
+import { GET, POST } from '../route';
 
 const ADMIN = { id: 'user-1', name: 'Мастер', role: 'ADMIN', tenantId: 'tenant-a' };
 
@@ -86,5 +100,73 @@ describe('POST /api/reports/pdf — tenant id reaches the queue', () => {
     expect(enqueuePdfGenerationMock).toHaveBeenCalledWith(
       expect.objectContaining({ tenantId: null })
     );
+  });
+});
+
+describe('GET /api/reports/pdf — лимит на синхронную генерацию по пользователю', () => {
+  // Мини-замена лимитера: считает вызовы по ключу и берёт порог из конфига,
+  // который передал маршрут, — так проверяется именно заданный порог
+  // (20 за 5 минут), а не заглушка.
+  const windows = new Map<string, number>();
+
+  function syncReq(): NextRequest {
+    return new NextRequest('http://localhost/api/reports/pdf?dateFrom=2026-09-01&dateTo=2026-09-30');
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    windows.clear();
+    requireAuthMock.mockResolvedValue({ user: ADMIN, error: null });
+    buildPeriodPdfDataMock.mockResolvedValue({
+      dateFrom: '2026-09-01',
+      dateTo: '2026-09-30',
+      siteId: '',
+      reports: [],
+      totalPiles: 3,
+      totalDrilling: 24,
+      totalDowntime: 75,
+      companyName: 'ООО «ОРИОН-Строй»',
+    });
+    generatePeriodPdfMock.mockResolvedValue(Buffer.from('%PDF-1.4'));
+    rateLimiterCheckMock.mockImplementation(
+      async (key: string, config: { maxAttempts: number }) => {
+        const used = (windows.get(key) ?? 0) + 1;
+        windows.set(key, used);
+        return used > config.maxAttempts
+          ? { allowed: false, remaining: 0, retryAfter: 300 }
+          : { allowed: true, remaining: config.maxAttempts - used };
+      }
+    );
+  });
+
+  it('ключ — по пользователю, лимит 20 за 5 минут', async () => {
+    await GET(syncReq());
+
+    expect(rateLimiterCheckMock).toHaveBeenCalledWith('pdf:get:user-1', {
+      maxAttempts: 20,
+      windowMs: 5 * 60 * 1000,
+      blockDurationMs: 5 * 60 * 1000,
+    });
+  });
+
+  it('обычный темп — PDF отдаётся как раньше', async () => {
+    const res = await GET(syncReq());
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get('content-type')).toBe('application/pdf');
+    expect(generatePeriodPdfMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('21-й запрос за окно — 429 без генерации', async () => {
+    for (let i = 0; i < 20; i++) {
+      expect((await GET(syncReq())).status).toBe(200);
+    }
+
+    const res = await GET(syncReq());
+
+    expect(res.status).toBe(429);
+    expect((await res.json()).error).toBe('Слишком много выгрузок подряд. Подождите пару минут.');
+    expect(res.headers.get('retry-after')).toBe('300');
+    expect(generatePeriodPdfMock).toHaveBeenCalledTimes(20);
   });
 });

@@ -9,12 +9,25 @@ import { enqueuePdfGeneration, getPdfJobStatus, downloadPdf } from '@/lib/pdf-qu
 import { recordFeedbackEvent } from '@/services/feedback/feedback-event-service';
 import { getRequestId } from '@/lib/request-context';
 import { logger } from '@/lib/logger';
+import { rateLimiter, type RateLimitConfig } from '@/lib/rate-limiter';
 import { withApi, withMutation } from '@/core/api-wrapper';
 
 export const runtime = 'nodejs';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+// Ограничение частоты на GET-генерацию PDF (аудит R67, F-PDF-GET-LIMIT):
+// переход верхнего уровня с чужого сайта несёт cookie SameSite=Lax и заставляет
+// браузер жертвы дёргать тяжёлую синхронную генерацию (агрегация + PDFKit).
+// Ключ — пользователь, не IP: экраны бьют с одного адреса за NAT.
+// Тот же ключ и тот же лимит в single-pdf/route.ts — 20 выгрузок за 5 минут
+// суммарно по обеим веткам.
+const PDF_GET_RATE_LIMIT: RateLimitConfig = {
+  maxAttempts: 20,
+  windowMs: 5 * 60 * 1000,
+  blockDurationMs: 5 * 60 * 1000,
+};
 
 // FeedbackEvent messages are rendered verbatim in the feedback feed, so a
 // non-ServiceError (Prisma/English internals) must never reach it — the real
@@ -226,6 +239,15 @@ export const GET = withApi(async (request: NextRequest) => {
 
 async function handleSyncGeneration(request: NextRequest, user: { id: string; name: string; role: string; email: string; phone: string; tenantId: string | null }) {
   const requestId = getRequestId(request);
+
+  // Лимит — до любой работы: и до валидации, и до агрегации с рендером.
+  const rl = await rateLimiter.check(`pdf:get:${user.id}`, PDF_GET_RATE_LIMIT);
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: 'Слишком много выгрузок подряд. Подождите пару минут.' },
+      { status: 429, headers: { 'Retry-After': String(rl.retryAfter || 60) } }
+    );
+  }
 
   try {
     assertCan(user, 'reports.read_all');

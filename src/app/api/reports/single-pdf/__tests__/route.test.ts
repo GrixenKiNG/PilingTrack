@@ -6,6 +6,10 @@
  * PDF's own RESULTS_TTL expires in storage). The ownership check used to be
  * skipped entirely in that case — any authenticated user could poll/download
  * any job by guessing/observing a jobId. Must fail closed instead.
+ *
+ * Also covers the per-user rate limit on the GET sync generation branch
+ * (audit R67, F-PDF-GET-LIMIT): a top-level navigation from a foreign site
+ * carries the SameSite=Lax session cookie and fires the heavy render.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
@@ -13,7 +17,7 @@ import { ServiceError } from '@/lib/service-error';
 
 const {
   requireAuthMock, getPdfJobOwnerIdMock, getPdfJobStatusMock, downloadPdfMock,
-  assertCanAccessReportOwnerMock, assertCanMock,
+  assertCanAccessReportOwnerMock, assertCanMock, rateLimiterCheckMock,
 } = vi.hoisted(() => ({
   requireAuthMock: vi.fn(),
   getPdfJobOwnerIdMock: vi.fn(),
@@ -21,6 +25,11 @@ const {
   downloadPdfMock: vi.fn(),
   assertCanAccessReportOwnerMock: vi.fn(),
   assertCanMock: vi.fn(),
+  // По умолчанию запрос разрешён: POST/статус-ветки ходят в тот же лимитер.
+  rateLimiterCheckMock: vi.fn(async (_key: string, _config: { maxAttempts: number }) => ({
+    allowed: true,
+    remaining: 20,
+  })),
 }));
 
 vi.mock('@/lib/auth', () => ({ requireAuth: requireAuthMock }));
@@ -39,9 +48,14 @@ vi.mock('@/lib/pdf-generator', () => ({ generateSinglePdf: vi.fn() }));
 vi.mock('@/lib/pdf-data', () => ({ loadSingleReportPdfContext: vi.fn() }));
 vi.mock('@/services/feedback/feedback-event-service', () => ({ recordFeedbackEvent: vi.fn() }));
 vi.mock('@/lib/csrf-protection', () => ({ withCsrf: () => null }));
+vi.mock('@/lib/rate-limiter', () => ({
+  rateLimiter: { check: rateLimiterCheckMock },
+  getRateLimitIdentifier: () => 'test-ip',
+}));
 
 import { GET, POST } from '../route';
 import { loadSingleReportPdfContext } from '@/lib/pdf-data';
+import { generateSinglePdf } from '@/lib/pdf-generator';
 import { enqueuePdfGeneration } from '@/lib/pdf-queue';
 import { recordFeedbackEvent } from '@/services/feedback/feedback-event-service';
 
@@ -172,5 +186,67 @@ describe('POST /api/reports/single-pdf — body validation', () => {
     const feedbackMessage = vi.mocked(recordFeedbackEvent).mock.calls[0][0].message;
     expect(feedbackMessage).toBe('Не удалось сформировать PDF — попробуйте ещё раз или сообщите администратору');
     expect(feedbackMessage).not.toContain('prisma');
+  });
+});
+
+describe('GET /api/reports/single-pdf — лимит на синхронную генерацию по пользователю', () => {
+  // Мини-замена лимитера: считает вызовы по ключу и берёт порог из конфига,
+  // который передал маршрут, — так проверяется именно заданный порог
+  // (20 за 5 минут), а не заглушка.
+  const windows = new Map<string, number>();
+
+  function syncReq(): NextRequest {
+    return new NextRequest('http://localhost/api/reports/single-pdf?reportId=report-1');
+  }
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+    windows.clear();
+    requireAuthMock.mockResolvedValue({ user: OPERATOR, error: null });
+    vi.mocked(loadSingleReportPdfContext).mockResolvedValue({
+      report: { date: '2026-09-01', siteId: 'site-1', tenantId: 'tenant-a', userId: 'user-1' },
+      pdfData: {},
+    } as never);
+    vi.mocked(generateSinglePdf).mockResolvedValue(Buffer.from('%PDF-1.4'));
+    rateLimiterCheckMock.mockImplementation(
+      async (key: string, config: { maxAttempts: number }) => {
+        const used = (windows.get(key) ?? 0) + 1;
+        windows.set(key, used);
+        return used > config.maxAttempts
+          ? { allowed: false, remaining: 0, retryAfter: 300 }
+          : { allowed: true, remaining: config.maxAttempts - used };
+      }
+    );
+  });
+
+  it('ключ — по пользователю, лимит 20 за 5 минут', async () => {
+    await GET(syncReq());
+
+    expect(rateLimiterCheckMock).toHaveBeenCalledWith('pdf:get:user-1', {
+      maxAttempts: 20,
+      windowMs: 5 * 60 * 1000,
+      blockDurationMs: 5 * 60 * 1000,
+    });
+  });
+
+  it('обычный темп — PDF отдаётся как раньше', async () => {
+    const res = await GET(syncReq());
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get('content-type')).toBe('application/pdf');
+    expect(generateSinglePdf).toHaveBeenCalledTimes(1);
+  });
+
+  it('21-й запрос за окно — 429 без генерации', async () => {
+    for (let i = 0; i < 20; i++) {
+      expect((await GET(syncReq())).status).toBe(200);
+    }
+
+    const res = await GET(syncReq());
+
+    expect(res.status).toBe(429);
+    expect((await res.json()).error).toBe('Слишком много выгрузок подряд. Подождите пару минут.');
+    expect(res.headers.get('retry-after')).toBe('300');
+    expect(generateSinglePdf).toHaveBeenCalledTimes(20);
   });
 });
