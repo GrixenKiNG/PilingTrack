@@ -148,7 +148,7 @@ export function MeterReadingsPanel({
       </div>
 
       {!formOpen && (
-        <Button variant="outline" size="sm" className="mb-3 h-9 w-full" onClick={() => setFormOpen(true)}>
+        <Button variant="outline" size="sm" className="mb-3 h-11 w-full sm:h-9" onClick={() => setFormOpen(true)}>
           <Plus className="mr-1 h-4 w-4" /> Добавить показание
         </Button>
       )}
@@ -169,18 +169,18 @@ export function MeterReadingsPanel({
               value={hours}
               onChange={(e) => setHours(e.target.value)}
               placeholder="напр. 5670"
-              className="h-9"
+              className="h-11 sm:h-9"
             />
           </div>
           <div>
             <label className="mb-1 block text-2xs text-muted-foreground">Дата снятия</label>
-            <Input type="date" value={recordedAt} onChange={(e) => setRecordedAt(e.target.value)} className="h-9" />
+            <Input type="date" value={recordedAt} onChange={(e) => setRecordedAt(e.target.value)} className="h-11 sm:h-9" />
           </div>
           <div>
             <label className="mb-1 block text-2xs text-muted-foreground">Примечание</label>
-            <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="необязательно" className="h-9" />
+            <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="необязательно" className="h-11 sm:h-9" />
           </div>
-          <Button size="sm" className="h-9 w-full" onClick={submit} disabled={submitting}>
+          <Button size="sm" className="h-11 w-full sm:h-9" onClick={submit} disabled={submitting}>
             {submitting ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : null}
             Сохранить
           </Button>

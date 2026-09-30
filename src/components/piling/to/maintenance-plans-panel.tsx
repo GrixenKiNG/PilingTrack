@@ -162,7 +162,7 @@ export function MaintenancePlansPanel({ equipmentId }: { equipmentId: string }) 
       </div>
 
       {!formOpen && (
-        <Button variant="outline" size="sm" className="mb-3 h-9 w-full" onClick={() => setFormOpen(true)}>
+        <Button variant="outline" size="sm" className="mb-3 h-11 w-full sm:h-9" onClick={() => setFormOpen(true)}>
           <Plus className="mr-1 h-4 w-4" /> Добавить регламент
         </Button>
       )}
@@ -177,7 +177,7 @@ export function MaintenancePlansPanel({ equipmentId }: { equipmentId: string }) 
               <X className="h-4 w-4" />
             </button>
           </div>
-          <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Напр. ТО-1 по моточасам" className="h-9" />
+          <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Напр. ТО-1 по моточасам" className="h-11 sm:h-9" />
           <div className="flex gap-1 rounded-md border border-border bg-card p-1">
             <button
               type="button"
@@ -200,9 +200,9 @@ export function MaintenancePlansPanel({ equipmentId }: { equipmentId: string }) 
             value={interval}
             onChange={(e) => setIntervalValue(e.target.value)}
             placeholder={trigger === 'HOURS' ? 'интервал, м/ч (напр. 250)' : 'интервал, дней (напр. 90)'}
-            className="h-9"
+            className="h-11 sm:h-9"
           />
-          <Button size="sm" className="h-9 w-full" onClick={submit} disabled={submitting}>
+          <Button size="sm" className="h-11 w-full sm:h-9" onClick={submit} disabled={submitting}>
             {submitting ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : null}
             {editingId ? 'Сохранить изменения' : 'Сохранить'}
           </Button>
