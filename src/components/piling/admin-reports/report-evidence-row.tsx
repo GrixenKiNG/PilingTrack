@@ -67,7 +67,7 @@ export function ReportsHeader({
         <Button
           onClick={onPrint}
           variant="outline"
-          className="h-10 border-border bg-card text-foreground"
+          className="h-11 border-border bg-card text-foreground sm:h-10"
         >
           <Printer className="mr-1.5 h-4 w-4" />
           Печать
@@ -76,7 +76,7 @@ export function ReportsHeader({
           onClick={onExport}
           disabled={exporting}
           variant="outline"
-          className="h-10 border-border bg-card text-foreground"
+          className="h-11 border-border bg-card text-foreground sm:h-10"
         >
           <Download className="mr-1.5 h-4 w-4" />
           {exporting ? 'Готовим…' : 'CSV'}
@@ -85,14 +85,14 @@ export function ReportsHeader({
           onClick={onExportXlsx}
           disabled={exporting}
           variant="outline"
-          className="h-10 border-border bg-card text-foreground"
+          className="h-11 border-border bg-card text-foreground sm:h-10"
         >
           <Download className="mr-1.5 h-4 w-4" />
           {exporting ? 'Готовим…' : 'Excel'}
         </Button>}
         {onCreate && <Button
           onClick={onCreate}
-          className="h-10 bg-signal text-white hover:bg-signal-strong"
+          className="h-11 bg-signal text-white hover:bg-signal-strong sm:h-10"
         >
           <Plus className="mr-1.5 h-4 w-4" />
           Новый отчёт
