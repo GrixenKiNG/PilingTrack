@@ -6,9 +6,9 @@
  * русском интерфейсе машинист читал «Failed to fetch» и звонил диспетчеру про
  * поломку приложения вместо того, чтобы проверить связь.
  */
-import {describe, expect, it, vi} from 'vitest';
-import {ApiError, fetchKnowledgeAttempt, operatorErrorDetails, operatorErrorText, QueuedOffline} from '../api';
-import {QueueStorageError} from '../offline-queue';
+import {beforeEach, describe, expect, it, vi} from 'vitest';
+import {ApiError, fetchKnowledgeAttempt, operatorErrorDetails, operatorErrorText, QueuedOffline, sendCommand} from '../api';
+import {QueueStorageError, readQueue} from '../offline-queue';
 
 describe('operatorErrorText', () => {
   it('сетевой сбой — «Нет связи с сервером…», а не английская строка браузера', () => {
@@ -139,5 +139,65 @@ describe('fetchKnowledgeAttempt', () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({status: 'ok'}), {status: 200})));
     await expect(fetchKnowledgeAttempt()).rejects.toThrow(/не от сервера приложения/);
     vi.unstubAllGlobals();
+  });
+});
+
+/**
+ * Судьба записи при немедленной отправке (аудит R82, находка 1).
+ *
+ * Раньше отказ по существу (400/409) прямо здесь вызывал `resolve` и удалял
+ * запись с устройства, хотя тот же самый отказ при сливе очереди оставлял её
+ * как `FAILED`. Один ответ сервера давал противоположный итог для данных:
+ * потеря зависела только от того, была ли связь в момент нажатия.
+ */
+describe('sendCommand и отказ по существу', () => {
+  const command = {
+    command: 'log-production' as const,
+    clientCommandId: 'c1',
+    shiftId: 's1',
+    entry: {kind: 'PILES' as const, pileGradeId: 'g1', count: 12},
+  };
+
+  beforeEach(() => {
+    const store = new Map<string, string>();
+    Object.defineProperty(globalThis, 'localStorage', {
+      configurable: true,
+      value: {
+        getItem: (key: string) => store.get(key) ?? null,
+        setItem: (key: string, value: string) => { store.set(key, value); },
+        removeItem: (key: string) => { store.delete(key); },
+        clear: () => { store.clear(); },
+      },
+    });
+  });
+
+  it('409 — запись остаётся на устройстве как FAILED с причиной, ошибка брошена', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(
+      JSON.stringify({error: 'Смена уже закрыта'}), {status: 409})));
+    const error = await sendCommand(command).catch((caught: unknown) => caught);
+    vi.unstubAllGlobals();
+
+    expect(error).toBeInstanceOf(ApiError);
+    expect((error as ApiError).status).toBe(409);
+    const queue = readQueue();
+    expect(queue).toHaveLength(1);
+    expect(queue[0]).toMatchObject({clientCommandId: 'c1', state: 'FAILED', lastError: 'Смена уже закрыта'});
+  });
+
+  it('успех — запись снимается с устройства', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({data: {}}), {status: 200})));
+    await sendCommand(command);
+    vi.unstubAllGlobals();
+
+    expect(readQueue()).toHaveLength(0);
+  });
+
+  it('обрыв сети — запись ждёт отправки (PENDING), ошибка QueuedOffline', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => { throw new TypeError('Failed to fetch'); }));
+    const error = await sendCommand(command).catch((caught: unknown) => caught);
+    vi.unstubAllGlobals();
+
+    expect(error).toBeInstanceOf(QueuedOffline);
+    expect(readQueue()[0].state).toBe('PENDING');
   });
 });
