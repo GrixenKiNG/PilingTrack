@@ -69,3 +69,25 @@ describe('WorkspaceSettings: пока идёт сохранение', () => {
     await waitFor(() => expect(screen.getByRole('switch', { name: LABEL })).not.toBeDisabled());
   });
 });
+
+/**
+ * QA 30.09.2026 (375×812): переключатели уведомлений были 44×24, кнопка
+ * «Редактировать» — 32px. На телефоне цель расширяется до 44px по высоте
+ * (`min-h-11`), на десктопе вид тот же (`sm:min-h-0`/`sm:h-8`).
+ */
+describe('WorkspaceSettings: цель нажатия на телефоне', () => {
+  it('переключатель и «Редактировать» не ниже 44px на телефоне, на десктопе — без изменений', async () => {
+    mocks.authFetch.mockReset();
+    mocks.authFetch.mockImplementation(async (url: string) => {
+      if (url === '/api/settings') return json({ companyName: 'Орион', timezone: 'Europe/Moscow', notifications: {} });
+      return json({ users: [], nextCursor: null });
+    });
+    render(<WorkspaceSettings />);
+
+    const toggle = await screen.findByRole('switch', { name: LABEL });
+    expect(toggle).toHaveClass('min-h-11', 'sm:min-h-0');
+
+    const edit = screen.getByRole('button', { name: /Редактировать/ });
+    expect(edit).toHaveClass('min-h-11', 'sm:min-h-0');
+  });
+});

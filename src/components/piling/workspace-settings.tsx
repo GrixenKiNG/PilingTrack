@@ -26,14 +26,20 @@ const ROLE_ORDER = ['ADMIN', 'DISPATCHER', 'OPERATOR', 'ASSISTANT'];
 
 function Toggle({ checked, label, disabled, onClick }: { checked: boolean; label: string; disabled?: boolean; onClick: () => void }) {
   return (
+    // Зона касания ≥44px на телефоне: сам <button> растёт по высоте (min-h-11),
+    // а видимая дорожка остаётся 44×24 — палец попадает, вид переключателя не
+    // меняется. `sm:min-h-0` возвращает на десктопе прежнюю высоту.
+    //
     // Дорожка 44px, кружок 20px, поля по 2px с каждой стороны:
     // выключено — left 2px, включено — +20px (2..42). `left-0.5` обязателен:
     // без него кружок вставал в статическую позицию, а <button> центрирует
     // содержимое, поэтому отсчёт шёл от середины и включённый кружок вылезал
     // на 8px за правый край дорожки.
     <button type="button" role="switch" aria-label={label} aria-checked={checked} disabled={disabled} onClick={onClick}
-      className={`relative h-6 w-11 shrink-0 rounded-full transition-colors disabled:opacity-50 ${checked ? 'bg-signal' : 'bg-slate-200'}`}>
-      <span className={`absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-card shadow-sm transition-transform ${checked ? 'translate-x-5' : 'translate-x-0'}`} />
+      className="grid min-h-11 w-11 shrink-0 place-items-center disabled:opacity-50 sm:min-h-0">
+      <span className={`relative block h-6 w-11 rounded-full transition-colors ${checked ? 'bg-signal' : 'bg-slate-200'}`}>
+        <span className={`absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-card shadow-sm transition-transform ${checked ? 'translate-x-5' : 'translate-x-0'}`} />
+      </span>
     </button>
   );
 }
@@ -224,7 +230,7 @@ export function WorkspaceSettings() {
             <CardHeader className="flex-row items-center justify-between space-y-0">
               <CardTitle className="flex items-center gap-2 text-base"><Building2 className="h-4 w-4 text-signal-strong" />Рабочее пространство</CardTitle>
               {isAdmin && !editing && (
-                <Button variant="outline" size="sm" disabled={settingsState !== 'ready'} onClick={() => { setSnapshot(settings); setEditing(true); }}><Pencil className="h-4 w-4" />Редактировать</Button>
+                <Button variant="outline" size="sm" className="min-h-11 sm:min-h-0" disabled={settingsState !== 'ready'} onClick={() => { setSnapshot(settings); setEditing(true); }}><Pencil className="h-4 w-4" />Редактировать</Button>
               )}
             </CardHeader>
             <CardContent>
