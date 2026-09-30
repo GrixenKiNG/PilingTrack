@@ -129,3 +129,30 @@ describe('v1: отказ команды с подробностями', () => {
     expect(alerts.some((node) => node.textContent?.includes('Паспорт заполнен не полностью'))).toBe(true);
   });
 });
+
+/**
+ * Тихое перечитывание после принятой команды (R76, находка 9).
+ *
+ * Команда уже принята сервером; сбой следующего за ней чтения значит лишь
+ * несвежий экран. Раньше он заменял экран полноэкранным «Нет связи», и машинист
+ * читал это как «моя свая не записалась».
+ */
+describe('v1: перечитывание после успешной команды', () => {
+  it('сбой перечитывания не заменяет экран, а показывает уведомление', async () => {
+    api.fetchState.mockResolvedValueOnce(workState);
+    api.fetchState.mockRejectedValueOnce(new ApiError(503, 'Сервис временно недоступен'));
+    api.sendCommand.mockResolvedValue(undefined);
+
+    render(<OperatorMobileApp />);
+
+    fireEvent.click((await screen.findAllByRole('button', {name: 'Завершить работу'}))[0]);
+    fireEvent.click(screen.getByRole('button', {name: 'Да, работа завершена'}));
+
+    expect(await screen.findByText(/Записано\. Не удалось обновить экран/)).toBeInTheDocument();
+    // Экран прежний: полноэкранного отказа нет ни под каким заголовком.
+    expect(screen.queryByText('Сервер не отвечает')).not.toBeInTheDocument();
+    expect(screen.queryByText('Нет связи')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', {name: 'Повторить'})).not.toBeInTheDocument();
+    expect(screen.getAllByRole('button', {name: 'Завершить работу'}).length).toBeGreaterThan(0);
+  });
+});

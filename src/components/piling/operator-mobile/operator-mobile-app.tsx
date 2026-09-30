@@ -78,6 +78,16 @@ export function OperatorMobileApp() {
   const [forbidden, setForbidden] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   /**
+   * Короткое уведомление над текущим экраном — «запись принята».
+   *
+   * Держится отдельно от `actionError`: отказ команды и успешная команда,
+   * после которой не удалось перечитать состояние, — разные вещи, и красная
+   * плашка отказа здесь была бы неправдой. Пока это единственный повод для
+   * заметки: сбой «тихого» перечитывания после принятой команды (аудит R76,
+   * находка 9).
+   */
+  const [notice, setNotice] = useState<string | null>(null);
+  /**
    * Подробности последнего отказа — что именно не заполнено.
    *
    * Держатся рядом с текстом отказа и снимаются вместе с ним: общая фраза
@@ -133,7 +143,19 @@ export function OperatorMobileApp() {
   const [incidentCommandId, setIncidentCommandId] = useState(newCommandId);
   const [correctionCommandId, setCorrectionCommandId] = useState(newCommandId);
 
-  const reload = useCallback(async () => {
+  /**
+   * Перечитать состояние смены.
+   *
+   * `quiet` — вызов после уже принятой команды. Там сбой перечитывания значит
+   * лишь несвежий экран, а не «нет связи»: если показать его как отказ на весь
+   * экран, машинист решит, что запись не прошла, и отправит её второй раз
+   * (аудит R76, находка 9; в v5 для этого тот же режим). Поэтому ошибку отдаём
+   * наверх — вызывающий скажет о ней коротким уведомлением, оставив экран.
+   *
+   * 401 и 403 «тихими» не бывают: истёкшая сессия и роль — не несвежий экран,
+   * и обрабатываются здесь же, до выхода наружу.
+   */
+  const reload = useCallback(async (options: {quiet?: boolean} = {}) => {
     try {
       const next = await fetchState({
         coordinates: coordinates.current,
@@ -142,6 +164,8 @@ export function OperatorMobileApp() {
       setState(next);
       setLoadError(null);
       setServerFault(false);
+      // Экран снова свежий — прежняя заметка о несвежести больше не верна.
+      setNotice(null);
     } catch (error) {
       if (error instanceof ApiError && error.status === 401) {
         // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- намеренно: сессия истекла, полная перезагрузка сбрасывает кэш маршрутов и память вкладки прежнего входа
@@ -154,6 +178,8 @@ export function OperatorMobileApp() {
         setForbidden(error.message);
         return;
       }
+      // Тихое перечитывание: экран остаётся прежним, о сбое скажет вызывающий.
+      if (options.quiet) throw error;
       // 5xx — сломан сервер, а не связь: совет «восстановите связь» здесь врёт,
       // и машинист ищет причину не там.
       setServerFault(error instanceof ApiError && error.status >= 500);
@@ -193,6 +219,7 @@ export function OperatorMobileApp() {
     setActionError(null);
     setActionErrorDetails([]);
     setKnowledgeExpired(false);
+    setNotice(null);
     try {
       await work();
       setChecklistCommandId(newCommandId());
@@ -200,7 +227,18 @@ export function OperatorMobileApp() {
       setIncidentCommandId(newCommandId());
       setCorrectionCommandId(newCommandId());
       setDetour(null);
-      await reload();
+      /*
+        ТИХОЕ ПЕРЕЧИТЫВАНИЕ (аудит R76, находка 9). Команда уже принята
+        сервером, а это чтение лишь освежает экран. Упади оно полноэкранным
+        «Нет связи» — машинист прочитал бы «моя свая не записалась» и набрал
+        бы её заново. Поэтому экран остаётся прежним, а человек получает
+        короткую заметку.
+      */
+      try {
+        await reload({quiet: true});
+      } catch {
+        setNotice('Записано. Не удалось обновить экран — обновится автоматически при связи.');
+      }
       return true;
     } catch (error) {
       // Запись легла в очередь на устройстве — это принято, а не отказ. Форму
@@ -602,6 +640,19 @@ export function OperatorMobileApp() {
       {actionErrorDetails.length > 0 ? (
         <div className="px-3 pt-2">
           <ErrorNote message={actionError} details={actionErrorDetails} />
+        </div>
+      ) : null}
+      {/*
+        Короткое уведомление о принятой записи, экран при этом остаётся
+        прежним (аудит R76, находка 9). Тон предупреждения, а не отказа:
+        запись на сервере есть, несвежим может быть только экран. `role`
+        без `alert` — объявление не должно прерывать чтение экрана.
+      */}
+      {notice ? (
+        <div className="px-3 pt-2">
+          <Panel tone="warning">
+            <p role="status" className="text-sm font-medium">{notice}</p>
+          </Panel>
         </div>
       ) : null}
       {screen()}
