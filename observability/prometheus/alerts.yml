@@ -215,7 +215,10 @@ groups:
   - name: infrastructure
     rules:
       - alert: TargetDown
-        expr: up == 0
+        # F-ALERT-TARGETDOWN-DEDUP (R69): alertmanager исключён — у него своё
+        # правило AlertmanagerDown ниже (5m, critical). Иначе падение
+        # Alertmanager давало бы две тревоги об одном и том же.
+        expr: up{job!="alertmanager"} == 0
         for: 2m
         labels:
           severity: critical
