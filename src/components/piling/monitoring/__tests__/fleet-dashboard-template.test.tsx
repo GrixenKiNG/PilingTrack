@@ -65,6 +65,17 @@ describe('FleetDashboard shared equipment template', () => {
     });
   });
 
+  /**
+   * Следующий ответ `/api/monitoring/fleet` — ошибка, остальные ответы прежние.
+   * Нужно, чтобы показать экран в состоянии сбоя: без снимка и с устаревшим.
+   */
+  const failFleetFetch = () => {
+    const base = mocks.authFetch.getMockImplementation();
+    if (!base) throw new Error('authFetch mock is not configured');
+    mocks.authFetch.mockImplementation(async (url: string, init?: RequestInit) =>
+      url.startsWith('/api/monitoring/fleet') ? { ok: false, json: async () => ({}) } : base(url, init));
+  };
+
   it('applies one saved template to all visible equipment cards', async () => {
     // Шаблон приходит с сервера уже сохранённым: редактор переехал в
     // «Настройки → Шаблоны плиток», и на мониторинге его больше нет. Проверяем
@@ -103,5 +114,52 @@ describe('FleetDashboard shared equipment template', () => {
     // Плавающая кнопка за скрытым замком `?design=1` уехала в настройки.
     // Диспетчеру, который следит за сменой, она под руку больше не попадётся.
     expect(screen.queryByRole('button', { name: 'Редактировать шаблон' })).not.toBeInTheDocument();
+  });
+
+  /**
+   * R73 №54: селекты фильтров «Объект»/«Сортировка» были 32px на телефоне —
+   * диспетчер с телефона тянется пальцем к самому верху экрана. Правка только
+   * на телефоне: `min-h-11 … sm:min-h-0`, на десктопе высота не меняется
+   * (сброс обязателен — `min-height` сильнее `height`).
+   */
+  it('держит селекты фильтров не ниже 44px на телефоне (R73)', async () => {
+    render(<FleetDashboard />);
+    await waitFor(() => expect(screen.getAllByTestId('equipment-tile')).toHaveLength(2));
+
+    for (const label of ['Фильтр по объекту', 'Сортировка техники']) {
+      expect(screen.getByLabelText(label)).toHaveClass('min-h-11', 'sm:min-h-0');
+    }
+  });
+
+  /**
+   * R73 №54: «Повторить загрузку» — ссылка-кнопка высотой в строку текста
+   * (≈20px), ниже минимума WCAG 24px. Телефон поднимает её до 44px, десктоп
+   * оставляет прежней (`sm:min-h-0`).
+   */
+  it('держит «Повторить загрузку» не ниже 44px на телефоне (R73)', async () => {
+    failFleetFetch();
+
+    render(<FleetDashboard />);
+
+    const retry = await screen.findByRole('button', { name: 'Повторить загрузку' });
+    expect(retry).toHaveClass('inline-flex', 'min-h-11', 'items-center', 'sm:min-h-0');
+  });
+
+  /**
+   * R73 №54: «Обновить» в баннере «Показан предыдущий снимок» — та же
+   * ссылка-кнопка (≈20px). Она стоит в строке текста, поэтому рост до 44px
+   * задан через `inline-flex items-center`, чтобы подпись осталась по центру.
+   */
+  it('держит «Обновить» в баннере устаревшего снимка не ниже 44px на телефоне (R73)', async () => {
+    render(<FleetDashboard />);
+    await waitFor(() => expect(screen.getAllByTestId('equipment-tile')).toHaveLength(2));
+
+    // Снимок уже на экране, следующий опрос не удался — появляется баннер
+    // «Показан предыдущий снимок» с кнопкой «Обновить».
+    failFleetFetch();
+    window.dispatchEvent(new Event('online'));
+
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Обновить' })).toBeInTheDocument());
+    expect(screen.getByRole('button', { name: 'Обновить' })).toHaveClass('inline-flex', 'min-h-11', 'items-center', 'sm:min-h-0');
   });
 });
