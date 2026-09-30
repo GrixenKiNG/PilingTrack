@@ -1,0 +1,12 @@
+[Unit]
+Description=PilingTrack independent app liveness guard
+After=docker.service
+
+[Service]
+Type=oneshot
+# Override defaults here if needed, e.g.:
+#   Environment=APP_GUARD_FAIL_THRESHOLD=5
+#   Environment=APP_GUARD_STATE_FILE=/var/lib/pilingtrack/app-guard.state
+ExecStart=/bin/bash /opt/pilingtrack/scripts/app-guard.sh
+StandardOutput=journal
+StandardError=journal
