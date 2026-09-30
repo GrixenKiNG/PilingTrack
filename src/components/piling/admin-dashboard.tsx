@@ -339,7 +339,7 @@ export function AdminDashboard() {
               <button key={m} type="button" onClick={() => setPeriodMode(m)}
                 aria-pressed={periodMode === m}
                 className={cn(
-                  'px-2.5 py-1 text-xs font-medium',
+                  'px-2.5 py-1 text-xs font-medium min-h-11 sm:min-h-0',
                   periodMode === m ? 'bg-info/10 text-info-strong' : 'bg-card text-muted-foreground hover:bg-muted',
                 )}>
                 {label}
