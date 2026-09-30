@@ -193,9 +193,18 @@ export interface CrewWithDetails {
 }
 
 export async function getCrewsWithDetailsRaw(
+  tenantId: string,
   siteId?: string | null
 ): Promise<CrewWithDetails[]> {
   const start = Date.now();
+
+  // Fail closed (CLAUDE.md): у «Crew» нет своей колонки tenantId, он наследуется
+  // от объекта. Пустая организация — отказ, а не полный список активных бригад
+  // всех организаций с e-mail машинистов (аудит R65 #2, тот же случай, что
+  // bulkDeleteReportsRaw в 398d1d50).
+  if (typeof tenantId !== 'string' || tenantId.trim().length === 0) {
+    throw new ServiceError('Не определена организация пользователя', 403);
+  }
 
   const crews = await db.$queryRaw<CrewWithDetails[]>`
     SELECT c.id, c.name, c."operatorId", c."equipmentId", c."siteId",
@@ -208,6 +217,7 @@ export async function getCrewsWithDetailsRaw(
     LEFT JOIN "Equipment" e ON c."equipmentId" = e.id
     LEFT JOIN "Site" s ON c."siteId" = s.id
     WHERE c."isActive" = true
+      AND s."tenantId" = ${tenantId}
       ${siteId ? Prisma.sql`AND c."siteId" = ${siteId}` : Prisma.sql``}
     ORDER BY c."createdAt" DESC
   `;
