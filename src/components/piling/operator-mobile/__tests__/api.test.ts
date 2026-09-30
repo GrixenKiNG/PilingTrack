@@ -6,8 +6,8 @@
  * русском интерфейсе машинист читал «Failed to fetch» и звонил диспетчеру про
  * поломку приложения вместо того, чтобы проверить связь.
  */
-import {describe, expect, it} from 'vitest';
-import {ApiError, operatorErrorText, QueuedOffline} from '../api';
+import {describe, expect, it, vi} from 'vitest';
+import {ApiError, fetchKnowledgeAttempt, operatorErrorText, QueuedOffline} from '../api';
 import {QueueStorageError} from '../offline-queue';
 
 describe('operatorErrorText', () => {
@@ -48,5 +48,42 @@ describe('operatorErrorText', () => {
   it('прочая ошибка — общий совет повторить', () => {
     expect(operatorErrorText(new Error('что-то не сошлось')))
       .toBe('Не удалось выполнить действие. Повторите.');
+  });
+});
+
+/**
+ * Загрузка вопросов проверки знаний (аудит R76, находка 16).
+ *
+ * Раньше экран разбирал ответ своим кодом: `response.json()` шёл до проверки
+ * статуса, а текст брался как `error.message`. Ответ не-JSON (портал Wi‑Fi,
+ * HTML-ошибка прокси) давал английское «Unexpected token '<'…».
+ */
+describe('fetchKnowledgeAttempt', () => {
+  it('не-JSON ответ — русский текст про чужой сервер, а не английский разбор', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('<html>Вход в сеть</html>', {status: 200})));
+    await expect(fetchKnowledgeAttempt()).rejects.toThrow(/не от сервера приложения/);
+    vi.unstubAllGlobals();
+  });
+
+  it('HTML-ошибка прокси — отказ сервера с кодом', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('<html>502</html>', {status: 502})));
+    const error = await fetchKnowledgeAttempt().catch((caught: unknown) => caught);
+    expect(error).toBeInstanceOf(ApiError);
+    expect((error as ApiError).status).toBe(502);
+    expect(operatorErrorText(error)).toBe('Сервер не ответил');
+    vi.unstubAllGlobals();
+  });
+
+  it('успешный ответ — вопросы и токен попытки', async () => {
+    const payload = {data: {questions: [{id: 'q-1', topic: 'GENERAL', text: 'Вопрос', options: ['а', 'б'], correct: 0}], attemptToken: 'token-1'}};
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify(payload), {status: 200})));
+    await expect(fetchKnowledgeAttempt()).resolves.toEqual(payload.data);
+    vi.unstubAllGlobals();
+  });
+
+  it('200 с чужим JSON без наших полей — отказ, экран не зависает', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({status: 'ok'}), {status: 200})));
+    await expect(fetchKnowledgeAttempt()).rejects.toThrow(/не от сервера приложения/);
+    vi.unstubAllGlobals();
   });
 });

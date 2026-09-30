@@ -1,7 +1,7 @@
 'use client';
 
 import type {
-  ChecklistAnswer, ChecklistStage, OperatorMobileState,
+  ChecklistAnswer, ChecklistStage, KnowledgeQuestion, OperatorMobileState,
 } from '@/modules/operator-mobile/contracts';
 import {
   AUTH_WAIT_MESSAGE, classifyFailure, commandLabel, enqueue, isQueueable, markAttempt,
@@ -87,6 +87,42 @@ export async function fetchState(input: {
     credentials: 'same-origin',
   });
   return parse<OperatorMobileState>(response);
+}
+
+/** Набор вопросов проверки знаний: тот же разбор ответа, что у прочих запросов. */
+export interface KnowledgeAttempt {
+  questions: KnowledgeQuestion[];
+  attemptToken: string;
+}
+
+/**
+ * Текст для чужого ответа на загрузке вопросов.
+ *
+ * `parse` про такой ответ говорит «Запись осталась на устройстве» — на этом
+ * экране никакой записи нет, и та фраза здесь только сбивает с толку.
+ */
+const NOT_SERVER_RESPONSE =
+  'Ответ пришёл не от сервера приложения — возможно, сеть требует входа (Wi‑Fi). Проверьте соединение и повторите.';
+
+export async function fetchKnowledgeAttempt(signal?: AbortSignal): Promise<KnowledgeAttempt> {
+  const response = await fetch('/api/operator/knowledge-attempt', {
+    cache: 'no-store',
+    credentials: 'same-origin',
+    signal,
+  });
+  let attempt: KnowledgeAttempt;
+  try {
+    attempt = await parse<KnowledgeAttempt>(response);
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 0) throw new ApiError(0, NOT_SERVER_RESPONSE);
+    throw error;
+  }
+  // Форма ответа — тоже проверка: 200 с чужим JSON (портал Wi‑Fi, прокси) без
+  // `questions` оставил бы экран навсегда на «Получаем вопросы…».
+  if (!attempt || !Array.isArray(attempt.questions) || typeof attempt.attemptToken !== 'string') {
+    throw new ApiError(0, NOT_SERVER_RESPONSE);
+  }
+  return attempt;
 }
 
 /** Один залог: серия ударов и погружение сваи за неё. */

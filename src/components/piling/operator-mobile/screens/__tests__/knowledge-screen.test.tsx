@@ -38,6 +38,56 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+describe('загрузка вопросов', () => {
+  it('успешный ответ — вопросы на экране', async () => {
+    stubAttempt();
+    render(<KnowledgeScreen busy={false} error={null} onDone={vi.fn()} onBack={vi.fn()} />);
+    expect(await screen.findByText('Вопрос 1')).toBeInTheDocument();
+    expect(screen.queryByRole('button', {name: 'Повторить'})).not.toBeInTheDocument();
+  });
+
+  /*
+    Страница-перехватчик Wi‑Fi и HTML-ошибка прокси отвечают не нашим JSON.
+    Раньше экран разбирал ответ до проверки статуса и показывал машинисту
+    английское «Unexpected token '<'…» (аудит R76, находка 16).
+  */
+  it('HTML вместо JSON при 200 — русский текст, а не английский разбор', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(
+      '<!doctype html><html><body>Вход в сеть отеля</body></html>',
+      {status: 200, headers: {'Content-Type': 'text/html'}},
+    )));
+    render(<KnowledgeScreen busy={false} error={null} onDone={vi.fn()} onBack={vi.fn()} />);
+
+    expect(await screen.findByText(/не от сервера приложения/)).toBeInTheDocument();
+    expect(screen.queryByText(/Unexpected token/i)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', {name: 'Повторить'})).toBeInTheDocument();
+  });
+
+  it('HTML-ошибка прокси со статусом 502 — русский отказ, без английского разбора', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(
+      '<html><head><title>502 Bad Gateway</title></head></html>',
+      {status: 502, headers: {'Content-Type': 'text/html'}},
+    )));
+    render(<KnowledgeScreen busy={false} error={null} onDone={vi.fn()} onBack={vi.fn()} />);
+
+    expect(await screen.findByText('Сервер не ответил')).toBeInTheDocument();
+    expect(screen.queryByText(/Unexpected token/i)).not.toBeInTheDocument();
+  });
+
+  // Истёкшая сессия — не повод предлагать «Повторить»: тот же запрос отклонят
+  // тем же 401. Уводим на вход, как на загрузке состояния рабочего места.
+  it('401 уводит на вход', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(
+      JSON.stringify({error: 'Войдите в систему'}),
+      {status: 401},
+    )));
+    render(<KnowledgeScreen busy={false} error={null} onDone={vi.fn()} onBack={vi.fn()} />);
+
+    await waitFor(() => expect(window.location.pathname).toBe('/login'));
+    expect(screen.queryByRole('button', {name: 'Повторить'})).not.toBeInTheDocument();
+  });
+});
+
 describe('итог проверки знаний при просроченной попытке', () => {
   it('объясняет, что время вышло, и даёт начать заново вместо повтора отправки', async () => {
     const fetchMock = stubAttempt();

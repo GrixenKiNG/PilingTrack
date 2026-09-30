@@ -3,6 +3,7 @@
 import {useEffect, useState} from 'react';
 import {TOPIC_LABELS, type KnowledgeQuestion} from '@/modules/operator-mobile/contracts';
 import {cn} from '@/lib/utils';
+import {ApiError, fetchKnowledgeAttempt, operatorErrorText} from '../api';
 import {BigButton, ErrorNote, Panel, PanelTitle, Screen} from '../ui';
 
 /** Часть серверного текста просроченной попытки (`admission.ts:314`). */
@@ -51,12 +52,23 @@ export function KnowledgeScreen(props: KnowledgeScreenProps) {
   const [retry, setRetry] = useState(0);
   useEffect(() => {
     const abort = new AbortController();
-    void fetch('/api/operator/knowledge-attempt', {cache: 'no-store', signal: abort.signal})
-      .then(async response => {
-        const body = await response.json();
-        if (!response.ok) throw new Error(body.error ?? 'Не удалось получить вопросы');
-        if (!abort.signal.aborted) setAttempt(body.data);
-      }).catch(error => { if (!abort.signal.aborted) setLoadError(error.message); });
+    // Тем же путём, что и остальные запросы экрана: сначала статус, потом
+    // разбор (`api.ts`). Раньше здесь `response.json()` шёл до проверки `ok`, и
+    // страница-перехватчик Wi‑Fi отдавала машинисту английское «Unexpected
+    // token '<'…» (аудит R76, находка 16).
+    void fetchKnowledgeAttempt(abort.signal)
+      .then((loaded) => { if (!abort.signal.aborted) setAttempt(loaded); })
+      .catch((error: unknown) => {
+        if (abort.signal.aborted) return;
+        // Сессия истекла — как на загрузке состояния (`operator-mobile-app.tsx`):
+        // «Повторить» здесь повторяло бы запрос, который отклонит тот же 401.
+        if (error instanceof ApiError && error.status === 401) {
+          // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- намеренно: сессия истекла, полная перезагрузка сбрасывает кэш маршрутов и память вкладки прежнего входа
+          window.location.href = '/login';
+          return;
+        }
+        setLoadError(operatorErrorText(error));
+      });
     return () => abort.abort();
   }, [retry]);
   /**
