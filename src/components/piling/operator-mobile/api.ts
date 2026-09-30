@@ -39,9 +39,18 @@ export class ApiError extends Error {
  *
  * Отказ сервера (`ApiError`) несёт русский текст от сервера — его и показываем:
  * «Смена закрыта» объясняет положение лучше любой общей фразы.
+ *
+ * ПОЧЕМУ ОТДЕЛЬНО `QueueStorageError` И `QueuedOffline`. Обе несут готовый
+ * русский текст, который нельзя затирать общей фразой. У `QueueStorageError`
+ * это предупреждение о возможной ПОТЕРЕ данных («Память браузера недоступна
+ * (частный режим?) — без связи запись не сохранится. Не закрывайте форму…»);
+ * у `QueuedOffline` — «сохранено на устройстве, отправим при связи». Раньше их
+ * текст показывался как `error.message`, а общий возврат его съедал.
  */
 export function operatorErrorText(error: unknown): string {
   if (error instanceof ApiError) return error.message;
+  if (error instanceof QueueStorageError) return error.message;
+  if (error instanceof QueuedOffline) return error.message;
   if (error instanceof TypeError) return 'Нет связи с сервером. Проверьте интернет и повторите.';
   return 'Не удалось выполнить действие. Повторите.';
 }

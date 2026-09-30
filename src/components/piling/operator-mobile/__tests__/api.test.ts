@@ -7,7 +7,8 @@
  * поломку приложения вместо того, чтобы проверить связь.
  */
 import {describe, expect, it} from 'vitest';
-import {ApiError, operatorErrorText} from '../api';
+import {ApiError, operatorErrorText, QueuedOffline} from '../api';
+import {QueueStorageError} from '../offline-queue';
 
 describe('operatorErrorText', () => {
   it('сетевой сбой — «Нет связи с сервером…», а не английская строка браузера', () => {
@@ -21,6 +22,27 @@ describe('operatorErrorText', () => {
 
   it('отказ сервера доносит свой русский текст', () => {
     expect(operatorErrorText(new ApiError(400, 'Смена закрыта'))).toBe('Смена закрыта');
+  });
+
+  // Ошибка хранилища — предупреждение о возможной потере данных, его нельзя
+  // затирать общей фразой: «не закрывайте форму» и есть выход.
+  it('недоступное хранилище объясняет, что запись не сохранится', () => {
+    expect(operatorErrorText(new QueueStorageError('unavailable'))).toBe(
+      'Память браузера недоступна (частный режим?) — без связи запись не сохранится. Не закрывайте форму и отправьте её при связи.',
+    );
+  });
+
+  it('переполненное хранилище просит освободить место', () => {
+    expect(operatorErrorText(new QueueStorageError('full'))).toBe(
+      'Не удалось сохранить запись на устройстве. Не закрывайте форму: освободите место или восстановите связь и повторите.',
+    );
+  });
+
+  it('запись в очереди — не отказ, а «сохранено на устройстве»', () => {
+    expect(operatorErrorText(new QueuedOffline('Выработка')))
+      .toBe('Выработка: сохранено на устройстве, отправим при связи');
+    expect(operatorErrorText(new QueuedOffline('Выработка', 'после входа')))
+      .toBe('Выработка: сохранено на устройстве, отправим после входа');
   });
 
   it('прочая ошибка — общий совет повторить', () => {
