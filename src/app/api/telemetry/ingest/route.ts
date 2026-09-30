@@ -96,7 +96,10 @@ export const POST = withApi(async (request: NextRequest) => {
   const requestId = getRequestId(request);
 
   // Rate limiting (device-specific, higher than default)
-  const identifier = getRateLimitIdentifier(request);
+  // Ключ с префиксом маршрута: порог здесь свой (500/60 с против 1000/60 с
+  // у /api/telemetry), а корзина раньше была общей — и с ними, и с публичной
+  // формой заявок ORION.
+  const identifier = `telemetry:ingest:${getRateLimitIdentifier(request)}`;
   const rl = await rateLimiter.check(identifier, TELEMETRY_RATE_LIMIT);
   if (!rl.allowed) {
     return NextResponse.json(
@@ -138,7 +141,10 @@ export const POST = withApi(async (request: NextRequest) => {
 export const PATCH = withApi(async (request: NextRequest) => {
   const requestId = getRequestId(request);
 
-  const identifier = getRateLimitIdentifier(request);
+  // Ключ с префиксом маршрута: порог здесь свой (500/60 с против 1000/60 с
+  // у /api/telemetry), а корзина раньше была общей — и с ними, и с публичной
+  // формой заявок ORION.
+  const identifier = `telemetry:ingest:${getRateLimitIdentifier(request)}`;
   const rl = await rateLimiter.check(identifier, TELEMETRY_RATE_LIMIT);
   if (!rl.allowed) {
     return NextResponse.json(

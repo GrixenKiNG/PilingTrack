@@ -65,7 +65,10 @@ export const POST = withApi(async (request: NextRequest) => {
   const csrfCheck = withCsrf(request);
   if (csrfCheck) return csrfCheck;
 
-  const identifier = getRateLimitIdentifier(request);
+  // Ключ с префиксом телеметрии — см. telemetry/route.ts: без него корзина
+  // общая с публичной формой заявок ORION, и её порог (5/10 мин) закрывает
+  // приём телеметрии с того же адреса.
+  const identifier = `telemetry:${getRateLimitIdentifier(request)}`;
   const rl = await rateLimiter.check(identifier, TELEMETRY_RATE_LIMIT);
   if (!rl.allowed) {
     return NextResponse.json(
