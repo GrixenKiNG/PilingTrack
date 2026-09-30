@@ -341,7 +341,7 @@ export function EquipmentDetail({ equipmentId, embedded = false }: Props) {
   }
 
   return (
-    <div className={cn('space-y-5', 'p-4 lg:p-6')}>
+    <div className={cn('space-y-5', 'p-4 lg:p-6', 'field-type')}>
       <BackLink />
 
       {header}

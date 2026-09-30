@@ -121,4 +121,20 @@ describe('журнал забивки: цель нажатия на телефо
     const decisions = within(accept.parentElement as HTMLElement);
     expect(decisions.getByRole('button', { name: 'На добивку' })).toHaveClass('h-11', 'text-xs', 'sm:h-8');
   });
+
+  /**
+   * F-TEXT-FIELD-TYPE: корень журнала носит `.field-type`, чтобы лифт мелкого
+   * текста (globals.css) поднимал 3xs/2xs до 13px на телефоне и планшете.
+   * Карточка сваи рендерится внутри этого корня (не в портале), поэтому лифт
+   * достаёт и до сетки фактов с кнопками решения.
+   */
+  it('корень журнала и карточка сваи несут .field-type (F-TEXT-FIELD-TYPE)', async () => {
+    const { container } = await renderJournal();
+
+    expect(container.firstElementChild).toHaveClass('field-type');
+
+    fireEvent.click(screen.getByText('С-130'));
+    const accept = await screen.findByRole('button', { name: 'Принять сваю' });
+    expect(accept.closest('.field-type')).not.toBeNull();
+  });
 });

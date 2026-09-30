@@ -190,7 +190,7 @@ export function PileJournal() {
   const patch = (part: Partial<JournalFilters>) => setFilters((current) => ({ ...current, ...part }));
 
   return (
-    <div className="space-y-3 p-4">
+    <div className="space-y-3 p-4 field-type">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-lg font-semibold">Журнал забивки свай</h1>

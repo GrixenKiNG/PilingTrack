@@ -93,7 +93,7 @@ export function AdminEquipment() {
   }
 
   return (
-    <div className="space-y-4 p-4 lg:p-6">
+    <div className="space-y-4 p-4 lg:p-6 field-type">
       {/* Заголовок и KPI — во всю ширину, над колонками: внутри левой колонки
           плитки в один ряд ужимались до ~128px и текст обрезался. */}
       <div className="flex flex-wrap items-center justify-between gap-3">
