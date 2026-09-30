@@ -162,7 +162,7 @@ describe('POST /api/alerts/webhook — notification switch', () => {
     mocks.enabled.mockResolvedValueOnce(false);
     const res = await POST(reqWithBody(firing));
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ ok: true, forwarded: 0 });
+    expect(await res.json()).toEqual({ ok: true, forwarded: 0, reason: 'disabled' });
     expect(mocks.sendAlert).not.toHaveBeenCalled();
   });
 
@@ -170,5 +170,55 @@ describe('POST /api/alerts/webhook — notification switch', () => {
     const res = await POST(reqWithBody(firing));
     expect(await res.json()).toEqual({ ok: true, forwarded: 1 });
     expect(mocks.sendAlert).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('POST /api/alerts/webhook — delivery failure', () => {
+  const originalEnv = process.env.ALERTMANAGER_WEBHOOK_TOKEN;
+
+  beforeEach(() => {
+    process.env.ALERTMANAGER_WEBHOOK_TOKEN = TOKEN;
+    mocks.enabled.mockResolvedValue(true);
+    mocks.sendAlert.mockClear();
+  });
+  afterEach(() => {
+    process.env.ALERTMANAGER_WEBHOOK_TOKEN = originalEnv;
+    mocks.sendAlert.mockResolvedValue(true);
+  });
+
+  const firing = {
+    alerts: [{ status: 'firing', labels: { severity: 'critical', alertname: 'rule-1' }, annotations: { summary: 'Disk full' } }],
+  };
+
+  it('answers 503 when a firing alert could not be delivered (Alertmanager must retry)', async () => {
+    mocks.sendAlert.mockResolvedValue(false);
+    const res = await POST(reqWithBody(firing));
+    expect(res.status).toBe(503);
+    expect(await res.json()).toEqual({
+      ok: false,
+      forwarded: 0,
+      error: 'Не удалось доставить алерты в Telegram',
+    });
+    expect(mocks.sendAlert).toHaveBeenCalledTimes(1);
+  });
+
+  it('answers 200 when at least one message was delivered', async () => {
+    const alerts = [
+      { status: 'firing', labels: { severity: 'critical', alertname: 'rule-1' }, annotations: {} },
+      { status: 'firing', labels: { severity: 'warning', alertname: 'rule-2' }, annotations: {} },
+    ];
+    mocks.sendAlert.mockResolvedValueOnce(false).mockResolvedValueOnce(true);
+    const res = await POST(reqWithBody({ alerts }));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true, forwarded: 1 });
+  });
+
+  it('answers 200 when the batch has only resolved alerts (no firing to deliver)', async () => {
+    const res = await POST(reqWithBody({
+      alerts: [{ status: 'resolved', labels: { severity: 'critical', alertname: 'rule-1' }, annotations: {} }],
+    }));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true, forwarded: 0 });
+    expect(mocks.sendAlert).not.toHaveBeenCalled();
   });
 });
