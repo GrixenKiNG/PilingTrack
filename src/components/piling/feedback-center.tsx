@@ -64,6 +64,31 @@ function formatEventDate(value: string) {
   });
 }
 
+// Подписи областей (scope) для бейджа ленты. Ключи — реальные значения из
+// recordAuditEvent/recordFeedbackEvent/pushClientFeedback. Незнакомую область
+// показываем как есть: скрывать её нельзя (F-FEED-SCOPE-LABELS).
+const SCOPE_LABELS: Record<string, string> = {
+  equipment: 'Техника',
+  inspections: 'Осмотры',
+  users: 'Пользователи',
+  sites: 'Объекты',
+  crews: 'Бригады',
+  reports: 'Отчёты',
+  pdf: 'PDF',
+  dictionaries: 'Справочники',
+  settings: 'Настройки',
+  projections: 'Аналитика',
+  auth: 'Безопасность',
+  telegram: 'Telegram',
+  network: 'Сеть',
+  api: 'API',
+  ui: 'Интерфейс',
+};
+
+function getScopeLabel(scope: string) {
+  return SCOPE_LABELS[scope] ?? scope;
+}
+
 export function FeedbackCenter() {
   const user = usePilingStore((state) => state.currentUser);
   // Operators/assistants get a plain notifications feed; the platform-health
@@ -276,7 +301,7 @@ export function FeedbackCenter() {
                             <p className="text-sm font-semibold text-foreground">{event.title}</p>
                             {getPriorityBadge(event.priority)}
                             <Badge variant="secondary" className="text-3xs">
-                              {event.source === 'client' ? 'локально' : event.scope}
+                              {event.source === 'client' ? 'локально' : getScopeLabel(event.scope)}
                             </Badge>
                             {event.unread && (
                               <Badge className="bg-signal/10 text-signal-strong hover:bg-signal/10">Новое</Badge>

@@ -125,3 +125,38 @@ describe('центр уведомлений: цели нажатия на тел
     }
   });
 });
+
+/**
+ * F-FEED-SCOPE-LABELS — бейдж области показывал сырой код (`equipment`),
+ * непонятный владельцу. Известные области берут подпись из словаря,
+ * незнакомая остаётся как есть (не скрываем), локальное событие — «локально».
+ */
+describe('лента: подписи области события (F-FEED-SCOPE-LABELS)', () => {
+  it('переводит известную область на русский', () => {
+    state.events = [feedbackEvent({scope: 'equipment'})];
+
+    render(<FeedbackCenter />);
+    fireEvent.click(screen.getByRole('button', {name: 'Открыть уведомления'}));
+
+    expect(screen.getByText('Техника')).toBeInTheDocument();
+  });
+
+  it('незнакомую область показывает как есть', () => {
+    state.events = [feedbackEvent({scope: 'unknown_scope'})];
+
+    render(<FeedbackCenter />);
+    fireEvent.click(screen.getByRole('button', {name: 'Открыть уведомления'}));
+
+    expect(screen.getByText('unknown_scope')).toBeInTheDocument();
+  });
+
+  it('для локального события показывает «локально», а не область', () => {
+    state.localEvents = [feedbackEvent({id: 'local-1', source: 'client', scope: 'equipment'})];
+
+    render(<FeedbackCenter />);
+    fireEvent.click(screen.getByRole('button', {name: 'Открыть уведомления'}));
+
+    expect(screen.getByText('локально')).toBeInTheDocument();
+    expect(screen.queryByText('Техника')).toBeNull();
+  });
+});
