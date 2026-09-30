@@ -25,6 +25,7 @@ import { startProjection } from './unified-worker/projection';
 import { startPmScheduler } from './unified-worker/pm-scheduler';
 import { startProjectionRebuildScheduler } from './unified-worker/projection-rebuild-scheduler';
 import { startReadinessScheduler } from './unified-worker/readiness-scheduler';
+import { startIdempotencyCleanupScheduler } from './unified-worker/idempotency-cleanup-scheduler';
 import { initWorkerSentry } from './unified-worker/sentry';
 import { workerStates } from './unified-worker/state';
 
@@ -33,6 +34,7 @@ let healthServer: http.Server | null = null;
 let stopPmScheduler: (() => void) | null = null;
 let stopProjectionRebuild: (() => void) | null = null;
 let stopReadinessScheduler: (() => void) | null = null;
+let stopIdempotencyCleanup: (() => void) | null = null;
 
 async function gracefulShutdown(signal: string): Promise<void> {
   if (isShuttingDown) {
@@ -72,6 +74,11 @@ async function gracefulShutdown(signal: string): Promise<void> {
   if (stopReadinessScheduler) {
     stopReadinessScheduler();
     stopReadinessScheduler = null;
+  }
+
+  if (stopIdempotencyCleanup) {
+    stopIdempotencyCleanup();
+    stopIdempotencyCleanup = null;
   }
 
   if (healthServer) {
@@ -134,6 +141,13 @@ async function main(): Promise<void> {
   // числится согласованным. Идемпотентен, выбора лидера не требует.
   if (process.env.READINESS_SCHEDULER_ENABLED !== 'false') {
     stopReadinessScheduler = startReadinessScheduler();
+  }
+
+  // Суточная уборка просроченных ключей идемпотентности: таблица задумана с
+  // TTL 7 суток, но очистку никто не вызывал (R63 #4). Идемпотентна, лидера
+  // не требует; организация не нужна — таблица намеренно вне RLS.
+  if (process.env.IDEMPOTENCY_CLEANUP_ENABLED !== 'false') {
+    stopIdempotencyCleanup = startIdempotencyCleanupScheduler();
   }
 
   logger.info('Unified Worker Service ready');
