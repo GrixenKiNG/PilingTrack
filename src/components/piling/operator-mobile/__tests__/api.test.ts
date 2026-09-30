@@ -7,7 +7,7 @@
  * поломку приложения вместо того, чтобы проверить связь.
  */
 import {describe, expect, it, vi} from 'vitest';
-import {ApiError, fetchKnowledgeAttempt, operatorErrorText, QueuedOffline} from '../api';
+import {ApiError, fetchKnowledgeAttempt, operatorErrorDetails, operatorErrorText, QueuedOffline} from '../api';
 import {QueueStorageError} from '../offline-queue';
 
 describe('operatorErrorText', () => {
@@ -48,6 +48,60 @@ describe('operatorErrorText', () => {
   it('прочая ошибка — общий совет повторить', () => {
     expect(operatorErrorText(new Error('что-то не сошлось')))
       .toBe('Не удалось выполнить действие. Повторите.');
+  });
+});
+
+/**
+ * Подробности отказа (аудит R76, находка 10).
+ *
+ * Сервер отвечает общей фразой и списком подробностей, и список до сих пор
+ * нигде не читался: машинист читал «Паспорт заполнен не полностью» и не знал,
+ * что править. Здесь проверяется отбор: понятные русские строки показываем,
+ * идентификаторы вопросов и разбор схемы запроса (zod issues) — нет.
+ */
+describe('operatorErrorDetails', () => {
+  it('объекты с русским текстом — это подробности полей', () => {
+    const error = new ApiError(400, 'Паспорт заполнен не полностью', [
+      {field: 'pileNumber', message: 'Укажите номер сваи по проекту'},
+      {field: 'sets', message: 'В залоге нужны число ударов больше нуля и погружение от нуля'},
+    ]);
+
+    expect(operatorErrorDetails(error)).toEqual([
+      'Укажите номер сваи по проекту',
+      'В залоге нужны число ударов больше нуля и погружение от нуля',
+    ]);
+  });
+
+  it('список строк — тоже подробности', () => {
+    const error = new ApiError(400, 'Выберите, что произошло', ['Отметьте хотя бы один наблюдаемый признак']);
+
+    expect(operatorErrorDetails(error)).toEqual(['Отметьте хотя бы один наблюдаемый признак']);
+  });
+
+  it('разбор схемы запроса (zod issues) наружу не выходит', () => {
+    const error = new ApiError(400, 'Некорректная команда', [
+      {
+        code: 'invalid_type',
+        path: ['entry', 'passport', 'pileNumber'],
+        message: 'Invalid input: expected string, received undefined',
+      },
+      {code: 'too_small', path: ['entry', 'count'], message: 'Too small: expected number to be >0'},
+    ]);
+
+    expect(operatorErrorDetails(error)).toEqual([]);
+  });
+
+  it('идентификаторы вопросов проверки знаний машинисту не показываются', () => {
+    const error = new ApiError(409, 'Не на все вопросы дан верный ответ', ['q-general-4', 'q-rigging-2']);
+
+    expect(operatorErrorDetails(error)).toEqual([]);
+  });
+
+  it('чужие формы подробностей и не-`ApiError` — пустой список', () => {
+    expect(operatorErrorDetails(new ApiError(409, 'Работа запрещена', {blocks: ['DOCUMENT_EXPIRED']}))).toEqual([]);
+    expect(operatorErrorDetails(new ApiError(400, 'Паспорт заполнен не полностью'))).toEqual([]);
+    expect(operatorErrorDetails(new Error('что-то не сошлось'))).toEqual([]);
+    expect(operatorErrorDetails(new ApiError(400, 'Отказ', [null, 7, {message: 5}]))).toEqual([]);
   });
 });
 

@@ -55,6 +55,49 @@ export function operatorErrorText(error: unknown): string {
   return 'Не удалось выполнить действие. Повторите.';
 }
 
+/**
+ * Строки подробностей отказа — то, чего не хватает в общей фразе сервера.
+ *
+ * ПОЧЕМУ ЭТО НУЖНО. Отказ по существу сервер отвечает общей фразой и списком
+ * подробностей: «Паспорт заполнен не полностью» и какие поля не заполнены,
+ * «Чек-лист заполнен не полностью» и какие пункты, «Залог № 2 заполнен неверно»
+ * и что в нём не так (`production.ts:286,297`, `checklist.ts:127`). До сих пор
+ * список собирался в `ApiError` и нигде не читался: машинист заполняет полтора
+ * десятка полей паспорта, читает «заполнен не полностью» и не знает, что
+ * править (аудит R76, находка 10).
+ *
+ * ПОЧЕМУ ЗДЕСЬ ОТБОР, А НЕ ПРОСТО ПОКАЗ `details`. В этом поле приходит три
+ * разные вещи: названные человеку поля (список строк у происшествия — «Выберите,
+ * что произошло»; список объектов с русским `message`/`label` у паспорта и
+ * чек-листа), идентификаторы вопросов проверки знаний (`admission.ts:320-324`) и
+ * разбор схемы запроса — zod issues со своими кодами и английскими
+ * техническими сообщениями (`command/route.ts:196`). Показать можно только
+ * первое: идентификатор вопроса и техническое сообщение схемы машинисту ничего
+ * не говорят. Отличительный признак понятной строки один — русский текст, и
+ * другого признака у нас нет.
+ *
+ * Всё, что не опознано, — пустой список. Выдумать подробность хуже, чем
+ * показать одну общую фразу.
+ */
+export function operatorErrorDetails(error: unknown): string[] {
+  if (!(error instanceof ApiError) || !Array.isArray(error.details)) return [];
+  const lines: string[] = [];
+  for (const item of error.details) {
+    const text = typeof item === 'string' ? item : detailText(item);
+    // Кириллица — признак того, что строку писал человек для человека.
+    if (text && /[А-Яа-яЁё]/.test(text)) lines.push(text.trim());
+  }
+  return lines;
+}
+
+/** Текст подробности в известных формах: `{message}` у паспорта и чек-листа, `{label}` — на будущее. */
+function detailText(item: unknown): string | null {
+  if (typeof item !== 'object' || item === null) return null;
+  const {message, label} = item as {message?: unknown; label?: unknown};
+  if (typeof message === 'string') return message;
+  return typeof label === 'string' ? label : null;
+}
+
 async function parse<T>(response: Response): Promise<T> {
   const payload = await response.json().catch(() => null) as
     {data?: T; error?: string; details?: unknown} | null;

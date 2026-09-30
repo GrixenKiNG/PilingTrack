@@ -6,13 +6,13 @@ import type {
   ChecklistAnswer, ChecklistStage, OperatorMobileState, OperatorPhase,
 } from '@/modules/operator-mobile/contracts';
 import {
-  ApiError, currentPosition, fetchState, newCommandId, operatorErrorText, QueuedOffline, sendCommand,
-  type ProductionEntryInput,
+  ApiError, currentPosition, fetchState, newCommandId, operatorErrorDetails, operatorErrorText, QueuedOffline,
+  sendCommand, type ProductionEntryInput,
 } from './api';
 import {OfflineQueueBanner} from './offline-queue-banner';
 import {useOfflineQueue} from './use-offline-queue';
 import {OperatorStatusStrip} from './operator-status-strip';
-import {BigButton, Panel, PanelTitle, PhaseBar, Screen, TabBar} from './ui';
+import {BigButton, ErrorNote, Panel, PanelTitle, PhaseBar, Screen, TabBar} from './ui';
 import {IdentityScreen} from './screens/identity-screen';
 import {BriefingScreen} from './screens/briefing-screen';
 import {KnowledgeScreen, isKnowledgeAttemptExpired} from './screens/knowledge-screen';
@@ -77,6 +77,14 @@ export function OperatorMobileApp() {
   const [serverFault, setServerFault] = useState(false);
   const [forbidden, setForbidden] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  /**
+   * Подробности последнего отказа — что именно не заполнено.
+   *
+   * Держатся рядом с текстом отказа и снимаются вместе с ним: общая фраза
+   * «Паспорт заполнен не полностью» без списка полей бесполезна (аудит R76,
+   * находка 10). Отбор строк из `ApiError.details` — `operatorErrorDetails`.
+   */
+  const [actionErrorDetails, setActionErrorDetails] = useState<string[]>([]);
   /**
    * Отказ проверки знаний из-за просроченной попытки. Держится отдельно от
    * `actionError`: экрану мало текста отказа, ему нужно знать, что повтор
@@ -183,6 +191,7 @@ export function OperatorMobileApp() {
   const run = useCallback(async (work: () => Promise<unknown>): Promise<boolean> => {
     setBusy(true);
     setActionError(null);
+    setActionErrorDetails([]);
     setKnowledgeExpired(false);
     try {
       await work();
@@ -205,9 +214,11 @@ export function OperatorMobileApp() {
         setCorrectionCommandId(newCommandId());
         setDetour(null);
         setActionError(null);
+        setActionErrorDetails([]);
         return true;
       }
       setActionError(operatorErrorText(error));
+      setActionErrorDetails(operatorErrorDetails(error));
       // Просроченная попытка проверки знаний — единственный отказ, который
       // повтором не лечится: экран предложит новую попытку вместо кнопки
       // повторной отправки. Признак считает `isKnowledgeAttemptExpired` (400 и
@@ -462,7 +473,7 @@ export function OperatorMobileApp() {
           expired={knowledgeExpired}
           // Новая попытка начата: прежний отказ снимаем, иначе он висел бы на
           // экране поверх новых вопросов.
-          onRestart={() => { setActionError(null); setKnowledgeExpired(false); }}
+          onRestart={() => { setActionError(null); setActionErrorDetails([]); setKnowledgeExpired(false); }}
           onDone={(picks, attemptToken) => void run(() => sendCommand({command: 'submit-knowledge', picks, attemptToken}))}
           onBack={() => setDetour(null)}
         />
@@ -574,6 +585,25 @@ export function OperatorMobileApp() {
       />
       <OperatorStatusStrip online={online} items={queued} />
       <OfflineQueueBanner items={queued} onRetry={retryQueued} onDiscard={discardQueued} />
+      {/*
+        Отказ с подробностями — отдельной плашкой над экраном.
+
+        Почему здесь, а не в экране формы. Текст отказа рисуют экраны
+        (`work-screen.tsx`, `checklist-screen.tsx` и другие), и лежат они вне
+        этой правки. Показывать подробности отдельно от текста нельзя: список
+        полей без фразы «Паспорт заполнен не полностью» читается как
+        непонятный обрывок. Поэтому рабочее место показывает отказ целиком —
+        фразу и перечень того, что не заполнено, — в той же плашке, что и
+        экраны (`ErrorNote`), над текущим экраном.
+
+        Плашка есть только у отказа с подробностями: обычный отказ, как и
+        раньше, читается одним `ErrorNote` внутри экрана.
+      */}
+      {actionErrorDetails.length > 0 ? (
+        <div className="px-3 pt-2">
+          <ErrorNote message={actionError} details={actionErrorDetails} />
+        </div>
+      ) : null}
       {screen()}
     </OperatorFrame>
   );

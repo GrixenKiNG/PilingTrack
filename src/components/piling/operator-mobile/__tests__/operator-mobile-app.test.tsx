@@ -6,8 +6,9 @@
  * связь есть, сломан сервер, и чинить его будет механик или администратор, а не
  * машинист с выключенным и включённым Wi-Fi.
  */
-import {render, screen} from '@testing-library/react';
+import {fireEvent, render, screen} from '@testing-library/react';
 import {beforeEach, describe, expect, it, vi} from 'vitest';
+import type {OperatorMobileState} from '@/modules/operator-mobile/contracts';
 
 const api = vi.hoisted(() => ({
   fetchState: vi.fn(),
@@ -63,5 +64,68 @@ describe('v1: загрузка состояния не удалась', () => {
     expect(screen.queryByText(/Failed to fetch/)).not.toBeInTheDocument();
     expect(screen.queryByText('Сервер не отвечает')).not.toBeInTheDocument();
     expect(screen.getByRole('button', {name: 'Повторить'})).toBeInTheDocument();
+  });
+});
+
+/**
+ * Отказ команды с подробностями (R76, находка 10).
+ *
+ * Общая фраза сервера без перечня полей бесполезна: машинист после «Паспорт
+ * заполнен не полностью» не знает, какое из пятнадцати полей править. Здесь
+ * проверяется вся цепочка — отказ команды → `details` у `ApiError` → плашка
+ * над экраном со списком.
+ */
+const workState = {
+  phase: 'WORK',
+  productionDate: '2026-09-20',
+  shift: {id: 'shift-1', productionDate: '2026-09-20'},
+  assignment: {equipmentId: 'eq-1', equipmentName: 'Установка 12', siteName: 'Площадка А', lastMeter: null},
+  identity: {
+    ppe: {confirmed: true, missing: []},
+    briefing: {ok: true, acknowledgedAt: '2026-09-20T05:00:00.000Z'},
+    knowledge: {ok: true}, documents: [],
+  },
+  checklists: ['PRESHIFT_INSPECTION', 'SITE_READY', 'EO_BEFORE'].map((stage) => ({stage, done: true})),
+  permit: {allowed: true, blocks: []},
+  dictionaries: {pileGrades: [], drillingTypes: [], downtimeReasons: []},
+  production: {
+    piles: {count: 12, meters: 60},
+    drilling: {count: 4, meters: 24},
+    downtimeHours: 0,
+  },
+  entries: [], warnings: [], defects: [], incidents: [], progress: [],
+} as unknown as OperatorMobileState;
+
+async function finishWork(failure: unknown) {
+  api.fetchState.mockResolvedValue(workState);
+  api.sendCommand.mockRejectedValue(failure);
+
+  render(<OperatorMobileApp />);
+
+  fireEvent.click((await screen.findAllByRole('button', {name: 'Завершить работу'}))[0]);
+  fireEvent.click(screen.getByRole('button', {name: 'Да, работа завершена'}));
+
+  return screen.findAllByRole('alert');
+}
+
+describe('v1: отказ команды с подробностями', () => {
+  it('показывает, что именно не заполнено', async () => {
+    const alerts = await finishWork(new ApiError(400, 'Паспорт заполнен не полностью', [
+      {field: 'pileNumber', message: 'Укажите номер сваи по проекту'},
+    ]));
+
+    const note = alerts.find((node) => node.textContent?.includes('Укажите номер сваи по проекту'));
+    expect(note).toHaveTextContent('Паспорт заполнен не полностью');
+    expect(screen.getAllByRole('listitem').map((item) => item.textContent))
+      .toContain('Укажите номер сваи по проекту');
+  });
+
+  it('разбор схемы запроса машинисту не показывается', async () => {
+    const alerts = await finishWork(new ApiError(400, 'Паспорт заполнен не полностью', [
+      {code: 'invalid_type', path: ['entry'], message: 'Invalid input: expected object'},
+    ]));
+
+    expect(alerts.some((node) => node.textContent?.includes('Invalid input'))).toBe(false);
+    expect(alerts.some((node) => node.textContent?.includes('Паспорт заполнен не полностью'))).toBe(true);
   });
 });
