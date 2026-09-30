@@ -129,7 +129,7 @@ export function MaintenanceDetailPanel({
               <TimelineLine tone="green" date={formatRuDate(record.startedAt)} text={record.startedAt ? 'Работы начаты' : 'Работы не начаты'} actor={assigneeName} />
               <TimelineLine tone={record.completedAt ? 'green' : 'orange'} date={formatRuDate(record.completedAt)} text={record.completedAt ? 'ТО закрыто' : 'Закрытие ожидается'} actor={assigneeName} />
             </div>
-            <Link href={`/admin/maintenance/${record.id}`} className="mt-3 inline-flex text-xs font-medium text-info-strong hover:text-info-strong">
+            <Link href={`/admin/maintenance/${record.id}`} className="mt-3 inline-flex min-h-11 items-center text-xs font-medium text-info-strong hover:text-info-strong sm:min-h-0">
               Показать все события
             </Link>
           </PanelSection>
@@ -138,7 +138,7 @@ export function MaintenanceDetailPanel({
         <footer className="grid grid-cols-2 gap-2 border-t border-border px-4 py-3">
           <Button
             size="sm"
-            className="h-9 bg-signal px-2 text-white hover:bg-signal-strong"
+            className="h-11 bg-signal px-2 text-white hover:bg-signal-strong sm:h-9"
             disabled={closeBusy || record.status === 'DONE'}
             onClick={() => void onClose(record)}
           >
@@ -148,7 +148,7 @@ export function MaintenanceDetailPanel({
             type="button"
             size="sm"
             variant="outline"
-            className="h-9 px-2"
+            className="h-11 px-2 sm:h-9"
             onClick={() => window.print()}
           >
             <Printer className="mr-1 h-4 w-4" /> Печать
