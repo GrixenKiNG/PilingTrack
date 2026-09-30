@@ -43,6 +43,20 @@ export function runWithGucApplied<T>(fn: () => T): T {
   return gucApplied.run(true, fn);
 }
 
+/**
+ * Выйти из пометки «тенант уже в базе» для работы, идущей глобальным клиентом
+ * МИМО объемлющей транзакции.
+ *
+ * Пометка живёт в AsyncLocalStorage и наследуется всем, что вызвано изнутри
+ * `$transaction(async (tx) => …)`, — в том числе запросами через глобальный
+ * `db`, которые уходят другим соединением, где `set_config` не выполнялся.
+ * Такой запрос шёл без тенанта, и строгий RLS молча отдавал ноль строк: PDF
+ * отчёта из транзакции outbox не видел настроек бота (30.09.2026).
+ */
+export function runOutsideGucScope<T>(fn: () => T): T {
+  return gucApplied.exit(fn);
+}
+
 /** Выставлен ли уже `app.current_tenant` для текущей транзакции. */
 export function isGucApplied(): boolean {
   return gucApplied.getStore() === true;

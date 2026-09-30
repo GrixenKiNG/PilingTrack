@@ -19,6 +19,7 @@ import {
   runWithTenantContext,
   setRequestTenantId,
 } from '@/core/security/tenant-context';
+import { runOutsideGucScope } from '@/core/security/tenant-rls';
 
 // ============================================================
 // Configuration
@@ -47,10 +48,15 @@ async function getConfigs(): Promise<TelegramBotConfig[]> {
     // из мест без обёртки маршрута (webhook Alertmanager, публичная форма
     // заявки, очередь недоставленных). Без него под строгими политиками RLS
     // настройка бота не читается и уведомления молча пропадают.
-    return await runWithTenantContext(async () => {
+    //
+    // И вне пометки «тенант уже в базе»: отправку зовут и изнутри транзакций
+    // (PDF отчёта — из блокировки строки outbox), а запрос ниже идёт
+    // глобальным клиентом другим соединением. С унаследованной пометкой
+    // расширение не прикладывало тенанта, и RLS отдавал ноль настроек.
+    return await runWithTenantContext(() => runOutsideGucScope(async () => {
       setRequestTenantId(tenantId);
       return loadConfigsForTenant(tenantId);
-    });
+    }));
   } catch (err) {
     logger.error('Failed to load Telegram config', err);
     return [];
