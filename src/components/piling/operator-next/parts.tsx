@@ -16,8 +16,8 @@ import {cn} from '@/lib/utils';
 export function StageTitle({children, hint}: {children: ReactNode; hint?: ReactNode}) {
   return (
     <div className="pt-1">
-      <h2 className="text-2xs font-semibold uppercase tracking-wider text-muted-foreground">{children}</h2>
-      {hint ? <p className="mt-1 text-2xs text-muted-foreground">{hint}</p> : null}
+      <h2 className="text-base font-semibold uppercase tracking-wider text-muted-foreground">{children}</h2>
+      {hint ? <p className="mt-1 text-sm text-muted-foreground">{hint}</p> : null}
     </div>
   );
 }
@@ -31,7 +31,7 @@ export function StageTitle({children, hint}: {children: ReactNode; hint?: ReactN
  */
 export function ReasonNote({children}: {children: ReactNode}) {
   return (
-    <p role="note" className="rounded-lg border border-warning/50 bg-warning/10 px-3 py-2 text-2xs font-medium text-warning-strong">
+    <p role="note" className="rounded-lg border border-warning/50 bg-warning/10 px-3 py-2 text-sm font-medium text-warning-strong">
       {children}
     </p>
   );
@@ -73,7 +73,7 @@ export function ActionButton({
         )}
       >
         <span>{label}</span>
-        {hint ? <span className="text-3xs font-medium opacity-80">{hint}</span> : null}
+        {hint ? <span className="text-sm font-medium opacity-80">{hint}</span> : null}
       </button>
       {blocked && reason ? <ReasonNote>{reason}</ReasonNote> : null}
     </div>
@@ -103,7 +103,7 @@ export function ChoiceButton({
       )}
     >
       <span className="text-base font-bold leading-tight">{label}</span>
-      {hint ? <span className="text-2xs text-muted-foreground">{hint}</span> : null}
+      {hint ? <span className="text-sm text-muted-foreground">{hint}</span> : null}
     </button>
   );
 }
@@ -131,7 +131,7 @@ export function NextActionCard({
       data-testid={testId ?? 'next-action'}
       className="rounded-xl border border-signal/40 bg-signal/5 p-4 shadow-xs"
     >
-      <h2 className="text-2xs font-semibold uppercase tracking-wider text-signal-strong">Следующее действие</h2>
+      <h2 className="text-base font-semibold uppercase tracking-wider text-signal-strong">Следующее действие</h2>
       <p className="mt-1 text-base font-bold leading-snug">{title}</p>
       <p className="mt-1 text-sm text-muted-foreground">{hint}</p>
       <div className="mt-3">
@@ -163,7 +163,7 @@ export function ErrorStrip({
       data-testid={testId ?? 'error-strip'}
       className="mx-3 mt-2 space-y-2 rounded-xl border border-destructive/45 bg-destructive/8 p-3"
     >
-      <p className="text-sm font-semibold text-destructive-strong">{message}</p>
+      <p className="text-base font-semibold text-destructive-strong">{message}</p>
       <button
         type="button"
         onClick={onRetry}
@@ -186,7 +186,7 @@ export function NoticeStrip({children, testId}: {children: ReactNode; testId?: s
     <div
       role="status"
       data-testid={testId ?? 'notice-strip'}
-      className="mx-3 mt-2 rounded-xl border border-success/45 bg-success/8 px-3 py-2 text-2xs font-semibold text-success-strong"
+      className="mx-3 mt-2 rounded-xl border border-success/45 bg-success/8 px-3 py-2 text-sm font-semibold text-success-strong"
     >
       {children}
     </div>

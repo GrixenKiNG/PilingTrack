@@ -192,7 +192,7 @@ export function ReportSendScreen({
             className="w-full rounded-md border bg-card p-3 text-sm shadow-xs"
           />
           {!storageOk ? (
-            <p className="mt-1 text-2xs text-muted-foreground">
+            <p className="mt-1 text-sm text-muted-foreground">
               Черновик не сохранится при перезагрузке страницы: память браузера недоступна.
             </p>
           ) : null}

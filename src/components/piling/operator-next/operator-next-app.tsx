@@ -879,7 +879,7 @@ export function OperatorNextApp() {
     <Frame>
       <PhaseBar progress={state.progress} />
       <div className="px-3 pt-2">
-        <p className={online ? 'text-2xs text-muted-foreground' : 'text-2xs font-semibold text-warning-strong'}>
+        <p className={online ? 'text-sm text-muted-foreground' : 'text-sm font-semibold text-warning-strong'}>
           {online ? 'Связь есть' : 'Связи нет — записи сохраняются на устройстве'}
         </p>
       </div>

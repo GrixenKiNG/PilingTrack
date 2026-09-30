@@ -65,10 +65,10 @@ export function AdmissionScreen({
                 {step.done ? '✓' : step.n}
               </StatusMark>
               <span className="min-w-0 flex-1">
-                <span className="block text-sm font-bold leading-snug">{step.title}</span>
-                <span className="block text-2xs text-muted-foreground">{step.hint}</span>
+                <span className="block text-base font-bold leading-snug">{step.title}</span>
+                <span className="block text-sm text-muted-foreground">{step.hint}</span>
               </span>
-              <span className={step.done ? 'text-2xs font-semibold text-success-strong' : 'text-2xs font-semibold text-warning-strong'}>
+              <span className={step.done ? 'text-sm font-semibold text-success-strong' : 'text-sm font-semibold text-warning-strong'}>
                 {step.note}
               </span>
             </>

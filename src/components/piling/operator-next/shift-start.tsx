@@ -112,7 +112,7 @@ export function ShiftStartScreen({
       <WarningsPanel warnings={state.warnings} />
 
       {loading ? (
-        <p role="status" className="text-2xs font-semibold text-info-strong">
+        <p role="status" className="text-sm font-semibold text-info-strong">
           Загружаем выбранную установку…
         </p>
       ) : null}
@@ -130,7 +130,7 @@ export function ShiftStartScreen({
               disabled={busy || loading}
             />
           ))}
-          <p className="text-2xs text-muted-foreground">
+          <p className="text-sm text-muted-foreground">
             Касание строки только выбирает установку. Смена откроется после кнопки «Принять установку».
           </p>
         </div>
@@ -139,7 +139,7 @@ export function ShiftStartScreen({
       {assignment ? (
         <Panel>
           <PanelTitle>{assignment.equipmentName}</PanelTitle>
-          <p className="text-2xs text-muted-foreground">
+          <p className="text-sm text-muted-foreground">
             {assignment.equipmentModel || 'модель не указана'}
           </p>
           <div className="mt-3">
@@ -168,7 +168,7 @@ export function ShiftStartScreen({
               <Fact label="Помощник" value={assignment.assistants.join(', ')} />
             ) : null}
           </div>
-          <p className="mt-2 text-2xs text-muted-foreground">
+          <p className="mt-2 text-sm text-muted-foreground">
             Сваи, бурение и простой — накопительно по объекту. Топливо — остаток на конец предыдущей
             смены этой машины.
           </p>
@@ -179,10 +179,10 @@ export function ShiftStartScreen({
         {state.weather ? (
           <>
             <div className="flex items-baseline justify-between gap-3">
-              <span className="text-2xs font-semibold uppercase tracking-wider text-muted-foreground">
+              <span className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
                 Погода на площадке
               </span>
-              <span className="text-sm font-bold tabular-nums">
+              <span className="text-base font-bold tabular-nums">
                 {state.weather.temperatureC !== null ? `${state.weather.temperatureC}°` : '—'}
                 {' · ветер '}
                 {state.weather.windMs !== null ? state.weather.windMs : '—'}
@@ -190,7 +190,7 @@ export function ShiftStartScreen({
               </span>
             </div>
             {state.conditions.length > 0 ? (
-              <p className="mt-1 text-2xs text-muted-foreground">
+              <p className="mt-1 text-sm text-muted-foreground">
                 {state.conditions.map((condition) => CONDITION_LABELS[condition]).join(', ')}.
                 В чек-листы добавлены сезонные пункты.
               </p>

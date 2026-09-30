@@ -220,7 +220,7 @@ export function ChecklistRunScreen({
       )}
     >
       <div className={cn('onx-counter', remaining === 0 && 'is-done')} data-testid="inspection-counter">
-        <span className="text-2xs font-semibold uppercase tracking-wider text-muted-foreground">
+        <span className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
           {remaining === 0 ? 'Осмотр отмечен' : 'Осталось отметить'}
         </span>
         <strong>{remaining}</strong>
@@ -248,7 +248,7 @@ export function ChecklistRunScreen({
             <div className="flex items-start justify-between gap-3">
               <PanelTitle>
                 {section.title}
-                <span className="ml-2 align-middle text-2xs font-medium text-muted-foreground">
+                <span className="ml-2 align-middle text-sm font-medium text-muted-foreground">
                   {doneCount} из {section.items.length}
                 </span>
               </PanelTitle>
@@ -267,7 +267,7 @@ export function ChecklistRunScreen({
               ) : null}
             </div>
             {canceled ? (
-              <p className="mt-1 text-2xs text-muted-foreground">
+              <p className="mt-1 text-sm text-muted-foreground">
                 Отмечены только пункты без ответа. Уже выбранные замечания и неисправности не тронуты.
               </p>
             ) : null}
@@ -321,10 +321,10 @@ function ItemRow({
           {known ? '✓' : draft.answer === 'FAULT' ? '✕' : draft.answer === 'REMARK' ? '!' : draft.answer === 'OK' ? '✓' : '·'}
         </StatusMark>
         <div className="min-w-0">
-          <p className="text-sm font-semibold leading-snug">{item.text}</p>
-          {item.hint ? <p className="text-2xs text-muted-foreground">{item.hint}</p> : null}
+          <p className="text-base font-semibold leading-snug">{item.text}</p>
+          {item.hint ? <p className="text-sm text-muted-foreground">{item.hint}</p> : null}
           {known ? (
-            <p className="mt-1 text-2xs text-success-strong">Подтверждено системой: {known.fact}</p>
+            <p className="mt-1 text-sm text-success-strong">Подтверждено системой: {known.fact}</p>
           ) : null}
         </div>
       </div>
@@ -347,7 +347,7 @@ function ItemRow({
 
           {isIssue ? (
             <label className="block">
-              <span className="text-2xs font-medium text-muted-foreground">
+              <span className="text-base font-medium text-muted-foreground">
                 Опишите, что именно не так
               </span>
               <textarea
@@ -363,7 +363,7 @@ function ItemRow({
 
           {measure && measureNeeded ? (
             <label className="block">
-              <span className="text-2xs font-medium text-muted-foreground">
+              <span className="text-base font-medium text-muted-foreground">
                 {measure.label}, {measure.unit}
               </span>
               <input
@@ -377,7 +377,7 @@ function ItemRow({
                 className="mt-1 h-12 w-full rounded-md border bg-card px-3 text-lg font-semibold tabular-nums shadow-xs"
               />
               {lastMeter && measure.key === 'engineHours' ? (
-                <span className="mt-1 block text-2xs text-muted-foreground">
+                <span className="mt-1 block text-base text-muted-foreground">
                   Прошлое показание: {lastMeter.engineHours} м/ч
                 </span>
               ) : null}
@@ -390,7 +390,7 @@ function ItemRow({
                   блок исчезал после первого файла, человек не видел, что снимок
                   приложен, и не мог добавить второй. */}
               {draft.mediaIds.length > 0 ? (
-                <p className="text-2xs text-success-strong">Снимков приложено: {draft.mediaIds.length}</p>
+                <p className="text-sm text-success-strong">Снимков приложено: {draft.mediaIds.length}</p>
               ) : null}
               <label className="onx-quiet flex cursor-pointer items-center justify-center rounded-lg border border-dashed px-3">
                 {draft.uploading
@@ -424,7 +424,7 @@ function ItemRow({
         </>
       ) : null}
 
-      {problem ? <p className="text-2xs font-medium text-warning-strong">{problem}</p> : null}
+      {problem ? <p className="text-sm font-medium text-warning-strong">{problem}</p> : null}
     </li>
   );
 }

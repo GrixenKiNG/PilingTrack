@@ -167,7 +167,7 @@ export function WorkScreenNext({
       ) : undefined}
     >
       {mode === 'NONE' && !storageOk ? (
-        <p className="text-2xs text-muted-foreground">
+        <p className="text-sm text-muted-foreground">
           Черновик не сохранится при перезагрузке страницы: память браузера недоступна.
         </p>
       ) : null}
@@ -211,10 +211,10 @@ export function WorkScreenNext({
           <div className="pt-1">
             {finishing ? (
               <div className="space-y-2 rounded-xl border border-warning/50 bg-warning/10 p-3">
-                <p className="text-sm font-bold">
+                <p className="text-base font-bold">
                   {WORDS.finishWork}? Дальше — осмотр после работы, новую выработку записать будет нельзя.
                 </p>
-                <p className="text-2xs text-muted-foreground">
+                <p className="text-sm text-muted-foreground">
                   За смену: {state.production.piles.count} свай, {state.production.drilling.count} скважин, простой {formatDowntimeHours(state.production.downtimeHours)}.
                 </p>
                 <ActionButton label="Да, работа завершена" tone="danger" onClick={onFinish} disabled={busy} />
@@ -257,7 +257,7 @@ export function WorkScreenNext({
         <ActionButton label="Назад к смене" tone="ghost" onClick={() => open('NONE')} />
         <Panel>
           <PanelTitle>Паспорт сваи</PanelTitle>
-          <p className="mt-1 text-2xs text-muted-foreground">
+          <p className="mt-1 text-sm text-muted-foreground">
             Залоги нумеруются самим списком. «Отказ» в паспорте — это осадка сваи за залог (мм/удар),
             а не поломка машины.
           </p>
@@ -277,7 +277,7 @@ export function WorkScreenNext({
             </fieldset>
           </div>
           {!storageOk && mode === 'PASSPORT' ? (
-            <p className="mt-2 text-2xs text-muted-foreground">
+            <p className="mt-2 text-sm text-muted-foreground">
               Черновик не сохранится при перезагрузке страницы: память браузера недоступна.
             </p>
           ) : null}
@@ -293,7 +293,7 @@ export function WorkScreenNext({
                 больше ничего не теряет. */}
             <ActionButton label="Очистить" tone="ghost" onClick={() => patchFields(emptyFormFields())} disabled={locked || !dirty} />
           </div>
-          <p className="text-2xs text-muted-foreground">
+          <p className="text-sm text-muted-foreground">
             {storageOk
               ? 'Набранное сохраняется при переходах и переживёт перезагрузку страницы. Уйдёт только после подтверждённой записи.'
               : 'Черновик не сохранится при перезагрузке страницы: память браузера недоступна. Уйдёт только после подтверждённой записи.'}
@@ -392,7 +392,7 @@ export function WorkScreenNext({
               никуда не уходит, значит обещать сохранение, которого не будет. */}
           {mode === 'DRILLING' ? null : (
             <label className="block">
-              <span className="text-2xs font-medium text-muted-foreground">Комментарий, если нужно</span>
+              <span className="text-base font-medium text-muted-foreground">Комментарий, если нужно</span>
               <textarea
                 value={fields.comment}
                 disabled={locked}
@@ -424,7 +424,7 @@ function NumberField({label, value, onChange, decimal = false, disabled}: {
 }) {
   return (
     <label className="block">
-      <span className="text-2xs font-medium text-muted-foreground">{label}</span>
+      <span className="text-base font-medium text-muted-foreground">{label}</span>
       <input
         type="number"
         inputMode={decimal ? 'decimal' : 'numeric'}
@@ -445,7 +445,7 @@ function TimeField({label, value, onChange, disabled}: {
 }) {
   return (
     <label className="block">
-      <span className="text-2xs font-medium text-muted-foreground">{label}, ЧЧ:ММ</span>
+      <span className="text-base font-medium text-muted-foreground">{label}, ЧЧ:ММ</span>
       <input
         type="time"
         aria-label={`${label}, ЧЧ:ММ`}

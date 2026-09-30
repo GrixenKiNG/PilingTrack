@@ -37,7 +37,7 @@ function Num({label, unit, value, onChange, hint, allowNegative, step = '0.01', 
 }) {
   return (
     <label className="block">
-      <span className="text-2xs font-medium text-muted-foreground">
+      <span className="text-base font-medium text-muted-foreground">
         {label}{unit ? `, ${unit}` : ''}
       </span>
       <input
@@ -50,7 +50,7 @@ function Num({label, unit, value, onChange, hint, allowNegative, step = '0.01', 
         onChange={(event) => onChange(event.target.value)}
         className="mt-1 h-12 w-full rounded-md border bg-card px-3 text-lg font-semibold tabular-nums shadow-xs"
       />
-      {hint ? <span className="mt-1 block text-2xs text-muted-foreground">{hint}</span> : null}
+      {hint ? <span className="mt-1 block text-base text-muted-foreground">{hint}</span> : null}
     </label>
   );
 }
@@ -67,7 +67,7 @@ function Check({label, checked, onChange, disabled}: {
         onChange={(event) => onChange(event.target.checked)}
         className="h-5 w-5"
       />
-      <span className="text-sm font-medium">{label}</span>
+      <span className="text-base font-medium">{label}</span>
     </label>
   );
 }
@@ -177,7 +177,7 @@ export function PassportForm({grades, busy, value, onChange, onSubmit}: {
   return (
     <div className="space-y-3">
       <label className="block">
-        <span className="text-2xs font-medium text-muted-foreground">Марка сваи</span>
+        <span className="text-base font-medium text-muted-foreground">Марка сваи</span>
         <select
           value={value.grade}
           disabled={busy}
@@ -192,7 +192,7 @@ export function PassportForm({grades, busy, value, onChange, onSubmit}: {
       </label>
 
       <label className="block">
-        <span className="text-2xs font-medium text-muted-foreground">Номер сваи по проекту</span>
+        <span className="text-base font-medium text-muted-foreground">Номер сваи по проекту</span>
         <input
           value={value.number}
           disabled={busy}
@@ -220,7 +220,7 @@ export function PassportForm({grades, busy, value, onChange, onSubmit}: {
 
       <Panel tone={exceeds === true ? 'warning' : 'plain'}>
         <PanelTitle tone={exceeds === true ? 'warning' : 'plain'}>Залоги и отказ</PanelTitle>
-        <p className="mt-1 text-2xs text-muted-foreground">
+        <p className="mt-1 text-sm text-muted-foreground">
           Залог — серия ударов, после которой снимают по рейке, на сколько свая ушла.
           Отказ считается по трём последним залогам.
         </p>
@@ -234,7 +234,7 @@ export function PassportForm({grades, busy, value, onChange, onSubmit}: {
             return (
               <div key={index} className="rounded-md border bg-muted/40 p-2">
                 <div className="flex items-center justify-between">
-                  <span className="text-2xs font-semibold text-muted-foreground">
+                  <span className="text-sm font-semibold text-muted-foreground">
                     Залог № {index + 1}
                     {setRefusal !== null ? ` · отказ ${setRefusal} мм/удар` : ''}
                   </span>
@@ -286,8 +286,8 @@ export function PassportForm({grades, busy, value, onChange, onSubmit}: {
         </div>
         {refusal !== null && journal ? (
           <p className={exceeds === true
-            ? 'mt-3 rounded-md bg-warning/15 px-3 py-2 text-sm font-semibold text-warning-strong'
-            : 'mt-3 rounded-md bg-info/10 px-3 py-2 text-sm font-semibold text-info-strong'}
+            ? 'mt-3 rounded-md bg-warning/15 px-3 py-2 text-base font-semibold text-warning-strong'
+            : 'mt-3 rounded-md bg-info/10 px-3 py-2 text-base font-semibold text-info-strong'}
           >
             Отказ: {refusal} мм/удар
             {journal.setsUsed < REFUSAL_SET_WINDOW
@@ -335,7 +335,7 @@ export function PassportForm({grades, busy, value, onChange, onSubmit}: {
       </div>
 
       <label className="block">
-        <span className="text-2xs font-medium text-muted-foreground">Примечание</span>
+        <span className="text-base font-medium text-muted-foreground">Примечание</span>
         <textarea
           value={value.note}
           disabled={busy}
