@@ -74,6 +74,17 @@ function csvMeters(meters: number): string {
   return meters.toFixed(1).replace('.', ',');
 }
 
+/**
+ * Дробное значение в CSV — через запятую, разделитель полей «;» (D-20260930-007).
+ * Метры бурения и часы простоя уходили точкой («16.7»), и русский Excel читал
+ * их как текст: колонка не суммировалась. Целые оставляем как есть — «2», а не
+ * «2,0». `formatFixed` из @/lib/format сюда не подходит по той же причине, что и
+ * в csvMeters: он добавляет разряды неразрывным пробелом («1 234,5»).
+ */
+function csvDecimal(value: number): string {
+  return String(value).replace('.', ',');
+}
+
 /** Метраж по строке свай: count × длина сваи из единственного источника (lib/pile-length). */
 function pileRowMeters(pile: { count?: number | null; pileGrade?: { lengthMm?: number | null } | null }): number {
   return (pile.count ?? 0) * pileLengthMeters({ gradeLengthMm: pile.pileGrade?.lengthMm });
@@ -192,7 +203,7 @@ export async function exportReportsCsv(filters: ReportExportFilters) {
       pileCount: '',
       pileMeters: '',
       drillType: drilling.type?.name ?? '',
-      drillMeters: String(drilling.meters),
+      drillMeters: csvDecimal(drilling.meters),
       dtReason: '',
       dtHours: '',
       dtComment: '',
@@ -207,7 +218,7 @@ export async function exportReportsCsv(filters: ReportExportFilters) {
       drillType: '',
       drillMeters: '',
       dtReason: downtime.reason?.name ?? '',
-      dtHours: String(downtime.duration),
+      dtHours: csvDecimal(downtime.duration),
       dtComment: downtime.comment || '',
     }));
 

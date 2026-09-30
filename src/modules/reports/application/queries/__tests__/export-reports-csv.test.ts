@@ -252,6 +252,100 @@ describe('exportReportsXlsx — числовая колонка «Свай, м.�
 });
 
 /**
+ * Дробные значения и запятая (D-20260930-007). Разделитель полей в выгрузке —
+ * «;» (см. csvCell), значит дробная часть обязана быть через запятую: иначе
+ * русский Excel читает «16.7» как текст и колонка не суммируется. Целые
+ * остаются целыми — «2», а не «2,0».
+ */
+describe('exportReportsCsv — дробные значения через запятую', () => {
+  const report = (drillMeters: number, duration: number) => ({
+    reportId: 'R-1', date: '2026-08-17', shiftType: 'DAY', status: 'submitted',
+    site: { name: 'Объект' }, user: { name: 'Иванов' },
+    crew: null, equipment: { name: 'Banut 655' },
+    piles: [],
+    drillings: [{ count: 1, meters: drillMeters, type: { name: 'Бурение' } }],
+    downtimes: [{ duration, comment: '', reason: { name: 'Ремонт' } }],
+  });
+
+  beforeEach(() => { findManyMock.mockReset(); });
+
+  it('пишет метры бурения и часы простоя через запятую', async () => {
+    findManyMock.mockResolvedValue([report(16.7, 1.5)]);
+
+    const csv = await exportReportsCsv({ tenantId: 'tenant-a' });
+
+    expect(csv).toContain('"16,7"');
+    expect(csv).not.toContain('"16.7"');
+    expect(csv).toContain('"1,5"');
+    expect(csv).not.toContain('"1.5"');
+    // Заголовок колонок не поехал: значения остались в своих колонках.
+    expect(csv).toContain('Метры бурения;Причина простоя;Часы простоя');
+  });
+
+  it('целые не превращает в «2,0»', async () => {
+    findManyMock.mockResolvedValue([report(16, 2)]);
+
+    const csv = await exportReportsCsv({ tenantId: 'tenant-a' });
+
+    expect(csv).toContain('"16"');
+    expect(csv).toContain('"2"');
+    expect(csv).not.toContain('"16,0"');
+    expect(csv).not.toContain('"2,0"');
+  });
+});
+
+/**
+ * XLSX: числа обязаны уезжать числовой ячейкой, а не строкой «16.7»
+ * (D-20260930-007). Разделитель дробной части Excel подставляет сам по локали
+ * пользователя, поэтому в самом файле число лежит точкой — это формат, а не
+ * текст, и колонка с ним суммируется и фильтруется.
+ */
+describe('exportReportsXlsx — дробные числа числовыми ячейками', () => {
+  const report = {
+    reportId: 'R-1', date: '2026-08-17', shiftType: 'DAY', status: 'submitted',
+    site: { name: 'Объект' }, user: { name: 'Иванов' },
+    crew: null, equipment: { name: 'Banut 655' },
+    piles: [{ count: 3, pileGrade: { name: 'С300', lengthMm: 12000 } }],
+    drillings: [{ count: 1, meters: 16.7, type: { name: 'Бурение' } }],
+    downtimes: [{ duration: 1.5, comment: '', reason: { name: 'Ремонт' } }],
+    endingFuelPercent: 42.5,
+  };
+
+  beforeEach(() => {
+    sheets.current = [];
+    findManyMock.mockReset();
+    findManyMock.mockResolvedValue([report]);
+    getSettingsMock.mockReset();
+    getSettingsMock.mockResolvedValue({ timezone: 'Europe/Moscow', companyName: '', inn: '' });
+  });
+
+  it('метры, часы и топливо — тип number, а не строка', async () => {
+    await exportReportsXlsx({ tenantId: 'tenant-a' });
+
+    const detail = sheets.current.find((sheet) => sheet.name === 'Детализация');
+    if (!detail) throw new Error('листа «Детализация» нет в выгрузке');
+    const header = detail.rows.find((row) => row[0] === 'ID отчёта');
+    if (!header) throw new Error('шапки нет на листе «Детализация»');
+    const rows = detail.rows.filter((row) => row[0] === 'R-1');
+    const drilling = rows[rows.findIndex((row) => row[header.indexOf('Тип бурения')] === 'Бурение')];
+    const downtime = rows[rows.findIndex((row) => row[header.indexOf('Причина простоя')] === 'Ремонт')];
+
+    expect(typeof rows[0][header.indexOf('Свай, м.п.')]).toBe('number');
+    expect(rows[0][header.indexOf('Свай, м.п.')]).toBe(36);
+    expect(drilling[header.indexOf('Метры бурения')]).toBe(16.7);
+    expect(downtime[header.indexOf('Часы простоя')]).toBe(1.5);
+
+    const totals = sheets.current.find((sheet) => sheet.name === 'Итоги');
+    if (!totals) throw new Error('листа «Итоги» нет в выгрузке');
+    const totalsHeader = totals.rows[0];
+    const totalsRow = totals.rows.find((row) => row[0] === 'R-1');
+    if (!totalsRow) throw new Error('строки итогов нет');
+    expect(totalsRow[totalsHeader.indexOf('Бурение, м')]).toBe(16.7);
+    expect(totalsRow[totalsHeader.indexOf('Остаток топлива, %')]).toBe(42.5);
+  });
+});
+
+/**
  * Формат даты. `Report.date` — строка БД `ГГГГ-ММ-ДД`, но выгрузку открывает
  * человек: в колонке «Дата» должно стоять `ДД.ММ.ГГГГ` (Аудит 17, находка 5).
  */
