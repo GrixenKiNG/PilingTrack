@@ -874,6 +874,33 @@ const AUDIT_DESCRIPTIONS: Record<string, AuditDescription> = {
       return equipment ? `${line}: установка «${equipment}».` : `${line}.`;
     },
   },
+
+  // ── Осмотры: завершение ──
+  // Завершение осмотра — самый «допусковый» акт в системе: считается балл
+  // состояния, закрывается наряд ТО, пишутся моточасы и заводятся дефекты, — а
+  // следа в ленте не было вовсе (F-R72-FEED-INSPECTION). Срочность зависит от
+  // итога: неполный балл означает найденные неисправности (тем же признаком
+  // считается `findings` в готовности — `readiness-facts.ts`), а заведённые
+  // дефекты держат блокер. В тексте — название установки, уровень осмотра и
+  // балл, без внутренних id.
+  'inspection.completed': {
+    level: (m) => {
+      const score = num(m, 'after.healthScore');
+      const defects = num(m, 'after.defectCount');
+      return (score !== null && score < 100) || (defects !== null && defects > 0) ? 'warn' : 'info';
+    },
+    title: 'Осмотр завершён',
+    message: (m) => {
+      const equipment = subject(m);
+      const level = maintenanceTypeLabel(str(m, 'after.level'));
+      const score = num(m, 'after.healthScore');
+      const defects = num(m, 'after.defectCount');
+      const result = [level, score === null ? null : `балл ${score}%`].filter(Boolean).join(', ');
+      const what = equipment ? `Осмотр завершён — «${equipment}»` : 'Осмотр завершён';
+      const line = result ? `${what}: ${result}` : what;
+      return defects === null ? `${line}.` : `${line}, дефектов ${defects}.`;
+    },
+  },
 };
 
 /**

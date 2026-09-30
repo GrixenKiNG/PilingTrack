@@ -1137,3 +1137,61 @@ describe('recordAuditEvent — ввод показания моточасов и
     );
   });
 });
+
+/**
+ * Завершение осмотра не оставляло следа нигде (F-R72-FEED-INSPECTION), хотя это
+ * самый «допусковый» акт: считается балл состояния, закрывается наряд ТО,
+ * пишутся моточасы и заводятся дефекты. Осмотр с неисправностями (неполный
+ * балл) или с заведёнными дефектами должен читаться в ленте как предупреждение,
+ * осмотр без замечаний — как обычное событие.
+ */
+describe('recordAuditEvent — завершение осмотра', () => {
+  it('называет установку, уровень осмотра, балл и число дефектов', async () => {
+    await recordAuditEvent({
+      action: 'inspection.completed',
+      scope: 'inspections',
+      actorId: 'operator-1',
+      targetId: 'insp-1',
+      metadata: { name: 'ЭО-5111', after: { level: 'EO', healthScore: 82, defectCount: 2 } },
+    });
+
+    expect(mocks.recordFeedbackEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        level: 'warn',
+        priority: 'HIGH',
+        title: 'Осмотр завершён',
+        message: 'Осмотр завершён — «ЭО-5111»: ЕО, балл 82%, дефектов 2.',
+      }),
+    );
+  });
+
+  it('осмотр без замечаний пишет info, а не предупреждение', async () => {
+    await recordAuditEvent({
+      action: 'inspection.completed',
+      scope: 'inspections',
+      actorId: 'operator-1',
+      metadata: { name: 'ЭО-5111', after: { level: 'TO1', healthScore: 100, defectCount: 0 } },
+    });
+
+    expect(mocks.recordFeedbackEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        level: 'info',
+        priority: 'MEDIUM',
+        title: 'Осмотр завершён',
+        message: 'Осмотр завершён — «ЭО-5111»: ТО-1, балл 100%, дефектов 0.',
+      }),
+    );
+  });
+
+  it('остаётся читаемым без названия установки и итога осмотра', async () => {
+    await recordAuditEvent({ action: 'inspection.completed', scope: 'inspections' });
+
+    expect(mocks.recordFeedbackEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        level: 'info',
+        title: 'Осмотр завершён',
+        message: 'Осмотр завершён.',
+      }),
+    );
+  });
+});

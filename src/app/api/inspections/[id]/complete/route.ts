@@ -6,6 +6,8 @@ import { assertCan } from '@/services/auth/authorization-service';
 import { completeInspection } from '@/modules/inspections';
 import { withMutation, readJsonBody } from '@/core/api-wrapper';
 import { ServiceError } from '@/services/service-error';
+import { db } from '@/lib/db';
+import { recordAuditEvent } from '@/services/audit/audit-service';
 
 export const runtime = 'nodejs';
 
@@ -22,14 +24,45 @@ export const POST = withMutation(
     const { id } = await params;
     const parsed = schema.safeParse(await readJsonBody(request));
     if (!parsed.success) return NextResponse.json({ error: 'Некорректные данные' }, { status: 400 });
+    let inspection;
     try {
       // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
-      const inspection = await completeInspection(id, { tenantId, signedByName: parsed.data.signedByName, performerId: user!.role === 'OPERATOR' ? user!.id : null });
-      return NextResponse.json({ inspection });
+      inspection = await completeInspection(id, { tenantId, signedByName: parsed.data.signedByName, performerId: user!.role === 'OPERATOR' ? user!.id : null });
     } catch (err) {
       if (err instanceof ServiceError) return NextResponse.json({ error: err.message }, { status: err.status });
       throw err;
     }
+
+    // Завершение осмотра — самый «допусковый» акт в системе: считается балл
+    // состояния, закрывается наряд ТО, пишутся моточасы и заводятся дефекты, —
+    // а следа в ленте не было вовсе (F-R72-FEED-INSPECTION). Название установки
+    // и число заведённых дефектов команда не возвращает, поэтому читаются
+    // отдельно — строго по тенанту и только после успешной команды.
+    const [equipment, defectCount] = await Promise.all([
+      inspection
+        ? db.equipment.findFirst({ where: { id: inspection.equipmentId, tenantId }, select: { name: true } })
+        : null,
+      db.equipmentDefect.count({ where: { tenantId, inspectionId: id } }),
+    ]);
+
+    await recordAuditEvent({
+      action: 'inspection.completed',
+      scope: 'inspections',
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
+      actorId: user!.id,
+      targetId: id,
+      tenantId,
+      metadata: {
+        ...(equipment?.name ? { name: equipment.name } : {}),
+        after: {
+          level: inspection?.level ?? null,
+          healthScore: inspection?.healthScore ?? null,
+          defectCount,
+        },
+      },
+    });
+
+    return NextResponse.json({ inspection });
   },
   { domain: 'inspections' }
 );
