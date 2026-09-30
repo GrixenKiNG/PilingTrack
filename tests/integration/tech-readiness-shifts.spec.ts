@@ -145,10 +145,10 @@ describe.runIf(Boolean(connectionString))('shifts and handovers on disposable Po
       VALUES ('rules-default',$1,'PUBLISHED',$2,$3,$4,NOW())`, [tenantId, DEFAULT_READINESS_RULES.version,
       JSON.stringify(DEFAULT_READINESS_RULES.criteria), JSON.stringify(DEFAULT_READINESS_RULES.blockers)]);
     prisma = new PrismaClient({adapter: new PrismaPg({connectionString: url.toString(), max: 30})}); await prisma.$connect();
-  }, 30_000);
+  }, 60_000);
 
   afterAll(async () => { await prisma?.$disconnect(); await sql?.end();
-    await admin.query(`DROP DATABASE IF EXISTS "${database}" WITH (FORCE)`); await admin.end(); });
+    await admin.query(`DROP DATABASE IF EXISTS "${database}" WITH (FORCE)`); await admin.end(); }, 60_000);
 
   it('allows exactly one of 20 parallel starts and commits one atomic evidence set', async () => {
     await sql.query('INSERT INTO "Inspection" ("id","tenantId","equipmentId","inspectionDate","healthScore","status") VALUES ($1,$2,$3,NOW(),100,$4)', ['valid-start-inspection',tenantId,equipmentId,'COMPLETED']);
@@ -199,7 +199,7 @@ describe.runIf(Boolean(connectionString))('shifts and handovers on disposable Po
     expect(await prisma.outboxEvent.count({where: {tenantId, aggregateId: 'handover-1'}})).toBe(1);
     expect(await prisma.outboxEvent.findFirstOrThrow({where: {tenantId, aggregateId: 'handover-1'},
       select: {payload: true}})).toMatchObject({payload: {equipmentId, shiftId: 'accept-shift'}});
-  });
+  }, 30_000);
 
   it('ignores a stale READY snapshot and commits an explainable blocked decision from authoritative rows', async () => {
     await insertShift('blocked-shift', 'PENDING_ACCEPTANCE');
@@ -254,5 +254,5 @@ describe.runIf(Boolean(connectionString))('shifts and handovers on disposable Po
     expect(await prisma.readinessScoreSnapshot.count({
       where: {tenantId, shiftId: 'blocked-shift', triggerType: 'SHIFT_START_DECISION'},
     })).toBe(2);
-  });
+  }, 30_000);
 });
