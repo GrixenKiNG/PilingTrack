@@ -24,6 +24,31 @@ export const SCHEDULER_HEARTBEAT_PREFIX = 'system:scheduler:';
  */
 export const IDEMPOTENCY_CLEANUP_SCHEDULER_NAME = 'idempotency-cleanup';
 
+/**
+ * Переменная явного (opt-in) включения уборки ключей идемпотентности.
+ *
+ * Живёт здесь, а не в воркере: по ней принимают решение ДВА слоя — планировщик
+ * (workers/unified-worker.ts: стартовать или нет) и health-tracker
+ * (checkers/schedulers.ts: требовать ли пульс). Литерал в двух местах разошёлся
+ * бы молча — ровно та ловушка, ради которой заведён этот реестр.
+ */
+export const IDEMPOTENCY_CLEANUP_ENABLED_ENV = 'IDEMPOTENCY_CLEANUP_ENABLED';
+
+/**
+ * Включена ли суточная уборка ключей идемпотентности.
+ *
+ * По умолчанию ВЫКЛЮЧЕНА, включает только строка 'true' ('1', 'yes' и пустое
+ * значение не считаются). Прежнее «включено, пока не 'false'» снято
+ * (F-IDEMP-CLEANUP-OPTIN): у уборки открытая находка Codex (ревью out36,
+ * R83 #1-2) — при перехвате зависшего `processing` `expiresAt` не обновляется,
+ * и уборка может удалить АКТИВНЫЙ ключ. Пока `src/core/security/idempotency.ts`
+ * не исправлен, включение по умолчанию удаляло бы живые ключи молча; опечатка
+ * в боевом окружении должна оставлять уборку выключенной, а не включать её.
+ */
+export function isIdempotencyCleanupEnabled(): boolean {
+  return process.env[IDEMPOTENCY_CLEANUP_ENABLED_ENV] === 'true';
+}
+
 /** Имена планировщиков (совпадают с тегами задач в Sentry). */
 export const SCHEDULER_NAMES = [
   'pm-scheduler',
@@ -31,3 +56,16 @@ export const SCHEDULER_NAMES = [
   'readiness-scheduler',
   IDEMPOTENCY_CLEANUP_SCHEDULER_NAME,
 ] as const;
+
+/**
+ * Имена планировщиков, чей пульс health-tracker обязан найти.
+ *
+ * Выключенный планировщик пульса не пишет, и требовать его пульс нельзя: иначе
+ * `/api/health/deep` навсегда показывал бы `degraded` со `staleSchedulers`
+ * (R83 #3), и настоящая остановка уборки потерялась бы в постоянном шуме.
+ */
+export function enabledSchedulerNames(): string[] {
+  return SCHEDULER_NAMES.filter(
+    (name) => name !== IDEMPOTENCY_CLEANUP_SCHEDULER_NAME || isIdempotencyCleanupEnabled(),
+  );
+}

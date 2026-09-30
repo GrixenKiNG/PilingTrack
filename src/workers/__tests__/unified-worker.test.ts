@@ -191,6 +191,9 @@ describe('Unified Worker Service', { timeout: 30_000 }, () => {
     delete process.env.PROJECTION_INTERVAL_MS;
     delete process.env.WORKER_SHUTDOWN_TIMEOUT_MS;
     delete process.env.REDIS_URL;
+    // Opt-in (F-IDEMP-CLEANUP-OPTIN): переменную ставит только тест и только
+    // на своё время — иначе она включила бы уборку соседям по файлу.
+    delete process.env.IDEMPOTENCY_CLEANUP_ENABLED;
   });
 
   describe('Health check endpoint', () => {
@@ -306,9 +309,64 @@ describe('Unified Worker Service', { timeout: 30_000 }, () => {
     });
   });
 
+  describe('Уборка ключей идемпотентности включается только явно (F-IDEMP-CLEANUP-OPTIN)', () => {
+    /*
+      Планировщик уборки не виден снаружи ничем, кроме своих таймеров: пульс он
+      пишет только после прохода (а проход — раз в сутки). Поэтому считаем
+      интервалы, созданные при старте воркера, и сравниваем два запуска одного и
+      того же графа: лишний интервал — это и есть поднятый планировщик.
+    */
+    async function countIntervals(): Promise<number> {
+      vi.clearAllTimers(); // таймеры прошлого запуска не должны попасть в счёт
+      const intervalSpy = vi.spyOn(globalThis, 'setInterval');
+      try {
+        const listenersBefore = process.listeners('SIGTERM').length;
+        await import('@/workers/unified-worker');
+        await vi.waitFor(() => {
+          expect(process.listeners('SIGTERM').length).toBeGreaterThan(listenersBefore);
+        });
+        return intervalSpy.mock.calls.length;
+      } finally {
+        intervalSpy.mockRestore();
+      }
+    }
+
+    it("'true' включает уборку, а не заданная переменная, 'false' и '1' — нет", async () => {
+      process.env.ENABLED_WORKERS = 'outbox';
+      vi.useFakeTimers();
+
+      try {
+        delete process.env.IDEMPOTENCY_CLEANUP_ENABLED;
+        const unset = await countIntervals();
+
+        vi.resetModules();
+        process.env.IDEMPOTENCY_CLEANUP_ENABLED = 'false';
+        const explicitFalse = await countIntervals();
+
+        vi.resetModules();
+        process.env.IDEMPOTENCY_CLEANUP_ENABLED = '1';
+        const one = await countIntervals();
+
+        vi.resetModules();
+        process.env.IDEMPOTENCY_CLEANUP_ENABLED = 'true';
+        const enabled = await countIntervals();
+
+        expect(explicitFalse).toBe(unset);
+        expect(one).toBe(unset);
+        expect(enabled).toBe(unset + 1);
+      } finally {
+        vi.useRealTimers();
+        delete process.env.IDEMPOTENCY_CLEANUP_ENABLED;
+      }
+    });
+  });
+
   describe('Graceful shutdown (F-SHUTDOWN-SIGNALS)', () => {
     it('по SIGTERM снимает таймеры планировщиков, закрывает очередь PDF, отпускает замок и соединения', async () => {
       process.env.ENABLED_WORKERS = 'outbox,projection,pdf';
+      // Уборка ключей идемпотентности теперь opt-in (F-IDEMP-CLEANUP-OPTIN) —
+      // включаем её явно, иначе четвёртого планировщика в арифметике ниже нет.
+      process.env.IDEMPOTENCY_CLEANUP_ENABLED = 'true';
       vi.useFakeTimers();
 
       const clearTimeoutSpy = vi.spyOn(globalThis, 'clearTimeout');

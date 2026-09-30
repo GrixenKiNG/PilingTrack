@@ -429,6 +429,13 @@ describe('планировщики: истёкший пульс виден и д
       key === 'system:worker:heartbeat:outbox' ? String(Date.now()) : freshSchedulerHeartbeat(key));
     mocks.readdir.mockRejectedValue(new Error('missing backup directory'));
     delete process.env.BACKUP_ENABLED;
+    // Уборка ключей идемпотентности — opt-in (F-IDEMP-CLEANUP-OPTIN): по
+    // умолчанию её нет, и её пульса в списке требуемых быть не должно.
+    delete process.env.IDEMPOTENCY_CLEANUP_ENABLED;
+  });
+
+  afterEach(() => {
+    delete process.env.IDEMPOTENCY_CLEANUP_ENABLED;
   });
 
   it('все ключи живы → schedulers ok, система здорова', async () => {
@@ -483,11 +490,52 @@ describe('планировщики: истёкший пульс виден и д
 
     // Нет данных о пульсе — это не «всё в порядке»: планировщики считаются stale.
     expect(status.components.schedulers.status).toBe('stale');
+    // Уборки ключей идемпотентности в списке нет: она выключена по умолчанию
+    // (F-IDEMP-CLEANUP-OPTIN) и пульса не пишет — требовать его нельзя.
     expect(status.components.schedulers.stale).toEqual([
       'pm-scheduler',
       'projection-rebuild',
       'readiness-scheduler',
-      'idempotency-cleanup',
     ]);
+  });
+
+  it('выключенная уборка ключей не в счёте: её пульс не спрашивают и не ждут', async () => {
+    // Значение, которое владелец мог задать «на всякий случай», уборку не
+    // включает: opt-in — только строка 'true' (F-IDEMP-CLEANUP-OPTIN).
+    process.env.IDEMPOTENCY_CLEANUP_ENABLED = '1';
+    mocks.stateGet.mockImplementation(async (key: string) => {
+      if (key === 'system:worker:heartbeat:outbox') return String(Date.now());
+      // Единственный ключ, которого на проде нет: уборка выключена.
+      if (key === 'system:scheduler:idempotency-cleanup') return null;
+      return freshSchedulerHeartbeat(key);
+    });
+
+    const { checkSystemStatus } = await import('../health-tracker');
+
+    const status = await checkSystemStatus();
+
+    expect(status.components.schedulers).toEqual({ status: 'ok', stale: [] });
+    expect(status.status).toBe('healthy');
+    expect(mocks.stateGet).not.toHaveBeenCalledWith('system:scheduler:idempotency-cleanup');
+  });
+
+  it("явно включённая уборка ключей требует пульса: без него stale (F-IDEMP-CLEANUP-OPTIN)", async () => {
+    process.env.IDEMPOTENCY_CLEANUP_ENABLED = 'true';
+    mocks.stateGet.mockImplementation(async (key: string) => {
+      if (key === 'system:worker:heartbeat:outbox') return String(Date.now());
+      if (key === 'system:scheduler:idempotency-cleanup') return null;
+      return freshSchedulerHeartbeat(key);
+    });
+
+    const { checkSystemStatus } = await import('../health-tracker');
+
+    const status = await checkSystemStatus();
+
+    expect(status.components.schedulers).toEqual({
+      status: 'stale',
+      stale: ['idempotency-cleanup'],
+    });
+    expect(status.status).toBe('degraded');
+    expect(mocks.stateGet).toHaveBeenCalledWith('system:scheduler:idempotency-cleanup');
   });
 });

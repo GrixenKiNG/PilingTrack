@@ -29,6 +29,7 @@ import { startPmScheduler } from './unified-worker/pm-scheduler';
 import { startProjectionRebuildScheduler } from './unified-worker/projection-rebuild-scheduler';
 import { startReadinessScheduler } from './unified-worker/readiness-scheduler';
 import { startIdempotencyCleanupScheduler } from './unified-worker/idempotency-cleanup-scheduler';
+import { isIdempotencyCleanupEnabled } from '@/core/observability/health-tracker/scheduler-registry';
 import { initWorkerSentry } from './unified-worker/sentry';
 import { workerStates } from './unified-worker/state';
 
@@ -183,7 +184,16 @@ async function main(): Promise<void> {
   // Суточная уборка просроченных ключей идемпотентности: таблица задумана с
   // TTL 7 суток, но очистку никто не вызывал (R63 #4). Идемпотентна, лидера
   // не требует; организация не нужна — таблица намеренно вне RLS.
-  if (process.env.IDEMPOTENCY_CLEANUP_ENABLED !== 'false') {
+  //
+  // Включение — только явным IDEMPOTENCY_CLEANUP_ENABLED='true'
+  // (F-IDEMP-CLEANUP-OPTIN; прежнее «включено, пока не 'false'» снято).
+  // По умолчанию выключено: у уборки открыта находка Codex (ревью out36,
+  // R83 #1-2) — при перехвате зависшего `processing` `expiresAt` не
+  // обновляется, и уборка может удалить АКТИВНЫЙ ключ. Включать только после
+  // исправления src/core/security/idempotency.ts и добавления переменной в
+  // docker-compose.yml: в сервис `workers` (там живёт планировщик) и в сервис
+  // `app` (там /api/health/deep считает пульс). Сейчас её нет ни там, ни там.
+  if (isIdempotencyCleanupEnabled()) {
     stopIdempotencyCleanup = startIdempotencyCleanupScheduler();
   }
 
