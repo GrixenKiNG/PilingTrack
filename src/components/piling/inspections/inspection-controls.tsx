@@ -3,6 +3,11 @@
 /**
  * Контролы ответа для пунктов осмотра/ТО (используются в RunInspection).
  * Вынесены из run-inspection.tsx, чтобы держать основной файл < 500 строк.
+ *
+ * R73 (F-MOB-INSPECTIONS): ответ на пункт чек-листа — самая частая полевая цель
+ * в продукте, а кнопки были 28–32px. На телефоне поднимаем до 44px
+ * (`min-h-11`), на десктопе возвращаем прежнюю высоту через `sm:min-h-0` —
+ * `min-height` сильнее `height`, поэтому одного `sm:h-*` здесь мало.
  */
 
 import { Input } from '@/components/ui/input';
@@ -15,7 +20,7 @@ export function YesNoControl({ value, onChange, disabled }: { value: string; onC
       disabled={disabled}
       onClick={() => onChange(value === v ? '' : v)}
       className={cn(
-        'flex-1 rounded-md border py-1.5 text-sm font-medium transition-colors',
+        'flex-1 min-h-11 rounded-md border py-1.5 text-sm font-medium transition-colors sm:min-h-0',
         value === v ? activeClass : 'border-border bg-card text-muted-foreground hover:bg-muted',
         'disabled:opacity-50'
       )}
@@ -47,7 +52,7 @@ export function Status4Control({ value, onChange, disabled }: { value: string; o
           disabled={disabled}
           onClick={() => onChange(value === v ? '' : v)}
           className={cn(
-            'rounded-md border py-1.5 text-xs font-medium transition-colors',
+            'min-h-11 rounded-md border py-1.5 text-xs font-medium transition-colors sm:min-h-0',
             value === v ? cls : 'border-border bg-card text-muted-foreground hover:bg-muted',
             'disabled:opacity-50'
           )}
