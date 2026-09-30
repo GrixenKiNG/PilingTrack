@@ -159,6 +159,14 @@ export function PilePassportForm({grades, busy, onSubmit}: {
 
   const ready = Boolean(pileGradeId) && pileNumber.trim().length > 0 && !depthProblem;
 
+  // Серая кнопка молчит, и новичок, заполнивший все замеры, не понимает, чего
+  // не хватает. Собираем перечень ровно из тех слагаемых, из которых собран
+  // `ready`, — включая текст проблемы глубины, что уже показан в панели отметок.
+  const missing: string[] = [];
+  if (!pileGradeId) missing.push('марка сваи');
+  if (pileNumber.trim().length === 0) missing.push('номер сваи');
+  if (depthProblem) missing.push(depthProblem.message);
+
   const submit = async () => {
     if (!ready) return;
     const saved = await onSubmit(pileGradeId, {
@@ -375,6 +383,12 @@ export function PilePassportForm({grades, busy, onSubmit}: {
       <BigButton onClick={() => void submit()} disabled={!ready || busy}>
         {busy ? 'Записываем…' : 'Записать сваю с паспортом'}
       </BigButton>
+
+      {!ready ? (
+        <p className="text-center text-2xs font-medium text-muted-foreground">
+          Не заполнено: {missing.join(', ')}
+        </p>
+      ) : null}
     </div>
   );
 }
