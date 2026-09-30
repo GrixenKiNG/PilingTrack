@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
-import { getMediaService } from '@/core/media/media-service';
 import { assertCanAccessMedia, ownsUserDocumentMedia } from '@/core/media/media-auth';
 import { withApi } from '@/core/api-wrapper';
 import { ServiceError } from '@/services/service-error';
@@ -74,5 +73,3 @@ export const GET = withApi(
   },
   { domain: 'media.download' },
 );
-
-void getMediaService;
