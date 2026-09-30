@@ -176,7 +176,7 @@ describe('Unified Worker Service', () => {
 
     // Set env vars for testing
     process.env.ENABLED_WORKERS = 'outbox,projection';
-    process.env.WORKER_HEALTH_PORT = '0'; // Use random port for tests
+    process.env.WORKER_HEALTH_PORT = '3102'; // Порт проверяем явный: 0 помощник отвергает
     process.env.OUTBOX_INTERVAL_MS = '100';
     process.env.PROJECTION_INTERVAL_MS = '100';
   });
@@ -222,7 +222,7 @@ describe('Unified Worker Service', () => {
 
       // Health server should be created with correct port
       expect(mocks.mockHttpListen).toHaveBeenCalledWith(
-        0, // WORKER_HEALTH_PORT
+        3102, // WORKER_HEALTH_PORT
         expect.any(Function)
       );
     }, 15_000);

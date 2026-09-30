@@ -27,15 +27,10 @@ import { logger } from '@/lib/logger';
 import { cleanupExpiredKeys } from '@/core/security/idempotency';
 import { IDEMPOTENCY_CLEANUP_SCHEDULER_NAME } from '@/core/observability/health-tracker/scheduler-registry';
 import { recordSchedulerHeartbeat } from './scheduler-heartbeat';
+import { positiveIntEnv } from './env-int';
 
-const CLEANUP_INTERVAL = parseInt(
-  process.env.IDEMPOTENCY_CLEANUP_INTERVAL_MS || String(24 * 60 * 60 * 1000),
-  10,
-);
-const CLEANUP_STARTUP_DELAY = parseInt(
-  process.env.IDEMPOTENCY_CLEANUP_STARTUP_DELAY_MS || '120000',
-  10,
-);
+const CLEANUP_INTERVAL = positiveIntEnv('IDEMPOTENCY_CLEANUP_INTERVAL_MS', 24 * 60 * 60 * 1000);
+const CLEANUP_STARTUP_DELAY = positiveIntEnv('IDEMPOTENCY_CLEANUP_STARTUP_DELAY_MS', 120000);
 
 async function runOnce(): Promise<void> {
   try {

@@ -46,7 +46,7 @@ const ENV_KEYS = [
 async function startWithCleanup(): Promise<{
   startIdempotencyCleanupScheduler: () => () => void;
 }> {
-  process.env.IDEMPOTENCY_CLEANUP_STARTUP_DELAY_MS = '0';
+  process.env.IDEMPOTENCY_CLEANUP_STARTUP_DELAY_MS = '1'; // 1 мс = «прогон сразу»: 0 не принимается
   process.env.IDEMPOTENCY_CLEANUP_INTERVAL_MS = '60000';
   return import('@/workers/unified-worker/idempotency-cleanup-scheduler');
 }

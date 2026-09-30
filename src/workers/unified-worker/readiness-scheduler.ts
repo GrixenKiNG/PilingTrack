@@ -16,9 +16,10 @@ import { logger } from '@/lib/logger';
 import { forEachTenant } from '@/lib/tenant-iteration';
 import { runReadinessScheduler } from '@/modules/readiness/application/scheduler';
 import { recordSchedulerHeartbeat } from './scheduler-heartbeat';
+import { positiveIntEnv } from './env-int';
 
-const INTERVAL = parseInt(process.env.READINESS_SCHEDULER_INTERVAL_MS || String(60 * 60 * 1000), 10);
-const STARTUP_DELAY = parseInt(process.env.READINESS_SCHEDULER_STARTUP_DELAY_MS || '90000', 10);
+const INTERVAL = positiveIntEnv('READINESS_SCHEDULER_INTERVAL_MS', 60 * 60 * 1000);
+const STARTUP_DELAY = positiveIntEnv('READINESS_SCHEDULER_STARTUP_DELAY_MS', 90000);
 
 async function runOnce(): Promise<void> {
   try {

@@ -97,7 +97,9 @@ describe('Sentry в процессе воркера', () => {
   });
 
   it('падение планировщика ТО уходит в Sentry с тегом задачи', async () => {
-    process.env.PM_SCHEDULER_STARTUP_DELAY_MS = '0';
+    // Задержка старта 1 мс = «прогон сразу»: 0 отвергается как неположительная
+    // (positiveIntEnv, F-WORKER-ENV-INTS) и дала бы штатные 60 с.
+    process.env.PM_SCHEDULER_STARTUP_DELAY_MS = '1';
     process.env.PM_SCHEDULER_INTERVAL_MS = '60000';
     mocks.runPmScheduler.mockRejectedValue(new Error('pm boom'));
 
@@ -119,7 +121,7 @@ describe('Sentry в процессе воркера', () => {
   });
 
   it('падение планировщика техготовности уходит в Sentry с тегом задачи', async () => {
-    process.env.READINESS_SCHEDULER_STARTUP_DELAY_MS = '0';
+    process.env.READINESS_SCHEDULER_STARTUP_DELAY_MS = '1';
     process.env.READINESS_SCHEDULER_INTERVAL_MS = '60000';
     mocks.runReadinessScheduler.mockRejectedValue(new Error('readiness boom'));
 
@@ -145,7 +147,7 @@ describe('Sentry в процессе воркера', () => {
 
   describe('пульс планировщика (F-SCHEDULER-HEARTBEAT)', () => {
     it('успешный проход планировщика ТО пишет пульс с именем и интервалом', async () => {
-      process.env.PM_SCHEDULER_STARTUP_DELAY_MS = '0';
+      process.env.PM_SCHEDULER_STARTUP_DELAY_MS = '1';
       process.env.PM_SCHEDULER_INTERVAL_MS = '60000';
       mocks.runPmScheduler.mockResolvedValue({ created: 0, due: 0, overdue: [] });
 
@@ -164,7 +166,7 @@ describe('Sentry в процессе воркера', () => {
     });
 
     it('упавший проход пульса не пишет', async () => {
-      process.env.PM_SCHEDULER_STARTUP_DELAY_MS = '0';
+      process.env.PM_SCHEDULER_STARTUP_DELAY_MS = '1';
       process.env.PM_SCHEDULER_INTERVAL_MS = '60000';
       mocks.runPmScheduler.mockRejectedValue(new Error('pm boom'));
 

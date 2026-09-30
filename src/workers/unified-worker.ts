@@ -20,6 +20,7 @@ import { logger } from '@/lib/logger';
 import { db } from '@/lib/db';
 import { closeRedisConnection } from '@/lib/redis-cache';
 import { ENABLED_WORKERS, HEALTH_PORT } from './unified-worker/config';
+import { positiveIntEnv } from './unified-worker/env-int';
 import { startHealthServer } from './unified-worker/health-server';
 import { startOutbox } from './unified-worker/outbox';
 import { startPdf } from './unified-worker/pdf';
@@ -42,7 +43,7 @@ let stopIdempotencyCleanup: (() => void) | null = null;
 // задан) и присылает SIGKILL, поэтому свой дедлайн держим короче: зависшая
 // stop-функция (задача PDF в работе, недоступный Redis) не должна превращать
 // остановку в жёсткое убийство процесса.
-const SHUTDOWN_TIMEOUT_MS = parseInt(process.env.WORKER_SHUTDOWN_TIMEOUT_MS || '8000', 10);
+const SHUTDOWN_TIMEOUT_MS = positiveIntEnv('WORKER_SHUTDOWN_TIMEOUT_MS', 8000);
 
 async function gracefulShutdown(signal: string): Promise<void> {
   if (isShuttingDown) {

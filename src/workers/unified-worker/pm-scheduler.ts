@@ -11,9 +11,10 @@ import { forEachTenant } from '@/lib/tenant-iteration';
 import { db } from '@/lib/db';
 import { runPmScheduler } from '@/modules/equipment';
 import { recordSchedulerHeartbeat } from './scheduler-heartbeat';
+import { positiveIntEnv } from './env-int';
 
-const PM_INTERVAL = parseInt(process.env.PM_SCHEDULER_INTERVAL_MS || String(24 * 60 * 60 * 1000), 10);
-const PM_STARTUP_DELAY = parseInt(process.env.PM_SCHEDULER_STARTUP_DELAY_MS || '60000', 10);
+const PM_INTERVAL = positiveIntEnv('PM_SCHEDULER_INTERVAL_MS', 24 * 60 * 60 * 1000);
+const PM_STARTUP_DELAY = positiveIntEnv('PM_SCHEDULER_STARTUP_DELAY_MS', 60000);
 
 /**
  * Оповещение о просроченном ТО.

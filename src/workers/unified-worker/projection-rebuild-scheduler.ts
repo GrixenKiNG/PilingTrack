@@ -17,15 +17,10 @@ import * as Sentry from '@sentry/nextjs';
 import { logger } from '@/lib/logger';
 import { rebuildAll } from '@/modules/reports/application/projections/rebuild';
 import { recordSchedulerHeartbeat } from './scheduler-heartbeat';
+import { positiveIntEnv } from './env-int';
 
-const REBUILD_INTERVAL = parseInt(
-  process.env.PROJECTION_REBUILD_INTERVAL_MS || String(24 * 60 * 60 * 1000),
-  10,
-);
-const REBUILD_STARTUP_DELAY = parseInt(
-  process.env.PROJECTION_REBUILD_STARTUP_DELAY_MS || '90000',
-  10,
-);
+const REBUILD_INTERVAL = positiveIntEnv('PROJECTION_REBUILD_INTERVAL_MS', 24 * 60 * 60 * 1000);
+const REBUILD_STARTUP_DELAY = positiveIntEnv('PROJECTION_REBUILD_STARTUP_DELAY_MS', 90000);
 
 async function runOnce(): Promise<void> {
   try {
