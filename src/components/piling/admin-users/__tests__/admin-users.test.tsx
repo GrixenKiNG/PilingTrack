@@ -8,6 +8,9 @@ vi.mock('../use-users-list', () => ({
   useUsersList: () => useUsersListMock(),
 }));
 
+const authFetchMock = vi.fn();
+vi.mock('@/lib/api', () => ({ authFetch: (...args: unknown[]) => authFetchMock(...args) }));
+
 vi.mock('@/lib/store', () => ({
   usePilingStore: (selector: (state: { currentUser: { id: string } }) => unknown) =>
     selector({ currentUser: { id: 'admin-current' } }),
@@ -47,6 +50,11 @@ function operationalUser(overrides: Partial<OperationalUserDTO> = {}): Operation
 
 describe('AdminUsers', () => {
   beforeEach(() => {
+    authFetchMock.mockReset();
+    // Экран хранит фильтр/поиск/выбранного сотрудника в адресе страницы, а
+    // window.location в jsdom общий для файла: без сброса следующий тест
+    // начинает с поисковой строки предыдущего.
+    window.history.replaceState(null, '', '/');
     useUsersListMock.mockReturnValue({
       users: [
         operationalUser(),
@@ -90,5 +98,55 @@ describe('AdminUsers', () => {
 
     expect(screen.getAllByText('Борис Петров').length).toBeGreaterThanOrEqual(1);
     expect(screen.queryByText('Анна Сидорова')).not.toBeInTheDocument();
+  });
+
+  /**
+   * R73: «Редактировать/Заблокировать/Удалить» (32px) и кнопки шапки (40px)
+   * были ниже 44px на телефоне. Блокировка доступа и удаление идут рядом —
+   * промах пальцем по паре кнопок стоит не того действия. Правка только на
+   * телефоне: `h-11 … sm:h-8` / `h-11 … sm:h-10`, на десктопе вид прежний.
+   */
+  it('держит кнопки карточки и шапки не ниже 44px на телефоне (R73)', () => {
+    useUsersListMock.mockReturnValue({
+      users: [operationalUser({ canHardDelete: true })],
+      loading: false,
+      error: null,
+      retry: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+      remove: vi.fn(),
+      toggleActive: vi.fn(),
+    });
+    render(<AdminUsers />);
+
+    expect(screen.getByRole('button', { name: /Виды документов/ })).toHaveClass('h-11', 'sm:h-10');
+    expect(screen.getByRole('button', { name: /Новый пользователь/ })).toHaveClass('h-11', 'sm:h-10');
+
+    // Radix Tabs переключает вкладку по mousedown, не по click.
+    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Доступ' }));
+    for (const name of [/Редактировать/, /Заблокировать/, /Удалить/]) {
+      expect(screen.getByRole('button', { name })).toHaveClass('h-11', 'text-xs', 'sm:h-8');
+    }
+  });
+
+  /** R73: тот же размер у кнопок справочника видов документов (32px). */
+  it('держит кнопки справочника видов документов не ниже 44px на телефоне (R73)', async () => {
+    authFetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        types: [{
+          id: 'type-1', name: 'Медосмотр', requiresExpiry: true, defaultValidMonths: 12,
+          leadTimeDays: 30, requiredForOperator: false, isActive: true, documentCount: 0,
+        }],
+      }),
+    });
+    render(<AdminUsers />);
+
+    fireEvent.click(screen.getByRole('button', { name: /Виды документов/ }));
+
+    for (const name of ['Изменить', 'Требовать для смены', 'Отключить']) {
+      expect(await screen.findByRole('button', { name })).toHaveClass('h-11', 'text-2xs', 'sm:h-8');
+    }
+    expect(screen.getByLabelText('Удалить вид «Медосмотр»')).toHaveClass('h-11', 'w-11', 'sm:h-8', 'sm:w-8');
   });
 });

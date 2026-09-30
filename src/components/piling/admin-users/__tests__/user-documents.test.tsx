@@ -47,6 +47,8 @@ describe('UserDocuments ownership', () => {
     await screen.findByRole('alert');
     expect(screen.queryByText('Удостоверение Иванова')).not.toBeInTheDocument();
     expect(screen.getByText(/Это не значит, что их нет/)).toBeInTheDocument();
+    // R73: «Повторить» на телефоне — не ниже 44px (на десктопе прежние 32px).
+    expect(screen.getByRole('button', { name: 'Повторить' })).toHaveClass('min-h-11', 'sm:min-h-0');
   });
 
   it('ignores a slow answer about the previous employee', async () => {
@@ -62,5 +64,21 @@ describe('UserDocuments ownership', () => {
     releaseSlow(ok({ documents: [docRow('doc-1', 'Удостоверение Иванова')] }));
     await waitFor(() => expect(screen.getByText('Медосмотр Петровой')).toBeInTheDocument());
     expect(screen.queryByText('Удостоверение Иванова')).not.toBeInTheDocument();
+  });
+
+  /**
+   * R73: правка/удаление документа были 36×36, «Добавить» — 32px. Строка
+   * списка плотная, кнопки идут рядом друг с другом. Правка — только телефон:
+   * `min-h-11 min-w-11 … sm:min-h-0 sm:min-w-0`, на десктопе размеры прежние.
+   */
+  it('держит правку и удаление документа не ниже 44px на телефоне (R73)', async () => {
+    documentsResponse = () => Promise.resolve(ok({ documents: [docRow('doc-3', 'Медосмотр Сидоровой')] }));
+    render(<UserDocuments userId="sidorova" />);
+    await screen.findByText('Медосмотр Сидоровой');
+
+    for (const label of ['Изменить документ', 'Удалить документ']) {
+      expect(screen.getByLabelText(label)).toHaveClass('min-h-11', 'min-w-11', 'sm:min-h-0', 'sm:min-w-0');
+    }
+    expect(screen.getByRole('button', { name: /Добавить/ })).toHaveClass('min-h-11', 'sm:min-h-0');
   });
 });
