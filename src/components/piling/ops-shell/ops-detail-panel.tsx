@@ -35,7 +35,7 @@ export function OpsDetailPanel({
             <button
               type="button"
               onClick={onClose}
-              className="grid h-8 w-8 place-items-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
+              className="grid h-8 w-8 min-h-11 min-w-11 place-items-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground sm:min-h-0 sm:min-w-0"
               aria-label="Закрыть панель"
               title="Закрыть"
             >

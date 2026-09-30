@@ -197,7 +197,7 @@ export function FeedbackCenter() {
               </p>
             </div>
             <div className="flex items-center gap-2">
-              <Button onClick={() => void loadFeedbackFeed({ includeHealth: true })} size="sm" variant="outline" className="h-8 text-xs">
+              <Button onClick={() => void loadFeedbackFeed({ includeHealth: true })} size="sm" variant="outline" className="h-8 min-h-11 text-xs sm:min-h-8">
                 <RefreshCw className={`mr-1.5 h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
                 Обновить
               </Button>
@@ -237,12 +237,12 @@ export function FeedbackCenter() {
           </div>
 
           <div className="flex flex-wrap gap-2">
-            <Button onClick={() => void markAllRead()} size="sm" variant="outline" className="h-8 text-xs">
+            <Button onClick={() => void markAllRead()} size="sm" variant="outline" className="h-8 min-h-11 text-xs sm:min-h-8">
               <CheckCheck className="mr-1.5 h-3.5 w-3.5" />
               Отметить всё как прочитанное
             </Button>
             {localFeedbackEvents.length > 0 && (
-              <Button onClick={clearLocalFeedbackEvents} size="sm" variant="outline" className="h-8 text-xs">
+              <Button onClick={clearLocalFeedbackEvents} size="sm" variant="outline" className="h-8 min-h-11 text-xs sm:min-h-8">
                 Очистить локальные
               </Button>
             )}
@@ -303,7 +303,7 @@ export function FeedbackCenter() {
                               <Button
                                 size="sm"
                                 variant="outline"
-                                className="h-8 text-xs"
+                                className="h-8 min-h-11 text-xs sm:min-h-8"
                                 onClick={() => void updateEventState(event.id, 'read')}
                               >
                                 Отметить как прочитанное
@@ -312,7 +312,7 @@ export function FeedbackCenter() {
                             {canAcknowledge && (
                               <Button
                                 size="sm"
-                                className="h-8 text-xs bg-slate-900 hover:bg-slate-800"
+                                className="h-8 min-h-11 text-xs bg-slate-900 hover:bg-slate-800 sm:min-h-8"
                                 onClick={() => void updateEventState(event.id, 'acknowledge')}
                               >
                                 <Siren className="mr-1.5 h-3.5 w-3.5" />

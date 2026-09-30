@@ -49,7 +49,7 @@ export function PdfPreviewDialog({
             Просмотр отчёта
           </DialogTitle>
           <div className="flex items-center gap-1">
-            <Button onClick={handlePrint} disabled={!previewUrl || loading} size="sm" variant="outline" className="h-8 text-xs">
+            <Button onClick={handlePrint} disabled={!previewUrl || loading} size="sm" variant="outline" className="h-8 min-h-11 text-xs sm:min-h-8">
               <Printer className="mr-1.5 h-3.5 w-3.5" />Печать
             </Button>
           </div>
