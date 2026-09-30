@@ -168,7 +168,7 @@ export function EquipmentDocuments({ equipmentId, documents, canManage, onChange
           и подсвечивается, если истекает.
         </p>
         {canManage && (
-          <Button onClick={openCreate} size="sm" className="bg-signal hover:bg-signal-strong text-white">
+          <Button onClick={openCreate} size="sm" className="min-h-11 bg-signal hover:bg-signal-strong text-white sm:min-h-0">
             <Plus className="w-3.5 h-3.5 mr-1" /> Добавить
           </Button>
         )}

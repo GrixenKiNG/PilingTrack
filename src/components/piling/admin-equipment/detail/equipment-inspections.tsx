@@ -52,7 +52,7 @@ export function EquipmentInspections({ equipmentId }: { equipmentId: string }) {
     <div>
       <div className="mb-3 flex items-center justify-between gap-2">
         <p className="text-xs text-muted-foreground">Чек-листы осмотров этой установки.</p>
-        <Button asChild size="sm" className="bg-signal hover:bg-signal-strong text-white">
+        <Button asChild size="sm" className="min-h-11 bg-signal hover:bg-signal-strong text-white sm:min-h-0">
           <Link href="/inspections/new">
             <Plus className="w-3.5 h-3.5 mr-1" /> Провести осмотр
           </Link>

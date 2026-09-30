@@ -137,7 +137,7 @@ export function AdminEquipment() {
                 {cards.length === 0 ? 'Нет установок' : 'Нет установок под выбранные фильтры'}
               </p>
               {cards.length > 0 && (
-                <button onClick={() => setFilters(EMPTY_FILTERS)} className="mt-2 text-xs text-info-strong underline">
+                <button onClick={() => setFilters(EMPTY_FILTERS)} className="mt-2 inline-flex min-h-11 items-center text-xs text-info-strong underline sm:min-h-0">
                   Сбросить фильтры
                 </button>
               )}

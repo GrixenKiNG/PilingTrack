@@ -169,7 +169,7 @@ export function EquipmentCardGrid({
                   aria-label={`Редактировать плитку: ${card.name}`}
                   onClick={(event) => { event.stopPropagation(); setEditScope(card.id); }}
                   className={cn(
-                    'absolute right-2 top-2 z-10 flex items-center gap-1 rounded-lg border px-2 py-1 text-2xs font-semibold shadow-sm backdrop-blur transition-colors',
+                    'absolute right-2 top-2 z-10 flex min-h-11 items-center gap-1 rounded-lg border px-2 py-1 text-2xs font-semibold shadow-sm backdrop-blur transition-colors sm:min-h-0',
                     customized
                       ? 'border-info/30 bg-info/10/90 text-info-strong hover:bg-info/10'
                       : 'border-border bg-card/90 text-muted-foreground opacity-0 hover:bg-muted group-hover:opacity-100',

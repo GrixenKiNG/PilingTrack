@@ -75,7 +75,7 @@ export function EquipmentReportExport({ equipmentId }: { equipmentId: string }) 
     setFrom(shiftYmd(-(days - 1), timezone));
   };
 
-  const chip = 'rounded-md border border-border px-2 py-1 text-xs text-muted-foreground hover:bg-muted';
+  const chip = 'min-h-11 rounded-md border border-border px-2 py-1 text-xs text-muted-foreground hover:bg-muted sm:min-h-0';
 
   return (
     <div className="space-y-3">
@@ -86,7 +86,7 @@ export function EquipmentReportExport({ equipmentId }: { equipmentId: string }) 
             type="date"
             value={from}
             onChange={(e) => setFrom(e.target.value)}
-            className="rounded-md border border-border bg-card px-2 py-1 text-sm"
+            className="min-h-11 rounded-md border border-border bg-card px-2 py-1 text-sm sm:min-h-0"
           />
         </label>
         <label className="text-sm">
@@ -95,7 +95,7 @@ export function EquipmentReportExport({ equipmentId }: { equipmentId: string }) 
             type="date"
             value={to}
             onChange={(e) => setTo(e.target.value)}
-            className="rounded-md border border-border bg-card px-2 py-1 text-sm"
+            className="min-h-11 rounded-md border border-border bg-card px-2 py-1 text-sm sm:min-h-0"
           />
         </label>
         <div className="flex gap-1">
