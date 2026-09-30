@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # One-command bootstrap for PilingTrack on a fresh machine.
 # Generates secrets if missing, brings the full stack up via Docker
-# (Postgres + Redis + app + workers + WebSocket), and waits for
+# (Postgres + Redis + app + workers), and waits for
 # migration + seed to finish before printing credentials.
 
 set -euo pipefail
@@ -51,7 +51,7 @@ if [ ! -f .env.docker ]; then
 POSTGRES_USER=piling
 POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
 POSTGRES_DB=pilingtrack
-# DATABASE_URL здесь намеренно НЕ задаётся. Для app/workers/ws адрес собирается
+# DATABASE_URL здесь намеренно НЕ задаётся. Для app/workers адрес собирается
 # в docker-compose.yml из APP_DB_USER / APP_DB_PASSWORD и ведёт на pgbouncer, а
 # секция environment: перекрывает всё, что написано в .env. Прежде эти две
 # строки записывались сюда со ролью-владельцем piling и читались как рабочая
@@ -109,7 +109,6 @@ echo "============================================================"
 echo " PilingTrack is up."
 echo
 echo " App:        http://localhost:3000"
-echo " WebSocket:  ws://localhost:3001"
 echo " Postgres:   localhost:5432   (user: piling)"
 echo " PgBouncer:  localhost:6432"
 echo " Redis:      localhost:6379"
