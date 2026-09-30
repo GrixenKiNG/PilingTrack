@@ -11,17 +11,35 @@ describe('закрытие смены с неотправленными запи
     production: {piles: {count: 3, meters: 42}, drilling: {count: 0, meters: 0}, downtimeHours: 0},
   } as unknown as OperatorMobileState;
 
-  it('не даёт закрыть смену, пока на телефоне есть записи, и предлагает отправить их', () => {
+  it('не даёт закрыть смену, пока на телефоне ждут отправки записи, и предлагает отправить их', () => {
     const onClose = vi.fn();
     const onSendNow = vi.fn();
     render(<ClosingScreen state={state} busy={false} error={null} onOpenService={vi.fn()}
-      onClose={onClose} unsent={2} onSendNow={onSendNow} />);
+      onClose={onClose} pending={2} onSendNow={onSendNow} />);
 
-    expect(screen.getByText('На телефоне не отправлено: 2')).toBeInTheDocument();
+    expect(screen.getByText('На телефоне ждут отправки: 2')).toBeInTheDocument();
     expect(screen.queryByRole('button', {name: 'Закрыть смену и отправить отчёт'})).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', {name: 'Отправить записи с телефона'}));
     expect(onSendNow).toHaveBeenCalled();
     expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it('зовёт разобрать отклонённые записи и не прячет закрытие смены навсегда', () => {
+    const onClose = vi.fn();
+    const onRetryFailed = vi.fn();
+    render(<ClosingScreen state={state} busy={false} error={null} onOpenService={vi.fn()}
+      onClose={onClose} failed={2} onRetryFailed={onRetryFailed} />);
+
+    expect(screen.getByText('Сервер не принял 2 записи')).toBeInTheDocument();
+    expect(screen.getByText(/Причина — в списке вверху/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', {name: 'Отправить записи с телефона'})).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', {name: 'Повторить отклонённые'}));
+    expect(onRetryFailed).toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', {name: 'Закрыть смену и отправить отчёт'}));
+    expect(onClose).toHaveBeenCalled();
   });
 
   it('закрывает смену, когда очередь пуста', () => {

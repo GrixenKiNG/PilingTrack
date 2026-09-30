@@ -24,7 +24,7 @@ vi.mock('@/components/piling/operator-mobile/api', async (importOriginal) => {
   };
 });
 vi.mock('@/components/piling/operator-mobile/use-offline-queue', () => ({
-  useOfflineQueue: () => ({queued: [], flush: vi.fn(), retry: vi.fn(), discard: vi.fn()}),
+  useOfflineQueue: () => ({queued: [], flush: vi.fn(), retry: vi.fn(), retryFailed: vi.fn(), discard: vi.fn()}),
 }));
 vi.mock('../operator-type.css', () => ({}));
 vi.mock('../operator-concept.css', () => ({}));

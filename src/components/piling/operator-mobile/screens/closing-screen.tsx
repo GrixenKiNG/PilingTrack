@@ -2,6 +2,7 @@
 
 import {useState, type ReactNode} from 'react';
 import {formatDowntimeHours} from '@/lib/downtime-hours';
+import {pluralizeRu} from '@/lib/format';
 import type {OperatorMobileState} from '@/modules/operator-mobile/contracts';
 import {formatDateTimeInTimezone} from '@/lib/timezone';
 import {BigButton, ErrorNote, Fact, Panel, PanelTitle, Screen, VolumeFact} from '../ui';
@@ -21,8 +22,18 @@ import {WarningsPanel} from '../warnings-panel';
  * ПОЧЕМУ НЕЛЬЗЯ ЗАКРЫТЬ С НЕОТПРАВЛЕННЫМИ ЗАПИСЯМИ. Сервер после закрытия
  * отвергает всё, что пришло в смену позже («Смена уже закрыта»): сваи,
  * лежавшие на телефоне без связи, в отчёт бы уже не попали (аудит R43 №1).
+ *
+ * ПОЧЕМУ ЖДУЩИЕ И ОТВЕРГНУТЫЕ СЧИТАЮТСЯ РАЗДЕЛЬНО. Отправка пропускает
+ * записи с `FAILED` — сервер отказал по существу, и повторять то же самое
+ * бессмысленно. Общий счётчик неотправленного прятал за собой закрытие смены,
+ * а кнопка «Отправить записи с телефона» для таких записей ничего не делала:
+ * смена оставалась незакрываемой навсегда, и выход был только в плашке вверху,
+ * о которой машинист не знал (аудит R76, F-V1-CLOSE-FAILED). Ждёт отправки —
+ * записи `PENDING`, у них один выход: отправить. Отклонённые — решение
+ * человека: повторить или убрать, поэтому кнопка зовёт к разбору, а закрытие
+ * смены не прячется навсегда — правило держится только на `PENDING`.
  */
-export function ClosingScreen({state, onOpenService, onClose, busy, error, tabs, unsent = 0, onSendNow}: {
+export function ClosingScreen({state, onOpenService, onClose, busy, error, tabs, pending = 0, failed = 0, onSendNow, onRetryFailed}: {
   state: OperatorMobileState;
   onOpenService: () => void;
   onClose: (comment: string) => void;
@@ -30,10 +41,14 @@ export function ClosingScreen({state, onOpenService, onClose, busy, error, tabs,
   error: string | null;
   /** Нижние вкладки. Рисует оболочка — экран лишь отдаёт их в Screen. */
   tabs?: ReactNode;
-  /** Сколько записей этого машиниста ещё лежит на телефоне. */
-  unsent?: number;
-  /** Отправить их сейчас. */
+  /** Сколько записей этого машиниста ещё ждут отправки (`PENDING`). */
+  pending?: number;
+  /** Сколько записей сервер отклонил по существу (`FAILED`). */
+  failed?: number;
+  /** Отправить ждущие записи сейчас. */
   onSendNow?: () => void;
+  /** Вернуть отклонённые в отправку — решение человека. */
+  onRetryFailed?: () => void;
 }) {
   const [comment, setComment] = useState('');
   const service = state.checklists.find((checklist) => checklist.stage === 'EO_AFTER');
@@ -47,24 +62,47 @@ export function ClosingScreen({state, onOpenService, onClose, busy, error, tabs,
       footer={(
         !serviceDone
           ? <BigButton onClick={onOpenService}>Выполнить ЕО после работы</BigButton>
-          : unsent > 0
+          : pending > 0
             ? <BigButton onClick={onSendNow}>Отправить записи с телефона</BigButton>
             : (
-              <BigButton onClick={() => onClose(comment)} disabled={busy}>
-                {busy ? 'Отправляем…' : 'Закрыть смену и отправить отчёт'}
-              </BigButton>
+              <>
+                {failed > 0 ? (
+                  <BigButton tone="ghost" onClick={onRetryFailed}>Повторить отклонённые</BigButton>
+                ) : null}
+                <BigButton onClick={() => onClose(comment)} disabled={busy}>
+                  {busy ? 'Отправляем…' : 'Закрыть смену и отправить отчёт'}
+                </BigButton>
+              </>
             )
       )}
     >
       <WarningsPanel warnings={state.warnings} />
 
-      {unsent > 0 ? (
+      {pending > 0 ? (
         <Panel tone="warning">
-          <PanelTitle tone="warning">На телефоне не отправлено: {unsent}</PanelTitle>
+          <PanelTitle tone="warning">
+            На телефоне {pluralizeRu(pending, ['ждёт', 'ждут', 'ждут'])} отправки: {pending}
+          </PanelTitle>
           <p className="mt-1 text-sm">
             Смену можно закрыть, когда эти записи уйдут на сервер. Если отправка не проходит —
             причина видна в строке с записями вверху экрана.
           </p>
+        </Panel>
+      ) : null}
+
+      {failed > 0 ? (
+        <Panel tone="danger">
+          <PanelTitle tone="danger">
+            Сервер не принял {failed} {pluralizeRu(failed, ['запись', 'записи', 'записей'])}
+          </PanelTitle>
+          <p className="mt-1 text-sm">
+            Причина — в списке вверху: исправьте и повторите или удалите запись.
+          </p>
+          {pending === 0 ? (
+            <p className="mt-1 text-sm">
+              Такие записи в отчёт не попадут, но закрыть смену можно — решение за вами.
+            </p>
+          ) : null}
         </Panel>
       ) : null}
 

@@ -226,7 +226,7 @@ export function OperatorMobileApp() {
 
   // Что лежит на устройстве и ещё не ушло: машинист видит это постоянно, а не
   // узнаёт по факту пропажи. Когда слать — решает общий хук (use-offline-queue).
-  const {queued, flush: flushQueued, retry: retryQueued, discard: discardQueued} = useOfflineQueue(reload);
+  const {queued, flush: flushQueued, retry: retryQueued, retryFailed, discard: discardQueued} = useOfflineQueue(reload);
 
   if (forbidden) {
     return (
@@ -548,8 +548,15 @@ export function OperatorMobileApp() {
               comment,
             }))}
             tabs={tabBar}
-            unsent={queued.length}
+            /*
+              Ждущие и отклонённые считаются раздельно: отправка пропускает
+              `FAILED`, и общий счётчик запирал закрытие смены без выхода
+              (аудит R76, F-V1-CLOSE-FAILED).
+            */
+            pending={queued.filter((item) => item.state === 'PENDING').length}
+            failed={queued.filter((item) => item.state === 'FAILED').length}
             onSendNow={() => void flushQueued()}
+            onRetryFailed={retryFailed}
           />
         );
       case 'CLOSED':
