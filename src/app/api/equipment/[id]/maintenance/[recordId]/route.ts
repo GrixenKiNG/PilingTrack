@@ -121,14 +121,54 @@ export const DELETE = withMutation(
 
     const { id, recordId } = await params;
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
-    const tenantId = requireTenantId(user!);
+    const actor = user!;
+    const tenantId = requireTenantId(actor);
+
+    // Снимок удаляемого наряда читается ДО удаления (F-R72-FEED-METER-MAINT):
+    // строки после `delete` уже нет, а наряд держит критерий «Обслуживание» и
+    // блокер по открытому ремонту. Строго по тенанту и по установке — как
+    // команда.
+    const snapshot = await db.maintenanceRecord.findFirst({
+      where: { id: recordId, equipmentId: id, tenantId },
+      select: {
+        title: true,
+        type: true,
+        status: true,
+        scheduledAt: true,
+        equipment: { select: { name: true } },
+      },
+    });
+
     try {
       await deleteMaintenance(id, recordId, { tenantId });
-      return NextResponse.json({ ok: true });
     } catch (err) {
       if (err instanceof ServiceError) return NextResponse.json({ error: err.message }, { status: err.status });
       throw err;
     }
+
+    // Удаление наряда ТО не оставляло следа нигде, хотя создание, правка и
+    // приёмка того же наряда писались (F-R72-FEED-METER-MAINT). Пишется только
+    // после успешной команды.
+    await recordAuditEvent({
+      action: 'maintenance.record.deleted',
+      scope: 'equipment',
+      actorId: actor.id,
+      targetId: recordId,
+      tenantId,
+      metadata: snapshot
+        ? {
+            name: snapshot.title,
+            before: {
+              type: snapshot.type,
+              status: snapshot.status,
+              scheduledAt: snapshot.scheduledAt,
+              equipmentName: snapshot.equipment.name,
+            },
+          }
+        : undefined,
+    });
+
+    return NextResponse.json({ ok: true });
   },
   { domain: 'equipment.maintenance' }
 );

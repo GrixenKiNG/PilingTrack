@@ -38,7 +38,7 @@ vi.mock('@/lib/logger', () => ({
   logger: { error: loggerErrorMock, warn: vi.fn(), info: vi.fn(), debug: vi.fn() },
 }));
 
-import { PUT } from '../route';
+import { PUT, DELETE } from '../route';
 
 const ADMIN = { id: 'admin-1', name: 'Админ А.', role: 'ADMIN', tenantId: 'tenant-a' };
 
@@ -144,5 +144,101 @@ describe('PUT /api/equipment/[id]/maintenance/[recordId] — след правк
 
     expect(res.status).toBe(200);
     expect(loggerErrorMock).toHaveBeenCalled();
+  });
+});
+
+/**
+ * DELETE /api/equipment/[id]/maintenance/[recordId] — след удаления наряда ТО
+ * (F-R72-FEED-METER-MAINT).
+ *
+ * Удаление наряда не оставляло следа нигде, хотя создание, правка и приёмка
+ * того же наряда писались. Удалить можно и открытый наряд, который держит
+ * блокер по ремонту, поэтому роут читает снимок ДО удаления (строго по тенанту
+ * и установке: вид ТО, состояние, плановая дата, установка) и после успеха
+ * пишет `maintenance.record.deleted`.
+ */
+const DELETE_SNAPSHOT = {
+  title: 'Замена РВД',
+  type: 'REPAIR',
+  status: 'IN_PROGRESS',
+  scheduledAt: new Date('2026-10-01T00:00:00.000Z'),
+  equipment: { name: 'ЭО-5111' },
+};
+
+function deleteReq(): NextRequest {
+  return new NextRequest('http://localhost/api/equipment/eq-1/maintenance/rec-1', {
+    method: 'DELETE',
+  });
+}
+
+describe('DELETE /api/equipment/[id]/maintenance/[recordId] — след удаления (F-R72-FEED-METER-MAINT)', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    requireAuthMock.mockResolvedValue({ user: ADMIN, error: null });
+    findFirstMock.mockResolvedValue(DELETE_SNAPSHOT);
+    deleteMaintenanceMock.mockResolvedValue(undefined);
+    recordAuditEventMock.mockResolvedValue(undefined);
+  });
+
+  it('читает снимок наряда по тенанту и установке вперёд удаления', async () => {
+    const res = await DELETE(deleteReq(), params());
+
+    expect(res.status).toBe(200);
+    expect(findFirstMock).toHaveBeenCalledWith({
+      where: { id: 'rec-1', equipmentId: 'eq-1', tenantId: 'tenant-a' },
+      select: {
+        title: true,
+        type: true,
+        status: true,
+        scheduledAt: true,
+        equipment: { select: { name: true } },
+      },
+    });
+    expect(findFirstMock.mock.invocationCallOrder[0]).toBeLessThan(
+      deleteMaintenanceMock.mock.invocationCallOrder[0],
+    );
+  });
+
+  it('пишет maintenance.record.deleted со снимком наряда после успеха', async () => {
+    await DELETE(deleteReq(), params());
+
+    expect(recordAuditEventMock).toHaveBeenCalledTimes(1);
+    expect(recordAuditEventMock).toHaveBeenCalledWith({
+      action: 'maintenance.record.deleted',
+      scope: 'equipment',
+      actorId: 'admin-1',
+      targetId: 'rec-1',
+      tenantId: 'tenant-a',
+      metadata: {
+        name: 'Замена РВД',
+        before: {
+          type: 'REPAIR',
+          status: 'IN_PROGRESS',
+          scheduledAt: DELETE_SNAPSHOT.scheduledAt,
+          equipmentName: 'ЭО-5111',
+        },
+      },
+    });
+  });
+
+  it('не пишет след, когда наряд не найден (404)', async () => {
+    const { ServiceError } = await import('@/services/service-error');
+    deleteMaintenanceMock.mockRejectedValue(new ServiceError('Наряд ТО не найден', 404));
+
+    const res = await DELETE(deleteReq(), params());
+
+    expect(res.status).toBe(404);
+    expect(recordAuditEventMock).not.toHaveBeenCalled();
+  });
+
+  it('остаётся успешным, когда снимок не прочитан заранее', async () => {
+    findFirstMock.mockResolvedValue(null);
+
+    const res = await DELETE(deleteReq(), params());
+
+    expect(res.status).toBe(200);
+    expect(recordAuditEventMock).toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'maintenance.record.deleted', metadata: undefined }),
+    );
   });
 });

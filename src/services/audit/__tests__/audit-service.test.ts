@@ -1064,3 +1064,76 @@ describe('recordAuditEvent — наряды ТО', () => {
     );
   });
 });
+
+/**
+ * Запись показания моточасов и удаление наряда ТО не оставляли следа
+ * (F-R72-FEED-METER-MAINT): добавленное показание двигает наработку и сроки ТО,
+ * а удалённый наряд (в том числе открытый ремонт) держит блокер готовности.
+ * В ленте должно быть видно, по какой установке вписали цифру и какой наряд
+ * убрали — человеческими словами, без внутренних id.
+ */
+describe('recordAuditEvent — ввод показания моточасов и удаление наряда ТО', () => {
+  it('называет внесённое показание и установку', async () => {
+    await recordAuditEvent({
+      action: 'meter.reading.added',
+      scope: 'equipment',
+      actorId: 'admin-1',
+      metadata: { name: 'ЭО-5111', after: { engineHours: 1234 } },
+    });
+
+    expect(mocks.recordFeedbackEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        level: 'info',
+        priority: 'MEDIUM',
+        title: 'Показание моточасов внесено',
+        message: 'Внесено показание моточасов 1234 м/ч — «ЭО-5111».',
+      }),
+    );
+  });
+
+  it('остаётся читаемым без названия установки и значения', async () => {
+    await recordAuditEvent({ action: 'meter.reading.added', scope: 'equipment' });
+
+    expect(mocks.recordFeedbackEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'Показание моточасов внесено',
+        message: 'Внесено показание моточасов.',
+      }),
+    );
+  });
+
+  it('называет удалённый наряд, его вид, состояние, плановую дату и установку', async () => {
+    await recordAuditEvent({
+      action: 'maintenance.record.deleted',
+      scope: 'equipment',
+      actorId: 'admin-1',
+      targetId: 'rec-1',
+      metadata: {
+        name: 'Замена РВД',
+        before: {
+          type: 'REPAIR',
+          status: 'IN_PROGRESS',
+          scheduledAt: new Date('2026-10-01T00:00:00.000Z'),
+          equipmentName: 'ЭО-5111',
+        },
+      },
+    });
+
+    expect(mocks.recordFeedbackEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        level: 'warn',
+        priority: 'HIGH',
+        title: 'Наряд ТО удалён',
+        message: 'Удалён наряд ТО «Замена РВД» (ремонт, в работе, плановая дата 01.10.2026): установка «ЭО-5111».',
+      }),
+    );
+  });
+
+  it('остаётся читаемым без снимка удалённого наряда', async () => {
+    await recordAuditEvent({ action: 'maintenance.record.deleted', scope: 'equipment' });
+
+    expect(mocks.recordFeedbackEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ title: 'Наряд ТО удалён', message: 'Удалён наряд ТО.' }),
+    );
+  });
+});
