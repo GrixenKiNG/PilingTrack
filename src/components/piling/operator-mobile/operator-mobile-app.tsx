@@ -447,6 +447,7 @@ export function OperatorMobileApp() {
       return (
         <BriefingScreen
           busy={busy}
+          error={actionError}
           onAcknowledge={() => void run(() => sendCommand({command: 'acknowledge-briefing'}))}
           onBack={() => setDetour(null)}
         />
