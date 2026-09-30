@@ -67,6 +67,14 @@ type Detour =
 export function OperatorMobileApp() {
   const [state, setState] = useState<OperatorMobileState | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  /**
+   * Отказ сервера (5xx) на загрузке состояния, в отличие от обрыва связи.
+   *
+   * Держится отдельно от `loadError`: текст «восстановите связь» на 500/503
+   * отправляет машиниста искать сеть, которой нет проблем, тогда как чинить
+   * надо сервер — об этом и должен узнать диспетчер (R76, находка 4).
+   */
+  const [serverFault, setServerFault] = useState(false);
   const [forbidden, setForbidden] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   /**
@@ -125,6 +133,7 @@ export function OperatorMobileApp() {
       });
       setState(next);
       setLoadError(null);
+      setServerFault(false);
     } catch (error) {
       if (error instanceof ApiError && error.status === 401) {
         // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- намеренно: сессия истекла, полная перезагрузка сбрасывает кэш маршрутов и память вкладки прежнего входа
@@ -137,6 +146,9 @@ export function OperatorMobileApp() {
         setForbidden(error.message);
         return;
       }
+      // 5xx — сломан сервер, а не связь: совет «восстановите связь» здесь врёт,
+      // и машинист ищет причину не там.
+      setServerFault(error instanceof ApiError && error.status >= 500);
       setLoadError(error instanceof Error ? error.message : 'Не удалось загрузить смену');
     }
   }, [equipmentId]);
@@ -236,12 +248,16 @@ export function OperatorMobileApp() {
     return (
       <OperatorFrame>
         <OperatorStatusStrip online={online} items={queued} />
-        <Screen title="Нет связи" footer={<BigButton onClick={() => void reload()}>Повторить</BigButton>}>
+        <Screen
+          title={serverFault ? 'Сервер не отвечает' : 'Нет связи'}
+          footer={<BigButton onClick={() => void reload()}>Повторить</BigButton>}
+        >
           <Panel tone="danger">
             <PanelTitle tone="danger">{loadError}</PanelTitle>
             <p className="mt-1 text-sm">
-              Без загруженного состояния нельзя безопасно открыть или закрыть смену. Восстановите
-              связь и повторите. Уже сохранённые на устройстве выработка и события не пропадут.
+              {serverFault
+                ? 'Связь есть, но сервер временно не работает. Сообщите механику или диспетчеру и повторите через несколько минут.'
+                : 'Без загруженного состояния нельзя безопасно открыть или закрыть смену. Восстановите связь и повторите. Уже сохранённые на устройстве выработка и события не пропадут.'}
             </p>
           </Panel>
         </Screen>
