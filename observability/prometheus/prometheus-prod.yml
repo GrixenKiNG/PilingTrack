@@ -1,7 +1,7 @@
 # ============================================================
 # Prometheus — production config (slim)
 # ============================================================
-# Без AlertManager и pushgateway. Скрейпим: app, node-exporter,
+# Без AlertManager и pushgateway. Скрейпим: app, workers, node-exporter,
 # postgres-exporter, redis-exporter, сам Prometheus.
 
 global:
@@ -35,6 +35,19 @@ scrape_configs:
           service: 'pilingtrack-app'
           tier: 'frontend'
 
+  # F-WORKERS-SCRAPE (R59 #3): контейнер workers отдаёт /metrics на :3002
+  # (worker_status, worker_is_leader, worker_uptime_seconds) — без этого job'а
+  # его остановка не поднимала ни одного алерта. Порт не проксируется наружу
+  # (docker-compose.prod.yml: bind 127.0.0.1), Prometheus достаёт сервис по
+  # имени внутри общей сети pilingtrack_pilingtrack, без авторизации.
+  - job_name: 'pilingtrack-workers'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['workers:3002']
+        labels:
+          service: 'pilingtrack-workers'
+          tier: 'worker'
+
   - job_name: 'node'
     scrape_interval: 15s
     static_configs:
@@ -63,3 +76,17 @@ scrape_configs:
     scrape_interval: 30s
     static_configs:
       - targets: ['localhost:9090']
+
+  # F-ALERTMANAGER-WATCH (R69 #4/#5): Prometheus не скрейпил сам Alertmanager,
+  # поэтому ни up{job="alertmanager"}==0, ни alertmanager_notifications_failed_total
+  # не были наблюдаемы — отказ конвейера оповещения проходил молча. Сервис
+  # `alertmanager` объявлен в docker-compose.monitoring-prod.yml:118-149 (порт 9093),
+  # сеть pilingtrack_pilingtrack — та же, что у Prometheus; наружу порт не отдан.
+  # /metrics Alertmanager отдаёт сам, авторизации нет.
+  - job_name: 'alertmanager'
+    scrape_interval: 30s
+    static_configs:
+      - targets: ['alertmanager:9093']
+        labels:
+          service: 'alertmanager'
+          tier: 'infra'

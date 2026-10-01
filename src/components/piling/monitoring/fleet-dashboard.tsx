@@ -141,7 +141,7 @@ export function FleetDashboard() {
           <button
             type="button"
             onClick={() => void fetchSnapshot({ bust: true })}
-            className="mt-3 text-sm font-semibold text-destructive-strong underline underline-offset-2"
+            className="mt-3 inline-flex min-h-11 items-center text-sm font-semibold text-destructive-strong underline underline-offset-2 sm:min-h-0"
           >
             Повторить загрузку
           </button>
@@ -167,7 +167,7 @@ export function FleetDashboard() {
     <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
       {error && <div role="alert" className="rounded-lg border border-destructive p-3 text-destructive-strong">
         {error} Показан предыдущий снимок.
-        <button type="button" className="ml-3 underline" onClick={() => void fetchSnapshot({bust: true})}>Обновить</button>
+        <button type="button" className="ml-3 inline-flex min-h-11 items-center underline sm:min-h-0" onClick={() => void fetchSnapshot({bust: true})}>Обновить</button>
       </div>}
       <StatusBar snap={snap} conn={conn} />
 
@@ -223,7 +223,7 @@ export function FleetDashboard() {
 }
 
 const selectCls =
-  'rounded-lg border border-border bg-muted px-3 py-2 text-xs text-foreground focus:border-info focus:outline-none focus:ring-2 focus:ring-info/30/15';
+  'min-h-11 rounded-lg border border-border bg-muted px-3 py-2 text-xs text-foreground focus:border-info focus:outline-none focus:ring-2 focus:ring-info/30/15 sm:min-h-0';
 
 // ----------------------------------------------------------------------------
 

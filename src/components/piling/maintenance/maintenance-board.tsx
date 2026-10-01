@@ -278,7 +278,7 @@ export function MaintenanceBoard() {
 
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <Select value={equipmentFilterId || ALL} onValueChange={(value) => setEquipmentFilterId(value === ALL ? '' : value)}>
-              <SelectTrigger className="h-9 w-[138px]"><SelectValue placeholder="Все установки" /></SelectTrigger>
+              <SelectTrigger className="min-h-11 h-9 w-[138px] sm:min-h-0"><SelectValue placeholder="Все установки" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value={ALL}>Все установки</SelectItem>
                 {equipmentOptions.map(([id, name]) => (
@@ -288,7 +288,7 @@ export function MaintenanceBoard() {
             </Select>
 
             <Select value={siteFilterId || ALL} onValueChange={(value) => setSiteFilterId(value === ALL ? '' : value)}>
-              <SelectTrigger className="h-9 w-[128px]"><SelectValue placeholder="Все объекты" /></SelectTrigger>
+              <SelectTrigger className="min-h-11 h-9 w-[128px] sm:min-h-0"><SelectValue placeholder="Все объекты" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value={ALL}>Все объекты</SelectItem>
                 {siteOptions.map(([id, name]) => (
@@ -298,7 +298,7 @@ export function MaintenanceBoard() {
             </Select>
 
             <Select value={filter.assigneeId || ALL} onValueChange={(value) => setF('assigneeId', value)}>
-              <SelectTrigger className="h-9 w-[150px]"><SelectValue placeholder="Все исполнители" /></SelectTrigger>
+              <SelectTrigger className="min-h-11 h-9 w-[150px] sm:min-h-0"><SelectValue placeholder="Все исполнители" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value={ALL}>Все исполнители</SelectItem>
                 {assignees.map((user) => (
@@ -308,7 +308,7 @@ export function MaintenanceBoard() {
             </Select>
 
             <Select value={filter.type || ALL} onValueChange={(value) => setF('type', value)}>
-              <SelectTrigger className="h-9 w-[118px]"><SelectValue placeholder="Тип ТО" /></SelectTrigger>
+              <SelectTrigger className="min-h-11 h-9 w-[118px] sm:min-h-0"><SelectValue placeholder="Тип ТО" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value={ALL}>Все типы</SelectItem>
                 {MAINTENANCE_TYPE_OPTIONS.map((key) => (
@@ -318,7 +318,7 @@ export function MaintenanceBoard() {
             </Select>
 
             <Select value={filter.priority || ALL} onValueChange={(value) => setF('priority', value)}>
-              <SelectTrigger className="h-9 w-[128px]"><SelectValue placeholder="Приоритет" /></SelectTrigger>
+              <SelectTrigger className="min-h-11 h-9 w-[128px] sm:min-h-0"><SelectValue placeholder="Приоритет" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value={ALL}>Приоритет</SelectItem>
                 {(Object.keys(PRIORITY_LABEL) as MaintenancePriority[]).map((key) => (
@@ -332,10 +332,10 @@ export function MaintenanceBoard() {
               <CalendarDays className="h-4 w-4 text-muted-foreground" />
             </div>
 
-            <Button onClick={() => { setEditingId(null); setEditingEquipmentId(null); setDialogOpen(true); }} size="sm" className="h-9 bg-signal text-white hover:bg-signal-strong">
+            <Button onClick={() => { setEditingId(null); setEditingEquipmentId(null); setDialogOpen(true); }} size="sm" className="h-11 bg-signal text-white hover:bg-signal-strong sm:h-9">
               <Plus className="mr-1.5 h-4 w-4" /> Задача ТО
             </Button>
-            <Button variant="outline" size="sm" className="h-9" asChild>
+            <Button variant="outline" size="sm" className="h-11 sm:h-9" asChild>
               {/* План-график ТО — это регламенты в модуле техготовности, а не
                   редактор чек-листов осмотра, куда вела кнопка раньше. */}
               <Link href="/admin/to?view=plans"><CalendarDays className="mr-1.5 h-4 w-4" /> План-график</Link>
@@ -366,7 +366,7 @@ export function MaintenanceBoard() {
           <div className="flex items-center gap-2">
             <span>Показать по:</span>
             <Select value={String(pageSize)} onValueChange={(value) => setPageSize(Number(value))}>
-              <SelectTrigger className="h-8 w-[74px] bg-card font-mono">
+              <SelectTrigger className="min-h-11 h-8 w-[74px] bg-card font-mono sm:min-h-0">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -394,7 +394,7 @@ export function MaintenanceBoard() {
                 type="button"
                 onClick={() => setPage(pageNumber)}
                 className={cn(
-                  'h-8 w-8 rounded-md border font-mono',
+                  'h-11 w-11 rounded-md border font-mono sm:h-8 sm:w-8',
                   pageNumber === safePage
                     ? 'border-info/30 bg-info/10 text-info-strong'
                     : 'border-border bg-card text-foreground',

@@ -35,7 +35,7 @@ const REPORT_STATUS_OPTIONS: { value: ReportStatus; label: string }[] = [
 ];
 
 const selectCls =
-  'rounded-lg border border-border bg-muted px-3 py-2 text-xs text-foreground focus:border-info focus:outline-none focus:ring-2 focus:ring-info/30/15';
+  'min-h-11 rounded-lg border border-border bg-muted px-3 py-2 text-xs text-foreground focus:border-info focus:outline-none focus:ring-2 focus:ring-info/30/15 sm:min-h-0';
 
 export function EquipmentFilters({
   sites,

@@ -42,7 +42,7 @@ export function OpsPage({
   };
 
   return (
-    <div className="min-h-full space-y-4 bg-muted/60 p-4 lg:p-6">
+    <div className="min-h-full space-y-4 bg-muted/60 p-4 lg:p-6 field-type">
       {header}
       {kpi}
       <div

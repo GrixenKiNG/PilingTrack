@@ -127,17 +127,17 @@ export function UserDetail({ user, isSelf, onEdit, onDelete, onToggle }: UserDet
 
         <TabsContent value="access" className="space-y-2">
           <div className="flex flex-wrap gap-2">
-            <Button size="sm" variant="outline" onClick={onEdit} className="h-8 text-xs">
+            <Button size="sm" variant="outline" onClick={onEdit} className="h-11 text-xs sm:h-8">
               <Pencil className="h-3.5 w-3.5" />Редактировать
             </Button>
             {!isSelf && (
-              <Button size="sm" variant="outline" onClick={onToggle} className="h-8 text-xs">
+              <Button size="sm" variant="outline" onClick={onToggle} className="h-11 text-xs sm:h-8">
                 {user.isActive ? <PowerOff className="h-3.5 w-3.5" /> : <Power className="h-3.5 w-3.5" />}
                 {user.isActive ? 'Заблокировать' : 'Разблокировать'}
               </Button>
             )}
             {!isSelf && user.canHardDelete && (
-              <Button size="sm" variant="outline" onClick={onDelete} className="h-8 text-xs text-destructive-strong hover:bg-destructive/10">
+              <Button size="sm" variant="outline" onClick={onDelete} className="h-11 text-xs text-destructive-strong hover:bg-destructive/10 sm:h-8">
                 <Trash2 className="h-3.5 w-3.5" />Удалить
               </Button>
             )}

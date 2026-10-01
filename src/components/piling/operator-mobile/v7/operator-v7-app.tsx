@@ -58,6 +58,15 @@ const DETOUR_BACK: Record<Detour['kind'], string> = {
 export function OperatorV7App() {
   const [state, setState] = useState<OperatorMobileState | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  /**
+   * Отказ по роли при загрузке состояния — отдельно от «нет связи».
+   *
+   * 403 значит, что экран не для этой роли: ни «Повторить», ни «уйдёт при
+   * связи» здесь не помогут — помощник машиниста будет жать кнопку до вечера,
+   * а обещание отправки он прочтёт как «подожди и всё появится». Поэтому текст
+   * про роль показываем сам по себе, без кнопки повтора (как в `/operator`).
+   */
+  const [forbidden, setForbidden] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -82,11 +91,18 @@ export function OperatorV7App() {
       const next = await fetchState({coordinates: coordinates.current});
       setState(next);
       setLoadError(null);
+      setForbidden(null);
       setSyncedAt(new Date().toLocaleTimeString('ru-RU', {hour: '2-digit', minute: '2-digit'}));
     } catch (cause) {
       if (cause instanceof ApiError && cause.status === 401) {
         // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- намеренно: сессия истекла, полная перезагрузка сбрасывает кэш маршрутов и память вкладки прежнего входа
         window.location.href = '/login';
+        return;
+      }
+      // Отказ по роли — не обрыв связи: «Повторить» его не исправит, а «данные
+      // отправятся позже» — неправда, при 403 не уйдёт ничего.
+      if (cause instanceof ApiError && cause.status === 403) {
+        setForbidden(cause.message);
         return;
       }
       setLoadError(cause instanceof ApiError ? cause.message : 'Не удалось получить состояние смены');
@@ -172,6 +188,17 @@ export function OperatorV7App() {
     }
     return true;
   }, [reload]);
+
+  if (forbidden) {
+    return (
+      <Shell online={online} syncedAt={syncedAt} pending={0}>
+        <div className="state">
+          <h2>{forbidden}</h2>
+          <p>Смену ведёт машинист, закреплённый за установкой. Записи о выработке и осмотрах подаёт он.</p>
+        </div>
+      </Shell>
+    );
+  }
 
   if (loadError) {
     return (

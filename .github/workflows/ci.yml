@@ -186,6 +186,31 @@ jobs:
             exit 1
           fi
 
+      # Ещё пять наборов гейтятся на DATABASE_URL_POSTGRES (runIf/skipIf) и при
+      # её отсутствии тоже исчезают МОЛЧА — прогон остаётся зелёным, ничего не
+      # проверив (R81, находка 4). Переменная задана в env этого job, так что
+      # гейт открыт; здесь пропуск объявляется падением. Файлы с законными
+      # describe.skip (tech-readiness-write-pipeline, contract/tech-readiness-api)
+      # сюда не входят — иначе страж срабатывал бы ложно.
+      - name: DB-gated readiness suites must actually run
+        run: |
+          if npx vitest run \
+            tests/integration/tech-readiness-projection.spec.ts \
+            tests/integration/tech-readiness-shifts.spec.ts \
+            tests/integration/tech-readiness-work-permits.spec.ts \
+            tests/integration/tenant-dictionary-migration.spec.ts \
+            tests/integration/tenant-transaction-pool.spec.ts > db-gated.log 2>&1; then
+            EXIT=0
+          else
+            EXIT=$?
+          fi
+          cat db-gated.log
+          if [ "$EXIT" -ne 0 ]; then exit "$EXIT"; fi
+          if grep -qE '[0-9]+ skipped' db-gated.log; then
+            echo "FAIL: наборы техготовности/тенанта пропущены, а не выполнены (проверьте DATABASE_URL_POSTGRES)"
+            exit 1
+          fi
+
   # Golden-path browser tests so the operator/admin core flows don't
   # silently break between releases. We don't run the full Playwright
   # suite here — only a curated set against chromium. The other specs

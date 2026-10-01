@@ -276,10 +276,10 @@ export function AdminUsers() {
           {/* Справочник видов документов живёт здесь, а не в «Справочниках»:
               там перечни свайных работ (марки свай, типы бурения, причины
               простоя), а это перечень про людей и он нужен рядом с ними. */}
-          <Button variant="outline" className="h-10" onClick={() => setShowTypes(true)}>
+          <Button variant="outline" className="h-11 sm:h-10" onClick={() => setShowTypes(true)}>
             <FileText className="h-4 w-4" />Виды документов
           </Button>
-          <Button onClick={() => setShowCreate(true)} className="h-10 bg-signal text-white hover:bg-signal-strong">
+          <Button onClick={() => setShowCreate(true)} className="h-11 bg-signal text-white hover:bg-signal-strong sm:h-10">
             <Plus className="h-4 w-4" />Новый пользователь
           </Button>
         </div>

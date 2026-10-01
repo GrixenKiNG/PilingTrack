@@ -13,6 +13,8 @@ const mocks = vi.hoisted(() => ({
   redisSmembers: vi.fn().mockResolvedValue(['outbox']),
   stateGet: vi.fn(),
   stateSmembers: vi.fn().mockResolvedValue(['outbox']),
+  // Инстанс состояния может быть недоступен: проверка обязана выжить.
+  stateClient: { available: true },
   readdir: vi.fn(),
   stat: vi.fn(),
 }));
@@ -36,11 +38,14 @@ vi.mock('@/lib/redis-cache', () => ({
     get: mocks.redisGet,
     smembers: mocks.redisSmembers,
   })),
-  getStateRedisClient: vi.fn(async () => ({
-    ping: mocks.statePing,
-    get: mocks.stateGet,
-    smembers: mocks.stateSmembers,
-  })),
+  getStateRedisClient: vi.fn(async () =>
+    mocks.stateClient.available
+      ? {
+          ping: mocks.statePing,
+          get: mocks.stateGet,
+          smembers: mocks.stateSmembers,
+        }
+      : null),
 }));
 
 vi.mock('@/services/reports/outbox-publisher', () => ({
@@ -75,6 +80,18 @@ vi.mock('../s3-health-check', () => ({
   getS3ClientForHealth: s3Mock.getS3ClientForHealth,
 }));
 
+/*
+  Свежий пульс всех планировщиков (F-HEALTH-SCHEDULERS).
+
+  Планировщики пишут `system:scheduler:<имя>` с TTL в три интервала. Тесты про
+  бэкап, хранилище и пульс служб к планировщикам отношения не имеют — без этой
+  подстановки они бы получали 'degraded' из-за отсутствующих ключей и падали бы
+  не по своей причине.
+*/
+function freshSchedulerHeartbeat(key: string): string | null {
+  return key.startsWith('system:scheduler:') ? new Date().toISOString() : null;
+}
+
 describe('health-tracker backup monitoring', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -96,7 +113,7 @@ describe('health-tracker backup monitoring', () => {
         return '0';
       }
 
-      return null;
+      return freshSchedulerHeartbeat(key);
     });
     mocks.readdir.mockRejectedValue(new Error('missing backup directory'));
     mocks.stat.mockReset();
@@ -199,6 +216,75 @@ describe('пульс служб: инстанс состояния, а не кэ
   });
 });
 
+
+/*
+  Ключи бэкапа: инстанс состояния, а не кэш (F-OFFSITE-SIGNAL-b).
+
+  scripts/backup-postgres.sh пишет system:backup:* в инстанс состояния
+  (REDIS_URL). На проде задан REDIS_URL_CACHE, и getRedisClient уходит на
+  вытесняющий кэш — ключей там нет, метрики бэкапа оставались нулями (та же
+  ловушка двух Redis, что и с пульсом служб). Проверка должна брать
+  getStateRedisClient: state-клиент вызван, кэш ключей бэкапа не видит.
+*/
+describe('ключи бэкапа: инстанс состояния, а не кэш (F-OFFSITE-SIGNAL-b)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.queryRaw.mockResolvedValue([{ '?column?': 1 }]);
+    mocks.outboxStats.mockResolvedValue({ unpublished: 0, failed: 0, total: 0 });
+    mocks.dlqStats.mockResolvedValue({ pending: 0 });
+    mocks.lagMetrics.mockReturnValue(null);
+    mocks.redisPing.mockResolvedValue('PONG');
+    mocks.statePing.mockResolvedValue('PONG');
+    mocks.redisSmembers.mockResolvedValue(['outbox']);
+    mocks.stateSmembers.mockResolvedValue(['outbox']);
+    mocks.readdir.mockRejectedValue(new Error('missing backup directory'));
+    process.env.BACKUP_ENABLED = 'true';
+    // Продовая конфигурация app-контейнера: кэш-инстанс задан.
+    process.env.REDIS_URL_CACHE = 'redis://redis-cache:6379';
+  });
+
+  afterEach(() => {
+    delete process.env.BACKUP_ENABLED;
+    delete process.env.REDIS_URL_CACHE;
+  });
+
+  it('читает system:backup:* из инстанса состояния', async () => {
+    mocks.redisGet.mockResolvedValue(null);
+    mocks.stateGet.mockImplementation(async (key: string) => {
+      if (key === 'system:backup:last_timestamp') {
+        return new Date(Date.now() - 60 * 60 * 1000).toISOString();
+      }
+      if (key === 'system:backup:last_size') {
+        return '10485760';
+      }
+      if (key === 'system:backup:s3_synced') {
+        return 'true';
+      }
+      return null;
+    });
+
+    const { checkSystemStatus } = await import('../health-tracker');
+    const status = await checkSystemStatus();
+
+    expect(mocks.stateGet).toHaveBeenCalledWith('system:backup:last_timestamp');
+    expect(status.components.backup.source).toBe('redis');
+    expect(status.components.backup.status).toBe('up');
+    expect(status.components.backup.s3Synced).toBe(true);
+    // Кэш ключей бэкапа не получал — на проде их там и нет.
+    expect(mocks.redisGet).not.toHaveBeenCalledWith('system:backup:last_timestamp');
+  });
+
+  it('ключи бэкапа, попавшие в кэш вместо состояния, метрику не воскрешают', async () => {
+    mocks.redisGet.mockImplementation(async (key: string) =>
+      key.startsWith('system:backup:') ? new Date().toISOString() : null);
+    mocks.stateGet.mockResolvedValue(null);
+
+    const { checkSystemStatus } = await import('../health-tracker');
+    const status = await checkSystemStatus();
+
+    expect(status.components.backup.source).toBe('missing');
+  });
+});
 
 describe('shouldLogHealthSnapshot', () => {
   it('пишет первую поломку — предыдущей картины ещё нет', async () => {
@@ -311,5 +397,145 @@ describe('storage health: медленный S3 ≠ упавший S3 (F-R50-1)'
 
     expect(status.components.storage).toEqual({ status: 'down', provider: 's3' });
     expect(status.status).toBe('unhealthy');
+  });
+});
+
+/*
+  Пульс планировщиков (F-HEALTH-SCHEDULERS).
+
+  F-SCHEDULER-HEARTBEAT научил суточные/часовые планировщики писать
+  `system:scheduler:<имя>` с TTL в три интервала, но читать эти ключи было
+  некому: остановка контейнера workers означала тихое прекращение суточной
+  рутины, невидимое ни /api/health, ни метрикам (R59 #1, #2).
+
+  Три случая: все ключи живы; один истёк (это и есть остановившийся прогон);
+  инстанс состояния недоступен — проверка не бросает.
+*/
+describe('планировщики: истёкший пульс виден и даёт degraded (F-HEALTH-SCHEDULERS)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.stateClient.available = true;
+    mocks.queryRaw.mockResolvedValue([{ '?column?': 1 }]);
+    mocks.outboxStats.mockResolvedValue({ unpublished: 0, failed: 0, total: 0 });
+    mocks.dlqStats.mockResolvedValue({ pending: 0 });
+    mocks.lagMetrics.mockReturnValue(null);
+    mocks.redisPing.mockResolvedValue('PONG');
+    mocks.statePing.mockResolvedValue('PONG');
+    mocks.redisSmembers.mockResolvedValue(['outbox']);
+    mocks.stateSmembers.mockResolvedValue(['outbox']);
+    // Кэш пульса планировщиков не знает — он лежит в инстансе состояния.
+    mocks.redisGet.mockResolvedValue(null);
+    mocks.stateGet.mockImplementation(async (key: string) =>
+      key === 'system:worker:heartbeat:outbox' ? String(Date.now()) : freshSchedulerHeartbeat(key));
+    mocks.readdir.mockRejectedValue(new Error('missing backup directory'));
+    delete process.env.BACKUP_ENABLED;
+    // Уборка ключей идемпотентности — opt-in (F-IDEMP-CLEANUP-OPTIN): по
+    // умолчанию её нет, и её пульса в списке требуемых быть не должно.
+    delete process.env.IDEMPOTENCY_CLEANUP_ENABLED;
+  });
+
+  afterEach(() => {
+    delete process.env.IDEMPOTENCY_CLEANUP_ENABLED;
+  });
+
+  it('все ключи живы → schedulers ok, система здорова', async () => {
+    const { checkSystemStatus } = await import('../health-tracker');
+
+    const status = await checkSystemStatus();
+
+    expect(status.components.schedulers).toEqual({ status: 'ok', stale: [] });
+    expect(status.status).toBe('healthy');
+  });
+
+  it('ключ одного планировщика истёк → stale с его именем, общий статус degraded', async () => {
+    mocks.stateGet.mockImplementation(async (key: string) => {
+      if (key === 'system:worker:heartbeat:outbox') return String(Date.now());
+      // Проходы пересборки проекций прекратились — TTL ключа истёк.
+      if (key === 'system:scheduler:projection-rebuild') return null;
+      return freshSchedulerHeartbeat(key);
+    });
+
+    const { checkSystemStatus } = await import('../health-tracker');
+
+    const status = await checkSystemStatus();
+
+    expect(status.components.schedulers.status).toBe('stale');
+    expect(status.components.schedulers.stale).toEqual(['projection-rebuild']);
+    // Суточная рутина встала, но приложение работает: degraded, а не unhealthy —
+    // иначе мониторинг получал бы 503 и поднимал бы на уши напрасно.
+    expect(status.status).toBe('degraded');
+  });
+
+  it('пульс, попавший в кэш вместо состояния, планировщика не воскрешает', async () => {
+    // Ровно продовая ловушка двух Redis: ключ есть, но не в том инстансе.
+    mocks.redisGet.mockImplementation(async (key: string) =>
+      key.startsWith('system:scheduler:') ? new Date().toISOString() : null);
+    mocks.stateGet.mockImplementation(async (key: string) =>
+      key === 'system:worker:heartbeat:outbox' ? String(Date.now()) : null);
+
+    const { checkSystemStatus } = await import('../health-tracker');
+
+    const status = await checkSystemStatus();
+
+    expect(mocks.stateGet).toHaveBeenCalledWith('system:scheduler:pm-scheduler');
+    expect(status.components.schedulers.status).toBe('stale');
+  });
+
+  it('недоступный инстанс состояния не бросает и не выглядит благополучием', async () => {
+    mocks.stateClient.available = false;
+
+    const { checkSystemStatus } = await import('../health-tracker');
+
+    const status = await checkSystemStatus();
+
+    // Нет данных о пульсе — это не «всё в порядке»: планировщики считаются stale.
+    expect(status.components.schedulers.status).toBe('stale');
+    // Уборки ключей идемпотентности в списке нет: она выключена по умолчанию
+    // (F-IDEMP-CLEANUP-OPTIN) и пульса не пишет — требовать его нельзя.
+    expect(status.components.schedulers.stale).toEqual([
+      'pm-scheduler',
+      'projection-rebuild',
+      'readiness-scheduler',
+    ]);
+  });
+
+  it('выключенная уборка ключей не в счёте: её пульс не спрашивают и не ждут', async () => {
+    // Значение, которое владелец мог задать «на всякий случай», уборку не
+    // включает: opt-in — только строка 'true' (F-IDEMP-CLEANUP-OPTIN).
+    process.env.IDEMPOTENCY_CLEANUP_ENABLED = '1';
+    mocks.stateGet.mockImplementation(async (key: string) => {
+      if (key === 'system:worker:heartbeat:outbox') return String(Date.now());
+      // Единственный ключ, которого на проде нет: уборка выключена.
+      if (key === 'system:scheduler:idempotency-cleanup') return null;
+      return freshSchedulerHeartbeat(key);
+    });
+
+    const { checkSystemStatus } = await import('../health-tracker');
+
+    const status = await checkSystemStatus();
+
+    expect(status.components.schedulers).toEqual({ status: 'ok', stale: [] });
+    expect(status.status).toBe('healthy');
+    expect(mocks.stateGet).not.toHaveBeenCalledWith('system:scheduler:idempotency-cleanup');
+  });
+
+  it("явно включённая уборка ключей требует пульса: без него stale (F-IDEMP-CLEANUP-OPTIN)", async () => {
+    process.env.IDEMPOTENCY_CLEANUP_ENABLED = 'true';
+    mocks.stateGet.mockImplementation(async (key: string) => {
+      if (key === 'system:worker:heartbeat:outbox') return String(Date.now());
+      if (key === 'system:scheduler:idempotency-cleanup') return null;
+      return freshSchedulerHeartbeat(key);
+    });
+
+    const { checkSystemStatus } = await import('../health-tracker');
+
+    const status = await checkSystemStatus();
+
+    expect(status.components.schedulers).toEqual({
+      status: 'stale',
+      stale: ['idempotency-cleanup'],
+    });
+    expect(status.status).toBe('degraded');
+    expect(mocks.stateGet).toHaveBeenCalledWith('system:scheduler:idempotency-cleanup');
   });
 });

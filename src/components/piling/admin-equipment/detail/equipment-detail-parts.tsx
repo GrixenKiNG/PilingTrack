@@ -42,7 +42,7 @@ export function Section({
             type="button"
             onClick={() => setOpen((o) => !o)}
             aria-expanded={open}
-            className="mb-3 flex w-full items-center gap-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground hover:text-foreground"
+            className="mb-3 flex min-h-11 w-full items-center gap-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground hover:text-foreground sm:min-h-0"
           >
             {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
             <Icon className="w-4 h-4" /> {title}
@@ -161,7 +161,7 @@ export function HistoryTable({ rows }: { rows: TimelineRow[] }) {
                       onClick={() => setOpen((o) => !o)}
                       aria-expanded={open}
                       aria-label={open ? 'Свернуть историю' : 'Развернуть историю'}
-                      className="flex items-center justify-center rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+                      className="flex min-h-11 min-w-11 items-center justify-center rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground sm:min-h-0 sm:min-w-0"
                     >
                       {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                     </button>
@@ -189,7 +189,7 @@ export function HistoryTable({ rows }: { rows: TimelineRow[] }) {
         <button
           type="button"
           onClick={() => setOpen((o) => !o)}
-          className="flex w-full items-center justify-center gap-1 border-t bg-muted/50 py-1.5 text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
+          className="flex min-h-11 w-full items-center justify-center gap-1 border-t bg-muted/50 py-1.5 text-xs text-muted-foreground hover:bg-muted hover:text-foreground sm:min-h-0"
         >
           {open ? 'Свернуть' : `Показать всю историю (${rows.length})`}
         </button>

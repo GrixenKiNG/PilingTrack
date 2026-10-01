@@ -20,7 +20,7 @@ import {WarningsPanel} from '../warnings-panel';
  * ПОЧЕМУ НЕТ ВВОДА МОТОЧАСОВ. Их снимают при пуске, в ЕО перед работой. Два
  * ввода подряд про одно и то же заполняют не глядя.
  */
-export function AdmissionScreen({state, tabs, onAccept, onSelectEquipment, busy, error}: {
+export function AdmissionScreen({state, tabs, onAccept, onSelectEquipment, busy, error, errorDetails}: {
   state: OperatorMobileState;
   /** Нижние вкладки: на приёме они уже доступны — см. `operator-mobile-app`. */
   tabs?: ReactNode;
@@ -34,6 +34,8 @@ export function AdmissionScreen({state, tabs, onAccept, onSelectEquipment, busy,
   onSelectEquipment: (equipmentId: string) => void;
   busy: boolean;
   error: string | null;
+  /** Подробности отказа (аудит R76, находка 10). */
+  errorDetails?: string[];
 }) {
   const assignment = state.assignment;
   const [shiftType, setShiftType] = useState<'DAY' | 'NIGHT'>('DAY');
@@ -192,7 +194,7 @@ export function AdmissionScreen({state, tabs, onAccept, onSelectEquipment, busy,
         </div>
       ) : null}
 
-      <ErrorNote message={error} />
+      <ErrorNote message={error} details={errorDetails} />
     </Screen>
   );
 }

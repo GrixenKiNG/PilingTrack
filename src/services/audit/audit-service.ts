@@ -730,6 +730,22 @@ const AUDIT_DESCRIPTIONS: Record<string, AuditDescription> = {
   },
 
   // ── Техника: моточасы ──
+  // Запись показания двигает наработку (Equipment.engineHoursTotal) и сроки
+  // ТО, поэтому в ленте нужна пара «внёс — стёр»: без первой строки удаление
+  // читается перевёрнуто (F-R72-FEED-METER-MAINT). Название установки и
+  // значение — без внутренних id.
+  'meter.reading.added': {
+    level: 'info',
+    title: 'Показание моточасов внесено',
+    message: (m) => {
+      const hours = num(m, 'after.engineHours');
+      const value = hours === null ? '' : ` ${hours} м/ч`;
+      const equipment = subject(m);
+      return equipment
+        ? `Внесено показание моточасов${value} — «${equipment}».`
+        : `Внесено показание моточасов${value}.`;
+    },
+  },
   // Удаление показания меняет наработку (Equipment.engineHoursTotal) и сроки
   // ТО, а самой строки показания после этого уже нет: кто и какую цифру стёр,
   // видно только здесь. Название установки и снятое значение — без внутренних
@@ -834,6 +850,55 @@ const AUDIT_DESCRIPTIONS: Record<string, AuditDescription> = {
     message: (m) => {
       const name = subject(m);
       return name ? `Наряд ТО «${name}» принят администратором.` : 'Наряд ТО принят администратором.';
+    },
+  },
+  // Удаление наряда ТО не оставляло следа нигде, хотя создание, правка и
+  // приёмка того же наряда писались (F-R72-FEED-METER-MAINT). Удалить можно и
+  // открытый наряд, который держит блокер по ремонту, поэтому в ленте нужен
+  // снимок до удаления: вид ТО, состояние, плановая дата и установка. Внутренних
+  // id в тексте нет.
+  'maintenance.record.deleted': {
+    level: 'warn',
+    title: 'Наряд ТО удалён',
+    message: (m) => {
+      const name = subject(m);
+      const type = maintenanceTypeLabel(str(m, 'before.type'));
+      const status = maintenanceStatusLabel(str(m, 'before.status'));
+      const scheduled = dateAt(m, 'before.scheduledAt');
+      const equipment = str(m, 'before.equipmentName');
+      const what = name ? `Удалён наряд ТО «${name}»` : 'Удалён наряд ТО';
+      const details = [type, status, scheduled ? `плановая дата ${scheduled}` : null]
+        .filter(Boolean)
+        .join(', ');
+      const line = details ? `${what} (${details})` : what;
+      return equipment ? `${line}: установка «${equipment}».` : `${line}.`;
+    },
+  },
+
+  // ── Осмотры: завершение ──
+  // Завершение осмотра — самый «допусковый» акт в системе: считается балл
+  // состояния, закрывается наряд ТО, пишутся моточасы и заводятся дефекты, — а
+  // следа в ленте не было вовсе (F-R72-FEED-INSPECTION). Срочность зависит от
+  // итога: неполный балл означает найденные неисправности (тем же признаком
+  // считается `findings` в готовности — `readiness-facts.ts`), а заведённые
+  // дефекты держат блокер. В тексте — название установки, уровень осмотра и
+  // балл, без внутренних id.
+  'inspection.completed': {
+    level: (m) => {
+      const score = num(m, 'after.healthScore');
+      const defects = num(m, 'after.defectCount');
+      return (score !== null && score < 100) || (defects !== null && defects > 0) ? 'warn' : 'info';
+    },
+    title: 'Осмотр завершён',
+    message: (m) => {
+      const equipment = subject(m);
+      const level = maintenanceTypeLabel(str(m, 'after.level'));
+      const score = num(m, 'after.healthScore');
+      const defects = num(m, 'after.defectCount');
+      const result = [level, score === null ? null : `балл ${score}%`].filter(Boolean).join(', ');
+      const what = equipment ? `Осмотр завершён — «${equipment}»` : 'Осмотр завершён';
+      const line = result ? `${what}: ${result}` : what;
+      return defects === null ? `${line}.` : `${line}, дефектов ${defects}.`;
     },
   },
 };

@@ -125,10 +125,10 @@ export async function requirePileGrade(tx: Tx, tenantId: string, id: string, shi
       where: {tenantId, id},
       select: {id: true, lengthMm: true, isActive: true, archivedAt: true, name: true},
     }),
-    'Марка сваи не найдена в справочнике вашей организации',
+    'Марка сваи не найдена в справочнике вашей организации — обновите экран и выберите марку заново',
   );
   if (!grade.isActive && !(grade.archivedAt && grade.archivedAt > shiftStartedAt)) {
-    throw new OperatorCommandError(400, 'Марка сваи убрана в архив — выберите действующую марку');
+    throw new OperatorCommandError(400, 'Марка сваи убрана в архив — обновите экран и выберите действующую марку');
   }
   return {id: grade.id, lengthMm: grade.lengthMm, name: grade.name};
 }
@@ -139,7 +139,7 @@ export function requireDrillingType(tx: Tx, tenantId: string, id: string) {
       where: {tenantId, id, isActive: true},
       select: {id: true},
     }),
-    'Тип бурения не найден в справочнике вашей организации',
+    'Тип бурения не найден в справочнике вашей организации — обновите экран и выберите тип заново',
   );
 }
 
@@ -149,7 +149,7 @@ export function requireDowntimeReason(tx: Tx, tenantId: string, id: string) {
       where: {tenantId, id, isActive: true},
       select: {id: true, name: true},
     }),
-    'Причина простоя не найдена в справочнике вашей организации',
+    'Причина простоя не найдена в справочнике вашей организации — обновите экран и выберите причину заново',
   );
 }
 

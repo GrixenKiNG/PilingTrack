@@ -13,27 +13,26 @@
  * source of truth — idempotent, so no leader election is needed.
  */
 
+import * as Sentry from '@sentry/nextjs';
 import { logger } from '@/lib/logger';
 import { rebuildAll } from '@/modules/reports/application/projections/rebuild';
+import { recordSchedulerHeartbeat } from './scheduler-heartbeat';
+import { positiveIntEnv } from './env-int';
 
-const REBUILD_INTERVAL = parseInt(
-  process.env.PROJECTION_REBUILD_INTERVAL_MS || String(24 * 60 * 60 * 1000),
-  10,
-);
-const REBUILD_STARTUP_DELAY = parseInt(
-  process.env.PROJECTION_REBUILD_STARTUP_DELAY_MS || '90000',
-  10,
-);
+const REBUILD_INTERVAL = positiveIntEnv('PROJECTION_REBUILD_INTERVAL_MS', 24 * 60 * 60 * 1000);
+const REBUILD_STARTUP_DELAY = positiveIntEnv('PROJECTION_REBUILD_STARTUP_DELAY_MS', 90000);
 
 async function runOnce(): Promise<void> {
   try {
     const results = await rebuildAll();
     const rows = results.reduce((sum, r) => sum + r.rowsWritten, 0);
     logger.info('Projection rebuild pass', { rows, projections: results.length });
+    await recordSchedulerHeartbeat('projection-rebuild', REBUILD_INTERVAL);
   } catch (error) {
     logger.error('Projection rebuild pass failed', {
       error: error instanceof Error ? error.message : String(error),
     });
+    Sentry.captureException(error, { tags: { task: 'projection-rebuild' } });
   }
 }
 

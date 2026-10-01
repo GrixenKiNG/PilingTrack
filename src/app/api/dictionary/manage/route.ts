@@ -55,7 +55,7 @@ const patchSchema = z.object({
   confirmRecalculate: z.boolean().optional(),
 }).refine(
   (v) => v.name !== undefined || v.isActive !== undefined || v.lengthMm !== undefined || v.sectionOrDiameter !== undefined,
-  { message: 'name, isActive, lengthMm or sectionOrDiameter required' },
+  { message: 'Укажите хотя бы одно поле: name, isActive, lengthMm или sectionOrDiameter' },
 );
 
 function withUsage<T extends { id: string }>(items: T[], usage: UsageMap) {

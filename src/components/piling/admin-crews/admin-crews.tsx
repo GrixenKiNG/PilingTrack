@@ -265,12 +265,12 @@ function CrewDetail({ crew, canManage, onEdit, onDelete, onToggle }: { crew: Cre
   return (
     <OpsDetailPanel title={crew.name || 'Без названия'} subtitle={`Бригада · ${crew.site?.name ?? '—'}`} status={<OpsRiskBadge level={risk.level} label={risk.label} />}>
       {canManage && <div className="flex flex-wrap gap-2">
-        <Button size="sm" variant="outline" onClick={onEdit} className="h-8 text-xs"><Pencil className="mr-1 h-3.5 w-3.5" />Редактировать</Button>
-        <Button size="sm" variant="outline" onClick={onToggle} className="h-8 text-xs">
+        <Button size="sm" variant="outline" onClick={onEdit} className="h-11 text-xs sm:h-8"><Pencil className="mr-1 h-3.5 w-3.5" />Редактировать</Button>
+        <Button size="sm" variant="outline" onClick={onToggle} className="h-11 text-xs sm:h-8">
           {crew.isActive ? <PowerOff className="mr-1 h-3.5 w-3.5" /> : <Power className="mr-1 h-3.5 w-3.5" />}
           {crew.isActive ? 'Деактивировать' : 'Активировать'}
         </Button>
-        <Button size="sm" variant="outline" onClick={onDelete} className="h-8 text-xs text-destructive-strong hover:bg-destructive/10"><Trash2 className="mr-1 h-3.5 w-3.5" />Удалить</Button>
+        <Button size="sm" variant="outline" onClick={onDelete} className="h-11 text-xs text-destructive-strong hover:bg-destructive/10 sm:h-8"><Trash2 className="mr-1 h-3.5 w-3.5" />Удалить</Button>
       </div>}
 
       <div className="grid grid-cols-2 divide-x rounded-md border border-border bg-muted">

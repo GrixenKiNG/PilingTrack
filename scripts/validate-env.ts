@@ -121,6 +121,37 @@ const ENV_CONFIG: Record<string, EnvVarConfig> = {
   S3_SECRET_ACCESS_KEY: { required: false, description: 'S3 secret key' },
 };
 
+// Переменные, без которых на бою функция тихо выключается (см. R61).
+// Это предупреждения, а не ошибки: validate-env запускается в сборке
+// (npm run build), и падение сломало бы выкладку. Значения не печатаем —
+// только имя и то, что именно перестанет работать. Проверяется только
+// «переменная не задана»: явное TRUST_PROXY=false остаётся решением владельца.
+const PRODUCTION_WARNINGS: Record<string, string> = {
+  TELEGRAM_API_BASE:
+    'Telegram-уведомления не дойдут: на боевом сервере api.telegram.org заблокирован провайдером, ' +
+    'а без переменной запросы уходят именно туда. Укажите адрес прокси.',
+  TRUST_PROXY:
+    'все посетители будут считаться одним клиентом: счётчик попыток входа станет общим на домен ' +
+    'и после исчерпания лимита вход заблокируется сразу всем. Укажите TRUST_PROXY=true, ' +
+    'если порт приложения закрыт снаружи.',
+  DB_IDENTITY_ROLE:
+    'опознание (вход по email, вход по ПИН-коду, поиск ключа устройства) пойдёт без переключения ' +
+    'на свою роль и под RLS вернёт пусто — пользователи не смогут войти. Укажите имя роли.',
+  BACKUP_ENABLED:
+    'мониторинг бэкапов выключен: метрики возраста бэкапа и выгрузки в S3 будут нулевыми, ' +
+    'а алерт OffsiteBackupNotSynced не сможет сработать. Задайте BACKUP_ENABLED=true.',
+};
+
+function warnMissingProductionVars(): void {
+  if (process.env.NODE_ENV !== 'production') return;
+  for (const [key, message] of Object.entries(PRODUCTION_WARNINGS)) {
+    const value = process.env[key];
+    if (!value || value.trim() === '') {
+      console.warn(`⚠️  ${key} не задана — ${message}`);
+    }
+  }
+}
+
 function validateEnv(): { valid: boolean; errors: string[]; warnings: string[] } {
   const errors: string[] = [];
   const warnings: string[] = [];
@@ -198,6 +229,10 @@ function main() {
     warnings.forEach((w) => console.log(`   • ${w}`));
     console.log();
   }
+
+  // Прод-предупреждения о переменных, без которых функция молча выключается.
+  // Печатаются всегда при NODE_ENV=production и никогда не валят сборку.
+  warnMissingProductionVars();
 
   if (valid) {
     console.log('✅ All environment variables are valid!\n');

@@ -272,7 +272,7 @@ export function StartInspectionForm() {
                 <div className="flex items-center gap-1.5 text-sm font-semibold text-success-strong">
                   <ShoppingCart className="h-4 w-4" /> Заказать перед ТО
                 </div>
-                <Button type="button" variant="outline" size="sm" onClick={copyConsumables} className="h-7 gap-1 px-2 text-xs">
+                <Button type="button" variant="outline" size="sm" onClick={copyConsumables} className="h-11 gap-1 px-2 text-xs sm:h-7">
                   <Copy className="h-3 w-3" /> Скопировать
                 </Button>
               </div>

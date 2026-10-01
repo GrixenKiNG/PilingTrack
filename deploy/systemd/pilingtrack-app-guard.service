@@ -1,0 +1,19 @@
+[Unit]
+Description=PilingTrack independent app liveness guard
+After=docker.service
+
+[Service]
+Type=oneshot
+# The guard's own (infrastructure) bot credentials:
+#   APP_GUARD_TELEGRAM_BOT_TOKEN, APP_GUARD_TELEGRAM_CHAT_ID, TELEGRAM_API_BASE.
+# Primary source — on prod the app bot token lives in the database, so the compose
+# .env has no TELEGRAM_BOT_TOKEN and the guard could not notify at all.
+# Create it as root:root with mode 0600; the leading '-' keeps the unit valid if
+# the file is absent (see the install header in scripts/app-guard.sh).
+EnvironmentFile=-/etc/pilingtrack/app-guard.env
+# Override defaults here if needed, e.g.:
+#   Environment=APP_GUARD_FAIL_THRESHOLD=5
+#   Environment=APP_GUARD_STATE_FILE=/var/lib/pilingtrack/app-guard.state
+ExecStart=/bin/bash /opt/pilingtrack/scripts/app-guard.sh
+StandardOutput=journal
+StandardError=journal

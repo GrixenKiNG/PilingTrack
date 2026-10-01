@@ -190,7 +190,7 @@ export function PileJournal() {
   const patch = (part: Partial<JournalFilters>) => setFilters((current) => ({ ...current, ...part }));
 
   return (
-    <div className="space-y-3 p-4">
+    <div className="space-y-3 p-4 field-type">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-lg font-semibold">Журнал забивки свай</h1>
@@ -199,7 +199,7 @@ export function PileJournal() {
             Принимает сваю мастер, он же отправляет её на добивку.
           </p>
         </div>
-        <Button size="sm" variant="outline" className="h-8 text-xs" disabled={exporting}
+        <Button size="sm" variant="outline" className="h-11 text-xs sm:h-8" disabled={exporting}
           onClick={() => void exportJournal()}>
           {exporting ? 'Выгрузка…' : 'Выгрузить журнал (.xlsx)'}
         </Button>
@@ -212,7 +212,7 @@ export function PileJournal() {
               key={option.key}
               size="sm"
               variant={filters.status === option.key ? 'default' : 'outline'}
-              className="h-8 text-xs"
+              className="min-h-11 text-xs sm:min-h-8"
               onClick={() => patch({ status: option.key })}
             >
               {option.label}
@@ -225,7 +225,7 @@ export function PileJournal() {
           <select
             value={filters.siteId}
             onChange={(event) => patch({ siteId: event.target.value })}
-            className="mt-0.5 block h-8 rounded-md border bg-card px-2 text-xs"
+            className="mt-0.5 block min-h-11 rounded-md border bg-card px-2 text-xs sm:min-h-8 sm:h-8"
           >
             <option value="all">Все объекты</option>
             {sites.map((site) => (
@@ -240,7 +240,7 @@ export function PileJournal() {
             type="date"
             value={filters.dateFrom}
             onChange={(event) => patch({ dateFrom: event.target.value })}
-            className="mt-0.5 block h-8 rounded-md border bg-card px-2 text-xs"
+            className="mt-0.5 block min-h-11 rounded-md border bg-card px-2 text-xs sm:min-h-8 sm:h-8"
           />
         </label>
         <label className="text-2xs text-muted-foreground">
@@ -249,7 +249,7 @@ export function PileJournal() {
             type="date"
             value={filters.dateTo}
             onChange={(event) => patch({ dateTo: event.target.value })}
-            className="mt-0.5 block h-8 rounded-md border bg-card px-2 text-xs"
+            className="mt-0.5 block min-h-11 rounded-md border bg-card px-2 text-xs sm:min-h-8 sm:h-8"
           />
         </label>
 
@@ -259,11 +259,11 @@ export function PileJournal() {
             value={filters.pileNumber}
             onChange={(event) => patch({ pileNumber: event.target.value })}
             placeholder="С-130"
-            className="mt-0.5 block h-8 w-28 rounded-md border bg-card px-2 text-xs"
+            className="mt-0.5 block min-h-11 w-28 rounded-md border bg-card px-2 text-xs sm:min-h-8 sm:h-8"
           />
         </label>
 
-        <Button size="sm" variant="ghost" className="h-8 text-xs"
+        <Button size="sm" variant="ghost" className="min-h-11 text-xs sm:min-h-8"
           onClick={() => setFilters(EMPTY_FILTERS)}>
           Сбросить
         </Button>

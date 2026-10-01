@@ -7,6 +7,8 @@ import { addMeterReading, canDecreaseMeter, listMeterReadings } from '@/modules/
 import { getCrewForOperator } from '@/modules/crews';
 import { withApi, withMutation, readJsonBody } from '@/core/api-wrapper';
 import { ServiceError } from '@/services/service-error';
+import { db } from '@/lib/db';
+import { recordAuditEvent } from '@/services/audit/audit-service';
 
 export const runtime = 'nodejs';
 
@@ -79,10 +81,20 @@ export const POST = withMutation(
 
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     const tenantId = requireTenantId(user!);
+
+    // Название установки нужно только ленте (F-R72-FEED-METER-MAINT): сама
+    // команда его не возвращает, а в тексте события оно читается вместо id.
+    // Читается ДО команды, строго по тенанту — как в удалении показания.
+    const equipment = await db.equipment.findFirst({
+      where: { id, tenantId },
+      select: { name: true },
+    });
+
+    let result;
     try {
       // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
       await assertOperatorOwnsEquipment(user!, id);
-      const result = await addMeterReading(id, parsed.data, {
+      result = await addMeterReading(id, parsed.data, {
         tenantId,
         // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
         recordedById: user!.id,
@@ -90,11 +102,27 @@ export const POST = withMutation(
         // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
         allowDecrease: canDecreaseMeter(user!.role),
       });
-      return NextResponse.json(result, { status: 201 });
     } catch (err) {
       if (err instanceof ServiceError) return NextResponse.json({ error: err.message }, { status: err.status });
       throw err;
     }
+
+    // Запись показания двигает наработку и сроки ТО, а строки в журнале по ней
+    // не было вовсе — при том что удаление того же показания писалось
+    // (F-R72-FEED-METER-MAINT). Пишется только после успешной команды.
+    await recordAuditEvent({
+      action: 'meter.reading.added',
+      scope: 'equipment',
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
+      actorId: user!.id,
+      targetId: result.reading.id,
+      tenantId,
+      metadata: equipment
+        ? { name: equipment.name, after: { engineHours: result.reading.engineHours } }
+        : { after: { engineHours: result.reading.engineHours } },
+    });
+
+    return NextResponse.json(result, { status: 201 });
   },
   { domain: 'equipment.maintenance' }
 );

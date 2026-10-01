@@ -282,7 +282,7 @@ export function WorkOrderDetail({ recordId }: { recordId: string }) {
         {actions.length > 0 && (
           <div className="mt-3 flex flex-wrap gap-2 border-t border-border pt-3">
             {actions.map((s) => (
-              <Button key={s} size="sm" variant="outline" disabled={savingStatus !== null}
+              <Button key={s} size="sm" variant="outline" disabled={savingStatus !== null} className="min-h-11 sm:min-h-0"
                 // Отмена — единственный переход, который сначала спрашивает «почему»:
                 // сервер её без причины не примет, и лучше спросить до отказа.
                 onClick={() => (s === 'CANCELLED' ? setCancelDraft('') : changeStatus(s))}>
@@ -290,7 +290,7 @@ export function WorkOrderDetail({ recordId }: { recordId: string }) {
                 {STATUS_LABEL[s]}
               </Button>
             ))}
-            <Button size="sm" className="ml-auto bg-signal hover:bg-signal-strong text-white" onClick={() => setDialogOpen(true)}>
+            <Button size="sm" className="min-h-11 ml-auto bg-signal hover:bg-signal-strong text-white sm:min-h-0" onClick={() => setDialogOpen(true)}>
               Полное редактирование
             </Button>
           </div>
@@ -302,10 +302,10 @@ export function WorkOrderDetail({ recordId }: { recordId: string }) {
               placeholder="Напр. работа выполнена по другому наряду; узел заменён целиком"
               onChange={(e) => setCancelDraft(e.target.value)} />
             <div className="mt-2 flex justify-end gap-2">
-              <Button size="sm" variant="outline" onClick={() => setCancelDraft(null)} disabled={savingStatus !== null}>
+              <Button size="sm" variant="outline" className="min-h-11 sm:min-h-0" onClick={() => setCancelDraft(null)} disabled={savingStatus !== null}>
                 Не отменять
               </Button>
-              <Button size="sm" variant="destructive" disabled={savingStatus !== null || cancelDraft.trim() === ''}
+              <Button size="sm" variant="destructive" className="min-h-11 sm:min-h-0" disabled={savingStatus !== null || cancelDraft.trim() === ''}
                 onClick={() => changeStatus('CANCELLED', { cancelReason: cancelDraft.trim() })}>
                 {savingStatus === 'CANCELLED' && <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />}
                 Отменить наряд
@@ -315,7 +315,7 @@ export function WorkOrderDetail({ recordId }: { recordId: string }) {
         )}
         {actions.length === 0 && (
           <div className="mt-3 flex border-t border-border pt-3">
-            <Button size="sm" className="ml-auto bg-signal hover:bg-signal-strong text-white" onClick={() => setDialogOpen(true)}>
+            <Button size="sm" className="min-h-11 ml-auto bg-signal hover:bg-signal-strong text-white sm:min-h-0" onClick={() => setDialogOpen(true)}>
               Полное редактирование
             </Button>
           </div>
@@ -398,7 +398,7 @@ export function WorkOrderDetail({ recordId }: { recordId: string }) {
         </div>
         <div className="mt-3 flex items-center justify-between">
           <span className="text-xs text-muted-foreground">Назначено: {resolveAssigneeName(record.assigneeId, names)}</span>
-          <Button size="sm" disabled={savingQuick} className="bg-signal hover:bg-signal-strong text-white" onClick={saveQuick}>
+          <Button size="sm" disabled={savingQuick} className="min-h-11 bg-signal hover:bg-signal-strong text-white sm:min-h-0" onClick={saveQuick}>
             {savingQuick && <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />}
             Сохранить
           </Button>
@@ -426,7 +426,7 @@ export function WorkOrderDetail({ recordId }: { recordId: string }) {
         ) : isAdmin ? (
           <div className="flex items-center justify-between gap-3">
             <span className="text-sm text-muted-foreground">Работа ещё не принята.</span>
-            <Button size="sm" disabled={accepting} className="bg-success-strong hover:bg-success-strong text-white" onClick={accept}>
+            <Button size="sm" disabled={accepting} className="min-h-11 bg-success-strong hover:bg-success-strong text-white sm:min-h-0" onClick={accept}>
               {accepting && <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />}
               Принять
             </Button>

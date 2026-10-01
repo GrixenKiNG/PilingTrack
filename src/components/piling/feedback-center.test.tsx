@@ -13,12 +13,13 @@ const state = vi.hoisted(() => ({
     role: 'OPERATOR',
   } as Record<string, unknown>,
   events: [] as unknown[],
+  localEvents: [] as unknown[],
 }));
 
 vi.mock('@/lib/store', () => ({
   usePilingStore: (selector: (state: Record<string, unknown>) => unknown) => selector({
     currentUser: state.currentUser,
-    localFeedbackEvents: [],
+    localFeedbackEvents: state.localEvents,
     dismissLocalFeedbackEvent: vi.fn(),
     clearLocalFeedbackEvents: vi.fn(),
   }),
@@ -65,6 +66,7 @@ describe('центр уведомлений', () => {
       role: 'OPERATOR',
     };
     state.events = [];
+    state.localEvents = [];
     // Панель при открытии заводит SSE-поток; в happy-dom его нет.
     vi.stubGlobal('EventSource', class {
       addEventListener() {}
@@ -91,5 +93,70 @@ describe('центр уведомлений', () => {
     expect(screen.queryByText(new RegExp(requestId))).toBeNull();
     expect(screen.queryByText(`requestId: ${requestId}`)).toBeNull();
     expect(screen.getByTitle(`requestId: ${requestId}`)).toBeInTheDocument();
+  });
+});
+
+/**
+ * R73 №50 — колокольчик в шапке всех экранов: кнопки панели были 32px
+ * (`h-8 text-xs`). На телефоне (<640px) поднимаем цель до 44px (`min-h-11`),
+ * на десктопе возвращаем прежние 32px (`sm:min-h-8`) — `min-height` сильнее
+ * `height`, поэтому одного `h-8` для сброса мало.
+ */
+describe('центр уведомлений: цели нажатия на телефоне (R73 №50)', () => {
+  it('кнопки панели не ниже 44px на телефоне, на десктопе прежние 32px', () => {
+    state.currentUser = {id: 'admin-1', name: 'Админ', email: 'admin@example.test', role: 'ADMIN'};
+    state.events = [feedbackEvent()];
+    state.localEvents = [
+      feedbackEvent({id: 'local-1', source: 'client', level: 'info', title: 'Локальное событие'}),
+    ];
+
+    render(<FeedbackCenter />);
+    fireEvent.click(screen.getByRole('button', {name: 'Открыть уведомления'}));
+
+    const names = [
+      'Обновить',
+      'Отметить всё как прочитанное',
+      'Очистить локальные',
+      'Отметить как прочитанное',
+      'Подтвердить обработку',
+    ];
+    for (const name of names) {
+      expect(screen.getByRole('button', {name}), name).toHaveClass('min-h-11', 'sm:min-h-8');
+    }
+  });
+});
+
+/**
+ * F-FEED-SCOPE-LABELS — бейдж области показывал сырой код (`equipment`),
+ * непонятный владельцу. Известные области берут подпись из словаря,
+ * незнакомая остаётся как есть (не скрываем), локальное событие — «локально».
+ */
+describe('лента: подписи области события (F-FEED-SCOPE-LABELS)', () => {
+  it('переводит известную область на русский', () => {
+    state.events = [feedbackEvent({scope: 'equipment'})];
+
+    render(<FeedbackCenter />);
+    fireEvent.click(screen.getByRole('button', {name: 'Открыть уведомления'}));
+
+    expect(screen.getByText('Техника')).toBeInTheDocument();
+  });
+
+  it('незнакомую область показывает как есть', () => {
+    state.events = [feedbackEvent({scope: 'unknown_scope'})];
+
+    render(<FeedbackCenter />);
+    fireEvent.click(screen.getByRole('button', {name: 'Открыть уведомления'}));
+
+    expect(screen.getByText('unknown_scope')).toBeInTheDocument();
+  });
+
+  it('для локального события показывает «локально», а не область', () => {
+    state.localEvents = [feedbackEvent({id: 'local-1', source: 'client', scope: 'equipment'})];
+
+    render(<FeedbackCenter />);
+    fireEvent.click(screen.getByRole('button', {name: 'Открыть уведомления'}));
+
+    expect(screen.getByText('локально')).toBeInTheDocument();
+    expect(screen.queryByText('Техника')).toBeNull();
   });
 });

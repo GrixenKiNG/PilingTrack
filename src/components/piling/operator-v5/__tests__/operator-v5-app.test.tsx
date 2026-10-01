@@ -16,12 +16,17 @@ const api = vi.hoisted(() => ({
   newCommandId: vi.fn(() => 'cmd-1'),
 }));
 vi.mock('@/components/piling/operator-mobile/api', () => ({
-  ApiError: class ApiError extends Error {},
+  ApiError: class ApiError extends Error {
+    constructor(readonly status: number, message: string) {
+      super(message);
+      this.name = 'ApiError';
+    }
+  },
   QueuedOffline: class QueuedOffline extends Error {},
   ...api,
 }));
 
-import {QueuedOffline} from '@/components/piling/operator-mobile/api';
+import {ApiError, QueuedOffline} from '@/components/piling/operator-mobile/api';
 import {CloseScreen, OperatorV5App, WorkScreen} from '../operator-v5-app';
 
 /** Обещание, которым тест сам решает, когда закончится перечитывание экрана. */
@@ -257,5 +262,36 @@ describe('запись ушла в офлайн-очередь', () => {
     // Запись принята устройством — форма чистится, кнопка свободна.
     await waitFor(() => expect(count.value).toBe(''));
     expect(screen.getByRole('button', {name: 'Записать'})).toBeDisabled();
+  });
+});
+
+/**
+ * F-QA-403-V5: отказ по роли — не «нет связи».
+ *
+ * 403 при загрузке состояния значит, что экран не для этой роли (вошёл
+ * помощник машиниста). «Повторить» тут бесполезно, а «данные сохранены на
+ * телефоне и отправятся, когда связь появится» — неправда: при 403 не уйдёт
+ * ничего. Показываем текст про роль сам по себе, как в v1/v10.
+ */
+describe('отказ по роли при загрузке состояния', () => {
+  it('при 403 показывает текст про роль, без «Повторить» и без обещания отправки', async () => {
+    vi.mocked(api.fetchState).mockRejectedValue(new ApiError(403, 'Экран доступен только машинисту'));
+    render(<OperatorV5App />);
+
+    expect(await screen.findByText('Экран доступен только машинисту')).toBeInTheDocument();
+    expect(screen.getByText(/Смену ведёт машинист, закреплённый за установкой/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', {name: 'Повторить'})).not.toBeInTheDocument();
+    expect(screen.queryByText(/отправятся, когда связь появится/)).not.toBeInTheDocument();
+    expect(screen.queryByText('Нет связи с сервером')).not.toBeInTheDocument();
+  });
+
+  it('при сетевом сбое остаётся прежний текст «Нет связи с сервером»', async () => {
+    vi.mocked(api.fetchState).mockRejectedValue(new Error('нет связи'));
+    render(<OperatorV5App />);
+
+    expect(await screen.findByText('Нет связи с сервером')).toBeInTheDocument();
+    expect(screen.getByRole('button', {name: 'Повторить'})).toBeInTheDocument();
+    expect(screen.getByText(/Введённые данные сохранены на телефоне/)).toBeInTheDocument();
+    expect(screen.queryByText(/Смену ведёт машинист/)).not.toBeInTheDocument();
   });
 });

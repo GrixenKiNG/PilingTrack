@@ -2,7 +2,7 @@
 
 import {OperatorWorkOverview, type WorkAction} from '../operator-work-overview';
 import {useCallback, useEffect, useRef, useState} from 'react';
-import {formatDowntimeHours} from '@/lib/downtime-hours';
+import {DOWNTIME_MAX_HOURS, formatDowntimeHours} from '@/lib/downtime-hours';
 import type {
   ChecklistAnswer, ChecklistStage, DocumentVerdict, IncidentCategory, IncidentSign,
   OperatorMobileState,
@@ -365,6 +365,39 @@ function ScreenAccept({state, busy, onAccept, go}: {
   );
 }
 
+/** Допуск на расхождение часов телефона и сервера — тот же, что у сервера. */
+const CLOCK_SKEW_MIN = 5;
+
+/**
+ * ОКНО ПРОСТОЯ ВИДНО ДО ОТПРАВКИ (D-20260927-004). Раньше границы проверял
+ * только сервер, и отказ «Простой не может начаться раньше смены…» приходил уже
+ * после нажатия «Записать». Оператор тратил цикл «отправил — получил ошибку», а
+ * при слабой связи мог решить, что простой записан. Границы здесь те же, что у
+ * сервера (domain/downtime-interval): начало не раньше старта смены с допуском
+ * пять минут на расхождение часов, длительность не больше DOWNTIME_MAX_HOURS.
+ * Тексты повторяют серверные дословно — об одном запрете не должно быть двух
+ * разных формулировок.
+ */
+export function downtimeWindowProblem(
+  startValue: string, endValue: string,
+  shiftStartedAt: string | null | undefined,
+  now: Date = new Date(),
+): string | null {
+  const interval = downtimeInterval(startValue, endValue, now);
+  if (!interval || !shiftStartedAt) return null;
+  const startedAt = new Date(interval.startedAt).getTime();
+  const shiftStart = new Date(shiftStartedAt).getTime();
+
+  // Начало раньше смены — то, из-за чего и приходил серверный отказ.
+  if (startedAt < shiftStart - CLOCK_SKEW_MIN * 60_000) {
+    return `Простой не может начаться раньше смены — смена начата в ${hhmm(new Date(shiftStart))}.`;
+  }
+  if (interval.minutes > DOWNTIME_MAX_HOURS * 60) {
+    return `Простой длиннее суток (${Math.round(interval.minutes / 60)} ч). Проверьте время.`;
+  }
+  return null;
+}
+
 /**
  * Запись выработки прямо здесь (решение владельца 18.09.2026).
  *
@@ -410,11 +443,16 @@ function ProductionForm({state, busy, onLog, initialKind = 'PILES', downtimeOnly
   // Простой задаётся интервалом: подпись под полями и то, что уйдёт на
   // сервер, — одна и та же величина (см. downtime-interval).
   const interval = kind === 'DOWNTIME' ? downtimeInterval(startedHm, endedHm) : null;
+  // Границы окна смены — те же, что проверит сервер: раньше отправки и рядом с
+  // полем, а не только отказом после запроса (D-20260927-004).
+  const windowProblem = kind === 'DOWNTIME'
+    ? downtimeWindowProblem(startedHm, endedHm, state.shift?.startedAt ?? null)
+    : null;
   // Запрет закрывает выработку и не трогает простой — domain/production-permit.ts.
   const forbidden = kind !== 'DOWNTIME' && !state.permit.allowed;
   const ready = !forbidden && optionId !== '' && (
     kind === 'DOWNTIME'
-      ? interval !== null
+      ? interval !== null && windowProblem === null
       : Number.isFinite(amount) && amount > 0
         && (kind !== 'DRILLING' || (Number.isFinite(perUnit) && perUnit > 0))
   );
@@ -504,6 +542,7 @@ function ProductionForm({state, busy, onLog, initialKind = 'PILES', downtimeOnly
           </label>
           <button type="button" className="ov10-rowbtn"
             onClick={() => setEndedHm(hhmm(new Date()))}>Закончился сейчас</button>
+          {windowProblem ? <p className="ov10-hint">{windowProblem}</p> : null}
           {interval ? (
             <p className="ov10-hint">Простой: {formatIntervalMinutes(interval.minutes)}</p>
           ) : null}
@@ -712,13 +751,17 @@ function ScreenSafetyChecklists({state, busy, error, commandId, onSubmit, go}: {
  * то, что надо передать следующей смене, — это передача машины, отдельное
  * действие со своим адресатом, а не строчка в закрытии.
  */
-function ScreenClosing({state, busy, onFinish, onClose, go}: {
+function ScreenClosing({state, busy, onFinish, onClose, go, unsent, onFlush}: {
   state: OperatorMobileState;
   busy: boolean;
   /** «Завершить работу» — сервер переводит смену в сдачу (finish-work). */
   onFinish: () => void;
   onClose: () => void;
   go: Go;
+  /** Записей на устройстве, ещё не принятых сервером. */
+  unsent: number;
+  /** Отправить их немедленно. */
+  onFlush: () => void;
 }) {
   const {assignment} = state;
   const [confirmFinish, setConfirmFinish] = useState(false);
@@ -800,8 +843,16 @@ function ScreenClosing({state, busy, onFinish, onClose, go}: {
           </button>
         </>
       ) : null}
+      {!closed && unsent > 0 ? (
+        <>
+          <Banner tone="warn" title={`Сначала отправьте записи с телефона: ${unsent} не отправлено`} />
+          <button type="button" className="ov10-btn ghost" onClick={onFlush}>
+            Отправить сейчас
+          </button>
+        </>
+      ) : null}
       {!closed && afterDone ? (
-        <button type="button" className="ov10-btn orange" disabled={busy} onClick={onClose}>
+        <button type="button" className="ov10-btn orange" disabled={busy || unsent > 0} onClick={onClose}>
           {busy ? 'Закрываем…' : 'Закрыть смену и отправить отчёт'}
         </button>
       ) : null}
@@ -1086,6 +1137,39 @@ function ScreenMore({state, go}: {state: OperatorMobileState; go: Go}) {
 
 /* --------------------------------------------------- шаги допуска (ТБ) --- */
 
+/** Куда ведёт смена по её фазе — для кнопки «Далее» после подтверждения СИЗ. */
+function nextScreen(state: OperatorMobileState): string {
+  switch (state.phase) {
+    case 'IDENTITY': return 'safety';
+    case 'ADMISSION': return 'accept';
+    case 'PRESHIFT_INSPECTION': case 'SITE_READY': case 'STARTUP': return 'step';
+    case 'WORK': return 'work';
+    case 'CLOSING': case 'CLOSED': return 'closing';
+    default: return 'maint';
+  }
+}
+
+/**
+ * Итог подтверждения СИЗ и куда ведёт «Далее».
+ *
+ * D-20260927-003: подтвердив комплект, человек оставался на том же экране с той
+ * же кнопкой — «СИЗ подтверждены» мелькало во всплывающей строке, а «допуск
+ * пройден» было видно только в другом разделе. Итог и следующий шаг считаются
+ * здесь, разметка — в `ScreenPpe`; правило то же, что в `/operator`: пока сервер
+ * держит фазу `IDENTITY`, допуск не объявляем.
+ */
+export function ppeOutcome(state: OperatorMobileState): {title: string; note: string; screen: string} {
+  if (state.phase !== 'IDENTITY') {
+    return {title: 'Вы допущены к смене', note: 'Допуск пройден', screen: nextScreen(state)};
+  }
+  const next = admissionSteps(state)
+    .find((step) => step.id !== 'SIGNATURE' && step.opens !== null && !step.done);
+  if (next && next.opens) {
+    return {title: 'СИЗ подтверждены', note: `Дальше: ${next.title}`, screen: STEP_SCREEN[next.opens]};
+  }
+  return {title: 'СИЗ подтверждены', note: 'Все шаги допуска пройдены', screen: 'safety'};
+}
+
 /**
  * СИЗ: отмечают ОТСУТСТВИЕ, нехватка записывается как есть и не запирает экран.
  *
@@ -1098,10 +1182,11 @@ function ScreenMore({state, go}: {state: OperatorMobileState; go: Go}) {
  * добросовестно нажав на каждую строку, СНИМАЛ весь комплект. Подтверждение
  * уходило с пометкой «не хватает каски». Экран должен просить то, что делает.
  */
-function ScreenPpe({state, busy, onConfirm}: {
+function ScreenPpe({state, busy, onConfirm, go}: {
   state: OperatorMobileState;
   busy: boolean;
   onConfirm: (items: string[]) => void;
+  go: Go;
 }) {
   const [items, setItems] = useState<string[]>(
     state.identity.ppe.confirmed && state.identity.ppe.items.length > 0
@@ -1112,6 +1197,9 @@ function ScreenPpe({state, busy, onConfirm}: {
   const toggle = (code: string) => setItems((current) => (
     current.includes(code) ? current.filter((value) => value !== code) : [...current, code]
   ));
+  /* Итог показываем, только когда комплект уже подтверждён: до подтверждения
+     «СИЗ подтверждены» — обещание, которого человек ещё не давал. */
+  const outcome = state.identity.ppe.confirmed ? ppeOutcome(state) : null;
 
   return (
     <>
@@ -1133,11 +1221,19 @@ function ScreenPpe({state, busy, onConfirm}: {
           нельзя — простой и происшествия записываются как обычно.
         </Banner>
       ) : null}
+      {outcome ? (
+        <Card>
+          <Row icon="check" tone="ok" title={outcome.title} note={outcome.note} />
+        </Card>
+      ) : null}
       <button type="button" className="ov10-btn" disabled={busy} onClick={() => onConfirm(items)}>
         {busy ? 'Записываем…'
           : missing.length === 0 ? 'Комплект в порядке'
             : `Подтвердить (нет: ${missing.length})`}
       </button>
+      {outcome ? (
+        <button type="button" className="ov10-btn green" onClick={() => go(outcome.screen)}>Далее</button>
+      ) : null}
     </>
   );
 }
@@ -1401,7 +1497,7 @@ export function OperatorV10App() {
     }
   }, [reload]);
 
-  const {queued, retry: retryQueued, discard: discardQueued} = useOfflineQueue(reload);
+  const {queued, flush: flushQueued, retry: retryQueued, discard: discardQueued} = useOfflineQueue(reload);
 
 
   const accept = useCallback(() => {
@@ -1543,7 +1639,8 @@ export function OperatorV10App() {
       );
     }
     if (current.phase === 'WORK') return <ScreenWork state={current} busy={busy} onLog={logProduction} go={setActive} />;
-    return <ScreenClosing state={current} busy={busy} onFinish={finishWork} onClose={closeShift} go={setActive} />;
+    return <ScreenClosing state={current} busy={busy} onFinish={finishWork} onClose={closeShift} go={setActive}
+      unsent={queued.length} onFlush={() => void flushQueued()} />;
   };
 
   const current = SCREENS.find((screen) => screen.id === active) ?? SCREENS[0];
@@ -1564,7 +1661,7 @@ export function OperatorV10App() {
     switch (current.id) {
       case 'docs': return <ScreenDocs state={state} />;
       case 'more': return <ScreenMore state={state} go={setActive} />;
-      case 'ppe': return <ScreenPpe state={state} busy={busy} onConfirm={confirmPpe} />;
+      case 'ppe': return <ScreenPpe state={state} busy={busy} onConfirm={confirmPpe} go={setActive} />;
       case 'briefing': return <ScreenBriefing state={state} busy={busy} onAcknowledge={acknowledgeBriefing} />;
       case 'knowledge': return <ScreenKnowledge busy={busy} onDone={submitKnowledge} />;
       case 'incidents': return <ScreenIncidents state={state} busy={busy} onReport={reportIncident} />;
@@ -1579,7 +1676,8 @@ export function OperatorV10App() {
       );
       case 'maint': return <ScreenMaint state={state} go={setActive} />;
       case 'closing': return (
-        <ScreenClosing state={state} busy={busy} onFinish={finishWork} onClose={closeShift} go={setActive} />
+        <ScreenClosing state={state} busy={busy} onFinish={finishWork} onClose={closeShift} go={setActive}
+          unsent={queued.length} onFlush={() => void flushQueued()} />
       );
       case 'report': return <ScreenReport state={state} />;
       // «Смена» — всегда лестница шагов: что сделано, что сейчас, что дальше.

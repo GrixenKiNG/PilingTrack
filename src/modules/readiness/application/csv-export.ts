@@ -25,6 +25,13 @@ function csvCellText(value: unknown, timezone: string): string {
   if (value instanceof Date) {
     return formatDateInTimezone(value, timezone, DATE_TIME_FORMAT).replace(', ', ' ');
   }
+  // Дробное число печатаем через запятую, как csvDecimal в выгрузке отчётов
+  // (D-20260930-007): русский Excel с разделителем «;» читает «16.7» текстом и
+  // колонку не суммирует. Целые оставляем как есть — «2», а не «2,0». Строки не
+  // трогаем: «16.7» оттуда может быть номером или кодом.
+  if (typeof value === 'number' && Number.isFinite(value) && !Number.isInteger(value)) {
+    return String(value).replace('.', ',');
+  }
   if (typeof value === 'string') {
     if (DATE_ONLY.test(value)) return formatRuDate(value);
     if (TIMESTAMP.test(value) && !Number.isNaN(Date.parse(value))) {

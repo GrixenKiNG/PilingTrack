@@ -179,7 +179,7 @@ export function EquipmentDetail({ equipmentId, embedded = false }: Props) {
           {eq.registrationNumber && <span className="font-mono">{eq.registrationNumber}</span>}
         </div>
       </div>
-      {canManage && <Button onClick={() => setEditOpen(true)} className="bg-signal hover:bg-signal-strong text-white">
+      {canManage && <Button onClick={() => setEditOpen(true)} className="min-h-11 bg-signal hover:bg-signal-strong text-white sm:min-h-0">
         <Pencil className="w-4 h-4 mr-1.5" /> Редактировать
       </Button>}
     </div>
@@ -205,7 +205,7 @@ export function EquipmentDetail({ equipmentId, embedded = false }: Props) {
               key={t.key}
               onClick={() => setTab(t.key)}
               className={cn(
-                '-mb-px min-w-0 border-b-2 px-2 py-2 text-xs font-medium transition-colors',
+                '-mb-px min-h-11 min-w-0 border-b-2 px-2 py-2 text-xs font-medium transition-colors sm:min-h-0',
                 tab === t.key
                   ? 'border-info text-info-strong'
                   : 'border-transparent text-muted-foreground hover:text-foreground',
@@ -341,7 +341,7 @@ export function EquipmentDetail({ equipmentId, embedded = false }: Props) {
   }
 
   return (
-    <div className={cn('space-y-5', 'p-4 lg:p-6')}>
+    <div className={cn('space-y-5', 'p-4 lg:p-6', 'field-type')}>
       <BackLink />
 
       {header}

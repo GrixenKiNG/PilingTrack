@@ -211,11 +211,11 @@ export function UserDocumentTypesDialog({ open, onOpenChange }: {
                         </div>
                         <div className="flex gap-2 sm:justify-end">
                           <Button onClick={() => void saveEdit(row)} disabled={busy}
-                            className="h-8 text-2xs bg-signal text-white hover:bg-signal-strong">
+                            className="h-11 text-2xs bg-signal text-white hover:bg-signal-strong sm:h-8">
                             {busy && <Loader2 className="h-4 w-4 animate-spin" />}
                             Сохранить
                           </Button>
-                          <Button variant="outline" className="h-8 text-2xs" onClick={() => setDraft(null)}>
+                          <Button variant="outline" className="h-11 text-2xs sm:h-8" onClick={() => setDraft(null)}>
                             Отмена
                           </Button>
                         </div>
@@ -235,17 +235,17 @@ export function UserDocumentTypesDialog({ open, onOpenChange }: {
                             )}
                           </div>
                         </div>
-                        <Button variant="outline" className="h-8 text-2xs" onClick={() => startEdit(row)}>
+                        <Button variant="outline" className="h-11 text-2xs sm:h-8" onClick={() => startEdit(row)}>
                           Изменить
                         </Button>
                         {/* Обязательность останавливает работу людей: без действующего
                             документа оператор не начнёт смену. Поэтому переключатель
                             стоит рядом со списком, а не прячется в отдельной форме. */}
-                        <Button variant="outline" className="h-8 text-2xs"
+                        <Button variant="outline" className="h-11 text-2xs sm:h-8"
                           onClick={() => void patch(row, { requiredForOperator: !row.requiredForOperator })}>
                           {row.requiredForOperator ? 'Не требовать' : 'Требовать для смены'}
                         </Button>
-                        <Button variant="outline" className="h-8 text-2xs"
+                        <Button variant="outline" className="h-11 text-2xs sm:h-8"
                           onClick={() => void patch(row, { isActive: !row.isActive })}>
                           {row.isActive ? 'Отключить' : 'Включить'}
                         </Button>
@@ -255,7 +255,7 @@ export function UserDocumentTypesDialog({ open, onOpenChange }: {
                           type="button"
                           onClick={() => setPendingDelete(row)}
                           aria-label={`Удалить вид «${row.name}»`}
-                          className="flex h-8 w-8 items-center justify-center rounded-md text-destructive-strong hover:bg-destructive/10"
+                          className="flex h-11 w-11 items-center justify-center rounded-md text-destructive-strong hover:bg-destructive/10 sm:h-8 sm:w-8"
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                         </button>

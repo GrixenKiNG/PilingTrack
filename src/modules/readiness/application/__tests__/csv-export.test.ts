@@ -13,6 +13,18 @@ describe('readiness CSV export', () => {
     expect(safeCsvCell('-5+A1')).toBe(`"'-5+A1"`);
   });
 
+  it('prints fractional numbers with a comma, so Russian Excel sums them (D-20260930-007)', () => {
+    expect(safeCsvCell(16.7)).toBe('"16,7"');
+    expect(safeCsvCell(2)).toBe('"2"');
+    expect(safeCsvCell(-16.7)).toBe('"-16,7"');
+    // Строка «16.7» может быть номером или кодом — её не трогаем.
+    expect(safeCsvCell('16.7')).toBe('"16.7"');
+  });
+
+  it('still escapes formulas after the decimal change', () => {
+    expect(safeCsvCell('=SUM(A1)')).toBe(`"'=SUM(A1)"`);
+  });
+
   it('embeds timezone and deterministic data hash', () => {
     const result = buildReadinessCsv({
       dataset: 'audit',

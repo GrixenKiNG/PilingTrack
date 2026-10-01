@@ -1064,3 +1064,154 @@ describe('recordAuditEvent — наряды ТО', () => {
     );
   });
 });
+
+/**
+ * Запись показания моточасов и удаление наряда ТО не оставляли следа
+ * (F-R72-FEED-METER-MAINT): добавленное показание двигает наработку и сроки ТО,
+ * а удалённый наряд (в том числе открытый ремонт) держит блокер готовности.
+ * В ленте должно быть видно, по какой установке вписали цифру и какой наряд
+ * убрали — человеческими словами, без внутренних id.
+ */
+describe('recordAuditEvent — ввод показания моточасов и удаление наряда ТО', () => {
+  it('называет внесённое показание и установку', async () => {
+    await recordAuditEvent({
+      action: 'meter.reading.added',
+      scope: 'equipment',
+      actorId: 'admin-1',
+      metadata: { name: 'ЭО-5111', after: { engineHours: 1234 } },
+    });
+
+    expect(mocks.recordFeedbackEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        level: 'info',
+        priority: 'MEDIUM',
+        title: 'Показание моточасов внесено',
+        message: 'Внесено показание моточасов 1234 м/ч — «ЭО-5111».',
+      }),
+    );
+  });
+
+  it('остаётся читаемым без названия установки и значения', async () => {
+    await recordAuditEvent({ action: 'meter.reading.added', scope: 'equipment' });
+
+    expect(mocks.recordFeedbackEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'Показание моточасов внесено',
+        message: 'Внесено показание моточасов.',
+      }),
+    );
+  });
+
+  it('называет удалённый наряд, его вид, состояние, плановую дату и установку', async () => {
+    await recordAuditEvent({
+      action: 'maintenance.record.deleted',
+      scope: 'equipment',
+      actorId: 'admin-1',
+      targetId: 'rec-1',
+      metadata: {
+        name: 'Замена РВД',
+        before: {
+          type: 'REPAIR',
+          status: 'IN_PROGRESS',
+          scheduledAt: new Date('2026-10-01T00:00:00.000Z'),
+          equipmentName: 'ЭО-5111',
+        },
+      },
+    });
+
+    expect(mocks.recordFeedbackEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        level: 'warn',
+        priority: 'HIGH',
+        title: 'Наряд ТО удалён',
+        message: 'Удалён наряд ТО «Замена РВД» (ремонт, в работе, плановая дата 01.10.2026): установка «ЭО-5111».',
+      }),
+    );
+  });
+
+  it('остаётся читаемым без снимка удалённого наряда', async () => {
+    await recordAuditEvent({ action: 'maintenance.record.deleted', scope: 'equipment' });
+
+    expect(mocks.recordFeedbackEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ title: 'Наряд ТО удалён', message: 'Удалён наряд ТО.' }),
+    );
+  });
+});
+
+/**
+ * Завершение осмотра не оставляло следа нигде (F-R72-FEED-INSPECTION), хотя это
+ * самый «допусковый» акт: считается балл состояния, закрывается наряд ТО,
+ * пишутся моточасы и заводятся дефекты. Осмотр с неисправностями (неполный
+ * балл) или с заведёнными дефектами должен читаться в ленте как предупреждение,
+ * осмотр без замечаний — как обычное событие.
+ */
+describe('recordAuditEvent — завершение осмотра', () => {
+  it('называет установку, уровень осмотра, балл и число дефектов', async () => {
+    await recordAuditEvent({
+      action: 'inspection.completed',
+      scope: 'inspections',
+      actorId: 'operator-1',
+      targetId: 'insp-1',
+      metadata: { name: 'ЭО-5111', after: { level: 'EO', healthScore: 82, defectCount: 2 } },
+    });
+
+    expect(mocks.recordFeedbackEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        level: 'warn',
+        priority: 'HIGH',
+        title: 'Осмотр завершён',
+        message: 'Осмотр завершён — «ЭО-5111»: ЕО, балл 82%, дефектов 2.',
+      }),
+    );
+  });
+
+  it('осмотр без замечаний пишет info, а не предупреждение', async () => {
+    await recordAuditEvent({
+      action: 'inspection.completed',
+      scope: 'inspections',
+      actorId: 'operator-1',
+      metadata: { name: 'ЭО-5111', after: { level: 'TO1', healthScore: 100, defectCount: 0 } },
+    });
+
+    expect(mocks.recordFeedbackEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        level: 'info',
+        priority: 'MEDIUM',
+        title: 'Осмотр завершён',
+        message: 'Осмотр завершён — «ЭО-5111»: ТО-1, балл 100%, дефектов 0.',
+      }),
+    );
+  });
+
+  it('остаётся читаемым без названия установки и итога осмотра', async () => {
+    await recordAuditEvent({ action: 'inspection.completed', scope: 'inspections' });
+
+    expect(mocks.recordFeedbackEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        level: 'info',
+        title: 'Осмотр завершён',
+        message: 'Осмотр завершён.',
+      }),
+    );
+  });
+
+  // Число дефектов может быть неизвестно (чтение упало после завершения осмотра).
+  // Тогда в ленте не должно быть «дефектов 0»: ноль — это утверждение, что
+  // дефектов нет, а не отсутствие данных (F-R72-FEED-b).
+  it('не пишет «дефектов 0», когда число дефектов неизвестно', async () => {
+    await recordAuditEvent({
+      action: 'inspection.completed',
+      scope: 'inspections',
+      actorId: 'operator-1',
+      metadata: { name: 'ЭО-5111', after: { level: 'EO', healthScore: 82, defectCount: null } },
+    });
+
+    expect(mocks.recordFeedbackEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        level: 'warn',
+        title: 'Осмотр завершён',
+        message: 'Осмотр завершён — «ЭО-5111»: ЕО, балл 82%.',
+      }),
+    );
+  });
+});

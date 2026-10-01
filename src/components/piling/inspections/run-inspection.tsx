@@ -312,14 +312,14 @@ export function RunInspection({ inspectionId, onExit }: { inspectionId: string; 
           <button
             type="button"
             onClick={onExit}
-            className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+            className="inline-flex min-h-11 items-center gap-1 text-sm text-muted-foreground hover:text-foreground sm:min-h-0"
           >
             <ArrowLeft className="w-3.5 h-3.5" /> К смене
           </button>
         ) : (
           <Link
             href="/inspections"
-            className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+            className="inline-flex min-h-11 items-center gap-1 text-sm text-muted-foreground hover:text-foreground sm:min-h-0"
           >
             <ArrowLeft className="w-3.5 h-3.5" /> Осмотры
           </Link>
@@ -380,7 +380,7 @@ export function RunInspection({ inspectionId, onExit }: { inspectionId: string; 
                 aria-current={index === current ? 'step' : undefined}
                 aria-label={`${section.title || `Раздел ${index + 1}`}: ${
                   section.remaining === 0 ? 'заполнен' : `осталось ${section.remaining}`}`}
-                className={`h-9 min-w-9 rounded-lg border px-2 text-sm font-semibold transition ${
+                className={`h-9 min-h-11 min-w-11 rounded-lg border px-2 text-sm font-semibold transition sm:min-h-0 sm:min-w-9 ${
                   index === current
                     ? 'border-signal bg-signal text-white'
                     : section.remaining === 0
@@ -468,7 +468,7 @@ export function RunInspection({ inspectionId, onExit }: { inspectionId: string; 
                             type="button"
                             disabled={isDone}
                             onClick={() => setExpandedExtras((p) => ({ ...p, [item.id]: true }))}
-                            className="mt-2 text-2xs text-muted-foreground hover:text-muted-foreground disabled:opacity-50"
+                            className="mt-2 inline-flex min-h-11 items-center text-2xs text-muted-foreground hover:text-muted-foreground disabled:opacity-50 sm:min-h-0"
                           >
                             + замечание / фото
                           </button>
@@ -542,7 +542,7 @@ export function RunInspection({ inspectionId, onExit }: { inspectionId: string; 
             variant="outline"
             onClick={() => void saveDraft()}
             disabled={isBusy}
-            className="w-full"
+            className="min-h-11 w-full sm:min-h-0"
           >
             {saving && <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />}
             Сохранить черновик
@@ -554,7 +554,7 @@ export function RunInspection({ inspectionId, onExit }: { inspectionId: string; 
             <Button
               onClick={() => setShowSign(true)}
               disabled={isBusy}
-              className="w-full bg-signal hover:bg-signal-strong text-white"
+              className="min-h-11 w-full bg-signal hover:bg-signal-strong text-white sm:min-h-0"
             >
               Завершить осмотр
             </Button>
@@ -574,14 +574,14 @@ export function RunInspection({ inspectionId, onExit }: { inspectionId: string; 
                   variant="outline"
                   onClick={() => setShowSign(false)}
                   disabled={completing}
-                  className="flex-1"
+                  className="min-h-11 flex-1 sm:min-h-0"
                 >
                   Отмена
                 </Button>
                 <Button
                   onClick={complete}
                   disabled={completing || !signedByName.trim()}
-                  className="flex-1 bg-signal hover:bg-signal-strong text-white"
+                  className="min-h-11 flex-1 bg-signal hover:bg-signal-strong text-white sm:min-h-0"
                 >
                   {completing && <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />}
                   Подтвердить

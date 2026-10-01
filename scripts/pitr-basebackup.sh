@@ -1,13 +1,20 @@
 #!/usr/bin/env bash
 # ============================================================
-# PilingTrack — Weekly Postgres base backup for PITR
+# PilingTrack — Weekly Postgres base backup (pg_basebackup)
 # ============================================================
-# Pairs with WAL archiving (archive_command in docker-compose.prod.yml).
-# Together they give point-in-time recovery to any second within the
-# retention window.
+# What this gives you: one full file-level snapshot per week.
+# Restore is possible ONLY to the moment of a snapshot — there is no
+# replay of anything after it.
 #
-# Recovery window = (oldest kept base backup) → now. With 4 weekly base
-# backups + WAL files since the oldest, that's ~28 days max.
+# "Point-in-time recovery to any second" is NOT available today:
+# archive_mode=off and the WAL archive is empty, so there is no WAL to
+# replay between snapshots. PITR would need archive_mode=on plus a
+# working archive_command — currently switched off. See
+# docs/runbooks/010-restore-drill.md (RPO/RTO) and runbook 009 for the
+# current state and what it takes to turn WAL archiving back on.
+#
+# Recovery window = oldest kept base backup → now, as weekly restore
+# points only. With 4 weekly base backups that's ~28 days.
 #
 # Usage (from /opt/pilingtrack):
 #   COMPOSE_DIR=/opt/pilingtrack BASEBACKUP_DIR=/opt/pilingtrack/basebackups \

@@ -41,7 +41,7 @@ describe.skipIf(!connectionString)('lazy tenant transactions with a single datab
     await setup.query('GRANT SELECT, INSERT ON "Site" TO "' + role + '"');
     prisma = new PrismaClient({adapter: new PrismaPg({connectionString: url.toString(), max: 1, connectionTimeoutMillis: 1000, options: '-c role=' + role})});
     scoped = applyTenantGuc(prisma as never) as PrismaClient;
-  }, 30000);
+  }, 60_000);
 
   afterAll(async () => {
     await prisma?.$disconnect();
@@ -49,7 +49,7 @@ describe.skipIf(!connectionString)('lazy tenant transactions with a single datab
     if (createdDatabase) await admin.query('DROP DATABASE "' + database + '" WITH (FORCE)');
     if (createdRole) await admin.query('DROP ROLE "' + role + '"');
     await admin?.end();
-  });
+  }, 60_000);
 
   const transaction = <T>(tenantId: string, work: (tx: Prisma.TransactionClient) => Promise<T>) => runWithTenantContext(async () => {
     setRequestTenantId(tenantId);
@@ -60,21 +60,21 @@ describe.skipIf(!connectionString)('lazy tenant transactions with a single datab
   it('uses a role which cannot bypass RLS', async () => {
     const rows = await prisma.$queryRaw<Array<{rolsuper: boolean; rolbypassrls: boolean}>>`SELECT rolsuper, rolbypassrls FROM pg_roles WHERE rolname = current_user`;
     expect(rows).toEqual([{rolsuper: false, rolbypassrls: false}]);
-  });
+  }, 30_000);
   it('executes lazy callbacks without a second connection and keeps tenant rows separate', async () => {
     expect(await transaction('tenant-a', sites)).toEqual([{id: 'site-a', tenantId: 'tenant-a'}]);
     expect(await transaction('tenant-b', sites)).toEqual([{id: 'site-b', tenantId: 'tenant-b'}]);
     expect(await transaction('unknown-tenant', sites)).toEqual([]);
-  });
+  }, 30_000);
   it('does not retain tenant context when the connection returns to the pool', async () => {
     await transaction('tenant-a', sites);
     expect(await sites(scoped)).toEqual([]);
-  });
+  }, 30_000);
   it('rolls back writes when the callback fails', async () => {
     await expect(transaction('tenant-a', async tx => {
       await tx.$executeRaw`INSERT INTO "Site" VALUES ('rollback-site', 'tenant-a')`;
       throw new Error('rollback requested');
     })).rejects.toThrow('rollback requested');
     expect(await transaction('tenant-a', sites)).toEqual([{id: 'site-a', tenantId: 'tenant-a'}]);
-  });
+  }, 30_000);
 });

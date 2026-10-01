@@ -30,7 +30,7 @@ export function LoadFailure({ message, onRetry }: { message: string; onRetry: ()
         type="button"
         variant="outline"
         size="sm"
-        className="shrink-0"
+        className="min-h-11 shrink-0 sm:min-h-8"
         onClick={onRetry}
       >
         Повторить

@@ -77,15 +77,20 @@ groups:
           summary: "CRITICAL: PostgreSQL pool nearly exhausted"
           description: "{{ $value }} connections — risk of request queuing"
 
-      - alert: PostgresSlowQueries
-        expr: rate(pg_stat_statatments_mean_time_seconds{datname="pilingtrack"}[5m]) > 0.3
-        for: 5m
-        labels:
-          severity: warning
-          service: postgresql
-        annotations:
-          summary: "PostgreSQL average query time > 300ms"
-          description: "Average query time: {{ $value | humanizeDuration }}"
+      # метрики нет, см. R56. pg_stat_statements не включён нигде: в Postgres нет
+      # shared_preload_libraries (docker-compose.prod.yml), у postgres-exporter
+      # (prometheuscommunity/postgres-exporter:latest) не включён коллектор
+      # stat_statements и файла queries.yaml в репозитории нет
+      # (docker-compose.monitoring-prod.yml:101-116).
+      # - alert: PostgresSlowQueries
+      #   expr: rate(pg_stat_statements_mean_time_seconds{datname="pilingtrack"}[5m]) > 0.3
+      #   for: 5m
+      #   labels:
+      #     severity: warning
+      #     service: postgresql
+      #   annotations:
+      #     summary: "PostgreSQL average query time > 300ms"
+      #     description: "Average query time: {{ $value | humanizeDuration }}"
 
       - alert: PostgresDeadlocks
         expr: increase(pg_stat_database_deadlocks{datname="pilingtrack"}[5m]) > 0
@@ -103,7 +108,7 @@ groups:
   - name: application
     rules:
       - alert: HighMemoryUsage
-        expr: nodejs_heap_size_used_bytes / nodejs_heap_size_total_bytes > 0.9
+        expr: process_heap_used_bytes / process_heap_bytes > 0.9
         for: 5m
         labels:
           severity: warning
@@ -123,43 +128,46 @@ groups:
           summary: "Node.js event loop lag > 100ms"
           description: "Event loop lag on {{ $labels.instance }} is {{ $value | humanizeDuration }}"
 
-      - alert: HighGarbageCollectionTime
-        expr: rate(nodejs_gc_duration_seconds_sum[5m]) > 0.05
-        for: 10m
-        labels:
-          severity: warning
-          service: nodejs
-        annotations:
-          summary: "Excessive GC activity"
-          description: "GC is consuming {{ $value | humanizePercentage }} of CPU time"
+      # метрики нет в приложении, см. R56
+      # - alert: HighGarbageCollectionTime
+      #   expr: rate(nodejs_gc_duration_seconds_sum[5m]) > 0.05
+      #   for: 10m
+      #   labels:
+      #     severity: warning
+      #     service: nodejs
+      #   annotations:
+      #     summary: "Excessive GC activity"
+      #     description: "GC is consuming {{ $value | humanizePercentage }} of CPU time"
 
   # ============================================================
   # Business Logic Alerts
   # ============================================================
   - name: business-logic
     rules:
-      - alert: NoReportsCreated
-        expr: rate(reports_created_total[1h]) == 0
-        for: 1h
-        labels:
-          severity: warning
-          service: pilingtrack-app
-        annotations:
-          summary: "No reports created in the last hour"
-          description: "Zero report creation activity — possible system issue"
+      # метрики нет в приложении, см. R56
+      # - alert: NoReportsCreated
+      #   expr: rate(reports_created_total[1h]) == 0
+      #   for: 1h
+      #   labels:
+      #     severity: warning
+      #     service: pilingtrack-app
+      #   annotations:
+      #     summary: "No reports created in the last hour"
+      #     description: "Zero report creation activity — possible system issue"
 
-      - alert: HighSyncFailureRate
-        expr: rate(sync_errors_total[5m]) / rate(sync_updates_total[5m]) > 0.1
-        for: 5m
-        labels:
-          severity: warning
-          service: pilingtrack-app
-        annotations:
-          summary: "Sync failure rate > 10%"
-          description: "{{ $value | humanizePercentage }} of sync operations are failing"
+      # метрики нет в приложении, см. R56
+      # - alert: HighSyncFailureRate
+      #   expr: rate(sync_errors_total[5m]) / rate(sync_updates_total[5m]) > 0.1
+      #   for: 5m
+      #   labels:
+      #     severity: warning
+      #     service: pilingtrack-app
+      #   annotations:
+      #     summary: "Sync failure rate > 10%"
+      #     description: "{{ $value | humanizePercentage }} of sync operations are failing"
 
       - alert: OutboxBacklog
-        expr: outbox_events_pending_total > 1000
+        expr: outbox_pending_count > 1000
         for: 10m
         labels:
           severity: warning
@@ -167,6 +175,29 @@ groups:
         annotations:
           summary: "Outbox event backlog > 1000"
           description: "{{ $value }} events pending processing"
+
+      - alert: OutboxLagHigh
+        # пороги скопированы из src/core/observability/lag-monitor.ts:71-76
+        # (lagWarnThresholdSec=60, lagCriticalThresholdSec=300) — там они
+        # уходили только в лог, F-WORKERS-SCRAPE (R59 #5).
+        expr: outbox_lag_seconds > 300
+        for: 5m
+        labels:
+          severity: critical
+          service: pilingtrack-app
+        annotations:
+          summary: "CRITICAL: публикация outbox отстала больше чем на 5 минут"
+          description: "Самое старое неопубликованное outbox-событие ждёт {{ $value }} с — воркер публикации стоит или не успевает"
+
+      - alert: OutboxLagWarn
+        expr: outbox_lag_seconds > 60
+        for: 10m
+        labels:
+          severity: warning
+          service: pilingtrack-app
+        annotations:
+          summary: "Публикация outbox отстала больше чем на минуту"
+          description: "Самое старое неопубликованное outbox-событие ждёт {{ $value }} с (порог кода — 60 с)"
 
       - alert: DeadLetterQueueNotEmpty
         expr: dlq_pending_count > 0
@@ -184,13 +215,53 @@ groups:
   - name: infrastructure
     rules:
       - alert: TargetDown
-        expr: up == 0
+        # F-ALERT-TARGETDOWN-DEDUP (R69): alertmanager исключён — у него своё
+        # правило AlertmanagerDown ниже (5m, critical). Иначе падение
+        # Alertmanager давало бы две тревоги об одном и том же.
+        expr: up{job!="alertmanager"} == 0
         for: 2m
         labels:
           severity: critical
         annotations:
           summary: "Monitoring target {{ $labels.job }} is DOWN"
           description: "{{ $labels.instance }} has been unreachable for 2 minutes"
+
+      - alert: WorkersDown
+        # F-WORKERS-SCRAPE (R59 #3): контейнер workers — единственный, где живут
+        # суточные планировщики и PDF-воркер BullMQ. Его /metrics теперь
+        # scrape'ится job'ом pilingtrack-workers.
+        expr: up{job="pilingtrack-workers"} == 0
+        for: 5m
+        labels:
+          severity: critical
+          service: pilingtrack-workers
+        annotations:
+          summary: "CRITICAL: контейнер воркеров недоступен"
+          description: "{{ $labels.instance }} не отвечает 5 минут — смены не закрываются, наряды не истекают, PDF-задачи стоят в очереди"
+
+      - alert: AlertmanagerDown
+        # F-ALERTMANAGER-WATCH (R69 #4): job `alertmanager` заведён в
+        # prometheus-prod.yml, порт 9093 (docker-compose.monitoring-prod.yml:118-149).
+        expr: up{job="alertmanager"} == 0
+        for: 5m
+        labels:
+          severity: critical
+          service: alertmanager
+        annotations:
+          summary: "CRITICAL: Alertmanager недоступен"
+          description: "{{ $labels.instance }} не отвечает 5 минут — доставлять тревоги некому. Важно: это правило само уходит наружу через тот же Alertmanager, поэтому при его полном падении сообщение не придёт — такой отказ ловит внешний сторож (F-APP-GUARD), пингуя стек снаружи."
+
+      - alert: AlertmanagerNotificationsFailing
+        # F-ALERTMANAGER-WATCH (R69 #4): метрика появилась вместе с job'ом `alertmanager`
+        # в prometheus-prod.yml; до этого скрейпа Alertmanager не было вообще.
+        expr: rate(alertmanager_notifications_failed_total[15m]) > 0
+        for: 15m
+        labels:
+          severity: warning
+          service: alertmanager
+        annotations:
+          summary: "Alertmanager не может доставить уведомления"
+          description: "Alertmanager уже 15 минут стабильно получает отказы доставки ({{ $value | humanize }} сбоев/с) — тревоги не доходят до вебхука приложения/Telegram. Проверьте вебхук /api/alerts/webhook и канал Telegram."
 
       - alert: RedisHighMemory
         expr: redis_memory_used_bytes / redis_memory_max_bytes > 0.8

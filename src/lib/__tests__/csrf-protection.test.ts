@@ -81,6 +81,11 @@ describe('withCsrf — gating', () => {
   it('does NOT exempt /api/auth/login_with_suffix (no prefix matching on exempts)', async () => {
     const res = withCsrf(makeRequest({ path: '/api/auth/login_evil', method: 'POST' }));
     expect(res).not.toBeNull();
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- test: value is established by the setup/fixture above
+    expect(res!.status).toBe(403);
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- test: value is established by the setup/fixture above
+    const body = await res!.json();
+    expect(body.error).toMatch(/missing origin/i);
   });
 });
 

@@ -35,6 +35,8 @@ export type {
   OutboxStatus,
   OverallStatus,
   RedisHealth,
+  SchedulerHealth,
+  SchedulerStatus,
   StorageHealth,
   StorageProvider,
   SystemComponents,

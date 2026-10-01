@@ -1,0 +1,201 @@
+import {fireEvent, render, screen, waitFor} from '@testing-library/react';
+import {describe, expect, it, vi} from 'vitest';
+import type {OperatorMobileState} from '@/modules/operator-mobile/contracts';
+
+// Экран тянет оформление обзора; в тестах подменяем CSS пустышкой — так же,
+// как в operator-work-overview.test.tsx.
+vi.mock('../../operator-concept.css', () => ({}));
+
+import {WorkScreen} from '../work-screen';
+
+/*
+  Аудит R82, находки 3 и 8: введённое в форме выработки и черновик паспорта
+  сваи обязаны переживать отказ сервера и возврат «← К смене».
+*/
+
+const state = {
+  phase: 'WORK',
+  productionDate: '2026-09-30',
+  shift: {id: 's1', productionDate: '2026-09-30'},
+  assignment: {equipmentId: 'e1', equipmentName: 'Liebherr LRH 100 №1', siteName: 'Площадка-1'},
+  permit: {allowed: true, blocks: []},
+  warnings: [],
+  weather: null,
+  entries: [],
+  production: {piles: {count: 0, meters: 0}, drilling: {count: 0, meters: 0}, downtimeHours: 0},
+  dictionaries: {
+    pileGrades: [{id: 'g1', name: 'С 100.30-8', lengthMm: 3000}],
+    drillingTypes: [],
+    downtimeReasons: [],
+  },
+  checklists: [
+    {stage: 'PRESHIFT_INSPECTION', done: true},
+    {stage: 'SITE_READY', done: true},
+    {stage: 'EO_BEFORE', done: true},
+    {stage: 'TB_PILING', done: true},
+  ],
+  identity: {
+    ppe: {confirmed: true, missing: []},
+    briefing: {ok: true},
+    knowledge: {ok: true},
+    documents: [],
+  },
+} as unknown as OperatorMobileState;
+
+const baseProps = {
+  state,
+  busy: false,
+  onLog: vi.fn().mockResolvedValue(true),
+  onFinish: vi.fn(),
+  onOpenSafety: vi.fn(),
+  error: null as string | null,
+  errorDetails: [],
+  onCorrect: vi.fn().mockResolvedValue(true),
+};
+
+/** Непустой список записей: с ним отказ обязан остаться у кнопки, а не под списком. */
+const stateWithEntries = {
+  ...state,
+  entries: [
+    {id: 'e1', kind: 'PILES', label: 'С 100.30-8', value: 5, meters: 15, occurredAt: '2026-09-30T10:00:00.000Z', corrections: []},
+  ],
+} as unknown as OperatorMobileState;
+
+/** Идёт ли `second` после `first` в разметке. */
+function isBefore(first: Element, second: Element): boolean {
+  return Boolean(first.compareDocumentPosition(second) & Node.DOCUMENT_POSITION_FOLLOWING);
+}
+
+describe('рабочий экран: отказ рядом с формой', () => {
+  it('в форме выработки показывает отказ прямо над кнопкой «Записать»', () => {
+    render(<WorkScreen {...baseProps} state={stateWithEntries} error="Смена уже закрыта" />);
+
+    fireEvent.click(screen.getByRole('button', {name: 'Добавить сваю'}));
+
+    const note = screen.getByText('Смена уже закрыта');
+    const button = screen.getByRole('button', {name: 'Записать'});
+    expect(isBefore(note, button)).toBe(true);
+  });
+
+  it('в форме паспорта отказ и подробности — над кнопкой и выше списка записей', () => {
+    render(<WorkScreen {...baseProps} state={stateWithEntries}
+      error="Паспорт заполнен не полностью" errorDetails={['Номер сваи не заполнен']} />);
+
+    fireEvent.click(screen.getByRole('button', {name: 'Свая с паспортом'}));
+
+    const note = screen.getByText('Паспорт заполнен не полностью');
+    const detail = screen.getByText('Номер сваи не заполнен');
+    const button = screen.getByRole('button', {name: 'Записать сваю с паспортом'});
+    const entries = screen.getByText('Записано за смену');
+
+    expect(isBefore(note, button)).toBe(true);
+    expect(isBefore(detail, button)).toBe(true);
+    expect(isBefore(note, entries)).toBe(true);
+  });
+
+  it('показывает фразу отказа на экране один раз, а не и в форме, и в списке', () => {
+    render(<WorkScreen {...baseProps} state={stateWithEntries} error="Паспорт заполнен не полностью" />);
+
+    fireEvent.click(screen.getByRole('button', {name: 'Свая с паспортом'}));
+
+    expect(screen.getAllByText('Паспорт заполнен не полностью')).toHaveLength(1);
+  });
+
+  it('в обзоре смены (форма закрыта) отказ остаётся вверху экрана', () => {
+    render(<WorkScreen {...baseProps} error="Смена уже закрыта" />);
+
+    const note = screen.getByText('Смена уже закрыта');
+    const main = note.closest('main');
+    expect(main).not.toBeNull();
+    expect(main?.firstElementChild?.contains(note)).toBe(true);
+  });
+});
+
+describe('рабочий экран: черновик при отказе сервера', () => {
+  it('сохраняет введённое количество после отказа, «← К смене» и повторного входа', () => {
+    const onLog = vi.fn().mockResolvedValue(true);
+    const {rerender} = render(<WorkScreen {...baseProps} onLog={onLog} error={null} />);
+
+    fireEvent.click(screen.getByRole('button', {name: 'Добавить сваю'}));
+    fireEvent.change(screen.getByLabelText('Марка сваи'), {target: {value: 'g1'}});
+    fireEvent.change(screen.getByLabelText('Свай, шт'), {target: {value: '12'}});
+
+    rerender(<WorkScreen {...baseProps} onLog={onLog} error="Смена уже закрыта" />);
+
+    fireEvent.click(screen.getByRole('button', {name: '← К смене'}));
+    fireEvent.click(screen.getByRole('button', {name: 'Добавить сваю'}));
+
+    expect(screen.getByLabelText('Марка сваи')).toHaveValue('g1');
+    expect(screen.getByLabelText('Свай, шт')).toHaveValue(12);
+  });
+
+  it('черновик паспорта сваи переживает «← К смене» и возврат', () => {
+    render(<WorkScreen {...baseProps} />);
+
+    fireEvent.click(screen.getByRole('button', {name: 'Свая с паспортом'}));
+    fireEvent.change(screen.getByPlaceholderText('С-130'), {target: {value: 'С-130'}});
+
+    fireEvent.click(screen.getByRole('button', {name: '← К смене'}));
+    fireEvent.click(screen.getByRole('button', {name: 'Свая с паспортом'}));
+
+    expect(screen.getByPlaceholderText('С-130')).toHaveValue('С-130');
+  });
+
+  it('после успешной записи поля пусты', async () => {
+    const onLog = vi.fn().mockResolvedValue(true);
+    render(<WorkScreen {...baseProps} onLog={onLog} />);
+
+    fireEvent.click(screen.getByRole('button', {name: 'Добавить сваю'}));
+    fireEvent.change(screen.getByLabelText('Марка сваи'), {target: {value: 'g1'}});
+    fireEvent.change(screen.getByLabelText('Свай, шт'), {target: {value: '12'}});
+    fireEvent.click(screen.getByRole('button', {name: 'Записать'}));
+
+    await waitFor(() => expect(onLog).toHaveBeenCalled());
+    await waitFor(() => {
+      expect((screen.getByLabelText('Свай, шт') as HTMLInputElement).value).toBe('');
+    });
+  });
+});
+
+/*
+  Аудит R82, находка 13: пока запрос в полёте (`busy`), вкладку формы менять
+  нельзя — смена вкладки чистит поля, и число исчезало до того, как машинист
+  увидел отказ.
+*/
+describe('рабочий экран: вкладки формы во время отправки', () => {
+  it('при busy блокирует вкладки формы', () => {
+    const {rerender} = render(<WorkScreen {...baseProps} />);
+
+    fireEvent.click(screen.getByRole('button', {name: 'Добавить сваю'}));
+
+    rerender(<WorkScreen {...baseProps} busy />);
+
+    expect(screen.getByRole('button', {name: 'Сваи'})).toBeDisabled();
+    expect(screen.getByRole('button', {name: 'Бурение'})).toBeDisabled();
+    expect(screen.getByRole('button', {name: 'Простой'})).toBeDisabled();
+  });
+
+  it('при busy клик по вкладке не очищает поле количества', () => {
+    const {rerender} = render(<WorkScreen {...baseProps} />);
+
+    fireEvent.click(screen.getByRole('button', {name: 'Добавить сваю'}));
+    fireEvent.change(screen.getByLabelText('Марка сваи'), {target: {value: 'g1'}});
+    fireEvent.change(screen.getByLabelText('Свай, шт'), {target: {value: '12'}});
+
+    rerender(<WorkScreen {...baseProps} busy />);
+    fireEvent.click(screen.getByRole('button', {name: 'Бурение'}));
+
+    expect(screen.getByLabelText('Свай, шт')).toHaveValue(12);
+  });
+
+  it('при busy=false переключение вкладок работает как раньше', () => {
+    render(<WorkScreen {...baseProps} />);
+
+    fireEvent.click(screen.getByRole('button', {name: 'Добавить сваю'}));
+    fireEvent.change(screen.getByLabelText('Свай, шт'), {target: {value: '12'}});
+    fireEvent.click(screen.getByRole('button', {name: 'Простой'}));
+
+    expect(screen.getByLabelText('Причина простоя')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Свай, шт')).toBeNull();
+  });
+});

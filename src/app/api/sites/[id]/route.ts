@@ -22,7 +22,7 @@ export const GET = withApi(
     const tenantId = requireTenantId(user!);
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     const site = await getSiteWithHierarchy(user!, tenantId, id);
-    if (!site) throw new ServiceError('Site not found', 404);
+    if (!site) throw new ServiceError('Объект не найден', 404);
     return NextResponse.json({ site });
   },
   { domain: 'sites', cache: true, cacheTTL: 30_000 }

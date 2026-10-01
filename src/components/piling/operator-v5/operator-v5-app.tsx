@@ -883,6 +883,15 @@ export function CloseScreen({state, busy, onClose, unsent, onFlush}: {
 export function OperatorV5App() {
   const [state, setState] = useState<OperatorMobileState | null>(null);
   const [error, setError] = useState<string | null>(null);
+  /**
+   * Отказ по роли при загрузке состояния — отдельно от «нет связи».
+   *
+   * 403 значит, что экран не для этой роли: ни «Повторить», ни «данные
+   * отправятся позже» здесь не помогут — при 403 ничего не уйдёт, а помощник
+   * машиниста жал бы кнопку до вечера. Поэтому текст про роль показываем сам
+   * по себе, без кнопки повтора (как в `/operator`).
+   */
+  const [forbidden, setForbidden] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [tab, setTab] = useState<Tab>('SHIFT');
@@ -905,7 +914,14 @@ export function OperatorV5App() {
       const coordinates = await currentPosition();
       setState(await fetchState({coordinates}));
       setError(null);
+      setForbidden(null);
     } catch (cause) {
+      // Отказ по роли — не обрыв связи: «Повторить» его не исправит, а
+      // «данные отправятся позже» было бы неправдой, при 403 не уйдёт ничего.
+      if (cause instanceof ApiError && cause.status === 403) {
+        setForbidden(cause.message);
+        return;
+      }
       if (options.quiet) throw cause;
       setError(cause instanceof ApiError || cause instanceof Error
         ? cause.message
@@ -1070,6 +1086,19 @@ export function OperatorV5App() {
     );
   }, [commandId, run, state]);
 
+  if (forbidden) {
+    return (
+      <div className="app">
+        <div className="scr">
+          <h2 className="h">{forbidden}</h2>
+          <p className="note">
+            Смену ведёт машинист, закреплённый за установкой. Записи о выработке и осмотрах
+            подаёт он.
+          </p>
+        </div>
+      </div>
+    );
+  }
   if (error) {
     return (
       <div className="app">

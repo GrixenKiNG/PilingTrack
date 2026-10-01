@@ -300,18 +300,23 @@ function ActiveToggle({ value, onChange }: { value: boolean; onChange: (v: boole
   return (
     <div className="sm:col-span-2 flex items-center justify-between rounded-lg bg-muted p-3">
       <Label className="text-sm">Активна</Label>
+      {/* Зона касания ≥44px на телефоне: растёт сам <button> (min-h-11), а
+          видимая дорожка остаётся 40×24 — палец попадает, вид не меняется.
+          `sm:min-h-0` возвращает на десктопе прежнюю высоту. */}
       <button
         type="button"
         onClick={() => onChange(!value)}
-        className={cn(
-          'relative w-10 h-6 rounded-full transition-colors',
-          value ? 'bg-success-strong' : 'bg-slate-300',
-        )}
+        className="grid min-h-11 w-11 shrink-0 place-items-center sm:min-h-0"
       >
         <span className={cn(
-          'absolute top-1 w-4 h-4 rounded-full bg-card transition-transform',
-          value ? 'translate-x-5' : 'translate-x-1',
-        )} />
+          'relative block w-10 h-6 rounded-full transition-colors',
+          value ? 'bg-success-strong' : 'bg-slate-300',
+        )}>
+          <span className={cn(
+            'absolute top-1 w-4 h-4 rounded-full bg-card transition-transform',
+            value ? 'translate-x-5' : 'translate-x-1',
+          )} />
+        </span>
       </button>
     </div>
   );

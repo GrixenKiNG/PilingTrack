@@ -62,7 +62,7 @@ function checkCircuitBreaker(): NextResponse | null {
 
     return NextResponse.json(
       {
-        error: 'Service temporarily unavailable — database circuit breaker is OPEN',
+        error: 'Сервис временно недоступен — сработала защита базы данных',
         circuitBreaker: {
           state: stats.state,
           timeUntilRetryMs: stats.timeUntilRetry,
@@ -84,13 +84,16 @@ export const POST = withApi(async (request: NextRequest) => {
   const csrfCheck = withCsrf(request);
   if (csrfCheck) return csrfCheck;
 
-  // Telemetry-specific rate limiting
-  const identifier = getRateLimitIdentifier(request);
+  // Telemetry-specific rate limiting.
+  // Ключ с префиксом телеметрии: без него корзина и блок-ключ (`rl:<ip>`)
+  // общие с публичной формой заявок ORION, у которой свой порог, — пять заявок
+  // с одного адреса закрывали приём телеметрии, и наоборот.
+  const identifier = `telemetry:${getRateLimitIdentifier(request)}`;
   const rl = await rateLimiter.check(identifier, TELEMETRY_RATE_LIMIT);
   if (!rl.allowed) {
     return NextResponse.json(
       {
-        error: 'Telemetry rate limit exceeded. Try again later.',
+        error: 'Слишком много запросов телеметрии. Попробуйте позже.',
         retryAfter: rl.retryAfter,
       },
       {
@@ -122,7 +125,7 @@ export const POST = withApi(async (request: NextRequest) => {
       if (body.length > MAX_BATCH_SIZE) {
         return NextResponse.json(
           {
-            error: `Batch size exceeds maximum of ${MAX_BATCH_SIZE} records`,
+            error: `Слишком много записей за раз: максимум ${MAX_BATCH_SIZE}`,
             maxBatchSize: MAX_BATCH_SIZE,
           },
           { status: 400 }
@@ -132,7 +135,7 @@ export const POST = withApi(async (request: NextRequest) => {
       const validated = telemetryBatchSchema.safeParse(body);
       if (!validated.success) {
         return NextResponse.json(
-          { error: 'Validation error', details: validated.error.flatten() },
+          { error: 'Некорректные данные', details: validated.error.flatten() },
           { status: 400 }
         );
       }
@@ -144,7 +147,7 @@ export const POST = withApi(async (request: NextRequest) => {
       const foreign = await findForeignEquipmentIds(tenantId, requestedIds);
       if (foreign.length > 0) {
         return NextResponse.json(
-          { error: 'One or more equipment ids are not in your tenant' },
+          { error: 'Часть техники не относится к вашей организации' },
           { status: 403 }
         );
       }
@@ -175,7 +178,7 @@ export const POST = withApi(async (request: NextRequest) => {
     const validated = telemetryRecordSchema.safeParse(body);
     if (!validated.success) {
       return NextResponse.json(
-        { error: 'Validation error', details: validated.error.flatten() },
+        { error: 'Некорректные данные', details: validated.error.flatten() },
         { status: 400 }
       );
     }
@@ -183,7 +186,7 @@ export const POST = withApi(async (request: NextRequest) => {
     const foreign = await findForeignEquipmentIds(tenantId, [validated.data.equipmentId]);
     if (foreign.length > 0) {
       return NextResponse.json(
-        { error: 'Equipment id is not in your tenant' },
+        { error: 'Техника не относится к вашей организации' },
         { status: 403 }
       );
     }
@@ -219,7 +222,7 @@ export const POST = withApi(async (request: NextRequest) => {
       const retryAfter = Math.ceil(err.retryAfterMs / 1000);
       return NextResponse.json(
         {
-          error: 'Database unavailable — circuit breaker is OPEN',
+          error: 'База данных недоступна — сработала защита',
           retryAfter,
           circuitBreaker: databaseCircuitBreaker.getStats(),
         },
@@ -306,7 +309,7 @@ export const GET = withApi(async (request: NextRequest) => {
 
     if (!from || !to) {
       return NextResponse.json(
-        { error: 'from and to parameters required (ISO date)' },
+        { error: 'Укажите параметры from и to (даты в формате ISO)' },
         { status: 400 }
       );
     }
@@ -327,7 +330,7 @@ export const GET = withApi(async (request: NextRequest) => {
     // Per-parameter aggregated analysis over the range (engine/hydraulics/etc.)
     if (action === 'analysis') {
       if (!equipmentId) {
-        return NextResponse.json({ error: 'equipmentId required for analysis' }, { status: 400 });
+        return NextResponse.json({ error: 'Для анализа укажите equipmentId' }, { status: 400 });
       }
       const { getTelemetryAnalysis } = await import(
         '@/services/telemetry/telemetry-ingestion-service'
@@ -362,7 +365,7 @@ export const GET = withApi(async (request: NextRequest) => {
 
 function assertAnyRole(user: { role: string }, roles: string[]) {
   if (!roles.includes(user.role)) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    return NextResponse.json({ error: 'Недостаточно прав' }, { status: 403 });
   }
 
   return null;

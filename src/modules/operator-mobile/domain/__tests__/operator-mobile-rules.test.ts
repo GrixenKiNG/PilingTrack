@@ -259,10 +259,21 @@ describe('заполнение чек-листа', () => {
     expect(drafts[0].severity).toBe('HIGH');
   });
 
-  it('пропущенный пункт не даёт закрыть список', () => {
-    expect(validateChecklistRun(items, allOk.slice(1))).toContainEqual(
-      expect.objectContaining({message: 'Пункт не заполнен'}),
+  it('пропущенный пункт не даёт закрыть список и назван поимённо', () => {
+    // Ответ на первый пункт не отправлен: сервер обязан назвать именно его,
+    // иначе пять строк «Пункт не заполнен» не различить (F-V1-ERROR-DETAILS-b).
+    const problems = validateChecklistRun(items, allOk.slice(1));
+    expect(problems).toContainEqual(
+      expect.objectContaining({message: 'Пункт не заполнен', label: items[0].text}),
     );
+  });
+
+  it('у каждого пустого пункта свой label — пункты различимы по названию', () => {
+    const problems = validateChecklistRun(items, []);
+    expect(problems).toHaveLength(items.length);
+    expect(problems.map((problem) => problem.label)).toEqual(items.map((item) => item.text));
+    // Формулировку отказа не меняли: на неё смотрят прежние проверки экрана.
+    expect(problems.every((problem) => problem.message === 'Пункт не заполнен')).toBe(true);
   });
 });
 

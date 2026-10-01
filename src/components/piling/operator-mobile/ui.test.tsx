@@ -1,7 +1,7 @@
 import {render, screen} from '@testing-library/react';
 import {describe, expect, it} from 'vitest';
 import {OperatorStatusStrip} from './operator-status-strip';
-import {PhaseBar} from './ui';
+import {ErrorNote, PhaseBar} from './ui';
 import {admissionBlockers, admissionSteps} from './safety/admission-steps';
 
 const progress = [
@@ -36,8 +36,9 @@ describe('рабочая оболочка машиниста', () => {
 
   it('явно показывает, где находятся записи при потере связи', () => {
     const {rerender} = render(<OperatorStatusStrip online items={[]} />);
-    expect(screen.getByRole('status')).toHaveTextContent('Синхронизировано');
-    expect(screen.getByRole('status')).toHaveTextContent('Сервер доступен');
+    expect(screen.getByRole('status')).toHaveTextContent('Всё отправлено');
+    expect(screen.getByRole('status')).toHaveTextContent('очередь на телефоне пуста');
+    expect(screen.queryByText(/Сервер доступен/)).not.toBeInTheDocument();
 
     rerender(<OperatorStatusStrip online={false} items={[]} />);
     expect(screen.getByRole('status')).toHaveTextContent('Офлайн');
@@ -58,6 +59,40 @@ describe('рабочая оболочка машиниста', () => {
 
     rerender(<OperatorStatusStrip online items={failed} />);
     expect(screen.getByRole('status')).toHaveTextContent('Нужно проверить: 1');
+  });
+});
+
+/*
+ * Плашка отказа: сервер называет общую фразу и подробности, и подробности —
+ * самое полезное в ней. Без них машинист читает «Паспорт заполнен не
+ * полностью» и не знает, какое из пятнадцати полей править (R76, находка 10).
+ */
+describe('плашка отказа', () => {
+  it('показывает фразу отказа и перечень того, что не заполнено', () => {
+    render(<ErrorNote
+      message="Паспорт заполнен не полностью"
+      details={['Укажите номер сваи по проекту', 'Отказ считается по залогу: нужны и погружение, и число ударов']}
+    />);
+
+    const note = screen.getByRole('alert');
+    expect(note).toHaveTextContent('Паспорт заполнен не полностью');
+    expect(screen.getAllByRole('listitem').map((item) => item.textContent)).toEqual([
+      'Укажите номер сваи по проекту',
+      'Отказ считается по залогу: нужны и погружение, и число ударов',
+    ]);
+  });
+
+  it('без подробностей — как раньше: одна фраза и никакого списка', () => {
+    render(<ErrorNote message="Смена уже закрыта" />);
+
+    expect(screen.getByRole('alert')).toHaveTextContent('Смена уже закрыта');
+    expect(screen.queryAllByRole('listitem')).toEqual([]);
+  });
+
+  it('пустой список подробностей плашку не рисует', () => {
+    render(<ErrorNote message={null} details={[]} />);
+
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 });
 

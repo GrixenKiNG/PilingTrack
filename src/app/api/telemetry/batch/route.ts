@@ -43,7 +43,7 @@ function checkCircuitBreaker(): NextResponse | null {
 
     return NextResponse.json(
       {
-        error: 'Service temporarily unavailable — database circuit breaker is OPEN',
+        error: 'Сервис временно недоступен — сработала защита базы данных',
         circuitBreaker: {
           state: stats.state,
           timeUntilRetryMs: stats.timeUntilRetry,
@@ -65,11 +65,14 @@ export const POST = withApi(async (request: NextRequest) => {
   const csrfCheck = withCsrf(request);
   if (csrfCheck) return csrfCheck;
 
-  const identifier = getRateLimitIdentifier(request);
+  // Ключ с префиксом телеметрии — см. telemetry/route.ts: без него корзина
+  // общая с публичной формой заявок ORION, и её порог (5/10 мин) закрывает
+  // приём телеметрии с того же адреса.
+  const identifier = `telemetry:${getRateLimitIdentifier(request)}`;
   const rl = await rateLimiter.check(identifier, TELEMETRY_RATE_LIMIT);
   if (!rl.allowed) {
     return NextResponse.json(
-      { error: 'Telemetry rate limit exceeded', retryAfter: rl.retryAfter },
+      { error: 'Слишком много запросов телеметрии. Попробуйте позже.', retryAfter: rl.retryAfter },
       { status: 429, headers: { 'Retry-After': String(rl.retryAfter || 60) } }
     );
   }
@@ -81,7 +84,7 @@ export const POST = withApi(async (request: NextRequest) => {
     // Only ADMIN, DISPATCHER, and OPERATOR can submit telemetry
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     if (!['ADMIN', 'DISPATCHER', 'OPERATOR'].includes(user!.role)) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      return NextResponse.json({ error: 'Недостаточно прав' }, { status: 403 });
     }
 
     // Check circuit breaker
@@ -92,7 +95,7 @@ export const POST = withApi(async (request: NextRequest) => {
 
     if (!Array.isArray(body)) {
       return NextResponse.json(
-        { error: 'Request body must be an array of telemetry records' },
+        { error: 'Тело запроса должно быть массивом записей телеметрии' },
         { status: 400 }
       );
     }
@@ -100,7 +103,7 @@ export const POST = withApi(async (request: NextRequest) => {
     if (body.length > MAX_BATCH_SIZE) {
       return NextResponse.json(
         {
-          error: `Batch size exceeds maximum of ${MAX_BATCH_SIZE} records`,
+          error: `Слишком много записей за раз: максимум ${MAX_BATCH_SIZE}`,
           maxBatchSize: MAX_BATCH_SIZE,
           receivedCount: body.length,
         },
@@ -111,7 +114,7 @@ export const POST = withApi(async (request: NextRequest) => {
     const validated = telemetryBatchSchema.safeParse(body);
     if (!validated.success) {
       return NextResponse.json(
-        { error: 'Validation error', details: validated.error.flatten() },
+        { error: 'Некорректные данные', details: validated.error.flatten() },
         { status: 400 }
       );
     }
@@ -127,7 +130,7 @@ export const POST = withApi(async (request: NextRequest) => {
     const foreign = await findForeignEquipmentIds(tenantId, requestedIds);
     if (foreign.length > 0) {
       return NextResponse.json(
-        { error: 'One or more equipment ids are not in your tenant' },
+        { error: 'Часть техники не относится к вашей организации' },
         { status: 403 }
       );
     }
@@ -161,7 +164,7 @@ export const POST = withApi(async (request: NextRequest) => {
       });
       return NextResponse.json(
         {
-          error: 'Database unavailable — circuit breaker is OPEN',
+          error: 'База данных недоступна — сработала защита',
           retryAfter,
           circuitBreaker: databaseCircuitBreaker.getStats(),
         },

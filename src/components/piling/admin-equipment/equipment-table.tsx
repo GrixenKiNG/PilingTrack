@@ -34,7 +34,12 @@ export function EquipmentTable({
   const toggle = (key: SortKey) =>
     setSort((s) => ({ key, asc: s.key === key ? !s.asc : true }));
 
-  const th = 'cursor-pointer select-none break-words px-1.5 py-2 text-left text-xs font-semibold uppercase leading-tight text-muted-foreground';
+  // Сортировке нужен `h-11`, а не `min-h-11`: у `display: table-cell` браузер
+  // min-height игнорирует (замер в Chrome: одиночная ячейка с min-height:44px
+  // осталась 32px, с height:44px стала 44px). `height` у ячейки работает как
+  // минимум, поэтому телефон получает 44px, а `sm:h-auto` возвращает десктоп
+  // к прежней высоте от содержимого.
+  const th = 'h-11 cursor-pointer select-none break-words px-1.5 py-2 text-left text-xs font-semibold uppercase leading-tight text-muted-foreground sm:h-auto';
   const staticTh = 'break-words px-1.5 py-2 text-left text-xs font-semibold uppercase leading-tight text-muted-foreground';
 
   return (

@@ -38,6 +38,18 @@ export function OfflineQueueBanner({items, onRetry, onDiscard, className = 'spac
   const failed = items.filter((item) => item.state === 'FAILED');
   const pending = items.filter((item) => item.state === 'PENDING');
   const waitsForLogin = pending.some((item) => item.lastError === AUTH_WAIT_MESSAGE);
+  /*
+    Отказ сервера от обрыва связи отличаем по языку строки: сетевой сбой
+    браузера и таймаут приходят англоязычным текстом («Failed to fetch»,
+    «Load failed», «signal timed out»), а отказ сервера — русским (`markAttempt`
+    кладёт `error.message`, а он у `ApiError` прочитан из тела ответа).
+    Без этого 500/503/429 выглядели как «ждём связи», хотя связь есть
+    (аудит R76, находка 6). `AUTH_WAIT_MESSAGE` разбирается отдельной ветвью.
+  */
+  const serverReasons = pending
+    .map((item) => item.lastError)
+    .filter((text): text is string =>
+      !!text && text !== AUTH_WAIT_MESSAGE && /[А-Яа-яЁё]/.test(text));
 
   return (
     <div className={className} data-testid="offline-queue-banner">
@@ -56,7 +68,14 @@ export function OfflineQueueBanner({items, onRetry, onDiscard, className = 'spac
       {pending.length > 0 && (
         <div role="status" className="rounded-xl border border-warning bg-warning/10 px-3 py-2 text-2xs font-medium text-warning-strong">
           На устройстве: {pending.map((item) => item.label).join(', ')}.{' '}
-          {waitsForLogin ? AUTH_WAIT_MESSAGE : 'Отправим, когда появится связь.'}
+          {waitsForLogin
+            ? AUTH_WAIT_MESSAGE
+            : serverReasons.length > 0
+              ? 'Сервер не принял запись, повторим автоматически.'
+              : 'Отправим, когда появится связь.'}
+          {serverReasons.length > 0 && (
+            <span className="mt-1 block font-normal">{serverReasons.join(' · ')}</span>
+          )}
         </div>
       )}
       {failed.map((item) => (
@@ -81,7 +100,11 @@ function FailedItem({item, onRetry, onDiscard}: {
   return (
     <div role="alert" className="space-y-2 rounded-xl border border-destructive bg-destructive/10 px-3 py-2 text-2xs font-medium text-destructive-strong">
       <p className="min-w-0 break-words">
-        {item.label} не принята: {item.lastError ?? 'причина неизвестна'}
+        {item.label} не принята
+      </p>
+      {/* Причина отказа сервера — главное на карточке: по ней решают, поможет ли повтор. */}
+      <p className="min-w-0 break-words text-sm font-semibold">
+        {item.lastError ?? 'причина неизвестна'}
       </p>
       {open && (
         <p className="break-words font-normal text-foreground">
@@ -102,19 +125,26 @@ function FailedItem({item, onRetry, onDiscard}: {
           </button>
         </div>
       ) : (
-        <div className="flex flex-wrap gap-2">
-          <button type="button" onClick={() => onRetry(item.clientCommandId)}
-            className="rounded border border-destructive px-2 py-1 font-semibold">
-            Повторить
-          </button>
-          <button type="button" onClick={() => setOpen((value) => !value)} aria-expanded={open}
-            className="rounded border border-destructive px-2 py-1 font-semibold">
-            {open ? 'Скрыть' : 'Что введено'}
-          </button>
-          <button type="button" onClick={() => { setOpen(true); setConfirming(true); }}
-            className="rounded border border-destructive px-2 py-1 font-semibold">
-            Убрать
-          </button>
+        <div className="space-y-2">
+          <div className="flex flex-wrap gap-2">
+            <button type="button" onClick={() => { setOpen(true); setConfirming(true); }}
+              className="rounded border border-destructive bg-destructive px-2 py-1 font-semibold text-white">
+              Удалить запись
+            </button>
+            <button type="button" onClick={() => setOpen((value) => !value)} aria-expanded={open}
+              className="rounded border border-destructive px-2 py-1 font-semibold">
+              {open ? 'Скрыть' : 'Что введено'}
+            </button>
+          </div>
+          <div className="space-y-1">
+            <button type="button" onClick={() => onRetry(item.clientCommandId)}
+              className="rounded border border-destructive px-2 py-1 font-normal">
+              Повторить
+            </button>
+            <p className="break-words font-normal text-foreground">
+              Повтор отправит то же самое — поможет, только если причина уже устранена (смену переоткрыли, справочник поправили)
+            </p>
+          </div>
         </div>
       )}
     </div>

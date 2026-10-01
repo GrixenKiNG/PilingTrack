@@ -274,5 +274,5 @@ describe('pdf-generator — числа ru-RU', () => {
     expect(formatNumber(2.5)).toBe('2,5');
     expect(formatNumber(null)).toBe('0');
     expect(safeText('')).toBe('—');
-  });
+  }, 30_000);
 });

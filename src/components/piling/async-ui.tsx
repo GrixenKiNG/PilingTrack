@@ -73,7 +73,7 @@ export function QueryErrorBanner({
             variant="outline"
             onClick={onRetry}
             disabled={retrying}
-            className="w-fit"
+            className="w-fit min-h-11 sm:min-h-0"
           >
             <RotateCcw />
             {retrying ? 'Повтор…' : 'Повторить'}

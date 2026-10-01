@@ -167,7 +167,7 @@ function QuickLink({ href, icon, label }: { href: string; icon: React.ReactNode;
   return (
     <Link
       href={href}
-      className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-border py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+      className="flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-lg border border-border py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground sm:min-h-0"
     >
       {icon}
       {label}

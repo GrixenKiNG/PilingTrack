@@ -553,37 +553,6 @@
           }
         }
       }
-    },
-    {
-      "id": 13,
-      "title": "📊 HPA — API Replicas",
-      "type": "timeseries",
-      "gridPos": {
-        "h": 8,
-        "w": 8,
-        "x": 16,
-        "y": 28
-      },
-      "targets": [
-        {
-          "expr": "kube_hpa_status_current_replicas{hpa=~\"pilingtrack.*\"}",
-          "legendFormat": "Current replicas",
-          "refId": "A"
-        },
-        {
-          "expr": "kube_hpa_spec_max_replicas{hpa=~\"pilingtrack.*\"}",
-          "legendFormat": "Max replicas",
-          "refId": "B"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "color": {
-            "mode": "palette-classic"
-          }
-        }
-      }
     }
   ],
   "schemaVersion": 39,

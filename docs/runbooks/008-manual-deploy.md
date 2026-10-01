@@ -118,6 +118,75 @@ docker compose exec -T postgres psql -U piling -d pilingtrack -c \
 # must be the migration you just shipped, not the previous one.
 ```
 
+### Rehearse the migration on a copy of prod data first (R57)
+
+Before shipping a deploy whose diff adds a `prisma/migrations/*` folder,
+apply it once against a **copy of the prod database** on the local stand.
+CI only ever runs `migrate deploy` on an empty `postgres:18-alpine`
+(`.github/workflows/ci.yml`), and prod runs it straight on live data — so
+everything that depends on real rows (a unique index over existing rows,
+`SET NOT NULL`, backfill, fail-closed RLS) is invisible until prod. That
+gap is finding **R57** (`docs/audits/hermes-night/R57-migration-upgrade.md`,
+F-13, top-1: «migrate deploy ни разу не репетируется на копии боевой базы»).
+The rehearsal is cheap; a bad migration on prod is not.
+
+The stand does the whole thing: `--refresh-db` takes a read-only `pg_dump`
+from prod, restores it, recreates the cluster roles and re-applies the
+grants (`scripts/app-role-grants.sql`, `scripts/identity-role-grants.sql`),
+then brings the stand up — and its `migrate` service applies the new
+migrations to the copy, which is exactly what will happen on deploy.
+
+```bash
+# from the workstation, on the branch/commit you are about to ship.
+# Prerequisite: the working tree is clean (the script refuses otherwise —
+# the image must be the commit) and Docker is running.
+bash scripts/staging-local.sh --refresh-db
+
+# without --refresh-db it reuses the stand's existing database copy;
+# use the plain form only when you know that copy is already recent.
+
+# watch the migrate step (same image and command as prod):
+docker compose -p pilingtrack-staging logs migrate | grep -E 'Applying|applied|No pending|Error'
+```
+
+The stand prints its own check at the end; **success is all of:**
+
+- `последние миграции:` — the first line is **your** `migration_name`
+  (the script runs `SELECT migration_name FROM _prisma_migrations ORDER BY finished_at DESC NULLS LAST LIMIT 3;`
+  against the stand's postgres itself);
+- `health: {...}` healthy, `deep: 200`, `/login: 200`;
+- `ошибок в журналах app/workers после подъёма: 0`.
+
+If the top row of `_prisma_migrations` is still the *previous* migration
+(or `Applying` never appears in the log), the migration did not run —
+the same stale-image trap as the section above, not a passing rehearsal.
+Stop the stand with `bash scripts/staging-local.sh --down` (the database is
+kept; `--destroy` wipes it).
+
+**If the rehearsal fails — do not deploy.** A migration that fails inside
+`prisma migrate deploy` leaves **P3009**, and Prisma then refuses to apply
+*any* migration until someone runs `prisma migrate resolve --rolled-back
+<migration_name>` by hand on prod. On prod that is an outage of the whole
+deploy path, not just this release. So:
+
+1. Read the failing statement in the `migrate` log on the stand.
+2. Inspect the data on the copy — the failure is nearly always data, not
+   SQL (duplicate rows under a new unique index, `NULL`s under
+   `SET NOT NULL`, a constraint or index name that diverged). R57 lists the
+   known candidates with the exact queries to run.
+3. Resolve the data dependency (dedupe / backfill) or rework the migration:
+   add a `DO $$ … RAISE EXCEPTION` pre-check with the query from step 2, and
+   `NOT VALID` + `VALIDATE CONSTRAINT` for constraints. Never ship the
+   failing migration with a plan to `resolve --rolled-back` on prod.
+4. Re-run the rehearsal with `--refresh-db` on the fixed commit.
+
+**Time estimate.** A rehearsal on a warm stand (images already built for
+this SHA) is the prod dump + restore of a ~130 MB database plus the stand's
+health checks — minutes, **≈2–5 min (estimate, not measured; the stand was
+never run for this task)**. The first run on a cold machine also builds the
+`app` / `workers` / `migrate` images, which is the slow part (tens of
+minutes on this hardware); it is skipped for the same SHA afterwards.
+
 If the migration is **destructive** (Prisma prints a `Warnings:` /
 `DROP COLUMN` / `DROP TABLE` block in the `.sql`), check the target on prod
 *before* swapping — e.g. `SELECT count("col") FROM "Table";` — and confirm

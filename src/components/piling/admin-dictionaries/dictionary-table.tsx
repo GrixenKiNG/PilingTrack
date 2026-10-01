@@ -210,7 +210,13 @@ export function DictionaryTable({
                   onKeyDown={onRowKeyDown}
                   className={`cursor-pointer border-b last:border-0 hover:bg-info/10/70 focus-visible:outline-none focus-visible:ring-ring/50 focus-visible:ring-[3px] ${selectedId === item.id ? 'bg-info/10/70 ring-1 ring-inset ring-info/30' : ''}`}
                 >
-                  <td className="px-3 py-2"><Checkbox aria-label={`Выбрать ${item.name}`} checked={checkedIds.includes(item.id)} onClick={(event) => event.stopPropagation()} onCheckedChange={(checked) => toggleItem(item.id, checked === true)} /></td>
+                  <td className="px-3 py-2">
+                    {/* Флажок выбора остаётся 16px, а нажатие по нему — по 44px
+                        (обёртка-`label` с откатом на компьютер: `sm:min-h-0`). */}
+                    <label className="flex min-h-11 min-w-11 items-center justify-center rounded-lg sm:min-h-0 sm:min-w-0" onClick={(event) => event.stopPropagation()}>
+                      <Checkbox aria-label={`Выбрать ${item.name}`} checked={checkedIds.includes(item.id)} onClick={(event) => event.stopPropagation()} onCheckedChange={(checked) => toggleItem(item.id, checked === true)} />
+                    </label>
+                  </td>
                   <td className={`px-3 py-2 font-medium ${item.isActive ? 'text-foreground' : 'text-muted-foreground'}`}>
                     {item.name}
                   </td>

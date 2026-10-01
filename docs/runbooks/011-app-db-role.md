@@ -1,6 +1,6 @@
 # Runbook 011 — роль приложения `pilingtrack_app`
 
-**Зачем.** Приложение, воркеры и ws ходят в базу ролью-владельцем. На проде это
+**Зачем.** Приложение и воркеры ходят в базу ролью-владельцем. На проде это
 `piling`, и она — суперпользователь:
 
 ```
@@ -24,7 +24,7 @@ fail-closed миграция `20260813030000` в том числе — на пр
 | Кто | Роль до | Роль после | Зачем |
 |---|---|---|---|
 | `migrate` (prisma migrate deploy, seed) | `piling` | `piling` | владеет таблицами, ему нужен DDL |
-| `app`, `workers`, `ws` | `piling` | `pilingtrack_app` | рантайм; без BYPASSRLS — политики начинают работать |
+| `app`, `workers` | `piling` | `pilingtrack_app` | рантайм; без BYPASSRLS — политики начинают работать |
 | `pgbouncer` | `piling` | `pilingtrack_app` | чтобы в контейнере пула не лежал пароль суперпользователя |
 | psql руками, бэкапы, восстановление | `piling` | `piling` | без изменений |
 
@@ -172,7 +172,7 @@ grep -n 'DB_IDENTITY_ROLE' docker-compose.yml   # должен быть у app �
 
 ```bash
 # 4. Перезапуск, чтобы переменная доехала, и проверка, что она видна изнутри.
-docker compose up -d app workers ws
+docker compose up -d app workers
 docker compose exec -T app printenv DB_IDENTITY_ROLE   # pilingtrack_identity
 ```
 
@@ -211,11 +211,11 @@ docker compose exec -T -e PGPASSWORD="$PW" postgres \
 # Переключение. Пересборка НЕ нужна — меняется только окружение.
 # Одной командой: разъезд ролей между пулом и приложением означал бы отказ
 # аутентификации.
-docker compose up -d pgbouncer app workers ws
+docker compose up -d pgbouncer app workers
 ```
 
-⚠️ **Окно недоступности — около 5 минут, а не секунды.** У `app`, `workers` и
-`ws` стоит `depends_on: migrate: service_completed_successfully`, поэтому
+⚠️ **Окно недоступности — около 5 минут, а не секунды.** У `app` и `workers`
+стоит `depends_on: migrate: service_completed_successfully`, поэтому
 `up -d` поднимает и `migrate`: старые контейнеры уже сняты, а новые ждут, пока
 `prisma migrate deploy` отработает и выйдет. На проде 13.08.2026 это заняло
 ~5 минут при «No pending migrations to apply» — то есть время уходит на запуск
@@ -252,7 +252,7 @@ docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U piling -d pilingtrack
 
 # 4. Приложение живо
 curl -fsS https://orionpiling.ru/api/health | head -c 400
-docker compose logs --since 5m app workers ws | grep -iE "permission denied|42501" || echo "нет отказов в правах"
+docker compose logs --since 5m app workers | grep -iE "permission denied|42501" || echo "нет отказов в правах"
 ```
 
 **5. Руками в интерфейсе** — то, что скриптами не проверяется: открыть
@@ -272,7 +272,7 @@ docker compose logs --since 5m app workers ws | grep -iE "permission denied|4250
 ```bash
 cd /opt/pilingtrack
 sed -i '/^APP_DB_USER=/d;/^APP_DB_PASSWORD=/d' .env
-docker compose up -d pgbouncer app workers ws
+docker compose up -d pgbouncer app workers
 ```
 
 Без `APP_DB_*` compose подставляет `POSTGRES_USER` — конфигурация возвращается к

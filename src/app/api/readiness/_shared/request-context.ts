@@ -71,7 +71,7 @@ export async function resolveReadinessRequestContext(
   if (error) return {response: error};
   if (!user?.tenantId) {
     const {NextResponse} = await import('next/server');
-    return {response: NextResponse.json({error: {code: 'FORBIDDEN', message: 'Tenant context is required'}}, {status: 403})};
+    return {response: NextResponse.json({error: {code: 'FORBIDDEN', message: 'Не задан контекст организации'}}, {status: 403})};
   }
   //  — не украшение: тип контекста обещает , а
   // отсутствующее поле дало бы  и утекло бы в журнал как таковое.

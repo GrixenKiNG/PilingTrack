@@ -43,12 +43,17 @@ export async function GET(_request: NextRequest) {
     components: {
       database: status.components.database.status === 'up' ? 'ok' : 'down',
       redis: status.components.redis.status === 'up' ? 'ok' : 'down',
+      // Планировщики живут только в контейнере workers и молча умирают вместе
+      // с ним (R59 #1, #2): их пульс — единственный признак, что суточная рутина
+      // ещё идёт. Статус уже 'ok' | 'stale', имена идут рядом списком.
+      schedulers: status.components.schedulers.status,
       storage: status.components.storage.status === 'up'
         ? 'ok'
         : status.components.storage.status === 'degraded'
           ? 'degraded'
           : 'down',
     },
+    staleSchedulers: status.components.schedulers.stale,
   };
 
   const httpStatus = status.status === 'unhealthy' ? 503 : 200;

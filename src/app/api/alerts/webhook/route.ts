@@ -84,18 +84,18 @@ function isAuthorized(request: NextRequest): boolean {
 
 export async function POST(request: NextRequest) {
   if (!isAuthorized(request)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return NextResponse.json({ error: 'Неверный токен вебхука' }, { status: 401 });
   }
 
   let payload: AlertmanagerPayload;
   try {
     const parsed = webhookSchema.safeParse(await request.json());
     if (!parsed.success) {
-      return NextResponse.json({ error: 'Invalid payload' }, { status: 400 });
+      return NextResponse.json({ error: 'Некорректные данные' }, { status: 400 });
     }
     payload = parsed.data as AlertmanagerPayload;
   } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
+    return NextResponse.json({ error: 'Некорректный JSON' }, { status: 400 });
   }
 
   const alerts = (payload.alerts ?? []).slice(0, MAX_FORWARDED);
@@ -112,12 +112,14 @@ export async function POST(request: NextRequest) {
   );
   if (!notifyEnabled) {
     logger.info('Alertmanager webhook suppressed by notification settings', { total: alerts.length });
-    return NextResponse.json({ ok: true, forwarded: 0 });
+    return NextResponse.json({ ok: true, forwarded: 0, reason: 'disabled' });
   }
 
   let forwarded = 0;
+  let firing = 0;
   for (const alert of alerts) {
     if (alert.status !== 'firing') continue;
+    firing++;
     const severity = SEVERITY_MAP[alert.labels.severity] ?? 'medium';
     const summary = alert.annotations.summary || alert.annotations.description || alert.labels.alertname || 'Alert';
     const description = alert.annotations.description;
@@ -129,6 +131,17 @@ export async function POST(request: NextRequest) {
       ruleId: alert.labels.alertname,
     });
     if (sent) forwarded++;
+  }
+
+  // Ни одно сообщение не ушло при непустой пачке firing-алертов — это сбой
+  // доставки (нет конфигурации/тенанта, прокси недоступен, 429, таймаут).
+  // Отвечаем 503, чтобы Alertmanager повторил, а не считал доставку успешной.
+  if (firing > 0 && forwarded === 0) {
+    logger.error('Alertmanager webhook: no alert delivered to Telegram', { total: alerts.length, firing });
+    return NextResponse.json(
+      { ok: false, forwarded: 0, error: 'Не удалось доставить алерты в Telegram' },
+      { status: 503 },
+    );
   }
 
   logger.info('Alertmanager webhook processed', { total: alerts.length, forwarded });

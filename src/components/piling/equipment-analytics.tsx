@@ -134,8 +134,8 @@ export function EquipmentAnalytics() {
     else { setSortKey(key); setSortDir(key === 'name' ? 'asc' : 'desc'); }
   };
 
-  // Тач-таргеты ≥40px на мобильном, компактно на десктопе.
-  const chip = 'min-h-10 rounded-md border border-border px-3 py-2 text-sm text-muted-foreground hover:bg-muted sm:min-h-0 sm:py-1 sm:text-xs';
+  // Тач-таргеты ≥44px у кнопок периода на мобильном, компактно на десктопе.
+  const chip = 'min-h-11 rounded-md border border-border px-3 py-2 text-sm text-muted-foreground hover:bg-muted sm:min-h-0 sm:py-1 sm:text-xs';
   const dateInput = 'min-h-10 rounded-md border border-border bg-card px-2 py-2 text-sm sm:min-h-0 sm:py-1';
 
   return (
@@ -147,7 +147,7 @@ export function EquipmentAnalytics() {
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">Выработка, утилизация, простои и обслуживание парка за период</p>
         </div>
-        <Button variant="outline" onClick={() => window.print()}>
+        <Button variant="outline" className="h-11 sm:h-9" onClick={() => window.print()}>
           <Printer className="mr-1.5 h-4 w-4" /> Печать
         </Button>
       </div>

@@ -216,7 +216,7 @@ export function UserDocuments({ userId }: { userId: string }) {
         <p className="font-medium text-destructive-strong">{failed}</p>
         {/* Ни одной строки: чужие документы под чужим именем хуже пустоты. */}
         <p className="text-muted-foreground">Документы этого сотрудника не показаны. Это не значит, что их нет.</p>
-        <Button size="sm" variant="outline" onClick={() => void load()}>Повторить</Button>
+        <Button size="sm" variant="outline" onClick={() => void load()} className="min-h-11 sm:min-h-0">Повторить</Button>
       </div>
     );
   }
@@ -238,7 +238,7 @@ export function UserDocuments({ userId }: { userId: string }) {
         <span className="text-xs text-muted-foreground">
           {documents.length ? `Документов: ${documents.length}` : 'Документов нет'}
         </span>
-        <Button size="sm" variant="outline" onClick={openCreate}>
+        <Button size="sm" variant="outline" onClick={openCreate} className="min-h-11 sm:min-h-0">
           <Plus className="mr-1 h-3.5 w-3.5" /> Добавить
         </Button>
       </div>
@@ -263,10 +263,10 @@ export function UserDocuments({ userId }: { userId: string }) {
                 <span className={cn('rounded px-2 py-0.5 text-xs font-medium', STATUS_STYLE[doc.expiry.status])}>
                   {statusText(doc.expiry)}
                 </span>
-                <Button size="icon" variant="ghost" onClick={() => openEdit(doc)} aria-label="Изменить документ">
+                <Button size="icon" variant="ghost" onClick={() => openEdit(doc)} aria-label="Изменить документ" className="min-h-11 min-w-11 sm:min-h-0 sm:min-w-0">
                   <Pencil className="h-3.5 w-3.5" />
                 </Button>
-                <Button size="icon" variant="ghost" onClick={() => setPendingDelete(doc)} aria-label="Удалить документ">
+                <Button size="icon" variant="ghost" onClick={() => setPendingDelete(doc)} aria-label="Удалить документ" className="min-h-11 min-w-11 sm:min-h-0 sm:min-w-0">
                   <Trash2 className="h-3.5 w-3.5" />
                 </Button>
               </div>

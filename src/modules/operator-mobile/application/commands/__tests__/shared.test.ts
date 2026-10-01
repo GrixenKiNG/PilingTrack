@@ -29,15 +29,16 @@ describe('requirePileGrade', () => {
 
   it('rejects a grade archived before the shift started', async () => {
     const tx = txWith({id: 'g1', lengthMm: 12000, isActive: false, archivedAt: new Date('2026-09-25T09:00:00.000Z')});
-    await expect(requirePileGrade(tx, 'tenant-a', 'g1', shiftStartedAt)).rejects.toThrow('убрана в архив');
+    await expect(requirePileGrade(tx, 'tenant-a', 'g1', shiftStartedAt)).rejects.toThrow('убрана в архив — обновите экран');
   });
 
   it('rejects a grade archived with no recorded time', async () => {
     const tx = txWith({id: 'g1', lengthMm: 12000, isActive: false, archivedAt: null});
-    await expect(requirePileGrade(tx, 'tenant-a', 'g1', shiftStartedAt)).rejects.toThrow('убрана в архив');
+    await expect(requirePileGrade(tx, 'tenant-a', 'g1', shiftStartedAt)).rejects.toThrow('убрана в архив — обновите экран');
   });
 
   it('rejects a grade of another organization', async () => {
-    await expect(requirePileGrade(txWith(null), 'tenant-a', 'g1', shiftStartedAt)).rejects.toThrow('не найдена');
+    await expect(requirePileGrade(txWith(null), 'tenant-a', 'g1', shiftStartedAt))
+      .rejects.toThrow('не найдена в справочнике вашей организации — обновите экран и выберите марку заново');
   });
 });

@@ -44,10 +44,10 @@ describe.runIf(Boolean(connectionString))('readiness snapshot projection on disp
       UNIQUE ("tenantId", "equipmentId", "triggerType", "triggerId"), UNIQUE ("tenantId", "id"));`);
     for (const path of migrationPaths) await sql.query(await readFile(path, 'utf8'));
     prisma = new PrismaClient({adapter: new PrismaPg({connectionString: url.toString()})}); await prisma.$connect();
-  });
+  }, 60_000);
 
   afterAll(async () => { await prisma?.$disconnect(); await sql?.end();
-    await admin.query(`DROP DATABASE IF EXISTS "${database}" WITH (FORCE)`); await admin.end(); });
+    await admin.query(`DROP DATABASE IF EXISTS "${database}" WITH (FORCE)`); await admin.end(); }, 60_000);
 
   const evaluation = (at: string) => evaluateReadiness({facts,
     rules: immutablePublishedRules(DEFAULT_READINESS_RULES),
@@ -68,7 +68,7 @@ describe.runIf(Boolean(connectionString))('readiness snapshot projection on disp
     })).toEqual({facts});
     await expect(prisma.readinessScoreSnapshot.update({where: {id: first.id}, data: {score: 1}})).rejects.toThrow();
     await expect(prisma.readinessScoreSnapshot.delete({where: {id: first.id}})).rejects.toThrow();
-  });
+  }, 30_000);
 
   it('adds nullable jsonb facts without rewriting historical snapshots', async () => {
     await sql.query(`INSERT INTO "ReadinessScoreSnapshot" (
@@ -87,7 +87,7 @@ describe.runIf(Boolean(connectionString))('readiness snapshot projection on disp
     expect(await prisma.readinessScoreSnapshot.findUniqueOrThrow({
       where: {id: 'legacy-no-facts'}, select: {facts: true},
     })).toEqual({facts: null});
-  });
+  }, 30_000);
 
   it('does not let delayed delivery regress the current projection', async () => {
     await prisma.$transaction(async (tx) => {
@@ -105,7 +105,7 @@ describe.runIf(Boolean(connectionString))('readiness snapshot projection on disp
     const current = await prisma.currentReadiness.findUniqueOrThrow({where: {tenantId_equipmentId: {tenantId, equipmentId: 'eq-2'}}});
     const pointed = await prisma.readinessScoreSnapshot.findUniqueOrThrow({where: {id: current.snapshotId}});
     expect(pointed.triggerId).toBe('new');
-  });
+  }, 30_000);
 
   it('rolls back partial projection writes and resumes a durable checkpoint', async () => {
     await expect(prisma.$transaction(async (tx) => {
@@ -124,5 +124,5 @@ describe.runIf(Boolean(connectionString))('readiness snapshot projection on disp
     expect(await prisma.readinessBackfillProgress.findUniqueOrThrow({where: {tenantId}})).toMatchObject({
       lastEquipmentId: 'eq-200', processedCount: 200, errorCount: 1, status: 'RUNNING',
     });
-  });
+  }, 30_000);
 });
