@@ -158,7 +158,11 @@ describe('v1: перечитывание после успешной коман�
     fireEvent.click((await screen.findAllByRole('button', {name: 'Завершить работу'}))[0]);
     fireEvent.click(screen.getByRole('button', {name: 'Да, работа завершена'}));
 
-    expect(await screen.findByText(/Записано\. Экран не обновился/)).toBeInTheDocument();
+    // Принятая команда — прежний `STALE_SCREEN_NOTICE`, вместе с «не вводите
+    // запись повторно»: здесь запись действительно записана.
+    expect(await screen.findByText(
+      'Записано. Экран не обновился — обновим, как появится связь. Не вводите запись повторно.',
+    )).toBeInTheDocument();
     // Экран прежний: полноэкранного отказа нет ни под каким заголовком.
     expect(screen.queryByText('Сервер не отвечает')).not.toBeInTheDocument();
     expect(screen.queryByText('Нет связи')).not.toBeInTheDocument();
@@ -464,18 +468,20 @@ describe('v1: отказ виден на экране закрытой смен�
 
 /**
  * Сбой перечитывания на 409 не уносит экран и текст отказа (R82, находка 4;
- * F-V1-409-QUIET-RELOAD).
+ * F-V1-409-QUIET-RELOAD, F-V1-409-NOTICE-TEXT).
  *
  * На 409 («сервер уже в другом состоянии») рабочее место перечитывает
  * состояние. Пока это чтение было обычным (`reload()`), его сбой (сеть/5xx)
  * заменял весь экран на «Нет связи» / «Сервер не отвечает» и уносил с собой
  * текст отказа 409 вместе с формой — машинист не успевал прочитать, что именно
- * произошло. Теперь перечитывание тихое, как после принятой команды: сбой лишь
- * помечает экран несвежим. Успешное перечитывание на 409 — прежний переход на
- * экран закрытой смены (тест выше).
+ * произошло. Теперь перечитывание тихое, как после принятой команды. Но текст
+ * заметки другой: на 409 запись НЕ принята, и прежний `STALE_SCREEN_NOTICE`
+ * («Записано … не вводите запись повторно») читался как «отказ принят» — за
+ * отклонённой записью машинист не возвращался. Успешное перечитывание на 409 —
+ * прежний переход на экран закрытой смены (тест выше).
  */
 describe('v1: 409 перечитывается тихо', () => {
-  it('сбой перечитывания не заменяет экран, текст 409 остаётся, есть уведомление о несвежести', async () => {
+  it('сбой перечитывания не заменяет экран, текст 409 остаётся, заметка без «Записано»', async () => {
     api.fetchState.mockResolvedValueOnce(workState);
     api.fetchState.mockRejectedValueOnce(new ApiError(503, 'Сервис временно недоступен'));
     api.sendCommand.mockRejectedValue(new ApiError(409, 'Смена уже закрыта'));
@@ -485,15 +491,19 @@ describe('v1: 409 перечитывается тихо', () => {
     fireEvent.click((await screen.findAllByRole('button', {name: 'Завершить работу'}))[0]);
     fireEvent.click(screen.getByRole('button', {name: 'Да, работа завершена'}));
 
-    // Уведомление о несвежем экране — тот же текст, что после принятой команды.
-    expect(await screen.findByText(/Записано\. Экран не обновился/)).toBeInTheDocument();
+    // Отказ 409 остался на экране работы.
+    const alerts = await screen.findAllByRole('alert');
+    expect(alerts.some((node) => node.textContent === 'Смена уже закрыта')).toBe(true);
+
+    // Заметка о несвежести без «Записано» и без «не вводите запись повторно»:
+    // запись отклонена, её нужно ввести снова (F-V1-409-NOTICE-TEXT).
+    expect(screen.queryByText(/Записано/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/не вводите запись повторно/i)).not.toBeInTheDocument();
+    expect(screen.getByText('Экран не обновился — обновим, как появится связь.')).toBeInTheDocument();
     // Экран прежний: полноэкранного отказа нет ни под каким заголовком.
     expect(screen.queryByText('Сервер не отвечает')).not.toBeInTheDocument();
     expect(screen.queryByText('Нет связи')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', {name: 'Повторить'})).not.toBeInTheDocument();
-    // Текст отказа 409 остался на экране работы.
-    const alerts = await screen.findAllByRole('alert');
-    expect(alerts.some((node) => node.textContent === 'Смена уже закрыта')).toBe(true);
     expect(screen.getAllByRole('button', {name: 'Завершить работу'}).length).toBeGreaterThan(0);
   });
 });
