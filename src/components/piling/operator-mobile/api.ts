@@ -54,6 +54,13 @@ export function operatorErrorText(error: unknown): string {
   if (error instanceof QueueStorageError) return error.message;
   if (error instanceof QueueOwnershipError) return error.message;
   if (error instanceof QueuedOffline) return error.message;
+  // Истёкший таймаут запроса (`AbortSignal.timeout`) приходит как `DOMException`
+  // «TimeoutError» (в старых браузерах — «AbortError»). Для машиниста это тот же
+  // обрыв связи: на связь и надо смотреть, запись при этом остаётся на
+  // устройстве и уйдёт повтором (R76, находка 13).
+  if (error instanceof DOMException && (error.name === 'TimeoutError' || error.name === 'AbortError')) {
+    return 'Нет связи с сервером. Проверьте интернет и повторите.';
+  }
   if (error instanceof TypeError) return 'Нет связи с сервером. Проверьте интернет и повторите.';
   return 'Не удалось выполнить действие. Повторите.';
 }
@@ -127,6 +134,33 @@ async function parse<T>(response: Response): Promise<T> {
   return payload.data as T;
 }
 
+/**
+ * Таймауты запросов к серверу (аудит R76, находка 13).
+ *
+ * ПОЧЕМУ ТАЙМАУТ. «Повисшее» соединение на мобильной сети не завершает `fetch`.
+ * У очереди один `inFlight` на всю отправку (`offline-queue.ts`), и снимается
+ * он только по завершению промиса: пока запрос висит, таймер, событие `online`,
+ * «Повторить» и «Отправить записи с телефона» возвращают тот же незавершённый
+ * промис и ничего не шлют до перезагрузки страницы, а кнопка остаётся в
+ * «Записываем…». Истёкший таймаут — это сетевой сбой: запись остаётся `PENDING`
+ * и уйдёт повтором (сервер узнаёт команду по `clientCommandId`).
+ *
+ * ПОЧЕМУ У ЗАГРУЗКИ ФАЙЛА БОЛЬШЕ. Файл снимка идёт напрямую в хранилище, и на
+ * медленной сети большое фото грузится дольше 20 с: командам и чтению состояния
+ * (короткий JSON-ответ) хватает 20 с, а снимку нужно больше.
+ */
+const REQUEST_TIMEOUT_MS = 20_000;
+const UPLOAD_TIMEOUT_MS = 120_000;
+
+/**
+ * Сигнал таймаута запроса. Внешний сигнал (отмена при уходе с экрана) сохраняем:
+ * запрос обрывается по тому, что наступит раньше.
+ */
+function timeoutSignal(ms: number, external?: AbortSignal): AbortSignal {
+  const timeout = AbortSignal.timeout(ms);
+  return external ? AbortSignal.any([external, timeout]) : timeout;
+}
+
 export async function fetchState(input: {
   coordinates?: {latitude: number; longitude: number} | null;
   equipmentId?: string;
@@ -141,6 +175,7 @@ export async function fetchState(input: {
   const response = await fetch(`/api/operator/mobile/state?${query.toString()}`, {
     cache: 'no-store',
     credentials: 'same-origin',
+    signal: timeoutSignal(REQUEST_TIMEOUT_MS),
   });
   return parse<OperatorMobileState>(response);
 }
@@ -164,7 +199,7 @@ export async function fetchKnowledgeAttempt(signal?: AbortSignal): Promise<Knowl
   const response = await fetch('/api/operator/knowledge-attempt', {
     cache: 'no-store',
     credentials: 'same-origin',
-    signal,
+    signal: timeoutSignal(REQUEST_TIMEOUT_MS, signal),
   });
   let attempt: KnowledgeAttempt;
   try {
@@ -264,6 +299,7 @@ async function postCommand<T>(command: unknown): Promise<T> {
     headers: {'Content-Type': 'application/json'},
     credentials: 'same-origin',
     body: JSON.stringify(command),
+    signal: timeoutSignal(REQUEST_TIMEOUT_MS),
   });
   return parse<T>(response);
 }
@@ -354,6 +390,7 @@ export async function uploadPhoto(input: {
       entityType,
       entityId,
     }),
+    signal: timeoutSignal(REQUEST_TIMEOUT_MS),
   });
   // Медиа-маршрут отвечает объектом напрямую, без обёртки `data` — здесь
   // разбираем его сами, а не общим `parse`.
@@ -368,12 +405,14 @@ export async function uploadPhoto(input: {
     method: 'PUT',
     headers: {'Content-Type': input.file.type || 'image/jpeg'},
     body: input.file,
+    signal: timeoutSignal(UPLOAD_TIMEOUT_MS),
   });
   if (!stored.ok) throw new ApiError(stored.status, 'Снимок не загрузился');
 
   const confirmed = await fetch(`/api/media/${mediaId}/confirm`, {
     method: 'POST',
     credentials: 'same-origin',
+    signal: timeoutSignal(REQUEST_TIMEOUT_MS),
   });
   if (!confirmed.ok) throw new ApiError(confirmed.status, 'Снимок не подтверждён сервером');
 

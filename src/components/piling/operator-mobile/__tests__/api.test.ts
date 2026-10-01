@@ -6,8 +6,8 @@
  * русском интерфейсе машинист читал «Failed to fetch» и звонил диспетчеру про
  * поломку приложения вместо того, чтобы проверить связь.
  */
-import {beforeEach, describe, expect, it, vi} from 'vitest';
-import {ApiError, fetchKnowledgeAttempt, operatorErrorDetails, operatorErrorText, QueuedOffline, sendCommand} from '../api';
+import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
+import {ApiError, fetchKnowledgeAttempt, operatorErrorDetails, operatorErrorText, QueuedOffline, sendCommand, uploadPhoto} from '../api';
 import {QueueOwnershipError, QueueStorageError, readQueue} from '../offline-queue';
 
 describe('operatorErrorText', () => {
@@ -17,6 +17,15 @@ describe('operatorErrorText', () => {
     expect(operatorErrorText(new TypeError('NetworkError when attempting to fetch resource')))
       .toBe('Нет связи с сервером. Проверьте интернет и повторите.');
     expect(operatorErrorText(new TypeError('Load failed')))
+      .toBe('Нет связи с сервером. Проверьте интернет и повторите.');
+  });
+
+  // Истёкший таймаут `AbortSignal.timeout` — это `DOMException` «TimeoutError»,
+  // а не `TypeError`. Машинисту текст нужен тот же: это обрыв связи (R76 №13).
+  it('истёкший таймаут запроса — та же фраза про связь', () => {
+    expect(operatorErrorText(new DOMException('The operation was aborted due to timeout', 'TimeoutError')))
+      .toBe('Нет связи с сервером. Проверьте интернет и повторите.');
+    expect(operatorErrorText(new DOMException('signal is aborted without reason', 'AbortError')))
       .toBe('Нет связи с сервером. Проверьте интернет и повторите.');
   });
 
@@ -238,5 +247,90 @@ describe('sendCommand и отказ по существу', () => {
 
     expect(error).toBeInstanceOf(QueuedOffline);
     expect(readQueue()[0].state).toBe('PENDING');
+  });
+});
+
+/**
+ * Таймаут запроса (аудит R76, находка 13).
+ *
+ * «Повисшее» соединение не завершает `fetch`, а очередь держит единый `inFlight`
+ * до завершения промиса (`offline-queue.ts`): без таймаута ни таймер, ни событие
+ * `online`, ни «Повторить» не отправляли ничего до перезагрузки страницы. Здесь
+ * проверяется, что запросу передан сигнал таймаута и что его истечение — это
+ * сетевой сбой (запись остаётся `PENDING`), а не отказ по существу.
+ *
+ * Настоящий `AbortSignal.timeout` тикает своим таймером мимо фейковых часов,
+ * поэтому в тесте он подменён тем же по смыслу: `setTimeout` на фейковых часах
+ * обрывает `AbortController`.
+ */
+describe('таймаут запроса', () => {
+  const command = {
+    command: 'log-production' as const,
+    clientCommandId: 'c1',
+    shiftId: 's1',
+    entry: {kind: 'PILES' as const, pileGradeId: 'g1', count: 12},
+  };
+
+  let timeouts: number[];
+
+  beforeEach(() => {
+    const store = new Map<string, string>();
+    Object.defineProperty(globalThis, 'localStorage', {
+      configurable: true,
+      value: {
+        getItem: (key: string) => store.get(key) ?? null,
+        setItem: (key: string, value: string) => { store.set(key, value); },
+        removeItem: (key: string) => { store.delete(key); },
+        clear: () => { store.clear(); },
+      },
+    });
+    timeouts = [];
+    vi.useFakeTimers();
+    vi.spyOn(AbortSignal, 'timeout').mockImplementation((ms: number) => {
+      timeouts.push(ms);
+      const controller = new AbortController();
+      setTimeout(() => controller.abort(), ms);
+      return controller.signal;
+    });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+
+  it('повисший fetch обрывается через 20 с: запись PENDING, ошибка QueuedOffline', async () => {
+    // Сервер не отвечает сам — промис завершается только сигналом таймаута.
+    vi.stubGlobal('fetch', vi.fn((_url: string, init?: RequestInit) => new Promise((_resolve, reject) => {
+      init?.signal?.addEventListener('abort', () =>
+        reject(new DOMException('The operation was aborted due to timeout', 'TimeoutError')));
+    })));
+
+    const result = sendCommand(command).catch((caught: unknown) => caught);
+    await vi.advanceTimersByTimeAsync(20_000);
+    const error = await result;
+
+    expect(timeouts).toContain(20_000);
+    expect(error).toBeInstanceOf(QueuedOffline);
+    expect(readQueue()[0]).toMatchObject({clientCommandId: 'c1', state: 'PENDING'});
+  });
+
+  // Файл снимка идёт напрямую в хранилище и на медленной сети грузится дольше:
+  // у PUT таймаут больше, чем у запроса ссылки и подтверждения.
+  it('файл снимка грузится с большим таймаутом, подтверждение — с обычным', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
+      if (init?.method === 'PUT') return new Response(null, {status: 200});
+      if (url === '/api/media') {
+        return new Response(JSON.stringify({mediaId: 'm1', uploadUrl: 'https://storage.test/put'}), {status: 200});
+      }
+      return new Response(JSON.stringify({}), {status: 200});
+    }));
+
+    const file = new File(['x'], 'photo.jpg', {type: 'image/jpeg'});
+    const mediaId = await uploadPhoto({file, clientCommandId: 'c1'});
+
+    expect(mediaId).toBe('m1');
+    expect(timeouts).toEqual([20_000, 120_000, 20_000]);
   });
 });
