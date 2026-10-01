@@ -119,6 +119,139 @@ describe('ReportFormDialog — дата по умолчанию', () => {
   });
 });
 
+describe('ReportFormDialog — сетевой обрыв (F-R93-3)', () => {
+  beforeEach(() => {
+    authFetchMock.mockReset();
+    vi.mocked(toast.error).mockClear();
+  });
+
+  it('показывает русский текст вместо браузерного «Failed to fetch»', async () => {
+    authFetchMock.mockRejectedValue(new TypeError('Failed to fetch'));
+
+    render(
+      <ReportFormDialog
+        open
+        onClose={vi.fn()}
+        editReport={editReport}
+        loadingReferenceData={false}
+        dictionaryError={null}
+        operators={[]}
+        sites={[]}
+        pileGrades={[{ id: 'g1', name: 'С90.30', isActive: true, lengthMm: 9000 }]}
+        drillingTypes={[]}
+        downtimeReasons={[]}
+        equipment={[]}
+        onSuccess={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /Сохранить/ }));
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith(
+      'Нет связи с сервером. Проверьте интернет и нажмите «Сохранить» ещё раз.',
+    ));
+  });
+});
+
+describe('ReportFormDialog — CSRF-403 (F-R93-4)', () => {
+  beforeEach(() => {
+    authFetchMock.mockReset();
+    vi.mocked(toast.error).mockClear();
+  });
+
+  it('английский текст CSRF заменяется русским про проверку безопасности', async () => {
+    authFetchMock.mockResolvedValue({
+      ok: false,
+      status: 403,
+      json: async () => ({ error: 'CSRF validation failed: origin mismatch' }),
+    });
+
+    render(
+      <ReportFormDialog
+        open
+        onClose={vi.fn()}
+        editReport={editReport}
+        loadingReferenceData={false}
+        dictionaryError={null}
+        operators={[]}
+        sites={[]}
+        pileGrades={[{ id: 'g1', name: 'С90.30', isActive: true, lengthMm: 9000 }]}
+        drillingTypes={[]}
+        downtimeReasons={[]}
+        equipment={[]}
+        onSuccess={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /Сохранить/ }));
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith(
+      'Запрос отклонён проверкой безопасности. Обновите страницу и повторите сохранение.',
+    ));
+  });
+});
+
+describe('ReportFormDialog — конфликт 409 (F-R93-2)', () => {
+  beforeEach(() => {
+    authFetchMock.mockReset();
+    vi.mocked(toast.error).mockClear();
+    vi.mocked(toast.success).mockClear();
+  });
+
+  it('перечитывает свежую версию, не закрывает форму и не советует терять правки', async () => {
+    authFetchMock.mockImplementation((url: string, init?: RequestInit) => {
+      void init;
+      if (url.startsWith('/api/reports/admin-upsert')) {
+        return Promise.resolve({
+          ok: false,
+          status: 409,
+          json: async () => ({ error: 'Отчёт был изменён другим пользователем. Обновите страницу и сохраните заново.' }),
+        });
+      }
+      if (url.startsWith('/api/reports/all')) {
+        // Свежая версия того же отчёта: id из editReport = 'r1'.
+        return Promise.resolve({ ok: true, status: 200, json: async () => ({ reports: [{ reportId: 'r1', version: 7 }] }) });
+      }
+      return Promise.resolve({ ok: true, status: 200, json: async () => ({}) });
+    });
+    const onClose = vi.fn();
+
+    render(
+      <ReportFormDialog
+        open
+        onClose={onClose}
+        editReport={editReport}
+        loadingReferenceData={false}
+        dictionaryError={null}
+        operators={[]}
+        sites={[]}
+        pileGrades={[{ id: 'g1', name: 'С90.30', isActive: true, lengthMm: 9000 }]}
+        drillingTypes={[]}
+        downtimeReasons={[]}
+        equipment={[]}
+        onSuccess={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /Сохранить/ }));
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith(
+      'Отчёт изменён другим пользователем. Ваши правки сохранены — нажмите «Сохранить» ещё раз.',
+    ));
+    // Форма не закрыта — введённые сваи не потеряны.
+    expect(onClose).not.toHaveBeenCalled();
+
+    // Повтор отправляет уже свежую версию, а не прежнюю.
+    fireEvent.click(screen.getByRole('button', { name: /Сохранить/ }));
+    await waitFor(() => {
+      const posts = authFetchMock.mock.calls.filter(([u]) => String(u).startsWith('/api/reports/admin-upsert'));
+      expect(posts).toHaveLength(2);
+      const body = JSON.parse(String((posts[1][1] as RequestInit).body));
+      expect(body.version).toBe(7);
+    });
+  });
+});
+
 describe('ReportFormDialog — построчные ошибки сервера', () => {
   beforeEach(() => {
     vi.mocked(toast.error).mockClear();
