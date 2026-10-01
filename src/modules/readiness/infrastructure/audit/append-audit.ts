@@ -1,4 +1,5 @@
 import {randomUUID} from 'node:crypto';
+import {generateRequestId, getRequestIdFromContext} from '@/lib/request-context';
 import {canonicalize} from '../../domain/audit/canonicalize';
 import {digestAuditEvent, digestIdempotencyKey} from '../../domain/audit/digest';
 import {maskOptionalAuditPayload} from '../../domain/audit/mask';
@@ -36,6 +37,13 @@ export async function appendAuditEvent(
       role: input.actor?.role ?? null,
       actingAs: input.actor?.actingAs ?? null,
     };
+    // R87 №2: ограничение БД AuditLog_native_chain_complete требует непустые
+    // requestId и correlationId у любого звена с хэшем, а вызывающие команды
+    // (правила допуска, матрица доступов, замещение роли) их не передают —
+    // INSERT отбивался CHECK'ом и падала вся транзакция команды. Моки Prisma
+    // ограничений БД не воспроизводят, поэтому юнит-тесты молчали. Подставляем
+    // здесь, до вычисления хэша: значения входят в подписываемое событие.
+    const requestId = input.requestId ?? getRequestIdFromContext() ?? generateRequestId();
     const event: CanonicalAuditEvent = {
       id: randomUUID(),
       tenantId,
@@ -49,8 +57,8 @@ export async function appendAuditEvent(
         id: required(input.entityId, 'entityId'),
         version: input.entityVersion ?? null,
       },
-      requestId: input.requestId ?? null,
-      correlationId: input.correlationId ?? null,
+      requestId,
+      correlationId: input.correlationId ?? requestId,
       idempotencyKeyHash: input.idempotencyKey
         ? digestIdempotencyKey(input.idempotencyKey)
         : null,

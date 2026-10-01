@@ -1,4 +1,5 @@
 import {describe, expect, it} from 'vitest';
+import {traceContext} from '@/lib/request-context';
 import type {AuditChainHead, StoredAuditEvent} from '../../../domain/audit/types';
 import {appendAuditEvent} from '../append-audit';
 import type {AuditRepository} from '../audit-repository';
@@ -77,5 +78,60 @@ describe('audit append and verifier', () => {
     });
     expect(verifyAuditEvents('tenant-1', [first, second], {lastSequence: BigInt(3), headHash: Uint8Array.from(Buffer.from(second.hash, 'hex'))}))
       .toMatchObject({valid: false, reason: 'HEAD_MISMATCH'});
+  });
+
+  describe('chain metadata (R87 №2: DB CHECK AuditLog_native_chain_complete)', () => {
+    it('fills requestId/correlationId for chained events and hashes them', async () => {
+      const repository = new MemoryAuditRepository();
+      const event = await appendAuditEvent(repository, {
+        tenantId: 'tenant-1', action: 'test.chain-metadata', entityType: 'Test', entityId: '1',
+      });
+      expect(event.requestId).toBeTruthy();
+      expect(event.correlationId).toBe(event.requestId);
+      const stored = await repository.readChain('tenant-1');
+      expect(verifyAuditEvents('tenant-1', stored.events, stored.head)).toMatchObject({valid: true});
+    });
+
+    it('takes requestId from the trace context when the caller omits it', async () => {
+      const repository = new MemoryAuditRepository();
+      const event = await traceContext.run(
+        {traceId: 'trace-1', spanId: 'span-1', requestId: 'ctx-request-id'},
+        () => appendAuditEvent(repository, {
+          tenantId: 'tenant-1', action: 'test.chain-context', entityType: 'Test', entityId: '1',
+        }),
+      );
+      expect(event.requestId).toBe('ctx-request-id');
+      expect(event.correlationId).toBe('ctx-request-id');
+    });
+
+    it('never overwrites requestId/correlationId supplied by the caller', async () => {
+      const repository = new MemoryAuditRepository();
+      const event = await traceContext.run(
+        {traceId: 'trace-1', spanId: 'span-1', requestId: 'ctx-ignored'},
+        () => appendAuditEvent(repository, {
+          tenantId: 'tenant-1', action: 'test.chain-explicit', entityType: 'Test', entityId: '1',
+          requestId: 'given-request', correlationId: 'given-correlation',
+        }),
+      );
+      expect(event.requestId).toBe('given-request');
+      expect(event.correlationId).toBe('given-correlation');
+    });
+
+    it('mirrors the AuditLog_native_chain_complete CHECK on every stored link', async () => {
+      const repository = new MemoryAuditRepository();
+      const event = await appendAuditEvent(repository, {
+        tenantId: 'tenant-1', action: 'test.chain-check', entityType: 'Test', entityId: '1',
+      });
+      // CHECK: hash IS NULL OR (все перечисленные поля IS NOT NULL) — у звена с хэшем.
+      expect(event.hash).toBeTruthy();
+      expect(event.tenantId).toBeTruthy();
+      expect(event.sequence).toBeTruthy();
+      expect(event.occurredAt).toBeTruthy();
+      expect(event.recordedAt).toBeTruthy();
+      expect(event.entity.type).toBeTruthy();
+      expect(event.requestId).toBeTruthy();
+      expect(event.correlationId).toBeTruthy();
+      expect(event.metadata).not.toBeNull();
+    });
   });
 });
