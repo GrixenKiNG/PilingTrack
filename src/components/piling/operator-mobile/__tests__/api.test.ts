@@ -456,6 +456,59 @@ describe('uploadPhoto: подтверждение снимка', () => {
 });
 
 /**
+ * Текст отказа хранилища на PUT файла снимка (аудит R76, находка 24).
+ *
+ * Раньше ЛЮБОЙ неуспешный PUT давал общую фразу «Снимок не загрузился»: по ней
+ * нельзя было понять, повторять (ссылка истекла, хранилище недоступно) или
+ * переснимать (файл слишком большой). Здесь проверяется текст по статусу;
+ * тело хранилища (XML) не разбираем. Обрыв сети — не ответ хранилища, текст
+ * остаётся прежним.
+ */
+describe('uploadPhoto: отказ хранилища на PUT', () => {
+  const file = new File(['x'], 'photo.jpg', {type: 'image/jpeg'});
+
+  /** Первый шаг отдаёт ссылку, ответ на PUT задаёт сам тест. */
+  function stubPut(put: () => Response) {
+    vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
+      if (url === '/api/media') {
+        return new Response(JSON.stringify({mediaId: 'm1', uploadUrl: 'https://storage.test/put'}), {status: 200});
+      }
+      if (init?.method === 'PUT') return put();
+      return new Response(null, {status: 200});
+    }));
+  }
+
+  it.each([
+    [403, 'Ссылка для загрузки устарела. Повторите — получим новую.'],
+    [413, 'Снимок слишком большой. Сделайте фото заново с меньшим качеством.'],
+    [503, 'Хранилище временно недоступно. Повторите позже.'],
+    [400, 'Снимок не загрузился (код 400).'],
+  ])('PUT %i — понятный машинисту текст', async (status, text) => {
+    stubPut(() => new Response('<Error><Code>…</Code></Error>', {status}));
+    const error = await uploadPhoto({file, clientCommandId: 'c1'}).catch((caught: unknown) => caught);
+    vi.unstubAllGlobals();
+
+    expect(error).toBeInstanceOf(ApiError);
+    expect((error as ApiError).status).toBe(status);
+    expect((error as ApiError).message).toBe(text);
+    expect(operatorErrorText(error)).toBe(text);
+  });
+
+  it('обрыв сети на PUT — прежний текст про связь', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+      if (url === '/api/media') {
+        return new Response(JSON.stringify({mediaId: 'm1', uploadUrl: 'https://storage.test/put'}), {status: 200});
+      }
+      throw new TypeError('Failed to fetch');
+    }));
+    const error = await uploadPhoto({file, clientCommandId: 'c1'}).catch((caught: unknown) => caught);
+    vi.unstubAllGlobals();
+
+    expect(operatorErrorText(error)).toBe('Нет связи с сервером. Проверьте интернет и повторите.');
+  });
+});
+
+/**
  * Таймаут без родных `AbortSignal.any`/`AbortSignal.timeout` (F-V1-FETCH-TIMEOUT-b).
  *
  * `AbortSignal.any` есть только с Safari 17.4 / Chrome 116, а цели Next по

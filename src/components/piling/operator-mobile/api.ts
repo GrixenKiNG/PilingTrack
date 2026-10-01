@@ -486,6 +486,23 @@ export async function sendCommand<T = unknown>(command: Command): Promise<T> {
 }
 
 /**
+ * Текст отказа хранилища на PUT файла снимка (аудит R76, находка 24).
+ *
+ * Тело отказа хранилища — XML, разбирать его незачем, а решать по нему надо.
+ * Прежняя общая фраза «Снимок не загрузился» не давала выбора между повтором и
+ * пересъёмкой: 403 — «ссылка истекла, нужна новая» (повторять), 413 — «файл
+ * велик, снимайте с меньшим качеством» (переснимать), 5xx — «хранилище
+ * недоступно, повторите позже» (ждать). Прочие коды машинисту ни о чём не
+ * говорят — называем код, чтобы диспетчер мог разобраться.
+ */
+function uploadRejectionText(status: number): string {
+  if (status === 403) return 'Ссылка для загрузки устарела. Повторите — получим новую.';
+  if (status === 413) return 'Снимок слишком большой. Сделайте фото заново с меньшим качеством.';
+  if (status >= 500) return 'Хранилище временно недоступно. Повторите позже.';
+  return `Снимок не загрузился (код ${status}).`;
+}
+
+/**
  * Загрузка снимка к пункту осмотра.
  *
  * Три шага: попросить у сервера ссылку, положить файл в хранилище, подтвердить.
@@ -536,7 +553,7 @@ export async function uploadPhoto(input: {
         body: input.file,
         signal: storedTimeout.signal,
       });
-      if (!stored.ok) throw new ApiError(stored.status, 'Снимок не загрузился');
+      if (!stored.ok) throw new ApiError(stored.status, uploadRejectionText(stored.status));
     } finally {
       storedTimeout.cleanup();
     }
