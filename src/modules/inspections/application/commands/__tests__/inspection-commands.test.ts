@@ -38,7 +38,7 @@ vi.mock('@/lib/db', () => {
   };
   return { db: client };
 });
-import { startInspection, startToInspection, saveAnswers, completeInspection } from '../inspection-commands';
+import { startInspection, startToInspection, saveAnswers, completeInspection, completeInspectionWithOutcome } from '../inspection-commands';
 
 /** SQL тегированного шаблона с `?` вместо параметров — для проверки формы запроса. */
 const sqlOf = (call: unknown[]): string => (call[0] as TemplateStringsArray).join('?');
@@ -259,6 +259,33 @@ describe('completeInspection', () => {
     expect(m.recUpdateMany).not.toHaveBeenCalled();
     expect(m.outboxCreate).not.toHaveBeenCalled();
     expect(res).not.toBeNull();
+  });
+
+  /**
+   * Находка 7 отчёта R84. Маршрут завершения пишет `inspection.completed`
+   * безусловно; чтобы не писать событие на повтор, команда сообщает признак
+   * повтора. Первый вызов — перехода не было ещё ни разу, `replayed: false`;
+   * второй (обрыв связи, двойное нажатие, ретрай телефона) — `replayed: true`
+   * (F-R84-INSPECTION-DUP-EVENT).
+   */
+  it('сообщает признак повтора: первый вызов false, второй true', async () => {
+    m.insFindUnique.mockResolvedValue({
+      id: 'ins1', tenantId: 'orion', status: 'DRAFT', equipmentId: 'eq1',
+      templateSnapshot: [{ id: 'i1', answerType: 'YES_NO', required: true, photoRequired: false }],
+      answers: [{ itemId: 'i1', result: 'YES', photoCount: 0 }],
+    });
+    m.insUpdateMany.mockResolvedValue({ count: 1 });
+    m.insFindUniqueOrThrow.mockResolvedValue({ id: 'ins1', status: 'COMPLETED', equipmentId: 'eq1' });
+
+    const first = await completeInspectionWithOutcome('ins1', { tenantId: 'orion', signedByName: 'Иванов' });
+    expect(first.replayed).toBe(false);
+    expect(first.inspection).toMatchObject({ status: 'COMPLETED' });
+
+    // Повтор: строка осмотра уже завершена, условный переход не состоялся.
+    m.insUpdateMany.mockResolvedValue({ count: 0 });
+    const second = await completeInspectionWithOutcome('ins1', { tenantId: 'orion', signedByName: 'Иванов' });
+    expect(second.replayed).toBe(true);
+    expect(second.inspection).toMatchObject({ id: 'ins1' });
   });
 
   /**

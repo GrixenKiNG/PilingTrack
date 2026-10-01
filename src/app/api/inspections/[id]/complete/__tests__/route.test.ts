@@ -40,7 +40,7 @@ vi.mock('@/lib/db', () => ({
     equipmentDefect: { count: defectCountMock },
   },
 }));
-vi.mock('@/modules/inspections', () => ({ completeInspection: completeInspectionMock }));
+vi.mock('@/modules/inspections', () => ({ completeInspectionWithOutcome: completeInspectionMock }));
 vi.mock('@/services/audit/audit-service', () => ({ recordAuditEvent: recordAuditEventMock }));
 
 import { POST } from '../route';
@@ -65,7 +65,7 @@ describe('POST /api/inspections/[id]/complete — след завершения 
   beforeEach(() => {
     vi.resetAllMocks();
     requireAuthMock.mockResolvedValue({ user: ADMIN, error: null });
-    completeInspectionMock.mockResolvedValue(INSPECTION);
+    completeInspectionMock.mockResolvedValue({ inspection: INSPECTION, replayed: false });
     recordAuditEventMock.mockResolvedValue(undefined);
     equipmentFindFirstMock.mockResolvedValue({ name: 'ЭО-5111' });
     defectCountMock.mockResolvedValue(2);
@@ -106,6 +106,21 @@ describe('POST /api/inspections/[id]/complete — след завершения 
     const res = await POST(post(), params());
 
     expect(res.status).toBe(400);
+    expect(recordAuditEventMock).not.toHaveBeenCalled();
+  });
+
+  // Находка 7 отчёта R84: команда идемпотентна, а событие писалось безусловно.
+  // Повтор (обрыв связи, двойное нажатие, ретрай телефона) давал в ленте
+  // второе «Осмотр завершён», а при дефектах — второй warn и вторую задачу
+  // подтверждения. При `replayed: true` следа быть не должно, а телефон
+  // получает тот же ответ (F-R84-INSPECTION-DUP-EVENT).
+  it('на повторе завершения не пишет след в ленту, ответ тот же', async () => {
+    completeInspectionMock.mockResolvedValue({ inspection: INSPECTION, replayed: true });
+
+    const res = await POST(post(), params());
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ inspection: INSPECTION });
     expect(recordAuditEventMock).not.toHaveBeenCalled();
   });
 

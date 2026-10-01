@@ -305,7 +305,17 @@ export async function saveAnswers(
   });
 }
 
-export async function completeInspection(
+/**
+ * Завершение осмотра вместе с признаком повтора.
+ *
+ * Команда идемпотентна: `updateMany` с условием «ещё не COMPLETED» пропускает
+ * повтор (обрыв связи, двойное нажатие, ретрай телефона) и возвращает осмотр
+ * как есть. `replayed: true` означает, что перехода не было и побочные
+ * действия записи повторять нельзя — иначе повтор даёт второе «Осмотр
+ * завершён» в ленте, а при дефектах — второй warn и вторую задачу
+ * подтверждения (F-R84-INSPECTION-DUP-EVENT).
+ */
+export async function completeInspectionWithOutcome(
   id: string,
   ctx: { tenantId: string; signedByName: string; performerId?: string | null },
 ) {
@@ -394,7 +404,12 @@ export async function completeInspection(
     if (claimed.count === 0) {
       // Осмотр уже завершён — это не ошибка, а повтор. Возвращаем то, что
       // есть: телефон получит тот же ответ, что и с первой попытки.
-      return tx.inspection.findUnique({ where: { id }, include: { answers: true } });
+      // `replayed: true` — перехода не было, вызывающий не должен повторять
+      // побочные действия (запись события в ленту).
+      return {
+        inspection: await tx.inspection.findUnique({ where: { id }, include: { answers: true } }),
+        replayed: true,
+      };
     }
     const inspection = await tx.inspection.findUniqueOrThrow({ where: { id } });
     // Запись ТО заводится вместе с осмотром и закрывается вместе с ним. Без
@@ -486,6 +501,17 @@ export async function completeInspection(
         } as Prisma.InputJsonValue,
       }],
     });
-    return inspection;
+    return { inspection, replayed: false };
   });
+}
+
+/**
+ * Завершение осмотра. Обёртка над `completeInspectionWithOutcome` для
+ * вызывающих, которым нужен только осмотр; признак повтора отбрасывается.
+ */
+export async function completeInspection(
+  id: string,
+  ctx: { tenantId: string; signedByName: string; performerId?: string | null },
+) {
+  return (await completeInspectionWithOutcome(id, ctx)).inspection;
 }
