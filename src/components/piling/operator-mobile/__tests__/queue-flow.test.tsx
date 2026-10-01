@@ -316,6 +316,48 @@ describe('T-V1-QUEUE-FLOW: 409 переводит экран в закрытую
   });
 });
 
+describe('T-V1-QUEUE-FLOW: причина отказа видна на экране «Нет связи»', () => {
+  it('409 на записи, затем обрыв связи — причина печатается в карточке очереди', async () => {
+    /*
+      F-R89-DUP-REJECT-b. Причина отказа не должна повторяться в карточке
+      очереди, ПОКА её печатает `ErrorNote` у кнопки. Но `actionError` живёт
+      дольше своего экрана: снимает его только новое действие (`run`), а не
+      перечитывание состояния. Оборвись связь и уйди экран в «Нет связи» —
+      `ErrorNote` там нет, и безусловный `shownElsewhere` уносил причину
+      отовсюду: строка состояния писала «причина отказа ниже», а ниже её не
+      было. Здесь причина обязана остаться в карточке.
+    */
+    render(<OperatorMobileApp />);
+    await screen.findByRole('button', {name: 'Добавить сваю'});
+
+    // 1. Первая запись не ушла по сети: лежит на устройстве как PENDING.
+    logProduction();
+    expect(await screen.findByText('Выработка: сохранено на устройстве, отправим при связи'))
+      .toBeInTheDocument();
+
+    // 2. Вторая запись отвергнута по существу (409): на устройстве становится
+    //    FAILED с той же причиной, а у кнопки её печатает `ErrorNote`.
+    respondCommand = () => jsonResponse({error: 'Смена уже закрыта'}, 409);
+    fireEvent.change(screen.getByLabelText('Свай, шт'), {target: {value: '12'}});
+    fireEvent.click(screen.getByRole('button', {name: 'Записать'}));
+    expect(await screen.findByText('Смена уже закрыта')).toBeInTheDocument();
+
+    // 3. Связь вернулась: PENDING-запись уходит, её слив перечитывает состояние,
+    //    но чтение падает обрывом сети — экран уходит в «Нет связи». Причина
+    //    отказа при этом не сброшена (сброс — только в `run`).
+    respondCommand = () => jsonResponse({data: {reportId: 'r1'}});
+    respondState = () => { throw new TypeError('Failed to fetch'); };
+    await act(async () => { globalThis.dispatchEvent(new Event('online')); });
+
+    // Экран отказа загрузки — `ErrorNote` на нём не рисуется.
+    expect(await screen.findByText('Нет связи')).toBeInTheDocument();
+
+    // Причина отказа не потерялась: она печатается в карточке очереди.
+    const banner = screen.getByTestId('offline-queue-banner');
+    expect(within(banner).getByText('Смена уже закрыта')).toBeInTheDocument();
+  });
+});
+
 describe('T-V1-QUEUE-FLOW: ждущая и отклонённая записи одновременно', () => {
   it('строка состояния говорит и об отклонённой, и о ждущей (F-R89-STRIP-COUNTS)', async () => {
     render(<OperatorMobileApp />);

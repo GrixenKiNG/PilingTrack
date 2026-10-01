@@ -477,7 +477,12 @@ export function OperatorMobileApp() {
           когда ниже ничего нет.
         */}
         <OperatorStatusStrip online={online} items={queued} />
-        <OfflineQueueBanner items={queued} onRetry={retryQueued} onDiscard={discardQueued} shownElsewhere={actionError} />
+        {/*
+          Без `shownElsewhere`: `ErrorNote` на этом экране нет, и признак «причина
+          уже показана у кнопки» был бы неправдой — причина пропадала отовсюду
+          (F-R89-DUP-REJECT-b). Причина отказа печатается в карточке очереди.
+        */}
+        <OfflineQueueBanner items={queued} onRetry={retryQueued} onDiscard={discardQueued} />
         <Screen
           title="Рабочее место машиниста"
           /*
@@ -509,9 +514,13 @@ export function OperatorMobileApp() {
           Плашка очереди — сразу под строкой состояния (аудит R76, находка 17).
           Строка состояния при отклонённых записях пишет «Сервер отклонил запись —
           причина показана ниже», а ниже ничего не было: карточки с причиной и
-          кнопками оставались на невидимом экране работы.
+          карточки с причиной и кнопками оставались на невидимом экране работы.
+
+          Без `shownElsewhere` по той же причине, что у отказа по роли:
+          `ErrorNote` здесь не рисуется, и причина обязана остаться в карточке
+          (F-R89-DUP-REJECT-b).
         */}
-        <OfflineQueueBanner items={queued} onRetry={retryQueued} onDiscard={discardQueued} shownElsewhere={actionError} />
+        <OfflineQueueBanner items={queued} onRetry={retryQueued} onDiscard={discardQueued} />
         <Screen
           title={serverFault ? 'Сервер не отвечает' : 'Нет связи'}
           footer={<BigButton onClick={() => void reload()}>Повторить</BigButton>}
@@ -579,6 +588,43 @@ export function OperatorMobileApp() {
     `detour` — любой открытый шаг.
   */
   const tabsVisible = !detour && !checklist;
+
+  /*
+    ПОКАЗАНА ЛИ ПРИЧИНА ОТКАЗА НА ЭКРАНЕ (F-R89-DUP-REJECT-b).
+
+    `shownElsewhere` говорит плашке очереди: эту фразу уже печатает `ErrorNote`
+    у кнопки, в карточке её повторять незачем. Но `actionError` живёт дольше
+    своего экрана: его снимает только новое действие (`run`), а не перечитывание
+    состояния. Дойди экран до отказа загрузки («Нет связи», «Сервер не
+    отвечает») или до отказа по роли — `ErrorNote` там не рисуется вовсе, и
+    безусловный `shownElsewhere={actionError}` уносил причину отовсюду: строка
+    состояния обещала «причина показана ниже», а ниже её не было.
+
+    Поэтому признак считаем по фактической ветке: где `ErrorNote` есть —
+    причина показана у кнопки, где нет — `null`, и причина остаётся в карточке.
+  */
+  const rejectionShownOnScreen = (() => {
+    // Обходной просмотр — единственный без `ErrorNote`; остальные обходные
+    // экраны (ППО, инструктаж, знания) и чек-лист его рисуют.
+    if (detour?.kind === 'REVIEW') return null;
+    if (detour) return actionError;
+    if (checklist) return actionError;
+    // Вкладки вне «Работы»: происшествия (`MORE`) рисуют `ErrorNote`, «Техника» и «ТБ» — нет.
+    if (tabsVisible && workTab !== 'SHIFT') {
+      return workTab === 'MORE' ? actionError : null;
+    }
+    switch (state.phase) {
+      case 'ADMISSION':
+      case 'CLOSED':
+        return actionError;
+      // Без смены экран — `ShiftMissingScreen`, у него `ErrorNote` нет.
+      case 'WORK':
+      case 'CLOSING':
+        return shift ? actionError : null;
+      default:
+        return null;
+    }
+  })();
 
   const alarmingIncidents = state.incidents.filter(
     (incident) => isIncidentOpen(incident.reviewedAt),
@@ -854,7 +900,7 @@ export function OperatorMobileApp() {
         onOpen={(phase) => setDetour({kind: 'REVIEW', phase: phase as OperatorPhase})}
       />
       <OperatorStatusStrip online={online} items={queued} />
-      <OfflineQueueBanner items={queued} onRetry={retryQueued} onDiscard={discardQueued} shownElsewhere={actionError} />
+      <OfflineQueueBanner items={queued} onRetry={retryQueued} onDiscard={discardQueued} shownElsewhere={rejectionShownOnScreen} />
       {/*
         Короткая заметка над экраном; повод бывает разный (аудит R76, находка
         9): принятая запись с несвежим экраном; отказ 409 — записи на сервере
