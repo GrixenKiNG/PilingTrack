@@ -121,6 +121,12 @@ services:
       # SEC-10, 24.09.2026). Включать только когда порт 3000 закрыт снаружи,
       # иначе заголовок подделывается в обход Caddy. Пусто = как раньше.
       - TRUST_PROXY=${TRUST_PROXY:-}
+      # Мониторинг бэкапов: health читает метки system:backup:* из Redis,
+      # которые пишет хостовый таймер pilingtrack-backup. Без переменной
+      # проверка всегда «up (disabled)» и алерт о несвежем бэкапе молчит.
+      # Строка в .env до контейнера не доходит — env_file не объявлен
+      # (ранбук 014, шаг 4; 01.10.2026). Пусто = выключено, как раньше.
+      - BACKUP_ENABLED=${BACKUP_ENABLED:-}
     depends_on:
       postgres:
         condition: service_healthy
@@ -192,6 +198,12 @@ services:
       # не объявлен, поэтому в контейнер попадает лишь то, что перечислено в
       # этом блоке. Пустое значение = переключения нет, поведение как раньше.
       - DB_IDENTITY_ROLE=${DB_IDENTITY_ROLE:-}
+      # Sentry воркера (src/workers/unified-worker/sentry.ts) включается
+      # только при заданной SENTRY_DSN; app берёт DSN из sentry.server.config.ts,
+      # а воркер — только отсюда. Тот же DSN, что в sentry.server.config.ts.
+      # Без проброса ошибки outbox/projection/pdf в Sentry не уходят (ранбук
+      # 014, шаг 4; 01.10.2026). Пусто = Sentry воркера выключен, как раньше.
+      - SENTRY_DSN=${SENTRY_DSN:-}
     depends_on:
       postgres:
         condition: service_healthy
