@@ -101,3 +101,11 @@ graphify-out
 release-audit
 design-previews
 playwright-report
+
+# Черновики концептов сайта ОРИОН и превью. git их не отслеживает, но они лежат
+# в public/ рабочей папки, а выкладка собирает образ из неё: до 30.09.2026 шесть
+# таких страниц (с непроверенными цифрами о компании) были публичны на
+# orionpiling.ru. Ни один отслеживаемый файл под эти шаблоны не попадает.
+public/*concept*.html
+public/*-preview.html
+public/__*.html

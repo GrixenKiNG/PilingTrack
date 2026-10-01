@@ -299,3 +299,46 @@ describe('telegramNotifier — человекочитаемые поля и зо
     expect(sentText()).toContain('⏰ 27.09.2026, 04:30');
   });
 });
+
+/**
+ * PDF отчёта не доходил в Telegram ни разу с 25.09.2026: обработчик шлёт его
+ * изнутри `db.$transaction(async (tx) => …)` (блокировка строки события,
+ * event-handlers.ts), а обёртка транзакции помечает область «тенант уже в
+ * базе» (tenant-rls.ts: runWithGucApplied). Чтение настроек бота идёт
+ * глобальным клиентом МИМО этой транзакции, но пометку наследовало — тенант к
+ * запросу не прикладывался, строгий RLS возвращал ноль строк, и в журнале
+ * было «Telegram not configured — skipping document». Сообщения об ошибках
+ * идут вне транзакций и доходили.
+ */
+describe('telegramNotifier — чтение настроек внутри чужой транзакции', () => {
+  const originalDefaultTenantId = process.env.DEFAULT_TENANT_ID;
+
+  beforeEach(() => {
+    findManyMock.mockReset();
+    isEncryptedMock.mockReset().mockReturnValue(false);
+    process.env.DEFAULT_TENANT_ID = 'orion';
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, text: async () => '' }));
+  });
+
+  afterEach(() => {
+    if (originalDefaultTenantId === undefined) delete process.env.DEFAULT_TENANT_ID;
+    else process.env.DEFAULT_TENANT_ID = originalDefaultTenantId;
+  });
+
+  it('запрос настроек несёт тенанта, даже если вызван из области runWithGucApplied', async () => {
+    const { runWithGucApplied, resolveGucTenantId } = await import('@/core/security/tenant-rls');
+    let tenantSeenByQuery: string | null | undefined;
+    findManyMock.mockImplementation(async () => {
+      // Ровно то, что решает расширение Prisma: доставлять ли тенанта в базу.
+      tenantSeenByQuery = resolveGucTenantId();
+      return [{ botToken: 'plain-token', chatId: '-100', enabled: true }];
+    });
+
+    const sent = await runWithGucApplied(() =>
+      telegramNotifier.sendDocument('r.pdf', Buffer.from('%PDF'), 'подпись'),
+    );
+
+    expect(tenantSeenByQuery).toBe('orion');
+    expect(sent).toBe(true);
+  });
+});
