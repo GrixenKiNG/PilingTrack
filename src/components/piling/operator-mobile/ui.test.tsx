@@ -36,8 +36,9 @@ describe('рабочая оболочка машиниста', () => {
 
   it('явно показывает, где находятся записи при потере связи', () => {
     const {rerender} = render(<OperatorStatusStrip online items={[]} />);
-    expect(screen.getByRole('status')).toHaveTextContent('Синхронизировано');
-    expect(screen.getByRole('status')).toHaveTextContent('Сервер доступен');
+    expect(screen.getByRole('status')).toHaveTextContent('Всё отправлено');
+    expect(screen.getByRole('status')).toHaveTextContent('очередь на телефоне пуста');
+    expect(screen.queryByText(/Сервер доступен/)).not.toBeInTheDocument();
 
     rerender(<OperatorStatusStrip online={false} items={[]} />);
     expect(screen.getByRole('status')).toHaveTextContent('Офлайн');
