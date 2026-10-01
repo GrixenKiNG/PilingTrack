@@ -5,6 +5,7 @@
 
 import { db } from '@/lib/db';
 import { logger } from '@/lib/logger';
+import { runWithTenantContext, setRequestTenantId } from '@/core/security/tenant-context';
 import {
   DEFAULT_NOTIFICATIONS,
   DEFAULT_WORKSPACE_SETTINGS,
@@ -63,7 +64,20 @@ export async function isNotificationEnabled(
     return true;
   }
   try {
-    const settings = await getSettings(tenantId);
+    // Читаем настройки внутри собственного контекста организации (R86 №3).
+    // Маршрут вебхука Alertmanager и другие фоновые вызовы идут без сессии и без
+    // withApi, поэтому tenant-rls.ts не выставляет set_config: под строгим RLS
+    // TenantSettings отдаёт 0 строк, readSettings подставляет умолчания, и
+    // выключатель владельца молча игнорируется.
+    //
+    // Внутри уже открытого db.$transaction это не помогает: там область помечена
+    // runWithGucApplied, расширение не вмешивается, и глобальное чтение всё равно
+    // уходит без set_config. Такие вызовы надо выносить из транзакции наружу
+    // (как сделано в d7a57cdc для durable-alert-delivery).
+    const settings = await runWithTenantContext(() => {
+      setRequestTenantId(tenantId);
+      return getSettings(tenantId);
+    });
     return settings.notifications[key] ?? DEFAULT_NOTIFICATIONS[key] ?? false;
   } catch {
     return true;
