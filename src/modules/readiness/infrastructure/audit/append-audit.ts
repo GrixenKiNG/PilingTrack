@@ -1,5 +1,5 @@
 import {randomUUID} from 'node:crypto';
-import {generateRequestId, getRequestIdFromContext} from '@/lib/request-context';
+import {generateRequestId, getRequestIdFromContext} from '@/lib/trace-context';
 import {canonicalize} from '../../domain/audit/canonicalize';
 import {digestAuditEvent, digestIdempotencyKey} from '../../domain/audit/digest';
 import {maskOptionalAuditPayload} from '../../domain/audit/mask';

@@ -19,57 +19,29 @@
  *     const traceId = getTraceId(); // available anywhere in the call chain
  */
 
-import { AsyncLocalStorage } from 'async_hooks';
 import { NextResponse } from 'next/server';
+import { generateRequestId, traceContext } from './trace-context';
+import type { TraceContext } from './trace-context';
 
 // ============================================================
 // Trace Context Types
 // ============================================================
+//
+// Ядро трассировки живёт в './trace-context' — без вызовов NextResponse, чтобы
+// его мог тянуть фоновый процесс unified-worker, чей образ (Dockerfile.workers)
+// удаляет node_modules/next (F-R87-CHAIN-METADATA-b). Здесь оно только
+// реэкспортируется: экземпляр traceContext остаётся тем же самым, поэтому
+// импорты '@/lib/request-context' работают без изменений.
 
-export interface TraceContext {
-  traceId: string;      // Unique per request, propagated across services
-  spanId: string;       // Unique per operation within a trace
-  parentSpanId?: string; // Parent span for nested operations
-  requestId?: string;   // Client-provided request ID (for correlation)
-  userId?: string;      // Authenticated user ID
-  tenantId?: string;    // Multi-tenant context
-}
-
-// ============================================================
-// AsyncLocalStorage for Trace Context
-// ============================================================
-
-export const traceContext = new AsyncLocalStorage<TraceContext>();
-
-/**
- * Get current trace context.
- * Returns undefined if called outside of traceContext.run().
- */
-export function getCurrentTrace(): TraceContext | undefined {
-  return traceContext.getStore();
-}
-
-/**
- * Get the current trace ID.
- * Falls back to 'no-trace' if called outside of a trace context.
- */
-export function getTraceId(): string {
-  return traceContext.getStore()?.traceId || 'no-trace';
-}
-
-/**
- * Get the current span ID.
- */
-export function getSpanId(): string {
-  return traceContext.getStore()?.spanId || 'no-span';
-}
-
-/**
- * Get the current request ID (client-provided or generated).
- */
-export function getRequestIdFromContext(): string | undefined {
-  return traceContext.getStore()?.requestId;
-}
+export {
+  getCurrentTrace,
+  getRequestIdFromContext,
+  getSpanId,
+  getTraceId,
+  generateRequestId,
+  traceContext,
+} from './trace-context';
+export type { TraceContext } from './trace-context';
 
 // ============================================================
 // Request ID (legacy compatibility)
@@ -83,10 +55,6 @@ interface HeaderCarrier {
   headers: {
     get(name: string): string | null;
   };
-}
-
-export function generateRequestId() {
-  return crypto.randomUUID();
 }
 
 export function getRequestId(request?: HeaderCarrier) {
