@@ -232,7 +232,7 @@ function rejectionError(
   if (status === 403 && serverText !== null && serverText.startsWith('CSRF validation failed')) {
     return new ApiError(403, options.csrfMessage, payload?.details, 'csrf');
   }
-  if (serverText !== null && (!options.russianOnly || /[А-Яа-яЁё]/.test(serverText))) {
+  if (serverText !== null && (!options.russianOnly || isHumanRussianText(serverText))) {
     return new ApiError(status,
       serverText === BAD_COMMAND_TEXT_FROM_SERVER ? BAD_COMMAND_HINT : serverText, payload?.details);
   }
