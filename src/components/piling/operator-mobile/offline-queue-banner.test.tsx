@@ -65,3 +65,36 @@ describe('плашка очереди на общем телефоне', () => {
     usePilingStore.setState({currentUser: null});
   });
 });
+
+describe('плашка ждущих записей: связь или отказ сервера', () => {
+  const pending = (lastError: string | null) => ({
+    clientCommandId: 'p1',
+    label: 'Выработка',
+    command: {command: 'log-production', entry: {kind: 'PILES', count: 12}},
+    queuedAt: '2026-10-01T08:00:00.000Z',
+    attempts: 1,
+    state: 'PENDING' as const,
+    lastError,
+  });
+
+  it('PENDING после обрыва связи → «Отправим, когда появится связь»', () => {
+    // Обрыв сети приходит англоязычным текстом браузера (см. api.ts sendCommand).
+    render(<OfflineQueueBanner items={[pending('Failed to fetch')]} onRetry={vi.fn()} onDiscard={vi.fn()} />);
+
+    expect(screen.getByRole('status').textContent).toContain('Отправим, когда появится связь.');
+  });
+
+  it('PENDING с отказом сервера (503) → «Сервер не принял…» и причина видна', () => {
+    const reason = 'Сервис временно недоступен. Попробуйте позже.';
+    render(<OfflineQueueBanner items={[pending(reason)]} onRetry={vi.fn()} onDiscard={vi.fn()} />);
+
+    expect(screen.getByRole('status').textContent).toContain('Сервер не принял запись, повторим автоматически.');
+    expect(screen.getByText(reason)).toBeTruthy();
+  });
+
+  it('английский текст сети не показывается как причина отказа сервера', () => {
+    render(<OfflineQueueBanner items={[pending('Failed to fetch')]} onRetry={vi.fn()} onDiscard={vi.fn()} />);
+
+    expect(screen.queryByText('Failed to fetch')).toBeNull();
+  });
+});
