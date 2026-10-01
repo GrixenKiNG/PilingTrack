@@ -69,7 +69,14 @@ jobs:
             # Smoke именно построенного образа; до замены работающих сервисов.
             case \" \$SVCS \" in
               *\" workers \"*)
-                WORKERS_IMAGE=\$(docker compose config --images workers)
+                WORKERS_IMAGE=''
+                for image in \$(docker compose config --images workers); do
+                  service=\$(docker image inspect --format '{{ index .Config.Labels \"com.docker.compose.service\" }}' \"\$image\" 2>/dev/null || true)
+                  if [ \"\$service\" = workers ]; then
+                    WORKERS_IMAGE=\"\$image\"
+                    break
+                  fi
+                done
                 [ -n \"\$WORKERS_IMAGE\" ] || exit 1
                 bash scripts/smoke-workers-image.sh \"\$WORKERS_IMAGE\"
                 ;;

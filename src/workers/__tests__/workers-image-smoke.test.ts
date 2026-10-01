@@ -109,3 +109,28 @@ describe('CI и ручная выкладка workers', () => {
     expect(deploy.slice(smoke).split('\n')[0]).not.toContain('|| true');
   });
 });
+
+describe('выбор compose-образа workers', () => {
+  it.each([true, false])('отбирает только образ с меткой workers (%s)', (found) => {
+    const deploy = fs.readFileSync(path.join(root, '.github/workflows/deploy.yml'), 'utf8');
+    const resolver = deploy.slice(deploy.indexOf('WORKERS_IMAGE='), deploy.indexOf('bash scripts/smoke-workers-image.sh'))
+      .replaceAll('\\"', '"').replaceAll('\\$', '$');
+    const commands = [
+      'set -e',
+      'docker() {',
+      '  if [ "$1" = compose ]; then printf "postgres:16-alpine\\ncodex-config-workers\\n"; return 0; fi',
+      '  for arg in "$@"; do last="$arg"; done',
+      '  if [ "$last" = codex-config-workers ]; then printf "%s" "$WORKERS_LABEL"; else printf postgres; fi',
+      '}',
+      resolver,
+      'printf "%s" "$WORKERS_IMAGE"',
+    ].join('\n');
+    const result = spawnSync(bash, ['-c', commands], {
+      cwd: root, encoding: 'utf8', timeout: 5000,
+      env: { ...process.env, WORKERS_LABEL: found ? 'workers' : 'unknown' },
+    });
+    expect(result.error).toBeUndefined();
+    expect(result.status, result.stderr).toBe(found ? 0 : 1);
+    if (found) expect(result.stdout).toBe('codex-config-workers');
+  });
+});
