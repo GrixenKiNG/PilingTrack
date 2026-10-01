@@ -3,6 +3,7 @@
  */
 
 import { db, DEFAULT_TX_OPTIONS } from '@/lib/db';
+import { getRequestTenantId } from '@/core/security/tenant-context';
 import { CrewAggregate } from '../domain';
 import { toPrismaData, fromPrismaToState, toOutboxData } from './crew.prisma.mapper';
 
@@ -26,6 +27,11 @@ export class PrismaCrewRepository implements CrewRepository {
     const state = aggregate.getState();
     const persistenceData = toPrismaData(aggregate);
     const pendingEvents = aggregate.getPendingEvents();
+    // У бригады нет своей колонки tenantId — её организация это организация
+    // объекта (site). Здесь она уже известна: команды бригады ходят только из
+    // запроса, а обёртка маршрута открывает контекст и кладёт туда тенанта
+    // (F-R86-OUTBOX-TENANT). Лишний запрос за объектом не делаем.
+    const tenantId = getRequestTenantId() ?? undefined;
 
     // Transactional outbox: crew data + outbox events + caller hooks in one tx
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Prisma interactive-transaction callback client type isn't cleanly exported
@@ -44,11 +50,12 @@ export class PrismaCrewRepository implements CrewRepository {
 
       if (pendingEvents.length > 0) {
         const outboxRecords = pendingEvents.map((event) => {
-          const data = toOutboxData(event);
+          const data = toOutboxData(event, tenantId);
           return {
             type: data.type,
             aggregateId: data.aggregateId,
             aggregateType: data.aggregateType,
+            tenantId: data.tenantId,
             // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Prisma JSON column / event payload is an arbitrary serializable shape
             payload: data.payload as any,
           };

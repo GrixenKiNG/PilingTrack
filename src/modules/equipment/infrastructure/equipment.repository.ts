@@ -27,7 +27,7 @@ export class PrismaEquipmentRepository implements EquipmentRepository {
         update: { name: pd.name, model: pd.model, qty: pd.qty, description: pd.description, isActive: pd.isActive },
       });
       if (evts.length > 0) {
-        await Promise.all(evts.map(e => tx.outboxEvent.create({ data: toOutboxData(e) })));
+        await Promise.all(evts.map(e => tx.outboxEvent.create({ data: toOutboxData(e, s.tenantId) })));
       }
     });
     agg.clearPendingEvents();
