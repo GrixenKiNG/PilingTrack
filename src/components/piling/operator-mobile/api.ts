@@ -414,7 +414,20 @@ export async function uploadPhoto(input: {
     credentials: 'same-origin',
     signal: timeoutSignal(REQUEST_TIMEOUT_MS),
   });
-  if (!confirmed.ok) throw new ApiError(confirmed.status, 'Снимок не подтверждён сервером');
+  // Отказ по существу сервер объясняет сам: 422 «Загруженный файл пуст или
+  // недоступен» / «Содержимое файла не соответствует заявленному типу…»
+  // (`media-service.ts:244,268-271`). Раньше любой ответ подменялся общей фразой,
+  // и машинист жал то же битое фото снова вместо того, чтобы снять заново.
+  // Разбираем тело тем же способом, что на первом шаге (`:397-401`): понятный
+  // русский текст из поля `error` показываем, иначе (не JSON, чужая/английская
+  // строка) — общую фразу (аудит R76, находка 11).
+  if (!confirmed.ok) {
+    const body = await confirmed.json().catch(() => null) as {error?: string} | null;
+    const reason = typeof body?.error === 'string' && /[А-Яа-яЁё]/.test(body.error)
+      ? body.error
+      : 'Снимок не подтверждён сервером';
+    throw new ApiError(confirmed.status, reason);
+  }
 
   return mediaId;
 }

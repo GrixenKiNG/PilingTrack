@@ -334,3 +334,61 @@ describe('таймаут запроса', () => {
     expect(timeouts).toEqual([20_000, 120_000, 20_000]);
   });
 });
+
+/**
+ * Текст отказа при подтверждении снимка (аудит R76, находка 11).
+ *
+ * Третий шаг загрузки подменял ЛЮБОЙ ответ сервера общей фразой «Снимок не
+ * подтверждён сервером»: понятный отказ 422 («Содержимое файла не соответствует
+ * заявленному типу…») не доходил до машиниста, и он жал то же битое фото снова
+ * вместо того, чтобы снять заново. Здесь проверяется разбор тела отказа и
+ * отсечка чужого (английского) текста.
+ */
+describe('uploadPhoto: подтверждение снимка', () => {
+  const file = new File(['x'], 'photo.jpg', {type: 'image/jpeg'});
+
+  /** Первые два шага успешны, ответ на подтверждение задаёт сам тест. */
+  function stubConfirm(confirm: () => Response) {
+    vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
+      if (init?.method === 'PUT') return new Response(null, {status: 200});
+      if (url === '/api/media') {
+        return new Response(JSON.stringify({mediaId: 'm1', uploadUrl: 'https://storage.test/put'}), {status: 200});
+      }
+      return confirm();
+    }));
+  }
+
+  it('422 с русским текстом — ApiError с этим текстом и статусом', async () => {
+    stubConfirm(() => new Response(
+      JSON.stringify({error: 'Содержимое файла не соответствует заявленному типу image/jpeg'}),
+      {status: 422}));
+    const error = await uploadPhoto({file, clientCommandId: 'c1'}).catch((caught: unknown) => caught);
+    vi.unstubAllGlobals();
+
+    expect(error).toBeInstanceOf(ApiError);
+    expect((error as ApiError).status).toBe(422);
+    expect((error as ApiError).message).toBe('Содержимое файла не соответствует заявленному типу image/jpeg');
+  });
+
+  it('отказ без JSON — общая фраза', async () => {
+    stubConfirm(() => new Response('<html>502</html>', {status: 500}));
+    const error = await uploadPhoto({file, clientCommandId: 'c1'}).catch((caught: unknown) => caught);
+    vi.unstubAllGlobals();
+
+    expect(error).toBeInstanceOf(ApiError);
+    expect((error as ApiError).status).toBe(500);
+    expect((error as ApiError).message).toBe('Снимок не подтверждён сервером');
+  });
+
+  it('422 с английским текстом — общая фраза, не английская строка', async () => {
+    stubConfirm(() => new Response(
+      JSON.stringify({error: 'CSRF validation failed: origin mismatch'}),
+      {status: 422}));
+    const error = await uploadPhoto({file, clientCommandId: 'c1'}).catch((caught: unknown) => caught);
+    vi.unstubAllGlobals();
+
+    expect(error).toBeInstanceOf(ApiError);
+    expect((error as ApiError).status).toBe(422);
+    expect((error as ApiError).message).toBe('Снимок не подтверждён сервером');
+  });
+});
