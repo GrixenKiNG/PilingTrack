@@ -11,7 +11,7 @@
  * готовности дедуплицируется по дате.
  */
 
-import * as Sentry from '@sentry/nextjs';
+import * as Sentry from '@sentry/node';
 import { logger } from '@/lib/logger';
 import { forEachTenant } from '@/lib/tenant-iteration';
 import { runReadinessScheduler } from '@/modules/readiness/application/scheduler';

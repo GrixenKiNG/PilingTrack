@@ -77,8 +77,36 @@ function resolveFile(base: string): string | null {
   return null;
 }
 
+/**
+ * Пакеты, которые требуют `next` при загрузке. Не только сам `next`: 01.10.2026
+ * воркер упал на старте из-за `@sentry/nextjs` (он загружает `next/constants`),
+ * а сторож тогда смотрел только на `next`. В воркере вместо него — `@sentry/node`.
+ */
 function isNextSpecifier(specifier: string): boolean {
-  return specifier === 'next' || specifier.startsWith('next/');
+  return specifier === 'next'
+    || specifier.startsWith('next/')
+    || specifier.startsWith('@next/')
+    || specifier === '@sentry/nextjs'
+    || specifier.startsWith('@sentry/nextjs/');
+}
+
+/** Специфики динамических `import('…')` со строковым литералом — во всём файле. */
+function dynamicSpecifiers(source: string): string[] {
+  const sourceFile = ts.createSourceFile('source.ts', source, ts.ScriptTarget.Latest, true);
+  const specifiers: string[] = [];
+  const visit = (node: ts.Node): void => {
+    if (
+      ts.isCallExpression(node)
+      && node.expression.kind === ts.SyntaxKind.ImportKeyword
+      && node.arguments.length > 0
+      && ts.isStringLiteral(node.arguments[0])
+    ) {
+      specifiers.push(node.arguments[0].text);
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sourceFile);
+  return specifiers;
 }
 
 function walkWorkerGraph(): { visited: number; violations: string[]; unresolved: string[] } {
@@ -93,7 +121,13 @@ function walkWorkerGraph(): { visited: number; violations: string[]; unresolved:
     if (visited.has(relative)) continue;
     visited.add(relative);
 
-    for (const specifier of staticSpecifiers(fs.readFileSync(file, 'utf8'))) {
+    const source = fs.readFileSync(file, 'utf8');
+    // Динамический import() не обходим (код грузится только по требованию), но
+    // прямой динамический импорт запрещённого пакета — та же поломка, только позже.
+    for (const specifier of dynamicSpecifiers(source)) {
+      if (isNextSpecifier(specifier)) violations.push(`${relative} -> ${specifier} (dynamic)`);
+    }
+    for (const specifier of staticSpecifiers(source)) {
       if (isNextSpecifier(specifier)) {
         violations.push(`${relative} -> ${specifier}`);
         continue;

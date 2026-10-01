@@ -1,6 +1,6 @@
 import { Worker, Job } from 'bullmq';
 import Redis from 'ioredis';
-import * as Sentry from '@sentry/nextjs';
+import * as Sentry from '@sentry/node';
 import { generatePeriodPdf, generateSinglePdf, savePdfBuffer } from '@/lib/pdf-generator';
 import { loadCompanyName } from '@/lib/pdf-data';
 import { logger } from '@/lib/logger';

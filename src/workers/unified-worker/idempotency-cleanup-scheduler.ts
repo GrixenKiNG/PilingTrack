@@ -22,7 +22,7 @@
  * мог бы разойтись с реестром молча (F-SCHED-REGISTRY-IDEMP).
  */
 
-import * as Sentry from '@sentry/nextjs';
+import * as Sentry from '@sentry/node';
 import { logger } from '@/lib/logger';
 import { cleanupExpiredKeys } from '@/core/security/idempotency';
 import { IDEMPOTENCY_CLEANUP_SCHEDULER_NAME } from '@/core/observability/health-tracker/scheduler-registry';
