@@ -53,6 +53,64 @@ const baseProps = {
   onCorrect: vi.fn().mockResolvedValue(true),
 };
 
+/** Непустой список записей: с ним отказ обязан остаться у кнопки, а не под списком. */
+const stateWithEntries = {
+  ...state,
+  entries: [
+    {id: 'e1', kind: 'PILES', label: 'С 100.30-8', value: 5, meters: 15, occurredAt: '2026-09-30T10:00:00.000Z', corrections: []},
+  ],
+} as unknown as OperatorMobileState;
+
+/** Идёт ли `second` после `first` в разметке. */
+function isBefore(first: Element, second: Element): boolean {
+  return Boolean(first.compareDocumentPosition(second) & Node.DOCUMENT_POSITION_FOLLOWING);
+}
+
+describe('рабочий экран: отказ рядом с формой', () => {
+  it('в форме выработки показывает отказ прямо над кнопкой «Записать»', () => {
+    render(<WorkScreen {...baseProps} state={stateWithEntries} error="Смена уже закрыта" />);
+
+    fireEvent.click(screen.getByRole('button', {name: 'Добавить сваю'}));
+
+    const note = screen.getByText('Смена уже закрыта');
+    const button = screen.getByRole('button', {name: 'Записать'});
+    expect(isBefore(note, button)).toBe(true);
+  });
+
+  it('в форме паспорта отказ и подробности — над кнопкой и выше списка записей', () => {
+    render(<WorkScreen {...baseProps} state={stateWithEntries}
+      error="Паспорт заполнен не полностью" errorDetails={['Номер сваи не заполнен']} />);
+
+    fireEvent.click(screen.getByRole('button', {name: 'Свая с паспортом'}));
+
+    const note = screen.getByText('Паспорт заполнен не полностью');
+    const detail = screen.getByText('Номер сваи не заполнен');
+    const button = screen.getByRole('button', {name: 'Записать сваю с паспортом'});
+    const entries = screen.getByText('Записано за смену');
+
+    expect(isBefore(note, button)).toBe(true);
+    expect(isBefore(detail, button)).toBe(true);
+    expect(isBefore(note, entries)).toBe(true);
+  });
+
+  it('показывает фразу отказа на экране один раз, а не и в форме, и в списке', () => {
+    render(<WorkScreen {...baseProps} state={stateWithEntries} error="Паспорт заполнен не полностью" />);
+
+    fireEvent.click(screen.getByRole('button', {name: 'Свая с паспортом'}));
+
+    expect(screen.getAllByText('Паспорт заполнен не полностью')).toHaveLength(1);
+  });
+
+  it('в обзоре смены (форма закрыта) отказ остаётся вверху экрана', () => {
+    render(<WorkScreen {...baseProps} error="Смена уже закрыта" />);
+
+    const note = screen.getByText('Смена уже закрыта');
+    const main = note.closest('main');
+    expect(main).not.toBeNull();
+    expect(main?.firstElementChild?.contains(note)).toBe(true);
+  });
+});
+
 describe('рабочий экран: черновик при отказе сервера', () => {
   it('сохраняет введённое количество после отказа, «← К смене» и повторного входа', () => {
     const onLog = vi.fn().mockResolvedValue(true);

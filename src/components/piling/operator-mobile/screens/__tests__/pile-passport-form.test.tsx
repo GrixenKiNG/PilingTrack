@@ -23,4 +23,21 @@ describe('форма паспорта сваи', () => {
     expect(screen.getByRole('button', {name: 'Записать сваю с паспортом'})).toBeEnabled();
     expect(screen.queryByText(/Не заполнено:/)).not.toBeInTheDocument();
   });
+
+  it('показывает отказ и подробности над кнопкой записи', () => {
+    render(<PilePassportForm grades={grades} busy={false} onSubmit={vi.fn()}
+      error="Паспорт заполнен не полностью" errorDetails={['Номер сваи не заполнен']} />);
+
+    const note = screen.getByText('Паспорт заполнен не полностью');
+    expect(screen.getByText('Номер сваи не заполнен')).toBeInTheDocument();
+
+    const button = screen.getByRole('button', {name: 'Записать сваю с паспортом'});
+    expect(note.compareDocumentPosition(button) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('без error отказ не рисуется', () => {
+    render(<PilePassportForm grades={grades} busy={false} onSubmit={vi.fn()} />);
+
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
 });

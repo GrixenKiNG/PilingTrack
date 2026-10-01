@@ -177,17 +177,17 @@ export function WorkScreen({state, onLog, onFinish, onOpenSafety, busy, error, e
 
   const overviewScreen = (
     <Screen title="Моя смена" tabs={tabs}>
+      {/*
+        Строка отказа — вверху обзора и только у ВИДИМОЙ ветки. Обе ветки
+        смонтированы (см. комментарий над `return`), и без этого условия один
+        и тот же текст лежал бы в разметке дважды (аудит F-V1-ERROR-DETAILS-b).
+      */}
+      {formOpen ? null : <ErrorNote message={error} details={errorDetails} />}
       <WarningsPanel warnings={state.warnings} />
       <OperatorWorkOverview state={state} variant="base" busy={busy}
         onAction={(kind)=>{switchTab(kind==='PASSPORT'?'PILES':kind);setPileMode(kind==='PASSPORT'?'PASSPORT':'BATCH');setFormOpen(true);}}
         onFinish={()=>setFinishing(true)} />
       {finishing&&<Panel tone="warning"><PanelTitle>Завершить работу?</PanelTitle><p className="my-3 text-sm">Дальше — ЕО после работы. Новую выработку записывать будет нельзя.</p><BigButton tone="danger" disabled={busy} onClick={onFinish}>Да, работа завершена</BigButton><BigButton tone="ghost" onClick={()=>setFinishing(false)}>Продолжить работу</BigButton></Panel>}
-      {/*
-        Строка отказа — только у ВИДИМОЙ ветки. Обе ветки теперь смонтированы
-        (см. комментарий над `return`), и без этого условия один и тот же текст
-        лежал бы в разметке дважды (аудит F-V1-ERROR-DETAILS-b).
-      */}
-      {formOpen ? null : <ErrorNote message={error} details={errorDetails} />}
     </Screen>
   );
 
@@ -209,12 +209,22 @@ export function WorkScreen({state, onLog, onFinish, onOpenSafety, busy, error, e
             обязательным действием, которое оператор выполняет прямо здесь.
           */}
           {!passportMode ? (
-            <BigButton
-              onClick={() => void submit()}
-              disabled={!ready || busy || needsSafety}
-            >
-              {busy ? 'Записываем…' : 'Записать'}
-            </BigButton>
+            <>
+              {/*
+                Отказ — в липком футере, вплотную над кнопкой: пока он стоял
+                последним в `main`, то есть ниже списка записей, чем длиннее
+                смена, тем дальше уезжала причина от кнопки (аудит R82,
+                находки 6 и 7). Строка показывается только у видимой ветки,
+                чтобы не дублировать обзор смены.
+              */}
+              {formOpen ? <ErrorNote message={error} details={errorDetails} /> : null}
+              <BigButton
+                onClick={() => void submit()}
+                disabled={!ready || busy || needsSafety}
+              >
+                {busy ? 'Записываем…' : 'Записать'}
+              </BigButton>
+            </>
           ) : null}
           {finishing ? (
             <div className="space-y-2 rounded-lg border border-warning bg-warning/10 p-3">
@@ -321,13 +331,16 @@ export function WorkScreen({state, onLog, onFinish, onOpenSafety, busy, error, e
           <PilePassportForm
             grades={state.dictionaries.pileGrades}
             busy={busy}
+            error={formOpen ? error : null}
+            errorDetails={formOpen ? errorDetails : undefined}
             onSubmit={(pileGradeId, passport) => onLog({kind: 'PILE_PASSPORT', pileGradeId, passport})}
           />
           {/*
-            Список записанного и строка ошибки стоят ОДИН раз — ниже, общими
-            для всех режимов. Здесь они дублировались: в режиме паспорта
-            машинист видел свои две сваи и поправку к ним дважды и не мог
-            понять, записалось ли вдвое больше.
+            Список записанного стоит ОДИН раз — ниже, общим для всех режимов.
+            Здесь он дублировался: в режиме паспорта машинист видел свои две
+            сваи и поправку к ним дважды и не мог понять, записалось ли вдвое
+            больше. Строку отказа форма паспорта теперь рисует сама — над своей
+            кнопкой (аудит R82, находки 6 и 7).
           */}
         </div>
       ) : (
@@ -423,9 +436,6 @@ export function WorkScreen({state, onLog, onFinish, onOpenSafety, busy, error, e
       )}
 
       <EntriesList entries={state.entries} busy={busy} onCorrect={onCorrect} />
-
-      {/* Отказ — только у видимой ветки: у скрытой его текст в разметке не нужен. */}
-      {formOpen ? <ErrorNote message={error} details={errorDetails} /> : null}
     </Screen>
   );
 

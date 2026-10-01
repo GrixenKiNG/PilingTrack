@@ -6,7 +6,7 @@ import {
   setRefusalMm, validatePassport,
 } from '@/modules/operator-mobile/domain/pile-passport';
 import type {PilePassportInput} from '../api';
-import {BigButton, Panel, PanelTitle} from '../ui';
+import {BigButton, ErrorNote, Panel, PanelTitle} from '../ui';
 
 /**
  * Паспорт забитой сваи — журнал забивки на одну сваю.
@@ -116,9 +116,17 @@ function toMeasuredSets(drafts: SetDraft[]) {
   return measured;
 }
 
-export function PilePassportForm({grades, busy, onSubmit}: {
+export function PilePassportForm({grades, busy, error, errorDetails, onSubmit}: {
   grades: {id: string; name: string; lengthMm: number | null}[];
   busy: boolean;
+  /**
+   * Отказ сервера на запись паспорта: показывается прямо над кнопкой, иначе
+   * машинист, набравший полтора десятка замеров, не видит причины (аудит R82,
+   * находка 7). Необязателен: старые варианты экрана зовут форму без него.
+   */
+  error?: string | null;
+  /** Подробности отказа — какие поля паспорта не заполнены. */
+  errorDetails?: string[];
   onSubmit: (pileGradeId: string, passport: PilePassportInput) => Promise<boolean>;
 }) {
   const [pileGradeId, setPileGradeId] = useState('');
@@ -379,6 +387,8 @@ export function PilePassportForm({grades, busy, onSubmit}: {
           className="mt-1 w-full rounded-md border bg-card px-3 py-2 text-base shadow-xs"
         />
       </label>
+
+      <ErrorNote message={error ?? null} details={errorDetails} />
 
       <BigButton onClick={() => void submit()} disabled={!ready || busy}>
         {busy ? 'Записываем…' : 'Записать сваю с паспортом'}
