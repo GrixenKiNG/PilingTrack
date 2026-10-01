@@ -7,7 +7,7 @@
  * поломку приложения вместо того, чтобы проверить связь.
  */
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
-import {ApiError, fetchKnowledgeAttempt, fetchState, operatorErrorDetails, operatorErrorText, QueuedOffline, sendCommand, uploadPhoto} from '../api';
+import {ApiError, fetchKnowledgeAttempt, fetchState, isHumanRussianText, operatorErrorDetails, operatorErrorText, QueuedOffline, sendCommand, uploadPhoto} from '../api';
 import {QueueOwnershipError, QueueStorageError, CSRF_REJECT_MESSAGE, CSRF_REJECT_NOT_QUEUED_MESSAGE, readQueue} from '../offline-queue';
 
 describe('operatorErrorText', () => {
@@ -82,6 +82,33 @@ describe('operatorErrorText', () => {
   it('прочая ошибка — общий совет повторить', () => {
     expect(operatorErrorText(new Error('что-то не сошлось')))
       .toBe('Не удалось выполнить действие. Повторите.');
+  });
+});
+
+/**
+ * Признак «строка написана для человека по-русски» (R90, находка 4).
+ *
+ * Правило вынесено в один помощник: по нему отбираются подробности отказа,
+ * русский текст подтверждения снимка и причина отказа в плашке очереди.
+ * Кириллица — единственный доступный признак, что строку можно показать
+ * машинисту: английский текст сетевого сбоя и технические сообщения ему ничего
+ * не говорят.
+ */
+describe('isHumanRussianText', () => {
+  it('кириллица — строка для человека', () => {
+    expect(isHumanRussianText('Смена закрыта')).toBe(true);
+    expect(isHumanRussianText('  Смена закрыта  ')).toBe(true);
+    expect(isHumanRussianText('Сервер временно недоступен (код 502).')).toBe(true);
+  });
+
+  it('латиница, пустая строка, одни пробелы и не строка — не для человека', () => {
+    expect(isHumanRussianText('Failed to fetch')).toBe(false);
+    expect(isHumanRussianText('CSRF validation failed: origin mismatch')).toBe(false);
+    expect(isHumanRussianText('')).toBe(false);
+    expect(isHumanRussianText('   ')).toBe(false);
+    expect(isHumanRussianText(null)).toBe(false);
+    expect(isHumanRussianText(undefined)).toBe(false);
+    expect(isHumanRussianText(7)).toBe(false);
   });
 });
 

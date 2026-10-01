@@ -36,6 +36,15 @@ export class ApiError extends Error {
 }
 
 /**
+ * Общий текст сетевого сбоя: обрыв связи, истёкший таймаут запроса.
+ *
+ * Обе ветви `operatorErrorText` отвечают машинисту одним и тем же, поэтому текст
+ * живёт в одной константе — иначе правка формулировки в одной ветви дала бы два
+ * разных ответа на один и тот же сбой (R90, находка 6).
+ */
+const NETWORK_FAILURE_TEXT = 'Нет связи с сервером. Проверьте интернет и повторите.';
+
+/**
  * Текст ошибки для машиниста.
  *
  * ПОЧЕМУ НЕ `error.message`. Сетевой сбой в браузере — это `TypeError` с
@@ -67,10 +76,24 @@ export function operatorErrorText(error: unknown): string {
   // обрыв связи: на связь и надо смотреть, запись при этом остаётся на
   // устройстве и уйдёт повтором (R76, находка 13).
   if (error instanceof DOMException && (error.name === 'TimeoutError' || error.name === 'AbortError')) {
-    return 'Нет связи с сервером. Проверьте интернет и повторите.';
+    return NETWORK_FAILURE_TEXT;
   }
-  if (error instanceof TypeError) return 'Нет связи с сервером. Проверьте интернет и повторите.';
+  if (error instanceof TypeError) return NETWORK_FAILURE_TEXT;
   return 'Не удалось выполнить действие. Повторите.';
+}
+
+/**
+ * Признак строки, написанной для человека по-русски.
+ *
+ * Сервер пишет машинисту русским текстом, а технические сообщения приходят
+ * английскими: сетевой сбой браузера («Failed to fetch»), разбор схемы запроса
+ * (zod issues), служебные строки медиа-маршрута. Кириллица — единственный
+ * доступный признак «это можно показывать»: английское и техническое машинисту
+ * ничего не говорит. Непустая — пустая строка и одни пробелы признаком не
+ * считаются (R90, находка 4).
+ */
+export function isHumanRussianText(text: unknown): text is string {
+  return typeof text === 'string' && text.trim() !== '' && /[А-Яа-яЁё]/.test(text);
 }
 
 /**
@@ -103,7 +126,7 @@ export function operatorErrorDetails(error: unknown): string[] {
   for (const item of error.details) {
     const text = typeof item === 'string' ? item : detailText(item);
     // Кириллица — признак того, что строку писал человек для человека.
-    if (text && /[А-Яа-яЁё]/.test(text)) lines.push(text.trim());
+    if (isHumanRussianText(text)) lines.push(text.trim());
   }
   return lines;
 }
@@ -697,8 +720,8 @@ export async function uploadPhoto(input: {
       // строка) — общую фразу (аудит R76, находка 11).
       if (!confirmed.ok) {
         const body = await confirmed.json().catch(() => null) as {error?: string} | null;
-        const reason = typeof body?.error === 'string' && /[А-Яа-яЁё]/.test(body.error)
-          ? body.error
+        const reason = isHumanRussianText(body?.error)
+          ? body?.error
           : 'Снимок не подтверждён сервером';
         throw new ApiError(confirmed.status, reason);
       }

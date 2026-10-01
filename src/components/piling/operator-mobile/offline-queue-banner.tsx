@@ -2,6 +2,7 @@
 
 import {useEffect, useState} from 'react';
 import {usePilingStore} from '@/lib/store';
+import {isHumanRussianText} from './api';
 import {
   AUTH_WAIT_MESSAGE, describeCommand, foreignQueueSummary, subscribeQueue, type QueuedCommand,
 } from './offline-queue';
@@ -64,7 +65,7 @@ export function OfflineQueueBanner({items, onRetry, onDiscard, shownElsewhere = 
     pending
       .map((item) => item.lastError)
       .filter((text): text is string =>
-        !!text && text !== AUTH_WAIT_MESSAGE && /[А-Яа-яЁё]/.test(text))
+        isHumanRussianText(text) && text !== AUTH_WAIT_MESSAGE)
       .reduce((counts, text) => counts.set(text, (counts.get(text) ?? 0) + 1), new Map<string, number>()),
     ([text, count]) => (count > 1 ? `${text} (×${count})` : text),
   );
