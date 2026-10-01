@@ -477,7 +477,7 @@ export function OperatorMobileApp() {
           когда ниже ничего нет.
         */}
         <OperatorStatusStrip online={online} items={queued} />
-        <OfflineQueueBanner items={queued} onRetry={retryQueued} onDiscard={discardQueued} />
+        <OfflineQueueBanner items={queued} onRetry={retryQueued} onDiscard={discardQueued} shownElsewhere={actionError} />
         <Screen
           title="Рабочее место машиниста"
           /*
@@ -511,7 +511,7 @@ export function OperatorMobileApp() {
           причина показана ниже», а ниже ничего не было: карточки с причиной и
           кнопками оставались на невидимом экране работы.
         */}
-        <OfflineQueueBanner items={queued} onRetry={retryQueued} onDiscard={discardQueued} />
+        <OfflineQueueBanner items={queued} onRetry={retryQueued} onDiscard={discardQueued} shownElsewhere={actionError} />
         <Screen
           title={serverFault ? 'Сервер не отвечает' : 'Нет связи'}
           footer={<BigButton onClick={() => void reload()}>Повторить</BigButton>}
@@ -854,7 +854,7 @@ export function OperatorMobileApp() {
         onOpen={(phase) => setDetour({kind: 'REVIEW', phase: phase as OperatorPhase})}
       />
       <OperatorStatusStrip online={online} items={queued} />
-      <OfflineQueueBanner items={queued} onRetry={retryQueued} onDiscard={discardQueued} />
+      <OfflineQueueBanner items={queued} onRetry={retryQueued} onDiscard={discardQueued} shownElsewhere={actionError} />
       {/*
         Короткое уведомление о принятой записи, экран при этом остаётся
         прежним (аудит R76, находка 9). Тон предупреждения, а не отказа:

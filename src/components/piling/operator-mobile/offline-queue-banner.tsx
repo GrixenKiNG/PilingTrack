@@ -27,10 +27,18 @@ function useForeignQueue() {
  * отвергнутые — каждую отдельно, с составом записи (чтобы внести её заново)
  * и тремя выходами: повторить, показать, что введено, убрать с устройства.
  */
-export function OfflineQueueBanner({items, onRetry, onDiscard, className = 'space-y-1 px-3 pt-2'}: {
+export function OfflineQueueBanner({items, onRetry, onDiscard, shownElsewhere = null, className = 'space-y-1 px-3 pt-2'}: {
   items: QueuedCommand[];
   onRetry: (clientCommandId: string) => void;
   onDiscard: (clientCommandId: string) => void;
+  /**
+   * Причина, которую экран уже показывает у кнопки (`actionError`).
+   *
+   * Одна и та же фраза отказа стояла дважды: карточкой очереди и `ErrorNote`
+   * на экране. Если причина карточки совпадает с этой строкой, в карточке её
+   * не печатаем — состав и кнопки остаются (аудит R89, находка 3).
+   */
+  shownElsewhere?: string | null;
   className?: string;
 }) {
   const foreign = useForeignQueue();
@@ -89,16 +97,18 @@ export function OfflineQueueBanner({items, onRetry, onDiscard, className = 'spac
         </div>
       )}
       {failed.map((item) => (
-        <FailedItem key={item.clientCommandId} item={item} onRetry={onRetry} onDiscard={onDiscard} />
+        <FailedItem key={item.clientCommandId} item={item} onRetry={onRetry} onDiscard={onDiscard}
+          shownElsewhere={shownElsewhere} />
       ))}
     </div>
   );
 }
 
-function FailedItem({item, onRetry, onDiscard}: {
+function FailedItem({item, onRetry, onDiscard, shownElsewhere}: {
   item: QueuedCommand;
   onRetry: (clientCommandId: string) => void;
   onDiscard: (clientCommandId: string) => void;
+  shownElsewhere: string | null;
 }) {
   const [open, setOpen] = useState(false);
   const [confirming, setConfirming] = useState(false);
@@ -106,6 +116,12 @@ function FailedItem({item, onRetry, onDiscard}: {
   const when = Number.isNaN(queuedAt.getTime())
     ? ''
     : queuedAt.toLocaleString('ru-RU', {day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'});
+  /*
+    Ту же причину уже печатает `ErrorNote` у кнопки на экране. Второй раз
+    повторять её в карточке незачем — машинист видит одну фразу дважды
+    (аудит R89, находка 3). Состав записи и кнопки остаются на месте.
+  */
+  const reasonShownElsewhere = !!shownElsewhere && item.lastError === shownElsewhere;
 
   return (
     <div role="alert" className="space-y-2 rounded-xl border border-destructive bg-destructive/10 px-3 py-2 text-2xs font-medium text-destructive-strong">
@@ -113,9 +129,11 @@ function FailedItem({item, onRetry, onDiscard}: {
         {item.label} не принята
       </p>
       {/* Причина отказа сервера — главное на карточке: по ней решают, поможет ли повтор. */}
-      <p className="min-w-0 break-words text-sm font-semibold">
-        {item.lastError ?? 'причина неизвестна'}
-      </p>
+      {!reasonShownElsewhere && (
+        <p className="min-w-0 break-words text-sm font-semibold">
+          {item.lastError ?? 'причина неизвестна'}
+        </p>
+      )}
       {open && (
         <p className="break-words font-normal text-foreground">
           Введено{when ? ` ${when}` : ''}: {describeCommand(item.command)}

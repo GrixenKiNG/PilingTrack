@@ -123,3 +123,55 @@ describe('плашка ждущих записей: связь или отказ
     expect(text.match(/Смена уже закрыта/g)).toHaveLength(1);
   });
 });
+
+describe('причина отказа не повторяется в карточке (F-R89-DUP-REJECT)', () => {
+  const failed = (lastError: string) => ({
+    clientCommandId: 'f1',
+    label: 'Выработка',
+    command: {command: 'log-production', entry: {kind: 'PILES', count: 12}},
+    queuedAt: '2026-10-01T08:00:00.000Z',
+    attempts: 1,
+    state: 'FAILED' as const,
+    lastError,
+  });
+
+  it('причина, показанная у кнопки экрана, в карточке не печатается, кнопки остаются', () => {
+    const reason = 'Паспорт заполнен не полностью';
+    render(
+      <OfflineQueueBanner
+        items={[failed(reason)]}
+        onRetry={vi.fn()}
+        onDiscard={vi.fn()}
+        shownElsewhere={reason}
+      />,
+    );
+
+    expect(screen.queryByText(reason)).toBeNull();
+    // Состав и кнопки карточки на месте — запись можно разобрать.
+    expect(screen.getByRole('button', {name: 'Удалить запись'})).toBeTruthy();
+    expect(screen.getByRole('button', {name: 'Повторить'})).toBeTruthy();
+  });
+
+  it('другая причина у кнопки — причина карточки видна как раньше', () => {
+    const reason = 'Паспорт заполнен не полностью';
+    render(
+      <OfflineQueueBanner
+        items={[failed(reason)]}
+        onRetry={vi.fn()}
+        onDiscard={vi.fn()}
+        shownElsewhere="Смена уже закрыта"
+      />,
+    );
+
+    expect(screen.getByText(reason)).toBeTruthy();
+  });
+
+  it('пустой shownElsewhere — причина карточки видна как раньше', () => {
+    const reason = 'Паспорт заполнен не полностью';
+    render(
+      <OfflineQueueBanner items={[failed(reason)]} onRetry={vi.fn()} onDiscard={vi.fn()} />,
+    );
+
+    expect(screen.getByText(reason)).toBeTruthy();
+  });
+});
