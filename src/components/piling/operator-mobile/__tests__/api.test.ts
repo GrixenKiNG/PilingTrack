@@ -479,3 +479,71 @@ describe('таймаут запроса без AbortSignal.any/timeout', () => {
     expect(anySpy).toHaveBeenCalled();
   });
 });
+
+/**
+ * Признак нашего ответа — поле `data` (аудит R76, находка 14).
+ *
+ * Сети-посредники (гостиничный портал, прокси, WAF) отвечают 200 с чужим JSON
+ * вида `{"status":"ok"}`. Раньше это считалось успехом: `sendCommand` снимал
+ * запись с устройства, хотя сервер её не видел, а `fetchState` возвращал
+ * `undefined` и экран навсегда оставался на «Загрузка смены». Здесь проверяется,
+ * что успехом считается только ответ с полем `data`, а чужой JSON — сетевой сбой:
+ * запись остаётся `PENDING` и уйдёт повтором.
+ */
+describe('ответ 200 без поля data — не успех', () => {
+  const command = {
+    command: 'log-production' as const,
+    clientCommandId: 'c1',
+    shiftId: 's1',
+    entry: {kind: 'PILES' as const, pileGradeId: 'g1', count: 12},
+  };
+
+  beforeEach(() => {
+    const store = new Map<string, string>();
+    Object.defineProperty(globalThis, 'localStorage', {
+      configurable: true,
+      value: {
+        getItem: (key: string) => store.get(key) ?? null,
+        setItem: (key: string, value: string) => { store.set(key, value); },
+        removeItem: (key: string) => { store.delete(key); },
+        clear: () => { store.clear(); },
+      },
+    });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('чужой JSON на команду — запись остаётся PENDING, ошибка QueuedOffline', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(
+      JSON.stringify({status: 'ok'}), {status: 200})));
+    const error = await sendCommand(command).catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(QueuedOffline);
+    expect(operatorErrorText(error)).toBe('Выработка: сохранено на устройстве, отправим при связи');
+    const queue = readQueue();
+    expect(queue).toHaveLength(1);
+    expect(queue[0]).toMatchObject({clientCommandId: 'c1', state: 'PENDING'});
+  });
+
+  it('чужой JSON на состояние — понятная ошибка, а не undefined', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(
+      JSON.stringify({status: 'ok'}), {status: 200})));
+    const error = await fetchState({}).catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(ApiError);
+    expect((error as ApiError).status).toBe(0);
+    expect((error as ApiError).message)
+      .toBe('Ответ пришёл не от сервера. Проверьте подключение (вход в Wi-Fi) и повторите.');
+  });
+
+  it('ответ с полем data — успех, как раньше', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(
+      JSON.stringify({data: {phase: 'IDLE'}}), {status: 200})));
+
+    await expect(fetchState({})).resolves.toEqual({phase: 'IDLE'});
+    await expect(sendCommand(command)).resolves.toEqual({phase: 'IDLE'});
+    expect(readQueue()).toHaveLength(0);
+  });
+});

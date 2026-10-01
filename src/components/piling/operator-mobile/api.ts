@@ -118,6 +118,18 @@ function detailText(item: unknown): string | null {
   return hasLabel ? label : null;
 }
 
+/**
+ * Текст для чужого JSON-ответа: пришёл 200, но это не наш сервер.
+ *
+ * Сети-посредники умеют отвечать 200 с JSON вида `{"status":"ok"}` — так же
+ * охотно, как HTML-страницей входа. Раньше такой ответ считался успехом:
+ * `sendCommand` снимал запись с устройства (`resolve`), хотя сервер её не
+ * видел, а `fetchState` возвращал `undefined` и экран навсегда оставался на
+ * «Загрузка смены» (аудит R76, находка 14).
+ */
+const NOT_SERVER_JSON =
+  'Ответ пришёл не от сервера. Проверьте подключение (вход в Wi-Fi) и повторите.';
+
 async function parse<T>(response: Response): Promise<T> {
   const payload = await response.json().catch(() => null) as
     {data?: T; error?: string; details?: unknown} | null;
@@ -130,6 +142,14 @@ async function parse<T>(response: Response): Promise<T> {
   // сервер её так и не видел. Статус 0 — «не ответ сервера», повторить позже.
   if (payload === null || typeof payload !== 'object') {
     throw new ApiError(0, 'Ответ пришёл не от сервера приложения — возможно, сеть требует входа (Wi‑Fi). Запись осталась на устройстве.');
+  }
+  // Признак нашего ответа — результат под полем `data`. Все маршруты, которые
+  // зовёт этот разбор (`command`, `state`, `knowledge-attempt`), кладут его
+  // туда; чужой JSON поля `data` не имеет. Статус 0 → `classifyFailure` считает
+  // сбой временным: запись остаётся `PENDING` и уйдёт повтором, а не снимется
+  // с устройства (аудит R76, находка 14).
+  if (!('data' in payload)) {
+    throw new ApiError(0, NOT_SERVER_JSON);
   }
   return payload.data as T;
 }
