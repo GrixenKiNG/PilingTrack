@@ -145,6 +145,12 @@ REDIS_PASSWORD_VAL="$(read_env REDIS_PASSWORD)"
 BACKUP_TS="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 BACKUP_SIZE_BYTES="$(stat -c %s "$OUT" 2>/dev/null || echo 0)"
 
+# Keys carry the `pilingtrack:` prefix: the app reads them through ioredis with
+# keyPrefix 'pilingtrack:' (src/lib/redis-cache.ts), so an unprefixed
+# system:backup:* is invisible to the health-tracker (found 01.10.2026 when
+# BACKUP_ENABLED was first passed to the container: /api/health/deep went
+# degraded with backup_age_hours 0 while the bare keys were fresh).
+#
 # All three keys go in ONE MULTI/EXEC transaction: written separately, a lost
 # SET (e.g. s3_synced=false) would leave a fresh timestamp next to a stale
 # s3_synced=true — a failed off-site copy going unnoticed. Values carry no
@@ -152,9 +158,9 @@ BACKUP_SIZE_BYTES="$(stat -c %s "$OUT" 2>/dev/null || echo 0)"
 if [ -n "$REDIS_PASSWORD_VAL" ]; then
   printf '%s\n' \
     MULTI \
-    "SET system:backup:last_timestamp $BACKUP_TS EX 172800" \
-    "SET system:backup:last_size $BACKUP_SIZE_BYTES EX 172800" \
-    "SET system:backup:s3_synced $S3_SYNC_STATUS EX 172800" \
+    "SET pilingtrack:system:backup:last_timestamp $BACKUP_TS EX 172800" \
+    "SET pilingtrack:system:backup:last_size $BACKUP_SIZE_BYTES EX 172800" \
+    "SET pilingtrack:system:backup:s3_synced $S3_SYNC_STATUS EX 172800" \
     EXEC \
     | REDISCLI_AUTH="$REDIS_PASSWORD_VAL" docker compose --env-file "$ENV_FILE" exec -T \
         -e REDISCLI_AUTH redis redis-cli >/dev/null 2>&1 || true
