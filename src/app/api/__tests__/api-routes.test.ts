@@ -348,24 +348,94 @@ function handlerSite(sf: ts.SourceFile, bodies: Map<string, ts.Node>, method: st
   return null;
 }
 
-/** Имена, вызываемые как функции (`f(...)`), внутри узла — только по AST. */
-function calledIdentifiers(node: ts.Node, calls: Set<string>): void {
-  if (ts.isCallExpression(node) && ts.isIdentifier(node.expression)) {
-    calls.add(node.expression.text);
+/** Узел-функция: его тело — отдельная область выполнения. */
+function isFunctionLikeNode(node: ts.Node): boolean {
+  return ts.isArrowFunction(node) || ts.isFunctionExpression(node) || ts.isFunctionDeclaration(node);
+}
+
+/**
+ * Имя, под которым объявлена функция (`function helper()`,
+ * `const helper = () => …`). У анонимной функции имени нет — её запускает
+ * только тот вызов, аргументом которого она стоит.
+ */
+function declaredFunctionName(node: ts.Node): string | null {
+  if (ts.isFunctionDeclaration(node)) return node.name?.text ?? null;
+  if (ts.isArrowFunction(node) || ts.isFunctionExpression(node)) {
+    const parent = node.parent;
+    if (parent !== undefined && ts.isVariableDeclaration(parent) && ts.isIdentifier(parent.name)) {
+      return parent.name.text;
+    }
   }
-  ts.forEachChild(node, (child) => calledIdentifiers(child, calls));
+  return null;
+}
+
+/**
+ * Имена, запускаемые в этой области: вызовы `f(...)` и колбэки-аргументы
+ * вызовов (`db.$transaction(async tx => …)`, `promise.then(() => …)`) — их
+ * выполнит тот, кому их передали. В тела прочих вложенных функций обход не
+ * идёт: чтобы зайти в них, нужно доказательство запуска.
+ */
+function collectInvokedNames(node: ts.Node, invoked: Set<string>): void {
+  if (ts.isCallExpression(node)) {
+    if (ts.isIdentifier(node.expression)) invoked.add(node.expression.text);
+    for (const argument of node.arguments) {
+      if (isFunctionLikeNode(argument)) collectInvokedNames(argument, invoked);
+    }
+  }
+  ts.forEachChild(node, (child) => {
+    if (isFunctionLikeNode(child)) return;
+    collectInvokedNames(child, invoked);
+  });
+}
+
+/**
+ * Имена, вызываемые как функции (`f(...)`), в выполняемом коде узла — только по
+ * AST. Во вложенную функцию обход заходит, лишь когда есть доказательство, что
+ * её действительно запускают: (а) она передана аргументом вызова (колбэк) либо
+ * (б) объявлена под именем, которое эта область вызывает
+ * (`const check = () => …; check()`). Невызванная
+ * `const unused = () => requireAuth(request)` доказательством защиты не
+ * является: R80/Codex — «ложное защищён» пропускает незащищённый маршрут.
+ */
+function calledIdentifiers(node: ts.Node, calls: Set<string>): void {
+  const invoked = new Set<string>();
+  collectInvokedNames(node, invoked);
+  scanExecutedCode(node, calls, invoked);
+}
+
+function scanExecutedCode(node: ts.Node, calls: Set<string>, invoked: Set<string>): void {
+  if (ts.isCallExpression(node)) {
+    if (ts.isIdentifier(node.expression)) calls.add(node.expression.text);
+    // Колбэк вызова выполняется — заходим в его тело.
+    for (const argument of node.arguments) {
+      if (isFunctionLikeNode(argument)) calledIdentifiers(argument, calls);
+    }
+  }
+  ts.forEachChild(node, (child) => {
+    if (isFunctionLikeNode(child)) {
+      // Вложенная функция: заходим, только если область её запускает по имени.
+      const name = declaredFunctionName(child);
+      if (name !== null && invoked.has(name)) calledIdentifiers(child, calls);
+      return;
+    }
+    scanExecutedCode(child, calls, invoked);
+  });
 }
 
 /**
  * Локальные функции, которые узел действительно запускает: вызванные по имени
  * (`helper()`) или переданные обёртке аргументом-идентификатором
- * (`withApi(handleGet)` — обёртка вызовет handleGet).
+ * (`withApi(handleGet)` — обёртка вызовет handleGet). Аргумент-идентификатор
+ * считается запуском только у известных обёрток: `console.log(helper)` функцию
+ * не выполняет, и тело helper защитой не становится.
  */
 function invokedLocalNames(node: ts.Node, names: Set<string>): void {
   if (ts.isCallExpression(node)) {
     if (ts.isIdentifier(node.expression)) names.add(node.expression.text);
-    for (const argument of node.arguments) {
-      if (ts.isIdentifier(argument)) names.add(argument.text);
+    if (ts.isIdentifier(node.expression) && WRAPPERS.includes(node.expression.text)) {
+      for (const argument of node.arguments) {
+        if (ts.isIdentifier(argument)) names.add(argument.text);
+      }
     }
   }
   ts.forEachChild(node, (child) => invokedLocalNames(child, names));
@@ -491,6 +561,70 @@ describe('Контракт маршрутов — разбор тела обра
 
     // Раньше первая «{» из `Promise<{ user: unknown }>` принималась за начало
     // тела, и помощник с проверкой не достраивался.
+    expect(callsOf(source, 'GET')?.has('requireAuth')).toBe(true);
+  });
+
+  it('невызванная вложенная функция с проверкой защитой не считается', () => {
+    const source = [
+      "import { withApi } from '@/core/api-wrapper';",
+      "import { requireAuth } from '@/lib/auth';",
+      'export const GET = withApi(async (request: Request) => {',
+      '  const unused = () => requireAuth(request);',
+      '  return Response.json({});',
+      '});',
+    ].join('\n');
+
+    // Раньше обход заходил в тело `unused` и находил requireAuth, будто проверка
+    // выполняется; на деле функцию никто не вызывает.
+    expect(callsOf(source, 'GET')?.has('requireAuth')).toBe(false);
+  });
+
+  it('помощник, переданный console.log, а не обёртке, защитой не считается', () => {
+    const source = [
+      "import { withApi } from '@/core/api-wrapper';",
+      "import { requireAuth } from '@/lib/auth';",
+      'async function helper(request: Request) {',
+      '  await requireAuth(request);',
+      '}',
+      'export const GET = withApi(async (request: Request) => {',
+      '  console.log(helper);',
+      '  return Response.json({});',
+      '});',
+    ].join('\n');
+
+    // Раньше любой идентификатор-аргумент считался запуском: console.log(helper)
+    // засчитывал проверку из тела helper.
+    expect(callsOf(source, 'GET')?.has('requireAuth')).toBe(false);
+  });
+
+  it('проверка в колбэке вызова защитой считается', () => {
+    const source = [
+      "import { withApi } from '@/core/api-wrapper';",
+      "import { requireAuth } from '@/lib/auth';",
+      "declare const db: { $transaction: (fn: (tx: unknown) => Promise<void>) => Promise<void> };",
+      'export const GET = withApi(async (request: Request) => {',
+      '  await db.$transaction(async (tx) => {',
+      '    await requireAuth(request);',
+      '  });',
+      '  return Response.json({});',
+      '});',
+    ].join('\n');
+
+    // Колбэк выполняется вместе с вызовом — в его тело обход обязан заходить.
+    expect(callsOf(source, 'GET')?.has('requireAuth')).toBe(true);
+  });
+
+  it('проверка в вызванной по имени локальной функции защитой считается', () => {
+    const source = [
+      "import { withApi } from '@/core/api-wrapper';",
+      "import { requireAuth } from '@/lib/auth';",
+      'export const GET = withApi(async (request: Request) => {',
+      '  const check = () => requireAuth(request);',
+      '  check();',
+      '  return Response.json({});',
+      '});',
+    ].join('\n');
+
     expect(callsOf(source, 'GET')?.has('requireAuth')).toBe(true);
   });
 });
