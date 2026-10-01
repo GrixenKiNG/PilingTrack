@@ -321,6 +321,24 @@ export function OperatorMobileApp() {
   }, []);
 
   /**
+   * Уйти на вход с уведомлением об истёкшей сессии.
+   *
+   * Истёкший вход приходит двумя путями: отложенная запись (`QueuedOffline` с
+   * `reason === 'auth'`) и прямой 401 на команде-переходе (`close-shift`,
+   * `finish-work`, `submit-checklist`…), которая в очередь не кладётся. Делать
+   * в обоих случаях надо одно и то же, поэтому переход и текст собраны здесь:
+   * задержка нужна, чтобы машинист успел прочитать причину — без неё
+   * перезагрузка выглядит как сбой приложения.
+   */
+  const leaveToLogin = useCallback(() => {
+    setNotice(AUTH_EXPIRED_NOTICE);
+    authRedirectTimer.current = setTimeout(() => {
+      // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- намеренно: сессия истекла, полная перезагрузка сбрасывает кэш маршрутов и память вкладки прежнего входа
+      window.location.href = '/login';
+    }, AUTH_REDIRECT_MS);
+  }, []);
+
+  /**
    * Выполнить команду и сказать, получилось ли.
    *
    * ПОЧЕМУ ВОЗВРАЩАЕТ ПРИЗНАК. Экран очищает форму только по этому ответу.
@@ -382,11 +400,7 @@ export function OperatorMobileApp() {
           прочитать причину.
         */
         if (error.reason === 'auth') {
-          setNotice(AUTH_EXPIRED_NOTICE);
-          authRedirectTimer.current = setTimeout(() => {
-            // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- намеренно: сессия истекла, полная перезагрузка сбрасывает кэш маршрутов и память вкладки прежнего входа
-            window.location.href = '/login';
-          }, AUTH_REDIRECT_MS);
+          leaveToLogin();
         } else {
           /*
             ОБРЫВ СВЯЗИ — НЕ МОЛЧАНИЕ (аудит R76, находка 18). Запись легла на
@@ -399,6 +413,21 @@ export function OperatorMobileApp() {
           setNotice(error.message);
         }
         return true;
+      }
+      /*
+        ИСТЁКШИЙ ВХОД НА КОМАНДЕ-ПЕРЕХОДЕ (аудит R89, находка 5). 401 приходит
+        не только отложенной записью: у команд, которые в очередь не кладутся
+        (`close-shift`, `finish-work`, `submit-checklist`, `submit-report`,
+        `accept-equipment`, `confirm-ppe`, `acknowledge-briefing`), сервер
+        отвечает `ApiError` 401 напрямую. Раньше это был просто текст отказа
+        «Войдите в систему»: машинист оставался на экране без единого действия
+        и без входа. Теперь тот же уход на вход с уведомлением, что у
+        отложенной записи, — общий помощник `leaveToLogin`. Отказа команды при
+        этом не показываем: экран уходит на вход, а не разбирает ошибку.
+      */
+      if (error instanceof ApiError && error.status === 401) {
+        leaveToLogin();
+        return false;
       }
       setActionError(operatorErrorText(error));
       setActionErrorDetails(operatorErrorDetails(error));
@@ -431,7 +460,7 @@ export function OperatorMobileApp() {
     } finally {
       setBusy(false);
     }
-  }, [reload]);
+  }, [reload, leaveToLogin]);
 
   // Что лежит на устройстве и ещё не ушло: машинист видит это постоянно, а не
   // узнаёт по факту пропажи. Когда слать — решает общий хук (use-offline-queue).

@@ -308,6 +308,24 @@ describe('v1: истёкший вход на команде', () => {
     expect(window.location.pathname).toBe('/login');
   });
 
+  it('401 на команде-переходе уводит на вход тем же уведомлением (R89, находка 5)', async () => {
+    // Команды перехода (`finish-work`, `close-shift`…) в очередь не кладутся,
+    // поэтому истёкший вход приходит сюда прямым `ApiError` 401, а не
+    // `QueuedOffline`. Раньше это был только текст отказа без перехода: машинист
+    // оставался на экране без входа и без действия.
+    await sendFinishWork(new ApiError(401, 'Войдите в систему'));
+
+    expect(screen.getByText(/Сессия истекла\. Записи сохранены на телефоне/)).toBeInTheDocument();
+    // Отказ команды на экран не попал: экран уходит на вход, а не разбирает ошибку.
+    expect(screen.queryByText('Войдите в систему')).not.toBeInTheDocument();
+    // До паузы экран ещё не ушёл: машинист успевает прочитать причину.
+    expect(window.location.pathname).not.toBe('/login');
+
+    act(() => { vi.advanceTimersByTime(2500); });
+
+    expect(window.location.pathname).toBe('/login');
+  });
+
   it('обрыв связи — прежнее поведение: без уведомления и без перехода', async () => {
     await sendFinishWork(new QueuedOffline('Выработка'));
 
