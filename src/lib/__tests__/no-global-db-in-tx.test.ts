@@ -16,10 +16,16 @@
  *     которым в этом файле импортирован `db` из `@/lib/db` (учитывает `db as prisma`).
  *
  * Параметр `tx` и прочие имена не считаются; не считаются обращение к имени как
- * к свойству (`x.db`), имя свойства в литерале (`{ db: … }`) и объявление имени
- * (параметр, `const db = …`, импорт). Сознательно считается и `typeof db`
- * (например, приведение `tx as typeof db`): сторож реагирует на любое упоминание
- * импортированного имени в теле колбэка, а разобранные случаи лежат в KNOWN.
+ * к свойству (`x.db`), имя свойства в литерале (`{ db: … }`), объявление имени
+ * (параметр, `const db = …`, импорт) и упоминание имени внутри узла ТИПА
+ * (`tx as typeof db`, `const t: typeof db = tx`): в типе Name указывает на форму
+ * клиента (TypeQuery), а не на сам клиент. Обращения в выражениях (`db.x`,
+ * `f(db)`, `const c = db`) считаются, как и раньше.
+ *
+ * Пределы: сторож видит только ЛЕКСИЧЕСКИЕ обращения к `db` в теле колбэка.
+ * Вызов функции, которая сама обращается к глобальному `db`, он не ловит — ровно
+ * так была устроена ошибка R85 (`sendDocument` → `getConfigs`): в колбэке стоял
+ * вызов помощника, а глобальный клиент доставался уже внутри него.
  *
  * Результат сверяется с KNOWN: тест ЗЕЛЁНЫЙ на текущем коде и КРАСНЫЙ на любом
  * новом вхождении. Запись в KNOWN — приглашение к разбору, а не разрешение.
@@ -36,43 +42,12 @@ const ROOT = path.resolve(process.cwd());
 const SRC = path.join(ROOT, 'src');
 
 /**
- * Уже существующие вхождения, найденные сторожем при первом запуске. Ключ —
- * `путь:строка` от корня, значение — почему вхождение разбирается отдельно.
- *
- * Все текущие записи — `typeof db` в приведении типа `tx as typeof db` (тут `db`
- * участвует только как тип, обращения к самому клиенту нет), но каждая строка
- * отмечена «разобрать», чтобы её подтвердили глазами, а не считали разрешением.
+ * Уже существующие вхождения. После разбора `tx as typeof db` — это упоминание
+ * `db` в позиции ТИПА, а не обращение к клиенту, — сторож такие строки не считает,
+ * и список пуст. Любое новое вхождение означает настоящее обращение к глобальному
+ * клиенту внутри транзакции; добавлять сюда запись без разбора нельзя.
  */
-const KNOWN: Record<string, string> = {
-  'src/modules/equipment/application/commands/equipment-maintenance.ts:97':
-    'T-GLOBAL-DB-IN-TX-GUARD: разобрать — `tx as typeof db`, обращение к типу, не к клиенту',
-  'src/modules/equipment/application/commands/equipment-maintenance.ts:258':
-    'T-GLOBAL-DB-IN-TX-GUARD: разобрать — `tx as typeof db`, обращение к типу, не к клиенту',
-  'src/modules/equipment/application/commands/equipment-maintenance.ts:266':
-    'T-GLOBAL-DB-IN-TX-GUARD: разобрать — `tx as typeof db`, обращение к типу, не к клиенту',
-  'src/modules/equipment/application/commands/equipment-maintenance.ts:270':
-    'T-GLOBAL-DB-IN-TX-GUARD: разобрать — `tx as typeof db`, обращение к типу, не к клиенту',
-  'src/modules/equipment/application/commands/equipment-maintenance.ts:314':
-    'T-GLOBAL-DB-IN-TX-GUARD: разобрать — `tx as typeof db`, обращение к типу, не к клиенту',
-  'src/modules/equipment/application/commands/equipment-maintenance.ts:320':
-    'T-GLOBAL-DB-IN-TX-GUARD: разобрать — `tx as typeof db`, обращение к типу, не к клиенту',
-  'src/modules/equipment/application/commands/equipment-maintenance.ts:322':
-    'T-GLOBAL-DB-IN-TX-GUARD: разобрать — `tx as typeof db`, обращение к типу, не к клиенту',
-  'src/modules/equipment/application/commands/equipment-maintenance.ts:357':
-    'T-GLOBAL-DB-IN-TX-GUARD: разобрать — `tx as typeof db`, обращение к типу, не к клиенту',
-  'src/modules/equipment/application/commands/meter-reading.ts:257':
-    'T-GLOBAL-DB-IN-TX-GUARD: разобрать — `tx as typeof db`, обращение к типу, не к клиенту',
-  'src/modules/equipment/application/commands/meter-reading.ts:277':
-    'T-GLOBAL-DB-IN-TX-GUARD: разобрать — `tx as typeof db`, обращение к типу, не к клиенту',
-  'src/modules/equipment/application/commands/meter-reading.ts:279':
-    'T-GLOBAL-DB-IN-TX-GUARD: разобрать — `tx as typeof db`, обращение к типу, не к клиенту',
-  'src/modules/equipment/application/commands/pm-scheduler.ts:133':
-    'T-GLOBAL-DB-IN-TX-GUARD: разобрать — `tx as typeof db`, обращение к типу, не к клиенту',
-  'src/modules/inspections/application/commands/inspection-commands.ts:166':
-    'T-GLOBAL-DB-IN-TX-GUARD: разобрать — `tx as typeof db`, обращение к типу, не к клиенту',
-  'src/modules/inspections/application/commands/inspection-commands.ts:432':
-    'T-GLOBAL-DB-IN-TX-GUARD: разобрать — `tx as typeof db`, обращение к типу, не к клиенту',
-};
+const KNOWN: Record<string, string> = {};
 
 /**
  * `parseDiagnostics` есть у узла во время выполнения, но не в публичном типе
@@ -99,9 +74,26 @@ function dbLocalNames(sourceFile: ts.SourceFile): Set<string> {
   return names;
 }
 
+/**
+ * Упоминание имени внутри узла ТИПА (`tx as typeof db`, `const t: typeof db = tx`,
+ * `Foo<typeof db>`): в типе `db` задаёт лишь форму клиента (TypeQuery), обращения
+ * к нему нет. Проверку ведём по предкам до границы выражения: встретили узел типа
+ * раньше, чем выражение/инструкцию, — значит это позиция ТИПА, а не обращение.
+ */
+function isInsideTypeContext(id: ts.Identifier): boolean {
+  let node: ts.Node | undefined = id.parent;
+  while (node) {
+    if (ts.isTypeNode(node) || ts.isTypeQueryNode(node)) return true;
+    if (ts.isExpression(node) || ts.isStatement(node)) return false;
+    node = node.parent;
+  }
+  return false;
+}
+
 /** Обращение к имени, а не имя свойства (`x.db`), ключ литерала (`{ db: … }`) или объявление имени. */
 function isReferenceToDb(id: ts.Identifier, names: Set<string>): boolean {
   if (!names.has(id.text)) return false;
+  if (isInsideTypeContext(id)) return false;
   const parent = id.parent;
   if (ts.isPropertyAccessExpression(parent) && parent.name === id) return false;
   if (ts.isPropertyAssignment(parent) && parent.name === id) return false;
@@ -286,12 +278,37 @@ describe('разбор исходника на глобальный db внут�
     expect(findGlobalDbInTx(source)).toEqual([]);
   });
 
-  it('считает typeof db — сознательно; такие строки разобраны в KNOWN', () => {
+  it('не считает db в позиции типа (tx as typeof db)', () => {
     const source = [
       "import { db } from '@/lib/db';",
       'async function f() {',
       '  return db.$transaction(async (tx) => {',
       '    await g(tx as typeof db);',
+      '  });',
+      '}',
+    ].join('\n');
+    expect(findGlobalDbInTx(source)).toEqual([]);
+  });
+
+  it('не считает db в аннотации типа (const t: typeof db = tx)', () => {
+    const source = [
+      "import { db } from '@/lib/db';",
+      'async function f() {',
+      '  return db.$transaction(async (tx) => {',
+      '    const t: typeof db = tx;',
+      '    await t.user.findMany();',
+      '  });',
+      '}',
+    ].join('\n');
+    expect(findGlobalDbInTx(source)).toEqual([]);
+  });
+
+  it('находит реальное обращение db внутри колбэка', () => {
+    const source = [
+      "import { db } from '@/lib/db';",
+      'async function f() {',
+      '  return db.$transaction(async (tx) => {',
+      '    await db.site.findMany();',
       '  });',
       '}',
     ].join('\n');
