@@ -145,10 +145,16 @@ const NOT_SERVER_JSON =
  * ошибке шлюза связь есть — сервер (или прокси перед ним) отдал отказ. Одна
  * фраза отправляла машиниста «искать связь» при живом сервере. Код называем,
  * чтобы диспетчер мог разобраться.
+ *
+ * ПОЧЕМУ БЕЗ «ЗАПИСЬ СОХРАНЕНА». Этот разбор обслуживает и ЧТЕНИЕ — загрузку
+ * состояния смены (`fetchState`) и вопросов проверки знаний, — где никакой
+ * записи не сохраняется, и обещание повтора там вводило бы в заблуждение
+ * (F-V1-STATE-5XX-TEXT). Добавку про сохранённую запись несёт только путь
+ * очереди, где она правдива: `withQueuedFailureNote` в `sendCommand`.
  */
 function unparsedFailureText(status: number): string {
   if (status >= 500) {
-    return `Сервер временно недоступен (код ${status}). Запись сохранена — отправим автоматически.`;
+    return `Сервер временно недоступен (код ${status}).`;
   }
   if (status >= 400) {
     return `Сервер отказал (код ${status}). Обновите экран и повторите.`;
@@ -455,6 +461,23 @@ async function postCommand<T>(command: unknown): Promise<T> {
   }
 }
 
+/**
+ * Дополнение к отказу сервера у команды, которая уже легла в очередь.
+ *
+ * ПОЧЕМУ ТОЛЬКО ЗДЕСЬ. Общий текст 5xx (`unparsedFailureText`) обслуживает и
+ * чтение состояния смены, и вопросы проверки знаний, где никакой записи не
+ * сохраняется, — там «Запись сохранена — отправим автоматически» обещало бы
+ * то, чего нет (F-V1-STATE-5XX-TEXT). Здесь же команда действительно лежит на
+ * устройстве и уйдёт повтором, поэтому обещание правдиво и вводит его только
+ * путь очереди. Разбор тела ответа не повторяем: берём готовый текст ошибки.
+ */
+const QUEUED_FAILURE_NOTE = ' Запись сохранена — отправим автоматически.';
+
+function withQueuedFailureNote(error: unknown): unknown {
+  if (!(error instanceof ApiError) || error.status < 500) return error;
+  return new ApiError(error.status, `${error.message}${QUEUED_FAILURE_NOTE}`, error.details, error.reason);
+}
+
 export async function sendCommand<T = unknown>(command: Command): Promise<T> {
   // Команды перехода состояния смены отправляем как есть: откладывать их
   // нельзя (см. offline-queue.ts).
@@ -495,7 +518,12 @@ export async function sendCommand<T = unknown>(command: Command): Promise<T> {
     const result = await postCommand<T>(command);
     resolve(command.clientCommandId, queuedAt);
     return result;
-  } catch (error) {
+  } catch (caught) {
+    // Отказ сервера у команды из очереди: 5xx дополняем обещанием повтора —
+    // запись правда на устройстве и уйдёт сама (F-V1-STATE-5XX-TEXT). Текст
+    // попадёт и машинисту в плашку очереди через `markAttempt`, и в решение о
+    // судьбе записи ниже.
+    const error = withQueuedFailureNote(caught);
     // CSRF-403 — временный отказ, хотя и 403: причина (расхождение `Origin` и
     // `Host`) снимается перезагрузкой страницы. Запись остаётся `PENDING` и
     // уйдёт сама, а машинист читает русское указание (`ApiError.message`).

@@ -172,9 +172,7 @@ describe('fetchKnowledgeAttempt', () => {
     const error = await fetchKnowledgeAttempt().catch((caught: unknown) => caught);
     expect(error).toBeInstanceOf(ApiError);
     expect((error as ApiError).status).toBe(502);
-    expect(operatorErrorText(error)).toBe(
-      'Сервер временно недоступен (код 502). Запись сохранена — отправим автоматически.',
-    );
+    expect(operatorErrorText(error)).toBe('Сервер временно недоступен (код 502).');
     vi.unstubAllGlobals();
   });
 
@@ -676,20 +674,25 @@ describe('ответ 200 без поля data — не успех', () => {
  * схемы «Некорректная команда» (рассогласование приложения и сервера). На
  * способность записи отправиться повтором это не влияет: решает статус
  * (`classifyFailure`), а не текст.
+ *
+ * ПОЧЕМУ У ЧТЕНИЯ НЕТ «ЗАПИСЬ СОХРАНЕНА» (F-V1-STATE-5XX-TEXT). Общий текст 5xx
+ * читают и `fetchState`, и вопросы проверки знаний — там записи нет, и обещание
+ * повтора обманывало бы машиниста. Добавка живёт только на пути очереди, где
+ * запись правда на устройстве: у `sendCommand` очередной команды она попадает
+ * в причину записи (`lastError`).
  */
 describe('ошибочный статус без разобранного тела', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
   });
 
-  it('502 с HTML — код в тексте, а не общая фраза про связь', async () => {
+  it('502 с HTML на чтении состояния — код в тексте, без обещания сохранить запись', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response('<html>502 Bad Gateway</html>', {status: 502})));
     const error = await fetchState({}).catch((caught: unknown) => caught);
 
     expect(error).toBeInstanceOf(ApiError);
     expect((error as ApiError).status).toBe(502);
-    expect(operatorErrorText(error))
-      .toBe('Сервер временно недоступен (код 502). Запись сохранена — отправим автоматически.');
+    expect(operatorErrorText(error)).toBe('Сервер временно недоступен (код 502).');
   });
 
   it('404 с HTML — отказ сервера с кодом', async () => {
@@ -730,7 +733,7 @@ describe('ошибочный статус без разобранного тел
     expect(operatorErrorText(error)).toBe('Нет связи с сервером. Проверьте интернет и повторите.');
   });
 
-  it('5xx с HTML на команде — запись остаётся ждать отправки', async () => {
+  it('5xx с HTML на очередной команде — запись ждёт отправки, а текст обещает повтор', async () => {
     const store = new Map<string, string>();
     Object.defineProperty(globalThis, 'localStorage', {
       configurable: true,
@@ -741,7 +744,7 @@ describe('ошибочный статус без разобранного тел
         clear: () => { store.clear(); },
       },
     });
-    vi.stubGlobal('fetch', vi.fn(async () => new Response('<html>503</html>', {status: 503})));
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('<html>502 Bad Gateway</html>', {status: 502})));
     const command = {
       command: 'log-production' as const,
       clientCommandId: 'c1',
@@ -751,7 +754,13 @@ describe('ошибочный статус без разобранного тел
 
     const error = await sendCommand(command).catch((caught: unknown) => caught);
 
+    // Запись легла в очередь на устройстве — это принято, а не отказ.
     expect(error).toBeInstanceOf(QueuedOffline);
-    expect(readQueue()[0]).toMatchObject({clientCommandId: 'c1', state: 'PENDING'});
+    const queue = readQueue();
+    expect(queue[0]).toMatchObject({clientCommandId: 'c1', state: 'PENDING'});
+    // Добавка про сохранённую запись правдива только здесь и доходит до
+    // машиниста в плашке очереди (F-V1-STATE-5XX-TEXT).
+    expect(queue[0].lastError)
+      .toBe('Сервер временно недоступен (код 502). Запись сохранена — отправим автоматически.');
   });
 });
