@@ -260,10 +260,33 @@ export function foreignQueueSummary(): {count: number; owners: string[]} {
 
 // --- Операции ---
 
-/** Кладём до отправки: обрыв на середине запроса не должен терять запись. */
+/**
+ * Кладём до отправки: обрыв на середине запроса не должен терять запись.
+ *
+ * ЕСЛИ ЗАПИСЬ С ЭТИМ КЛЮЧОМ УЖЕ ЕСТЬ И ОНА `FAILED` — ЗАМЕНЯЕМ её состав.
+ * Новый ключ приложение заводит только после успеха или `QueuedOffline`
+ * (`operator-mobile-app.tsx`, run()), поэтому машинист, исправив форму и нажав
+ * снова, приходит с тем же ключом. Без замены в очереди остался бы старый
+ * неверный состав, а исправленный потерялся бы, оборвись повтор на середине:
+ * `markAttempt` перевёл бы старую запись в `PENDING`, форма закрылась бы как
+ * `QueuedOffline`, а позже слив отправил бы прежний состав и снова получил
+ * отказ (F-V1-INLINE-REJECT-b, регрессия принятой F-V1-INLINE-REJECT; R82).
+ * Ждущую (`PENDING`) запись не трогаем — она уже снаряжена и уйдёт как есть.
+ * `attempts` не обнуляем: счётчик ведётся по записи, а не по составу.
+ */
 export function enqueue(command: {clientCommandId: string}): void {
   const queue = read(true);
-  if (queue.some((item) => item.clientCommandId === command.clientCommandId)) return;
+  const existing = queue.find((item) => item.clientCommandId === command.clientCommandId);
+  if (existing) {
+    if (existing.state !== 'FAILED') return;
+    existing.command = command;
+    existing.label = commandLabel(command);
+    existing.state = 'PENDING';
+    existing.lastError = null;
+    existing.queuedAt = new Date().toISOString();
+    write(queue);
+    return;
+  }
   queue.push({
     ownerId: currentOwnerId(),
     ownerName: usePilingStore.getState().currentUser?.name ?? null,

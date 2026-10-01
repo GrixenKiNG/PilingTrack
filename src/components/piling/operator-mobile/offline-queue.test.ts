@@ -51,6 +51,60 @@ describe('очередь команд на устройстве', () => {
     expect(readQueue()).toHaveLength(1);
   });
 
+  it('повтор с исправленным составом заменяет отвергнутую запись (F-V1-INLINE-REJECT-b)', async () => {
+    // Ключ после отказа приложение не меняет: машинист правит форму и жмёт
+    // снова с тем же ключом. Без замены в очереди остался бы старый состав.
+    const wrong = {command: 'log-production', clientCommandId: 'c1', entry: {kind: 'PILES', count: 0}};
+    const fixed = {command: 'log-production', clientCommandId: 'c1', entry: {kind: 'PILES', count: 7}};
+    enqueue(wrong);
+    await flushQueue(async () => { throw Object.assign(new Error('отказ'), {status: 409}); });
+    expect(readQueue()[0]).toMatchObject({state: 'FAILED', attempts: 1});
+
+    enqueue(fixed);
+    const queue = readQueue();
+    expect(queue).toHaveLength(1);
+    expect(queue[0]).toMatchObject({state: 'PENDING', lastError: null, attempts: 1});
+    expect(queue[0].command).toEqual(fixed);
+  });
+
+  it('ждущую запись повторный enqueue не переписывает (прежнее поведение)', () => {
+    const first = {command: 'log-production', clientCommandId: 'c1', entry: {kind: 'PILES', count: 3}};
+    const other = {command: 'log-production', clientCommandId: 'c1', entry: {kind: 'PILES', count: 9}};
+    enqueue(first);
+    enqueue(other);
+    const queue = readQueue();
+    expect(queue).toHaveLength(1);
+    expect(queue[0].state).toBe('PENDING');
+    expect(queue[0].command).toEqual(first);
+  });
+
+  it('сквозной: отказ, затем поворот с исправленным составом и обрыв не теряет правку (F-V1-INLINE-REJECT-b)', async () => {
+    const wrong = {command: 'log-production' as const, clientCommandId: 'c1', shiftId: 's1',
+      entry: {kind: 'PILES' as const, pileGradeId: 'g1', count: 0}};
+    const fixed = {command: 'log-production' as const, clientCommandId: 'c1', shiftId: 's1',
+      entry: {kind: 'PILES' as const, pileGradeId: 'g1', count: 5}};
+    const realFetch = globalThis.fetch;
+    try {
+      // Первый заход — отказ сервера по существу: запись краснеет.
+      globalThis.fetch = (async () => new Response(
+        JSON.stringify({error: 'Смена закрыта'}), {status: 409, headers: {'Content-Type': 'application/json'}},
+      )) as typeof fetch;
+      await expect(sendCommand(wrong)).rejects.toBeTruthy();
+      expect(readQueue()[0].state).toBe('FAILED');
+
+      // Повтор с исправленным составом обрывается на середине запроса.
+      globalThis.fetch = (async () => { throw new TypeError('Failed to fetch'); }) as typeof fetch;
+      await expect(sendCommand(fixed)).rejects.toBeInstanceOf(QueuedOffline);
+
+      const queue = readQueue();
+      expect(queue).toHaveLength(1);
+      expect(queue[0].state).toBe('PENDING');
+      expect(queue[0].command).toEqual(fixed);
+    } finally {
+      globalThis.fetch = realFetch;
+    }
+  });
+
   it('обрыв сети оставляет записи в очереди и не долбит остальные', async () => {
     enqueue(piles);
     enqueue(incident);
