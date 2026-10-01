@@ -81,7 +81,11 @@ function FailedItem({item, onRetry, onDiscard}: {
   return (
     <div role="alert" className="space-y-2 rounded-xl border border-destructive bg-destructive/10 px-3 py-2 text-2xs font-medium text-destructive-strong">
       <p className="min-w-0 break-words">
-        {item.label} не принята: {item.lastError ?? 'причина неизвестна'}
+        {item.label} не принята
+      </p>
+      {/* Причина отказа сервера — главное на карточке: по ней решают, поможет ли повтор. */}
+      <p className="min-w-0 break-words text-sm font-semibold">
+        {item.lastError ?? 'причина неизвестна'}
       </p>
       {open && (
         <p className="break-words font-normal text-foreground">
@@ -102,19 +106,26 @@ function FailedItem({item, onRetry, onDiscard}: {
           </button>
         </div>
       ) : (
-        <div className="flex flex-wrap gap-2">
-          <button type="button" onClick={() => onRetry(item.clientCommandId)}
-            className="rounded border border-destructive px-2 py-1 font-semibold">
-            Повторить
-          </button>
-          <button type="button" onClick={() => setOpen((value) => !value)} aria-expanded={open}
-            className="rounded border border-destructive px-2 py-1 font-semibold">
-            {open ? 'Скрыть' : 'Что введено'}
-          </button>
-          <button type="button" onClick={() => { setOpen(true); setConfirming(true); }}
-            className="rounded border border-destructive px-2 py-1 font-semibold">
-            Убрать
-          </button>
+        <div className="space-y-2">
+          <div className="flex flex-wrap gap-2">
+            <button type="button" onClick={() => { setOpen(true); setConfirming(true); }}
+              className="rounded border border-destructive bg-destructive px-2 py-1 font-semibold text-white">
+              Удалить запись
+            </button>
+            <button type="button" onClick={() => setOpen((value) => !value)} aria-expanded={open}
+              className="rounded border border-destructive px-2 py-1 font-semibold">
+              {open ? 'Скрыть' : 'Что введено'}
+            </button>
+          </div>
+          <div className="space-y-1">
+            <button type="button" onClick={() => onRetry(item.clientCommandId)}
+              className="rounded border border-destructive px-2 py-1 font-normal">
+              Повторить
+            </button>
+            <p className="break-words font-normal text-foreground">
+              Повтор отправит то же самое — поможет, только если причина уже устранена (смену переоткрыли, справочник поправили)
+            </p>
+          </div>
         </div>
       )}
     </div>

@@ -1,4 +1,4 @@
-import {render, screen} from '@testing-library/react';
+import {fireEvent, render, screen} from '@testing-library/react';
 import {beforeEach, describe, expect, it, vi} from 'vitest';
 import {usePilingStore} from '@/lib/store';
 import {enqueue} from './offline-queue';
@@ -26,6 +26,42 @@ describe('плашка очереди на общем телефоне', () => {
     render(<OfflineQueueBanner items={[]} onRetry={vi.fn()} onDiscard={vi.fn()} />);
 
     expect(screen.getByRole('status').textContent).toContain('другого сотрудника (Иванов И.): 1');
+    usePilingStore.setState({currentUser: null});
+  });
+
+  it('у отвергнутой записи основное действие — удаление, а повтор второстепенный (R76 №15)', () => {
+    usePilingStore.setState({currentUser: {id: 'op-day', name: 'Иванов И.'} as never});
+    const onRetry = vi.fn();
+    const onDiscard = vi.fn();
+    // Запись лежит в очереди целиком и не редактируется: повтор отправит то же самое.
+    const item = {
+      clientCommandId: 'f1',
+      label: 'Выработка',
+      command: {command: 'log-production', entry: {kind: 'PILES', count: 12}},
+      queuedAt: '2026-10-01T08:00:00.000Z',
+      attempts: 2,
+      state: 'FAILED' as const,
+      lastError: 'Число не изменилось',
+    };
+
+    render(<OfflineQueueBanner items={[item]} onRetry={onRetry} onDiscard={onDiscard} />);
+
+    // Текст отказа сервера — крупнее остального и показан как главное.
+    const reason = screen.getByText('Число не изменилось');
+    expect(reason.className).toContain('text-sm');
+    expect(reason.className).toContain('font-semibold');
+
+    // Основное действие — удаление записи (заливка), повтор — второстепенная кнопка с пояснением.
+    expect(screen.getByRole('button', {name: 'Удалить запись'}).className).toContain('bg-destructive');
+    expect(screen.getByText(/Повтор отправит то же самое/)).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', {name: 'Повторить'}));
+    expect(onRetry).toHaveBeenCalledWith('f1');
+
+    fireEvent.click(screen.getByRole('button', {name: 'Удалить запись'}));
+    expect(screen.getByText(/Введено/).textContent).toContain('сваи: 12 шт');
+    fireEvent.click(screen.getByRole('button', {name: 'Да, убрать'}));
+    expect(onDiscard).toHaveBeenCalledWith('f1');
     usePilingStore.setState({currentUser: null});
   });
 });
