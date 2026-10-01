@@ -39,6 +39,17 @@ const PHASE_STAGE: Partial<Record<OperatorMobileState['phase'], ChecklistStage>>
 };
 
 /**
+ * Истёкший вход на команде — уводим на вход, но не мгновенно.
+ *
+ * Задержка нужна, чтобы машинист успел прочитать, почему экран уходит: без неё
+ * перезагрузка выглядит как сбой приложения. Тот же переход, что на загрузке
+ * состояния (`reload`).
+ */
+const AUTH_REDIRECT_MS = 2500;
+const AUTH_EXPIRED_NOTICE =
+  'Сессия истекла. Записи сохранены на телефоне и уйдут после входа.';
+
+/**
  * Разделы, доступные после начала работы.
  *
  * До этого экран ведёт человека по порядку — допуск, приём, осмотр, пуск,
@@ -117,6 +128,8 @@ export function OperatorMobileApp() {
   const [equipmentId, setEquipmentId] = useState<string | null>(null);
   const [workTab, setWorkTab] = useState<WorkTab>('SHIFT');
   const coordinates = useRef<{latitude: number; longitude: number} | null>(null);
+  /** Таймер перехода на вход после истёкшей сессии: снимаем при размонтировании. */
+  const authRedirectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   /**
    * Ключ открытого чек-листа. К нему привязываются снимки, сделанные до
@@ -205,6 +218,11 @@ export function OperatorMobileApp() {
     };
   }, []);
 
+  /** Отложенный переход на вход не должен сработать после ухода с экрана. */
+  useEffect(() => () => {
+    if (authRedirectTimer.current !== null) clearTimeout(authRedirectTimer.current);
+  }, []);
+
   /**
    * Выполнить команду и сказать, получилось ли.
    *
@@ -253,6 +271,24 @@ export function OperatorMobileApp() {
         setDetour(null);
         setActionError(null);
         setActionErrorDetails([]);
+        /*
+          ИСТЁКШИЙ ВХОД — НЕ ПРОСТО ОЧЕРЕДЬ (аудит R76, находка 8). Отложенная
+          по 401 запись сольётся после входа того же пользователя: очередь
+          привязана к человеку (`ownerId` в `offline-queue.ts`), а
+          `use-offline-queue.ts` шлёт её при появлении вошедшего. Но пока входа
+          нет, ни одна запись не уйдёт, а машинист об этом не знает — прежний
+          экран лишь молча копил «Ожидает отправки: N», и он продолжал вводить
+          сваи. Поэтому говорим прямо и тем же переходом, что на загрузке
+          состояния (`reload`), уводим на вход — с задержкой, чтобы успеть
+          прочитать причину.
+        */
+        if (error.reason === 'auth') {
+          setNotice(AUTH_EXPIRED_NOTICE);
+          authRedirectTimer.current = setTimeout(() => {
+            // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- намеренно: сессия истекла, полная перезагрузка сбрасывает кэш маршрутов и память вкладки прежнего входа
+            window.location.href = '/login';
+          }, AUTH_REDIRECT_MS);
+        }
         return true;
       }
       setActionError(operatorErrorText(error));

@@ -6,8 +6,8 @@
  * связь есть, сломан сервер, и чинить его будет механик или администратор, а не
  * машинист с выключенным и включённым Wi-Fi.
  */
-import {fireEvent, render, screen} from '@testing-library/react';
-import {beforeEach, describe, expect, it, vi} from 'vitest';
+import {act, fireEvent, render, screen} from '@testing-library/react';
+import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 import type {OperatorMobileState} from '@/modules/operator-mobile/contracts';
 
 const api = vi.hoisted(() => ({
@@ -30,7 +30,7 @@ vi.mock('@/components/piling/operator-mobile/use-offline-queue', () => ({
 vi.mock('../operator-type.css', () => ({}));
 vi.mock('../operator-concept.css', () => ({}));
 
-import {ApiError} from '@/components/piling/operator-mobile/api';
+import {ApiError, QueuedOffline} from '@/components/piling/operator-mobile/api';
 import {OperatorMobileApp} from '../operator-mobile-app';
 
 beforeEach(() => {
@@ -153,6 +153,66 @@ describe('v1: перечитывание после успешной коман�
     expect(screen.queryByText('Сервер не отвечает')).not.toBeInTheDocument();
     expect(screen.queryByText('Нет связи')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', {name: 'Повторить'})).not.toBeInTheDocument();
+    expect(screen.getAllByRole('button', {name: 'Завершить работу'}).length).toBeGreaterThan(0);
+  });
+});
+
+/**
+ * Истёкшая сессия на команде уводит на вход (R76, находка 8).
+ *
+ * 401 от команды откладывает запись «после входа»: она сольётся, когда войдёт
+ * тот же пользователь (очередь привязана к `ownerId`). Но пока экран не просит
+ * войти, машинист продолжает вводить сваи, которые копятся и не уходят. Раньше
+ * редирект на `/login` был только у загрузки состояния.
+ */
+describe('v1: истёкший вход на команде', () => {
+  beforeEach(() => {
+    // window.location в happy-dom общий для файла: без сброса переход на
+    // /login из одного теста остался бы в следующем.
+    window.history.replaceState(null, '', '/');
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  async function sendFinishWork(failure: unknown) {
+    api.fetchState.mockResolvedValue(workState);
+    api.sendCommand.mockRejectedValue(failure);
+
+    render(<OperatorMobileApp />);
+
+    // Загрузку состояния ждём на настоящих таймерах: под подменёнными
+    // `findBy*` не дожидается элемента. Фейковые ставим только перед нажатием,
+    // в котором взводится таймер перехода.
+    const buttons = await screen.findAllByRole('button', {name: 'Завершить работу'});
+    vi.useFakeTimers();
+
+    fireEvent.click(buttons[0]);
+    fireEvent.click(screen.getByRole('button', {name: 'Да, работа завершена'}));
+    await act(async () => {});
+  }
+
+  it('401 показывает уведомление и через паузу уводит на /login', async () => {
+    await sendFinishWork(new QueuedOffline('Выработка', 'после входа'));
+
+    expect(screen.getByText(/Сессия истекла\. Записи сохранены на телефоне/)).toBeInTheDocument();
+    // До паузы экран ещё не ушёл: машинист успевает прочитать причину.
+    expect(window.location.pathname).not.toBe('/login');
+
+    act(() => { vi.advanceTimersByTime(2500); });
+
+    expect(window.location.pathname).toBe('/login');
+  });
+
+  it('обрыв связи — прежнее поведение: без уведомления и без перехода', async () => {
+    await sendFinishWork(new QueuedOffline('Выработка'));
+
+    act(() => { vi.advanceTimersByTime(2500); });
+
+    expect(screen.queryByText(/Сессия истекла/)).not.toBeInTheDocument();
+    expect(window.location.pathname).not.toBe('/login');
+    // Экран работы на месте — форма закрылась как при обычной постановке в очередь.
     expect(screen.getAllByRole('button', {name: 'Завершить работу'}).length).toBeGreaterThan(0);
   });
 });
