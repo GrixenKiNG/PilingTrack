@@ -156,6 +156,24 @@ export class QueueStorageError extends Error {
   }
 }
 
+/**
+ * Ключ команды занят записью другого машиниста.
+ *
+ * Планшет на установке общий: под сессией сменщика может лежать отвергнутая
+ * запись его предшественника с тем же ключом. Заменить её своим составом
+ * нельзя — она ушла бы под чужой сессией (или чужая работа под нашей), — а
+ * положить вторую запись с тем же ключом не даёт само хранилище. Не
+ * `QueueStorageError`: тот в `sendCommand` означает «память недоступна» и
+ * приводит к прямой отправке в обход очереди. Здесь отправлять нечего —
+ * машинист должен увидеть этот текст (F-V1-QUEUE-VERSION).
+ */
+export class QueueOwnershipError extends Error {
+  constructor() {
+    super('Запись с этим ключом принадлежит другому пользователю. Обновите страницу.');
+    this.name = 'QueueOwnershipError';
+  }
+}
+
 function read(strict = false): QueuedCommand[] {
   try {
     const raw = globalThis.localStorage?.getItem(STORAGE_KEY);
@@ -272,13 +290,18 @@ export function foreignQueueSummary(): {count: number; owners: string[]} {
  * `QueuedOffline`, а позже слив отправил бы прежний состав и снова получил
  * отказ (F-V1-INLINE-REJECT-b, регрессия принятой F-V1-INLINE-REJECT; R82).
  * Ждущую (`PENDING`) запись не трогаем — она уже снаряжена и уйдёт как есть.
+ * ЧУЖУЮ отвергнутую запись тоже не трогаем: ключ занят, а состав принадлежит
+ * прежнему машинисту (см. `QueueOwnershipError`).
  * `attempts` не обнуляем: счётчик ведётся по записи, а не по составу.
+ * `queuedAt` при замене обновляем: он отличает состав от прежнего, и по нему
+ * поздний ответ на старую отправку узнаёт, что запись уже другая.
  */
 export function enqueue(command: {clientCommandId: string}): void {
   const queue = read(true);
   const existing = queue.find((item) => item.clientCommandId === command.clientCommandId);
   if (existing) {
     if (existing.state !== 'FAILED') return;
+    if (!isMine(existing)) throw new QueueOwnershipError();
     existing.command = command;
     existing.label = commandLabel(command);
     existing.state = 'PENDING';
@@ -301,8 +324,19 @@ export function enqueue(command: {clientCommandId: string}): void {
   write(queue);
 }
 
-export function resolve(clientCommandId: string): void {
-  mutate((queue) => queue.filter((item) => item.clientCommandId !== clientCommandId));
+/**
+ * Снять отправленную запись с устройства.
+ *
+ * `expectedQueuedAt` — состав, за который пришёл ответ. Пока запрос был в
+ * пути, машинист мог исправить форму и положить тем же ключом НОВЫЙ состав:
+ * `enqueue` тогда обновил `queuedAt`. Поздний успех относится к прежнему
+ * составу, и снимать по нему новую запись нельзя (F-V1-QUEUE-VERSION).
+ * Не передан — поведение прежнее.
+ */
+export function resolve(clientCommandId: string, expectedQueuedAt?: string): void {
+  mutate((queue) => queue.filter((item) =>
+    item.clientCommandId !== clientCommandId
+    || (expectedQueuedAt !== undefined && item.queuedAt !== expectedQueuedAt)));
 }
 
 /**
@@ -333,11 +367,23 @@ export function discard(clientCommandId: string): void {
     item.clientCommandId !== clientCommandId || item.state !== 'FAILED'));
 }
 
-export function markAttempt(clientCommandId: string, error: string | null, permanent: boolean): void {
-  mutate((queue) => queue.map((item) => item.clientCommandId === clientCommandId
-    ? {...item, attempts: item.attempts + 1, lastError: error,
-      state: permanent ? 'FAILED' as const : 'PENDING' as const}
-    : item));
+/**
+ * Отметить попытку отправки: `permanent` — сервер отказал по существу.
+ *
+ * `expectedQueuedAt` — тот же предохранитель, что у `resolve`: если запись уже
+ * заменена новым составом, отказ на прежний состав её не трогает — иначе
+ * исправленное машинистом (F-V1-INLINE-REJECT-b) молча покраснело бы от
+ * старого ответа (F-V1-QUEUE-VERSION).
+ */
+export function markAttempt(
+  clientCommandId: string, error: string | null, permanent: boolean, expectedQueuedAt?: string,
+): void {
+  mutate((queue) => queue.map((item) => {
+    if (item.clientCommandId !== clientCommandId) return item;
+    if (expectedQueuedAt !== undefined && item.queuedAt !== expectedQueuedAt) return item;
+    return {...item, attempts: item.attempts + 1, lastError: error,
+      state: permanent ? 'FAILED' as const : 'PENDING' as const};
+  }));
 }
 
 let inFlight: Promise<{sent: number; left: number}> | null = null;
@@ -366,15 +412,19 @@ async function sendAll(
   let sent = 0;
   for (const item of readQueue()) {
     if (item.state === 'FAILED') continue;
+    // Состав запоминаем ДО отправки: пока ответ в пути, машинист может
+    // заменить его (enqueue обновит queuedAt). Тогда поздний результат
+    // относится к прежнему составу и новую запись трогать нельзя.
+    const queuedAt = item.queuedAt;
     try {
       await send(item.command);
-      resolve(item.clientCommandId);
+      resolve(item.clientCommandId, queuedAt);
       sent += 1;
     } catch (error) {
       const kind = classifyFailure((error as {status?: number} | null)?.status);
       markAttempt(item.clientCommandId,
         kind === 'auth' ? AUTH_WAIT_MESSAGE : error instanceof Error ? error.message : 'Не отправлено',
-        kind === 'permanent');
+        kind === 'permanent', queuedAt);
       // Сеть лежит, сервер занят или нужен вход — остальные ждут.
       if (kind !== 'permanent') break;
     }

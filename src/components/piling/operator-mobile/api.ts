@@ -5,7 +5,7 @@ import type {
 } from '@/modules/operator-mobile/contracts';
 import {
   AUTH_WAIT_MESSAGE, classifyFailure, commandLabel, enqueue, isQueueable, markAttempt,
-  QueueStorageError, resolve,
+  QueueOwnershipError, QueueStorageError, readQueue, resolve,
 } from './offline-queue';
 
 /**
@@ -46,10 +46,13 @@ export class ApiError extends Error {
  * (частный режим?) — без связи запись не сохранится. Не закрывайте форму…»);
  * у `QueuedOffline` — «сохранено на устройстве, отправим при связи». Раньше их
  * текст показывался как `error.message`, а общий возврат его съедал.
+ * `QueueOwnershipError` — того же рода: у неё один понятный выход («обновите
+ * страницу»), и общая фраза этот выход скрыла бы.
  */
 export function operatorErrorText(error: unknown): string {
   if (error instanceof ApiError) return error.message;
   if (error instanceof QueueStorageError) return error.message;
+  if (error instanceof QueueOwnershipError) return error.message;
   if (error instanceof QueuedOffline) return error.message;
   if (error instanceof TypeError) return 'Нет связи с сервером. Проверьте интернет и повторите.';
   return 'Не удалось выполнить действие. Повторите.';
@@ -286,9 +289,14 @@ export async function sendCommand<T = unknown>(command: Command): Promise<T> {
       throw storageError;
     }
   }
+  // Состав записи на момент отправки. Если за время ответа машинист исправит
+  // форму и положит тем же ключом новый состав (`enqueue` обновит `queuedAt`),
+  // поздний результат относится к прежнему и трогать новую запись нельзя
+  // (F-V1-QUEUE-VERSION).
+  const queuedAt = readQueue().find((item) => item.clientCommandId === command.clientCommandId)?.queuedAt;
   try {
     const result = await postCommand<T>(command);
-    resolve(command.clientCommandId);
+    resolve(command.clientCommandId, queuedAt);
     return result;
   } catch (error) {
     const kind = classifyFailure(error instanceof ApiError ? error.status : null);
@@ -296,11 +304,12 @@ export async function sendCommand<T = unknown>(command: Command): Promise<T> {
       // Не удаляем: запись остаётся видимой машинисту с составом и причиной,
       // а убрать её он может сам через `discard` (R82, находка 1).
       markAttempt(command.clientCommandId,
-        error instanceof Error ? error.message : 'Сервер отклонил запись', true);
+        error instanceof Error ? error.message : 'Сервер отклонил запись', true, queuedAt);
       throw error;
     }
     markAttempt(command.clientCommandId,
-      kind === 'auth' ? AUTH_WAIT_MESSAGE : error instanceof Error ? error.message : 'Не отправлено', false);
+      kind === 'auth' ? AUTH_WAIT_MESSAGE : error instanceof Error ? error.message : 'Не отправлено',
+      false, queuedAt);
     throw new QueuedOffline(commandLabel(command), kind === 'auth' ? 'после входа' : 'при связи');
   }
 }

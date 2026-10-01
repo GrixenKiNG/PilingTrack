@@ -1,9 +1,19 @@
 import {beforeEach, describe, expect, it} from 'vitest';
 import {
-  AUTH_WAIT_MESSAGE, discard, enqueue, flushQueue, foreignQueueSummary, isQueueable, readQueue, resolve, retry,
+  AUTH_WAIT_MESSAGE, discard, enqueue, flushQueue, foreignQueueSummary, isQueueable, markAttempt,
+  QueueOwnershipError, readQueue, resolve, retry,
 } from './offline-queue';
 import {QueuedOffline, sendCommand} from './api';
 import {usePilingStore} from '@/lib/store';
+
+const STORAGE_KEY = 'pilingtrack.operator.queue.v1';
+
+/** Подменить время постановки записи: так проверяем «прежний состав» без гонки часов. */
+function setQueuedAt(iso: string): void {
+  const raw = JSON.parse(globalThis.localStorage.getItem(STORAGE_KEY) as string) as {queuedAt: string}[];
+  raw[0].queuedAt = iso;
+  globalThis.localStorage.setItem(STORAGE_KEY, JSON.stringify(raw));
+}
 
 /*
   Очередь держит введённое машинистом до подтверждения сервером. Ошибка здесь
@@ -76,6 +86,71 @@ describe('очередь команд на устройстве', () => {
     expect(queue).toHaveLength(1);
     expect(queue[0].state).toBe('PENDING');
     expect(queue[0].command).toEqual(first);
+  });
+
+  it('поздний результат прежней отправки не трогает заменённый состав (F-V1-QUEUE-VERSION)', async () => {
+    // Немедленная отправка и слив очереди могут слать одну запись разом.
+    // Пока ответ прежнего состава в пути, машинист исправил форму и положил
+    // тем же ключом новый состав. Поздний ответ относится к прежнему: ни
+    // покраснеть, ни исчезнуть новая запись не должна.
+    const wrong = {command: 'log-production', clientCommandId: 'c1', entry: {kind: 'PILES', count: 0}};
+    const fixed = {command: 'log-production', clientCommandId: 'c1', entry: {kind: 'PILES', count: 7}};
+    enqueue(wrong);
+    await flushQueue(async () => { throw Object.assign(new Error('отказ'), {status: 409}); });
+
+    const oldQueuedAt = '2020-01-01T00:00:00.000Z';
+    setQueuedAt(oldQueuedAt);
+    enqueue(fixed);
+    expect(readQueue()[0].queuedAt).not.toBe(oldQueuedAt);
+
+    markAttempt('c1', 'Смена закрыта', true, oldQueuedAt);
+    resolve('c1', oldQueuedAt);
+
+    const queue = readQueue();
+    expect(queue).toHaveLength(1);
+    expect(queue[0]).toMatchObject({state: 'PENDING', lastError: null});
+    expect(queue[0].command).toEqual(fixed);
+  });
+
+  it('результат с текущим queuedAt применяется как раньше (F-V1-QUEUE-VERSION)', () => {
+    enqueue(piles);
+    const queuedAt = readQueue()[0].queuedAt;
+
+    markAttempt('c1', 'Смена закрыта', true, queuedAt);
+    expect(readQueue()[0]).toMatchObject({state: 'FAILED', lastError: 'Смена закрыта', attempts: 1});
+
+    resolve('c1', queuedAt);
+    expect(readQueue()).toHaveLength(0);
+  });
+
+  it('без expectedQueuedAt поведение прежнее (F-V1-QUEUE-VERSION)', () => {
+    enqueue(piles);
+    markAttempt('c1', null, false);
+    expect(readQueue()[0]).toMatchObject({state: 'PENDING', attempts: 1});
+
+    resolve('c1');
+    expect(readQueue()).toHaveLength(0);
+  });
+
+  it('чужую отвергнутую запись своим составом не заменяем (F-V1-QUEUE-VERSION)', async () => {
+    // Ключ занят записью сменщика: положить свою нельзя, а заменить её —
+    // отправить работу под чужой сессией. Отказываем понятным текстом.
+    usePilingStore.setState({currentUser: {id: 'op-day', name: 'Иванов И.'} as never});
+    const wrong = {command: 'log-production', clientCommandId: 'c1', entry: {kind: 'PILES', count: 0}};
+    const mine = {command: 'log-production', clientCommandId: 'c1', entry: {kind: 'PILES', count: 7}};
+    enqueue(wrong);
+    await flushQueue(async () => { throw Object.assign(new Error('отказ'), {status: 409}); });
+
+    usePilingStore.setState({currentUser: {id: 'op-night', name: 'Петров П.'} as never});
+    expect(() => enqueue(mine)).toThrow(QueueOwnershipError);
+    expect(() => enqueue(mine)).toThrow('Запись с этим ключом принадлежит другому пользователю. Обновите страницу.');
+
+    usePilingStore.setState({currentUser: {id: 'op-day', name: 'Иванов И.'} as never});
+    const queue = readQueue();
+    expect(queue).toHaveLength(1);
+    expect(queue[0]).toMatchObject({state: 'FAILED', ownerId: 'op-day'});
+    expect(queue[0].command).toEqual(wrong);
+    usePilingStore.setState({currentUser: null});
   });
 
   it('сквозной: отказ, затем поворот с исправленным составом и обрыв не теряет правку (F-V1-INLINE-REJECT-b)', async () => {

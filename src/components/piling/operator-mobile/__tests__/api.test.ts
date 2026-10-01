@@ -8,7 +8,7 @@
  */
 import {beforeEach, describe, expect, it, vi} from 'vitest';
 import {ApiError, fetchKnowledgeAttempt, operatorErrorDetails, operatorErrorText, QueuedOffline, sendCommand} from '../api';
-import {QueueStorageError, readQueue} from '../offline-queue';
+import {QueueOwnershipError, QueueStorageError, readQueue} from '../offline-queue';
 
 describe('operatorErrorText', () => {
   it('сетевой сбой — «Нет связи с сервером…», а не английская строка браузера', () => {
@@ -35,6 +35,15 @@ describe('operatorErrorText', () => {
   it('переполненное хранилище просит освободить место', () => {
     expect(operatorErrorText(new QueueStorageError('full'))).toBe(
       'Не удалось сохранить запись на устройстве. Не закрывайте форму: освободите место или восстановите связь и повторите.',
+    );
+  });
+
+  // Ключ занят чужой записью: у отказа один выход, и общая фраза его скрыла бы
+  // (F-V1-QUEUE-VERSION). Важно и то, что это не `QueueStorageError`: та в
+  // `sendCommand` означает «память недоступна» и уводит в отправку мимо очереди.
+  it('ключ занят записью сменщика — машинист читает, что делать', () => {
+    expect(operatorErrorText(new QueueOwnershipError())).toBe(
+      'Запись с этим ключом принадлежит другому пользователю. Обновите страницу.',
     );
   });
 
