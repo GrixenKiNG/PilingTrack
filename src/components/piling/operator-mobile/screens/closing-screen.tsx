@@ -33,12 +33,14 @@ import {WarningsPanel} from '../warnings-panel';
  * человека: повторить или убрать, поэтому кнопка зовёт к разбору, а закрытие
  * смены не прячется навсегда — правило держится только на `PENDING`.
  */
-export function ClosingScreen({state, onOpenService, onClose, busy, error, tabs, pending = 0, failed = 0, onSendNow, onRetryFailed}: {
+export function ClosingScreen({state, onOpenService, onClose, busy, error, errorDetails, tabs, pending = 0, failed = 0, onSendNow, onRetryFailed}: {
   state: OperatorMobileState;
   onOpenService: () => void;
   onClose: (comment: string) => void;
   busy: boolean;
   error: string | null;
+  /** Подробности отказа (аудит R76, находка 10). */
+  errorDetails?: string[];
   /** Нижние вкладки. Рисует оболочка — экран лишь отдаёт их в Screen. */
   tabs?: ReactNode;
   /** Сколько записей этого машиниста ещё ждут отправки (`PENDING`). */
@@ -155,7 +157,7 @@ export function ClosingScreen({state, onOpenService, onClose, busy, error, tabs,
         </label>
       ) : null}
 
-      <ErrorNote message={error} />
+      <ErrorNote message={error} details={errorDetails} />
     </Screen>
   );
 }

@@ -12,7 +12,7 @@ import {
 import {OfflineQueueBanner} from './offline-queue-banner';
 import {useOfflineQueue} from './use-offline-queue';
 import {OperatorStatusStrip} from './operator-status-strip';
-import {BigButton, ErrorNote, Panel, PanelTitle, PhaseBar, Screen, TabBar} from './ui';
+import {BigButton, Panel, PanelTitle, PhaseBar, Screen, TabBar} from './ui';
 import {IdentityScreen} from './screens/identity-screen';
 import {BriefingScreen} from './screens/briefing-screen';
 import {KnowledgeScreen, isKnowledgeAttemptExpired} from './screens/knowledge-screen';
@@ -563,6 +563,7 @@ export function OperatorMobileApp() {
           onSubmit={submitChecklist(checklist.stage)}
           busy={busy}
           error={actionError}
+          errorDetails={actionErrorDetails}
           commandId={checklistCommandId}
           lastMeter={state.assignment?.lastMeter ?? null}
           known={knownAnswers(checklist.stage, state)}
@@ -592,6 +593,7 @@ export function OperatorMobileApp() {
             tabs={tabBar}
             busy={busy}
             error={actionError}
+            errorDetails={actionErrorDetails}
             onSelectEquipment={setEquipmentId}
             onAccept={(input) => void run(() => sendCommand({
               command: 'accept-equipment',
@@ -607,6 +609,7 @@ export function OperatorMobileApp() {
             state={state}
             busy={busy}
             error={actionError}
+            errorDetails={actionErrorDetails}
             onLog={(entry: ProductionEntryInput) => run(() => sendCommand({
               command: 'log-production',
               clientCommandId: productionCommandId,
@@ -626,6 +629,7 @@ export function OperatorMobileApp() {
             state={state}
             busy={busy}
             error={actionError}
+            errorDetails={actionErrorDetails}
             onOpenService={() => setDetour({kind: 'CHECKLIST', stage: 'EO_AFTER'})}
             onClose={(comment) => void run(() => sendCommand({
               command: 'close-shift',
@@ -659,25 +663,6 @@ export function OperatorMobileApp() {
       />
       <OperatorStatusStrip online={online} items={queued} />
       <OfflineQueueBanner items={queued} onRetry={retryQueued} onDiscard={discardQueued} />
-      {/*
-        Отказ с подробностями — отдельной плашкой над экраном.
-
-        Почему здесь, а не в экране формы. Текст отказа рисуют экраны
-        (`work-screen.tsx`, `checklist-screen.tsx` и другие), и лежат они вне
-        этой правки. Показывать подробности отдельно от текста нельзя: список
-        полей без фразы «Паспорт заполнен не полностью» читается как
-        непонятный обрывок. Поэтому рабочее место показывает отказ целиком —
-        фразу и перечень того, что не заполнено, — в той же плашке, что и
-        экраны (`ErrorNote`), над текущим экраном.
-
-        Плашка есть только у отказа с подробностями: обычный отказ, как и
-        раньше, читается одним `ErrorNote` внутри экрана.
-      */}
-      {actionErrorDetails.length > 0 ? (
-        <div className="px-3 pt-2">
-          <ErrorNote message={actionError} details={actionErrorDetails} />
-        </div>
-      ) : null}
       {/*
         Короткое уведомление о принятой записи, экран при этом остаётся
         прежним (аудит R76, находка 9). Тон предупреждения, а не отказа:

@@ -43,7 +43,7 @@ function weatherAge(at: string): string {
   return `${Math.round(minutes / 60)} ч назад`;
 }
 
-export function WorkScreen({state, onLog, onFinish, onOpenSafety, busy, error, tabs, onCorrect}: {
+export function WorkScreen({state, onLog, onFinish, onOpenSafety, busy, error, errorDetails, tabs, onCorrect}: {
   state: OperatorMobileState;
   /** Возвращает признак удачи: по нему экран решает, чистить ли форму. */
   onLog: (entry: ProductionEntryInput) => Promise<boolean>;
@@ -51,6 +51,8 @@ export function WorkScreen({state, onLog, onFinish, onOpenSafety, busy, error, t
   onOpenSafety: (stage: 'TB_PILING' | 'TB_DRILLING') => void;
   busy: boolean;
   error: string | null;
+  /** Подробности отказа: какие поля не заполнены (аудит R76, находка 10). */
+  errorDetails?: string[];
   /** Нижние вкладки. Рисует оболочка — экран лишь отдаёт их в Screen. */
   tabs?: ReactNode;
   /** Поправка к ошибочной записи. Возвращает признак удачи. */
@@ -168,7 +170,7 @@ export function WorkScreen({state, onLog, onFinish, onOpenSafety, busy, error, t
       onAction={(kind)=>{switchTab(kind==='PASSPORT'?'PILES':kind);setPileMode(kind==='PASSPORT'?'PASSPORT':'BATCH');setFormOpen(true);}}
       onFinish={()=>setFinishing(true)} />
     {finishing&&<Panel tone="warning"><PanelTitle>Завершить работу?</PanelTitle><p className="my-3 text-sm">Дальше — ЕО после работы. Новую выработку записывать будет нельзя.</p><BigButton tone="danger" disabled={busy} onClick={onFinish}>Да, работа завершена</BigButton><BigButton tone="ghost" onClick={()=>setFinishing(false)}>Продолжить работу</BigButton></Panel>}
-    <ErrorNote message={error} />
+    <ErrorNote message={error} details={errorDetails} />
   </Screen>;
 
   return (
@@ -404,7 +406,7 @@ export function WorkScreen({state, onLog, onFinish, onOpenSafety, busy, error, t
 
       <EntriesList entries={state.entries} busy={busy} onCorrect={onCorrect} />
 
-      <ErrorNote message={error} />
+      <ErrorNote message={error} details={errorDetails} />
     </Screen>
   );
 }

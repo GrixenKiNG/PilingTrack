@@ -93,12 +93,22 @@ export function operatorErrorDetails(error: unknown): string[] {
   return lines;
 }
 
-/** Текст подробности в известных формах: `{message}` у паспорта и чек-листа, `{label}` — на будущее. */
+/**
+ * Текст подробности в известных формах: `{message}` у паспорта, `{label, message}`
+ * у чек-листа (сервер прикладывает название пункта — иначе пять строк «Пункт не
+ * заполнен» не различить), `{label}` — на будущее.
+ *
+ * Есть оба поля — отдаём «название: что не так». Иначе по одной фразе без
+ * названия пункта машинист не знает, какой из пяти пустых пунктов править.
+ */
 function detailText(item: unknown): string | null {
   if (typeof item !== 'object' || item === null) return null;
   const {message, label} = item as {message?: unknown; label?: unknown};
-  if (typeof message === 'string') return message;
-  return typeof label === 'string' ? label : null;
+  const hasMessage = typeof message === 'string';
+  const hasLabel = typeof label === 'string';
+  if (hasMessage && hasLabel) return `${label}: ${message}`;
+  if (hasMessage) return message;
+  return hasLabel ? label : null;
 }
 
 async function parse<T>(response: Response): Promise<T> {

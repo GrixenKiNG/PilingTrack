@@ -12,6 +12,12 @@ export interface ChecklistAnswer {
 export interface ChecklistProblem {
   itemId: string;
   message: string;
+  /**
+   * Название пункта (`item.text`). Нужно потому, что `message` у разных пунктов
+   * совпадает: сервер на каждый пустой пункт шлёт одно «Пункт не заполнен», и
+   * машинист по пяти одинаковым строкам не знает, какие пункты править.
+   */
+  label?: string;
 }
 
 /** Нужен ли замер при этом ответе. Долив спрашиваем только при замечании. */
@@ -38,25 +44,25 @@ export function validateChecklistRun(
   for (const item of items) {
     const answer = byItem.get(item.id);
     if (!answer) {
-      problems.push({itemId: item.id, message: 'Пункт не заполнен'});
+      problems.push({itemId: item.id, message: 'Пункт не заполнен', label: item.text});
       continue;
     }
 
     const isIssue = answer.answer === 'REMARK' || answer.answer === 'FAULT';
 
     if (isIssue && !answer.note?.trim()) {
-      problems.push({itemId: item.id, message: 'Опишите, что именно не так'});
+      problems.push({itemId: item.id, message: 'Опишите, что именно не так', label: item.text});
     }
 
     if (isIssue && item.photoOnIssue && (answer.mediaIds?.length ?? 0) === 0) {
-      problems.push({itemId: item.id, message: 'Приложите фотографию'});
+      problems.push({itemId: item.id, message: 'Приложите фотографию', label: item.text});
     }
 
     if (item.measure && measureRequired(item, answer.answer)) {
       const value = answer.measures?.[item.measure.key];
       const {min, max, label, unit} = item.measure;
       if (!Number.isFinite(value)) {
-        problems.push({itemId: item.id, message: `Укажите: ${label}, ${unit}`});
+        problems.push({itemId: item.id, message: `Укажите: ${label}, ${unit}`, label: item.text});
       } else if (
         (min !== undefined && (value as number) < min)
         || (max !== undefined && (value as number) > max)
@@ -66,6 +72,7 @@ export function validateChecklistRun(
         problems.push({
           itemId: item.id,
           message: `${label}: допустимо от ${min ?? 0} до ${max ?? '∞'} ${unit}`,
+          label: item.text,
         });
       }
     }

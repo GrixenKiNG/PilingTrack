@@ -109,13 +109,16 @@ async function finishWork(failure: unknown) {
 }
 
 describe('v1: отказ команды с подробностями', () => {
-  it('показывает, что именно не заполнено', async () => {
+  it('показывает, что именно не заполнено, — фраза один раз, пункты списком', async () => {
     const alerts = await finishWork(new ApiError(400, 'Паспорт заполнен не полностью', [
       {field: 'pileNumber', message: 'Укажите номер сваи по проекту'},
     ]));
 
     const note = alerts.find((node) => node.textContent?.includes('Укажите номер сваи по проекту'));
     expect(note).toHaveTextContent('Паспорт заполнен не полностью');
+    // Раньше фраза приходила дважды — плашкой над экраном и в самом экране
+    // (`F-V1-ERROR-DETAILS-b`). Теперь её рисует только экран, один раз.
+    expect(screen.getAllByText('Паспорт заполнен не полностью')).toHaveLength(1);
     expect(screen.getAllByRole('listitem').map((item) => item.textContent))
       .toContain('Укажите номер сваи по проекту');
   });
