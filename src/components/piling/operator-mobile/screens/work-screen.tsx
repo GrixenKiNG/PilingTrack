@@ -95,7 +95,13 @@ export function WorkScreen({state, onLog, onFinish, onOpenSafety, busy, error, e
   // снял, то есть `error` пуст; новый ключ команды родитель выдаёт только
   // после успеха, и тогда поля чистит сам `submit`. Смена на ДРУГУЮ вкладку
   // чистит по-прежнему: «5» из поля свай в поле часов — это ошибочный отчёт.
+  //
+  // ПОКА ЗАПРОС В ПОЛЁТЕ, ВКЛАДКУ НЕ МЕНЯЕМ (аудит R82, находка 13). Смена
+  // вкладки чистит поля, и нажатие «Записать» → «Бурение» стирало введённое
+  // число раньше, чем машинист увидел отказ. Кнопки при `busy` заблокированы,
+  // а этот ранний выход закрывает тот же путь для программного вызова.
   const switchTab = (next: Tab) => {
+    if (busy) return;
     setTab(next);
     if (error && next === tab) return;
     setReference('');
@@ -290,8 +296,10 @@ export function WorkScreen({state, onLog, onFinish, onOpenSafety, busy, error, e
             key={option.value}
             type="button"
             onClick={() => switchTab(option.value)}
+            disabled={busy}
             className={cn(
               'min-h-11 flex-1 rounded-md text-sm font-medium transition-colors',
+              'disabled:cursor-not-allowed disabled:opacity-50',
               tab === option.value ? 'border bg-card font-semibold shadow-xs' : 'text-muted-foreground',
             )}
           >

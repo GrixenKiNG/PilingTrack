@@ -156,3 +156,46 @@ describe('рабочий экран: черновик при отказе сер
     });
   });
 });
+
+/*
+  Аудит R82, находка 13: пока запрос в полёте (`busy`), вкладку формы менять
+  нельзя — смена вкладки чистит поля, и число исчезало до того, как машинист
+  увидел отказ.
+*/
+describe('рабочий экран: вкладки формы во время отправки', () => {
+  it('при busy блокирует вкладки формы', () => {
+    const {rerender} = render(<WorkScreen {...baseProps} />);
+
+    fireEvent.click(screen.getByRole('button', {name: 'Добавить сваю'}));
+
+    rerender(<WorkScreen {...baseProps} busy />);
+
+    expect(screen.getByRole('button', {name: 'Сваи'})).toBeDisabled();
+    expect(screen.getByRole('button', {name: 'Бурение'})).toBeDisabled();
+    expect(screen.getByRole('button', {name: 'Простой'})).toBeDisabled();
+  });
+
+  it('при busy клик по вкладке не очищает поле количества', () => {
+    const {rerender} = render(<WorkScreen {...baseProps} />);
+
+    fireEvent.click(screen.getByRole('button', {name: 'Добавить сваю'}));
+    fireEvent.change(screen.getByLabelText('Марка сваи'), {target: {value: 'g1'}});
+    fireEvent.change(screen.getByLabelText('Свай, шт'), {target: {value: '12'}});
+
+    rerender(<WorkScreen {...baseProps} busy />);
+    fireEvent.click(screen.getByRole('button', {name: 'Бурение'}));
+
+    expect(screen.getByLabelText('Свай, шт')).toHaveValue(12);
+  });
+
+  it('при busy=false переключение вкладок работает как раньше', () => {
+    render(<WorkScreen {...baseProps} />);
+
+    fireEvent.click(screen.getByRole('button', {name: 'Добавить сваю'}));
+    fireEvent.change(screen.getByLabelText('Свай, шт'), {target: {value: '12'}});
+    fireEvent.click(screen.getByRole('button', {name: 'Простой'}));
+
+    expect(screen.getByLabelText('Причина простоя')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Свай, шт')).toBeNull();
+  });
+});
