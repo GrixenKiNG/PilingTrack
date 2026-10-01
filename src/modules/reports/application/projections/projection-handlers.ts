@@ -7,6 +7,8 @@
  */
 
 import { db } from '@/lib/db';
+import { logger } from '@/lib/logger';
+import { getRequestTenantId } from '@/core/security/tenant-context';
 
 // Здесь до 17.08.2026 жили projectReportStats, projectOperatorPerformance,
 // projectOperatorPerformanceFull и projectDowntimeSummary — 255 строк, три
@@ -48,7 +50,18 @@ export async function projectWeeklyTrend(siteId: string, refDate?: string | null
     where: { id: siteId },
     select: { tenantId: true },
   });
-  if (!site?.tenantId) {
+  // findUnique возвращает null в двух разных случаях: объекта действительно нет
+  // (его удалили до обработки события) и объект есть, но скрыт строгой RLS —
+  // контекст организации не выставлен. Спутать их нельзя: в первом случае
+  // пересчитывать нечего, во втором это настоящая ошибка доставки события.
+  if (!site) {
+    if (getRequestTenantId() !== null) {
+      logger.info('Объект удалён — недельная сводка не пересчитывается', { siteId });
+      return;
+    }
+    throw new Error(`projectWeeklyTrend: site ${siteId} not visible: no tenant context`);
+  }
+  if (!site.tenantId) {
     throw new Error(`projectWeeklyTrend: site ${siteId} has no tenantId`);
   }
   const tenantId = site.tenantId;
