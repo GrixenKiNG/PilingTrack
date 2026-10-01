@@ -4,8 +4,8 @@ import type {
   ChecklistAnswer, ChecklistStage, KnowledgeQuestion, OperatorMobileState,
 } from '@/modules/operator-mobile/contracts';
 import {
-  AUTH_WAIT_MESSAGE, classifyFailure, commandLabel, enqueue, isQueueable, markAttempt,
-  QueueOwnershipError, QueueStorageError, readQueue, resolve,
+  AUTH_WAIT_MESSAGE, classifyFailure, commandLabel, CSRF_REJECT_MESSAGE, enqueue, isCsrfFailure,
+  isQueueable, markAttempt, QueueOwnershipError, QueueStorageError, readQueue, resolve,
 } from './offline-queue';
 
 /**
@@ -21,7 +21,14 @@ import {
  */
 
 export class ApiError extends Error {
-  constructor(readonly status: number, message: string, readonly details?: unknown) {
+  /**
+   * `reason` отличает отказ проверки безопасности (`'csrf'`) от прочих отказов
+   * сервера. Такой 403 лечится перезагрузкой страницы, а не решением человека,
+   * и очередь не должна считать его `permanent` (аудит R76, находка 12).
+   */
+  constructor(
+    readonly status: number, message: string, readonly details?: unknown, readonly reason?: 'csrf',
+  ) {
     super(message);
     this.name = 'ApiError';
   }
@@ -134,6 +141,17 @@ async function parse<T>(response: Response): Promise<T> {
   const payload = await response.json().catch(() => null) as
     {data?: T; error?: string; details?: unknown} | null;
   if (!response.ok) {
+    // Отказ CSRF-проверки приходит английской строкой (`csrf-protection.ts`:
+    // `CSRF validation failed: …`) при расхождении `Origin` и `Host` — так
+    // бывает, когда приложение открыто по IP, через прокси или вкладка
+    // пережила смену адреса. Машинисту нужен русский выход «обновите
+    // страницу», а не английская строка, и признак `reason`, по которому
+    // очередь оставит запись `PENDING` (аудит R76, находка 12).
+    if (response.status === 403
+      && typeof payload?.error === 'string'
+      && payload.error.startsWith('CSRF validation failed')) {
+      throw new ApiError(403, CSRF_REJECT_MESSAGE, payload.details, 'csrf');
+    }
     throw new ApiError(response.status, payload?.error ?? 'Сервер не ответил', payload?.details);
   }
   // Успех — только разобранный ответ нашего сервера. Сеть гостиницы или
@@ -442,6 +460,16 @@ export async function sendCommand<T = unknown>(command: Command): Promise<T> {
     resolve(command.clientCommandId, queuedAt);
     return result;
   } catch (error) {
+    // CSRF-403 — временный отказ, хотя и 403: причина (расхождение `Origin` и
+    // `Host`) снимается перезагрузкой страницы. Запись остаётся `PENDING` и
+    // уйдёт сама, а машинист читает русское указание (`ApiError.message`).
+    // Прочие 403 (роль, чужая смена) остаются `permanent`, как раньше
+    // (аудит R76, находка 12).
+    if (isCsrfFailure(error)) {
+      markAttempt(command.clientCommandId,
+        error instanceof Error ? error.message : CSRF_REJECT_MESSAGE, false, queuedAt);
+      throw error;
+    }
     const kind = classifyFailure(error instanceof ApiError ? error.status : null);
     if (kind === 'permanent') {
       // Не удаляем: запись остаётся видимой машинисту с составом и причиной,

@@ -145,6 +145,29 @@ export function classifyFailure(status: number | null | undefined): FailureKind 
 
 export const AUTH_WAIT_MESSAGE = 'Войдите снова — запись отправится после входа';
 
+/**
+ * Отказ проверки безопасности (CSRF) — временный, хотя и 403.
+ *
+ * `csrf-protection.ts` отдаёт 403 с английским текстом «CSRF validation failed…»,
+ * когда `Origin` не сошёлся с `Host`: приложение открыто по IP, через прокси или
+ * вкладка пережила смену адреса. Причина снимается перезагрузкой страницы,
+ * поэтому повтор записи осмыслен — в отличие от прочих 403 (чужая роль, чужая
+ * смена), которые остаются `permanent`. Русское указание машинисту несёт
+ * `ApiError` (аудит R76, находка 12).
+ */
+export const CSRF_REJECT_MESSAGE =
+  'Запрос отклонён проверкой безопасности. Обновите страницу — запись сохранена на телефоне и уйдёт после обновления.';
+
+/**
+ * Признак CSRF-отказа на ошибке отправки. Читаем структурно (поле `reason`), а не
+ * через `instanceof ApiError`: этот модуль не может импортировать `api.ts` —
+ * тот импортирует его (циклическая зависимость).
+ */
+export function isCsrfFailure(error: unknown): boolean {
+  return typeof error === 'object' && error !== null
+    && (error as {reason?: unknown}).reason === 'csrf';
+}
+
 // --- Хранилище ---
 
 export class QueueStorageError extends Error {
@@ -421,6 +444,15 @@ async function sendAll(
       resolve(item.clientCommandId, queuedAt);
       sent += 1;
     } catch (error) {
+      // CSRF-403 — не отказ по существу: причина (расхождение `Origin`/`Host`)
+      // снимается перезагрузкой страницы. Запись остаётся `PENDING`, а слив
+      // останавливаем, как при сетевом сбое, — остальные подождут
+      // (аудит R76, находка 12).
+      if (isCsrfFailure(error)) {
+        markAttempt(item.clientCommandId,
+          error instanceof Error ? error.message : CSRF_REJECT_MESSAGE, false, queuedAt);
+        break;
+      }
       const kind = classifyFailure((error as {status?: number} | null)?.status);
       markAttempt(item.clientCommandId,
         kind === 'auth' ? AUTH_WAIT_MESSAGE : error instanceof Error ? error.message : 'Не отправлено',

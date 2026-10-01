@@ -8,7 +8,7 @@
  */
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 import {ApiError, fetchKnowledgeAttempt, fetchState, operatorErrorDetails, operatorErrorText, QueuedOffline, sendCommand, uploadPhoto} from '../api';
-import {QueueOwnershipError, QueueStorageError, readQueue} from '../offline-queue';
+import {QueueOwnershipError, QueueStorageError, CSRF_REJECT_MESSAGE, readQueue} from '../offline-queue';
 
 describe('operatorErrorText', () => {
   it('сетевой сбой — «Нет связи с сервером…», а не английская строка браузера', () => {
@@ -247,6 +247,68 @@ describe('sendCommand и отказ по существу', () => {
 
     expect(error).toBeInstanceOf(QueuedOffline);
     expect(readQueue()[0].state).toBe('PENDING');
+  });
+});
+
+/**
+ * CSRF-отказ — временный, а не приговор (аудит R76, находка 12).
+ *
+ * 403 от `csrf-protection.ts` («CSRF validation failed: origin mismatch»)
+ * возникает при расхождении `Origin` и `Host` — приложение открыто по IP, через
+ * прокси, вкладка пережила смену адреса. Причина снимается перезагрузкой
+ * страницы, поэтому запись обязана остаться `PENDING` и уйти сама, а машинист —
+ * прочитать русское указание вместо английской строки. Прочие 403 (роль, чужая
+ * смена) остаются отказом по существу (`FAILED`), как раньше.
+ */
+describe('sendCommand и CSRF-отказ', () => {
+  const command = {
+    command: 'log-production' as const,
+    clientCommandId: 'c1',
+    shiftId: 's1',
+    entry: {kind: 'PILES' as const, pileGradeId: 'g1', count: 12},
+  };
+
+  beforeEach(() => {
+    const store = new Map<string, string>();
+    Object.defineProperty(globalThis, 'localStorage', {
+      configurable: true,
+      value: {
+        getItem: (key: string) => store.get(key) ?? null,
+        setItem: (key: string, value: string) => { store.set(key, value); },
+        removeItem: (key: string) => { store.delete(key); },
+        clear: () => { store.clear(); },
+      },
+    });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('403 «CSRF validation failed» — запись остаётся PENDING, текст русский', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(
+      JSON.stringify({error: 'CSRF validation failed: origin mismatch'}), {status: 403})));
+    const error = await sendCommand(command).catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(ApiError);
+    expect((error as ApiError).reason).toBe('csrf');
+    expect(operatorErrorText(error)).toBe(CSRF_REJECT_MESSAGE);
+    const queue = readQueue();
+    expect(queue).toHaveLength(1);
+    expect(queue[0]).toMatchObject({clientCommandId: 'c1', state: 'PENDING', lastError: CSRF_REJECT_MESSAGE});
+  });
+
+  it('403 «Нет доступа» — отказ по существу: запись FAILED, как раньше', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(
+      JSON.stringify({error: 'Нет доступа'}), {status: 403})));
+    const error = await sendCommand(command).catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(ApiError);
+    expect((error as ApiError).reason).toBeUndefined();
+    expect(operatorErrorText(error)).toBe('Нет доступа');
+    const queue = readQueue();
+    expect(queue).toHaveLength(1);
+    expect(queue[0]).toMatchObject({clientCommandId: 'c1', state: 'FAILED', lastError: 'Нет доступа'});
   });
 });
 

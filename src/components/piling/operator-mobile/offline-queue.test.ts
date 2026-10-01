@@ -1,9 +1,9 @@
 import {beforeEach, describe, expect, it} from 'vitest';
 import {
-  AUTH_WAIT_MESSAGE, discard, enqueue, flushQueue, foreignQueueSummary, isQueueable, markAttempt,
+  AUTH_WAIT_MESSAGE, CSRF_REJECT_MESSAGE, discard, enqueue, flushQueue, foreignQueueSummary, isQueueable, markAttempt,
   QueueOwnershipError, readQueue, resolve, retry,
 } from './offline-queue';
-import {QueuedOffline, sendCommand} from './api';
+import {ApiError, QueuedOffline, sendCommand} from './api';
 import {usePilingStore} from '@/lib/store';
 
 const STORAGE_KEY = 'pilingtrack.operator.queue.v1';
@@ -233,6 +233,24 @@ describe('очередь команд на устройстве', () => {
 
     await flushQueue(async () => { throw Object.assign(new Error('Войдите в систему'), {status: 401}); });
     expect(readQueue()[0]).toMatchObject({state: 'PENDING', lastError: AUTH_WAIT_MESSAGE});
+  });
+
+  it('CSRF-403 при сливе — запись ждёт, слив остановлен (аудит R76, находка 12)', async () => {
+    // Отказ проверки безопасности лечится перезагрузкой страницы, а не решением
+    // человека: запись не должна краснеть, а остальные — уходить под тем же
+    // расхождением Origin/Host. Ведём себя как при сетевом сбое.
+    enqueue(piles);
+    enqueue(incident);
+    let calls = 0;
+    const result = await flushQueue(async () => {
+      calls += 1;
+      throw new ApiError(403, CSRF_REJECT_MESSAGE, undefined, 'csrf');
+    });
+    expect(result).toEqual({sent: 0, left: 2});
+    expect(calls).toBe(1); // CSRF не лечится повтором — вторую запись не пробуем
+    const queue = readQueue();
+    expect(queue.every((item) => item.state === 'PENDING')).toBe(true);
+    expect(queue[0].lastError).toBe(CSRF_REJECT_MESSAGE);
   });
 
   it('убрать с устройства можно только отвергнутую запись', async () => {
