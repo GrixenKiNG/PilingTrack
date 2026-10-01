@@ -348,9 +348,24 @@ function handlerSite(sf: ts.SourceFile, bodies: Map<string, ts.Node>, method: st
   return null;
 }
 
-/** Узел-функция: его тело — отдельная область выполнения. */
+/**
+ * Узел, тело которого — отдельная область выполнения: функция любой формы,
+ * метод объекта/класса, аксессор, конструктор и тело класса целиком. Границы
+ * нужны, чтобы не засчитывать вызов из тела, которое никто не запускает:
+ * `const unused = { check() { requireAuth(request); } }` защитой не является.
+ */
 function isFunctionLikeNode(node: ts.Node): boolean {
-  return ts.isArrowFunction(node) || ts.isFunctionExpression(node) || ts.isFunctionDeclaration(node);
+  return (
+    ts.isArrowFunction(node) ||
+    ts.isFunctionExpression(node) ||
+    ts.isFunctionDeclaration(node) ||
+    ts.isMethodDeclaration(node) ||
+    ts.isGetAccessorDeclaration(node) ||
+    ts.isSetAccessorDeclaration(node) ||
+    ts.isConstructorDeclaration(node) ||
+    ts.isClassDeclaration(node) ||
+    ts.isClassExpression(node)
+  );
 }
 
 /**
@@ -368,6 +383,24 @@ function declaredFunctionName(node: ts.Node): string | null {
   }
   return null;
 }
+
+// ============================================================================
+// Известные пределы разбора
+//
+// Разбор — эвристика против случайных ошибок в обычных маршрутах, а не
+// доказательство защиты от нарочно запутанного кода. Ниже — два места, где
+// разбор намеренно не усложняется; ревью маршрутов человеком остаётся
+// обязательным.
+//
+// №2. Колбэком считается функция-аргумент ЛЮБОГО вызова: `console.log(() =>
+//     requireAuth(request))` засчитает проверку, хотя console.log тело не
+//     запускает. Различать «выполняющие» и «не выполняющие» приёмники — своя
+//     предметная область (обёртки известны, сторонние функции — нет).
+// №4. Одноимённые функции в разных блоках не различаются: тело ищется по имени
+//     в пределах файла, поэтому функция из другого блока с тем же именем может
+//     быть принята за запускаемую. Разбор ведётся по имени, а не по привязке
+//     идентификатора.
+// ============================================================================
 
 /**
  * Имена, запускаемые в этой области: вызовы `f(...)` и колбэки-аргументы
@@ -428,17 +461,42 @@ function scanExecutedCode(node: ts.Node, calls: Set<string>, invoked: Set<string
  * (`withApi(handleGet)` — обёртка вызовет handleGet). Аргумент-идентификатор
  * считается запуском только у известных обёрток: `console.log(helper)` функцию
  * не выполняет, и тело helper защитой не становится.
+ *
+ * Границы обхода те же, что у сбора вызовов (collectInvokedNames +
+ * scanExecutedCode): в тело вложенной функции заходим, лишь когда доказано её
+ * выполнение. Иначе `const unused = () => helper(request)` засчитывал бы тело
+ * helper как запущенное (Codex, out48 №1).
  */
 function invokedLocalNames(node: ts.Node, names: Set<string>): void {
+  const invoked = new Set<string>();
+  collectInvokedNames(node, invoked);
+  scanInvokedLocalNames(node, names, invoked);
+}
+
+function scanInvokedLocalNames(node: ts.Node, names: Set<string>, invoked: Set<string>): void {
   if (ts.isCallExpression(node)) {
-    if (ts.isIdentifier(node.expression)) names.add(node.expression.text);
-    if (ts.isIdentifier(node.expression) && WRAPPERS.includes(node.expression.text)) {
-      for (const argument of node.arguments) {
-        if (ts.isIdentifier(argument)) names.add(argument.text);
+    if (ts.isIdentifier(node.expression)) {
+      names.add(node.expression.text);
+      if (WRAPPERS.includes(node.expression.text)) {
+        for (const argument of node.arguments) {
+          if (ts.isIdentifier(argument)) names.add(argument.text);
+        }
       }
     }
+    // Колбэк вызова выполняется — заходим в его тело.
+    for (const argument of node.arguments) {
+      if (isFunctionLikeNode(argument)) invokedLocalNames(argument, names);
+    }
   }
-  ts.forEachChild(node, (child) => invokedLocalNames(child, names));
+  ts.forEachChild(node, (child) => {
+    if (isFunctionLikeNode(child)) {
+      // Вложенная функция: заходим, только если область её запускает по имени.
+      const name = declaredFunctionName(child);
+      if (name !== null && invoked.has(name)) invokedLocalNames(child, names);
+      return;
+    }
+    scanInvokedLocalNames(child, names, invoked);
+  });
 }
 
 /**
@@ -576,6 +634,44 @@ describe('Контракт маршрутов — разбор тела обра
 
     // Раньше обход заходил в тело `unused` и находил requireAuth, будто проверка
     // выполняется; на деле функцию никто не вызывает.
+    expect(callsOf(source, 'GET')?.has('requireAuth')).toBe(false);
+  });
+
+  it('невызванная вложенная функция, зовущая помощника, защитой не считается', () => {
+    const source = [
+      "import { withApi } from '@/core/api-wrapper';",
+      "import { requireAuth } from '@/lib/auth';",
+      'async function helper(request: Request) {',
+      '  await requireAuth(request);',
+      '}',
+      'export const GET = withApi(async (request: Request) => {',
+      '  const unused = () => helper(request);',
+      '  return Response.json({});',
+      '});',
+    ].join('\n');
+
+    // Тело `unused` не выполняется, значит и helper в нём не запускается: сбор
+    // «запускаемых» имён обязан иметь те же границы, что сбор вызовов, иначе
+    // тело helper засчитывается без вызова (Codex, out48 №1).
+    expect(callsOf(source, 'GET')?.has('requireAuth')).toBe(false);
+  });
+
+  it('метод объекта без вызова защитой не считается', () => {
+    const source = [
+      "import { withApi } from '@/core/api-wrapper';",
+      "import { requireAuth } from '@/lib/auth';",
+      'export const GET = withApi(async (request: Request) => {',
+      '  const unused = {',
+      '    check() {',
+      '      requireAuth(request);',
+      '    },',
+      '  };',
+      '  return Response.json({ unused });',
+      '});',
+    ].join('\n');
+
+    // Тело метода — отдельная область выполнения, как у функции; объект его не
+    // вызывает, значит requireAuth в разбор попадать не должен (Codex, out48 №3).
     expect(callsOf(source, 'GET')?.has('requireAuth')).toBe(false);
   });
 
