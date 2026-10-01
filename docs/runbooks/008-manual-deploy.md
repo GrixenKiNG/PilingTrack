@@ -60,6 +60,11 @@ docker compose up -d app workers
 Add `ws` to both lines only if the WebSocket server changed (rare —
 look for `src/core/realtime/server/` in the diff).
 
+## Workers image smoke
+
+`bash scripts/deploy-prod.sh` автоматически проверяет образ workers после локальной сборки, до первого SSH; ошибка smoke останавливает выкладку.
+Аварийный обход — только `SKIP_WORKERS_SMOKE=1`, с предупреждением о непроверенном образе.
+
 ## Post-deploy check (mandatory — the deploy is not done until this passes)
 
 Run from the workstation (read-only GETs, no secrets, safe to repeat):
