@@ -66,6 +66,14 @@ jobs:
               docker compose build \"\$s\"
               docker builder prune -f || true
             done
+            # Smoke именно построенного образа; до замены работающих сервисов.
+            case \" \$SVCS \" in
+              *\" workers \"*)
+                WORKERS_IMAGE=\$(docker compose config --images workers)
+                [ -n \"\$WORKERS_IMAGE\" ] || exit 1
+                bash scripts/smoke-workers-image.sh \"\$WORKERS_IMAGE\"
+                ;;
+            esac
             docker compose up -d \$SVCS
           "
 

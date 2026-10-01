@@ -73,3 +73,39 @@ describe('smoke образа workers', () => {
     expect(deploy).toContain('SKIP_WORKERS_SMOKE');
   });
 });
+
+describe('CI и ручная выкладка workers', () => {
+  it('собирает runner с Docker cache, запускает smoke и отдельно выполняет no-next', () => {
+    const ci = fs.readFileSync(path.join(root, '.github/workflows/ci.yml'), 'utf8');
+    const workerStart = ci.indexOf('  workers-smoke:');
+    expect(workerStart).toBeGreaterThan(-1);
+    const workerJob = ci.slice(workerStart, ci.indexOf('  # Validates'));
+    expect(workerJob).toContain('file: Dockerfile.workers');
+    expect(workerJob).toContain('target: runner');
+    expect(workerJob).toContain('load: true');
+    expect(workerJob).toContain('tags: pilingtrack-workers:smoke');
+    expect(workerJob).toContain('cache-from: type=gha,scope=workers');
+    expect(workerJob).toContain('cache-to: type=gha,mode=max,scope=workers');
+    expect(workerJob).toContain('run: bash scripts/smoke-workers-image.sh pilingtrack-workers:smoke');
+    expect(workerJob).not.toMatch(/continue-on-error|\|\| true/);
+    const unit = ci.slice(ci.indexOf('  unit:'), workerStart);
+    const guard = unit.indexOf('run: npx vitest run src/workers/__tests__/no-next-in-workers.test.ts');
+    expect(guard).toBeGreaterThan(unit.indexOf('run: npm run db:generate'));
+    expect(unit).not.toMatch(/continue-on-error|passWithNoTests/);
+    expect(unit).toContain('cache: npm');
+    const config = fs.readFileSync(path.join(root, 'vitest.config.ts'), 'utf8');
+    expect(config).toContain("'src/**/*.test.{ts,tsx}'");
+    const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
+    expect(pkg.scripts['test:unit']).toBe('vitest run');
+  });
+
+  it('проверяет именно построенный compose-образ до перезапуска сервисов', () => {
+    const deploy = fs.readFileSync(path.join(root, '.github/workflows/deploy.yml'), 'utf8');
+    const smoke = deploy.indexOf('bash scripts/smoke-workers-image.sh');
+    expect(smoke).toBeGreaterThan(deploy.indexOf('docker compose build'));
+    expect(smoke).toBeLessThan(deploy.indexOf('docker compose up -d'));
+    expect(deploy).toContain('docker compose config --images workers');
+    expect(deploy).toContain('case \\" \\$SVCS \\" in');
+    expect(deploy.slice(smoke).split('\n')[0]).not.toContain('|| true');
+  });
+});

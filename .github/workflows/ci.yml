@@ -76,9 +76,36 @@ jobs:
         # makes it a hard gate on every push/PR.
         run: npm run db:check-migrations
 
+      - name: Workers no-next guard
+        # Отдельный прогон падает и при исчезнувшем файле/нуле тестов.
+        run: npx vitest run src/workers/__tests__/no-next-in-workers.test.ts
+
       - name: Unit tests
         # Unit and contract checks; database-backed suites run below.
         run: npx vitest run src/ tests/contract --coverage --maxWorkers=2
+
+  workers-smoke:
+    name: Workers image + startup smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build workers runner
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.workers
+          target: runner
+          load: true
+          tags: pilingtrack-workers:smoke
+          cache-from: type=gha,scope=workers
+          cache-to: type=gha,mode=max,scope=workers
+
+      - name: Smoke workers image
+        run: bash scripts/smoke-workers-image.sh pilingtrack-workers:smoke
 
   # Validates that Prisma migrations apply cleanly on a real Postgres.
   # This catches a class of bugs that pure-mock unit tests miss:
