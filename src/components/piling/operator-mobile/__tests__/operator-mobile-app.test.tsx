@@ -15,6 +15,9 @@ const api = vi.hoisted(() => ({
   sendCommand: vi.fn(),
 }));
 
+/** Очередь на устройстве, которой управляет тест (R76, находки 17 и 18). */
+const queue = vi.hoisted(() => ({items: [] as QueuedCommand[]}));
+
 vi.mock('@/components/piling/operator-mobile/api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/components/piling/operator-mobile/api')>();
   return {
@@ -25,17 +28,21 @@ vi.mock('@/components/piling/operator-mobile/api', async (importOriginal) => {
   };
 });
 vi.mock('@/components/piling/operator-mobile/use-offline-queue', () => ({
-  useOfflineQueue: () => ({queued: [], flush: vi.fn(), retry: vi.fn(), retryFailed: vi.fn(), discard: vi.fn()}),
+  useOfflineQueue: () => ({
+    queued: queue.items, flush: vi.fn(), retry: vi.fn(), retryFailed: vi.fn(), discard: vi.fn(),
+  }),
 }));
 vi.mock('../operator-type.css', () => ({}));
 vi.mock('../operator-concept.css', () => ({}));
 
 import {ApiError, QueuedOffline} from '@/components/piling/operator-mobile/api';
+import type {QueuedCommand} from '@/components/piling/operator-mobile/offline-queue';
 import {OperatorMobileApp} from '../operator-mobile-app';
 
 beforeEach(() => {
   api.fetchState.mockReset();
   api.sendCommand.mockReset();
+  queue.items = [];
 });
 
 describe('v1: загрузка состояния не удалась', () => {
@@ -340,5 +347,63 @@ describe('v1: экран без выхода — не тупик', () => {
     // Состояние перечитано: смена вернулась, экран работы открылся.
     expect((await screen.findAllByRole('button', {name: 'Завершить работу'})).length).toBeGreaterThan(0);
     expect(api.fetchState).toHaveBeenCalledTimes(2);
+  });
+});
+
+/**
+ * Отклонённая запись видна и на экранах отказа (R76, находка 17).
+ *
+ * Строка состояния при `FAILED` пишет «Сервер отклонил запись — причина показана
+ * ниже». На экранах «Нет связи»/«Сервер не отвечает» и «доступ закрыт» ниже ничего
+ * не было: карточка с причиной и кнопкой «Удалить запись» оставалась на невидимом
+ * экране, и причину отказа нельзя было ни прочитать, ни убрать запись.
+ */
+describe('v1: очередь видна на экране отказа загрузки', () => {
+  const failedItem: QueuedCommand = {
+    clientCommandId: 'cmd-failed-1',
+    label: 'Выработка',
+    command: {command: 'log-production'},
+    queuedAt: '2026-09-20T05:00:00.000Z',
+    attempts: 1,
+    state: 'FAILED',
+    lastError: 'Смена уже закрыта',
+  };
+
+  it('503 с отклонённой записью показывает её причину и кнопку «Удалить запись»', async () => {
+    queue.items = [failedItem];
+    api.fetchState.mockRejectedValue(new ApiError(503, 'Сервис временно недоступен'));
+
+    render(<OperatorMobileApp />);
+
+    expect(await screen.findByText('Сервер не отвечает')).toBeInTheDocument();
+    // Строка состояния обещает причину ниже — причина действительно ниже.
+    expect(screen.getByText('Смена уже закрыта')).toBeInTheDocument();
+    expect(screen.getByRole('button', {name: 'Удалить запись'})).toBeInTheDocument();
+  });
+});
+
+/**
+ * Запись легла в очередь — экран об этом говорит (R76, находка 18).
+ *
+ * Раньше при обрыве связи форма просто закрывалась: машинист не получал ни
+ * слова о том, что введённое сохранено на устройстве. Сообщение `QueuedOffline`
+ * в `run()` проглатывалось (`setActionError(null)`), а плашку вверху на рабочем
+ * экране легко не заметить.
+ */
+describe('v1: запись легла в очередь — экран говорит об этом', () => {
+  it('обрыв связи показывает текст «сохранено на устройстве» без кнопки «Обновить»', async () => {
+    api.fetchState.mockResolvedValue(workState);
+    api.sendCommand.mockRejectedValue(new QueuedOffline('Выработка'));
+
+    render(<OperatorMobileApp />);
+
+    fireEvent.click((await screen.findAllByRole('button', {name: 'Завершить работу'}))[0]);
+    fireEvent.click(screen.getByRole('button', {name: 'Да, работа завершена'}));
+
+    expect(await screen.findByText('Выработка: сохранено на устройстве, отправим при связи')).toBeInTheDocument();
+    // Уведомление без кнопки «Обновить»: перечитывать нечего — сервер записи ещё не видел.
+    expect(screen.queryByRole('button', {name: 'Обновить'})).not.toBeInTheDocument();
+    // Экран работы на месте: форма закрылась как при обычной постановке в очередь.
+    expect(screen.getAllByRole('button', {name: 'Завершить работу'}).length).toBeGreaterThan(0);
   });
 });

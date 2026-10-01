@@ -374,6 +374,16 @@ export function OperatorMobileApp() {
             // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- намеренно: сессия истекла, полная перезагрузка сбрасывает кэш маршрутов и память вкладки прежнего входа
             window.location.href = '/login';
           }, AUTH_REDIRECT_MS);
+        } else {
+          /*
+            ОБРЫВ СВЯЗИ — НЕ МОЛЧАНИЕ (аудит R76, находка 18). Запись легла на
+            устройство, форма закрылась, и машинист не получает ни одного слова о
+            том, что введённое не потеряно: остаётся только плашка вверху, которую
+            на рабочем экране легко не заметить. Говорим тем же коротким
+            уведомлением, что и о несвежем экране, но без кнопки «Обновить»:
+            перечитывать нечего — сервер этой записи ещё не видел.
+          */
+          setNotice(error.message);
         }
         return true;
       }
@@ -402,6 +412,15 @@ export function OperatorMobileApp() {
   if (forbidden) {
     return (
       <OperatorFrame>
+        {/*
+          Строка состояния и плашка очереди нужны и здесь (аудит R76, находка 17).
+          Отказ по роли не отменяет записей, уже лежащих на устройстве: без плашки
+          машинист не увидит ни причины отклонённых записей, ни кнопок «Повторить»/
+          «Удалить запись», а строка состояния обещает «причина показана ниже»,
+          когда ниже ничего нет.
+        */}
+        <OperatorStatusStrip online={online} items={queued} />
+        <OfflineQueueBanner items={queued} onRetry={retryQueued} onDiscard={discardQueued} />
         <Screen
           title="Рабочее место машиниста"
           /*
@@ -429,6 +448,13 @@ export function OperatorMobileApp() {
     return (
       <OperatorFrame>
         <OperatorStatusStrip online={online} items={queued} />
+        {/*
+          Плашка очереди — сразу под строкой состояния (аудит R76, находка 17).
+          Строка состояния при отклонённых записях пишет «Сервер отклонил запись —
+          причина показана ниже», а ниже ничего не было: карточки с причиной и
+          кнопками оставались на невидимом экране работы.
+        */}
+        <OfflineQueueBanner items={queued} onRetry={retryQueued} onDiscard={discardQueued} />
         <Screen
           title={serverFault ? 'Сервер не отвечает' : 'Нет связи'}
           footer={<BigButton onClick={() => void reload()}>Повторить</BigButton>}
