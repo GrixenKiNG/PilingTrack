@@ -28,8 +28,18 @@ import { NextResponse } from 'next/server';
 const CSRF_EXEMPT_PATHS = [
   '/api/ready',
   '/api/health',
-  '/api/auth/login',
   '/api/auth/me',
+];
+
+// Вход: межсайтовые признаки браузера (чужой Origin/Referer, Sec-Fetch-Site
+// cross-site) отклоняются, а запрос совсем без браузерных заголовков
+// пропускается. Полное освобождение входа допускало login CSRF: чужой сайт
+// отправлял форму с учётными данными атакующего, и браузер сотрудника
+// получал чужую сессию (аудит Codex out55, F09). Без заголовков приходят
+// скрипты смоука и curl — подделать запрос из чужого браузера, не отправив
+// ни Origin, ни Sec-Fetch-Site, нельзя.
+const CSRF_HEADERLESS_ALLOWED_PATHS = [
+  '/api/auth/login',
 ];
 
 // Allowed Sec-Fetch-Site values for same-origin requests
@@ -107,7 +117,7 @@ export function withCsrf(request: Request): NextResponse | null {
 
   // Layer 4: If no Origin, no Referer, and no Sec-Fetch-Site — reject
   // (indicates suspicious request, likely not from a browser)
-  if (!origin && !referer && !secFetchSite) {
+  if (!origin && !referer && !secFetchSite && !CSRF_HEADERLESS_ALLOWED_PATHS.includes(pathname)) {
     return NextResponse.json(
       { error: 'CSRF validation failed: missing origin, referer, and sec-fetch-site' },
       { status: 403 }
