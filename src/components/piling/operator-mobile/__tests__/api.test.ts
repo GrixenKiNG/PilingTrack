@@ -8,7 +8,7 @@
  */
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 import {ApiError, fetchKnowledgeAttempt, fetchState, operatorErrorDetails, operatorErrorText, QueuedOffline, sendCommand, uploadPhoto} from '../api';
-import {QueueOwnershipError, QueueStorageError, CSRF_REJECT_MESSAGE, readQueue} from '../offline-queue';
+import {QueueOwnershipError, QueueStorageError, CSRF_REJECT_MESSAGE, CSRF_REJECT_NOT_QUEUED_MESSAGE, readQueue} from '../offline-queue';
 
 describe('operatorErrorText', () => {
   it('сетевой сбой — «Нет связи с сервером…», а не английская строка браузера', () => {
@@ -298,6 +298,22 @@ describe('sendCommand и CSRF-отказ', () => {
     expect(queue[0]).toMatchObject({clientCommandId: 'c1', state: 'PENDING', lastError: CSRF_REJECT_MESSAGE});
   });
 
+  // Команда-переход в очередь не попадает: обещание «запись сохранена на
+  // телефоне и уйдёт после обновления» было бы ложью — закрывать нечего, а
+  // смену после обновления придётся закрывать заново (аудит R89, находка 1).
+  it('403 CSRF на команде-переходе — текст без обещания сохранения, в очередь ничего не ложится', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(
+      JSON.stringify({error: 'CSRF validation failed: origin mismatch'}), {status: 403})));
+    const error = await sendCommand({command: 'close-shift', shiftId: 's1', comment: ''})
+      .catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(ApiError);
+    expect((error as ApiError).reason).toBe('csrf');
+    expect(operatorErrorText(error)).toBe(CSRF_REJECT_NOT_QUEUED_MESSAGE);
+    expect(operatorErrorText(error)).not.toMatch(/сохранена/);
+    expect(readQueue()).toHaveLength(0);
+  });
+
   it('403 «Нет доступа» — отказ по существу: запись FAILED, как раньше', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response(
       JSON.stringify({error: 'Нет доступа'}), {status: 403})));
@@ -394,6 +410,60 @@ describe('таймаут запроса', () => {
 
     expect(mediaId).toBe('m1');
     expect(timeouts).toEqual([20_000, 120_000, 20_000]);
+  });
+});
+
+/**
+ * Текст отказа на шаге получения ссылки на снимок (аудит R89, находка 2).
+ *
+ * Раньше этот шаг отдавал в интерфейс СЫРУЮ английскую строку сервера:
+ * «CSRF validation failed: origin mismatch» (расхождение `Origin` и `Host`) или
+ * «Unauthorized» (истёкшая сессия, `lib/auth.ts`). Машинист читал её вместо
+ * «обновите страницу». Теперь отказ разбирается теми же правилами, что у
+ * команд: CSRF-403 → русский текст без обещания сохранения (снимок в очередь не
+ * попадает), прочий некириллический отказ → общая фраза, русский текст сервера
+ * показываем как есть.
+ */
+describe('uploadPhoto: отказ на получении ссылки на снимок', () => {
+  const file = new File(['x'], 'photo.jpg', {type: 'image/jpeg'});
+
+  /** Первый шаг — получение ссылки: ответ задаёт сам тест. */
+  function stubGrant(grant: () => Response) {
+    vi.stubGlobal('fetch', vi.fn(async () => grant()));
+  }
+
+  it('403 CSRF — русский текст про обновление, без обещания сохранения и английского', async () => {
+    stubGrant(() => new Response(
+      JSON.stringify({error: 'CSRF validation failed: origin mismatch'}), {status: 403}));
+    const error = await uploadPhoto({file, clientCommandId: 'c1'}).catch((caught: unknown) => caught);
+    vi.unstubAllGlobals();
+
+    expect(error).toBeInstanceOf(ApiError);
+    expect((error as ApiError).status).toBe(403);
+    expect((error as ApiError).reason).toBe('csrf');
+    expect(operatorErrorText(error)).toBe(CSRF_REJECT_NOT_QUEUED_MESSAGE);
+    expect(operatorErrorText(error)).not.toMatch(/сохранена|CSRF validation/);
+  });
+
+  it('401 «Unauthorized» — русский текст, без английского', async () => {
+    stubGrant(() => new Response(JSON.stringify({error: 'Unauthorized'}), {status: 401}));
+    const error = await uploadPhoto({file, clientCommandId: 'c1'}).catch((caught: unknown) => caught);
+    vi.unstubAllGlobals();
+
+    expect(error).toBeInstanceOf(ApiError);
+    expect((error as ApiError).status).toBe(401);
+    expect(operatorErrorText(error)).toBe('Не удалось получить ссылку для снимка');
+  });
+
+  it('русский текст сервера — показываем как есть', async () => {
+    stubGrant(() => new Response(
+      JSON.stringify({error: 'Экран доступен только машинисту'}), {status: 403}));
+    const error = await uploadPhoto({file, clientCommandId: 'c1'}).catch((caught: unknown) => caught);
+    vi.unstubAllGlobals();
+
+    expect(error).toBeInstanceOf(ApiError);
+    expect((error as ApiError).reason).toBeUndefined();
+    expect(operatorErrorText(error)).toBe('Экран доступен только машинисту');
   });
 });
 

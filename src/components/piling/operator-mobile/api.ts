@@ -4,8 +4,9 @@ import type {
   ChecklistAnswer, ChecklistStage, KnowledgeQuestion, OperatorMobileState,
 } from '@/modules/operator-mobile/contracts';
 import {
-  AUTH_WAIT_MESSAGE, classifyFailure, commandLabel, CSRF_REJECT_MESSAGE, enqueue, isCsrfFailure,
-  isQueueable, markAttempt, QueueOwnershipError, QueueStorageError, readQueue, resolve,
+  AUTH_WAIT_MESSAGE, classifyFailure, commandLabel, CSRF_REJECT_MESSAGE,
+  CSRF_REJECT_NOT_QUEUED_MESSAGE, enqueue, isCsrfFailure, isQueueable, markAttempt,
+  QueueOwnershipError, QueueStorageError, readQueue, resolve,
 } from './offline-queue';
 
 /**
@@ -176,25 +177,53 @@ const BAD_COMMAND_TEXT_FROM_SERVER = 'Некорректная команда';
 const BAD_COMMAND_HINT =
   'Не удалось отправить — обновите экран и повторите. Если повторяется, сообщите администратору.';
 
-async function parse<T>(response: Response): Promise<T> {
+/**
+ * Отказ сервера → `ApiError` с понятным машинисту текстом. Общий разбор для
+ * команд, чтения состояния, вопросов проверки знаний и получения ссылки на
+ * снимок.
+ *
+ * ПОЧЕМУ ОБЩИЙ. Поток снимка разбирал ответ сам и отдавал в интерфейс СЫРУЮ
+ * английскую строку сервера — «CSRF validation failed: origin mismatch» или
+ * «Unauthorized» (аудит R89, находка 2). Те же правила, что у прочих запросов,
+ * убирают её из формы снимка.
+ *
+ * `csrfMessage` — что сказать про 403 CSRF: у команды в очереди обещание
+ * «запись сохранена на телефоне» правдиво, у команды-перехода и снимка — нет
+ * (аудит R89, находка 1). `fallback` — общая фраза, когда сервер не дал
+ * понятного текста. `russianOnly` — брать текст сервера только с кириллицей:
+ * тело маршрута медиа приносит служебные английские строки, а машинисту они
+ * ничего не говорят.
+ */
+function rejectionError(
+  status: number,
+  payload: {error?: unknown; details?: unknown} | null,
+  options: {csrfMessage: string; fallback: string; russianOnly?: boolean},
+): ApiError {
+  const serverText = typeof payload?.error === 'string' ? payload.error : null;
+  // Отказ CSRF-проверки приходит английской строкой (`csrf-protection.ts`:
+  // `CSRF validation failed: …`) при расхождении `Origin` и `Host` — так
+  // бывает, когда приложение открыто по IP, через прокси или вкладка
+  // пережила смену адреса. Машинисту нужен русский выход «обновите
+  // страницу», а не английская строка, и признак `reason`, по которому
+  // очередь оставит запись `PENDING` (аудит R76, находка 12).
+  if (status === 403 && serverText !== null && serverText.startsWith('CSRF validation failed')) {
+    return new ApiError(403, options.csrfMessage, payload?.details, 'csrf');
+  }
+  if (serverText !== null && (!options.russianOnly || /[А-Яа-яЁё]/.test(serverText))) {
+    return new ApiError(status,
+      serverText === BAD_COMMAND_TEXT_FROM_SERVER ? BAD_COMMAND_HINT : serverText, payload?.details);
+  }
+  return new ApiError(status, options.fallback, payload?.details);
+}
+
+async function parse<T>(response: Response, csrfMessage = CSRF_REJECT_MESSAGE): Promise<T> {
   const payload = await response.json().catch(() => null) as
     {data?: T; error?: string; details?: unknown} | null;
   if (!response.ok) {
-    // Отказ CSRF-проверки приходит английской строкой (`csrf-protection.ts`:
-    // `CSRF validation failed: …`) при расхождении `Origin` и `Host` — так
-    // бывает, когда приложение открыто по IP, через прокси или вкладка
-    // пережила смену адреса. Машинисту нужен русский выход «обновите
-    // страницу», а не английская строка, и признак `reason`, по которому
-    // очередь оставит запись `PENDING` (аудит R76, находка 12).
-    if (response.status === 403
-      && typeof payload?.error === 'string'
-      && payload.error.startsWith('CSRF validation failed')) {
-      throw new ApiError(403, CSRF_REJECT_MESSAGE, payload.details, 'csrf');
-    }
-    const message = typeof payload?.error === 'string'
-      ? (payload.error === BAD_COMMAND_TEXT_FROM_SERVER ? BAD_COMMAND_HINT : payload.error)
-      : unparsedFailureText(response.status);
-    throw new ApiError(response.status, message, payload?.details);
+    throw rejectionError(response.status, payload, {
+      csrfMessage,
+      fallback: unparsedFailureText(response.status),
+    });
   }
   // Успех — только разобранный ответ нашего сервера. Сеть гостиницы или
   // оператора связи отдаёт на перехваченный запрос свою страницу входа со
@@ -455,7 +484,12 @@ async function postCommand<T>(command: unknown): Promise<T> {
       body: JSON.stringify(command),
       signal: timeout.signal,
     });
-    return await parse<T>(response);
+    // Команда-переход (`close-shift`, `finish-work` и прочие неочередные) в
+    // очередь не попадает: при CSRF-отказе обещать «запись сохранена на
+    // телефоне и уйдёт после обновления» было бы ложью — сохранять нечего, а
+    // после обновления действие придётся повторить (аудит R89, находка 1).
+    return await parse<T>(response,
+      isQueueable(command) ? CSRF_REJECT_MESSAGE : CSRF_REJECT_NOT_QUEUED_MESSAGE);
   } finally {
     timeout.cleanup();
   }
@@ -600,12 +634,23 @@ export async function uploadPhoto(input: {
       }),
       signal: grantTimeout.signal,
     });
-    // Медиа-маршрут отвечает объектом напрямую, без обёртки `data` — здесь
-    // разбираем его сами, а не общим `parse`.
+    // Медиа-маршрут отвечает объектом напрямую, без обёртки `data`, поэтому
+    // разбираем его сами, но ОТКАЗ разбираем общими правилами: раньше сюда
+    // попадала сырая английская строка сервера — «CSRF validation failed:
+    // origin mismatch» или «Unauthorized» (аудит R89, находка 2). Снимок в
+    // очередь не попадает, поэтому у CSRF-отказа текст без обещания
+    // сохранения, а некириллический отказ заменяется общей фразой.
     const granted = await grant.json().catch(() => null) as
       {mediaId?: string; uploadUrl?: string; error?: string} | null;
-    if (!grant.ok || !granted?.mediaId || !granted.uploadUrl) {
-      throw new ApiError(grant.status, granted?.error ?? 'Не удалось получить ссылку для снимка');
+    if (!grant.ok) {
+      throw rejectionError(grant.status, granted, {
+        csrfMessage: CSRF_REJECT_NOT_QUEUED_MESSAGE,
+        fallback: 'Не удалось получить ссылку для снимка',
+        russianOnly: true,
+      });
+    }
+    if (!granted?.mediaId || !granted.uploadUrl) {
+      throw new ApiError(grant.status, 'Не удалось получить ссылку для снимка');
     }
     const {mediaId, uploadUrl} = granted;
 
