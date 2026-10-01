@@ -50,6 +50,26 @@ const AUTH_EXPIRED_NOTICE =
   'Сессия истекла. Записи сохранены на телефоне и уйдут после входа.';
 
 /**
+ * Текст о несвежем экране после принятой команды.
+ *
+ * Обещал «обновится автоматически при связи», но автоматического перечитывания
+ * не было: экран оставался несвежим до следующего действия (аудит F-V1-QUIET-RELOAD-b).
+ * Теперь обещание исполняется — ниже повторное перечитывание, — а к записи
+ * приписано прямое «не вводите повторно».
+ */
+const STALE_SCREEN_NOTICE =
+  'Записано. Экран не обновился — обновим, как появится связь. Не вводите запись повторно.';
+
+/**
+ * Как часто повторять тихое перечитывание, пока экран остаётся несвежим.
+ *
+ * Пятнадцать секунд — не чаще: сбой перечитывания обычно значит недоступный
+ * сервер, и долбить его каждую секунду незачем. События `online` и возврата на
+ * вкладку пробуют раньше таймера.
+ */
+const QUIET_RELOAD_EVERY_MS = 15_000;
+
+/**
  * Разделы, доступные после начала работы.
  *
  * До этого экран ведёт человека по порядку — допуск, приём, осмотр, пуск,
@@ -98,6 +118,17 @@ export function OperatorMobileApp() {
    * находка 9).
    */
   const [notice, setNotice] = useState<string | null>(null);
+  /**
+   * Экран остался несвежим после принятой команды: тихое перечитывание упало.
+   *
+   * Отдельно от `notice`, потому что уведомление бывает двух разных родов: об
+   * этом сбое (лечится повтором перечитывания) и об истёкшей сессии (лечится
+   * входом). Повторять `reload` на втором значило бы стучаться в закрытую дверь
+   * (аудит F-V1-QUIET-RELOAD-b).
+   */
+  const [staleScreen, setStaleScreen] = useState(false);
+  /** Тихое перечитывание уже идёт: параллельных вызовов не заводим. */
+  const reloadingQuietly = useRef(false);
   /**
    * Подробности последнего отказа — что именно не заполнено.
    *
@@ -179,6 +210,7 @@ export function OperatorMobileApp() {
       setServerFault(false);
       // Экран снова свежий — прежняя заметка о несвежести больше не верна.
       setNotice(null);
+      setStaleScreen(false);
     } catch (error) {
       if (error instanceof ApiError && error.status === 401) {
         // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- намеренно: сессия истекла, полная перезагрузка сбрасывает кэш маршрутов и память вкладки прежнего входа
@@ -206,6 +238,57 @@ export function OperatorMobileApp() {
       await reload();
     })();
   }, [reload]);
+
+  /**
+   * Тихое перечитывание, пригодное для повтора: не бросает наружу и не
+   * запускается вторым, пока идёт первое.
+   *
+   * Успех сам снимает уведомление (это делает `reload`), сбой оставляет экран
+   * несвежим — и повод для следующей попытки.
+   */
+  const quietReload = useCallback(async () => {
+    if (reloadingQuietly.current) return;
+    reloadingQuietly.current = true;
+    try {
+      await reload({quiet: true});
+    } catch {
+      // Экран остался несвежим: уведомление не снимаем, повторим по следующему поводу.
+    } finally {
+      reloadingQuietly.current = false;
+    }
+  }, [reload]);
+
+  /**
+   * Пока экран несвежий — повторять тихое перечитывание, не дожидаясь действия
+   * человека.
+   *
+   * Прежнее уведомление обещало «обновится автоматически при связи», но
+   * перечитывал экран только слив очереди, а после удачной немедленной команды
+   * очередь пуста: счётчик свай и фаза оставались прежними, и машинист мог
+   * ввести ту же сваю второй раз (ключи команд после успеха новые). Поводы —
+   * событие `online`, возврат на вкладку и таймер; успешное чтение снимает
+   * `notice`, а с ним и подписки, и таймер (аудит F-V1-QUIET-RELOAD-b).
+   */
+  useEffect(() => {
+    if (!staleScreen) return;
+    const retry = () => { void quietReload(); };
+    const onVisible = () => {
+      if (globalThis.document?.visibilityState === 'visible') retry();
+    };
+    const timer = setInterval(() => {
+      // Флаг браузера врёт и в обе стороны, но при явном «сети нет» стучаться
+      // смысла нет — дождёмся события `online`.
+      if (globalThis.navigator?.onLine === false) return;
+      retry();
+    }, QUIET_RELOAD_EVERY_MS);
+    globalThis.addEventListener?.('online', retry);
+    globalThis.document?.addEventListener('visibilitychange', onVisible);
+    return () => {
+      clearInterval(timer);
+      globalThis.removeEventListener?.('online', retry);
+      globalThis.document?.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [staleScreen, quietReload]);
 
   useEffect(() => {
     const update = () => setOnline(globalThis.navigator?.onLine ?? true);
@@ -238,6 +321,7 @@ export function OperatorMobileApp() {
     setActionErrorDetails([]);
     setKnowledgeExpired(false);
     setNotice(null);
+    setStaleScreen(false);
     try {
       await work();
       setChecklistCommandId(newCommandId());
@@ -255,7 +339,8 @@ export function OperatorMobileApp() {
       try {
         await reload({quiet: true});
       } catch {
-        setNotice('Записано. Не удалось обновить экран — обновится автоматически при связи.');
+        setNotice(STALE_SCREEN_NOTICE);
+        setStaleScreen(true);
       }
       return true;
     } catch (error) {
@@ -673,6 +758,17 @@ export function OperatorMobileApp() {
         <div className="px-3 pt-2">
           <Panel tone="warning">
             <p role="status" className="text-sm font-medium">{notice}</p>
+            {/*
+              Ручной выход к тому же тихому перечитыванию: машинист видит, что
+              экран несвежий, и может обновить его сам, не дожидаясь связи или
+              таймера. Кнопки нет у уведомления об истёкшей сессии — там нужен
+              вход, а не перечитывание (F-V1-QUIET-RELOAD-b).
+            */}
+            {staleScreen ? (
+              <div className="mt-2">
+                <BigButton tone="ghost" onClick={() => void quietReload()}>Обновить</BigButton>
+              </div>
+            ) : null}
           </Panel>
         </div>
       ) : null}

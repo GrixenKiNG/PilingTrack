@@ -151,12 +151,101 @@ describe('v1: перечитывание после успешной коман�
     fireEvent.click((await screen.findAllByRole('button', {name: 'Завершить работу'}))[0]);
     fireEvent.click(screen.getByRole('button', {name: 'Да, работа завершена'}));
 
-    expect(await screen.findByText(/Записано\. Не удалось обновить экран/)).toBeInTheDocument();
+    expect(await screen.findByText(/Записано\. Экран не обновился/)).toBeInTheDocument();
     // Экран прежний: полноэкранного отказа нет ни под каким заголовком.
     expect(screen.queryByText('Сервер не отвечает')).not.toBeInTheDocument();
     expect(screen.queryByText('Нет связи')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', {name: 'Повторить'})).not.toBeInTheDocument();
     expect(screen.getAllByRole('button', {name: 'Завершить работу'}).length).toBeGreaterThan(0);
+  });
+});
+
+/**
+ * Несвежий экран перечитывается сам (F-V1-QUIET-RELOAD-b).
+ *
+ * Прежнее уведомление обещало «обновится автоматически при связи», но
+ * автоматического перечитывания не было: очередь после удачной немедленной
+ * команды пуста, и `useOfflineQueue` не звал `reload`. Счётчик свай и фаза
+ * оставались прежними, и машиниста приходилось убеждать не вводить запись
+ * повторно — теперь экран догоняет состояние сам, без следующего действия.
+ */
+describe('v1: несвежий экран перечитывается сам', () => {
+  const freshState = {
+    ...workState,
+    production: {
+      piles: {count: 99, meters: 495},
+      drilling: {count: 4, meters: 24},
+      downtimeHours: 0,
+    },
+  } as unknown as OperatorMobileState;
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  /** Команда принята, а следующее за ней перечитывание упало — уведомление на экране. */
+  async function commandThenFailedReload() {
+    api.fetchState.mockResolvedValueOnce(workState);
+    api.sendCommand.mockResolvedValue(undefined);
+    api.fetchState.mockRejectedValueOnce(new ApiError(503, 'Сервис временно недоступен'));
+
+    render(<OperatorMobileApp />);
+
+    fireEvent.click((await screen.findAllByRole('button', {name: 'Завершить работу'}))[0]);
+    fireEvent.click(screen.getByRole('button', {name: 'Да, работа завершена'}));
+
+    await screen.findByText(/Записано\. Экран не обновился/);
+  }
+
+  it('по событию online уведомление исчезает, экран показывает свежие данные', async () => {
+    await commandThenFailedReload();
+
+    api.fetchState.mockResolvedValueOnce(freshState);
+    await act(async () => {
+      globalThis.dispatchEvent(new Event('online'));
+    });
+
+    expect(screen.queryByText(/Записано\. Экран не обновился/)).not.toBeInTheDocument();
+    expect((await screen.findAllByText('99')).length).toBeGreaterThan(0);
+  });
+
+  it('кнопка «Обновить» перечитывает состояние тем же тихим способом', async () => {
+    await commandThenFailedReload();
+
+    api.fetchState.mockResolvedValueOnce(freshState);
+    fireEvent.click(screen.getByRole('button', {name: 'Обновить'}));
+
+    expect((await screen.findAllByText('99')).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/Записано\. Экран не обновился/)).not.toBeInTheDocument();
+  });
+
+  it('таймер повторяет перечитывание, не дожидаясь действия человека', async () => {
+    api.fetchState.mockResolvedValueOnce(workState);
+    api.sendCommand.mockResolvedValue(undefined);
+    api.fetchState.mockRejectedValueOnce(new ApiError(503, 'Сервис временно недоступен'));
+
+    render(<OperatorMobileApp />);
+
+    // Загрузку ждём на настоящих таймерах, фейковые ставим до нажатия: иначе
+    // интервал повтора взведётся на настоящих часах, и `advanceTimersByTime`
+    // его не увидит (как в тестах истёкшего входа выше).
+    const buttons = await screen.findAllByRole('button', {name: 'Завершить работу'});
+    vi.useFakeTimers();
+
+    fireEvent.click(buttons[0]);
+    fireEvent.click(screen.getByRole('button', {name: 'Да, работа завершена'}));
+    await act(async () => {});
+
+    expect(screen.getByText(/Записано\. Экран не обновился/)).toBeInTheDocument();
+
+    api.fetchState.mockResolvedValueOnce(freshState);
+    await act(async () => {
+      vi.advanceTimersByTime(15_000);
+    });
+
+    expect(screen.queryByText(/Записано\. Экран не обновился/)).not.toBeInTheDocument();
+    // Загрузка + упавшее тихое чтение + успешное по таймеру.
+    expect(api.fetchState).toHaveBeenCalledTimes(3);
   });
 });
 
