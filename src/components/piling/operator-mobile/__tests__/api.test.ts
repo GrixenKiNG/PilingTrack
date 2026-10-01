@@ -7,7 +7,7 @@
  * поломку приложения вместо того, чтобы проверить связь.
  */
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
-import {ApiError, fetchKnowledgeAttempt, operatorErrorDetails, operatorErrorText, QueuedOffline, sendCommand, uploadPhoto} from '../api';
+import {ApiError, fetchKnowledgeAttempt, fetchState, operatorErrorDetails, operatorErrorText, QueuedOffline, sendCommand, uploadPhoto} from '../api';
 import {QueueOwnershipError, QueueStorageError, readQueue} from '../offline-queue';
 
 describe('operatorErrorText', () => {
@@ -390,5 +390,92 @@ describe('uploadPhoto: подтверждение снимка', () => {
     expect(error).toBeInstanceOf(ApiError);
     expect((error as ApiError).status).toBe(422);
     expect((error as ApiError).message).toBe('Снимок не подтверждён сервером');
+  });
+});
+
+/**
+ * Таймаут без родных `AbortSignal.any`/`AbortSignal.timeout` (F-V1-FETCH-TIMEOUT-b).
+ *
+ * `AbortSignal.any` есть только с Safari 17.4 / Chrome 116, а цели Next по
+ * умолчанию — Safari 16.4 / Chrome 111. На iPhone с iOS 16.x–17.3 прежний
+ * `timeoutSignal` вызывал `AbortSignal.any` синхронно, тот бросал `TypeError`, и
+ * запрос с внешним сигналом падал всегда — машинист навсегда оставался на «Нет
+ * связи». Здесь родные помощники снимаются на время теста, как в старом браузере,
+ * и проверяется, что сигнал собирается на `AbortController` и ведёт себя так же.
+ */
+describe('таймаут запроса без AbortSignal.any/timeout', () => {
+  const nativeTimeout = AbortSignal.timeout;
+  const nativeAny = AbortSignal.any;
+  // В happy-dom статики `AbortSignal` наследуются от базового класса и не
+  // удаляются (`Reflect.deleteProperty` не снимает унаследованное). Тень
+  // собственным значением `undefined` воспроизводит старый браузер надёжно.
+  const statics = AbortSignal as unknown as {timeout?: unknown; any?: unknown};
+
+  beforeEach(() => {
+    statics.timeout = undefined;
+    statics.any = undefined;
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+    statics.timeout = nativeTimeout;
+    statics.any = nativeAny;
+  });
+
+  it('fetchState с внешним сигналом не бросает TypeError и доходит до сервера', async () => {
+    const fetchMock = vi.fn(async (_url: string, _init?: RequestInit) => new Response(JSON.stringify({data: {phase: 'IDLE'}}), {status: 200}));
+    vi.stubGlobal('fetch', fetchMock);
+    const controller = new AbortController();
+
+    await expect(fetchState({signal: controller.signal})).resolves.toEqual({phase: 'IDLE'});
+    expect(fetchMock.mock.calls[0][1]?.signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it('зависший fetch обрывается через 20 с, ошибка — таймаут связи', async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal('fetch', vi.fn((_url: string, init?: RequestInit) => new Promise((_resolve, reject) => {
+      init?.signal?.addEventListener('abort', () => reject(init?.signal?.reason));
+    })));
+
+    const result = fetchState({}).catch((caught: unknown) => caught);
+    await vi.advanceTimersByTimeAsync(20_000);
+    const error = await result;
+
+    expect(error).toBeInstanceOf(DOMException);
+    expect((error as DOMException).name).toBe('TimeoutError');
+    expect(operatorErrorText(error)).toBe('Нет связи с сервером. Проверьте интернет и повторите.');
+  });
+
+  it('внешний abort обрывает запрос раньше таймаута, причину передаёт свою', async () => {
+    vi.useFakeTimers();
+    const controller = new AbortController();
+    let seen: AbortSignal | undefined;
+    vi.stubGlobal('fetch', vi.fn((_url: string, init?: RequestInit) => new Promise((_resolve, reject) => {
+      seen = init?.signal ?? undefined;
+      init?.signal?.addEventListener('abort', () => reject(init?.signal?.reason));
+    })));
+
+    const result = fetchState({signal: controller.signal}).catch((caught: unknown) => caught);
+    controller.abort(new DOMException('Отменено', 'AbortError'));
+    await vi.advanceTimersByTimeAsync(0);
+    const error = await result;
+
+    expect(seen?.aborted).toBe(true);
+    expect((error as DOMException).name).toBe('AbortError');
+  });
+
+  it('с родными помощниками сигнал по-прежнему берётся из AbortSignal.timeout/any', async () => {
+    statics.timeout = nativeTimeout;
+    statics.any = nativeAny;
+    const timeoutSpy = vi.spyOn(AbortSignal, 'timeout').mockReturnValue(new AbortController().signal);
+    const anySpy = vi.spyOn(AbortSignal, 'any');
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({data: {}}), {status: 200})));
+
+    await fetchState({signal: new AbortController().signal});
+
+    expect(timeoutSpy).toHaveBeenCalledWith(20_000);
+    expect(anySpy).toHaveBeenCalled();
   });
 });

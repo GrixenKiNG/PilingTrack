@@ -152,18 +152,80 @@ async function parse<T>(response: Response): Promise<T> {
 const REQUEST_TIMEOUT_MS = 20_000;
 const UPLOAD_TIMEOUT_MS = 120_000;
 
+/** Сигнал запроса и снятие его следов (таймер, подписка на внешний сигнал). */
+interface RequestSignal {
+  signal: AbortSignal;
+  cleanup: () => void;
+}
+
+/**
+ * Причина таймаута — `DOMException` «TimeoutError», её `operatorErrorText` знает
+ * как обрыв связи. Если конструктор с именем недоступен, обрываем без причины:
+ * тогда `fetch` отдаёт `AbortError`, который обрабатывается так же.
+ */
+function timeoutReason(): DOMException | undefined {
+  try {
+    return new DOMException('Timeout', 'TimeoutError');
+  } catch {
+    return undefined;
+  }
+}
+
 /**
  * Сигнал таймаута запроса. Внешний сигнал (отмена при уходе с экрана) сохраняем:
  * запрос обрывается по тому, что наступит раньше.
+ *
+ * ПОЧЕМУ НЕ ТОЛЬКО `AbortSignal.timeout`/`AbortSignal.any`. `any` появился лишь
+ * в Safari 17.4 / Chrome 116, а цели Next по умолчанию — Safari 16.4 / Chrome
+ * 111, и полифилла у проекта нет. На iPhone с iOS 16.x–17.3 вызов
+ * `AbortSignal.any` бросал бы `TypeError` синхронно, и любой запрос с внешним
+ * сигналом падал бы всегда — машинист навсегда оставался на «Нет связи». Когда
+ * родных помощников нет, собираем сигнал сами на `AbortController`.
+ *
+ * Таймер и подписка на внешний сигнал не должны жить дольше запроса, поэтому
+ * помощник отдаёт вместе с сигналом функцию очистки — каждый запрос зовёт её в
+ * `finally`. Без этого на длинном файле снимка (120 с) висел бы лишний таймер, а
+ * в тестах — фейковое время.
  */
-function timeoutSignal(ms: number, external?: AbortSignal): AbortSignal {
-  const timeout = AbortSignal.timeout(ms);
-  return external ? AbortSignal.any([external, timeout]) : timeout;
+function timeoutSignal(ms: number, external?: AbortSignal): RequestSignal {
+  const hasNativeTimeout = typeof AbortSignal.timeout === 'function';
+  const hasNativeAny = typeof AbortSignal.any === 'function';
+  if (hasNativeTimeout && (!external || hasNativeAny)) {
+    const timeout = AbortSignal.timeout(ms);
+    return {
+      signal: external ? AbortSignal.any([external, timeout]) : timeout,
+      cleanup: () => {},
+    };
+  }
+
+  const controller = new AbortController();
+  const reason = timeoutReason();
+  const timer = setTimeout(() => {
+    if (reason) controller.abort(reason);
+    else controller.abort();
+  }, ms);
+  const onExternalAbort = () => {
+    if (external) controller.abort(external.reason);
+  };
+  if (external) {
+    // Уже отменённый внешний сигнал не прислал бы событие — обрываем сразу.
+    if (external.aborted) controller.abort(external.reason);
+    else external.addEventListener('abort', onExternalAbort, {once: true});
+  }
+  return {
+    signal: controller.signal,
+    cleanup: () => {
+      clearTimeout(timer);
+      external?.removeEventListener('abort', onExternalAbort);
+    },
+  };
 }
 
 export async function fetchState(input: {
   coordinates?: {latitude: number; longitude: number} | null;
   equipmentId?: string;
+  /** Отмена при уходе с экрана: запрос обрывается тем, что наступит раньше. */
+  signal?: AbortSignal;
 }): Promise<OperatorMobileState> {
   const query = new URLSearchParams();
   if (input.coordinates) {
@@ -172,12 +234,17 @@ export async function fetchState(input: {
   }
   if (input.equipmentId) query.set('equipmentId', input.equipmentId);
 
-  const response = await fetch(`/api/operator/mobile/state?${query.toString()}`, {
-    cache: 'no-store',
-    credentials: 'same-origin',
-    signal: timeoutSignal(REQUEST_TIMEOUT_MS),
-  });
-  return parse<OperatorMobileState>(response);
+  const timeout = timeoutSignal(REQUEST_TIMEOUT_MS, input.signal);
+  try {
+    const response = await fetch(`/api/operator/mobile/state?${query.toString()}`, {
+      cache: 'no-store',
+      credentials: 'same-origin',
+      signal: timeout.signal,
+    });
+    return await parse<OperatorMobileState>(response);
+  } finally {
+    timeout.cleanup();
+  }
 }
 
 /** Набор вопросов проверки знаний: тот же разбор ответа, что у прочих запросов. */
@@ -196,24 +263,29 @@ const NOT_SERVER_RESPONSE =
   'Ответ пришёл не от сервера приложения — возможно, сеть требует входа (Wi‑Fi). Проверьте соединение и повторите.';
 
 export async function fetchKnowledgeAttempt(signal?: AbortSignal): Promise<KnowledgeAttempt> {
-  const response = await fetch('/api/operator/knowledge-attempt', {
-    cache: 'no-store',
-    credentials: 'same-origin',
-    signal: timeoutSignal(REQUEST_TIMEOUT_MS, signal),
-  });
-  let attempt: KnowledgeAttempt;
+  const timeout = timeoutSignal(REQUEST_TIMEOUT_MS, signal);
   try {
-    attempt = await parse<KnowledgeAttempt>(response);
-  } catch (error) {
-    if (error instanceof ApiError && error.status === 0) throw new ApiError(0, NOT_SERVER_RESPONSE);
-    throw error;
+    const response = await fetch('/api/operator/knowledge-attempt', {
+      cache: 'no-store',
+      credentials: 'same-origin',
+      signal: timeout.signal,
+    });
+    let attempt: KnowledgeAttempt;
+    try {
+      attempt = await parse<KnowledgeAttempt>(response);
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 0) throw new ApiError(0, NOT_SERVER_RESPONSE);
+      throw error;
+    }
+    // Форма ответа — тоже проверка: 200 с чужим JSON (портал Wi‑Fi, прокси) без
+    // `questions` оставил бы экран навсегда на «Получаем вопросы…».
+    if (!attempt || !Array.isArray(attempt.questions) || typeof attempt.attemptToken !== 'string') {
+      throw new ApiError(0, NOT_SERVER_RESPONSE);
+    }
+    return attempt;
+  } finally {
+    timeout.cleanup();
   }
-  // Форма ответа — тоже проверка: 200 с чужим JSON (портал Wi‑Fi, прокси) без
-  // `questions` оставил бы экран навсегда на «Получаем вопросы…».
-  if (!attempt || !Array.isArray(attempt.questions) || typeof attempt.attemptToken !== 'string') {
-    throw new ApiError(0, NOT_SERVER_RESPONSE);
-  }
-  return attempt;
 }
 
 /** Один залог: серия ударов и погружение сваи за неё. */
@@ -294,14 +366,19 @@ export function sendQueuedCommand(command: unknown): Promise<unknown> {
 }
 
 async function postCommand<T>(command: unknown): Promise<T> {
-  const response = await fetch('/api/operator/mobile/command', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    credentials: 'same-origin',
-    body: JSON.stringify(command),
-    signal: timeoutSignal(REQUEST_TIMEOUT_MS),
-  });
-  return parse<T>(response);
+  const timeout = timeoutSignal(REQUEST_TIMEOUT_MS);
+  try {
+    const response = await fetch('/api/operator/mobile/command', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      credentials: 'same-origin',
+      body: JSON.stringify(command),
+      signal: timeout.signal,
+    });
+    return await parse<T>(response);
+  } finally {
+    timeout.cleanup();
+  }
 }
 
 export async function sendCommand<T = unknown>(command: Command): Promise<T> {
@@ -379,57 +456,72 @@ export async function uploadPhoto(input: {
   // команды, потому что снимок относится к событию, а не к его части.
   const entityType = input.entityType ?? 'equipment_defect';
   const entityId = input.itemId ? `${input.clientCommandId}:${input.itemId}` : input.clientCommandId;
-  const grant = await fetch('/api/media', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    credentials: 'same-origin',
-    body: JSON.stringify({
-      fileName: input.file.name || 'photo.jpg',
-      contentType: input.file.type || 'image/jpeg',
-      fileSize: input.file.size,
-      entityType,
-      entityId,
-    }),
-    signal: timeoutSignal(REQUEST_TIMEOUT_MS),
-  });
-  // Медиа-маршрут отвечает объектом напрямую, без обёртки `data` — здесь
-  // разбираем его сами, а не общим `parse`.
-  const granted = await grant.json().catch(() => null) as
-    {mediaId?: string; uploadUrl?: string; error?: string} | null;
-  if (!grant.ok || !granted?.mediaId || !granted.uploadUrl) {
-    throw new ApiError(grant.status, granted?.error ?? 'Не удалось получить ссылку для снимка');
+  const grantTimeout = timeoutSignal(REQUEST_TIMEOUT_MS);
+  try {
+    const grant = await fetch('/api/media', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      credentials: 'same-origin',
+      body: JSON.stringify({
+        fileName: input.file.name || 'photo.jpg',
+        contentType: input.file.type || 'image/jpeg',
+        fileSize: input.file.size,
+        entityType,
+        entityId,
+      }),
+      signal: grantTimeout.signal,
+    });
+    // Медиа-маршрут отвечает объектом напрямую, без обёртки `data` — здесь
+    // разбираем его сами, а не общим `parse`.
+    const granted = await grant.json().catch(() => null) as
+      {mediaId?: string; uploadUrl?: string; error?: string} | null;
+    if (!grant.ok || !granted?.mediaId || !granted.uploadUrl) {
+      throw new ApiError(grant.status, granted?.error ?? 'Не удалось получить ссылку для снимка');
+    }
+    const {mediaId, uploadUrl} = granted;
+
+    const storedTimeout = timeoutSignal(UPLOAD_TIMEOUT_MS);
+    try {
+      const stored = await fetch(uploadUrl, {
+        method: 'PUT',
+        headers: {'Content-Type': input.file.type || 'image/jpeg'},
+        body: input.file,
+        signal: storedTimeout.signal,
+      });
+      if (!stored.ok) throw new ApiError(stored.status, 'Снимок не загрузился');
+    } finally {
+      storedTimeout.cleanup();
+    }
+
+    const confirmTimeout = timeoutSignal(REQUEST_TIMEOUT_MS);
+    try {
+      const confirmed = await fetch(`/api/media/${mediaId}/confirm`, {
+        method: 'POST',
+        credentials: 'same-origin',
+        signal: confirmTimeout.signal,
+      });
+      // Отказ по существу сервер объясняет сам: 422 «Загруженный файл пуст или
+      // недоступен» / «Содержимое файла не соответствует заявленному типу…»
+      // (`media-service.ts:244,268-271`). Раньше любой ответ подменялся общей фразой,
+      // и машинист жал то же битое фото снова вместо того, чтобы снять заново.
+      // Разбираем тело тем же способом, что на первом шаге (`:397-401`): понятный
+      // русский текст из поля `error` показываем, иначе (не JSON, чужая/английская
+      // строка) — общую фразу (аудит R76, находка 11).
+      if (!confirmed.ok) {
+        const body = await confirmed.json().catch(() => null) as {error?: string} | null;
+        const reason = typeof body?.error === 'string' && /[А-Яа-яЁё]/.test(body.error)
+          ? body.error
+          : 'Снимок не подтверждён сервером';
+        throw new ApiError(confirmed.status, reason);
+      }
+    } finally {
+      confirmTimeout.cleanup();
+    }
+
+    return mediaId;
+  } finally {
+    grantTimeout.cleanup();
   }
-  const {mediaId, uploadUrl} = granted;
-
-  const stored = await fetch(uploadUrl, {
-    method: 'PUT',
-    headers: {'Content-Type': input.file.type || 'image/jpeg'},
-    body: input.file,
-    signal: timeoutSignal(UPLOAD_TIMEOUT_MS),
-  });
-  if (!stored.ok) throw new ApiError(stored.status, 'Снимок не загрузился');
-
-  const confirmed = await fetch(`/api/media/${mediaId}/confirm`, {
-    method: 'POST',
-    credentials: 'same-origin',
-    signal: timeoutSignal(REQUEST_TIMEOUT_MS),
-  });
-  // Отказ по существу сервер объясняет сам: 422 «Загруженный файл пуст или
-  // недоступен» / «Содержимое файла не соответствует заявленному типу…»
-  // (`media-service.ts:244,268-271`). Раньше любой ответ подменялся общей фразой,
-  // и машинист жал то же битое фото снова вместо того, чтобы снять заново.
-  // Разбираем тело тем же способом, что на первом шаге (`:397-401`): понятный
-  // русский текст из поля `error` показываем, иначе (не JSON, чужая/английская
-  // строка) — общую фразу (аудит R76, находка 11).
-  if (!confirmed.ok) {
-    const body = await confirmed.json().catch(() => null) as {error?: string} | null;
-    const reason = typeof body?.error === 'string' && /[А-Яа-яЁё]/.test(body.error)
-      ? body.error
-      : 'Снимок не подтверждён сервером';
-    throw new ApiError(confirmed.status, reason);
-  }
-
-  return mediaId;
 }
 
 /** Ключ команды: один на нажатие кнопки, чтобы повтор при обрыве не удваивал запись. */
