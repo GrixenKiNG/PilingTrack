@@ -308,7 +308,7 @@ export async function logProduction(input: {
           where: {id: entry.passport.picketId, cluster: {field: {siteId: crew.siteId}}},
           select: {id: true},
         });
-        if (!picket) throw new OperatorCommandError(400, 'Пикет не относится к объекту смены');
+        if (!picket) throw new OperatorCommandError(400, 'Пикет не относится к объекту смены — выберите пикет этого объекта');
       }
 
       // Молот снимаем с карточки установки: позднейшая замена молота не должна
