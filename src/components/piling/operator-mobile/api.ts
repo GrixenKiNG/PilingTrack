@@ -455,14 +455,22 @@ type Command =
  * (`network`): у первого есть выход — войти снова, и о нём экран обязан сказать
  * вслух, у второго делать нечего, кроме ожидания. Текст «отправим после входа»
  * для этого не годится: по строке нельзя принять решение (аудит R76, находка 8).
+ *
+ * Третий повод — `server` (аудит R89, находка 4): сервер ОТВЕТИЛ отказом
+ * (503/429/500 и прочие временные статусы), значит связь есть, а ждать надо не
+ * её. Уведомление «сохранено на устройстве, отправим при связи» отправляло
+ * машиниста искать связь при живом сервере — для этого повода текст другой.
+ * Экран ведёт `server` как `network` (форма закрывается, уведомление с текстом).
  */
 export class QueuedOffline extends Error {
-  readonly reason: 'auth' | 'network';
+  readonly reason: 'auth' | 'network' | 'server';
 
-  constructor(readonly label: string, when: 'при связи' | 'после входа' = 'при связи') {
-    super(`${label}: сохранено на устройстве, отправим ${when}`);
+  constructor(readonly label: string, when: 'при связи' | 'после входа' | 'сервер' = 'при связи') {
+    super(when === 'сервер'
+      ? `${label}: сервер не принял запись, повторим автоматически`
+      : `${label}: сохранено на устройстве, отправим ${when}`);
     this.name = 'QueuedOffline';
-    this.reason = when === 'после входа' ? 'auth' : 'network';
+    this.reason = when === 'после входа' ? 'auth' : when === 'сервер' ? 'server' : 'network';
   }
 }
 
@@ -579,7 +587,12 @@ export async function sendCommand<T = unknown>(command: Command): Promise<T> {
     markAttempt(command.clientCommandId,
       kind === 'auth' ? AUTH_WAIT_MESSAGE : error instanceof Error ? error.message : 'Не отправлено',
       false, queuedAt);
-    throw new QueuedOffline(commandLabel(command), kind === 'auth' ? 'после входа' : 'при связи');
+    // Сервер ответил отказом (есть HTTP-статус) — связь есть, дело в сервере:
+    // уведомление не должно отправлять машиниста искать связь (аудит R89,
+    // находка 4). Без статуса (обрыв сети, таймаут) — прежний повод.
+    const serverRefused = error instanceof ApiError && error.status >= 400;
+    throw new QueuedOffline(commandLabel(command),
+      kind === 'auth' ? 'после входа' : serverRefused ? 'сервер' : 'при связи');
   }
 }
 

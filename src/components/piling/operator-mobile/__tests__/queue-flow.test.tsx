@@ -163,7 +163,9 @@ describe('T-V1-QUEUE-FLOW: отказ сервера и повтор по тай
     logProduction();
     await settle();
 
-    expect(screen.getByText('Выработка: сохранено на устройстве, отправим при связи'))
+    // Связь есть — отказал сервер: уведомление говорит про сервер, а не про связь
+    // (аудит R89, находка 4).
+    expect(screen.getByText('Выработка: сервер не принял запись, повторим автоматически'))
       .toBeInTheDocument();
     const banner = screen.getByTestId('offline-queue-banner');
     expect(banner).toHaveTextContent('Сервер не принял запись, повторим автоматически.');

@@ -72,6 +72,13 @@ describe('operatorErrorText', () => {
     expect(new QueuedOffline('Выработка', 'при связи').reason).toBe('network');
   });
 
+  // Сервер ответил отказом — связь есть, ждать надо не её (аудит R89, находка 4).
+  it('отказ сервера помечен как server и говорит про сервер, а не про связь', () => {
+    expect(new QueuedOffline('Выработка', 'сервер').reason).toBe('server');
+    expect(operatorErrorText(new QueuedOffline('Выработка', 'сервер')))
+      .toBe('Выработка: сервер не принял запись, повторим автоматически');
+  });
+
   it('прочая ошибка — общий совет повторить', () => {
     expect(operatorErrorText(new Error('что-то не сошлось')))
       .toBe('Не удалось выполнить действие. Повторите.');
@@ -325,6 +332,69 @@ describe('sendCommand и CSRF-отказ', () => {
     const queue = readQueue();
     expect(queue).toHaveLength(1);
     expect(queue[0]).toMatchObject({clientCommandId: 'c1', state: 'FAILED', lastError: 'Нет доступа'});
+  });
+});
+
+/**
+ * Повод отложения в очереди (аудит R89, находка 4).
+ *
+ * Уведомление на экране показывает `QueuedOffline.message` как есть. Для
+ * серверного отказа (503/429/500) прежний текст «сохранено на устройстве,
+ * отправим при связи» отправлял машиниста искать связь, которой не занимался:
+ * связь есть, отказал сервер. Признак — сервер ответил HTTP-статусом
+ * (`ApiError`); обрыв сети и таймаут статуса не несут.
+ */
+describe('sendCommand: повод отложения в очереди', () => {
+  const command = {
+    command: 'log-production' as const,
+    clientCommandId: 'c1',
+    shiftId: 's1',
+    entry: {kind: 'PILES' as const, pileGradeId: 'g1', count: 12},
+  };
+
+  beforeEach(() => {
+    const store = new Map<string, string>();
+    Object.defineProperty(globalThis, 'localStorage', {
+      configurable: true,
+      value: {
+        getItem: (key: string) => store.get(key) ?? null,
+        setItem: (key: string, value: string) => { store.set(key, value); },
+        removeItem: (key: string) => { store.delete(key); },
+        clear: () => { store.clear(); },
+      },
+    });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('503 HTML — сервер отказал: повод server и текст про сервер, а не про связь', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('<html>503</html>', {status: 503})));
+    const error = await sendCommand(command).catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(QueuedOffline);
+    expect((error as QueuedOffline).reason).toBe('server');
+    expect(operatorErrorText(error)).toBe('Выработка: сервер не принял запись, повторим автоматически');
+    expect(readQueue()[0]).toMatchObject({clientCommandId: 'c1', state: 'PENDING'});
+  });
+
+  it('обрыв сети — повод network и прежний текст про связь', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => { throw new TypeError('Failed to fetch'); }));
+    const error = await sendCommand(command).catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(QueuedOffline);
+    expect((error as QueuedOffline).reason).toBe('network');
+    expect(operatorErrorText(error)).toBe('Выработка: сохранено на устройстве, отправим при связи');
+  });
+
+  it('401 — повод auth, как было', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(
+      JSON.stringify({error: 'Войдите в систему'}), {status: 401})));
+    const error = await sendCommand(command).catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(QueuedOffline);
+    expect((error as QueuedOffline).reason).toBe('auth');
   });
 });
 
