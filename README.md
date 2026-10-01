@@ -104,6 +104,12 @@ npm run dev
 
 **Важно:** не запускай `docker compose up workers` одновременно с `npm run dev` — outbox leader-election даст одному из них замолчать. Подробности и подводные камни — `docs/dev-modes.md`.
 
+### Локальный запуск: фоновые задачи
+
+При `npm run dev` в процессе Next.js поднимаются только `outbox` и `projection` (`src/workers/embedded-workers.ts`) — остальное фоновое живёт в отдельном процессе `npm run worker:all` (`src/workers/unified-worker.ts`). Без него молчат: `pdf` (генерация PDF), `pm-scheduler` (суточный расчёт ТО и оповещение о просрочке), `projection-rebuild` (суточный пересчёт аналитических read-моделей), `readiness-scheduler` (ежечасное истечение нарядов и автозакрытие несданных смен — без него смены не закрываются, а журнал `AuditLog` не пополняется) и, если включена, `idempotency-cleanup` (уборка ключей идемпотентности; по умолчанию выключена).
+
+Запусти воркеры во втором терминале: `npm run worker:all`. Переменная `ENABLED_WORKERS` (по умолчанию `outbox,projection,pdf`) позволяет взять только часть: например, `ENABLED_WORKERS=outbox,projection npm run worker:all`.
+
 ## Ключевые команды
 
 ```bash
