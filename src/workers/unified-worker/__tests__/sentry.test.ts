@@ -24,7 +24,7 @@ const mocks = vi.hoisted(() => ({
   recordSchedulerHeartbeat: vi.fn(),
 }));
 
-vi.mock('@sentry/nextjs', () => ({
+vi.mock('@sentry/node', () => ({
   init: mocks.sentryInit,
   captureException: mocks.captureException,
 }));

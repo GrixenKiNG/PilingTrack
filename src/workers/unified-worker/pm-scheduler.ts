@@ -5,7 +5,7 @@
  * it needs no leader election — a double run can't create duplicates.
  */
 
-import * as Sentry from '@sentry/nextjs';
+import * as Sentry from '@sentry/node';
 import { logger } from '@/lib/logger';
 import { forEachTenant } from '@/lib/tenant-iteration';
 import { db } from '@/lib/db';

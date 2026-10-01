@@ -13,7 +13,7 @@
  * source of truth — idempotent, so no leader election is needed.
  */
 
-import * as Sentry from '@sentry/nextjs';
+import * as Sentry from '@sentry/node';
 import { logger } from '@/lib/logger';
 import { rebuildAll } from '@/modules/reports/application/projections/rebuild';
 import { recordSchedulerHeartbeat } from './scheduler-heartbeat';
