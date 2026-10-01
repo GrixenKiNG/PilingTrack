@@ -18,38 +18,23 @@ vi.mock('../operator-type.css', () => ({}));
 vi.mock('../operator-concept.css', () => ({}));
 
 import {OperatorMobileApp} from '../operator-mobile-app';
+import {workStateFixture} from './fixtures';
 
 /**
- * Состояние смены в фазе работы (взято из `operator-mobile-app.test.tsx`).
- * Отличие одно: есть марка сваи и пройден ТБ по забивке — иначе рабочий экран
- * вместо формы записи показывает требование пройти чек-лист, и до `log-production`
- * не добраться.
+ * Состояние смены в фазе работы (общая фабрика, F-R90-TEST-FIXTURE).
+ * Отличия от базы два: есть марка сваи и пройден ТБ по забивке — иначе рабочий
+ * экран вместо формы записи показывает требование пройти чек-лист, и до
+ * `log-production` не добраться.
  */
-const workState = {
-  phase: 'WORK',
-  productionDate: '2026-09-20',
-  shift: {id: 'shift-1', productionDate: '2026-09-20'},
-  assignment: {equipmentId: 'eq-1', equipmentName: 'Установка 12', siteName: 'Площадка А', lastMeter: null},
-  identity: {
-    ppe: {confirmed: true, missing: []},
-    briefing: {ok: true, acknowledgedAt: '2026-09-20T05:00:00.000Z'},
-    knowledge: {ok: true}, documents: [],
-  },
+const workState = workStateFixture({
   checklists: ['PRESHIFT_INSPECTION', 'SITE_READY', 'EO_BEFORE', 'TB_PILING', 'TB_DRILLING']
-    .map((stage) => ({stage, done: true})),
-  permit: {allowed: true, blocks: []},
+    .map((stage) => ({stage, done: true})) as unknown as OperatorMobileState['checklists'],
   dictionaries: {
     pileGrades: [{id: 'g1', name: 'С 300.30-6', lengthMm: 6000}],
     drillingTypes: [],
     downtimeReasons: [],
   },
-  production: {
-    piles: {count: 12, meters: 60},
-    drilling: {count: 4, meters: 24},
-    downtimeHours: 0,
-  },
-  entries: [], warnings: [], defects: [], incidents: [], progress: [],
-} as unknown as OperatorMobileState;
+});
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {status, headers: {'Content-Type': 'application/json'}});

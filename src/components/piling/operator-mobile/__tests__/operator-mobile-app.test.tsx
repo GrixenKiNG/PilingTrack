@@ -38,6 +38,7 @@ vi.mock('../operator-concept.css', () => ({}));
 import {ApiError, QueuedOffline} from '@/components/piling/operator-mobile/api';
 import type {QueuedCommand} from '@/components/piling/operator-mobile/offline-queue';
 import {OperatorMobileApp} from '../operator-mobile-app';
+import {workStateFixture} from './fixtures';
 
 beforeEach(() => {
   api.fetchState.mockReset();
@@ -82,26 +83,7 @@ describe('v1: загрузка состояния не удалась', () => {
  * проверяется вся цепочка — отказ команды → `details` у `ApiError` → плашка
  * над экраном со списком.
  */
-const workState = {
-  phase: 'WORK',
-  productionDate: '2026-09-20',
-  shift: {id: 'shift-1', productionDate: '2026-09-20'},
-  assignment: {equipmentId: 'eq-1', equipmentName: 'Установка 12', siteName: 'Площадка А', lastMeter: null},
-  identity: {
-    ppe: {confirmed: true, missing: []},
-    briefing: {ok: true, acknowledgedAt: '2026-09-20T05:00:00.000Z'},
-    knowledge: {ok: true}, documents: [],
-  },
-  checklists: ['PRESHIFT_INSPECTION', 'SITE_READY', 'EO_BEFORE'].map((stage) => ({stage, done: true})),
-  permit: {allowed: true, blocks: []},
-  dictionaries: {pileGrades: [], drillingTypes: [], downtimeReasons: []},
-  production: {
-    piles: {count: 12, meters: 60},
-    drilling: {count: 4, meters: 24},
-    downtimeHours: 0,
-  },
-  entries: [], warnings: [], defects: [], incidents: [], progress: [],
-} as unknown as OperatorMobileState;
+const workState = workStateFixture();
 
 async function finishWork(failure: unknown) {
   api.fetchState.mockResolvedValue(workState);
@@ -160,6 +142,7 @@ describe('v1: перечитывание после успешной коман�
 
     // Принятая команда — прежний `STALE_SCREEN_NOTICE`, вместе с «не вводите
     // запись повторно»: здесь запись действительно записана.
+    // Копия STALE_SCREEN_NOTICE из operator-mobile-app.tsx — менять вместе.
     expect(await screen.findByText(
       'Записано. Экран не обновился — обновим, как появится связь. Не вводите запись повторно.',
     )).toBeInTheDocument();
