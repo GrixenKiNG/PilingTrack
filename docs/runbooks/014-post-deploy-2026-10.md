@@ -4,7 +4,7 @@
 **не вступают в силу сами по себе**. Часть из них — конфигурация мониторинга,
 которую Prometheus читает при старте контейнера; часть — новый systemd-таймер,
 который на боевом сервере ещё не установлен; часть — проверка, которую можно
-сделать только руками. Этот ранбук собирает три шага в один список: они были
+сделать только руками. Этот ранбук собирает **четыре** шага в один список: они были
 разбросаны по отдельным коммитам и отчётам (F-APP-GUARD, F-WEBHOOK-RETRY,
 F-ALERTMANAGER-WATCH, F-WORKERS-SCRAPE, F-ALERT-NAMES).
 
@@ -29,6 +29,7 @@ read-only и безопасны для повторного запуска.
 1. Перечитать конфигурацию Prometheus (правила + опрос целей).
 2. Установить сторож `app-guard` и включить его таймер.
 3. Проверить вебхук Alertmanager (200 на тестовую тревогу; 503 при недоступном Telegram).
+4. Завести на бою переменные окружения, которых там нет (`BACKUP_ENABLED`, `SENTRY_DSN`).
 
 ---
 
@@ -275,6 +276,98 @@ alert could not be delivered"), а на бою о реальном сбое до
 
 ---
 
+## Шаг 4. Переменные окружения, которых нет на бою (01.10.2026)
+
+Повод — выкладка 01.10.2026 (`a803e61c`/`cc703810`): по **именам** переменных
+проверено, что в работающих контейнерах **не заданы** две — `BACKUP_ENABLED` и
+`SENTRY_DSN` (значения не читались и в документе не приводятся). Обе «тихие»:
+их отсутствие не роняет сервис и не пишет ошибку в лог — просто пропадает
+сигнал. Ниже: что именно молчит, кто читает переменную и что делать владельцу.
+
+| Переменная | Кто читает (файл) | Что молчит без неё | Нужна контейнеру |
+|---|---|---|---|
+| `BACKUP_ENABLED` | гейт `isBackupMonitoringEnabled()` — `src/core/observability/health-tracker/checkers/backup.ts:15-19`; предупреждение сборки — `scripts/validate-env.ts:140-142` | мониторинг бэкапов выключен: `checkBackupStatus()` отдаёт `{status:'up', source:'disabled'}` без возраста и `s3Synced` (`backup.ts:76-78`), а `/api/metrics` печатает жёсткие `backup_age_hours 0` и `backup_s3_synced 0` (`src/app/api/metrics/route.ts:111-112`); правило `OffsiteBackupNotSynced` (`backup_s3_synced == 0 and on() backup_age_hours > 0`, `observability/prometheus/alerts.yml:296-307`) сработать не может — о том, что облачной копии нет, никто не узнает | `app` |
+| `SENTRY_DSN` | воркер — `src/workers/unified-worker/sentry.ts:24,31`; флаг «настроено» — `src/services/system/system-service.ts:63` | ошибки процесса воркера (outbox / projection / pdf) в Sentry **не уходят**: без DSN `initWorkerSentry()` сразу возвращается, и SDK остаётся no-op (`sentry.ts:13`). Приложение этим не задето — его DSN зашит в коде (`sentry.server.config.ts:8`) | `workers` (приложению не нужна) |
+
+Что важно понимать про «что молчит»:
+
+- `BACKUP_ENABLED` включает только **чтение** готовых ключей. Сами ключи
+  `system:backup:*` пишет хостовый таймер (`deploy/systemd/pilingtrack-backup.service`
+  → `scripts/backup-postgres.sh`) в инстанс состояния Redis, а приложение читает их
+  через `getStateRedisClient()` (`backup.ts:81`) — поэтому переменная нужна
+  контейнеру `app`. Принимается любое из `1/true/yes/on` (`backup.ts:18`).
+- `SENTRY_DSN` для воркера — **тот же DSN, что зашит в `sentry.server.config.ts:8`**
+  (в этом документе значение не приводится). Инициализация идемпотентна и
+  происходит на старте процесса, поэтому нужен перезапуск контейнера `workers`.
+- `scripts/validate-env.ts` про `BACKUP_ENABLED` **предупреждает**, но сборку не
+  валит (это warning, а не error) — вот почему сборка на бою зелёная, а
+  переменной там нет.
+
+### Где задаётся на сервере
+
+Значения — в `/opt/pilingtrack/.env`. **Но одного `.env` недостаточно:** в
+`docker-compose.yml` ни у `app`, ни у `workers` **не объявлен `env_file`** (в
+`docker-compose.prod.yml` его тоже нет, там только блоки `environment:`), поэтому в
+контейнер попадает **только то, что перечислено в блоке `environment:`** этого
+сервиса. Та же ловушка уже описана в самом compose (`docker-compose.yml:104-107`,
+`:118-123`) и в ранбуке 011. Сейчас **ни `BACKUP_ENABLED`, ни `SENTRY_DSN` в
+блоках `environment:` нет** (`grep -n 'BACKUP_ENABLED\|SENTRY_DSN' docker-compose*.yml`
+→ пусто), значит строки в `.env` сами по себе до контейнера не доедут.
+
+### Команды (значения вводит владелец)
+
+```bash
+cd /opt/pilingtrack
+
+# 1. Строка в .env. Значение вводит владелец; в документе его нет.
+grep -q '^BACKUP_ENABLED=' .env || echo 'BACKUP_ENABLED=true' >> .env
+# DSN — тот же, что в sentry.server.config.ts (строка 8 файла в репозитории).
+grep -q '^SENTRY_DSN='     .env || echo 'SENTRY_DSN=<тот же DSN, что в sentry.server.config.ts>' >> .env
+
+# 2. Проброс в контейнер. Пусто = переменная НЕ доедет (env_file не объявлен).
+grep -n 'BACKUP_ENABLED\|SENTRY_DSN' docker-compose.yml
+```
+
+Если пункт 2 ничего не нашёл — добавить в блок `environment:` сервиса `app`
+строку `- BACKUP_ENABLED=${BACKUP_ENABLED:-}` и в блок `environment:` сервиса
+`workers` строку `- SENTRY_DSN=${SENTRY_DSN:-}` (значение всё равно берётся из
+`.env`). Это правка файла **репозитория**, а не только боевой настройки: без неё
+следующая выкладка перезапишет `docker-compose.yml`, и проброс исчезнет.
+
+```bash
+# 3. Перезапуск, чтобы переменные доехали (--no-build: образ уже собран).
+docker compose up -d --no-build app workers
+```
+
+```bash
+# 4. Проверка изнутри контейнера. Значения НЕ печатаем — только факт «задана».
+docker compose exec -T app     sh -c '[ -n "$BACKUP_ENABLED" ] && echo set'
+docker compose exec -T workers sh -c '[ -n "$SENTRY_DSN" ] && echo set'
+# ожидаем "set" у обеих; пусто и код 1 = переменная не доехала до контейнера
+```
+
+### Что проверить после
+
+```bash
+# Метрики бэкапа (источник — /api/metrics приложения, job pilingtrack-app)
+curl -s -G http://127.0.0.1:9090/api/v1/query --data-urlencode 'query=backup_age_hours'
+curl -s -G http://127.0.0.1:9090/api/v1/query --data-urlencode 'query=backup_s3_synced'
+```
+
+- `backup_age_hours` должен стать **больше 0** (сколько часов прошло с последнего
+  дампа), а не жёстким `0`. Если по-прежнему `0` — либо переменная не доехала
+  (пункты 2–4), либо на хосте не запущен таймер `pilingtrack-backup.timer` и ключи
+  `system:backup:*` не пишутся вовсе (см. ранбук 013).
+- `backup_s3_synced` = `1`, если ночная копия ушла в R2. `0` при
+  `backup_age_hours > 0` дольше 26 ч — это уже настоящий сигнал (сработка
+  `OffsiteBackupNotSynced`), а не «выключенный мониторинг».
+- Sentry: отдельного лога при успешной инициализации воркера нет, поэтому признак —
+  сама переменная внутри контейнера `workers` (пункт 4). Если `set` вывелось, а
+  событий от воркеров в Sentry всё равно нет — смотреть `docker compose logs workers`
+  на строку «Sentry init failed in worker process» (`sentry.ts:39-41`).
+
+---
+
 ## См. также
 
 - `docs/audits/hermes-night/R69-alerts-delivery.md` — куда реально доходят
@@ -296,3 +389,8 @@ alert could not be delivered"), а на бою о реальном сбое до
 - `docs/runbooks/008-manual-deploy.md` — сама выкладка (сборка, миграции, smoke).
 - `docs/runbooks/013-prod-timers.md` — прод-таймеры; `app-guard` добавляется к
   этому набору.
+- `scripts/validate-env.ts:129-143,235` — предупреждения сборки о переменных,
+  без которых функция молча выключается (в т.ч. `BACKUP_ENABLED`); они **не валят**
+  сборку, поэтому шаг 4 нельзя пропустить.
+- `docs/audits/hermes-night/R61-env-vars.md` — инвентарь переменных окружения
+  (находки 1 и 28: `BACKUP_ENABLED`/`BACKUP_DIR` и зашитый DSN Sentry).
