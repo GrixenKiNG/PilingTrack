@@ -2,6 +2,7 @@
 
 import {useCallback, useEffect, useRef, useState, type ReactNode} from 'react';
 import {Ellipsis, HardHat, ShieldCheck, Wrench} from 'lucide-react';
+import {logoutClient} from '@/lib/api';
 import type {
   ChecklistAnswer, ChecklistStage, OperatorMobileState, OperatorPhase,
 } from '@/modules/operator-mobile/contracts';
@@ -401,7 +402,17 @@ export function OperatorMobileApp() {
   if (forbidden) {
     return (
       <OperatorFrame>
-        <Screen title="Рабочее место машиниста">
+        <Screen
+          title="Рабочее место машиниста"
+          /*
+            Выход из отказа по роли. Раньше экран 403 был тупиком: ни выйти,
+            ни войти другим пользователем — только текст причины (аудит R76,
+            находки 23 и 26). Смена человека возможна только сменой сессии,
+            поэтому кнопка делает то же, что выход в остальных экранах
+            приложения, — `logoutClient` (оболочка затем уводит на /login).
+          */
+          footer={<BigButton onClick={() => void logoutClient()}>Войти другим пользователем</BigButton>}
+        >
           <Panel>
             <PanelTitle>{forbidden}</PanelTitle>
             <p className="mt-1 text-sm text-muted-foreground">
@@ -688,7 +699,7 @@ export function OperatorMobileApp() {
           />
         );
       case 'WORK':
-        if (!shift) return <Screen title="Смена"><p className="text-sm">Смена не найдена.</p></Screen>;
+        if (!shift) return <ShiftMissingScreen onReload={() => void reload()} />;
         return (
           <WorkScreen
             state={state}
@@ -708,7 +719,7 @@ export function OperatorMobileApp() {
           />
         );
       case 'CLOSING':
-        if (!shift) return <Screen title="Смена"><p className="text-sm">Смена не найдена.</p></Screen>;
+        if (!shift) return <ShiftMissingScreen onReload={() => void reload()} />;
         return (
           <ClosingScreen
             state={state}
@@ -825,6 +836,26 @@ function OperatorFrame({children}: {children: ReactNode}) {
     >
       {children}
     </div>
+  );
+}
+
+/**
+ * Работа или сдача, а смены в состоянии нет.
+ *
+ * Раньше это была голая строка «Смена не найдена.» — тупик без выхода и без
+ * объяснения (аудит R76, находки 23 и 26). Причина у состояния без смены ровно
+ * одна: смену закрыли на другом устройстве, и сервер отдаёт факты уже без неё.
+ * Поэтому говорим об этом прямо и даём перечитать состояние — тот же `reload`,
+ * что у экрана «Нет связи».
+ */
+function ShiftMissingScreen({onReload}: {onReload: () => void}) {
+  return (
+    <Screen title="Смена" footer={<BigButton onClick={onReload}>Обновить</BigButton>}>
+      <Panel>
+        <PanelTitle>Смена не найдена.</PanelTitle>
+        <p className="mt-1 text-sm text-muted-foreground">Смену могли закрыть на другом устройстве.</p>
+      </Panel>
+    </Screen>
   );
 }
 

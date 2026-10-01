@@ -308,3 +308,37 @@ describe('v1: истёкший вход на команде', () => {
     expect(screen.getAllByRole('button', {name: 'Завершить работу'}).length).toBeGreaterThan(0);
   });
 });
+
+/**
+ * Тупики рабочего места (F-V1-DEAD-ENDS, R76 находки 23 и 26).
+ *
+ * Два экрана v1 не оставляли человеку выхода: отказ по роли — без возможности
+ * войти другим пользователем, а фаза работы без смены — голой строкой «Смена не
+ * найдена.» без объяснения и кнопки.
+ */
+describe('v1: экран без выхода — не тупик', () => {
+  it('403 показывает причину и кнопку «Войти другим пользователем»', async () => {
+    api.fetchState.mockRejectedValue(new ApiError(403, 'Экран доступен только машинисту'));
+
+    render(<OperatorMobileApp />);
+
+    expect(await screen.findByText('Экран доступен только машинисту')).toBeInTheDocument();
+    expect(screen.getByRole('button', {name: 'Войти другим пользователем'})).toBeInTheDocument();
+  });
+
+  it('фаза работы без смены объясняет причину, «Обновить» перечитывает состояние', async () => {
+    api.fetchState.mockResolvedValueOnce({...workState, shift: null} as unknown as OperatorMobileState);
+    api.fetchState.mockResolvedValue(workState);
+
+    render(<OperatorMobileApp />);
+
+    expect(await screen.findByText('Смена не найдена.')).toBeInTheDocument();
+    expect(screen.getByText('Смену могли закрыть на другом устройстве.')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', {name: 'Обновить'}));
+
+    // Состояние перечитано: смена вернулась, экран работы открылся.
+    expect((await screen.findAllByRole('button', {name: 'Завершить работу'})).length).toBeGreaterThan(0);
+    expect(api.fetchState).toHaveBeenCalledTimes(2);
+  });
+});
