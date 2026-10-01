@@ -771,7 +771,20 @@ export function OperatorMobileApp() {
           />
         );
       case 'CLOSED':
-        return <ClosedScreen state={state} tabs={tabBar} />;
+        /*
+          Отказ, из-за которого экран сюда и попал, не теряем (аудит R82,
+          находка 5): смену закрыли на другом устройстве, машинист ввёл сваю и
+          получил 409, и без этой строки итог смены молча отличался бы от
+          введённого. Плашку с отклонённой записью рисует оболочка выше.
+        */
+        return (
+          <ClosedScreen
+            state={state}
+            tabs={tabBar}
+            error={actionError}
+            errorDetails={actionErrorDetails}
+          />
+        );
       default:
         return <Screen title="Смена"><p className="text-sm">Экран готовится…</p></Screen>;
     }

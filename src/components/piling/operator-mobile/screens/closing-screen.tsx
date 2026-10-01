@@ -162,13 +162,30 @@ export function ClosingScreen({state, onOpenService, onClose, busy, error, error
   );
 }
 
-/** Экран после закрытия: отчёт отправлен, действий больше нет. */
-export function ClosedScreen({state, tabs}: {state: OperatorMobileState; tabs?: ReactNode}) {
+/**
+ * Экран после закрытия: отчёт отправлен, действий больше нет.
+ *
+ * ПОЧЕМУ ЗДЕСЬ ЕСТЬ ОТКАЗ. Смену могли закрыть на другом устройстве, пока
+ * экран оставался в фазе работы: машинист вводит сваю, сервер отвечает 409
+ * «Смена уже закрыта», рабочее место перечитывает состояние и переходит в эту
+ * фазу. Без строки отказа итог смены на экране отличался бы от введённого, и
+ * человек не понимал бы, почему его свай здесь нет (аудит R82, находка 5).
+ * Запись при этом остаётся видимой плашкой очереди — её рисует оболочка.
+ */
+export function ClosedScreen({state, tabs, error = null, errorDetails}: {
+  state: OperatorMobileState;
+  tabs?: ReactNode;
+  error?: string | null;
+  /** Подробности отказа (аудит R82, находка 5). */
+  errorDetails?: string[];
+}) {
   const receiptTime = state.receipt?.submittedAt ?? state.receipt?.closedAt ?? null;
   const reportAccepted = Boolean(state.receipt?.submittedAt);
 
   return (
     <Screen title="Смена закрыта" subtitle={state.assignment?.equipmentName} tabs={tabs}>
+      <ErrorNote message={error} details={errorDetails} />
+
       <Panel tone={reportAccepted ? 'ok' : 'warning'}>
         <PanelTitle tone={reportAccepted ? 'ok' : 'warning'}>
           {reportAccepted ? 'Принято сервером' : state.receipt ? 'Смена закрыта сервером' : 'Смена закрыта'}

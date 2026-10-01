@@ -407,3 +407,57 @@ describe('v1: запись легла в очередь — экран гово�
     expect(screen.getAllByRole('button', {name: 'Завершить работу'}).length).toBeGreaterThan(0);
   });
 });
+
+/**
+ * Отказ не теряется при переходе на экран закрытой смены (R82, находка 5).
+ *
+ * Смену закрыли на другом устройстве, экран машиниста ещё в фазе работы. Он
+ * вводит «12 свай», сервер отвечает 409 «Смена уже закрыта», рабочее место
+ * перечитывает состояние и получает фазу `CLOSED`. Раньше `ClosedScreen` не
+ * принимал `error`: итог смены показывался без введённых свай и без единой
+ * строки о причине — молчаливая потеря.
+ */
+describe('v1: отказ виден на экране закрытой смены', () => {
+  const closedState = {
+    ...workState,
+    phase: 'CLOSED',
+    shift: null,
+    receipt: null,
+    production: {
+      piles: {count: 12, meters: 60},
+      drilling: {count: 0, meters: 0},
+      downtimeHours: 0,
+    },
+  } as unknown as OperatorMobileState;
+
+  const failedItem: QueuedCommand = {
+    clientCommandId: 'cmd-failed-closed',
+    label: 'Выработка',
+    command: {command: 'log-production'},
+    queuedAt: '2026-09-20T05:00:00.000Z',
+    attempts: 1,
+    state: 'FAILED',
+    lastError: 'Смена уже закрыта',
+  };
+
+  it('409 → перечитывание даёт CLOSED: отказ и отклонённая запись видны', async () => {
+    queue.items = [failedItem];
+    api.fetchState.mockResolvedValueOnce(workState);
+    api.fetchState.mockResolvedValue(closedState);
+    api.sendCommand.mockRejectedValue(new ApiError(409, 'Смена уже закрыта'));
+
+    render(<OperatorMobileApp />);
+
+    fireEvent.click((await screen.findAllByRole('button', {name: 'Завершить работу'}))[0]);
+    fireEvent.click(screen.getByRole('button', {name: 'Да, работа завершена'}));
+
+    // Экран перечитан в фазу закрытой смены.
+    expect(await screen.findByText('Номер отчёта пока недоступен')).toBeInTheDocument();
+    // Строка отказа — на самом экране (у `ErrorNote` только текст, без кнопок).
+    const alerts = await screen.findAllByRole('alert');
+    expect(alerts.some((node) => node.textContent === 'Смена уже закрыта')).toBe(true);
+    // Запись не исчезла: она в плашке очереди как отклонённая, с выходом «Удалить».
+    expect(screen.getByText('Выработка не принята')).toBeInTheDocument();
+    expect(screen.getByRole('button', {name: 'Удалить запись'})).toBeInTheDocument();
+  });
+});

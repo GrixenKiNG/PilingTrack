@@ -89,5 +89,35 @@ describe('закрытая смена оператора', () => {
 
     expect(screen.queryByText('Принято сервером')).not.toBeInTheDocument();
     expect(screen.getByText('Номер отчёта пока недоступен')).toBeInTheDocument();
+    // Без отказа на экране закрытой смены ничего лишнего: строка отказа не рисуется.
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  /**
+   * Отказ, из-за которого экран закрылся, не теряется (аудит R82, находка 5).
+   *
+   * Смену закрыли на другом устройстве, машинист ещё был в фазе работы, ввёл
+   * сваю и получил 409 «Смена уже закрыта». Без строки отказа итог смены молча
+   * отличался бы от введённого.
+   */
+  it('показывает строку отказа с подробностями, если отказ был', () => {
+    const state = {
+      assignment: {equipmentName: 'Liebherr LRH 100 №1'},
+      receipt: null,
+      production: {
+        piles: {count: 12, meters: 60},
+        drilling: {count: 0, meters: 0},
+        downtimeHours: 0,
+      },
+    } as unknown as OperatorMobileState;
+
+    render(<ClosedScreen state={state} error="Смена уже закрыта"
+      errorDetails={['Записи за эту смену сервер не принимает']} />);
+
+    // Итог смены на месте — строка отказа над ним, а не вместо него.
+    expect(screen.getByText('Номер отчёта пока недоступен')).toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent('Смена уже закрыта');
+    expect(screen.getAllByRole('listitem').map((item) => item.textContent))
+      .toContain('Записи за эту смену сервер не принимает');
   });
 });
