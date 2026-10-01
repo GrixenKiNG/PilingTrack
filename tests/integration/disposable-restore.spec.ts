@@ -26,10 +26,12 @@ describe('restore drill input boundaries', () => {
   });
 });
 
-const enabled = Boolean(process.env.INTEGRATION_DATABASE_URL_OWNER && process.env.INTEGRATION_DATABASE_URL_APP && process.env.INTEGRATION_DB_CONTAINER);
+const container = process.env.INTEGRATION_DB_CONTAINER;
+const enabled = Boolean(process.env.INTEGRATION_DATABASE_URL_OWNER && process.env.INTEGRATION_DATABASE_URL_APP && container);
 if (!enabled) console.info('SKIP real restore drill: set both INTEGRATION_DATABASE_URL_* and INTEGRATION_DB_CONTAINER from test-db-up.sh');
 describe.skipIf(!enabled)('restore synthetic dump from one consistent snapshot', () => {
   it('restores all tables/migrations/RLS, detects a wrong manifest and removes its target', async () => {
+    if (!container) throw new Error('INTEGRATION_DB_CONTAINER is required');
     const dir = mkdtempSync(path.join(tmpdir(), 'codex-drill-'));
     const fixture = await createFixture();
     const containers = () => {
@@ -40,7 +42,7 @@ describe.skipIf(!enabled)('restore synthetic dump from one consistent snapshot',
     const before = containers();
     try {
       const dump = path.join(dir, 'synthetic.sql.gz');
-      const create = spawnSync(process.execPath, ['scripts/test-db-dump.cjs', process.env.INTEGRATION_DB_CONTAINER!, dump], { encoding: 'utf8' });
+      const create = spawnSync(process.execPath, ['scripts/test-db-dump.cjs', container, dump], { encoding: 'utf8' });
       expect(create.status, create.stdout + create.stderr).toBe(0);
       console.info(create.stdout.trim());
       const restored = spawnSync(bash, ['scripts/restore-drill.sh', dump], { encoding: 'utf8' });

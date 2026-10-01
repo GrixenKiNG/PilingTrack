@@ -11,7 +11,8 @@ vi.mock('@/lib/db', () => ({ get db() { return state.db; }, DEFAULT_TX_OPTIONS: 
 vi.mock('@/modules/equipment', async () => ({ recordMeterReadingInTx: (await import('../../src/modules/equipment/application/commands/meter-reading')).recordMeterReadingInTx }));
 vi.mock('@/modules/readiness/server', async () => ({ requestReadinessSnapshot: (await import('../../src/modules/readiness/application/projection/request-snapshot')).requestReadinessSnapshot }));
 
-const enabled = Boolean(process.env.INTEGRATION_DATABASE_URL_OWNER && process.env.INTEGRATION_DATABASE_URL_APP);
+const appUrl = process.env.INTEGRATION_DATABASE_URL_APP;
+const enabled = Boolean(process.env.INTEGRATION_DATABASE_URL_OWNER && appUrl);
 if (!enabled) console.info('SKIP real readiness pipeline: supply both INTEGRATION_DATABASE_URL_* from scripts/test-db-up.sh');
 
 describe.skipIf(!enabled)('Tech Readiness real source → outbox → snapshot → read model', () => {
@@ -20,7 +21,8 @@ describe.skipIf(!enabled)('Tech Readiness real source → outbox → snapshot �
   let complete: typeof import('../../src/modules/inspections/application/commands/inspection-commands').completeInspectionWithOutcome;
   let project: typeof import('../../src/modules/readiness/application/projection/project-event').projectReadinessEvent;
   beforeAll(async () => {
-    raw = new PrismaClient({ adapter: new PrismaPg({ connectionString: process.env.INTEGRATION_DATABASE_URL_APP!, max: 1 }) });
+    if (!appUrl) throw new Error('INTEGRATION_DATABASE_URL_APP is required');
+    raw = new PrismaClient({ adapter: new PrismaPg({ connectionString: appUrl, max: 1 }) });
     const scoped = applyTenantGuc(raw);
     state.db = new Proxy(scoped, {
       get(client, key) {

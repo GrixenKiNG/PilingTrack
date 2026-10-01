@@ -23,7 +23,7 @@ created=1
 unset POSTGRES_PASSWORD
 ready=0
 for ((attempt=0; attempt<60; attempt++)); do
-  if docker exec "$name" pg_isready -U piling -d codex_test >/dev/null 2>&1; then ready=1; break; fi
+  if docker exec "$name" pg_isready -h 127.0.0.1 -U piling -d codex_test >/dev/null 2>&1; then ready=1; break; fi
   sleep 1
 done
 [[ "$ready" == 1 ]] || { echo 'Disposable Postgres did not become ready' >&2; exit 1; }
