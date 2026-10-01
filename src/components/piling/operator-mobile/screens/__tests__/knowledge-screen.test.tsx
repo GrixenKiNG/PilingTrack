@@ -70,7 +70,7 @@ describe('загрузка вопросов', () => {
     )));
     render(<KnowledgeScreen busy={false} error={null} onDone={vi.fn()} onBack={vi.fn()} />);
 
-    expect(await screen.findByText('Сервер не ответил')).toBeInTheDocument();
+    expect(await screen.findByText('Сервер временно недоступен (код 502). Запись сохранена — отправим автоматически.')).toBeInTheDocument();
     expect(screen.queryByText(/Unexpected token/i)).not.toBeInTheDocument();
   });
 

@@ -137,6 +137,39 @@ function detailText(item: unknown): string | null {
 const NOT_SERVER_JSON =
   'Ответ пришёл не от сервера. Проверьте подключение (вход в Wi-Fi) и повторите.';
 
+/**
+ * Текст отказа сервера, тело которого не разобралось (аудит R76, находка 21).
+ *
+ * ПОЧЕМУ НЕ ОБЩЕЕ «Сервер не ответил». Так выглядит и страница шлюза (502/504),
+ * и обрыв связи, но поводы разные: при обрыве связи искать надо её, а при
+ * ошибке шлюза связь есть — сервер (или прокси перед ним) отдал отказ. Одна
+ * фраза отправляла машиниста «искать связь» при живом сервере. Код называем,
+ * чтобы диспетчер мог разобраться.
+ */
+function unparsedFailureText(status: number): string {
+  if (status >= 500) {
+    return `Сервер временно недоступен (код ${status}). Запись сохранена — отправим автоматически.`;
+  }
+  if (status >= 400) {
+    return `Сервер отказал (код ${status}). Обновите экран и повторите.`;
+  }
+  return 'Сервер не ответил';
+}
+
+/** Точный текст схемы маршрута команд на несоответствие форме (`command/route.ts:196`). */
+const BAD_COMMAND_TEXT_FROM_SERVER = 'Некорректная команда';
+
+/**
+ * Что показать вместо «Некорректная команда» (аудит R76, находка 25).
+ *
+ * Так отвечает схема маршрута на любое несоответствие команды форме — то есть
+ * на рассогласование приложения и сервера, а не на ошибку машиниста. Прежняя
+ * фраза не говорила, что делать. `details` этой ошибки — разбор схемы (zod
+ * issues), машинисту их показывать нельзя: их отсекает `operatorErrorDetails`.
+ */
+const BAD_COMMAND_HINT =
+  'Не удалось отправить — обновите экран и повторите. Если повторяется, сообщите администратору.';
+
 async function parse<T>(response: Response): Promise<T> {
   const payload = await response.json().catch(() => null) as
     {data?: T; error?: string; details?: unknown} | null;
@@ -152,7 +185,10 @@ async function parse<T>(response: Response): Promise<T> {
       && payload.error.startsWith('CSRF validation failed')) {
       throw new ApiError(403, CSRF_REJECT_MESSAGE, payload.details, 'csrf');
     }
-    throw new ApiError(response.status, payload?.error ?? 'Сервер не ответил', payload?.details);
+    const message = typeof payload?.error === 'string'
+      ? (payload.error === BAD_COMMAND_TEXT_FROM_SERVER ? BAD_COMMAND_HINT : payload.error)
+      : unparsedFailureText(response.status);
+    throw new ApiError(response.status, message, payload?.details);
   }
   // Успех — только разобранный ответ нашего сервера. Сеть гостиницы или
   // оператора связи отдаёт на перехваченный запрос свою страницу входа со

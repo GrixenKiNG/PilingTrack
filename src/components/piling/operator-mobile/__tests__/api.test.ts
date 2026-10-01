@@ -172,7 +172,9 @@ describe('fetchKnowledgeAttempt', () => {
     const error = await fetchKnowledgeAttempt().catch((caught: unknown) => caught);
     expect(error).toBeInstanceOf(ApiError);
     expect((error as ApiError).status).toBe(502);
-    expect(operatorErrorText(error)).toBe('Сервер не ответил');
+    expect(operatorErrorText(error)).toBe(
+      'Сервер временно недоступен (код 502). Запись сохранена — отправим автоматически.',
+    );
     vi.unstubAllGlobals();
   });
 
@@ -660,5 +662,96 @@ describe('ответ 200 без поля data — не успех', () => {
     await expect(fetchState({})).resolves.toEqual({phase: 'IDLE'});
     await expect(sendCommand(command)).resolves.toEqual({phase: 'IDLE'});
     expect(readQueue()).toHaveLength(0);
+  });
+});
+
+/**
+ * Текст отказа при ошибочном статусе и неразобранном теле (аудит R76, находки
+ * 21 и 25).
+ *
+ * Прежде не-JSON тело (страница шлюза 502/504, HTML-ошибка прокси) подменялось
+ * общей фразой «Сервер не ответил» — той же, что при обрыве связи. Машинист по
+ * ней шёл «искать связь», хотя связь была, а сервер отдал ошибку шлюза. Теперь
+ * 5xx и 4xx объясняются по-разному и с кодом. Отдельно подменяется точный текст
+ * схемы «Некорректная команда» (рассогласование приложения и сервера). На
+ * способность записи отправиться повтором это не влияет: решает статус
+ * (`classifyFailure`), а не текст.
+ */
+describe('ошибочный статус без разобранного тела', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('502 с HTML — код в тексте, а не общая фраза про связь', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('<html>502 Bad Gateway</html>', {status: 502})));
+    const error = await fetchState({}).catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(ApiError);
+    expect((error as ApiError).status).toBe(502);
+    expect(operatorErrorText(error))
+      .toBe('Сервер временно недоступен (код 502). Запись сохранена — отправим автоматически.');
+  });
+
+  it('404 с HTML — отказ сервера с кодом', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('<html>404 Not Found</html>', {status: 404})));
+    const error = await fetchState({}).catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(ApiError);
+    expect((error as ApiError).status).toBe(404);
+    expect(operatorErrorText(error)).toBe('Сервер отказал (код 404). Обновите экран и повторите.');
+  });
+
+  it('400 «Некорректная команда» — текст с шагом для машиниста', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(
+      JSON.stringify({error: 'Некорректная команда', details: [{code: 'invalid_type'}]}),
+      {status: 400})));
+    const error = await fetchState({}).catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(ApiError);
+    expect(operatorErrorText(error))
+      .toBe('Не удалось отправить — обновите экран и повторите. Если повторяется, сообщите администратору.');
+    // Разбор схемы (zod issues) наружу по-прежнему не выходит.
+    expect(operatorErrorDetails(error)).toEqual([]);
+  });
+
+  it('400 с другим русским текстом — без подмены', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(
+      JSON.stringify({error: 'Смена уже закрыта'}), {status: 400})));
+    const error = await fetchState({}).catch((caught: unknown) => caught);
+
+    expect(operatorErrorText(error)).toBe('Смена уже закрыта');
+  });
+
+  it('обрыв сети — прежний текст про связь', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => { throw new TypeError('Failed to fetch'); }));
+    const error = await fetchState({}).catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(TypeError);
+    expect(operatorErrorText(error)).toBe('Нет связи с сервером. Проверьте интернет и повторите.');
+  });
+
+  it('5xx с HTML на команде — запись остаётся ждать отправки', async () => {
+    const store = new Map<string, string>();
+    Object.defineProperty(globalThis, 'localStorage', {
+      configurable: true,
+      value: {
+        getItem: (key: string) => store.get(key) ?? null,
+        setItem: (key: string, value: string) => { store.set(key, value); },
+        removeItem: (key: string) => { store.delete(key); },
+        clear: () => { store.clear(); },
+      },
+    });
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('<html>503</html>', {status: 503})));
+    const command = {
+      command: 'log-production' as const,
+      clientCommandId: 'c1',
+      shiftId: 's1',
+      entry: {kind: 'PILES' as const, pileGradeId: 'g1', count: 12},
+    };
+
+    const error = await sendCommand(command).catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(QueuedOffline);
+    expect(readQueue()[0]).toMatchObject({clientCommandId: 'c1', state: 'PENDING'});
   });
 });
