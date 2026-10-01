@@ -59,8 +59,16 @@ function jsonResponse(body: unknown, status = 200): Response {
 type CommandResponder = () => Response | Promise<Response>;
 let respondCommand: CommandResponder;
 
+/**
+ * Ответ на GET состояния. По умолчанию — фаза работы; сценарий может подменить
+ * его (экран закрытой смены, закрытие смены) или отдать состояние по порядку
+ * чтений (409 перечитывает состояние).
+ */
+type StateResponder = () => Response | Promise<Response>;
+let respondState: StateResponder;
+
 const fetchMock = vi.fn(async (url: string) => {
-  if (url.startsWith('/api/operator/mobile/state')) return jsonResponse({data: workState});
+  if (url.startsWith('/api/operator/mobile/state')) return respondState();
   if (url === '/api/operator/mobile/command') return respondCommand();
   throw new Error(`неожиданный запрос в тесте: ${url}`);
 });
@@ -78,6 +86,7 @@ beforeEach(() => {
   });
   Object.defineProperty(globalThis.navigator, 'onLine', {configurable: true, value: true});
   respondCommand = () => { throw new TypeError('Failed to fetch'); };
+  respondState = () => jsonResponse({data: workState});
   vi.stubGlobal('fetch', fetchMock);
 });
 
@@ -180,5 +189,156 @@ describe('T-V1-QUEUE-FLOW: отказ сервера и повтор по тай
 
     expect(screen.getByText('Всё отправлено')).toBeInTheDocument();
     expect(screen.queryByTestId('offline-queue-banner')).toBeNull();
+  });
+});
+
+describe('T-V1-QUEUE-FLOW: истёкшая сессия на записи выработки', () => {
+  beforeEach(() => {
+    // window.location в happy-dom общий для файла: без сброса переход на
+    // /login из этого сценария остался бы в следующем (как в
+    // operator-mobile-app.test.tsx).
+    window.history.replaceState(null, '', '/');
+  });
+
+  it('401: уведомление, запись PENDING с «Войдите снова», через 2,5 с — /login', async () => {
+    respondCommand = () => jsonResponse({error: 'Войдите в систему'}, 401);
+
+    render(<OperatorMobileApp />);
+    // Загрузку ждём на настоящих таймерах: под подменёнными `findBy*` не
+    // дожидается элемента. Фейковые ставим только перед нажатием, в котором
+    // взводится таймер перехода.
+    await screen.findByRole('button', {name: 'Добавить сваю'});
+    vi.useFakeTimers();
+
+    logProduction();
+    await settle();
+
+    // Уведомление об истёкшем входе — то же, что у команды-перехода.
+    expect(screen.getByText(/Сессия истекла\. Записи сохранены на телефоне/)).toBeInTheDocument();
+    // Запись не потеряна: она ждёт отправки и говорит, что делать.
+    const banner = screen.getByTestId('offline-queue-banner');
+    expect(banner).toHaveTextContent('Войдите снова — запись отправится после входа');
+    expect(screen.getByText('Ожидает отправки: 1')).toBeInTheDocument();
+    // До паузы экран ещё не ушёл: машинист успевает прочитать причину.
+    expect(window.location.pathname).not.toBe('/login');
+
+    act(() => { vi.advanceTimersByTime(2500); });
+
+    expect(window.location.pathname).toBe('/login');
+  });
+});
+
+describe('T-V1-QUEUE-FLOW: отказ проверки безопасности (403 CSRF)', () => {
+  const csrfBody = {error: 'CSRF validation failed: origin mismatch'};
+
+  it('запись выработки: запись PENDING, русский текст про проверку безопасности', async () => {
+    respondCommand = () => jsonResponse(csrfBody, 403);
+
+    render(<OperatorMobileApp />);
+    await screen.findByRole('button', {name: 'Добавить сваю'});
+
+    logProduction();
+
+    // Русское указание вместо английской строки сервера (аудит R89, находка 1).
+    const alerts = await screen.findAllByRole('alert');
+    expect(alerts.some((node) => node.textContent?.includes('Запрос отклонён проверкой безопасности')))
+      .toBe(true);
+    expect(screen.queryByText(/CSRF validation failed/)).toBeNull();
+
+    // CSRF-403 — временный отказ: запись ждёт, а не отвергнута.
+    const banner = screen.getByTestId('offline-queue-banner');
+    expect(banner).toHaveTextContent('Запрос отклонён проверкой безопасности');
+    expect(screen.getByText('Ожидает отправки: 1')).toBeInTheDocument();
+  });
+
+  it('закрытие смены (close-shift): тот же 403 — текст БЕЗ «запись сохранена»', async () => {
+    // Команда-переход в очередь не кладётся: обещание сохранения было бы ложью
+    // (F-R89-API-TEXTS).
+    respondState = () => jsonResponse({
+      data: {
+        ...workState,
+        phase: 'CLOSING',
+        checklists: [...workState.checklists, {stage: 'EO_AFTER', done: true}],
+      },
+    });
+    respondCommand = () => jsonResponse(csrfBody, 403);
+
+    render(<OperatorMobileApp />);
+    const close = await screen.findByRole('button', {name: 'Закрыть смену и отправить отчёт'});
+
+    fireEvent.click(close);
+
+    expect(await screen.findByText(
+      'Запрос отклонён проверкой безопасности. Обновите страницу и повторите действие.',
+    )).toBeInTheDocument();
+    expect(screen.queryByText(/запись сохранена/)).toBeNull();
+    // Сохранять нечего — плашки очереди нет.
+    expect(screen.queryByTestId('offline-queue-banner')).toBeNull();
+  });
+});
+
+describe('T-V1-QUEUE-FLOW: 409 переводит экран в закрытую смену', () => {
+  const closedState = {
+    ...workState,
+    phase: 'CLOSED',
+    shift: null,
+    receipt: null,
+    production: {
+      piles: {count: 12, meters: 60},
+      drilling: {count: 0, meters: 0},
+      downtimeHours: 0,
+    },
+  } as unknown as OperatorMobileState;
+
+  it('409 «Смена уже закрыта»: отказ на экране закрытой смены, запись — с «Удалить запись»', async () => {
+    // Первое чтение — фаза работы, перечитывание на 409 — уже закрытая смена.
+    let stateCalls = 0;
+    respondState = () => {
+      stateCalls += 1;
+      return jsonResponse({data: stateCalls === 1 ? workState : closedState});
+    };
+    respondCommand = () => jsonResponse({error: 'Смена уже закрыта'}, 409);
+
+    render(<OperatorMobileApp />);
+    await screen.findByRole('button', {name: 'Добавить сваю'});
+
+    logProduction();
+
+    // Экран перечитан в фазу закрытой смены.
+    expect(await screen.findByText('Номер отчёта пока недоступен')).toBeInTheDocument();
+    // Текст отказа — на самом экране закрытой смены (R82, находка 5).
+    const alerts = await screen.findAllByRole('alert');
+    expect(alerts.some((node) => node.textContent === 'Смена уже закрыта')).toBe(true);
+    // Отклонённая запись осталась видимой, с выходом «Удалить запись».
+    const banner = screen.getByTestId('offline-queue-banner');
+    expect(within(banner).getByText('Выработка не принята')).toBeInTheDocument();
+    expect(within(banner).getByRole('button', {name: 'Удалить запись'})).toBeInTheDocument();
+  });
+});
+
+describe('T-V1-QUEUE-FLOW: ждущая и отклонённая записи одновременно', () => {
+  it('строка состояния говорит и об отклонённой, и о ждущей (F-R89-STRIP-COUNTS)', async () => {
+    render(<OperatorMobileApp />);
+    await screen.findByRole('button', {name: 'Добавить сваю'});
+
+    // Первая запись — обрыв связи: ложится в очередь как PENDING.
+    respondCommand = () => { throw new TypeError('Failed to fetch'); };
+    logProduction();
+    expect(await screen.findByText('Выработка: сохранено на устройстве, отправим при связи'))
+      .toBeInTheDocument();
+
+    // Вторая запись — 409: сервер отказал по существу, запись становится FAILED,
+    // а ждущая остаётся ждать. Ключ у второго нажатия новый, поэтому в очереди
+    // две разные записи. Форму после постановки в очередь экран не закрывает,
+    // только чистит число, — открывать её заново не нужно.
+    respondCommand = () => jsonResponse({error: 'Смена уже закрыта'}, 409);
+    fireEvent.change(screen.getByLabelText('Свай, шт'), {target: {value: '12'}});
+    fireEvent.click(screen.getByRole('button', {name: 'Записать'}));
+
+    expect(await screen.findByText('Выработка не принята')).toBeInTheDocument();
+    // Раньше строка при failed > 0 молчала о ждущей записи и писала
+    // «Нужно проверить: 1» — машинист считал, что разбирать нечего.
+    expect(screen.getByText('Отклонено: 1 · ещё ждёт отправки: 1 — причина отказа ниже'))
+      .toBeInTheDocument();
   });
 });
