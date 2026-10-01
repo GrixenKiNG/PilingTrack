@@ -46,10 +46,20 @@ export function OfflineQueueBanner({items, onRetry, onDiscard, className = 'spac
     Без этого 500/503/429 выглядели как «ждём связи», хотя связь есть
     (аудит R76, находка 6). `AUTH_WAIT_MESSAGE` разбирается отдельной ветвью.
   */
-  const serverReasons = pending
-    .map((item) => item.lastError)
-    .filter((text): text is string =>
-      !!text && text !== AUTH_WAIT_MESSAGE && /[А-Яа-яЁё]/.test(text));
+  /*
+    Один и тот же отказ приходит от каждой ждущей записи: пять записей с 503
+    давали пять одинаковых фраз подряд. Сворачиваем повторы, сохраняя порядок
+    первого появления, и дописываем «(×N)» — сколько записей ждут по этой
+    причине.
+  */
+  const serverReasons = Array.from(
+    pending
+      .map((item) => item.lastError)
+      .filter((text): text is string =>
+        !!text && text !== AUTH_WAIT_MESSAGE && /[А-Яа-яЁё]/.test(text))
+      .reduce((counts, text) => counts.set(text, (counts.get(text) ?? 0) + 1), new Map<string, number>()),
+    ([text, count]) => (count > 1 ? `${text} (×${count})` : text),
+  );
 
   return (
     <div className={className} data-testid="offline-queue-banner">

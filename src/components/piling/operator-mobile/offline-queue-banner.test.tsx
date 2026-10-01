@@ -97,4 +97,29 @@ describe('плашка ждущих записей: связь или отказ
 
     expect(screen.queryByText('Failed to fetch')).toBeNull();
   });
+
+  it('одинаковые причины ждущих записей сворачиваются с «(×N)» (F-V1-BANNER-DEDUPE)', () => {
+    const reason = 'Сервер временно недоступен (код 503).';
+    const other = 'Смена уже закрыта';
+    render(
+      <OfflineQueueBanner
+        items={[
+          {...pending(reason), clientCommandId: 'p1'},
+          {...pending(reason), clientCommandId: 'p2'},
+          {...pending(reason), clientCommandId: 'p3'},
+          {...pending(other), clientCommandId: 'p4'},
+        ]}
+        onRetry={vi.fn()}
+        onDiscard={vi.fn()}
+      />,
+    );
+
+    const text = screen.getByRole('status').textContent ?? '';
+    // Первая причина — один раз, со счётчиком записей.
+    expect(text).toContain(`${reason} (×3)`);
+    expect(text.match(/код 503/g)).toHaveLength(1);
+    // Вторая причина уникальна — без счётчика и тоже один раз.
+    expect(text).toContain(other);
+    expect(text.match(/Смена уже закрыта/g)).toHaveLength(1);
+  });
 });
