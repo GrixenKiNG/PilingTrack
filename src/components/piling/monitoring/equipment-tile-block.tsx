@@ -31,41 +31,54 @@ function Value({ label, value, icon }: { label: string; value: React.ReactNode; 
   );
 }
 
+// Три состояния, а не два: «фото нет» и «фото не прочиталось» — разные вещи.
+// Отказ выдачи ссылки (403/500/обрыв) раньше схлопывался в «Фото не загружено»,
+// и диспетчер принимал непрочитанный снимок за отсутствующий.
+type PhotoResolution =
+  | { status: 'none' }
+  | { status: 'error' }
+  | { status: 'ok'; url: string };
+
 // The media download endpoint returns { url } with a presigned S3 link (same
 // contract report-thumbnail.tsx and equipment-photos.tsx consume) — an <img>
 // can't point at it directly, so resolve it first. cdnUrl values pass through.
-function useResolvedPhotoUrl(photoUrl: string | null | undefined): string | null {
-  const [url, setUrl] = useState<string | null>(
-    photoUrl && !photoUrl.startsWith('/api/') ? photoUrl : null,
+function useResolvedPhotoUrl(photoUrl: string | null | undefined): PhotoResolution {
+  const [state, setState] = useState<PhotoResolution>(() =>
+    photoUrl && !photoUrl.startsWith('/api/') ? { status: 'ok', url: photoUrl } : { status: 'none' },
   );
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- resets the resolved URL when photoUrl changes; the async resolve below sets the real value
-    if (!photoUrl) { setUrl(null); return; }
-    if (!photoUrl.startsWith('/api/')) { setUrl(photoUrl); return; }
+    if (!photoUrl) { setState({ status: 'none' }); return; }
+    if (!photoUrl.startsWith('/api/')) { setState({ status: 'ok', url: photoUrl }); return; }
     let active = true;
-    setUrl(null);
+    setState({ status: 'none' });
     void (async () => {
       try {
         const res = await authFetch(photoUrl);
-        if (!res.ok) return;
+        if (!active) return;
+        if (!res.ok) { setState({ status: 'error' }); return; }
         const body: unknown = await res.json();
         const signed = (body as { url?: unknown }).url;
-        if (active && typeof signed === 'string') setUrl(signed);
+        if (!active) return;
+        setState(typeof signed === 'string' ? { status: 'ok', url: signed } : { status: 'error' });
       } catch {
-        // leave the placeholder — a broken photo must not break the tile
+        // Отказ или обрыв сети — это не «фото нет»: помечаем как ошибку чтения,
+        // сломанное фото по-прежнему не ломает плитку.
+        if (active) setState({ status: 'error' });
       }
     })();
     return () => { active = false; };
   }, [photoUrl]);
 
-  return url;
+  return state;
 }
 
 function ServerPhoto({ photoUrl, alt, fit }: { photoUrl: string; alt: string; fit: 'cover' | 'contain' }) {
-  const url = useResolvedPhotoUrl(photoUrl);
-  if (!url) return <span className="text-xs text-muted-foreground">Фото не загружено</span>;
-  return <img src={url} alt={alt} className="h-full w-full" style={{ objectFit: fit }} />;
+  const photo = useResolvedPhotoUrl(photoUrl);
+  if (photo.status === 'error') return <span className="text-xs text-muted-foreground">Не удалось загрузить фото</span>;
+  if (photo.status === 'none') return <span className="text-xs text-muted-foreground">Фото не загружено</span>;
+  return <img src={photo.url} alt={alt} className="h-full w-full" style={{ objectFit: fit }} />;
 }
 
 function PhotoBlock({ card }: { card: FleetCard }) {
@@ -86,13 +99,13 @@ function PhotoBlock({ card }: { card: FleetCard }) {
 
   return (
     <div className="relative h-full min-h-0 overflow-hidden" style={{ backgroundColor: brand?.tint ?? 'var(--foreground)' }}>
-      {photo && (
+      {photo.status === 'ok' && (
         <>
           {/* Обычный img, а не next/image: фото из Media приходит presigned-ссылкой
               на S3 — внешний динамический хост, для next/image потребовал бы
               remotePatterns и всё равно не кэшировался бы (ссылка одноразовая). */}
-          <img src={photo} alt="" aria-hidden className="absolute inset-0 h-full w-full scale-125 object-cover opacity-70 blur-lg" />
-          <img src={photo} alt="" className="absolute inset-0 h-full w-full object-contain" />
+          <img src={photo.url} alt="" aria-hidden className="absolute inset-0 h-full w-full scale-125 object-cover opacity-70 blur-lg" />
+          <img src={photo.url} alt="" className="absolute inset-0 h-full w-full object-contain" />
         </>
       )}
       <div className="absolute inset-0 bg-gradient-to-br from-black/60 via-black/10 to-transparent" />

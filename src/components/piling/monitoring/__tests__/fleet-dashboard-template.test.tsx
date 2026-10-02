@@ -76,6 +76,24 @@ describe('FleetDashboard shared equipment template', () => {
       url.startsWith('/api/monitoring/fleet') ? { ok: false, json: async () => ({}) } : base(url, init));
   };
 
+  /** Следующий ответ `/api/monitoring/fleet` — отказ с указанным кодом статуса. */
+  const fleetFailsWith = (status: number) => {
+    const base = mocks.authFetch.getMockImplementation();
+    if (!base) throw new Error('authFetch mock is not configured');
+    mocks.authFetch.mockImplementation(async (url: string, init?: RequestInit) =>
+      url.startsWith('/api/monitoring/fleet') ? { ok: false, status, json: async () => ({}) } : base(url, init));
+  };
+
+  /** Запрос снимка обрывается исключением (таймаут AbortError или сетевая ошибка). */
+  const fleetThrows = (error: unknown) => {
+    const base = mocks.authFetch.getMockImplementation();
+    if (!base) throw new Error('authFetch mock is not configured');
+    mocks.authFetch.mockImplementation(async (url: string, init?: RequestInit) => {
+      if (url.startsWith('/api/monitoring/fleet')) throw error;
+      return base(url, init);
+    });
+  };
+
   it('applies one saved template to all visible equipment cards', async () => {
     // Шаблон приходит с сервера уже сохранённым: редактор переехал в
     // «Настройки → Шаблоны плиток», и на мониторинге его больше нет. Проверяем
@@ -161,5 +179,44 @@ describe('FleetDashboard shared equipment template', () => {
 
     await waitFor(() => expect(screen.getByRole('button', { name: 'Обновить' })).toBeInTheDocument());
     expect(screen.getByRole('button', { name: 'Обновить' })).toHaveClass('inline-flex', 'min-h-11', 'items-center', 'sm:min-h-0');
+  });
+
+  /**
+   * R101 №5: отказ сервера больше не выдаётся за «нет соединения» — код
+   * статуса разбирается, сбой БД и ограничение частоты объясняются по-разному,
+   * а таймаут 15 с отличается от настоящего обрыва связи.
+   */
+  it('называет 5xx сбоем сервера, а не отсутствием связи (R101 №5)', async () => {
+    fleetFailsWith(500);
+
+    render(<FleetDashboard />);
+
+    expect(await screen.findByText(/Сервер мониторинга временно недоступен/)).toBeInTheDocument();
+    expect(screen.queryByText(/Нет соединения с сервисом мониторинга/)).not.toBeInTheDocument();
+  });
+
+  it('отличает ограничение частоты 429 (R101 №5)', async () => {
+    fleetFailsWith(429);
+
+    render(<FleetDashboard />);
+
+    expect(await screen.findByText(/Слишком много запросов/)).toBeInTheDocument();
+  });
+
+  it('таймаут сервера (TimeoutError) не выдаётся за обрыв сети (R101 №5)', async () => {
+    fleetThrows(Object.assign(new Error('The operation timed out'), { name: 'TimeoutError' }));
+
+    render(<FleetDashboard />);
+
+    expect(await screen.findByText(/Сервер не ответил за 15 секунд/)).toBeInTheDocument();
+    expect(screen.queryByText(/Нет соединения с сервисом мониторинга/)).not.toBeInTheDocument();
+  });
+
+  it('настоящий обрыв сети по-прежнему объясняется как отсутствие соединения (R101 №5)', async () => {
+    fleetThrows(new TypeError('Failed to fetch'));
+
+    render(<FleetDashboard />);
+
+    expect(await screen.findByText(/Нет соединения с сервисом мониторинга/)).toBeInTheDocument();
   });
 });
