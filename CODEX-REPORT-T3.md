@@ -4,6 +4,8 @@
 Ветка: `codex/merge-trial-1003`, исходный HEAD `6b37416aac034b125eeab4ba1254748b0c108810`.
 Никакой выкладки, SSH/SCP, push, смены ветки, правок .env, пакетов, схемы или миграций вручную не выполнялось.
 
+Завершено 03.10.2026 (МСК): M1–M8 реализованы и проверены в назначенной ветке. Последний полный Vitest: 2923 passed/0 failed/81 skipped. TypeScript/lint/Docker smoke passed; Next build остановлен до компиляции из-за отсутствующих DATABASE_PROVIDER и SESSION_SECRET. Очистка PDF выключена по умолчанию. Все локальные изменения закоммичены; публикации и выкладки нет.
+
 ## M1 — слияния
 
 - `c354a155` — `(CODEX-M1) Пробно слить ветку исправлений безопасности`, `fix/security-codex55`; конфликтов нет.
@@ -54,7 +56,7 @@
 
 Тест сначала красный: expected version 3, received 7 (exit 1, 7 passed/1 failed). После исправления форма + серверный repository: exit 0, 14/14 в 2 файлах. Логи `m4-red-version.log`, `m4-green.log`. Первый вариант красного теста истекал по waitFor; затем ожидание отделено от синхронной проверки версии, получен точный AssertionError.
 
-Удалён только локальный помощник `refreshVersion` и связанный state из формы: поиск всего worktree (src/e2e/tests/scripts/prisma/config/docs, исключены секреты/сгенерированные файлы) показал единственный вызов в той же форме. Экспорт/файл не удалялся, существующий тест заменён безопасным контрактом. Diff M4: форма +3/-28; тест +9/-9.
+Удалён только локальный помощник `refreshVersion` и связанный state из формы: поиск всего worktree (src/e2e/tests/scripts/prisma/config/docs, исключены секреты/сгенерированные файлы) показал единственный вызов в той же форме. Экспорт/файл не удалялся, существующий тест заменён безопасным контрактом. Diff коммита M4: форма +4/-27; тест +8/-10 (git show --numstat e2b64326).
 
 Остальные замечания для владельца:
 
@@ -90,7 +92,7 @@ docker compose up -d --no-build app workers
 
 Не переходить через короткое окно «новый app + старый workers» или наоборот. После остановки проверять завершение операций; истечения TTL недостаточно при paused/in-flight процессе. При невозможности доказать отсутствие отдельного старого исполнителя переход остановить. Для отката нужен тот же общий барьер stop-all, иначе новые state-lease и старые cache-lease снова работают одновременно. Скрипт только изучен, не изменялся и не запускался.
 
-Предвыкладочные блокеры: build env не готов; первый полный тестовый прогон красный; графовый анализ недоступен; финальные решения M6–M8 и проверки ниже ещё выполняются. Production готовым не объявляется.
+Предвыкладочные блокеры: build env не готов, графовый анализ недоступен, live DB/browser QA не выполнены. Первоначальный красный Vitest сохраняется как исторический результат; последний полный прогон прошёл, см. финальную таблицу. M6–M8 завершены. Production готовым не объявляется.
 
 ## M6 / I05 — только отправленные в показателях
 
@@ -140,3 +142,292 @@ Media строит ключи `media/<tenant>/<entityType>/<entityId>/...` (`src
 - App smoke в deploy-prod.sh отсутствует, поэтому условная часть M3 не применима; app build через Next остаётся заблокирован окружением.
 
 Это проверка загрузки worker runtime без Next, а не живого Redis/БД, Telegram или выполнения opt-in cleanup на S3. Последний build имел image manifest sha256:4c349721fa9baf59977c4e68a008479e500d3e2ba5d22b1547d9f6ccbc3fd32e до удаления codex-tag.
+
+## Финальная проверка после последнего runtime-коммита a7edca31
+
+| Команда | Exit | Ключевой результат |
+|---|---:|---|
+| проверенное удаление .next/dev/types внутри worktree | 0 | перед финальным tsc; reparse points запрещены |
+| npx.cmd --no-install tsc --noEmit | 0 | final2-tsc.log; типы всего проекта |
+| npm.cmd run lint | 0 | final2-lint.log; 0 errors/7 прежних warnings; text integrity passed |
+| npm.cmd run test:unit -- --maxWorkers=2 --reporter=default --reporter=json --outputFile.json=output/codex-t3/final2-vitest.json | 0 | 328 файлов passed/9 skipped (337); 2923 tests passed/0 failed/81 skipped (3004), 262.85 с |
+| npx.cmd --no-install playwright test --list | 0 | final2-playwright-list.log; 99 tests/11 files, как до правок; E2E не запускались |
+| npm.cmd run build, процессный DATABASE_URL_POSTGRES=postgresql://x:x@localhost:5432/x | 1 | final2-build.log; validate-env требует DATABASE_PROVIDER и SESSION_SECRET; Next-компиляция не началась |
+| docker build -f Dockerfile.workers --target runner -t codex-workers:smoke . | 0 | final2-workers-build.log; реальный финальный runner |
+| Git Bash: bash scripts/smoke-workers-image.sh codex-workers:smoke | 0 | final2-workers-smoke.log; старт/Arming, network none |
+| docker image rm codex-workers:smoke | 0 | codex-tag удалён; фильтр codex-workers-smoke-* и codex-workers:smoke пуст |
+| git diff --check | 0 | whitespace/conflict markers нет |
+| GitNexus impact/detect_changes | 1 / не запускался повторно | runtime runner отказал, разрешённый fallback rg+diff; graph risk неизвестен |
+
+Разрешённая фиктивная DB-переменная использовалась только процессно для build. Иные build env не подставлялись, env-файлы не открывались/не менялись. 81 skipped не названы passed; в частности живые integration/RLS/tenant pipeline требуют реальной disposable DB и не проверены. JSON/логи лежат в output/codex-t3 (ignored), фактические результаты и команды закреплены этим отчётом. Сначала полный прогон с default workers был красным из-за двух 30-секундных таймаутов; оба отдельные набора и два полных последних прогона с maxWorkers=2 прошли без увеличения таймаутов.
+
+## Ограничения и что оставлено владельцу
+
+- Никаких ручных правок auth/core/security, tenancy/RLS реализации, schema/migrations, package*.json, Dockerfile/compose/deploy scripts, экранов машиниста/ORION. Слияния безопасности и Hermes содержат исходные правки этих веток, прямо запрошенные M1; отдельно эти области не перерабатывались. Metadata diff .env* пуст, содержимое не читалось.
+- Миграции от a803e61c по-прежнему отсутствуют. План M5 остаётся stop-all старых app/workers/standalone с остановкой автоперезапуска, проверкой отсутствия всех старых реплик и только затем одновременным стартом новых. STOP_ALL относится также к откату.
+- У unified-worker внутренний shutdown deadline по умолчанию 8000 мс (WORKER_SHUTDOWN_TIMEOUT_MS). Compose --timeout 120 не отменяет его: нельзя объявить in-flight drain доказанным только по этой команде. Владелец должен проверить завершение/rollback и возврат незавершённых jobs в очередь; все старые процессы должны прекратить выполнение до старта новых. Скрипт deploy-prod.sh сам пока не реализует барьер — в отчёте дан план правки, выкладка/правка deploy-скрипта не выполнялись.
+- Next build/route-type compilation, live DB/RLS, настоящий Telegram/Alertmanager, S3 и браузерный PDF/UI просмотр не проверены. Docker smoke проверяет старт worker runtime, не выполнение всех задач на инфраструктуре.
+- I08: при потере ответа Telegram/commit или отсутствии надёжного startsAt возможен редкий дубль; подтверждённые сохранённые доставки пропускаются. DLQ не скрывается как успешная доставка, повтор там ручной по существующей процедуре.
+- I11: по умолчанию off; первый opt-in — dry-run. Белый список пропускает неизвестные/старые имена не UUID v4. Перед apply владелец проверяет count/keys в логах и включение флагов в workers; автоматического удаления Media нет.
+- 7 исходных lint warnings и мелкие замечания M4 не исправлялись как несвязанные. Графовая проверка не подтверждена; риск не обозначен low. RPO/RTO и внешний мониторинг не реализовывались, согласно заданию.
+
+## Коммиты потока
+
+| Hash | Действие |
+|---|---|
+| c354a155 | (CODEX-M1) Пробно слить ветку исправлений безопасности |
+| b6f602b5 | (CODEX-M1) Пробно слить Hermes с сохранением плана I02 |
+| e2b64326 | (CODEX-M4) Сохранить защиту отчёта от потери чужих правок при 409 |
+| c99d87b1 | (CODEX-M5) Записать проверки, ревью и план согласованной выкладки I02 |
+| 276d777b | (CODEX-M6) Исключить черновики из выработки и сохранить отдельную историю |
+| e6982cc1 | (CODEX-M6) Записать доказательства правила submitted в отчёт |
+| 65a0d051 | (CODEX-M7) Повторять только неподтверждённые доставки Telegram |
+| 46501848 | (CODEX-M8) Добавить отключённую очистку временных PDF с dry-run и защитой вложений |
+| a7edca31 | (CODEX-M7) Сохранить частичную пачку Alertmanager и повторять только её остаток |
+| b18347f6 | (CODEX-M3) Записать успешный Docker smoke окончательного worker runtime |
+
+Последний отчётный commit M2 содержит эту финальную таблицу и инвентарь; его hash виден в git log и итоговом ответе (самоссылка на свой hash в файле не записывается).
+
+## Удаления и доказательства
+
+Ручных удалений файлов/экспортов после слияний нет. В M4 удалён приватный refreshVersion: его единственный caller был локальным обработчиком 409, теперь удалённым; отдельного экспорта и теста функции не было, regression-тест поведения усилен.
+
+В запрошенной ветке безопасности пришли ровно два удаления: prisma/rls-setup.sql и src/core/security/index.ts. Поиск whole worktree (src/e2e/tests/scripts/prisma/config/docs, исключены .env, .git, node_modules, generated/output) для rls-setup.sql, core/security/index и импорта @/core/security дал только исторические docs/audits/proposals, без live imports/SQL invocation/CSS/route-string usage. Barrel реэкспортировал оставшиеся tenant-enforcement/idempotency реализации; они сохранены. SQL был устаревшим образцом RLS, текущие миграции сохранены. Полный tsc/unit и Playwright collection не обнаружили потерянных импортов. Graph zero не использовался как доказательство; Next build не проверен.
+
+## Ручные изменения M4–M8 после слияний
+
+Добавлено/удалено строк, git diff --numstat b6f602b5..HEAD. Binary отмечены «-». Это diff, а не размер файла.
+
+| Путь | + | − |
+|---|---:|---:|
+| CODEX-REPORT-T3.md | 433 | 0 |
+| src/app/api/admin/analytics/overview/route.ts | 2 | 1 |
+| src/app/api/alerts/webhook/__tests__/route.test.ts | 46 | 11 |
+| src/app/api/alerts/webhook/route.ts | 40 | 21 |
+| src/app/api/reports/period/__tests__/period-summary.test.ts | 17 | 4 |
+| src/app/api/reports/period/__tests__/route.test.ts | 1 | 1 |
+| src/components/piling/admin-reports/__tests__/report-form-dialog.test.tsx | 8 | 10 |
+| src/components/piling/admin-reports/report-form-dialog.tsx | 4 | 27 |
+| src/core/infrastructure/__tests__/raw-queries.test.ts | 9 | 0 |
+| src/core/infrastructure/raw-queries.ts | 2 | 0 |
+| src/core/notifications/__tests__/telegram.test.ts | 36 | 8 |
+| src/core/notifications/durable-alert.ts | 2 | 1 |
+| src/core/notifications/telegram-delivery-progress.ts | 24 | 0 |
+| src/core/notifications/telegram.ts | 19 | 17 |
+| src/lib/__tests__/pdf-generator.test.ts | 19 | 0 |
+| src/lib/__tests__/pile-meters-invariant.test.ts | 1 | 1 |
+| src/lib/pdf-data.ts | 2 | 1 |
+| src/lib/pdf-generator/__tests__/cleanup.test.ts | 108 | 0 |
+| src/lib/pdf-generator/cleanup.ts | 90 | 0 |
+| src/lib/pdf-generator/components.ts | 2 | 2 |
+| src/lib/pdf-generator/period-pdf.ts | 19 | 10 |
+| src/lib/pdf-generator/storage.ts | 15 | 8 |
+| src/lib/report-status.ts | 6 | 0 |
+| src/modules/equipment/application/queries/__tests__/equipment-query.service.test.ts | 20 | 6 |
+| src/modules/equipment/application/queries/equipment-query.service.ts | 2 | 1 |
+| src/modules/monitoring/application/queries/__tests__/fleet-monitoring.service.test.ts | 16 | 0 |
+| src/modules/monitoring/application/queries/fleet-monitoring.service.ts | 2 | 0 |
+| src/modules/reports/application/projections/__tests__/rebuild.test.ts | 28 | 0 |
+| src/modules/reports/application/projections/rebuild.ts | 2 | 1 |
+| src/modules/reports/application/queries/__tests__/export-reports-csv.test.ts | 19 | 0 |
+| src/modules/reports/application/queries/__tests__/report-query.service.test.ts | 4 | 2 |
+| src/modules/reports/application/queries/report-export.service.ts | 6 | 11 |
+| src/modules/reports/application/queries/report-query.service.ts | 2 | 1 |
+| src/modules/reports/domain/period-summary.ts | 5 | 2 |
+| src/services/analytics/__tests__/site-analytics-service.test.ts | 4 | 2 |
+| src/services/analytics/equipment-analytics-service.ts | 3 | 2 |
+| src/services/analytics/site-analytics-service.ts | 8 | 7 |
+| src/services/notifications/__tests__/durable-alert-delivery.test.ts | 25 | 1 |
+| src/services/notifications/durable-alert-delivery.ts | 13 | 6 |
+| src/services/reports/__tests__/daily-summary.test.ts | 28 | 0 |
+| src/services/reports/event-handlers.ts | 14 | 6 |
+| src/services/reports/outbox-publisher.ts | 3 | 1 |
+| src/workers/__tests__/outbox-worker.test.ts | 12 | 0 |
+| src/workers/unified-worker.ts | 9 | 0 |
+| src/workers/unified-worker/__tests__/pdf-cleanup-scheduler.test.ts | 27 | 0 |
+| src/workers/unified-worker/pdf-cleanup-scheduler.ts | 18 | 0 |
+
+## Полный состав изменений с двумя merge
+
+Добавлено/удалено строк, git diff --numstat 6b37416a..HEAD. Binary отмечены «-». Это diff, а не размер файла.
+
+| Путь | + | − |
+|---|---:|---:|
+| CODEX-REPORT-T3.md | 433 | 0 |
+| README.md | 6 | 0 |
+| docs/DATA-SOURCES.md | 14 | 10 |
+| docs/audits/hermes-night/02-silent-failures.md | 49 | 1 |
+| docs/audits/hermes-night/R100-inspections-messages.md | 148 | 0 |
+| docs/audits/hermes-night/R101-monitoring-messages.md | 131 | 0 |
+| docs/audits/hermes-night/R102-admin-crews-messages.md | 123 | 0 |
+| docs/audits/hermes-night/R103-admin-dictionaries-messages.md | 160 | 0 |
+| docs/audits/hermes-night/R104-admin-incidents-messages.md | 131 | 0 |
+| docs/audits/hermes-night/R105-briefings-messages.md | 130 | 0 |
+| docs/audits/hermes-night/R106-analytics-dashboard-messages.md | 123 | 0 |
+| docs/audits/hermes-night/R107-pile-journal-messages.md | 70 | 0 |
+| docs/audits/hermes-night/R108-layout-editor-messages.md | 112 | 0 |
+| docs/audits/hermes-night/R69-alerts-delivery.md | 70 | 0 |
+| docs/audits/hermes-night/R85-global-db-inside-tx.md | 54 | 0 |
+| docs/audits/hermes-night/R87-audit-log-stopped.md | 88 | 0 |
+| docs/audits/hermes-night/R89-v1-messages-consistency.md | 134 | 0 |
+| docs/audits/hermes-night/R90-night-leftovers.md | 68 | 0 |
+| docs/audits/hermes-night/R91-changes-since-deploy.md | 81 | 0 |
+| docs/audits/hermes-night/R92-env-passthrough.md | 231 | 0 |
+| docs/audits/hermes-night/R93-admin-reports-messages.md | 163 | 0 |
+| docs/audits/hermes-night/R94-maintenance-messages.md | 67 | 0 |
+| docs/audits/hermes-night/R95-admin-dlq.md | 79 | 0 |
+| docs/audits/hermes-night/R96-readiness-idempotency.md | 97 | 0 |
+| docs/audits/hermes-night/R97-admin-equipment-messages.md | 191 | 0 |
+| docs/audits/hermes-night/R98-admin-users-messages.md | 142 | 0 |
+| docs/audits/hermes-night/R99-admin-sites-messages.md | 177 | 0 |
+| docs/runbooks/008-manual-deploy.md | 51 | 0 |
+| docs/runbooks/013-prod-timers.md | 35 | 1 |
+| docs/runbooks/014-post-deploy-2026-10.md | 180 | 1 |
+| docs/runbooks/015-encryption-key-rotation.md | 244 | 0 |
+| docs/strategy/quality-inventory.md | 192 | 0 |
+| prisma/rls-setup.sql | 0 | 91 |
+| src/app/api/__tests__/api-routes.test.ts | 0 | 1 |
+| src/app/api/admin/analytics/overview/route.ts | 2 | 1 |
+| src/app/api/alerts/webhook/__tests__/route.test.ts | 46 | 11 |
+| src/app/api/alerts/webhook/route.ts | 40 | 21 |
+| src/app/api/auth/login/__tests__/route.test.ts | 14 | 2 |
+| src/app/api/auth/login/route.ts | 10 | 0 |
+| src/app/api/reports/period/__tests__/period-summary.test.ts | 17 | 4 |
+| src/app/api/reports/period/__tests__/route.test.ts | 1 | 1 |
+| src/components/piling/__tests__/admin-dlq.test.tsx | 175 | 0 |
+| src/components/piling/admin-crews/__tests__/admin-crews.test.tsx | 151 | 0 |
+| src/components/piling/admin-crews/__tests__/crew-messages.test.ts | 60 | 0 |
+| src/components/piling/admin-crews/__tests__/use-crews-data.test.ts | 118 | 0 |
+| src/components/piling/admin-crews/admin-crews.tsx | 16 | 9 |
+| src/components/piling/admin-crews/crew-form-dialog.tsx | 22 | 3 |
+| src/components/piling/admin-crews/crew-messages.ts | 46 | 0 |
+| src/components/piling/admin-crews/use-crews-data.ts | 11 | 9 |
+| src/components/piling/admin-dictionaries/__tests__/admin-dictionaries.test.tsx | 21 | 0 |
+| src/components/piling/admin-dictionaries/dictionary-form.tsx | 13 | 3 |
+| src/components/piling/admin-dlq.tsx | 78 | 17 |
+| src/components/piling/admin-incidents/__tests__/admin-incidents.test.tsx | 150 | 0 |
+| src/components/piling/admin-incidents/admin-incidents.tsx | 91 | 24 |
+| src/components/piling/admin-reports/__tests__/admin-reports.test.tsx | 142 | 0 |
+| src/components/piling/admin-reports/__tests__/report-evidence-preview.test.tsx | 100 | 0 |
+| src/components/piling/admin-reports/__tests__/report-form-dialog.test.tsx | 131 | 0 |
+| src/components/piling/admin-reports/__tests__/use-reports-data.test.ts | 74 | 0 |
+| src/components/piling/admin-reports/admin-reports.tsx | 34 | 5 |
+| src/components/piling/admin-reports/report-evidence-preview.tsx | 31 | 3 |
+| src/components/piling/admin-reports/report-form-dialog.tsx | 22 | 2 |
+| src/components/piling/admin-reports/use-reports-data.ts | 28 | 5 |
+| src/components/piling/admin-sites/__tests__/admin-sites-hierarchy.test.tsx | 67 | 0 |
+| src/components/piling/admin-sites/__tests__/use-site-mutations.test.ts | 110 | 4 |
+| src/components/piling/admin-sites/__tests__/use-sites-overview.test.ts | 56 | 0 |
+| src/components/piling/admin-sites/__tests__/user-assignment.test.tsx | 62 | 0 |
+| src/components/piling/admin-sites/index.tsx | 31 | 11 |
+| src/components/piling/admin-sites/site-editor/__tests__/add-hierarchy-dialog.test.tsx | 33 | 0 |
+| src/components/piling/admin-sites/site-editor/add-hierarchy-dialog.tsx | 5 | 3 |
+| src/components/piling/admin-sites/use-site-mutations.ts | 53 | 19 |
+| src/components/piling/admin-sites/use-sites-overview.ts | 25 | 2 |
+| src/components/piling/admin-sites/user-assignment.tsx | 27 | 8 |
+| src/components/piling/analytics-dashboard/__tests__/kpi-widgets.test.tsx | 85 | 0 |
+| src/components/piling/analytics-dashboard/kpi-widgets.tsx | 41 | 8 |
+| src/components/piling/briefings/__tests__/briefing-journal-print.test.tsx | 68 | 0 |
+| src/components/piling/briefings/briefing-journal-print.tsx | 12 | 2 |
+| src/components/piling/inspections/__tests__/inspection-messages.test.tsx | 355 | 0 |
+| src/components/piling/inspections/inspection-api-error.ts | 72 | 0 |
+| src/components/piling/inspections/inspection-item-photos.tsx | 32 | 3 |
+| src/components/piling/inspections/inspections-list.tsx | 25 | 3 |
+| src/components/piling/inspections/run-inspection.tsx | 49 | 15 |
+| src/components/piling/inspections/template-editor.tsx | 45 | 3 |
+| src/components/piling/inspections/template-list.tsx | 24 | 2 |
+| src/components/piling/maintenance/__tests__/maintenance-helpers.test.ts | 39 | 1 |
+| src/components/piling/maintenance/__tests__/maintenance-messages.test.tsx | 209 | 0 |
+| src/components/piling/maintenance/__tests__/maintenance-mobile-targets.test.tsx | 4 | 1 |
+| src/components/piling/maintenance/maintenance-board.tsx | 45 | 15 |
+| src/components/piling/maintenance/maintenance-helpers.ts | 27 | 0 |
+| src/components/piling/maintenance/maintenance-request-form.tsx | 3 | 2 |
+| src/components/piling/maintenance/work-order-detail.tsx | 39 | 7 |
+| src/components/piling/maintenance/work-order-form-dialog.tsx | 3 | 2 |
+| src/components/piling/monitoring/__tests__/equipment-tile-block.test.tsx | 110 | 0 |
+| src/components/piling/monitoring/__tests__/fleet-dashboard-template.test.tsx | 57 | 0 |
+| src/components/piling/monitoring/equipment-tile-block.tsx | 29 | 16 |
+| src/components/piling/monitoring/fleet-dashboard.tsx | 26 | 4 |
+| src/components/piling/operator-mobile/__tests__/api.test.ts | 187 | 11 |
+| src/components/piling/operator-mobile/__tests__/fixtures.ts | 45 | 0 |
+| src/components/piling/operator-mobile/__tests__/operator-mobile-app.test.tsx | 21 | 20 |
+| src/components/piling/operator-mobile/__tests__/queue-flow.test.tsx | 371 | 0 |
+| src/components/piling/operator-mobile/api.ts | 146 | 36 |
+| src/components/piling/operator-mobile/offline-queue-banner.test.tsx | 77 | 0 |
+| src/components/piling/operator-mobile/offline-queue-banner.tsx | 39 | 10 |
+| src/components/piling/operator-mobile/offline-queue.ts | 10 | 0 |
+| src/components/piling/operator-mobile/operator-mobile-app.tsx | 94 | 18 |
+| src/components/piling/operator-mobile/operator-status-strip.tsx | 3 | 1 |
+| src/components/piling/operator-mobile/screens/__tests__/knowledge-screen.test.tsx | 1 | 1 |
+| src/components/piling/operator-mobile/ui.test.tsx | 5 | 0 |
+| src/components/piling/to/readiness/settings/dictionaries-section.tsx | 2 | 2 |
+| src/components/piling/to/readiness/settings/integrations-section.tsx | 2 | 2 |
+| src/components/piling/to/readiness/settings/roles-section.tsx | 4 | 4 |
+| src/core/infrastructure/__tests__/raw-queries.test.ts | 9 | 0 |
+| src/core/infrastructure/raw-queries.ts | 2 | 0 |
+| src/core/notifications/__tests__/telegram.test.ts | 36 | 8 |
+| src/core/notifications/durable-alert.ts | 2 | 1 |
+| src/core/notifications/telegram-delivery-progress.ts | 24 | 0 |
+| src/core/notifications/telegram.ts | 19 | 17 |
+| src/core/observability/health-tracker/checkers/backup.ts | 5 | 3 |
+| src/core/security/idempotency.ts | 9 | 175 |
+| src/core/security/index.ts | 0 | 36 |
+| src/core/security/tenant-enforcement.ts | 13 | 254 |
+| src/lib/__tests__/csrf-protection.test.ts | 42 | 1 |
+| src/lib/__tests__/no-global-db-in-tx.test.ts | 58 | 41 |
+| src/lib/__tests__/pdf-generator.test.ts | 19 | 0 |
+| src/lib/__tests__/pile-meters-invariant.test.ts | 1 | 1 |
+| src/lib/csrf-protection.ts | 12 | 2 |
+| src/lib/db.ts | 1 | 1 |
+| src/lib/pdf-data.ts | 2 | 1 |
+| src/lib/pdf-generator/__tests__/cleanup.test.ts | 108 | 0 |
+| src/lib/pdf-generator/cleanup.ts | 90 | 0 |
+| src/lib/pdf-generator/components.ts | 2 | 2 |
+| src/lib/pdf-generator/period-pdf.ts | 19 | 10 |
+| src/lib/pdf-generator/storage.ts | 17 | 4 |
+| src/lib/report-status.ts | 6 | 0 |
+| src/modules/crews/infrastructure/__tests__/crew.repository.test.ts | 59 | 0 |
+| src/modules/crews/infrastructure/crew.prisma.mapper.ts | 7 | 1 |
+| src/modules/crews/infrastructure/crew.repository.ts | 8 | 1 |
+| src/modules/equipment/application/queries/__tests__/equipment-query.service.test.ts | 20 | 6 |
+| src/modules/equipment/application/queries/equipment-query.service.ts | 2 | 1 |
+| src/modules/equipment/infrastructure/__tests__/equipment.repository.test.ts | 10 | 0 |
+| src/modules/equipment/infrastructure/equipment.prisma.mapper.ts | 6 | 2 |
+| src/modules/equipment/infrastructure/equipment.repository.ts | 1 | 1 |
+| src/modules/inspections/application/commands/__tests__/inspection-commands.test.ts | 5 | 5 |
+| src/modules/inspections/application/commands/inspection-commands.ts | 0 | 11 |
+| src/modules/inspections/index.ts | 1 | 1 |
+| src/modules/monitoring/application/queries/__tests__/fleet-monitoring.service.test.ts | 16 | 0 |
+| src/modules/monitoring/application/queries/fleet-monitoring.service.ts | 2 | 0 |
+| src/modules/readiness/application/csv-export.ts | 1 | 1 |
+| src/modules/reports/application/projections/__tests__/projection-handlers.test.ts | 22 | 5 |
+| src/modules/reports/application/projections/__tests__/rebuild.test.ts | 28 | 0 |
+| src/modules/reports/application/projections/projection-handlers.ts | 23 | 7 |
+| src/modules/reports/application/projections/projection-worker.ts | 1 | 1 |
+| src/modules/reports/application/projections/rebuild.ts | 2 | 1 |
+| src/modules/reports/application/queries/__tests__/export-reports-csv.test.ts | 19 | 0 |
+| src/modules/reports/application/queries/__tests__/report-query.service.test.ts | 4 | 2 |
+| src/modules/reports/application/queries/report-export.service.ts | 6 | 11 |
+| src/modules/reports/application/queries/report-query.service.ts | 2 | 1 |
+| src/modules/reports/domain/period-summary.ts | 5 | 2 |
+| src/modules/sites/infrastructure/__tests__/site.repository.test.ts | 50 | 0 |
+| src/modules/sites/infrastructure/site.prisma.mapper.ts | 8 | 1 |
+| src/modules/sites/infrastructure/site.repository.ts | 1 | 1 |
+| src/services/analytics/__tests__/site-analytics-service.test.ts | 4 | 2 |
+| src/services/analytics/equipment-analytics-service.ts | 3 | 2 |
+| src/services/analytics/site-analytics-service.ts | 8 | 7 |
+| src/services/auth/__tests__/auth-service-credentials.test.ts | 15 | 5 |
+| src/services/auth/__tests__/session-service.test.ts | 18 | 0 |
+| src/services/auth/auth-service.ts | 15 | 47 |
+| src/services/auth/session-service.ts | 11 | 6 |
+| src/services/notifications/__tests__/durable-alert-delivery.test.ts | 25 | 1 |
+| src/services/notifications/durable-alert-delivery.ts | 13 | 6 |
+| src/services/reports/__tests__/daily-summary.test.ts | 66 | 23 |
+| src/services/reports/event-handlers.ts | 14 | 6 |
+| src/services/reports/outbox-publisher.ts | 3 | 1 |
+| src/workers/__tests__/no-next-in-workers.test.ts | 131 | 5 |
+| src/workers/__tests__/outbox-worker.test.ts | 12 | 0 |
+| src/workers/unified-worker.ts | 9 | 0 |
+| src/workers/unified-worker/__tests__/pdf-cleanup-scheduler.test.ts | 27 | 0 |
+| src/workers/unified-worker/pdf-cleanup-scheduler.ts | 18 | 0 |
+| tests/integration/tenant-isolation.spec.ts | 8 | 90 |
