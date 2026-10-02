@@ -93,7 +93,8 @@ describe('getSiteAnalytics — deactivated sites of a past period', () => {
 
     expect(siteFilter).toContain('FROM "Report" r');
     expect(siteFilter).toContain('r."siteId" = s.id');
-    expect(siteFilter).toContain("r.status = 'submitted'");
+    expect(siteFilter).toContain('r.status = ?');
+    expect(params).toContain('submitted');
     expect(siteFilter).toContain('r.date >= ?');
     expect(siteFilter).toContain('r.date <= ?');
 
@@ -152,7 +153,8 @@ describe('getSiteAnalytics — cumulative progress (F-R52)', () => {
     // Всё между закрытием dt-подзапроса и p_all — это накопительные подзапросы.
     const allTimeBlock = sql.slice(sql.indexOf(') dt ON'), sql.indexOf(') p_all ON'));
     expect(allTimeBlock).toContain('SUM(pw.count)');
-    expect(allTimeBlock).toContain("r.status = 'submitted'");
+    expect(allTimeBlock).toContain('r.status = ?');
+    expect(queryRaw.mock.calls[0].slice(1)).toContain('submitted');
     expect(allTimeBlock).not.toContain('r.date');
   });
 });

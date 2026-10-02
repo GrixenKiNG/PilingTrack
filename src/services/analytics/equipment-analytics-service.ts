@@ -1,3 +1,4 @@
+import { SUBMITTED_REPORT_STATUS } from '@/lib/report-status';
 import { db } from '@/lib/db';
 import { checkMaintenanceDue } from '@/lib/maintenance-due';
 
@@ -70,7 +71,7 @@ export async function getEquipmentAnalytics(params: EquipmentAnalyticsParams) {
       WHERE r.date >= ${dateFrom}
         AND r.date <= ${dateTo}
         AND r."equipmentId" IS NOT NULL
-        AND r.status = 'submitted'
+        AND r.status = ${SUBMITTED_REPORT_STATUS}
         AND r."tenantId" = ${tenantId}
         AND (${siteId}::text IS NULL OR r."siteId" = ${siteId})
     )
@@ -126,7 +127,7 @@ export async function getEquipmentAnalytics(params: EquipmentAnalyticsParams) {
       WHERE r.date >= ${dateFrom}
         AND r.date <= ${dateTo}
         AND r."equipmentId" IS NOT NULL
-        AND r.status = 'submitted'
+        AND r.status = ${SUBMITTED_REPORT_STATUS}
         AND r."tenantId" = ${tenantId}
         AND (${siteId}::text IS NULL OR r."siteId" = ${siteId})
     )

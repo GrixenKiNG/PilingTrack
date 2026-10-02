@@ -1,3 +1,4 @@
+import { SUBMITTED_REPORT_STATUS } from '@/lib/report-status';
 import { db } from '@/lib/db';
 
 interface SiteAnalyticsRow {
@@ -115,7 +116,7 @@ export async function getSiteAnalytics(opts: SiteAnalyticsOptions) {
     LEFT JOIN (
       SELECT r."siteId", COUNT(*)::int AS report_count
       FROM "Report" r
-      WHERE r.date >= ${dateFrom} AND r.date <= ${dateTo} AND r.status = 'submitted'
+      WHERE r.date >= ${dateFrom} AND r.date <= ${dateTo} AND r.status = ${SUBMITTED_REPORT_STATUS}
       GROUP BY r."siteId"
     ) rc ON rc."siteId" = s.id
     LEFT JOIN (
@@ -126,7 +127,7 @@ export async function getSiteAnalytics(opts: SiteAnalyticsOptions) {
       FROM "Report" r
       JOIN "PileWork" pw ON pw."reportId" = r.id
       JOIN "PileGrade" pg ON pg.id = pw."pileGradeId"
-      WHERE r.date >= ${dateFrom} AND r.date <= ${dateTo} AND r.status = 'submitted'
+      WHERE r.date >= ${dateFrom} AND r.date <= ${dateTo} AND r.status = ${SUBMITTED_REPORT_STATUS}
       GROUP BY r."siteId"
     ) p ON p."siteId" = s.id
     LEFT JOIN (
@@ -136,14 +137,14 @@ export async function getSiteAnalytics(opts: SiteAnalyticsOptions) {
         SUM(ld.count)::int AS total_count
       FROM "Report" r
       JOIN "LeaderDrilling" ld ON ld."reportId" = r.id
-      WHERE r.date >= ${dateFrom} AND r.date <= ${dateTo} AND r.status = 'submitted'
+      WHERE r.date >= ${dateFrom} AND r.date <= ${dateTo} AND r.status = ${SUBMITTED_REPORT_STATUS}
       GROUP BY r."siteId"
     ) d ON d."siteId" = s.id
     LEFT JOIN (
       SELECT r."siteId", SUM(rd.duration)::float AS total_duration
       FROM "Report" r
       JOIN "ReportDowntime" rd ON rd."reportId" = r.id
-      WHERE r.date >= ${dateFrom} AND r.date <= ${dateTo} AND r.status = 'submitted'
+      WHERE r.date >= ${dateFrom} AND r.date <= ${dateTo} AND r.status = ${SUBMITTED_REPORT_STATUS}
       GROUP BY r."siteId"
     ) dt ON dt."siteId" = s.id
     LEFT JOIN (
@@ -154,14 +155,14 @@ export async function getSiteAnalytics(opts: SiteAnalyticsOptions) {
       FROM "Report" r
       JOIN "PileWork" pw ON pw."reportId" = r.id
       JOIN "PileGrade" pg ON pg.id = pw."pileGradeId"
-      WHERE r.status = 'submitted'
+      WHERE r.status = ${SUBMITTED_REPORT_STATUS}
       GROUP BY r."siteId"
     ) p_all ON p_all."siteId" = s.id
     LEFT JOIN (
       SELECT r."siteId", SUM(ld.meters)::float AS total_meters
       FROM "Report" r
       JOIN "LeaderDrilling" ld ON ld."reportId" = r.id
-      WHERE r.status = 'submitted'
+      WHERE r.status = ${SUBMITTED_REPORT_STATUS}
       GROUP BY r."siteId"
     ) d_all ON d_all."siteId" = s.id
     WHERE (
@@ -169,7 +170,7 @@ export async function getSiteAnalytics(opts: SiteAnalyticsOptions) {
         OR EXISTS (
           SELECT 1 FROM "Report" r
           WHERE r."siteId" = s.id
-            AND r.status = 'submitted'
+            AND r.status = ${SUBMITTED_REPORT_STATUS}
             AND r.date >= ${dateFrom} AND r.date <= ${dateTo}
         )
       )

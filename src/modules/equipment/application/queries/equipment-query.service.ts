@@ -1,3 +1,4 @@
+import { SUBMITTED_REPORT_STATUS } from '@/lib/report-status';
 import { db } from '@/lib/db';
 import { ServiceError } from '@/lib/service-error';
 import { pileLengthMeters } from '@/lib/pile-length';
@@ -104,7 +105,7 @@ export async function getEquipmentDetails(equipmentId: string, tenantId: string)
   });
   // The history cap must not truncate the independent 30-day KPI window.
   const reports30d = await db.report.findMany({
-    where: { equipmentId, date: { gte: cutoff } },
+    where: { equipmentId, date: { gte: cutoff }, status: SUBMITTED_REPORT_STATUS },
     select: reportSelect,
   });
   const reportIds = [...new Set([...allReports, ...reports30d].map((r) => r.reportId))];

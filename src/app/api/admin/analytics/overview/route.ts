@@ -1,3 +1,4 @@
+import { SUBMITTED_REPORT_STATUS } from '@/lib/report-status';
 /**
  * GET /api/admin/analytics/overview — period production overview, computed
  * from real reports (no projections, no assumptions):
@@ -52,7 +53,7 @@ async function loadPeriod(tenantId: string, from: string, to: string, siteId: st
     where: {
       tenantId,
       date: { gte: from, lte: to },
-      status: { not: 'draft' },
+      status: SUBMITTED_REPORT_STATUS,
       ...(siteId ? { siteId } : {}),
     },
     select: {

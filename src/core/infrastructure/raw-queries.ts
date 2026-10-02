@@ -1,3 +1,4 @@
+import { SUBMITTED_REPORT_STATUS } from '@/lib/report-status';
 /**
  * Raw SQL Queries — Optimized Hot Paths
  *
@@ -158,6 +159,7 @@ export async function getSiteDailySummaryRaw(
       FROM "ReportDowntime" rd WHERE rd."reportId" = r.id
     ) downtimes_agg ON true
     WHERE r."siteId" = ${siteId}
+      AND r.status = ${SUBMITTED_REPORT_STATUS}
       AND r."date" >= ${dateFrom}
       AND r."date" <= ${dateTo}
     GROUP BY r."siteId", r."date"

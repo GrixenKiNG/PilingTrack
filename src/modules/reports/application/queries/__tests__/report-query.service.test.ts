@@ -132,12 +132,14 @@ describe('exportReportsXlsx — статус смены', () => {
     expect(rows.some((row) => String(row[0]).startsWith('Организация'))).toBe(false);
   });
 
-  it('подписывает итоги периода, в который попали несданные смены', async () => {
+  it('отделяет несданные смены от итогов периода', async () => {
     findMany.mockResolvedValue([report('R-1', 'draft'), report('R-2', 'submitted')]);
 
     await exportReportsXlsx({ tenantId: 'tenant-a' });
 
-    expect(sheet('Итоги').rows).toContainEqual(['Включены несданные смены: 1']);
+    expect(sheet('Итоги').rows.map(row => row[0])).toEqual(['ID отчёта', 'R-2']);
+    expect(sheet('Черновики').rows.map(row => row[0])).toEqual(['ID отчёта', 'R-1']);
+    expect(sheet('Черновики').rows[1]).toContain('черновик (смена не сдана)');
   });
 
   it('без черновиков подписи нет', async () => {

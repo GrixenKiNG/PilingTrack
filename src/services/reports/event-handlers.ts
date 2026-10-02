@@ -1,3 +1,4 @@
+import { SUBMITTED_REPORT_STATUS } from '@/lib/report-status';
 /**
  * Event Handlers — Concrete handlers for domain events
  *
@@ -173,7 +174,7 @@ export async function recomputeSiteDailySummary(siteId: string, date: string) {
   // Только сданные: черновик идущей смены попадал в итог дня лишь тогда, когда
   // кто-то другой сдавал отчёт по тому же объекту, — и цифры дня плавали.
   const reports = await db.report.findMany({
-    where: { siteId, date, status: 'submitted' },
+    where: { siteId, date, status: SUBMITTED_REPORT_STATUS },
     select: {
       piles: { select: { count: true } },
       drillings: { select: { meters: true } },

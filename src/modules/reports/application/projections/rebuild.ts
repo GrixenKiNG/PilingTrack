@@ -1,3 +1,4 @@
+import { SUBMITTED_REPORT_STATUS } from '@/lib/report-status';
 /**
  * Projection backfill — recompute denormalized read tables from source of truth.
  *
@@ -42,7 +43,7 @@ async function rebuildSiteDailySummaryForTenant(tenantId: string): Promise<numbe
   // (recomputeSiteDailySummary): иначе полная перестройка давала бы другие
   // цифры, чем пересчёт по событиям.
   const reports = await db.report.findMany({
-    where: { tenantId, status: 'submitted' },
+    where: { tenantId, status: SUBMITTED_REPORT_STATUS },
     select: {
       siteId: true, date: true,
       piles: { select: { count: true } },

@@ -600,3 +600,15 @@ describe('аудит автосдачи отчёта планировщиком 
     }));
   });
 });
+
+it('I05: daily projection is unchanged by draft work and changes after submission', async () => {
+  const report = { status: 'draft', piles: [{ count: 2 }], drillings: [{ meters: 18 }], downtimes: [{ duration: 1.5 }] };
+  findManyMock.mockReset().mockImplementation(async ({ where }) => report.status === where.status ? [report] : []);
+  upsertMock.mockReset(); deleteManyMock.mockReset();
+  await recomputeSiteDailySummary('site_A', '2026-10-02');
+  expect(upsertMock).not.toHaveBeenCalled();
+  expect(deleteManyMock).toHaveBeenCalledTimes(1);
+  report.status = 'submitted';
+  await recomputeSiteDailySummary('site_A', '2026-10-02');
+  expect(upsertMock.mock.calls[0][0].create).toMatchObject({ reportCount: 1, totalPiles: 2, totalDrilling: 18, totalDowntime: 1.5 });
+});

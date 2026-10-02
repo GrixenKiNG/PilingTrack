@@ -1,3 +1,4 @@
+import { SUBMITTED_REPORT_STATUS } from '@/lib/report-status';
 /**
  * Fleet monitoring — single read-only snapshot of the equipment park.
  *
@@ -195,6 +196,7 @@ export async function getFleetSnapshot(opts: FleetSnapshotOptions): Promise<Flee
     where: {
       equipmentId: { in: equipmentIds },
       date: { gte: recentCutoff },
+      status: SUBMITTED_REPORT_STATUS,
       tenantId: opts.tenantId,
     },
     orderBy: { date: 'desc' },

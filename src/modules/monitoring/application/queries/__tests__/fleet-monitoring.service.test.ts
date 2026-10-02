@@ -270,3 +270,19 @@ describe('getFleetSnapshot — inventory fields and operators on shift', () => {
     expect(eq2?.photoUrl).toBe('/api/media/media-3/download?thumb=1');
   });
 });
+
+it('I05: fleet KPI counts a draft only after submission', async () => {
+  equipmentFindMany.mockReset().mockResolvedValue([{ id: 'eq-1', name: 'Rig', crews: [] }]);
+  mediaFindMany.mockReset().mockResolvedValue([]);
+  analyticsFindMany.mockReset().mockResolvedValue([]);
+  shiftFindMany.mockReset().mockResolvedValue([]); maintenanceFindMany.mockReset().mockResolvedValue([]);
+  const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Moscow' });
+  const report = { status: 'draft', reportId: 'r1', equipmentId: 'eq-1', userId: 'u1', date: today, shiftType: 'DAY', updatedAt: new Date(),
+    piles: [{ count: 2, pileGrade: { lengthMm: 6000 } }], drillings: [{ count: 3, meters: 18 }], downtimes: [{ duration: 1.5 }], user: { name: 'Operator' }, site: { name: 'Site' } };
+  reportFindMany.mockReset().mockImplementation(async ({ where }) => report.status === where.status ? [report] : []);
+  const draft = await getFleetSnapshot({ tenantId: 'orion' });
+  expect(draft.totals).toMatchObject({ pilesToday: 0, pileMetersToday: 0, drillingToday: 0, downtimeHoursToday: 0 });
+  report.status = 'submitted';
+  const submitted = await getFleetSnapshot({ tenantId: 'orion' });
+  expect(submitted.totals).toMatchObject({ pilesToday: 2, pileMetersToday: 12, drillingToday: 18, downtimeHoursToday: 1.5 });
+});

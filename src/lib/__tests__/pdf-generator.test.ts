@@ -387,3 +387,22 @@ describe('pdf-generator — числа ru-RU', () => {
     expect(safeText('')).toBe('—');
   }, 30_000);
 });
+
+it('I05: period PDF excludes drafts from headline totals and labels their separate section', async () => {
+  const { generatePeriodPdf } = await import('@/lib/pdf-generator');
+  const report = { ...singleReportWithPiles([{ pileGrade: { name: 'Grade', lengthMm: 6000 }, count: 2 }]), status: 'draft' };
+  const render = () => capturePdfText(async () => {
+    await generatePeriodPdf({ dateFrom: '2026-10-01', dateTo: '2026-10-02', siteId: '', reports: [report], totalPiles: 2, totalDrilling: 0, totalDowntime: 0 });
+  });
+  const draft = await render();
+  expect(draft).toContain('Черновики — не входят в итоги');
+  const headline = draft.slice(0, draft.indexOf('Черновики — не входят в итоги'));
+  expect(headline).toContain('0');
+  expect(headline).toContain('0 шт. / 0 м.п.');
+  expect(draft.some(text => text.includes('Черновик'))).toBe(true);
+  report.status = 'submitted';
+  const sent = await render();
+  expect(sent).not.toContain('Черновики — не входят в итоги');
+  expect(sent).toContain('Отправленные отчёты');
+  expect(sent).toContain('2 шт. / 12 м.п.');
+});

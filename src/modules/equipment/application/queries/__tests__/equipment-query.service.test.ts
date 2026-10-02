@@ -148,7 +148,7 @@ describe('getMaintenanceById', () => {
 
 function detailReport(index: number, date = '2026-10-01') {
   return {
-    id: 'cuid-' + index, reportId: 'uuid-' + index, date, shiftType: 'DAY', status: 'draft',
+    id: 'cuid-' + index, reportId: 'uuid-' + index, date, shiftType: 'DAY', status: 'submitted',
     site: { id: 'site-1', name: 'Site' }, user: { id: 'operator-1', name: 'Operator' },
     piles: [{ count: 2, pileGrade: { name: 'Grade', lengthMm: 12_000 } }],
     drillings: [{ count: 3, meters: 18 }], downtimes: [{ duration: 1.5 }],
@@ -166,9 +166,9 @@ describe('getEquipmentDetails — complete 30-day stats with existing history ca
     inspectionFirstMock.mockReset().mockResolvedValue(null);
     analyticsFindManyMock.mockReset().mockResolvedValue([]);
     reportFindManyMock.mockReset().mockImplementation(async ({ where, take }: {
-      where: { equipmentId: string; date?: { gte: string } }; take?: number;
+      where: { equipmentId: string; date?: { gte: string }; status?: string }; take?: number;
     }) => {
-      const matching = reports.filter(report => !where.date || report.date >= where.date.gte)
+      const matching = reports.filter(report => (!where.date || report.date >= where.date.gte) && (!where.status || report.status === where.status))
         .sort((a, b) => b.date.localeCompare(a.date));
       return take === undefined ? matching : matching.slice(0, take);
     });
@@ -185,7 +185,7 @@ describe('getEquipmentDetails — complete 30-day stats with existing history ca
     expect(details.stats30d).toEqual({ reportCount: 1001, piles: 2002, pileMeters: 24024, drillingCount: 3003, drillingMeters: 18018, downtimeHours: 1501.5 });
     expect(details.timeline).toHaveLength(1000);
     expect(reportFindManyMock).toHaveBeenCalledWith(expect.objectContaining({
-      where: { equipmentId: 'equipment-1', date: { gte: '2026-09-02' } },
+      where: { equipmentId: 'equipment-1', date: { gte: '2026-09-02' }, status: 'submitted' },
     }));
     const statsQuery = reportFindManyMock.mock.calls.find(([arg]) => arg.where.date);
     expect(statsQuery?.[0]).not.toHaveProperty('take');
@@ -214,14 +214,28 @@ describe('getEquipmentDetails — complete 30-day stats with existing history ca
     expect(analyticsFindManyMock.mock.calls[0][0].where.reportId.in).toEqual(['uuid-7']);
   });
 
-  it('keeps the inclusive UTC cutoff, future reports and current draft inclusion', async () => {
+  it('keeps the inclusive UTC cutoff, future submitted reports', async () => {
     reports = [detailReport(1, '2026-09-01'), detailReport(2, '2026-09-02'), detailReport(3, '2026-10-03')];
     const { getEquipmentDetails } = await import('../equipment-query.service');
     const details = await getEquipmentDetails('equipment-1', 'orion');
     expect(details.stats30d.reportCount).toBe(2);
     expect(details.stats30d.piles).toBe(4);
     expect(details.timeline).toHaveLength(3);
-    expect(details.timeline.every(report => report.status === 'draft')).toBe(true);
+    expect(details.timeline.every(report => report.status === 'submitted')).toBe(true);
+  });
+
+  it('I05: retains labelled drafts in history but counts them only after submission', async () => {
+    const report = detailReport(1);
+    report.status = 'draft';
+    reports = [report];
+    const { getEquipmentDetails } = await import('../equipment-query.service');
+    const draft = await getEquipmentDetails('equipment-1', 'orion');
+    expect(draft.stats30d).toEqual({ reportCount: 0, piles: 0, pileMeters: 0, drillingCount: 0, drillingMeters: 0, downtimeHours: 0 });
+    expect(draft.timeline).toHaveLength(1);
+    expect(draft.timeline[0]).toMatchObject({ status: 'draft', piles: 2 });
+    report.status = 'submitted';
+    const submitted = await getEquipmentDetails('equipment-1', 'orion');
+    expect(submitted.stats30d).toEqual({ reportCount: 1, piles: 2, pileMeters: 24, drillingCount: 3, drillingMeters: 18, downtimeHours: 1.5 });
   });
 
   it('reports actual source zero instead of missing projection null for an empty report', async () => {
