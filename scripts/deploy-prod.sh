@@ -43,14 +43,14 @@ dockerfile_of() {
   esac
 }
 
+for svc in "${SERVICES[@]}"; do dockerfile_of "$svc" >/dev/null; done
+
 # App starts embedded workers by default; an app-only deploy needs the barrier too.
 if [[ " ${SERVICES[*]} " == *" workers "* || " ${SERVICES[*]} " == *" app "* ]]; then
   [ "$REPLACE_GENERATION" = 1 ] || die 'для app/workers нужен --replace-worker-generation (остановка всего старого поколения)'
   if [[ " ${SERVICES[*]} " == *" migrate "* ]]; then SERVICES=(migrate app workers); else SERVICES=(app workers); fi
   [ "${WORKER_GENERATION_EXTERNAL_STOPPED:-0}" = 1 ] || die 'сначала остановите все внешние воркеры и подтвердите WORKER_GENERATION_EXTERNAL_STOPPED=1'
 fi
-
-for svc in "${SERVICES[@]}"; do dockerfile_of "$svc" >/dev/null; done
 
 # ── 1. Предпроверка ─────────────────────────────────────────
 step "Предпроверка"
