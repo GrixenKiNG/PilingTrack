@@ -191,3 +191,34 @@ describe('журнал забивки: сбой выгрузки .xlsx (F-R107-3
     );
   });
 });
+
+/**
+ * F-R107-4: перепутанный порядок дат («забита с 30.09 по 01.09») сервер
+ * превращал в выборку gte > lt — журнал пустел, а экран сообщал «записей нет»,
+ * как будто паспортов нет вовсе. Теперь: подсказка у полей и запрос не уходит.
+ */
+describe('журнал забивки: перепутанный порядок дат (F-R107-4)', () => {
+  beforeEach(() => {
+    mocks.authFetch.mockReset();
+  });
+
+  it('«с» позже «по» → подсказка у полей, запрос не отправляется, журнал не стирается', async () => {
+    const { container } = await renderJournal();
+
+    const pileRequests = () =>
+      mocks.authFetch.mock.calls.filter(([url]) => String(url).startsWith('/api/pile-passports?')).length;
+    const before = pileRequests();
+
+    const [dateFrom, dateTo] = container.querySelectorAll<HTMLInputElement>('input[type="date"]');
+    // Сначала ещё верный порядок (запрос уходит), затем «с» позже «по».
+    fireEvent.change(dateTo, { target: { value: '2026-09-01' } });
+    await waitFor(() => expect(pileRequests()).toBe(before + 1));
+
+    fireEvent.change(dateFrom, { target: { value: '2026-09-30' } });
+
+    expect(await screen.findByText('Дата начала позже даты окончания')).toBeInTheDocument();
+    expect(pileRequests()).toBe(before + 1);
+    expect(screen.getByText('С-130')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Выгрузить журнал/ })).toBeDisabled();
+  });
+});

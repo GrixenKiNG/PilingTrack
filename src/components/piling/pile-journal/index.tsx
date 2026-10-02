@@ -84,6 +84,12 @@ export function PileJournal() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
 
+  // Перепутанный порядок дат (с 30.09 по 01.09) сервер превращает в gte > lt —
+  // выборка пуста, и журнал говорит «записей нет», хотя паспорта есть. Ловим
+  // до запроса: показываем подсказку у полей и не беспокоим сервер.
+  const dateRangeInvalid =
+    filters.dateFrom !== '' && filters.dateTo !== '' && filters.dateFrom > filters.dateTo;
+
   // Объекты — только для фильтра. Их список не меняется по ходу разбора, и
   // перезапрашивать его вместе с журналом незачем.
   useEffect(() => {
@@ -113,6 +119,9 @@ export function PileJournal() {
   // Загрузка отменяется вместе с экраном: ответ, пришедший после ухода со
   // страницы, не должен писать в размонтированный список.
   useEffect(() => {
+    // Даты в перепутанном порядке — запрос не шлём: подсказка у полей уже
+    // объясняет, почему журнал не меняется.
+    if (dateRangeInvalid) return;
     let cancelled = false;
     void (async () => {
       try {
@@ -131,7 +140,7 @@ export function PileJournal() {
       }
     })();
     return () => { cancelled = true; };
-  }, [load]);
+  }, [load, dateRangeInvalid]);
 
   const reload = useCallback(async () => {
     try {
@@ -208,7 +217,7 @@ export function PileJournal() {
             Принимает сваю мастер, он же отправляет её на добивку.
           </p>
         </div>
-        <Button size="sm" variant="outline" className="h-11 text-xs sm:h-8" disabled={exporting}
+        <Button size="sm" variant="outline" className="h-11 text-xs sm:h-8" disabled={exporting || dateRangeInvalid}
           onClick={() => void exportJournal()}>
           {exporting ? 'Выгрузка…' : 'Выгрузить журнал (.xlsx)'}
         </Button>
@@ -261,6 +270,12 @@ export function PileJournal() {
             className="mt-0.5 block min-h-11 rounded-md border bg-card px-2 text-xs sm:min-h-8 sm:h-8"
           />
         </label>
+
+        {dateRangeInvalid ? (
+          <p className="text-2xs font-medium text-destructive-strong">
+            Дата начала позже даты окончания
+          </p>
+        ) : null}
 
         <label className="text-2xs text-muted-foreground">
           № сваи
