@@ -22,6 +22,11 @@ import { NextRequest } from 'next/server';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { SystemStatus } from '@/core/observability/health-tracker';
+import {
+  getAuditFeedbackFailureCount,
+  recordAuditFeedbackFailure,
+  resetAuditFeedbackMetrics,
+} from '@/core/observability/audit-feedback-metrics';
 
 const { requireAuthMock, assertCanMock, getCurrentStatusMock, exportLagMetricsMock } = vi.hoisted(() => ({
   requireAuthMock: vi.fn(),
@@ -127,6 +132,35 @@ describe('GET /api/metrics — scrape token auth', () => {
 });
 
 
+describe('GET /api/metrics — operational audit feedback counter', () => {
+  beforeEach(() => {
+    vi.stubEnv('METRICS_SCRAPE_TOKEN', TOKEN);
+    resetAuditFeedbackMetrics();
+    getCurrentStatusMock.mockReturnValue(null);
+  });
+  afterEach(() => {
+    resetAuditFeedbackMetrics();
+    vi.unstubAllEnvs();
+  });
+
+  it('exports the counter at zero before any failed write', async () => {
+    const text = await (await GET(req(TOKEN))).text();
+    expect(text).toContain('# TYPE audit_feedback_write_failures_total counter\n');
+    expect(text).toMatch(/^audit_feedback_write_failures_total 0$/m);
+  });
+
+  it('exports one unlabelled sample without resetting failures between scrapes', async () => {
+    recordAuditFeedbackFailure();
+    recordAuditFeedbackFailure();
+    for (let scrape = 0; scrape < 2; scrape += 1) {
+      const text = await (await GET(req(TOKEN))).text();
+      expect(text.match(/^audit_feedback_write_failures_total 2$/gm)).toHaveLength(1);
+      expect(text).not.toContain('audit_feedback_write_failures_total{');
+    }
+    expect(getAuditFeedbackFailureCount()).toBe(2);
+  });
+});
+
 function healthStatus(
   backup: SystemStatus['components']['backup'] = { status: 'up', source: 'disabled' },
   status: SystemStatus['status'] = 'healthy',
@@ -200,6 +234,12 @@ describe('Правила Prometheus — реальные источники и �
     expect(block, `Правило ${alert} должно существовать`).toBeDefined();
     return block?.split('- alert:')[0].match(/^\s*expr: (.+)$/m)?.[1].trim() ?? '';
   }
+
+  it('alerts on recent feedback write failures from both application processes', () => {
+    expect(expression('AuditFeedbackWriteFailures')).toBe(
+      'increase(audit_feedback_write_failures_total{job=~"pilingtrack-app|pilingtrack-workers"}[5m]) > 0',
+    );
+  });
 
   it('не считает отключённый worker отказавшим и сопоставляет его имя', () => {
     expect(expression('WorkerNotRunning')).toContain('worker_status{job="pilingtrack-workers"} == 0');

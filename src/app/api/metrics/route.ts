@@ -16,6 +16,7 @@ import { exportPrometheusMetrics, getLagMetrics } from '@/core/observability/lag
 import { getCurrentStatus } from '@/core/observability/health-tracker';
 import { getEventLoopLagSeconds, resetEventLoopLag } from '@/core/observability/event-loop-lag';
 import { exportHttpMetricsPrometheus } from '@/core/observability/http-metrics';
+import { exportAuditFeedbackMetricsPrometheus } from '@/core/observability/audit-feedback-metrics';
 import { withApi } from '@/core/api-wrapper';
 import { logger } from '@/lib/logger';
 
@@ -145,6 +146,8 @@ export const GET = withApi(
     } catch (err) {
       logger.error('metrics: http metrics failed', err);
     }
+
+    output += exportAuditFeedbackMetricsPrometheus();
 
     return new NextResponse(output, {
       headers: {

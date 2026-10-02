@@ -232,6 +232,16 @@ groups:
           summary: "Метрики outbox и проекции не обновляются"
           description: "Нет свежего успешного lag-снимка на {{ $labels.instance }} — старые нули не подтверждают здоровую очередь"
 
+      - alert: AuditFeedbackWriteFailures
+        # App и workers имеют независимые процессные счётчики; scrape их не сбрасывает.
+        expr: increase(audit_feedback_write_failures_total{job=~"pilingtrack-app|pilingtrack-workers"}[5m]) > 0
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Не сохраняются события операционной ленты"
+          description: "{{ $labels.job }} на {{ $labels.instance }} теряет события feedback — проверить audit.feedback_write_failed; счётчик не доказывает целостность hash chain"
+
       - alert: DeadLetterQueueNotEmpty
         expr: dlq_pending_count > 0
         for: 5m
