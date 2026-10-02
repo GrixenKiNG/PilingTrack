@@ -1,5 +1,6 @@
 import http from 'http';
 import { logger } from '@/lib/logger';
+import { exportAuditFeedbackMetricsPrometheus } from '@/core/observability/audit-feedback-metrics';
 import { ENABLED_WORKERS, HEALTH_PORT } from './config';
 import { workerStates } from './state';
 
@@ -50,7 +51,7 @@ export function startHealthServer(): http.Server {
         }`,
       ]);
 
-      res.end(lines.join('\n') + '\n');
+      res.end(lines.join('\n') + '\n' + exportAuditFeedbackMetricsPrometheus());
       return;
     }
 

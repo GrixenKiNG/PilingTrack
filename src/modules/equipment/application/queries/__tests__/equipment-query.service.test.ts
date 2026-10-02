@@ -5,17 +5,24 @@
  * are crew-assigned to (via an active crew). Without operatorUserId, all
  * equipment is returned (admin/dispatcher view).
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-const { findManyMock, findManyRecMock, findUniqueRecMock } = vi.hoisted(() => ({
+const { findManyMock, findManyRecMock, findUniqueRecMock, equipmentUniqueMock, reportFindManyMock, analyticsFindManyMock, inspectionFirstMock } = vi.hoisted(() => ({
   findManyMock: vi.fn(),
   findManyRecMock: vi.fn(),
   findUniqueRecMock: vi.fn(),
+  equipmentUniqueMock: vi.fn(),
+  reportFindManyMock: vi.fn(),
+  analyticsFindManyMock: vi.fn(),
+  inspectionFirstMock: vi.fn(),
 }));
 
 vi.mock('@/lib/db', () => ({
   db: {
-    equipment: { findMany: findManyMock },
+    equipment: { findMany: findManyMock, findUnique: equipmentUniqueMock },
+    report: { findMany: reportFindManyMock },
+    reportAnalytics: { findMany: analyticsFindManyMock },
+    inspection: { findFirst: inspectionFirstMock },
     maintenanceRecord: { findMany: findManyRecMock, findUnique: findUniqueRecMock },
   },
 }));
@@ -136,5 +143,96 @@ describe('getMaintenanceById', () => {
     findUniqueRecMock.mockResolvedValue(null);
     const { getMaintenanceById } = await import('../equipment-query.service');
     await expect(getMaintenanceById('missing', 'orion')).rejects.toThrow('Запись ТО не найдена');
+  });
+});
+
+function detailReport(index: number, date = '2026-10-01') {
+  return {
+    id: 'cuid-' + index, reportId: 'uuid-' + index, date, shiftType: 'DAY', status: 'draft',
+    site: { id: 'site-1', name: 'Site' }, user: { id: 'operator-1', name: 'Operator' },
+    piles: [{ count: 2, pileGrade: { name: 'Grade', lengthMm: 12_000 } }],
+    drillings: [{ count: 3, meters: 18 }], downtimes: [{ duration: 1.5 }],
+    updatedAt: new Date('2026-10-01T10:00:00Z'),
+  };
+}
+
+describe('getEquipmentDetails — complete 30-day stats with existing history cap', () => {
+  let reports: ReturnType<typeof detailReport>[];
+
+  beforeEach(() => {
+    vi.spyOn(Date, 'now').mockReturnValue(new Date('2026-10-02T10:00:00Z').getTime());
+    reports = [];
+    equipmentUniqueMock.mockReset().mockResolvedValue({ id: 'equipment-1', crews: [], telematicsDevices: [], documents: [] });
+    inspectionFirstMock.mockReset().mockResolvedValue(null);
+    analyticsFindManyMock.mockReset().mockResolvedValue([]);
+    reportFindManyMock.mockReset().mockImplementation(async ({ where, take }: {
+      where: { equipmentId: string; date?: { gte: string } }; take?: number;
+    }) => {
+      const matching = reports.filter(report => !where.date || report.date >= where.date.gte)
+        .sort((a, b) => b.date.localeCompare(a.date));
+      return take === undefined ? matching : matching.slice(0, take);
+    });
+  });
+  afterEach(() => vi.restoreAllMocks());
+
+  it('counts more than 1000 recent reports while preserving latest-1000 history', async () => {
+    reports = Array.from({ length: 1001 }, (_, index) => detailReport(index));
+    analyticsFindManyMock.mockResolvedValue(reports.map(report => ({
+      reportId: report.reportId, totalPiles: 2, totalDrilling: 18, totalDowntime: 1.5,
+    })));
+    const { getEquipmentDetails } = await import('../equipment-query.service');
+    const details = await getEquipmentDetails('equipment-1', 'orion');
+    expect(details.stats30d).toEqual({ reportCount: 1001, piles: 2002, pileMeters: 24024, drillingCount: 3003, drillingMeters: 18018, downtimeHours: 1501.5 });
+    expect(details.timeline).toHaveLength(1000);
+    expect(reportFindManyMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: { equipmentId: 'equipment-1', date: { gte: '2026-09-02' } },
+    }));
+    const statsQuery = reportFindManyMock.mock.calls.find(([arg]) => arg.where.date);
+    expect(statsQuery?.[0]).not.toHaveProperty('take');
+    expect(analyticsFindManyMock.mock.calls[0][0].where.reportId.in).toContain('uuid-1000');
+  });
+
+  it('uses source totals only when projection is missing, including units and signed corrections', async () => {
+    const report = detailReport(1);
+    report.piles.push({ count: -1, pileGrade: { name: 'Grade', lengthMm: 12_000 } });
+    report.drillings.push({ count: -1, meters: -4 });
+    report.downtimes.push({ duration: -0.5 });
+    reports = [report];
+    const { getEquipmentDetails } = await import('../equipment-query.service');
+    const details = await getEquipmentDetails('equipment-1', 'orion');
+    expect(details.stats30d).toEqual({ reportCount: 1, piles: 1, pileMeters: 12, drillingCount: 2, drillingMeters: 14, downtimeHours: 1 });
+    expect(details.timeline[0]).toMatchObject({ piles: 1, drillingMeters: 14, downtimeHours: 1 });
+  });
+
+  it('preserves an existing projection even if its totals differ from current source', async () => {
+    reports = [detailReport(7)];
+    analyticsFindManyMock.mockResolvedValue([{ reportId: 'uuid-7', totalPiles: 0, totalDrilling: 0, totalDowntime: 0 }]);
+    const { getEquipmentDetails } = await import('../equipment-query.service');
+    const details = await getEquipmentDetails('equipment-1', 'orion');
+    expect(details.stats30d).toEqual({ reportCount: 1, piles: 0, pileMeters: 24, drillingCount: 3, drillingMeters: 0, downtimeHours: 0 });
+    expect(details.timeline[0]).toMatchObject({ piles: 0, drillingMeters: 0, downtimeHours: 0 });
+    expect(analyticsFindManyMock.mock.calls[0][0].where.reportId.in).toEqual(['uuid-7']);
+  });
+
+  it('keeps the inclusive UTC cutoff, future reports and current draft inclusion', async () => {
+    reports = [detailReport(1, '2026-09-01'), detailReport(2, '2026-09-02'), detailReport(3, '2026-10-03')];
+    const { getEquipmentDetails } = await import('../equipment-query.service');
+    const details = await getEquipmentDetails('equipment-1', 'orion');
+    expect(details.stats30d.reportCount).toBe(2);
+    expect(details.stats30d.piles).toBe(4);
+    expect(details.timeline).toHaveLength(3);
+    expect(details.timeline.every(report => report.status === 'draft')).toBe(true);
+  });
+
+  it('reports actual source zero instead of missing projection null for an empty report', async () => {
+    const report = detailReport(1);
+    report.piles = [];
+    report.drillings = [];
+    report.downtimes = [];
+    reports = [report];
+    const { getEquipmentDetails } = await import('../equipment-query.service');
+    const details = await getEquipmentDetails('equipment-1', 'orion');
+    expect(details.stats30d).toEqual({ reportCount: 1, piles: 0, pileMeters: 0, drillingCount: 0, drillingMeters: 0, downtimeHours: 0 });
+    expect(details.timeline[0]).toMatchObject({ piles: 0, drillingMeters: 0, downtimeHours: 0 });
   });
 });

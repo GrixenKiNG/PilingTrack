@@ -1,178 +1,227 @@
-# CODEX — отчёт потока 2, 02.10.2026
+# CODEX — поток 1, 02.10.2026
 
-Рабочая папка: `D:\PillingR\wt-codex2`, ветка `codex/integration-1002`.
-Исходный HEAD: `13a4e4a1c226fff990825596cb86a3935b511546`; дерево было чистым.
-Задачи выполнены по порядку: стенд → настоящие интеграции → restore drill → CI.
-Поток 1 и его `.github/workflows/ci.yml` не менялись.
+Папка D:\PillingR\wt-codex, ветка codex/night-1001, исходный HEAD 0ea0c6be.
+Отчёт первого запуска полностью заменён. Порядок N1 → N2 → N3 → N8 → N5 соблюдён.
+Этап 2 выполняется S1 → S2 → S3+; статус и итоговые проверки дополняются ниже.
 
-## 1. Сделано и коммиты
+## Коммиты и результат N-задач
 
 | Задача | Коммит | Результат |
 |---|---|---|
-| Стенд | `2f3ef53b` `(CODEX-T2-1)` | Postgres 16, новый случайный `codex-pg-*`, loopback/случайный порт; 107 миграций реально применены через `prisma migrate deploy`; owner `piling`, штатные `pilingtrack_app`/`pilingtrack_identity`, генерируемые пароли; отдельный Prisma/Vitest config без `.env`; down проверяет имя и метку |
-| RLS и pipeline | `6c84ff00` `(CODEX-T2-2)` | 21 настоящий RLS сценарий на шести таблицах; пять настоящих сценариев команд осмотра и projection вместо отключённого Proxy-harness; запросы/записи выполняются PostgreSQL/Prisma под app-ролью |
-| Восстановление | `a82f6b26` `(CODEX-T2-3)` | custom dump через gzip; один exported read-only snapshot для дампа и манифеста; восстановление в новый контейнер; counts всех таблиц, миграции, RLS, роли и fail-closed; отрицательная сверка неправильного манифеста; runbook 015 |
-| CI | `96a904c5` `(CODEX-T2-4)` | Отдельный `.github/workflows/integration.yml`, service Postgres 16, все миграции/роли/генерация без `.env`, реальные тесты и JSON gate против пропусков/исчезновения наборов; исправлена наблюдавшаяся startup race — readiness по TCP, а не временному Unix socket |
+| N1 | 8eee7031 | Smoke workers: startup+Arming, fatal imports/syntax/reference/early exit →1, deadline60с, last40logs при отказе, trap cleanup. Deploy build+smoke до первого SSH; SKIP_WORKERS_SMOKE=1 с предупреждением. Runbook008 и тест |
+| N2 | 265a9c79 | AST-сторож защиты каждого экспортируемого метода: function/const/aliases/local callbacks/import aliases. 7 проверяемых mutation исключений и7публичных GET; новых дыр в текущем наборе не найдено |
+| N3 | fdc0c678 | Guard читает реальный keyPrefix,3client.get checker,SET всех scripts/*.sh. Исправлены5непрефиксованных записей backup.sh; stdin backup-postgres и исторические команды проверяются отдельно |
+| N8 | 7307f269 | Worker enabled/status,health status/freshness,backup enabled/available/stale/missing; Redis maxmemory0 исключён из ratio; диск root label /; Postgres sum всех labels,160/190 от max200, configurable DB name; offsite join job/instance |
+| N5 | 29417525,eada5e1f | CI runner build/load/smoke с Docker GHA cache,отдельный no-next после Prisma generate; npm cache и падающие gates сохранены. Manual deploy smoke до compose up. CLI-проверка выявила dependency images: выбирается штатная build-label workers, отсутствие образа →1 |
 
-Отчёт — отдельный коммит `(CODEX-T2-REPORT)`; его hash доступен в `git log -1`.
+## Проверки перед каждым коммитом
 
-## 2. Изменённые файлы
+Команды проверок выполнялись отдельно, реальные exit-коды сохранены. Для Next build/test конфигурация не подменялась; N1 startup smoke намеренно использует указанные в скрипте фиктивные адреса/ключ в контейнере без сети.
 
-Numstat относительно исходного `13a4e4a1`, до добавления этого отчёта:
+| Задача | RED | GREEN и дополнительно |
+|---|---|---|
+| N1 | shell guard8failed,exit1 | smoke+no-next16passed/0skipped0;tsc0;bash-n двух скриптов0; Docker runner build0,реальный smoke0 |
+| N2 | ограниченный parser11passed/3failed1 | 14passed/0skipped0;tsc0;ESLint файла0/0warnings |
+| N3 | прежний backup.sh5passed/1failed1 | guard+healthtracker26passed/0skipped0;tsc0;bash-n backup.sh0;fixture старых stdin SET отвергнут |
+| N8 | основной16failed/16passed1;PG1failed/22passed1 | 67passed/0skipped0 в4файлах;tsc0;ESLint4файлов0/0warnings;YAML js-yaml0,27active rules;ручная PromQL сверка |
+| N5 | CI/deploy8passed/2failed1;Compose selector10passed/2failed1 | smoke+no-next18/0,после selector20/0,exit0;tsc0;YAML2workflows0;bash-n remote block0;local runner build0/smoke0 |
 
-| Путь | Добавлено | Удалено |
-|---|---:|---:|
-| `.github/workflows/integration.yml` | 77 | 0 |
-| `docs/runbooks/015-disposable-integration-restore.md` | 83 | 0 |
-| `prisma.integration.config.ts` | 8 | 0 |
-| `scripts/check-integration-results.cjs` | 21 | 0 |
-| `scripts/db-drill-manifest.cjs` | 16 | 0 |
-| `scripts/restore-drill-verify.cjs` | 41 | 0 |
-| `scripts/restore-drill.sh` | 40 | 0 |
-| `scripts/test-db-down.sh` | 13 | 0 |
-| `scripts/test-db-dump.cjs` | 31 | 0 |
-| `scripts/test-db-up.sh` | 41 | 0 |
-| `tests/integration/disposable-ci.spec.ts` | 39 | 0 |
-| `tests/integration/disposable-restore.spec.ts` | 68 | 0 |
-| `tests/integration/disposable-rls.spec.ts` | 55 | 0 |
-| `tests/integration/disposable-scripts.spec.ts` | 11 | 0 |
-| `tests/integration/helpers/disposable-db.ts` | 81 | 0 |
-| `tests/integration/tech-readiness-write-pipeline.spec.ts` | 97 | 184 |
-| `vitest.integration.config.ts` | 14 | 0 |
+N5 GitHub Actions не запускался: push запрещён. Оценка дополнительного job4–10мин холодного
+кеша/1–3мин тёплого — оценка, не измерение GitHub runner. Job параллелен unit, поэтому
+критический путь CI может не вырасти. Локальная повторная сборка использовала кеш
+dependency layers и Prisma generate внутри образа; production не затрагивался.
 
-Удалённых путей нет. Удалены только локальный неэкспортируемый
-`IntegrationHarness`, Proxy, безусловный `describe.skip` и шесть предположительных
-тестов старого pipeline-файла; заменены пятью проверками текущих реальных команд.
-`rg` по `src/ tests/ e2e/ scripts/` показал использование `IntegrationHarness`
-только в этом отключённом файле. Runtime-функции/экспорты приложения не удалялись.
+## Scope и строки N-задач
 
-## 3. Доказательства интеграций
+Суммарно от исходного HEAD, до документов этапа2:14файлов,+910/-25.
+Удалённых путей, функций/экспортов приложения нет. Строки ниже — по логическим коммитам.
 
-Свой стенд: `codex-pg-9ccaea480607`, Postgres 16.
-Migrate deploy: **107/107**, exit 0; app гранты на **83/84** таблицы
-(`_prisma_migrations` исключён намеренно). App — не superuser, без BYPASSRLS;
-identity — не superuser, BYPASSRLS, NOLOGIN, штатное исключение опознания.
+- N1: scripts/smoke-workers-image.sh+46;deploy-prod.sh+13/-1;runbook008+5;workers-image-smoke.test.ts+75.
+- N2: route-guards.test.ts+323.
+- N3: backup-redis-keys.test.ts+88;scripts/backup.sh+5/-5.
+- N8: alerts.yml+81/-13;metrics route test+122/-2;metrics route+20/-3;unified-worker test+27;health-server+2/-1.
+- N5: ci.yml+27;deploy.yml+8,затем+8/-1;workers-image-smoke test+36,затем+25.
 
-RLS: Report, Site, Equipment, Inspection, Shift, AuditLog. В каждой таблице
-по одной строке двух отдельных организаций. Собственная организация видит
-только свою строку; без организации/с пустым GUC — ноль; чужая запись — 42501.
-Две транзакции используют один и тот же `pg_backend_pid`; между ними все шесть
-таблиц закрыты. App не читает журнал миграций и не создаёт таблицы.
+N2 проверяет структурную достижимость вызовов и текущий inventory; статический AST
+не доказывает runtime доминирование auth во всех ветвях. Runtime RBAC/browser не проверялся.
+Явные mutation исключения: auth/login POST,orion/lead POST,alerts/webhook POST,
+telemetry/ingest POST/PATCH,telemetry POST,telemetry/batch POST. Их собственные
+auth/token/CSRF/лимиты проверяются по достижимым вызовам; blanket allowlist нет.
 
-Pipeline использует реальные `completeInspectionWithOutcome` и
-`projectReadinessEvent`. Подменены подключение DB и широкие фасады на реальные
-узкие функции; SQL не мокается. Отказ INSERT OutboxEvent откатывает COMPLETED;
-повтор завершения не создаёт второй event; чужой осмотр отклоняется; отказ INSERT
-CurrentReadiness откатывает snapshot и projected marker; успешная projection
-создаёт один immutable snapshot и текущий read model. Попытка UPDATE snapshot
-отклоняется триггером базы. Каждый тест имеет собственные фикстуры.
+Других app-backup SET писателей scripts/*.sh не найдено: backup-postgres пишет
+префиксованные stdin-команды,backup.sh теперь пишет те же3метки.
+scripts/Dockerfile.backup копирует backup.sh, поэтому он не удалялся как legacy.
+prod-audit-readonly читает Redis; stress-test JS пишет свои failover ключи;
+BullMQ управляет namespace и намеренно работает без ioredis keyPrefix. Эти места не менялись.
 
-Последний полный прогон: **35 passed / 0 failed / 0 skipped**, 5 файлов,
-35.54 s, exit 0. Фактический JSON: `output/codex-t2-integration.json` (ignored).
-CI gate на этом файле: **35 passed, zero skipped**, exit 0.
+## Общие проверки после N-задач (до дополнительных selector tests/S3)
 
-### RED → GREEN
-
-- До down-скрипта три защитных теста падали с 127; после — 3/3.
-- До fixture harness новый RLS-файл не собирался (missing module, exit 1).
-  Дополнительно проведена реальная mutation-проверка: временное отключение RLS
-  только на Site своего стенда дало **4 failed / 17 passed**; политика возвращена
-  в `finally`, затем 21/21. Слабый тест не смог бы поймать эту поломку.
-- До restore-скрипта два input guard теста падали; после — 2/2 плюс live drill.
-- Подменённый count Report в манифесте даёт `Restore mismatch in counts`, exit 1;
-  отрицательный сценарий проходит только при этом отказе и удалённом target.
-- До JSON gate три CI guard теста падали; после — 3/3.
-- На повторе действительно поймана startup race: **34 passed / 1 failed**,
-  `pg_restore: FATAL: the database system is shutting down`. Unix pg_isready
-  увидел временный init-сервер. После ожидания TCP — снова **35/35, skip 0**.
-
-## 4. Учение восстановления
-
-Синтетические данные своего стенда, **не production dump**.
-Формат совпадает с `backup-postgres.sh`: `pg_dump -F c | gzip`.
-Манифест и dump используют один exported repeatable-read snapshot; SHA-256
-привязывает манифест к сжатому файлу. Сверяются counts всех public таблиц,
-имена/checksum/applied_steps/finished/rolled_back миграций, ENABLE/FORCE RLS
-и определения политик. Роли выдаются штатными SQL-скриптами после `--no-acl`.
-
-Последний результат:
-
-- **84 таблицы**, все counts совпали.
-- **107 миграций**, состояния/checksums совпали.
-- **76 RLS-политик**, определения и flags совпали.
-- Report/Site/Equipment/Inspection/Shift/AuditLog: **source=2 / restored=2**;
-  app-роль без организации — **0** на каждой.
-- Успешное восстановление со сверкой — **13 секунд** на этой локальной машине.
-- Подменённый манифест вызывает отказ; оба созданных restore-target удаляются.
-
-Учение 27.09.2026 (runbook 010) остаётся отдельным историческим доказательством.
-Этот прогон не проверяет production/offsite download, media, секреты,
-восстановление VPS, запуск всех сервисов или реальный эксплуатационный RTO.
-Внешний дамп без доверенного манифеста исходного snapshot не принимается как
-доказанное равенство. Генератор synthetic dump ограничен 64 MiB до gzip.
-
-## 5. Общие проверки — реальные exit codes
-
-Команды выполнены отдельно, без tail/head, подставных env или production.
-Перед unit/сборкой адреса внешних БД удалены из окружения процесса; `.env`
-не читался. Проверена только возможность наличия загружаемых файлов, не содержимое.
-
-| Проверка | Exit | Результат |
+| Команда | Exit | Результат |
 |---|---:|---|
-| Очистка stale `.next/dev/types` | 0 | Путь проверен внутри worktree; каталог отсутствовал, удаления не было |
-| `npx --no-install tsc --noEmit` | 0 | В том числе перед каждым кодовым коммитом; последний после проверки stale types |
-| `npm run lint` | 0 | 0 errors / **7 исходных warnings**; два собственных warning устранены; text integrity passed |
-| `npm run test:unit` | **1** | **2644 passed / 7 failed / 81 skipped**; 301 passed / 1 failed / 9 skipped файлов, всего 311 |
-| `npx --no-install playwright test --list` | 0 | **99 тестов / 11 файлов**, количество не упало; браузеры не запускались |
-| `npm run build` | **1** | Остановлен `validate-env.ts`: нет `DATABASE_PROVIDER` и `SESSION_SECRET`; Next build/route types не подтверждены |
-| `npx --no-install vitest run --config vitest.integration.config.ts` (с переменными своего стенда) | 0 | **35/35, skipped 0**, включая настоящее восстановление |
-| `node scripts/check-integration-results.cjs output/codex-t2-integration.json` | 0 | Фактический JSON принят, 35 passed / 0 skips |
-| `bash -n` новых shell-скриптов | 0 | Синтаксис up/down/restore |
-| `node --check` manifest/dump/verify scripts | 0 | Синтаксис CJS |
-| YAML parse через установленный `js-yaml` | 0 | Отдельный integration job, Postgres 16, 10 шагов |
+| Проверка .next/dev/types | 0 | каталога нет, stale types не оставлены; удаление не требовалось |
+| npx tsc --noEmit | 0 | в том числе после selector followup |
+| npm run lint | 0 | 0errors,7исходных warnings;check-text-integrity passed |
+| npm run test:unit | 1 | 2683passed/7failed/60skipped;files301passed/1failed/8skipped,310total |
+| npx playwright test --list | 0 | исходный контроль99tests/11files;итоговый после S3 ниже |
+| npm run build | 1 | исходный validate-env: нет DATABASE_PROVIDER/SESSION_SECRET;итоговый после S3 ниже |
 
-Семь падений — `src/services/reports/__tests__/daily-summary.test.ts`, известные
-в исходном состоянии: моки не изолируют DB event-handler, он требует DATABASE_URL.
-Их не скрывал skip/исключением/подставной БД и не правил в потоке 2.
-81 skip в обычном unit-прогоне не считаются прошедшей интеграцией: реальные DB
-сценарии доказаны отдельным проектом с заданными переменными. В общем прогоне
-без стенда новые DB сценарии намеренно пропускаются.
+Семь failures — прежний src/services/reports/__tests__/daily-summary.test.ts:
+неизолированные обработчики обращаются к lazy Prisma без DATABASE_URL.
+Код приложения/окружение ради них не менялись; отдельная задача Hermes.
+Vitest core не загружает env автоматически, но существующий vitest.config.ts читает
+2DB URL из .env, если он есть. В worktree .env отсутствовал (metadata-only проверка),
+поэтому конфиг не прочитал его, DB-backed suites пропустились.60skipped не проверенные интеграции.
 
-GitNexus: shared runner недоступен из-за native `@ladybugdb/core` на Node 26,
-подтверждено потоком 1. Использован прямо разрешённый владельцем fallback:
-`rg` callers в `src/ tests/ e2e/ scripts/`, затем `git diff --cached --stat`.
-Пакеты GitNexus не устанавливались; результаты поиска записаны в commit bodies.
+## GitNexus и границы
 
-## 6. Что не менялось, ограничения и эксплуатация
+Разрешённый общий launcher один раз попытался analyze --index-only;impact тоже не заработал:
+bootstrap native @ladybugdb/core под Node26,spawnSync cmd.exe ENOENT,exit1.
+Project package.json/package-lock/node_modules не менялись. Глобальный pnpm tool bootstrap
+не ремонтировался. Применён разрешённый владельцем fallback rg по src/tests/e2e/scripts
+и git diff --stat до редактирования/коммита;caller summary есть в каждом commit body.
+Текстовый поиск подтверждает источники/callers, но не равноценен полному call graph.
 
-- Production, SSH, push, merge, schema/migrations, auth/security/tenancy runtime,
-  Dockerfile/compose, зависимости, экраны машиниста и ORION не менялись.
-- Дефектов RLS в проверенных шести таблицах не выявлено; `it.fails` не добавлен,
-  потому что маскировать нечего. Непроверенные таблицы/HTTP-права не объявляются
-  доказанными. Identity BYPASSRLS — штатное исключение, не находка.
-- Другие отключённые readiness наборы пока не переписаны; HTTP-аудит,
-  idempotency pipeline и запуск смены не входят в пять реализованных сценариев.
-  Старый Proxy обещал audit/idempotency внутри completion, но текущая команда
-  пишет source/outbox; эти старые предположения не выдаются за выполненный контракт.
-- PgBouncer имитирован двумя транзакциями на одном соединении; отдельный
-  PgBouncer daemon не запускался.
-- GitHub workflow не запускался: push запрещён. Доказаны локальный эквивалент
-  DB-прогона, YAML parse и JSON gate; Node 22/hosted runner проверит приёмка.
-- Стендовые пароли не сохранялись в репозитории. Случайный app пароль в CI
-  маскируется; owner service-only пароль зависит от run id/attempt и действует
-  только в одноразовой базе изолированного runner.
-- При исчезновении Docker daemon Docker Desktop запускался скрыто, а затем
-  возобновлён только собственный `codex-pg-9ccaea480607`. Это глобальный запуск
-  приложения Docker; явно ни start/stop/exec/inspect контейнеров владельца,
-  ни подключений к их БД не выполнялось. Их состояние не проверялось.
-- После задач source-контейнер удалён down-скриптом, exit 0. Повторный
-  `docker ps -a --filter label=pilingtrack.codex.test-db=1 --format '{{.Names}}'`
-  дал пустой результат, exit 0. Наших контейнеров/volume не осталось;
-  временные synthetic dumps/manifests удалены тестами.
+Пакеты не устанавливались в проект. Prod/SSH/SCP/push/merge не выполнялись, ветки не переключались.
+promtool отсутствует: YAML parse и ручная PromQL проверка не заменяют
+promtool check rules observability/prometheus/alerts.yml.
+Нет TLS metric/exporter: не добавлено правило на выдуманное имя.
+Production series/reload,доставка тревог,внешний app-guard и browser/role workflows не проверялись:
+это приёмка владельца и Claude.
 
-Субагенты: независимый read-only аудит backup/runbooks выполнил переиспользованный
-`strategy_audit` через родительский поток (новый spawn был недоступен по лимиту).
-Его анализ подтвердил custom-gzip формат, восстановление ролей и исторический
-drill; реализация и все заявленные проверки выполнены в этом worktree.
+Диск подтверждён [node-exporter source](https://github.com/prometheus/node_exporter/blob/master/collector/paths.go#L43-L51).
+PG labels — [postgres-exporter source](https://github.com/prometheus-community/postgres_exporter/blob/master/collector/pg_stat_activity.go#L31-L44).
+Compose label — [build source](https://github.com/docker/compose/blob/v2/pkg/compose/build.go#L284-L294).
+При image build npm сообщил4high vulnerabilities;reachability не исследовалась, зависимости не обновлялись.
 
-Перед отчётным коммитом после удаления БД: независимые CI/cleanup guards — 6 passed / 0 failed / 0 skipped, exit 0; повторный tsc — exit 0. Последний полный live-прогон до удаления стенда остаётся 35/35.
+## Поток 2
+
+codex/integration-1002 в D:\PillingR\wt-codex2 завершён независимо.
+Коммиты2f3ef53b,6c84ff00,a82f6b26,96a904c5;отчёт53d30263.
+35passed/0failed/0skipped на PostgreSQL16,107миграций;
+restore84таблицы/107миграций/76RLS,successful13с,данные только синтетического стенда.
+Свои контейнеры удалены. Это не production backup/offsite/media/liveRTO.
+Учение27.09 уже было документировано runbook010; автоматизация дополняет его.
+Подробные команды/scope/границы — CODEX-REPORT.md второго worktree.
+После остановки daemon тот поток один раз запустил Desktop hidden;
+явных start/stop/inspect/exec owner-container не было. Факт указан в его отчёте.
+
+## Что намеренно оставлено
+
+Auth/security/CSRF/rate-limiter/RLS/tenancy runtime,schema/migrations,compose/Dockerfiles,
+зависимости,operator варианты,ORION не изменены потоком1. Многоарендность,2Redis,PgBouncer,
+outbox/projections сохранены. Исходные lint warnings/daily-summary failures не маскировались.
+Проверки UI не подменяются API/unit/build.
+
+## Этап 2
+
+S1 — 30650eec: стратегия 2026Q4, 6 измерений, 10 рисков, 12 инициатив. Source-reference check: 33 существующих пути, 0 missing; tsc exit 0; четыре существующих guard-файла: 40 passed / 0 skipped, exit 0. Подсчёт Node: 1230 файлов TS/TSX без generated, 41 крупный, 32 production / 9 test. S2 — da6b7077: 15 документов H01–H15, каждый +41/-0, общий +615/-0; точные whitelist, критерии, тесты, зависимости и стоп-условия. tsc exit 0; guards первый 39 passed / 1 failed (smoke timeout 5000ms), повтор 40 passed / 0 skipped exit 0; таймауты/assertions не изменены. Codex инициативы дополняются после отдельных коммитов.
+
+### I01 — настоящая очередь проекций
+
+Коммит 1df899d5 (CODEX-S3-projection-lag), 5 файлов +219/-26.
+projected:false независимо от published и retry; один агрегат count+oldest.
+Ошибочный сбор отклоняется и сохраняет предыдущий snapshot, freshness timestamp не обновляется.
+Null/invalid snapshot экспортирует timestamp=0; добавлены три правила projection warn/high и stale sample.
+Новый lag-monitor.test.ts +136; прочие пути: lag-monitor +41/-21, alerts +31,
+metrics route +1/-3, его существующий тест +10/-2.
+RED: 23 passed / 10 failed, exit 1, после устранения test dynamic-import race
+локальной загрузкой одного DB-client на snapshot. GREEN: 67 passed / 0 skipped
+в четырёх файлах, exit 0; актуальный общий tsc exit 0; ESLint exit 0/0 warnings;
+YAML js-yaml exit 0 (30 rules); scoped diff-check exit 0.
+Callers fallback: tracker/aggregate/metrics route; consumer flags сверены с outbox-publisher.
+Schema/DB runtime не менялись. Promtool и real production series не проверены;
+стоимость нового агрегата на production dataset не измерялась. Владелец проверяет scrape/reload.
+
+### I02 — lease в Redis состояния
+
+Коммит d1f38b5a (CODEX-S3-worker-lease), 3 файла +356/-139.
+leader-election +129/-87, существующий тест +200/-52, runbook014 +27.
+Atomic owner-checked renew/release; single-flight/generation/stop-start barrier,
+снятие лидерства при Redis error/null, deadline и synchronous expiry check.
+RED: 10 failed / 2 passed, exit 1; TTL callback gap отдельно: 1 failed / 12 passed.
+GREEN root: 44 passed / 0 skipped в lease+health+workers, exit 0; tsc exit 0,
+ESLint exit 0/0 warnings, diff-check exit 0. В промежуточном combined прогоне
+43 passed / 1 failed был параллельный I04 RED, после wiring повтор прошёл.
+Fallback callers: standalone, unified и embedded outbox/projection; lag monitor.
+Risk пользователю сообщён до правок. Перед применением владелец останавливает
+ВСЕ старые standalone/unified/embedded workers; old-cache/new-state rolling mix опасен.
+Ключи/префикс/nodeId/TTL/renew interval сохранены. Нет DB fencing уже начатых операций;
+stop может ждать зависший Redis request, локальное лидерство снимается сразу.
+Docker daemon сейчас недоступен: настоящий Lua smoke и новый image build не выполнены.
+Независимое review потребовало monotonic deadline вместо Date.now; follow-up ниже.
+
+### I03 — неперекрывающиеся scheduler
+
+Коммит 1a2d340f (CODEX-S3-scheduler-overlap), 4 файла +118/-0:
+PM/readiness/projection-rebuild scheduler по +6, существующий sentry.test +100.
+Один активный проход на модуль/процесс; finally снимает guard после успеха,
+ошибки команды или heartbeat. Stop очищает timers, но не сбрасывает guard
+незавершённого прохода. Tenant loops, domain commands и интервалы сохранены.
+RED: 9 failed / 6 passed, exit 1 — пока первый pass/heartbeat заблокирован,
+startup+interval запускали команду четыре раза. GREEN: 37 passed / 0 skipped
+в sentry/heartbeat/unified/no-next, exit 0; tsc exit 0; scoped ESLint exit 0.
+Fallback: unified-worker вызывает три start-функции, существующий Sentry тест.
+Межпроцессная исключительность и отмена уже начатого прохода не реализуются.
+В прогоне видны Vite config и MaxListeners warnings; они не подавлялись.
+
+### I02 follow-up — монотонный срок lease
+
+Коммит 35b5ca49: performance.now вместо Date.now для локального TTL.
+При обратной коррекции wall-clock lease не продлевается. RED: 1 failed / 13 passed,
+exit 1; GREEN lease+health: 34 passed / 0 skipped, exit 0; tsc/ESLint/diff-check exit 0.
+Два файла +26/-5: source +5/-4, existing test +21/-1. Предел DB fencing сохраняется.
+
+### I04 — наблюдаемость операционной ленты
+
+Коммит 7cf94a71 (CODEX-S3-feedback-metrics), 8 файлов +155/-1:
+helper +24, audit-service +2, existing audit test +48, metrics route +3,
+его тест +40, worker health +2/-1, existing worker test +26, alerts +10.
+Один bounded counter без labels на процесс, общий globalThis объект для копий
+Next route bundles. App и worker exporters независимы; scrapes не сбрасывают его.
+Отказ FeedbackEvent увеличивает счётчик, бизнес-действие остаётся nonthrow;
+actor lookup failure при успешно записанном событии не увеличивает счётчик.
+RED audit 75 passed / 2 failed, exporter/rule 34 passed / 4 failed,
+module copies 77 passed / 1 failed. GREEN всех трёх файлов 116 passed / 0 skipped,
+exit 0; tsc/ESLint/js-yaml/diff-check exit 0. require(yaml) сначала exit 1
+(пакет отсутствует); использован уже имеющийся js-yaml, зависимости не ставились.
+Fallback callers recordAuditEvent и app/worker exporters; auth/security не менялись.
+После restart счётчик сбрасывается: это сигнал потерь ленты, не durable audit/hash-chain.
+Правило increase[5m] по pilingtrack-app|pilingtrack-workers: YAML/source проверены,
+PromQL runtime/production доставка не подтверждены.
+
+### I05 — полнота статистики техники, независимая часть
+
+Коммит 1537f517 (CODEX-S3-equipment-completeness), 2 файла +129/-20:
+query service +28/-17, его существующий тест +101/-3.
+Stats30d имеет полную отдельную выборку по прежнему inclusive UTC cutoff,
+history cap остаётся 1000. Missing projection получает child sums по формулам
+rebuild: piles.count, drilling.meters без умножения count, downtime.duration в часах.
+UUID Report.reportId используется для join, существующая projection, включая нули,
+остаётся authoritative как прежде. Timeline больше не показывает null только
+из-за отсутствия проекции; пустой исходный отчёт даёт настоящий ноль.
+RED 17 passed / 4 failed / 0 skipped, exit 1; GREEN 28 passed / 0 skipped в3файлах,
+exit 0; tsc/ESLint/diff-check exit 0. Fallback callers: facade→details API→equipment UI.
+Statuses (включая drafts), будущие даты и history contract не изменены.
+Stale существующие проекции намеренно сохранены; стоимость дополнительной
+30-дневной выборки на production не измерена. Бизнес-контракт draft/submitted,
+pagination/history completeness и допустимый lag ещё требуют владельца.
+I05 целиком не объявляется закрытой: выполнена независимая техническая часть.
+
+### I11 — инвентаризация PDF, первый шаг
+
+Коммит d6550123 (CODEX-S3-capacity-retention), 3 файла +245/-0:
+read-only CLI +57, capacity/retention документ +77, existing PDF test +111.
+CLI только metadata явно указанного абсолютного local root pdf-results;
+не следует root junction/entry symlinks, не обходит nested directories,
+не читает содержимое/env/S3/Redis и не удаляет данные. Counts/bytes/mtime/age bands,
+ignored entries и partial/errors различены; ошибка scan даёт exit1.
+RED minimal scanner 13 passed / 3 failed, exit 1; GREEN16passed/0skipped exit0;
+tsc/node--check/diff-check exit0. ESLint test exit0; .cjs ignored с1warning:
+это не проверка ESLint самого CLI. 17source refs подтверждены.
+Fallback storage/queue callers: deletePdfResult только definition/re-export;
+job TTL не означает file retention. Собственные fixtures удалены, owner data не сканировались.
+Документ содержит disk/RAM worksheet и три НЕПРИНЯТЫХ варианта retention.
+Owner inputs30ГБ/3.8ГБ и historical build peak5–6ГБ не выданы за новые измерения.
+Actual backend/common storage mount неизвестен; полный S3 inventory и media/off-site
+восстановление не подтверждены. Политика хранения/cleanup/load budget не реализованы:
+I11 целиком остаётся открытой, никаких удалений/prune/lifecycle не было.

@@ -1,6 +1,117 @@
 import { describe, expect, it, vi } from 'vitest';
+import { mkdtempSync, mkdirSync, writeFileSync, utimesSync, symlinkSync, renameSync, rmSync } from 'node:fs';
+import { isAbsolute, join, relative } from 'node:path';
 
 const execFile = vi.fn();
+
+describe('read-only PDF storage inventory CLI', () => {
+  async function fixture(run: (root: string, base: string) => Promise<void>) {
+    const base = mkdtempSync(join(process.cwd(), 'codex-pdf-inventory-'));
+    const root = join(base, 'pdf-results');
+    mkdirSync(root);
+    try {
+      await run(root, base);
+    } finally {
+      const withinWorkspace = relative(process.cwd(), base);
+      if (isAbsolute(withinWorkspace) || withinWorkspace.startsWith('..') || !withinWorkspace.startsWith('codex-pdf-inventory-')) {
+        throw new Error('Fixture cleanup outside the workspace is forbidden');
+      }
+      rmSync(base, { recursive: true, force: true });
+    }
+  }
+
+  async function inventory(args: string[], preload?: string) {
+    const { spawnSync } = await vi.importActual<typeof import('node:child_process')>('node:child_process');
+    const result = spawnSync(process.execPath, [
+      ...(preload ? ['--require', preload] : []),
+      join(process.cwd(), 'scripts/pdf-storage-inventory.cjs'), ...args,
+    ], { encoding: 'utf8' });
+    expect(result.error).toBeUndefined();
+    return { exit: result.status, text: result.stdout, summary: JSON.parse(result.stdout) };
+  }
+
+  it('counts only flat regular PDFs and does not disclose filenames or follow links', async () => {
+    await fixture(async (root, base) => {
+      writeFileSync(join(root, 'recent.pdf'), Buffer.alloc(3));
+      writeFileSync(join(root, 'older.PDF'), Buffer.alloc(5));
+      const older = new Date(Date.now() - 48 * 3_600_000);
+      utimesSync(join(root, 'older.PDF'), older, older);
+      writeFileSync(join(root, 'ignore.txt'), 'not a PDF');
+      const directory = join(root, 'nested.pdf');
+      mkdirSync(directory);
+      writeFileSync(join(directory, 'unscanned.pdf'), Buffer.alloc(100));
+      const outside = join(base, 'other');
+      mkdirSync(outside);
+      writeFileSync(join(outside, 'unscanned.pdf'), Buffer.alloc(100));
+      symlinkSync(outside, join(root, 'linked.pdf'), 'junction');
+
+      const result = await inventory(['--root', root]);
+      expect(result.exit).toBe(0);
+      expect(result.summary).toMatchObject({
+        status: 'complete', partial: false, files: 2, bytes: 8, errors: 0,
+        ignored: { directories: 1, symlinks: 1, nonPdf: 1, other: 0 },
+        byAge: { under1Hour: 1, from1To24Hours: 0, from1To7Days: 1, atLeast7Days: 0 },
+        ageIsDeletionEligibility: false,
+      });
+      expect(result.summary.oldestMtime).toBe(older.toISOString());
+      expect(result.summary.newestMtime).not.toBeNull();
+      for (const name of ['recent.pdf', 'older.PDF', 'unscanned.pdf', root]) expect(result.text).not.toContain(name);
+    });
+  });
+
+  it('rejects a symlink or junction root before scanning its target', async () => {
+    await fixture(async (root, base) => {
+      const actual = join(base, 'actual');
+      renameSync(root, actual);
+      writeFileSync(join(actual, 'retained.pdf'), Buffer.alloc(12));
+      symlinkSync(actual, root, 'junction');
+      for (const candidate of [root, root + '/']) {
+        const result = await inventory(['--root', candidate]);
+        expect(result.exit).not.toBe(0);
+        expect(result.summary).toMatchObject({ status: 'partial', partial: true, files: 0, errors: 1 });
+      }
+    });
+  });
+
+  it.each([
+    { args: [] }, { args: ['--root', 'pdf-results'] }, { args: ['--root', '\\\\server\\share\\pdf-results'] },
+  ])('requires an explicit absolute local root ($args)', async ({ args }) => {
+    const result = await inventory(args);
+    expect(result.exit).not.toBe(0);
+    expect(result.summary.partial).toBe(true);
+  });
+
+  it('rejects another basename and distinguishes a missing root from an empty directory', async () => {
+    await fixture(async (root, base) => {
+      const invalid = await inventory(['--root', base]);
+      expect(invalid.exit).not.toBe(0);
+      const missing = await inventory(['--root', join(base, 'missing', 'pdf-results')]);
+      expect(missing.exit).not.toBe(0);
+      expect(missing.summary).toMatchObject({ status: 'partial', partial: true, errors: 1 });
+      const empty = await inventory(['--root', root]);
+      expect(empty.exit).toBe(0);
+      expect(empty.summary).toMatchObject({ status: 'complete', partial: false, files: 0, bytes: 0 });
+    });
+  });
+
+  it('reports metadata failures as partial with a nonzero CLI exit', async () => {
+    await fixture(async (root, base) => {
+      writeFileSync(join(root, 'unreadable.pdf'), 'fixture');
+      const preload = join(base, 'metadata-failure.cjs');
+      writeFileSync(preload, [
+        "const fs = require('node:fs'); const path = require('node:path');",
+        "for (const method of ['statSync', 'lstatSync']) {",
+        " const original = fs[method]; fs[method] = function(target, ...args) {",
+        "  if (path.basename(String(target)) === 'unreadable.pdf') throw Object.assign(new Error('fixture failure'), { code: 'EACCES' });",
+        "  return original.call(this, target, ...args); }; }",
+      ].join('\n'));
+      const result = await inventory(['--root', root], preload);
+      expect(result.exit).not.toBe(0);
+      expect(result.summary).toMatchObject({ status: 'partial', partial: true, files: 0, errors: 1 });
+      expect(result.text).not.toContain('unreadable.pdf');
+    });
+  });
+});
 
 vi.mock('child_process', () => ({
   execFile,

@@ -238,6 +238,32 @@ describe('Unified Worker Service', { timeout: 30_000 }, () => {
   });
 
   describe('Метрики отдельных воркеров', () => {
+    it('exports the process-local audit feedback counter without resetting it on scrape', async () => {
+      const metrics = await import('@/core/observability/audit-feedback-metrics');
+      metrics.resetAuditFeedbackMetrics();
+      const { startHealthServer } = await import('@/workers/unified-worker/health-server');
+      startHealthServer();
+      const listener = vi.mocked(http.createServer).mock.calls.at(-1)?.[0] as unknown as RequestListener | undefined;
+      if (typeof listener !== 'function') throw new Error('Обработчик health-сервера не установлен');
+
+      const response = { writeHead: vi.fn(), end: vi.fn() };
+      listener({ url: '/metrics' } as IncomingMessage, response as unknown as ServerResponse);
+      expect(response.end.mock.calls[0][0]).toContain('# TYPE audit_feedback_write_failures_total counter\n');
+      expect(response.end.mock.calls[0][0]).toMatch(/^audit_feedback_write_failures_total 0$/m);
+
+      metrics.recordAuditFeedbackFailure();
+      metrics.recordAuditFeedbackFailure();
+      for (let scrape = 0; scrape < 2; scrape += 1) {
+        response.end.mockClear();
+        listener({ url: '/metrics' } as IncomingMessage, response as unknown as ServerResponse);
+        const text: string = response.end.mock.calls[0][0];
+        expect(text.match(/^audit_feedback_write_failures_total 2$/gm)).toHaveLength(1);
+        expect(text).not.toContain('audit_feedback_write_failures_total{');
+      }
+      expect(metrics.getAuditFeedbackFailureCount()).toBe(2);
+      metrics.resetAuditFeedbackMetrics();
+    });
+
     it('отличает включённый остановившийся worker от отключённого и standby', async () => {
       process.env.ENABLED_WORKERS = 'outbox,projection';
       const { workerStates } = await import('@/workers/unified-worker/state');
