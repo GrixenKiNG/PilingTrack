@@ -136,3 +136,28 @@ S3 начинает I01 лишь после S1/S2. Перед каждым из�
 6. Приёмка/перенос результатов потока2 и отдельные разрешения на frozen/auth работы, если I12 выявит подтверждённый дефект.
 
 Все live-пункты остаются неизвестными до выполнения владельцем/Claude. Стратегия задаёт безопасную последовательность локальных действий и проверяемые условия готовности; не заменяет итоговый отчёт с реальными exit codes.
+
+## 8. Локальное исполнение дорожной карты на 02.10.2026
+
+Срез оценки выше остаётся eada5e1f. Эта таблица фиксирует последующую локальную работу;
+наличие коммита не означает применение на production или приёмку Claude.
+
+| Инициатива | Реализация / проверка | Остаток |
+|---|---|---|
+| I01 | 1df899d5: projected:false age/count и freshness; focused67pass/0skip | Production query cost, scrape/reload и promtool |
+| I02 | d1f38b5a + 35b5ca49: stateRedis, owner Lua, lifecycle и monotonic deadline | Реальный Lua smoke недоступен без Docker daemon; coordinated stop всех old workers владельцем, DB fencing не заявлен |
+| I03 | 1a2d340f: максимум один активный pass трёх scheduler в одном процессе; focused37pass | Межпроцессная исключительность не входит в этот guard |
+| I04 | 7cf94a71: globalThis process counter и два exporters; focused116pass | Restart сбрасывает счётчик; это не durable hash chain |
+| I05 | 1537f517: полный stats30d независимо history cap, missing-only source fallback; focused28pass | Draft/submitted contract, history pagination, существующая stale projection и production query measurement |
+| I06/I07 | Отдельный поток codex/integration-1002: 35 realPGpass/0skip, 84tables/107migrations/76RLS restore | Приёмка/перенос Claude, настоящая off-site/media проверка владельца |
+| I08 | Runtime retry не менялся | Решение о дублях/idempotency и стабильной идентичности доставки |
+| I09/I10 | S2 da6b7077: 15 точных задач H01–H15 подготовлены | Задачи Hermes не исполнены этим потоком; включая исходные семь daily-summary failures |
+| I11 | d6550123: ограниченный local flat inventory без удаления и capacity/retention worksheet; focused16pass | Политика владельца, полный S3 inventory, фактический disk/RAM budget, очистка не реализована |
+| I12 | Только критерии стратегии/runbook | Production, browser/role/offline/TLS и media/off-site workflows не проверены |
+
+Итоговые проверки потока1: tsc exit0; lint exit0 с7исходными warnings; полный unit повтор
+2735passed/7failed/60skipped, exit1. Первый итоговый unit:2734/8/60 с дополнительным
+workers health import timeout30с; targeted11/0 и полный повтор его не воспроизвели,
+причина таймаута не установлена, настройки не ослаблены. Playwright collection99/11,
+exit0; build exit1 на отсутствующих DATABASE_PROVIDER/SESSION_SECRET, до Next build.
+Полные команды, строки и ограничения — [CODEX-REPORT.md](../../CODEX-REPORT.md).
