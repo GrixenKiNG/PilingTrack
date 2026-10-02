@@ -16,7 +16,7 @@
 
 ## Проверки перед каждым коммитом
 
-Команды выполнялись отдельно, реальные exit-коды сохранены; fake env для прохождения проверок нет.
+Команды проверок выполнялись отдельно, реальные exit-коды сохранены. Для Next build/test конфигурация не подменялась; N1 startup smoke намеренно использует указанные в скрипте фиктивные адреса/ключ в контейнере без сети.
 
 | Задача | RED | GREEN и дополнительно |
 |---|---|---|
@@ -131,6 +131,7 @@ YAML js-yaml exit 0 (30 rules); scoped diff-check exit 0.
 Callers fallback: tracker/aggregate/metrics route; consumer flags сверены с outbox-publisher.
 Schema/DB runtime не менялись. Promtool и real production series не проверены;
 стоимость нового агрегата на production dataset не измерялась. Владелец проверяет scrape/reload.
+
 ### I02 — lease в Redis состояния
 
 Коммит d1f38b5a (CODEX-S3-worker-lease), 3 файла +356/-139.
@@ -148,6 +149,7 @@ Risk пользователю сообщён до правок. Перед пр�
 stop может ждать зависший Redis request, локальное лидерство снимается сразу.
 Docker daemon сейчас недоступен: настоящий Lua smoke и новый image build не выполнены.
 Независимое review потребовало monotonic deadline вместо Date.now; follow-up ниже.
+
 ### I03 — неперекрывающиеся scheduler
 
 Коммит 1a2d340f (CODEX-S3-scheduler-overlap), 4 файла +118/-0:
@@ -161,6 +163,7 @@ startup+interval запускали команду четыре раза. GREEN:
 Fallback: unified-worker вызывает три start-функции, существующий Sentry тест.
 Межпроцессная исключительность и отмена уже начатого прохода не реализуются.
 В прогоне видны Vite config и MaxListeners warnings; они не подавлялись.
+
 ### I02 follow-up — монотонный срок lease
 
 Коммит 35b5ca49: performance.now вместо Date.now для локального TTL.
@@ -185,3 +188,40 @@ Fallback callers recordAuditEvent и app/worker exporters; auth/security не м
 После restart счётчик сбрасывается: это сигнал потерь ленты, не durable audit/hash-chain.
 Правило increase[5m] по pilingtrack-app|pilingtrack-workers: YAML/source проверены,
 PromQL runtime/production доставка не подтверждены.
+
+### I05 — полнота статистики техники, независимая часть
+
+Коммит 1537f517 (CODEX-S3-equipment-completeness), 2 файла +129/-20:
+query service +28/-17, его существующий тест +101/-3.
+Stats30d имеет полную отдельную выборку по прежнему inclusive UTC cutoff,
+history cap остаётся 1000. Missing projection получает child sums по формулам
+rebuild: piles.count, drilling.meters без умножения count, downtime.duration в часах.
+UUID Report.reportId используется для join, существующая projection, включая нули,
+остаётся authoritative как прежде. Timeline больше не показывает null только
+из-за отсутствия проекции; пустой исходный отчёт даёт настоящий ноль.
+RED 17 passed / 4 failed / 0 skipped, exit 1; GREEN 28 passed / 0 skipped в3файлах,
+exit 0; tsc/ESLint/diff-check exit 0. Fallback callers: facade→details API→equipment UI.
+Statuses (включая drafts), будущие даты и history contract не изменены.
+Stale существующие проекции намеренно сохранены; стоимость дополнительной
+30-дневной выборки на production не измерена. Бизнес-контракт draft/submitted,
+pagination/history completeness и допустимый lag ещё требуют владельца.
+I05 целиком не объявляется закрытой: выполнена независимая техническая часть.
+
+### I11 — инвентаризация PDF, первый шаг
+
+Коммит d6550123 (CODEX-S3-capacity-retention), 3 файла +245/-0:
+read-only CLI +57, capacity/retention документ +77, existing PDF test +111.
+CLI только metadata явно указанного абсолютного local root pdf-results;
+не следует root junction/entry symlinks, не обходит nested directories,
+не читает содержимое/env/S3/Redis и не удаляет данные. Counts/bytes/mtime/age bands,
+ignored entries и partial/errors различены; ошибка scan даёт exit1.
+RED minimal scanner 13 passed / 3 failed, exit 1; GREEN16passed/0skipped exit0;
+tsc/node--check/diff-check exit0. ESLint test exit0; .cjs ignored с1warning:
+это не проверка ESLint самого CLI. 17source refs подтверждены.
+Fallback storage/queue callers: deletePdfResult только definition/re-export;
+job TTL не означает file retention. Собственные fixtures удалены, owner data не сканировались.
+Документ содержит disk/RAM worksheet и три НЕПРИНЯТЫХ варианта retention.
+Owner inputs30ГБ/3.8ГБ и historical build peak5–6ГБ не выданы за новые измерения.
+Actual backend/common storage mount неизвестен; полный S3 inventory и media/off-site
+восстановление не подтверждены. Политика хранения/cleanup/load budget не реализованы:
+I11 целиком остаётся открытой, никаких удалений/prune/lifecycle не было.
