@@ -48,6 +48,16 @@ git diff --quiet && git diff --cached --quiet || die "есть незакомм�
 git fetch -q origin main
 SHA=$(git rev-parse --short HEAD)
 [ "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)" ] || die "HEAD не совпадает с origin/main — сначала git push"
+# Workers проверяем до первого SSH, чтобы сломанный образ не касался сервера.
+if [[ " ${SERVICES[*]} " == *" workers "* ]]; then
+  step "Сборка workers (Dockerfile.workers → runner)"
+  docker build -f Dockerfile.workers --target runner --build-arg "APP_VERSION=$SHA" -t "pilingtrack-workers:$SHA" .
+  if [ "${SKIP_WORKERS_SMOKE:-0}" = 1 ]; then
+    echo "⚠ АВАРИЙНЫЙ ОБХОД: SKIP_WORKERS_SMOKE=1 — образ workers НЕ ПРОВЕРЕН" >&2
+  else
+    bash "$(dirname "${BASH_SOURCE[0]}")/smoke-workers-image.sh" "pilingtrack-workers:$SHA"
+  fi
+fi
 OLD=$("${SSH[@]}" "git -C $DIR rev-parse --short HEAD")
 echo "сервер: $OLD → выкатываем: $SHA; сервисы: ${SERVICES[*]}"
 
@@ -63,7 +73,9 @@ IMAGES=()
 for svc in "${SERVICES[@]}"; do
   read -r file target <<<"$(dockerfile_of "$svc")"
   step "Сборка $svc ($file → $target)"
-  docker build -f "$file" --target "$target" --build-arg "APP_VERSION=$SHA" -t "pilingtrack-$svc:$SHA" .
+  if [ "$svc" != workers ]; then
+    docker build -f "$file" --target "$target" --build-arg "APP_VERSION=$SHA" -t "pilingtrack-$svc:$SHA" .
+  fi
   IMAGES+=("pilingtrack-$svc:$SHA")
 done
 

@@ -9,6 +9,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
+import http, { type IncomingMessage, type ServerResponse, type RequestListener } from 'http';
 
 // ============================================================
 // Mocks
@@ -236,6 +237,32 @@ describe('Unified Worker Service', { timeout: 30_000 }, () => {
     }, 30_000);
   });
 
+  describe('Метрики отдельных воркеров', () => {
+    it('отличает включённый остановившийся worker от отключённого и standby', async () => {
+      process.env.ENABLED_WORKERS = 'outbox,projection';
+      const { workerStates } = await import('@/workers/unified-worker/state');
+      const { startHealthServer } = await import('@/workers/unified-worker/health-server');
+      workerStates.outbox.status = 'error';
+      workerStates.projection.status = 'running';
+      workerStates.projection.isLeader = false;
+      workerStates.pdf.status = 'stopped';
+      startHealthServer();
+
+      const listener = vi.mocked(http.createServer).mock.calls.at(-1)?.[0] as unknown as RequestListener | undefined;
+      if (typeof listener !== 'function') throw new Error('Обработчик health-сервера не установлен');
+      const response = { writeHead: vi.fn(), end: vi.fn() };
+      listener({ url: '/metrics' } as IncomingMessage, response as unknown as ServerResponse);
+      const text = response.end.mock.calls[0][0];
+
+      expect(text).toContain('worker_status{name="outbox"} 0\n');
+      expect(text).toContain('worker_enabled{name="outbox"} 1\n');
+      expect(text).toContain('worker_status{name="projection"} 1\n');
+      expect(text).toContain('worker_enabled{name="projection"} 1\n');
+      expect(text).toContain('worker_is_leader{name="projection"} 0\n');
+      expect(text).toContain('worker_status{name="pdf"} 0\n');
+      expect(text).toContain('worker_enabled{name="pdf"} 0\n');
+    });
+  });
   describe('Worker lifecycle', () => {
     it('starts outbox worker when enabled', async () => {
       process.env.ENABLED_WORKERS = 'outbox';
