@@ -5,7 +5,7 @@ import { PageLayoutEditor } from '../page-layout-editor';
 import type { RenderablePageWidget } from '../page-layout-renderer';
 import { createPageLayoutValidator, type PageLayoutTemplate } from '../page-layout-template';
 import { createTemplateValidator, type LayoutTemplate } from '../layout-template';
-import { LAYOUT_LOAD_FAILED_MESSAGE, LAYOUT_OFFLINE_MESSAGE, useLayoutTemplate } from '../use-layout-template';
+import { LAYOUT_CSRF_MESSAGE, LAYOUT_FORBIDDEN_MESSAGE, LAYOUT_LOAD_FAILED_MESSAGE, LAYOUT_OFFLINE_MESSAGE, useLayoutTemplate } from '../use-layout-template';
 import { usePageLayoutTemplate } from '../use-page-layout-template';
 
 /*
@@ -224,5 +224,106 @@ describe('PageLayoutEditor — обрыв сети при сохранении/�
 
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith(LAYOUT_OFFLINE_MESSAGE));
     expect(calls.filter((call) => call.method === 'DELETE').length).toBe(1);
+  });
+});
+
+/*
+  F-R108-3: редактор виден только ADMIN, поэтому 403 почти всегда приходит от
+  проверки CSRF (`csrf-protection.ts` — 403 с телом «CSRF validation failed: …»),
+  а не от роли. Различаем по телу ответа: обновить страницу или нет прав.
+*/
+describe('useLayoutTemplate — 403 при сохранении/сбросе (F-R108-3)', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    vi.mocked(toast.error).mockClear();
+  });
+
+  const SERVER_TILE: LayoutTemplate = {
+    ...TILE_DEFAULT,
+    blocks: [{ ...TILE_DEFAULT.blocks[0], text: 'С сервера' }],
+  };
+
+  it('403 от проверки CSRF объясняется устаревшей сессией, а не правами', async () => {
+    scriptedFetch([
+      () => new Response(JSON.stringify(SERVER_TILE), { status: 200 }),
+      () => new Response(JSON.stringify({ error: 'CSRF validation failed: origin mismatch' }), { status: 403 }),
+    ]);
+    const { result } = renderTileEditor();
+    await waitFor(() => expect(result.current.template.blocks[0].text).toBe('С сервера'));
+
+    await act(async () => { await result.current.saveDraft(); });
+
+    expect(toast.error).toHaveBeenCalledWith(LAYOUT_CSRF_MESSAGE);
+    expect(toast.error).not.toHaveBeenCalledWith(LAYOUT_FORBIDDEN_MESSAGE);
+  });
+
+  it('403 без признака CSRF остаётся отказом по правам', async () => {
+    scriptedFetch([
+      () => new Response(JSON.stringify(SERVER_TILE), { status: 200 }),
+      () => new Response(JSON.stringify({ error: 'Недостаточно прав' }), { status: 403 }),
+    ]);
+    const { result } = renderTileEditor();
+    await waitFor(() => expect(result.current.template.blocks[0].text).toBe('С сервера'));
+
+    await act(async () => { await result.current.saveDraft(); });
+
+    expect(toast.error).toHaveBeenCalledWith(LAYOUT_FORBIDDEN_MESSAGE);
+    expect(toast.error).not.toHaveBeenCalledWith(LAYOUT_CSRF_MESSAGE);
+  });
+
+  it('403 при сбросе от CSRF тоже объясняется устаревшей сессией', async () => {
+    scriptedFetch([
+      () => new Response(JSON.stringify(SERVER_TILE), { status: 200 }),
+      () => new Response(JSON.stringify({ error: 'CSRF validation failed: invalid sec-fetch-site' }), { status: 403 }),
+    ]);
+    const { result } = renderTileEditor();
+    await waitFor(() => expect(result.current.template.blocks[0].text).toBe('С сервера'));
+
+    await act(async () => { await result.current.reset(); });
+
+    expect(toast.error).toHaveBeenCalledWith(LAYOUT_CSRF_MESSAGE);
+  });
+});
+
+describe('PageLayoutEditor — 403 при сохранении/сбросе (F-R108-3)', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    vi.mocked(toast.error).mockClear();
+  });
+
+  const SERVER_PAGE: PageLayoutTemplate = {
+    version: 1,
+    widgets: [
+      { id: 'piles', visible: true, size: 'sm', order: 0 },
+      { id: 'meters', visible: false, size: 'sm', order: 1 },
+    ],
+  };
+
+  it('CSRF-403 при сохранении раскладки — «сессия устарела», а не «нет прав»', async () => {
+    scriptedFetch([
+      () => new Response(JSON.stringify(SERVER_PAGE), { status: 200 }),
+      () => new Response(JSON.stringify({ error: 'CSRF validation failed: origin mismatch' }), { status: 403 }),
+    ]);
+    render(<Harness />);
+    await waitFor(() => expect((screen.getAllByRole('checkbox')[1] as HTMLInputElement).checked).toBe(false));
+
+    fireEvent.click(screen.getAllByRole('checkbox')[1]);
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить' }));
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith(LAYOUT_CSRF_MESSAGE));
+    expect(toast.error).not.toHaveBeenCalledWith(LAYOUT_FORBIDDEN_MESSAGE);
+  });
+
+  it('CSRF-403 при сбросе раскладки — «сессия устарела»', async () => {
+    scriptedFetch([
+      () => new Response(JSON.stringify(SERVER_PAGE), { status: 200 }),
+      () => new Response(JSON.stringify({ error: 'CSRF validation failed: referer mismatch' }), { status: 403 }),
+    ]);
+    render(<Harness />);
+    await waitFor(() => expect((screen.getAllByRole('checkbox')[1] as HTMLInputElement).checked).toBe(false));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Сбросить' }));
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith(LAYOUT_CSRF_MESSAGE));
   });
 });

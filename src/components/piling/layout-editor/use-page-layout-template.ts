@@ -12,7 +12,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { authFetch } from '@/lib/api';
-import { LAYOUT_LOAD_FAILED_MESSAGE, LAYOUT_OFFLINE_MESSAGE } from './use-layout-template';
+import { LAYOUT_LOAD_FAILED_MESSAGE, LAYOUT_OFFLINE_MESSAGE, layoutForbiddenMessage } from './use-layout-template';
 import {
   clonePageLayoutTemplate,
   type PageLayoutTemplate,
@@ -112,7 +112,7 @@ export function usePageLayoutTemplate(options: {
       return;
     }
     if (!res.ok) {
-      toast.error(res.status === 403 ? 'Только администратор может сохранять раскладку' : 'Не удалось сохранить раскладку');
+      toast.error(res.status === 403 ? await layoutForbiddenMessage(res) : 'Не удалось сохранить раскладку');
       return;
     }
     setTemplate(clonePageLayoutTemplate(draft));
@@ -129,7 +129,7 @@ export function usePageLayoutTemplate(options: {
       return;
     }
     if (!res.ok) {
-      toast.error(res.status === 403 ? 'Только администратор может сбросить раскладку' : 'Не удалось сбросить раскладку');
+      toast.error(res.status === 403 ? await layoutForbiddenMessage(res) : 'Не удалось сбросить раскладку');
       return;
     }
     const { initial, failed } = await load();

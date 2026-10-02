@@ -30,6 +30,36 @@ export const LAYOUT_LOAD_FAILED_MESSAGE = 'Не удалось загрузит�
  */
 export const LAYOUT_OFFLINE_MESSAGE = 'Нет связи, изменения не сохранены — повторите';
 
+/**
+ * Отказ 403 по правам: редактор виден только ADMIN, значит роль не подвела
+ * (F-R108-3).
+ */
+export const LAYOUT_FORBIDDEN_MESSAGE = 'Нет прав на изменение раскладки';
+
+/**
+ * Отказ 403 от проверки CSRF: `csrf-protection.ts` отдаёт 403 с телом
+ * `{error: 'CSRF validation failed: …'}` при расхождении Origin/Host (вкладка
+ * устарела, адрес открыт по IP/за прокси). Здесь это не про роль — человеку
+ * нужно обновить страницу (F-R108-3).
+ */
+export const LAYOUT_CSRF_MESSAGE = 'Сессия устарела, обновите страницу';
+
+/**
+ * Текст отказа 403 на сохранение/сброс раскладки: по телу ответа различаем
+ * провал проверки CSRF и настоящий отказ по правам (F-R108-3).
+ */
+export async function layoutForbiddenMessage(res: Response): Promise<string> {
+  try {
+    const body = await res.json() as { error?: unknown } | null;
+    if (typeof body?.error === 'string' && body.error.startsWith('CSRF validation failed')) {
+      return LAYOUT_CSRF_MESSAGE;
+    }
+  } catch {
+    // тело нечитаемо (прокси/шлюз) — считаем отказом по правам
+  }
+  return LAYOUT_FORBIDDEN_MESSAGE;
+}
+
 export interface LayoutController<T extends LayoutTemplate = LayoutTemplate> {
   template: T;
   draft: T;
@@ -173,7 +203,7 @@ export function useLayoutTemplate<T extends LayoutTemplate>(options: UseLayoutTe
       return;
     }
     if (!res.ok) {
-      toast.error(res.status === 403 ? 'Только администратор может сохранять шаблон' : 'Не удалось сохранить шаблон');
+      toast.error(res.status === 403 ? await layoutForbiddenMessage(res) : 'Не удалось сохранить шаблон');
       return;
     }
     setTemplate(cloneLayoutTemplate(draft));
@@ -192,7 +222,7 @@ export function useLayoutTemplate<T extends LayoutTemplate>(options: UseLayoutTe
       return;
     }
     if (!res.ok) {
-      toast.error(res.status === 403 ? 'Только администратор может сбросить шаблон' : 'Не удалось сбросить шаблон');
+      toast.error(res.status === 403 ? await layoutForbiddenMessage(res) : 'Не удалось сбросить шаблон');
       return;
     }
     const { initial, failed } = await loadTemplate();
