@@ -29,6 +29,19 @@ export function PageLayoutEditor({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Пока есть несохранённые правки, предупреждаем при закрытии/перезагрузке
+  // вкладки: смена дашборда/вкладки в Настройках иначе молча теряет черновик
+  // (F-R108-2).
+  useEffect(() => {
+    if (!controller.editing || !controller.dirty) return;
+    const warnBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', warnBeforeUnload);
+    return () => window.removeEventListener('beforeunload', warnBeforeUnload);
+  }, [controller.editing, controller.dirty]);
+
   const rows = [...controller.draft.widgets].sort((a, b) => a.order - b.order);
 
   return (
