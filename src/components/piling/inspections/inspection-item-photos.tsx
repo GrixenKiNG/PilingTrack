@@ -16,6 +16,7 @@ import { Camera, Loader2, Trash2 } from '@/components/piling/icons/unified-icons
 import { toast } from 'sonner';
 import { authFetch } from '@/lib/api';
 import { getThumbnailUrl } from '@/lib/media-thumbnails';
+import { InspectionLoadError, isRetryableLoadError, loadErrorText } from './inspection-api-error';
 
 interface MediaRecord {
   id: string;
@@ -47,6 +48,9 @@ export function InspectionItemPhotos({ inspectionId, itemId, onCountChange }: Pr
   const [photos, setPhotos] = useState<PhotoTile[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  // Сбой чтения галереи — не «фото нет»: раньше он молча отдавал пустой
+  // список и обнулял счётчик у родителя (R100 №8).
+  const [loadError, setLoadError] = useState<InspectionLoadError | null>(null);
 
   // Keep the latest onCountChange in a ref so `refresh` does not depend on it.
   // The parent passes an inline callback; depending on it would re-create
@@ -62,9 +66,10 @@ export function InspectionItemPhotos({ inspectionId, itemId, onCountChange }: Pr
       const res = await authFetch(
         `/api/media?entityType=inspection&entityId=${encodeURIComponent(entityId)}`
       );
+      // Отказ (403/500) — не «фото нет»: пустая галерея обнуляла счётчик у
+      // родителя, и завершение требовало фото, которое на сервере есть.
       if (!res.ok) {
-        setPhotos([]);
-        onCountChangeRef.current?.(0);
+        setLoadError(new InspectionLoadError(res.status));
         return;
       }
       const json = await res.json();
@@ -79,9 +84,10 @@ export function InspectionItemPhotos({ inspectionId, itemId, onCountChange }: Pr
         })
       );
       setPhotos(tiles);
+      setLoadError(null);
       onCountChangeRef.current?.(tiles.length);
     } catch {
-      toast.error('Не удалось загрузить фото');
+      setLoadError(new InspectionLoadError(null));
     } finally {
       setLoading(false);
     }
@@ -167,6 +173,29 @@ export function InspectionItemPhotos({ inspectionId, itemId, onCountChange }: Pr
     return (
       <div className="h-10 flex items-center gap-1.5 text-muted-foreground text-xs">
         <Loader2 className="w-3.5 h-3.5 animate-spin" /> Загрузка фото…
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+        <span>
+          {loadErrorText(loadError, {
+            forbidden: 'Нет прав на просмотр фото. Смените роль или обратитесь к администратору.',
+            notFound: 'Фото не найдены.',
+            server: 'Не удалось загрузить фото. Сервер вернул ошибку.',
+          })}
+        </span>
+        {isRetryableLoadError(loadError) && (
+          <button
+            type="button"
+            onClick={() => void refresh()}
+            className="inline-flex min-h-11 items-center text-xs font-medium text-signal-strong underline hover:no-underline sm:min-h-0"
+          >
+            Повторить
+          </button>
+        )}
       </div>
     );
   }
