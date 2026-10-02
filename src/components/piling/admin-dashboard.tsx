@@ -174,6 +174,7 @@ export function AdminDashboard() {
           return;
         }
         const sites = ((await res.json()).sites ?? []) as SiteOption[];
+        if (cancelled) return;
         setSiteOptions(sites.map((s) => ({ id: s.id, name: s.name })));
         setStale((prev) => ({ ...prev, sites: false }));
       })

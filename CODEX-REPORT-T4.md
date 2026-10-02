@@ -47,3 +47,20 @@ decidePilePassport уже правильно проверял trim(note), выд
 Все 7 исходных предупреждений устранены без новых eslint-disable. Существующие намеренные пояснённые suppressions сохранены. crews/all: явный отказ 401 при отсутствующем user позволяет убрать неподавленное user!. Четыре интеграционных файла: URL проверяется до подключения/создания БД вместо non-null assertion; startSnapshotId явно обязателен до чтения снимка. Неиспользуемая локальная tenantB удалена (поиск файла: только декларация, не экспорт/файл).
 
 Красный existing route тест: exit 1, 1 failed/4 passed/0 skipped. После правки первый прогон без DB: exit 0, 5 passed/16 skipped; пропуски не считаются доказательством. Повтор всех затронутых тестов на новом codex-pg-* со всеми миграциями и настоящей ролью приложения для RLS: exit 0, 21 passed/0 failed/0 skipped, 5 файлов, 12.95с. Контейнер удалён trap. npm run lint: до exit 0 с 7 warnings; после exit 0, 0 errors/0 warnings, text integrity passed. TypeScript exit 0. Журналы d5-red.log/d5-tests.log/d5-live.log/d5-after.log/d5-tsc.log. Auth/security/RLS реализация и тестовые ожидания успеха не ослаблены.
+Коммит D5: 59f2de4f.
+
+## D6 — ревью ночных правок Hermes
+
+Read-only git -C D:\PillingR\wt-night log a5cfa9ff..HEAD и diff 713ae2c1..hermes/q4-0926 -- src/. Проверенный tip 38d2b889: шесть новых коммитов 803133ac, dc7b2629, a2ce1238, 8cdb47b5, 435492af, 38d2b889. Прочитан весь production diff и новые тесты: 6 production-файлов и 5 test-файлов. Merge --no-ff выполнен без конфликтов: e5fcb793; попал также read-only аудит R110, его рекомендации не реализовывались. Forbidden/operator/ORION/security/schema/compose файлы этим merge не менялись.
+
+Исправленная регрессия повторной загрузки объектов: cancelled проверялся только ДО await res.json(). Новый повтор мог успешно показать свежие объекты, затем поздний JSON старого запроса перезаписывал фильтр прежним списком. Добавлена одна проверка cancelled ПОСЛЕ await. Красный тест на коде Hermes: exit 1, 1 failed/6 passed/0 skipped. Зелёные все 5 затронутых test-файлов: exit 0, 55 passed/0 failed/0 skipped. Журналы d6-red.log/d6-green.log. Тест выполняет два запроса и завершает старый JSON после нового, затем проверяет сохранение свежего списка, а не только строку текста.
+
+| Остаточное замечание | Важность | Доказательство / ограничение |
+|---|---|---|
+| catchText определяет сеть по любому TypeError, включая возможный JS TypeError после fetch | P3 | use-site-mutations.ts: instanceof TypeError; тесты проверяют настоящий fetch TypeError и SyntaxError, но не различают этап исключения |
+| beforeunload защищает закрытие/перезагрузку документа, но не переход внутри SPA / переключение React-вкладки | P3, неполное покрытие прежнего требования | оба layout-editor: только listener beforeunload; Next navigation не вызывает событие. Не новая регрессия сохранения, не доказательство всех видов ухода |
+| Новые фото-состояния/onError сделаны для kind=image ServerPhoto; dataKey=photo PhotoBlock по-прежнему не объясняет загрузку/ошибку img | P3, неполный охват F-M4-TILE | две отдельные ветки EquipmentTileBlockContent; новые тесты покрывают только kind=image |
+| Общая подпись «Обновлено» относится только к аналитике, а парк/ТО/отчёты читаются независимо | P3 | analyticsUpdatedAt присваивается только loadAnalytics; при сбое ops есть отдельный stale баннер |
+| Тесты beforeunload используют synthetic DOM event | ограничение доказательства | наличие listener доказано; native browser prompt/SPA/navigation визуально не проверены |
+
+Права/валидация и сообщения ошибок прочитаны; поглощения ошибки сохранения с ложным успехом в новых правках не обнаружено. load(true) в maintenance используется только после 409; onSaved вызывает callback без аргументов. Refresh sites race исправлен выше. Другие уже существовавшие гонки аналитики не объявлены новой регрессией Hermes. Браузерный прогон не выполнялся.

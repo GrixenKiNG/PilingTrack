@@ -9,7 +9,7 @@
  * сносил весь экран — эти тесты падали.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 const mocks = vi.hoisted(() => ({ authFetch: vi.fn() }));
 
@@ -150,4 +150,29 @@ describe('AdminDashboard: отметка свежести аналитики (F-
     expect(await screen.findByText('Не удалось загрузить, обновите страницу')).toBeInTheDocument();
     expect(screen.queryByText(/^Обновлено в /)).not.toBeInTheDocument();
   });
+});
+
+it('D6: поздний JSON прежнего запроса объектов не перезаписывает результат повтора', async () => {
+  mocks.authFetch.mockReset();
+  let finishOld: (value: unknown) => void = () => { throw new Error('old JSON not started'); };
+  const oldJson = new Promise((resolve) => { finishOld = resolve; });
+  const oldResponse = json({}); vi.spyOn(oldResponse, 'json').mockReturnValue(oldJson);
+  let calls = 0;
+  mocks.authFetch.mockImplementation((url: string) => {
+    if (url.startsWith('/api/sites/all')) {
+      calls += 1;
+      return Promise.resolve(calls === 1 ? oldResponse : json({ sites: [{ id: 'fresh', name: 'Свежий объект' }] }));
+    }
+    if (url.startsWith('/api/monitoring/fleet')) return Promise.resolve(json(fleet));
+    if (url.startsWith('/api/maintenance')) return Promise.resolve(json({ records: [] }));
+    if (url.startsWith('/api/reports/recent')) return Promise.resolve(json({ reports: [] }));
+    return Promise.resolve(json({ analytics: [] }));
+  });
+  render(<AdminDashboard />);
+  await waitFor(() => expect(oldResponse.json).toHaveBeenCalled());
+  fireEvent.click(await screen.findByRole('button', { name: 'Обновить дашборд' }));
+  expect(await screen.findByText('Свежий объект')).toBeInTheDocument();
+  await act(async () => { finishOld({ sites: [{ id: 'old', name: 'Прежний объект' }] }); });
+  expect(screen.getByText('Свежий объект')).toBeInTheDocument();
+  expect(screen.queryByText('Прежний объект')).not.toBeInTheDocument();
 });
