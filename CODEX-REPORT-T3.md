@@ -108,3 +108,18 @@ Scoped Vitest: exit 0, 15 файлов /157 passed/0 failed/0 skipped (output/co
 HTTP 2xx без `ok: true` Telegram не считается подтверждением; таймаут/неясный ответ повторяется. PDF получил такой же timeout 5 секунд, как текст. Если Telegram принял запрос, но ответ/commit потерялся, допускается редкий дубль согласно решению владельца. Без сохранённого подтверждения сообщение не теряется. Прямые sendMessage/sendAlert без event identity — отдельная отправка; постоянные квитанции подключены к обоим существующим durable путям (alert и PDF), схема/tenant-условия не менялись.
 
 Тесты: реальные mocked fetch в частичной A-success/B-timeout пачке и новый progress из сохранённого JSON отправляют второй раз только B; HTTP ok без Telegram ok не подтверждается. Отдельно alert и PDF сохраняют частичные квитанции до повторного вызова; DLQ получает свежие квитанции. Scoped Vitest exit 0, 5 файлов /74 passed/0 failed/0 skipped (output/codex-t3/m7-tests.log); tsc exit 0 (m7-tsc.log). GitNexus fallback rg+diff, diff --check exit 0. Живые сообщения Telegram не отправлялись.
+## M8 / I11 — хранение временных PDF
+
+Очистка сканирует только `storage/pdf-results/` либо S3 `pdf-results/`, без рекурсии и без запроса Media. Белый список: точный префикс + имя UUID v4 задания + расширение .pdf; локально дополнительно `%PDF-`, обычный файл без symlink/junction/hard link, проверенная canonical root; S3 — HeadObject `ContentType=application/pdf` и LastModified. Удаляется строго старше 30×24 часов; ровно 30 дней сохраняется. Возраст/тип перепроверяются перед удалением; обновлённый файл сохраняется. save/read/delete temporary PDF также отвергают traversal и чужие имена.
+
+Media строит ключи `media/<tenant>/<entityType>/<entityId>/...` (`src/core/media/media-content.ts:165`), которые белому списку не соответствуют даже для PDF-вложения. Права/TTL/удаление Media не менялись. PDF, формируемый для Telegram прямо в Buffer, не создаёт временный объект. Неизвестные/исторические имена, не соответствующие текущему UUID v4, пропускаются: удаление их без подтверждения типа не расширялось.
+
+Планировщик в unified-worker: через 60 секунд после старта и раз в сутки; stop выключает таймеры и ждёт активный проход; перекрывающиеся проходы не запускаются. По умолчанию отключён, включая production. Владелец отдельно передаст в окружение сервиса workers:
+
+1. Для первой read-only проверки `PDF_TEMP_CLEANUP_ENABLED=true` и `PDF_TEMP_CLEANUP_DRY_RUN=true` (последнее и так значение по умолчанию).
+2. После просмотра логов `Temporary PDF cleanup plan` с count/keys/backend — явно `PDF_TEMP_CLEANUP_DRY_RUN=false`, оставив enabled=true.
+3. Выключение: убрать enabled или выставить false. Одной переменной dry-run=false недостаточно для запуска.
+
+.env/docker-compose/deploy scripts не менялись и на бою флаги не включались. Это надо включить владельцу/Claude именно в контейнер workers; планировщик встроенного app это не запускает.
+
+Тесты с настоящими локальными файлами: dry-run сохраняет кандидата; apply удаляет только старый временный UUID PDF после лога; свежий/ровно 30-дневный, JPEG (включая переименованный .pdf), PDF-вложение Media, неизвестное имя, подкаталог, hard link и junction сохраняются/отклоняются. Mocked S3: pagination, чужие ключи, неверный MIME, обновлённый объект, отсутствие delete в dry-run, log до delete. Планировщик: production без opt-in, dry-run по умолчанию, ежедневный запуск, stop и повтор после ошибки. Scoped Vitest exit 0, 6 файлов /55 passed/0 failed/0 skipped (m8-green.log). tsc exit 0; lint exit 0, 7 прежних warnings (m8-tsc.log/m8-lint.log). Предварительный красный прогон из-за неочищенного logger mock исправлен в тесте. MaxListeners warnings исходных unified-worker тестов оставлены, production listeners не менялись.
