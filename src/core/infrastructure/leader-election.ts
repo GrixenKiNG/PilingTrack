@@ -109,7 +109,7 @@ export class LeaderElection {
   }
 
   isLeader(): boolean {
-    if (this.isLeaderFlag && this.leaseExpiresAt !== null && Date.now() >= this.leaseExpiresAt) {
+    if (this.isLeaderFlag && this.leaseExpiresAt !== null && performance.now() >= this.leaseExpiresAt) {
       this.loseLeadership('lease expired');
     }
     return this.isLeaderFlag;
@@ -155,7 +155,8 @@ export class LeaderElection {
   private async acquire(generation: number): Promise<void> {
     // The server may apply the command before its reply arrives. Starting the
     // local deadline before any await never grants more time than Redis's TTL.
-    const deadline = Date.now() + this.config.ttl;
+    // Monotonic time prevents wall-clock corrections extending the lease.
+    const deadline = performance.now() + this.config.ttl;
     const ownershipVersion = this.ownershipVersion;
     try {
       const client = await getStateRedisClient();
@@ -182,7 +183,7 @@ export class LeaderElection {
 
       if (!this.running || this.generation !== generation) return;
       if (this.ownershipVersion !== ownershipVersion) return;
-      if (!ownsLease || Date.now() >= deadline) {
+      if (!ownsLease || performance.now() >= deadline) {
         this.loseLeadership('lease not confirmed before deadline');
         return;
       }
@@ -191,7 +192,7 @@ export class LeaderElection {
       if (this.leaseTimer) clearTimeout(this.leaseTimer);
       this.leaseTimer = setTimeout(() => {
         if (this.generation === generation) this.loseLeadership('lease expired');
-      }, deadline - Date.now());
+      }, deadline - performance.now());
 
       if (!this.isLeaderFlag) {
         this.isLeaderFlag = true;

@@ -42,9 +42,13 @@ async function createElection() {
   return election;
 }
 
+let monotonicOffset = 0;
+
 describe('LeaderElection', () => {
   beforeEach(() => {
     vi.useFakeTimers();
+    monotonicOffset = 0;
+    vi.spyOn(performance, 'now').mockImplementation(() => Date.now() + monotonicOffset);
     mocks.store.clear();
     vi.clearAllMocks();
     mocks.state.mockReset().mockResolvedValue(mocks.client);
@@ -57,6 +61,7 @@ describe('LeaderElection', () => {
 
   afterEach(() => {
     vi.clearAllTimers();
+    vi.restoreAllMocks();
     vi.useRealTimers();
   });
 
@@ -222,13 +227,28 @@ describe('LeaderElection', () => {
     expect(mocks.store.has('leader:outbox-worker')).toBe(false);
   });
 
-  it('synchronously expires leadership after a clock jump before queued timers can run', async () => {
+  it('synchronously expires leadership after elapsed time before queued timers can run', async () => {
     const election = await createElection();
     await election.start();
     vi.setSystemTime(Date.now() + 1000);
     expect(election.isLeader()).toBe(false);
     expect(election.getStats().isLeader).toBe(false);
     expect(election.isLeader()).toBe(false);
+    expect(election.onLoseLeadership).toHaveBeenCalledTimes(1);
+    await election.stop();
+    expect(election.onLoseLeadership).toHaveBeenCalledTimes(1);
+  });
+
+  it('expires its monotonic lease even when wall-clock time moves backwards', async () => {
+    const election = await createElection();
+    const startedAt = Date.now();
+    await election.start();
+    // Monotonic time advances by the TTL while wall time rolls back one minute.
+    monotonicOffset = 61_000;
+    vi.setSystemTime(startedAt - 60_000);
+    expect(performance.now()).toBe(startedAt + 1000);
+    expect(election.isLeader()).toBe(false);
+    expect(election.getStats().isLeader).toBe(false);
     expect(election.onLoseLeadership).toHaveBeenCalledTimes(1);
     await election.stop();
     expect(election.onLoseLeadership).toHaveBeenCalledTimes(1);
