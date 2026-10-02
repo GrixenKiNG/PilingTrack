@@ -62,7 +62,7 @@ export function DictionariesSettings({ equipment, bootstrap, onExport }: Diction
     void authFetch('/api/dictionary/all')
       .then(async (response) => {
         if (!response.ok) {
-          if (active) toast.error('Не удалось сохранить настройку');
+          if (active) toast.error('Не удалось загрузить справочники');
           return;
         }
         const body = await response.json() as { pileGrades?: DictionaryEntry[]; drillingTypes?: DictionaryEntry[]; downtimeReasons?: DictionaryEntry[] };
@@ -73,7 +73,7 @@ export function DictionariesSettings({ equipment, bootstrap, onExport }: Diction
           downtimeReasons: body.downtimeReasons ?? [],
         });
       })
-      .catch(() => { if (active) toast.error('Не удалось сохранить настройку'); });
+      .catch(() => { if (active) toast.error('Не удалось загрузить справочники'); });
     return () => { active = false; };
   }, []);
 
