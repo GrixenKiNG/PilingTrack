@@ -34,7 +34,7 @@ import { authFetch } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { formatCountMeters, formatNumber } from '@/lib/format';
 import { getTodayInTimezone } from '@/lib/timezone';
-import { QueryErrorBanner, useMinSkeletonDuration } from '@/components/piling/async-ui';
+import { useMinSkeletonDuration } from '@/components/piling/async-ui';
 import { Skeleton } from '@/components/ui/skeleton';
 import { computeDashboardKpis } from '@/components/piling/dashboard-kpis';
 import { formatDowntimeHours } from '@/lib/downtime-hours';
@@ -108,10 +108,14 @@ export function AdminDashboard() {
       if (range.to) params.set('dateTo', range.to);
       if (siteFilter !== 'all') params.set('siteId', siteFilter);
       const res = await authFetch(`/api/analytics/sites?${params.toString()}`);
-      if (!res.ok) throw new Error('analytics');
+      if (!res.ok) {
+        // 403 — это не сеть: у роли нет прав на аналитику, повтор не поможет.
+        setLoadError(res.status === 403 ? 'Нет прав на аналитику' : 'Не удалось загрузить, обновите страницу');
+        return;
+      }
       setAnalytics(((await res.json()).analytics ?? []) as SiteAnalyticsDTO[]);
     } catch {
-      setLoadError('Не удалось загрузить сводку. Проверьте сеть и повторите.');
+      setLoadError('Не удалось загрузить, обновите страницу');
     } finally {
       setLoading(false);
     }
@@ -298,14 +302,6 @@ export function AdminDashboard() {
     );
   }
 
-  if (loadError) {
-    return (
-      <div className="p-4 lg:p-5">
-        <QueryErrorBanner message={loadError} onRetry={refreshAll} retrying={loading} />
-      </div>
-    );
-  }
-
   const dashKpiWidgets: Record<string, RenderablePageWidget> = {
     // Подпись называет то, что плитка считает: снимок парка отдаёт машины
     // (`activeToday` / `expected`), а не число сданных отчётов. «Смен сдано»
@@ -399,7 +395,11 @@ export function AdminDashboard() {
       <div className="grid gap-3 lg:grid-cols-3 [&>*]:min-w-0">
         <div className="space-y-3 lg:col-span-2">
           <Section icon={Building2} title="План-факт по объектам" footerLabel="Все объекты" onFooter={() => router.push('/admin/sites')}>
-            {planRows.length === 0 ? <Empty text="Для выбранного периода нет объектов с планом" /> : (
+            {loadError ? (
+              /* Сбой аналитики объясняется на месте, только в своём блоке:
+                 парк, ТО и риски приходят другими выборками и остаются. */
+              <Empty text={loadError} tone="danger" />
+            ) : planRows.length === 0 ? <Empty text="Для выбранного периода нет объектов с планом" /> : (
               <div className="grid gap-2 p-3 sm:grid-cols-2">
                 {planRows.map((a) => <PlanTile key={a.siteId} a={a} />)}
               </div>

@@ -12,6 +12,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { authFetch } from '@/lib/api';
+import { LAYOUT_LOAD_FAILED_MESSAGE, LAYOUT_OFFLINE_MESSAGE, layoutForbiddenMessage } from './use-layout-template';
 import {
   clonePageLayoutTemplate,
   type PageLayoutTemplate,
@@ -24,6 +25,8 @@ export interface PageLayoutController {
   draft: PageLayoutTemplate;
   editing: boolean;
   dirty: boolean;
+  /** true, если GET раскладки завершился сбоем (не-ok/обрыв) — сохранение запрещено. */
+  loadFailed: boolean;
   startEditing(): void;
   cancelEditing(): void;
   saveDraft(): Promise<void>;
@@ -57,22 +60,33 @@ export function usePageLayoutTemplate(options: {
   const [template, setTemplate] = useState<PageLayoutTemplate>(() => mergeCatalog(defaultTemplate, catalogIds));
   const [draft, setDraft] = useState<PageLayoutTemplate>(() => mergeCatalog(defaultTemplate, catalogIds));
   const [editing, setEditing] = useState(false);
+  const [loadFailed, setLoadFailed] = useState(false);
 
-  const load = useCallback(async (): Promise<PageLayoutTemplate> => {
+  const load = useCallback(async (): Promise<{ initial: PageLayoutTemplate; failed: boolean }> => {
     let server = defaultTemplate;
+    let failed = false;
     try {
       const res = await authFetch(endpoint);
-      if (res.ok) server = validate(await res.json()) ?? defaultTemplate;
+      if (res.ok) {
+        server = validate(await res.json()) ?? defaultTemplate;
+      } else {
+        // «Раскладки нет» сервер отдаёт как 200 со стандартным шаблоном
+        // (layout-service.ts), поэтому не-ok — это сбой чтения, а не пустая раскладка.
+        failed = true;
+      }
     } catch {
-      // fall back to default so the page still renders
+      // network failure — standard template is shown for rendering only, saving stays blocked
+      failed = true;
     }
-    return mergeCatalog(server, catalogIds);
+    return { initial: mergeCatalog(server, catalogIds), failed };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- reload when the surface (endpoint) changes; catalog/default fixed per surface
   }, [endpoint]);
 
   useEffect(() => {
     let active = true;
-    void load().then((t) => { if (active) { setTemplate(t); setDraft(t); } });
+    void load().then(({ initial, failed }) => {
+      if (active) { setTemplate(initial); setDraft(initial); setLoadFailed(failed); }
+    });
     return () => { active = false; };
   }, [load]);
 
@@ -80,28 +94,48 @@ export function usePageLayoutTemplate(options: {
   const cancelEditing = useCallback(() => { setDraft(clonePageLayoutTemplate(template)); setEditing(false); }, [template]);
 
   const saveDraft = useCallback(async () => {
-    const res = await authFetch(endpoint, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(draft),
-    });
+    if (loadFailed) {
+      // Читали сбой: под стандартной раскладкой может быть сохранённая — не затираем её.
+      toast.error(LAYOUT_LOAD_FAILED_MESSAGE);
+      return;
+    }
+    let res: Response;
+    try {
+      res = await authFetch(endpoint, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(draft),
+      });
+    } catch {
+      // Обрыв сети: черновик не тронут, правки можно повторить (F-R108-4).
+      toast.error(LAYOUT_OFFLINE_MESSAGE);
+      return;
+    }
     if (!res.ok) {
-      toast.error(res.status === 403 ? 'Только администратор может сохранять раскладку' : 'Не удалось сохранить раскладку');
+      toast.error(res.status === 403 ? await layoutForbiddenMessage(res) : 'Не удалось сохранить раскладку');
       return;
     }
     setTemplate(clonePageLayoutTemplate(draft));
     setEditing(false);
-  }, [draft, endpoint]);
+  }, [draft, endpoint, loadFailed]);
 
   const reset = useCallback(async () => {
-    const res = await authFetch(endpoint, { method: 'DELETE' });
-    if (!res.ok) {
-      toast.error(res.status === 403 ? 'Только администратор может сбросить раскладку' : 'Не удалось сбросить раскладку');
+    let res: Response;
+    try {
+      res = await authFetch(endpoint, { method: 'DELETE' });
+    } catch {
+      // Обрыв сети: ничего не удалено, можно повторить (F-R108-4).
+      toast.error(LAYOUT_OFFLINE_MESSAGE);
       return;
     }
-    const t = await load();
-    setTemplate(t);
-    setDraft(t);
+    if (!res.ok) {
+      toast.error(res.status === 403 ? await layoutForbiddenMessage(res) : 'Не удалось сбросить раскладку');
+      return;
+    }
+    const { initial, failed } = await load();
+    setTemplate(initial);
+    setDraft(initial);
+    setLoadFailed(failed);
   }, [endpoint, load]);
 
   const patchWidget = useCallback((id: string, patch: Partial<PageWidgetPlacement>) => {
@@ -134,6 +168,7 @@ export function usePageLayoutTemplate(options: {
     draft,
     editing,
     dirty: JSON.stringify(template) !== JSON.stringify(draft),
+    loadFailed,
     startEditing,
     cancelEditing,
     saveDraft,

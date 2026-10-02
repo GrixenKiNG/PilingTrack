@@ -84,6 +84,12 @@ export function PileJournal() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
 
+  // Перепутанный порядок дат (с 30.09 по 01.09) сервер превращает в gte > lt —
+  // выборка пуста, и журнал говорит «записей нет», хотя паспорта есть. Ловим
+  // до запроса: показываем подсказку у полей и не беспокоим сервер.
+  const dateRangeInvalid =
+    filters.dateFrom !== '' && filters.dateTo !== '' && filters.dateFrom > filters.dateTo;
+
   // Объекты — только для фильтра. Их список не меняется по ходу разбора, и
   // перезапрашивать его вместе с журналом незачем.
   useEffect(() => {
@@ -113,6 +119,9 @@ export function PileJournal() {
   // Загрузка отменяется вместе с экраном: ответ, пришедший после ухода со
   // страницы, не должен писать в размонтированный список.
   useEffect(() => {
+    // Даты в перепутанном порядке — запрос не шлём: подсказка у полей уже
+    // объясняет, почему журнал не меняется.
+    if (dateRangeInvalid) return;
     let cancelled = false;
     void (async () => {
       try {
@@ -131,7 +140,7 @@ export function PileJournal() {
       }
     })();
     return () => { cancelled = true; };
-  }, [load]);
+  }, [load, dateRangeInvalid]);
 
   const reload = useCallback(async () => {
     try {
@@ -170,8 +179,11 @@ export function PileJournal() {
     try {
       const response = await authFetch(`/api/pile-passports/export?${journalParams(filters).toString()}`);
       if (!response.ok) {
+        // Истёкшая сессия приходит английским «Unauthorized», а ответ прокси
+        // без тела — техническим статусом. Человеку нужен русский текст.
+        if (response.status === 401) throw new Error('Сессия истекла — войдите заново.');
         const body = await response.json().catch(() => ({}));
-        throw new Error(body.error || `Сервер ответил ${response.status}`);
+        throw new Error(body.error || 'Сервер не выдал журнал — повторите или обратитесь к администратору.');
       }
       objectUrl = URL.createObjectURL(await response.blob());
       const link = document.createElement('a');
@@ -180,7 +192,13 @@ export function PileJournal() {
       link.click();
       toast.success('Журнал выгружен');
     } catch (exportError) {
-      toast.error(exportError instanceof Error ? exportError.message : 'Не удалось выгрузить журнал');
+      // fetch без сети бросает TypeError с английским «Failed to fetch» — в
+      // русском интерфейсе это не сообщение.
+      toast.error(
+        exportError instanceof TypeError
+          ? 'Нет связи с сервером, выгрузка не выполнена — повторите'
+          : exportError instanceof Error ? exportError.message : 'Не удалось выгрузить журнал',
+      );
     } finally {
       if (objectUrl) URL.revokeObjectURL(objectUrl);
       setExporting(false);
@@ -199,7 +217,7 @@ export function PileJournal() {
             Принимает сваю мастер, он же отправляет её на добивку.
           </p>
         </div>
-        <Button size="sm" variant="outline" className="h-11 text-xs sm:h-8" disabled={exporting}
+        <Button size="sm" variant="outline" className="h-11 text-xs sm:h-8" disabled={exporting || dateRangeInvalid}
           onClick={() => void exportJournal()}>
           {exporting ? 'Выгрузка…' : 'Выгрузить журнал (.xlsx)'}
         </Button>
@@ -253,6 +271,12 @@ export function PileJournal() {
           />
         </label>
 
+        {dateRangeInvalid ? (
+          <p className="text-2xs font-medium text-destructive-strong">
+            Дата начала позже даты окончания
+          </p>
+        ) : null}
+
         <label className="text-2xs text-muted-foreground">
           № сваи
           <input
@@ -283,10 +307,22 @@ export function PileJournal() {
 
       {rows === null ? <p className="text-sm text-muted-foreground">Загрузка журнала…</p> : null}
       {rows?.length === 0 ? (
-        <p className="rounded-md border border-border p-4 text-sm text-muted-foreground">
-          По этой выборке записей нет. Паспорта свай заводит машинист на вкладке «Сваи»,
-          мастер может дописать пропущенную сваю за него.
-        </p>
+        filters.status === 'PENDING' && !error ? (
+          // Пусто из-за стартового фильтра «Не разобранные» — это не «паспортов
+          // нет», а «все сваи уже разобраны». Объясняем фильтр и даём выход в «Все».
+          <div className="rounded-md border border-border p-4 text-sm text-muted-foreground">
+            <p>Все сваи объекта разобраны — среди неразобранных записей нет.</p>
+            <Button size="sm" variant="outline" className="mt-2 min-h-11 text-xs sm:min-h-8"
+              onClick={() => patch({ status: 'ALL' })}>
+              Показать все
+            </Button>
+          </div>
+        ) : (
+          <p className="rounded-md border border-border p-4 text-sm text-muted-foreground">
+            По этой выборке записей нет. Паспорта свай заводит машинист на вкладке «Сваи»,
+            мастер может дописать пропущенную сваю за него.
+          </p>
+        )
       ) : null}
 
       {rows && rows.length > 0 ? (
