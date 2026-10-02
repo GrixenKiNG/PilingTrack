@@ -51,7 +51,7 @@ decidePilePassport уже правильно проверял trim(note), выд
 
 ## D6 — ревью ночных правок Hermes
 
-Read-only git -C D:\PillingR\wt-night log a5cfa9ff..HEAD и diff 713ae2c1..hermes/q4-0926 -- src/. Проверенный tip 38d2b889: шесть новых коммитов 803133ac, dc7b2629, a2ce1238, 8cdb47b5, 435492af, 38d2b889. Прочитан весь production diff и новые тесты: 6 production-файлов и 5 test-файлов. Merge --no-ff выполнен без конфликтов: e5fcb793; попал также read-only аудит R110, его рекомендации не реализовывались. Forbidden/operator/ORION/security/schema/compose файлы этим merge не менялись.
+Read-only git -C D:\PillingR\wt-night log a5cfa9ff..HEAD и diff 713ae2c1..hermes/q4-0926 -- src/. Проверенный tip 38d2b889: шесть новых коммитов 803133ac, dc7b2629, a2ce1238, 8cdb47b5, 435492af, 38d2b889. Прочитан весь production diff и новые тесты: 6 production-файлов и 5 test-файлов. Merge --no-ff выполнен без конфликтов: e5fcb793, фактический второй родитель d68afe13 (38d2b889 плюс документационный R110); его рекомендации не реализовывались. Финальная сверка refs: hermes/q4-0926 = 1859fe12, после d68afe13 добавлены только аудиты R111/R112, diff 38d2b889..hermes/q4-0926 -- src/ пустой. R111/R112 не слиты. Forbidden/operator/ORION/security/schema/compose файлы этим merge не менялись.
 
 Исправленная регрессия повторной загрузки объектов: cancelled проверялся только ДО await res.json(). Новый повтор мог успешно показать свежие объекты, затем поздний JSON старого запроса перезаписывал фильтр прежним списком. Добавлена одна проверка cancelled ПОСЛЕ await. Красный тест на коде Hermes: exit 1, 1 failed/6 passed/0 skipped. Зелёные все 5 затронутых test-файлов: exit 0, 55 passed/0 failed/0 skipped. Журналы d6-red.log/d6-green.log. Тест выполняет два запроса и завершает старый JSON после нового, затем проверяет сохранение свежего списка, а не только строку текста.
 
@@ -72,3 +72,98 @@ Read-only git -C D:\PillingR\wt-night log a5cfa9ff..HEAD и diff 713ae2c1..herme
 ## D7 — ранбук релиза
 
 Создан docs/runbooks/016-release-2026-10.md: принятие в main и точное равенство origin/main, диск/образы/rollback, диапазон миграций и свежий migrate-image при необходимости, workers smoke и app artifact/runtime distinction, зависимости без ненужного restart, полный внешний/compose stop-барьер и внутренний shutdown deadline, post-deploy version/deep-health/Redis leaders/backlog/Telegram/alerts, rollback тем же барьером, PDF flags именно в workers.environment (env_file отсутствует) и сначала dry-run. Уточнены ограничения local storage, lease без DB fencing, сохранность helper при возврате к старому git SHA. Все команды в этом документе — план для Claude/владельца; ни один production шаг не выполнен. Диапазон a803e61c..HEAD по prisma/migrations пустой; фактический production OLD_SHA оператор обязан сверить заново. Проверено чтением актуального кода и git diff --check; red/unit tests для документа не применимы.
+
+Коммит дополнительной проверки аргументов D1: 01b9ab0f. Проверка неизвестных сервисов выполняется до нормализации app/workers, чтобы неизвестный аргумент не исчезал молча. Коммит D7: 56641136.
+
+## D8 — финальная проверка ветки
+
+D1–D8 завершены локально; это не подтверждение готовности production-конфигурации или браузерных сценариев. Ни один production-шаг ранбука не выполнялся. Проверки ниже выполнены на 56641136; после них изменён только этот отчёт.
+
+| Команда / проверка | Реальный exit | Результат |
+|---|---:|---|
+| Безопасное удаление устаревшего .next/dev/types | 0 | Проверен абсолютный путь внутри wt-codex4 и отсутствие ReparsePoint перед Remove-Item |
+| npx.cmd --no-install tsc --noEmit до build | 0 | Ошибок нет; output/codex-t4/d8-tsc.log |
+| npm.cmd run lint | 0 | 0 errors / 0 warnings; text integrity passed; d8-lint.log |
+| npx.cmd --no-install vitest run --maxWorkers=2 --reporter=default --reporter=json --outputFile.json=output/codex-t4/d8-vitest.json | 0 | 2968 passed / 0 failed / 84 skipped, всего 3052; файлов 331 passed / 10 skipped = 341; 262.00с; d8-vitest.log/json |
+| npx.cmd --no-install playwright test --list | 0 | 99 тестов в 11 файлах, число не снизилось; d8-playwright-list.log. Сценарии не запускались |
+| docker build -f Dockerfile.workers --target runner -t codex-workers:smoke . | 0 | Образ собран; d8-workers-build.log |
+| bash scripts/smoke-workers-image.sh codex-workers:smoke | 0 | Проверены запуск и Arming в изолированном контейнере, network none; d8-workers-smoke.log |
+| npm run build через node output/codex-t4/build-d8.cjs | 0 | Проверка env, db:generate, Next webpack / TypeScript / 94 страницы и standalone assets завершены; d8-build-retry.log |
+| npx.cmd --no-install tsc --noEmit после build | 0 | Повтор с актуальными типами Next также без ошибок |
+| bash -n scripts/deploy-prod.sh | 0 | Отдельный запуск |
+| bash -n scripts/replace-worker-generation.sh | 0 | Отдельный запуск |
+| bash -n scripts/test-worker-generation.sh | 0 | Отдельный запуск |
+| bash -n scripts/test-m6-m8.sh | 0 | Отдельный запуск |
+| GitNexus detect-changes --scope all --repo . через разрешённый runner | 1 | Глобальный CLI отсутствует; GITNEXUS_INVOCATION=gitnexus исключает автоустановку; d8-gitnexus.log. Использован разрешённый rg/diff fallback |
+
+npm run test:unit — это ровно vitest run по package.json. Отдельно повторно не запускался: выше выполнен полный Vitest, требуемый D8, с ограничением параллелизма и JSON-результатом. Его 84 skipped не объявляются успешными проверками БД. Живые D2 (3/3) и D5 (21/21) выполнены отдельно без skipped; результаты описаны в соответствующих разделах.
+
+Build запускался с заданными задачей фиктивными DATABASE_URL_POSTGRES=postgresql://x:x@localhost:5432/x и DATABASE_PROVIDER=postgres. SESSION_SECRET сгенерирован crypto.randomBytes(32).toString('hex') только в памяти родительского Node-процесса и передан дочернему env, нигде не записан и не выведен. Реальные .env/секреты не читались и не изменялись. Первый wrapper через cmd.exe завершился exit 1 с The syntax of the command is incorrect до запуска npm; журнал d8-build.log. Исправлен только игнорируемый wrapper на Git Bash, повтор actual npm build завершился exit 0.
+
+Предупреждения успешной сборки: REDIS_URL не задан (локальный rate limit in-memory), SENTRY_AUTH_TOKEN не задан (нет загрузки sourcemaps), optional @valkey/valkey-glide отсутствует в BullMQ. Зависимости и env не подставлялись для подавления предупреждений. Фиктивная конфигурация build не доказывает production Redis/БД/Telegram или работу PDF-очистки.
+
+Одноразовые контейнеры/сети собственных codex-deploytest/codex-pg/worker-smoke запусков удалены; codex-workers:smoke удалён без force (exit 0, sha256:8f807c5d0cabe3d031a3409b9d54c9e89b5b01eec50e542ba9f7abe5bc76016a). Общие базовые postgres/alpine и Docker build cache не чистились. pilingtrack-* не трогались. Журналы и локальные вспомогательные файлы output/codex-t4 игнорируются Git и не входят в коммиты.
+
+## Коммиты и изменённые файлы
+
+Исходный HEAD 7f676926; все изменения в разрешённой существующей ветке codex/night-1003. Каждая логическая правка — отдельный коммит, новые поведенческие тесты сначала проверены на старом коде (красные результаты выше). Последний коммит (CODEX-D8) содержит только этот итоговый отчёт; его hash указан в финальном сообщении и доступен через git log -1.
+
+| Коммит | Изменение |
+|---|---|
+| df0913d7 | (CODEX-D1) Добавить барьер смены поколения воркеров |
+| a4398d65 | (CODEX-D2) Доказать M6–M8 на одноразовом Postgres |
+| e297aaf6 | (CODEX-D3) Брать организацию события бригады из Site |
+| 403ebc2f | (CODEX-D4) Требовать основание добивки в схеме API |
+| 59f2de4f | (CODEX-D5) Убрать семь предупреждений lint явными проверками |
+| e5fcb793 | (CODEX-D6) Включить проверенные ночные правки Hermes до 38d2b889 |
+| ae90b421 | (CODEX-D6) Не подменять свежие объекты поздним ответом прежнего запроса |
+| f8595269 | (CODEX-D1) Блокировать новое поколение при скрытой ошибке остановки |
+| 01b9ab0f | (CODEX-D1) Проверять список сервисов до выбора режима поколения |
+| 56641136 | (CODEX-D7) Подготовить пошаговый ранбук выкладки и отката релиза |
+
+Полный diff относительно 7f676926, включая разрешённый merge Hermes. Числа — добавленные/удалённые строки (git diff --numstat), не общий размер файла. Удалённых файлов нет; доказательство ненужности файлов/экспортов для удаления не требуется. Единственная удалённая неиспользуемая локальная переменная tenantB описана в D5.
+
+| Путь | + строк | − строк |
+|---|---:|---:|
+| `CODEX-REPORT-T4.md` | 169 | 0 |
+| `docs/audits/hermes-night/R110-safety-messages.md` | 111 | 0 |
+| `docs/runbooks/008-manual-deploy.md` | 12 | 0 |
+| `docs/runbooks/016-release-2026-10.md` | 121 | 0 |
+| `scripts/deploy-prod.sh` | 15 | 2 |
+| `scripts/replace-worker-generation.sh` | 56 | 0 |
+| `scripts/test-m6-m8.sh` | 9 | 0 |
+| `scripts/test-worker-generation.sh` | 60 | 0 |
+| `src/app/api/crews/all/__tests__/route.test.ts` | 8 | 0 |
+| `src/app/api/crews/all/route.ts` | 2 | 1 |
+| `src/app/api/pile-passports/[id]/decide/__tests__/route.test.ts` | 11 | 0 |
+| `src/app/api/pile-passports/[id]/decide/route.ts` | 5 | 1 |
+| `src/components/piling/__tests__/admin-dashboard.test.tsx` | 102 | 3 |
+| `src/components/piling/admin-dashboard.tsx` | 41 | 4 |
+| `src/components/piling/admin-sites/__tests__/use-site-mutations.test.ts` | 32 | 1 |
+| `src/components/piling/admin-sites/use-site-mutations.ts` | 29 | 14 |
+| `src/components/piling/layout-editor/__tests__/layout-load-failure.test.tsx` | 82 | 0 |
+| `src/components/piling/layout-editor/layout-editor.tsx` | 14 | 0 |
+| `src/components/piling/layout-editor/page-layout-editor.tsx` | 13 | 0 |
+| `src/components/piling/maintenance/__tests__/maintenance-messages.test.tsx` | 40 | 0 |
+| `src/components/piling/maintenance/maintenance-board.tsx` | 16 | 7 |
+| `src/components/piling/monitoring/__tests__/equipment-tile-block.test.tsx` | 23 | 1 |
+| `src/components/piling/monitoring/equipment-tile-block.tsx` | 26 | 6 |
+| `src/modules/crews/infrastructure/__tests__/crew.repository.test.ts` | 18 | 5 |
+| `src/modules/crews/infrastructure/crew.repository.ts` | 4 | 7 |
+| `src/modules/reports/application/queries/__tests__/pile-passport.service.test.ts` | 19 | 3 |
+| `tests/integration/disposable-m6-m8.spec.ts` | 137 | 0 |
+| `tests/integration/rls-tenant-enforcement.spec.ts` | 2 | 1 |
+| `tests/integration/tech-readiness-projection.spec.ts` | 2 | 1 |
+| `tests/integration/tech-readiness-shifts.spec.ts` | 4 | 2 |
+| `tests/integration/tech-readiness-work-permits.spec.ts` | 2 | 2 |
+
+## Что оставлено без изменений и пределы доказательств
+
+- main, другие рабочие деревья, production, SSH/SCP, push/deploy, реальные БД/Telegram не использованы. Другие папки только читались в прямо разрешённых исключениях GitNexus и wt-night.
+- package*.json/версии, schema/migrations, auth/security/CSRF/rate-limiter/RLS/tenancy-реализация, Dockerfile/compose, операторские экраны и ORION не менялись. Старые намеренные eslint-disable сохранены. Отдельный диапазон миграций a803e61c..HEAD пустой, фактический production OLD_SHA неизвестен.
+- D1 не обнаруживает внешние процессы на других хостах и не предоставляет DB fencing. Ранбук требует ручного подтверждения их остановки, проверки Redis lease/логов и фактических старых контейнеров. Compose up не атомарен; ошибка компенсируется stop. Timeout без увеличения внутреннего drain-дедлайна не разрешает запуск.
+- D2 M7 доказывает сохранность состояния в БД при перезапуске клиента/модулей в одном процессе. OS crash, реальные Telegram API, HTTP submit workflow, S3 и production storage не проверялись. Очистка PDF не включалась: дефолты enabled=false/dry-run=true сохранены.
+- Playwright проверен только на сбор тестов. Браузерные E2E, native beforeunload, мобильные размеры и живые роли не проверялись; остаточные замечания D6 приведены выше и не устранены сверх задачи.
+- GitNexus графовые callers/processes/risk недоступны; пустой результат не трактуется как безопасность. Использован прямо разрешённый задачей текстовый fallback. Предупреждения build перечислены выше.
+
+Финальный git diff --check — exit 0; git diff --stat — exit 0 (изменён только отчёт). Forbidden paths diff пустой, exit 0. После коммита чистота дерева проверяется отдельно и указывается в финальном сообщении.
