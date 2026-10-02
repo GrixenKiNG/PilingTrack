@@ -86,6 +86,10 @@ export function AdminSites() {
 
   // Hierarchy tree of the selected site (loaded on demand).
   const [siteTree, setSiteTree] = useState<Record<string, SiteFullData>>({});
+  // Отказ загрузки дерева: блоки «Иерархия» и «Установки и бригады»
+  // оставались вечным «Загрузка…» (находка 8).
+  const [treeError, setTreeError] = useState<Record<string, boolean>>({});
+  const [treeAttempt, setTreeAttempt] = useState(0);
   const [, setExpandedSiteId] = useState<string | null>(null);
 
   const mutations = useSiteMutations({ setSites, setSiteTree, setExpandedSiteId });
@@ -148,16 +152,17 @@ export function AdminSites() {
     void (async () => {
       try {
         const res = await authFetch(`/api/sites/${id}`);
-        if (res.ok && !cancelled) {
-          const data = await res.json();
-          setSiteTree((prev) => ({ ...prev, [id]: data.site }));
-        }
+        if (!res.ok) throw new Error('tree load failed');
+        const data = await res.json();
+        if (cancelled) return;
+        setSiteTree((prev) => ({ ...prev, [id]: data.site }));
+        setTreeError((prev) => (prev[id] ? { ...prev, [id]: false } : prev));
       } catch {
-        /* tree is best-effort */
+        if (!cancelled) setTreeError((prev) => ({ ...prev, [id]: true }));
       }
     })();
     return () => { cancelled = true; };
-  }, [active?.siteId, siteTree]);
+  }, [active?.siteId, siteTree, treeAttempt]);
 
   const refreshTree = async (siteId: string) => {
     try {
@@ -293,6 +298,8 @@ export function AdminSites() {
               onToggleCompleted={() => mutations.handleSetCompleted(toListItem(active), !active.completionDate)}
               onToggleActive={() => (active.isActive ? setDeactivateRow(active) : mutations.handleToggleActive(toListItem(active)))}
               tree={siteTree[active.siteId]}
+              treeError={!!treeError[active.siteId]}
+              onRetryTree={() => setTreeAttempt((value) => value + 1)}
               onAddHierarchy={(type, siteId, parentId) => { setAddType(type); setAddSiteId(siteId); setAddParentId(parentId); setShowAdd(true); }}
               onDeleteHierarchy={async (siteId, type, itemId) => { await mutations.handleDeleteHierarchy(siteId, type, itemId); await refreshTree(siteId); }}
             />
@@ -381,6 +388,7 @@ export function AdminSites() {
         onAdd={async (name) => {
           const ok = await mutations.handleAddHierarchy(addSiteId, addParentId, addType, name);
           if (ok) { setShowAdd(false); await refreshTree(addSiteId); }
+          return ok;
         }}
       />
 
@@ -399,12 +407,14 @@ export function AdminSites() {
 }
 
 function SiteDetail({
-  row, canManage, togglingId, tree, onEdit, onDelete, onAssign, onToggleCompleted, onToggleActive, onAddHierarchy, onDeleteHierarchy,
+  row, canManage, togglingId, tree, treeError, onRetryTree, onEdit, onDelete, onAssign, onToggleCompleted, onToggleActive, onAddHierarchy, onDeleteHierarchy,
 }: {
   row: SiteOverviewRow;
   canManage: boolean;
   togglingId: string | null;
   tree?: SiteFullData;
+  treeError: boolean;
+  onRetryTree: () => void;
   onEdit: () => void;
   onDelete: () => void;
   onAssign: () => void;
@@ -443,13 +453,20 @@ function SiteDetail({
         <LabeledProgress label="Бурение" pct={row.drillingProgress} planned={row.plannedDrilling} tone="blue" />
       </div>
 
-      <SiteCrewBoard crews={tree?.crews} />
+      <SiteCrewBoard crews={tree?.crews} error={treeError} />
 
       <div className="rounded-md border border-border p-2.5">
         <h3 className="mb-1.5 flex items-center gap-2 text-xs font-semibold text-foreground"><Network className="h-4 w-4 text-muted-foreground" />Иерархия</h3>
         {tree
           ? <HierarchyTree readOnly={!canManage} siteId={row.siteId} tree={tree} onAdd={onAddHierarchy} onDelete={onDeleteHierarchy} />
-          : <p className="text-2xs text-muted-foreground">Загрузка структуры…</p>}
+          : treeError
+            ? (
+              <div className="space-y-2">
+                <p className="text-2xs text-destructive-strong">Не удалось загрузить структуру</p>
+                <Button size="sm" variant="outline" onClick={onRetryTree} className="h-11 text-xs sm:h-8">Повторить</Button>
+              </div>
+            )
+            : <p className="text-2xs text-muted-foreground">Загрузка структуры…</p>}
       </div>
 
       <PermittedEntityHistory scope="sites" targetId={row.siteId} title="История изменений" />
@@ -475,7 +492,7 @@ const EQUIPMENT_STATE: Record<string, { label: string; className: string }> = {
  * снимок модели узнаётся быстрее названия. Снимка на модель нет — показываем
  * название, а не пустую рамку.
  */
-function SiteCrewBoard({ crews }: { crews?: SiteCrew[] }) {
+function SiteCrewBoard({ crews, error }: { crews?: SiteCrew[]; error?: boolean }) {
   return (
     <div className="rounded-md border border-border p-2.5">
       <h3 className="mb-1.5 flex items-center gap-2 text-xs font-semibold text-foreground">
@@ -484,7 +501,10 @@ function SiteCrewBoard({ crews }: { crews?: SiteCrew[] }) {
         {crews?.length ? <span className="font-mono text-2xs text-muted-foreground">{crews.length}</span> : null}
       </h3>
 
-      {crews === undefined ? <p className="text-2xs text-muted-foreground">Загрузка…</p> : null}
+      {crews === undefined && error ? (
+        <p className="text-2xs text-destructive-strong">Не удалось загрузить состав бригад — повторите в блоке «Иерархия».</p>
+      ) : null}
+      {crews === undefined && !error ? <p className="text-2xs text-muted-foreground">Загрузка…</p> : null}
       {crews?.length === 0 ? (
         <p className="text-2xs text-muted-foreground">
           За объектом не закреплено ни одной бригады. Закрепление — в модуле «Бригады».

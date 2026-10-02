@@ -47,6 +47,29 @@ export interface SitesOverview {
   reload: () => void;
 }
 
+/** Отказ чтения: статус сервера либо обрыв связи (status = null). */
+class OverviewError extends Error {
+  constructor(readonly status: number | null) {
+    super('overview load failed');
+    this.name = 'OverviewError';
+  }
+}
+
+/**
+ * Понятный русский текст вместо «Аналитика объектов недоступна (403)» и
+ * браузерного «Failed to fetch» (находки 3 и 4): 403 — это права, а не сбой,
+ * обрыв связи отличается и от того, и от другого.
+ */
+function overviewErrorMessage(cause: unknown): string {
+  if (!(cause instanceof OverviewError)) {
+    return 'Нет соединения с сервером. Проверьте связь и нажмите «Повторить».';
+  }
+  if (cause.status === 403) {
+    return 'Нет прав на просмотр объектов. Смените роль или обратитесь к администратору.';
+  }
+  return 'Не удалось загрузить объекты. Сервер вернул ошибку.';
+}
+
 export function useSitesOverview(): SitesOverview {
   const [rows, setRows] = useState<SiteOverviewRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -66,7 +89,7 @@ export function useSitesOverview(): SitesOverview {
           authFetch('/api/analytics/sites'),
           authFetch('/api/crews/all'),
         ]);
-        if (!analyticsRes.ok) throw new Error(`Аналитика объектов недоступна (${analyticsRes.status})`);
+        if (!analyticsRes.ok) throw new OverviewError(analyticsRes.status);
         const analytics: SiteAnalytics[] = (await analyticsRes.json()).analytics ?? [];
         // The endpoint responds { crews: [...] } — reading .data here used to
         // zero out every site's crew count ("Без бригад: 2" with 7 active crews).
@@ -98,7 +121,7 @@ export function useSitesOverview(): SitesOverview {
           setCrewsError(!crewsLoaded);
         }
       } catch (err) {
-        if (!cancelled) setError(err instanceof Error ? err.message : 'Не удалось загрузить объекты');
+        if (!cancelled) setError(overviewErrorMessage(err));
       } finally {
         if (!cancelled) setLoading(false);
       }
