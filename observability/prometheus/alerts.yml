@@ -201,6 +201,37 @@ groups:
           summary: "Публикация outbox отстала больше чем на минуту"
           description: "Самое старое неопубликованное outbox-событие ждёт {{ $value }} с (порог кода — 60 с)"
 
+      - alert: ProjectionLagHigh
+        expr: projection_lag_seconds{job="pilingtrack-app"} > 300
+        for: 5m
+        labels:
+          severity: critical
+          service: pilingtrack-app
+        annotations:
+          summary: "CRITICAL: проекция outbox отстала больше чем на 5 минут"
+          description: "Самое старое непрожектированное событие ждёт {{ $value }} с, независимо от публикации и retry backoff"
+
+      - alert: ProjectionLagWarn
+        expr: projection_lag_seconds{job="pilingtrack-app"} > 60
+        for: 10m
+        labels:
+          severity: warning
+          service: pilingtrack-app
+        annotations:
+          summary: "Проекция outbox отстала больше чем на минуту"
+          description: "Самое старое непрожектированное событие ждёт {{ $value }} с — проверить projection worker"
+
+      - alert: LagSnapshotStale
+        # Сбор каждые 10 с; 60 с допускают шесть циклов. 0: успешного сбора ещё не было.
+        expr: time() - lag_snapshot_timestamp_seconds{job="pilingtrack-app"} > 60 or lag_snapshot_timestamp_seconds{job="pilingtrack-app"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          service: pilingtrack-app
+        annotations:
+          summary: "Метрики outbox и проекции не обновляются"
+          description: "Нет свежего успешного lag-снимка на {{ $labels.instance }} — старые нули не подтверждают здоровую очередь"
+
       - alert: DeadLetterQueueNotEmpty
         expr: dlq_pending_count > 0
         for: 5m

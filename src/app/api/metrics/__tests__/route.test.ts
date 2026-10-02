@@ -23,10 +23,11 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { SystemStatus } from '@/core/observability/health-tracker';
 
-const { requireAuthMock, assertCanMock, getCurrentStatusMock } = vi.hoisted(() => ({
+const { requireAuthMock, assertCanMock, getCurrentStatusMock, exportLagMetricsMock } = vi.hoisted(() => ({
   requireAuthMock: vi.fn(),
   assertCanMock: vi.fn(),
   getCurrentStatusMock: vi.fn<() => SystemStatus | null>(),
+  exportLagMetricsMock: vi.fn(() => 'lag_snapshot_timestamp_seconds 0\n'),
 }));
 
 vi.mock('@/lib/auth', () => ({ requireAuth: requireAuthMock }));
@@ -37,7 +38,7 @@ vi.mock('@/services/auth/authorization-service', async () => {
 vi.mock('@/lib/cache-metrics', () => ({ generatePrometheusMetrics: () => '# cache metrics\n' }));
 vi.mock('@/core/observability/lag-monitor', () => ({
   getLagMetrics: () => null,
-  exportPrometheusMetrics: () => '',
+  exportPrometheusMetrics: exportLagMetricsMock,
 }));
 vi.mock('@/core/observability/health-tracker', () => ({ getCurrentStatus: getCurrentStatusMock }));
 vi.mock('@/lib/logger', () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }));
@@ -59,12 +60,19 @@ describe('GET /api/metrics — scrape token auth', () => {
   beforeEach(() => {
     requireAuthMock.mockReset();
     assertCanMock.mockReset();
+    exportLagMetricsMock.mockClear();
     getCurrentStatusMock.mockReset().mockReturnValue(null);
     process.env.METRICS_SCRAPE_TOKEN = TOKEN;
   });
   afterEach(() => {
     process.env.METRICS_SCRAPE_TOKEN = originalEnv;
     vi.restoreAllMocks();
+  });
+
+  it('exports missing lag snapshot freshness for an authorized scrape', async () => {
+    const res = await GET(req(TOKEN));
+    expect(exportLagMetricsMock).toHaveBeenCalledWith(null);
+    expect(await res.text()).toContain('lag_snapshot_timestamp_seconds 0');
   });
 
   it('accepts a matching Bearer scrape token WITHOUT calling requireAuth/assertCan', async () => {

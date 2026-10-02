@@ -96,9 +96,7 @@ export const GET = withApi(
     // Worker lag metrics
     try {
       const lagMetrics = getLagMetrics();
-      if (lagMetrics) {
-        output += exportPrometheusMetrics(lagMetrics);
-      }
+      output += exportPrometheusMetrics(lagMetrics);
     } catch (err) {
       logger.error('metrics: lag metrics failed', err);
     }
