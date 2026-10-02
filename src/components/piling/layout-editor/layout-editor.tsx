@@ -78,6 +78,20 @@ export function LayoutEditor({
     if (wasEditingRef.current && onClose) onClose();
   }, [controller.editing, onClose]);
 
+  // Пока есть несохранённые правки, предупреждаем при закрытии/перезагрузке
+  // вкладки: уход в обход кнопки «Закрыть» иначе молча теряет черновик
+  // (F-R108-2). Событие `beforeunload` обрабатывается браузером как вопрос
+  // «покинуть страницу?» — достаточно отменить его (preventDefault/returnValue).
+  useEffect(() => {
+    if (!controller.editing || !controller.dirty) return;
+    const warnBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', warnBeforeUnload);
+    return () => window.removeEventListener('beforeunload', warnBeforeUnload);
+  }, [controller.editing, controller.dirty]);
+
   if (!visible) return null;
   if (!controller.editing) {
     // In modal mode the parent controls mounting; don't show the floating entry.

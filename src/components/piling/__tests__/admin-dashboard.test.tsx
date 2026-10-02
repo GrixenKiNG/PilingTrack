@@ -8,8 +8,8 @@
  * До правки любой не-ok ответ аналитики показывал один текст про сеть и
  * сносил весь экран — эти тесты падали.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { fireEvent, render, screen } from '@testing-library/react';
 
 const mocks = vi.hoisted(() => ({ authFetch: vi.fn() }));
 
@@ -75,5 +75,79 @@ describe('AdminDashboard: сбой аналитики не уносит весь
     expect(await screen.findByText('Для выбранного периода нет объектов с планом')).toBeInTheDocument();
     expect(screen.queryByText('Нет прав на аналитику')).not.toBeInTheDocument();
     expect(screen.queryByText('Не удалось загрузить, обновите страницу')).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * F-R109-2: справочник объектов читался один раз при монтировании, и при сбое
+ * `/api/sites/all` блок оставался пустым навсегда — фильтр «Объект» выглядел
+ * как «объектов в системе нет». Теперь в блоке видно «Объекты не загрузились»
+ * и кнопка «Повторить» перезапрашивает список.
+ */
+describe('AdminDashboard: сбой справочника объектов повторяется (F-R109-2)', () => {
+  beforeEach(() => {
+    mocks.authFetch.mockReset();
+  });
+
+  it('сбой /api/sites/all → «Объекты не загрузились»; «Повторить» перечитывает список', async () => {
+    let sitesCalls = 0;
+    mocks.authFetch.mockImplementation((url: string) => {
+      if (url.startsWith('/api/analytics/sites')) return Promise.resolve(json({ analytics: [] }));
+      if (url.startsWith('/api/monitoring/fleet')) return Promise.resolve(json(fleet));
+      if (url.startsWith('/api/maintenance')) return Promise.resolve(json({ records: [] }));
+      if (url.startsWith('/api/reports/recent')) return Promise.resolve(json({ reports: [] }));
+      if (url.startsWith('/api/sites/all')) {
+        sitesCalls += 1;
+        return Promise.resolve(
+          sitesCalls === 1
+            ? json({ error: 'Ошибка сервера' }, 500)
+            : json({ sites: [{ id: 's1', name: 'Объект №1' }] }),
+        );
+      }
+      return Promise.resolve(json({}));
+    });
+    render(<AdminDashboard />);
+
+    expect(await screen.findByText('Объекты не загрузились')).toBeInTheDocument();
+    // Справочник не прочитан — в фильтре только «Все объекты».
+    expect(screen.queryByText('Объект №1')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Повторить' }));
+
+    expect(await screen.findByText('Объект №1')).toBeInTheDocument();
+    expect(screen.queryByText('Объекты не загрузились')).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * F-R109-3: на панели не было ни одной отметки свежести — диспетчер держит
+ * /admin открытым часами и не отличает свежие данные от устаревших. Теперь под
+ * шапкой строка «Обновлено в ЧЧ:ММ» — местное время последней успешной загрузки
+ * аналитики. При сбое аналитики отметки нет (время нечего помечать).
+ */
+describe('AdminDashboard: отметка свежести аналитики (F-R109-3)', () => {
+  beforeEach(() => {
+    mocks.authFetch.mockReset();
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date(2026, 9, 3, 14, 5));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('после успешной загрузки аналитики под шапкой «Обновлено в 14:05»', async () => {
+    mockFetch(json({ analytics: [] }));
+    render(<AdminDashboard />);
+
+    expect(await screen.findByText('Обновлено в 14:05')).toBeInTheDocument();
+  });
+
+  it('при сбое аналитики отметки свежести нет', async () => {
+    mockFetch(json({ error: 'Ошибка сервера' }, 500));
+    render(<AdminDashboard />);
+
+    expect(await screen.findByText('Не удалось загрузить, обновите страницу')).toBeInTheDocument();
+    expect(screen.queryByText(/^Обновлено в /)).not.toBeInTheDocument();
   });
 });

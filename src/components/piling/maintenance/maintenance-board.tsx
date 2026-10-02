@@ -87,19 +87,24 @@ export function MaintenanceBoard() {
     [assignees],
   );
 
-  const load = useCallback(async () => {
+  // Возвращает признак успеха, чтобы вызывающий знал, перечитан ли журнал.
+  // `quiet = true` — перечитывание ради 409: тост об отказе скажет сам
+  // вызывающий, иначе человек получит два противоречащих сообщения.
+  const load = useCallback(async (quiet = false): Promise<boolean> => {
     setLoading(true);
     try {
       const res = await authFetch(`/api/maintenance${buildMaintenanceQuery(filter)}`);
       // 403 (нет права), 5xx и прочие отказы — разные причины: раньше все они
       // звучали как «не удалось загрузить», и отказ по правам не отличался от сбоя.
       if (!res.ok) {
-        toast.error(maintenanceErrorText(res.status));
-        return;
+        if (!quiet) toast.error(maintenanceErrorText(res.status));
+        return false;
       }
       setRecords(((await res.json()).records ?? []) as WorkOrderRow[]);
+      return true;
     } catch (err) {
-      toast.error(maintenanceCatchText(err, 'Не удалось загрузить наряды ТО'));
+      if (!quiet) toast.error(maintenanceCatchText(err, 'Не удалось загрузить наряды ТО'));
+      return false;
     } finally {
       setLoading(false);
     }
@@ -221,9 +226,13 @@ export function MaintenanceBoard() {
         const err = await res.json().catch(() => ({}));
         if (res.status === 409) {
           // Наряд изменили или приняли, пока экран был открыт. Перечитываем его,
-          // иначе повтор кнопкой снова упрётся в тот же 409.
-          toast.error('Запись изменилась — данные обновлены, повторите действие.');
-          await load();
+          // иначе повтор кнопкой снова упрётся в тот же 409. Обещать «данные
+          // обновлены» можно только после удачного перечитывания: если журнал
+          // не прочитался, строка на экране прежняя и повтор по ней бессмыслен.
+          const reloaded = await load(true);
+          toast.error(reloaded
+            ? 'Запись изменилась — данные обновлены, повторите действие.'
+            : 'Данные изменил другой пользователь, обновите страницу.');
           return;
         }
         throw new Error(maintenanceErrorText(res.status, err.error));

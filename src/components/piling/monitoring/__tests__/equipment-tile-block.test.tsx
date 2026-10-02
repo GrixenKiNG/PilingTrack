@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { FleetCard } from '@/components/piling/admin-equipment/fleet-types';
 import { createMemoryEquipmentTileAssetStorage } from '../equipment-tile-asset-storage';
@@ -106,5 +106,27 @@ describe('EquipmentTileBlockContent — фото', () => {
 
     expect(screen.getByText('Фото не загружено')).toBeInTheDocument();
     expect(mocks.authFetch).not.toHaveBeenCalled();
+  });
+
+  it('пока ссылка получается — «Загрузка фото…», а не «Фото не загружено» (F-M4-TILE)', async () => {
+    // Запрос за presigned-ссылкой ещё висит: это не «фото нет».
+    mocks.authFetch.mockImplementation(() => new Promise(() => {}));
+
+    renderBlock();
+
+    expect(await screen.findByText('Загрузка фото…')).toBeInTheDocument();
+    expect(screen.queryByText('Фото не загружено')).not.toBeInTheDocument();
+  });
+
+  it('сбой самого снимка после получения ссылки — «Фото не загрузилось» (F-M4-TILE)', async () => {
+    mocks.authFetch.mockResolvedValue({ ok: true, json: async () => ({ url: 'https://s3/broken.jpg' }) });
+
+    renderBlock();
+
+    const image = await screen.findByAltText('Фото установки');
+    fireEvent.error(image);
+
+    expect(await screen.findByText('Фото не загрузилось')).toBeInTheDocument();
+    expect(screen.queryByAltText('Фото установки')).not.toBeInTheDocument();
   });
 });

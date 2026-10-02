@@ -17,7 +17,7 @@ const { authFetchMock } = vi.hoisted(() => ({ authFetchMock: vi.fn() }));
 vi.mock('@/lib/api', () => ({ authFetch: authFetchMock }));
 vi.mock('sonner', () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 
-import { extractApiError, useSiteMutations } from '../use-site-mutations';
+import { catchText, extractApiError, useSiteMutations } from '../use-site-mutations';
 import { deactivateDescription } from '../site-deactivate';
 
 function res(json: () => Promise<unknown>): Response {
@@ -137,6 +137,37 @@ describe('useSiteMutations — отказ сервера доходит до ч�
     await act(async () => { await result.current.handleDeleteHierarchy('s1', 'cluster', 'c1'); });
 
     expect(toast.error).toHaveBeenCalledWith('Нет соединения с сервером. Проверьте связь и повторите.');
+  });
+
+  it('не-JSON ответ сервера → «ответил неожиданно», а не «нет связи» (F-M4-SITES)', async () => {
+    authFetchMock.mockResolvedValue(
+      new Response('<html>страница-перехватчик</html>', { status: 200 }),
+    );
+    const { result } = renderHook(() => useSiteMutations(options()));
+
+    await act(async () => { await result.current.handleCreateSite('Объект', [], []); });
+
+    expect(toast.error).toHaveBeenCalledWith('Сервер ответил неожиданно, повторите позже.');
+  });
+});
+
+describe('catchText — обрыв связи не путается с ответом сервера (F-M4-SITES)', () => {
+  it('TypeError от fetch («Failed to fetch») → «Нет соединения»', () => {
+    expect(catchText(new TypeError('Failed to fetch'))).toBe(
+      'Нет соединения с сервером. Проверьте связь и повторите.',
+    );
+  });
+
+  it('ошибка разбора ответа (не TypeError) → «Сервер ответил неожиданно»', () => {
+    expect(catchText(new SyntaxError('Unexpected token < in JSON'))).toBe(
+      'Сервер ответил неожиданно, повторите позже.',
+    );
+  });
+
+  it('иная ошибка → «Сервер ответил неожиданно», а не «Нет соединения»', () => {
+    expect(catchText(new Error('Не удалось разобрать ответ'))).toBe(
+      'Сервер ответил неожиданно, повторите позже.',
+    );
   });
 });
 

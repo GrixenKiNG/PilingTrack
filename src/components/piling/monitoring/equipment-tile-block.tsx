@@ -31,11 +31,13 @@ function Value({ label, value, icon }: { label: string; value: React.ReactNode; 
   );
 }
 
-// Три состояния, а не два: «фото нет» и «фото не прочиталось» — разные вещи.
-// Отказ выдачи ссылки (403/500/обрыв) раньше схлопывался в «Фото не загружено»,
-// и диспетчер принимал непрочитанный снимок за отсутствующий.
+// Четыре состояния: «фото нет», «ссылка ещё получается», «ссылка не выдалась»
+// и «ссылка есть, но сам снимок не открылся». Отказ выдачи (403/500/обрыв)
+// раньше схлопывался в «Фото не загружено», и диспетчер принимал непрочитанный
+// снимок за отсутствующий; время получения ссылки — тоже ещё не «нет фото».
 type PhotoResolution =
   | { status: 'none' }
+  | { status: 'loading' }
   | { status: 'error' }
   | { status: 'ok'; url: string };
 
@@ -44,7 +46,11 @@ type PhotoResolution =
 // can't point at it directly, so resolve it first. cdnUrl values pass through.
 function useResolvedPhotoUrl(photoUrl: string | null | undefined): PhotoResolution {
   const [state, setState] = useState<PhotoResolution>(() =>
-    photoUrl && !photoUrl.startsWith('/api/') ? { status: 'ok', url: photoUrl } : { status: 'none' },
+    !photoUrl
+      ? { status: 'none' }
+      : photoUrl.startsWith('/api/')
+        ? { status: 'loading' }
+        : { status: 'ok', url: photoUrl },
   );
 
   useEffect(() => {
@@ -52,7 +58,7 @@ function useResolvedPhotoUrl(photoUrl: string | null | undefined): PhotoResoluti
     if (!photoUrl) { setState({ status: 'none' }); return; }
     if (!photoUrl.startsWith('/api/')) { setState({ status: 'ok', url: photoUrl }); return; }
     let active = true;
-    setState({ status: 'none' });
+    setState({ status: 'loading' });
     void (async () => {
       try {
         const res = await authFetch(photoUrl);
@@ -76,9 +82,23 @@ function useResolvedPhotoUrl(photoUrl: string | null | undefined): PhotoResoluti
 
 function ServerPhoto({ photoUrl, alt, fit }: { photoUrl: string; alt: string; fit: 'cover' | 'contain' }) {
   const photo = useResolvedPhotoUrl(photoUrl);
+  // Ссылка получена, но сам <img> может не открыться (истёкшая presigned-ссылка,
+  // обрыв) — это тоже не «фото нет», а сбой загрузки. Храним адрес сбоя, чтобы
+  // сброс происходил сам при смене ссылки.
+  const [failedUrl, setFailedUrl] = useState<string | null>(null);
   if (photo.status === 'error') return <span className="text-xs text-muted-foreground">Не удалось загрузить фото</span>;
+  if (photo.status === 'loading') return <span className="text-xs text-muted-foreground">Загрузка фото…</span>;
   if (photo.status === 'none') return <span className="text-xs text-muted-foreground">Фото не загружено</span>;
-  return <img src={photo.url} alt={alt} className="h-full w-full" style={{ objectFit: fit }} />;
+  if (failedUrl === photo.url) return <span className="text-xs text-muted-foreground">Фото не загрузилось</span>;
+  return (
+    <img
+      src={photo.url}
+      alt={alt}
+      className="h-full w-full"
+      style={{ objectFit: fit }}
+      onError={() => setFailedUrl(photo.url)}
+    />
+  );
 }
 
 function PhotoBlock({ card }: { card: FleetCard }) {

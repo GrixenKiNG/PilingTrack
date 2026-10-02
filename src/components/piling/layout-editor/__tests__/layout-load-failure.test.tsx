@@ -2,6 +2,7 @@ import { act, fireEvent, render, renderHook, screen, waitFor } from '@testing-li
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { toast } from 'sonner';
 import { PageLayoutEditor } from '../page-layout-editor';
+import { LayoutEditor } from '../layout-editor';
 import type { RenderablePageWidget } from '../page-layout-renderer';
 import { createPageLayoutValidator, type PageLayoutTemplate } from '../page-layout-template';
 import { createTemplateValidator, type LayoutTemplate } from '../layout-template';
@@ -325,5 +326,86 @@ describe('PageLayoutEditor — 403 при сохранении/сбросе (F-R
     fireEvent.click(screen.getByRole('button', { name: 'Сбросить' }));
 
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith(LAYOUT_CSRF_MESSAGE));
+  });
+});
+
+/*
+  F-R108-2: уход со страницы (закрытие/перезагрузка вкладки) не должен молча
+  терять несохранённые правки. Пока `editing && dirty`, движок перехватывает
+  `beforeunload` — как форма отчёта (use-report-form.ts). Без правок и не в
+  режиме правки уход не перехватывается.
+*/
+describe('PageLayoutEditor — предупреждение о несохранённых правках (F-R108-2)', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  const SERVER_PAGE: PageLayoutTemplate = {
+    version: 1,
+    widgets: [
+      { id: 'piles', visible: true, size: 'sm', order: 0 },
+      { id: 'meters', visible: false, size: 'sm', order: 1 },
+    ],
+  };
+
+  it('перехватывает закрытие вкладки только при несохранённых правках', async () => {
+    scriptedFetch([() => new Response(JSON.stringify(SERVER_PAGE), { status: 200 })]);
+    render(<Harness />);
+    await waitFor(() => expect((screen.getAllByRole('checkbox')[1] as HTMLInputElement).checked).toBe(false));
+
+    // Без правок уход не перехватывается.
+    const clean = new Event('beforeunload', { cancelable: true });
+    expect(window.dispatchEvent(clean)).toBe(true);
+    expect(clean.defaultPrevented).toBe(false);
+
+    fireEvent.click(screen.getAllByRole('checkbox')[1]);
+
+    // Появилась правка — браузер предупреждает о закрытии вкладки.
+    const dirty = new Event('beforeunload', { cancelable: true });
+    expect(window.dispatchEvent(dirty)).toBe(false);
+    expect(dirty.defaultPrevented).toBe(true);
+  });
+});
+
+describe('LayoutEditor — предупреждение о несохранённых правках (F-R108-2)', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  const SERVER_TILE: LayoutTemplate = {
+    ...TILE_DEFAULT,
+    blocks: [{ ...TILE_DEFAULT.blocks[0], text: 'С сервера' }],
+  };
+
+  function TileEditorHarness() {
+    const controller = useLayoutTemplate({ surfaceId: 'tile-surface', defaultTemplate: TILE_DEFAULT, validate: createTemplateValidator([]) });
+    return (
+      <LayoutEditor
+        title="Плитка"
+        controller={controller}
+        renderBlockContent={(block) => (block.kind === 'text' ? block.text : null)}
+        dataBlocks={[]}
+        visible
+      />
+    );
+  }
+
+  it('перехватывает закрытие вкладки после правки в полноэкранном редакторе', async () => {
+    stubFetch(() => new Response(JSON.stringify(SERVER_TILE), { status: 200 }));
+    render(<TileEditorHarness />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Редактировать шаблон' }));
+    // Дождаться применения загрузки, иначе она перезапишет добавленный блок.
+    expect(await screen.findByText('С сервера')).toBeInTheDocument();
+
+    const clean = new Event('beforeunload', { cancelable: true });
+    expect(window.dispatchEvent(clean)).toBe(true);
+    expect(clean.defaultPrevented).toBe(false);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Добавить текст' }));
+
+    const dirty = new Event('beforeunload', { cancelable: true });
+    expect(window.dispatchEvent(dirty)).toBe(false);
+    expect(dirty.defaultPrevented).toBe(true);
   });
 });

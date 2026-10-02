@@ -207,3 +207,43 @@ describe('доска нарядов ТО: закрытие с подтвержд
     );
   });
 });
+
+describe('доска нарядов ТО: 409 обещает обновление только после удачного перечитывания (F-M4-MAINT)', () => {
+  /** 409 на PUT; журнал отдаётся первым GET и падает на повторном. */
+  it('сбой перечитывания → «данные обновил другой пользователь», без «данные обновлены»', async () => {
+    let getCalls = 0;
+    mocks.authFetch.mockImplementation(async (url: string, init?: RequestInit) => {
+      if (url.startsWith('/api/media')) return json({ data: [] });
+      if (init?.method === 'PUT') return json({ error: 'Наряд уже изменён' }, 409);
+      getCalls += 1;
+      if (getCalls === 1) return json({ records: [record()] });
+      return json({ error: 'x' }, 503);
+    });
+    render(<MaintenanceBoard />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Закрыть наряд ТО' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Закрыть наряд' }));
+
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith('Данные изменил другой пользователь, обновите страницу.'),
+    );
+    expect(toast.error).not.toHaveBeenCalledWith('Запись изменилась — данные обновлены, повторите действие.');
+  });
+
+  it('удачное перечитывание → «данные обновлены, повторите действие»', async () => {
+    mocks.authFetch.mockImplementation(async (url: string, init?: RequestInit) => {
+      if (url.startsWith('/api/media')) return json({ data: [] });
+      if (init?.method === 'PUT') return json({ error: 'Наряд уже изменён' }, 409);
+      return json({ records: [record()] });
+    });
+    render(<MaintenanceBoard />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Закрыть наряд ТО' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Закрыть наряд' }));
+
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith('Запись изменилась — данные обновлены, повторите действие.'),
+    );
+    expect(toast.error).not.toHaveBeenCalledWith('Данные изменил другой пользователь, обновите страницу.');
+  });
+});
