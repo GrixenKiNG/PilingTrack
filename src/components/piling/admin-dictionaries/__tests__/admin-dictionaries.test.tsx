@@ -91,6 +91,27 @@ describe('AdminDictionaries', () => {
     expect(screen.getByRole('button', { name: 'Сохранить' })).toBeEnabled();
   });
 
+  /*
+    R103 №6 (важно): форма отправляла заведомо отклоняемый сервером запрос
+    (название > 100 символов, длина > 1 000 000 мм) и получала без объяснений
+    «Некорректные данные». Лимиты формы приведены к серверной схеме.
+  */
+  it('не даёт отправить название длиннее 100 символов и длину больше 1000 м', async () => {
+    render(<AdminDictionaries />);
+    await screen.findByText('СВ 120-35');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Добавить марку сваи' }));
+    expect(screen.getByLabelText('Название')).toHaveAttribute('maxlength', '100');
+    expect(screen.getByText('Длина, м (до 1000)')).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('Название'), { target: { value: 'СВ 150-50' } });
+    fireEvent.change(screen.getByLabelText('Длина, м'), { target: { value: '1500' } });
+    expect(screen.getByRole('button', { name: 'Сохранить' })).toBeDisabled();
+
+    fireEvent.change(screen.getByLabelText('Длина, м'), { target: { value: '1000' } });
+    expect(screen.getByRole('button', { name: 'Сохранить' })).toBeEnabled();
+  });
+
   it('renders an actionable retry state when loading fails', async () => {
     authFetch.mockResolvedValue(jsonResponse({ error: 'boom' }, 500));
     render(<AdminDictionaries />);
