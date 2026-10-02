@@ -8,7 +8,7 @@
  * До правки любой не-ok ответ аналитики показывал один текст про сеть и
  * сносил весь экран — эти тесты падали.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 
 const mocks = vi.hoisted(() => ({ authFetch: vi.fn() }));
@@ -116,5 +116,38 @@ describe('AdminDashboard: сбой справочника объектов по�
 
     expect(await screen.findByText('Объект №1')).toBeInTheDocument();
     expect(screen.queryByText('Объекты не загрузились')).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * F-R109-3: на панели не было ни одной отметки свежести — диспетчер держит
+ * /admin открытым часами и не отличает свежие данные от устаревших. Теперь под
+ * шапкой строка «Обновлено в ЧЧ:ММ» — местное время последней успешной загрузки
+ * аналитики. При сбое аналитики отметки нет (время нечего помечать).
+ */
+describe('AdminDashboard: отметка свежести аналитики (F-R109-3)', () => {
+  beforeEach(() => {
+    mocks.authFetch.mockReset();
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date(2026, 9, 3, 14, 5));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('после успешной загрузки аналитики под шапкой «Обновлено в 14:05»', async () => {
+    mockFetch(json({ analytics: [] }));
+    render(<AdminDashboard />);
+
+    expect(await screen.findByText('Обновлено в 14:05')).toBeInTheDocument();
+  });
+
+  it('при сбое аналитики отметки свежести нет', async () => {
+    mockFetch(json({ error: 'Ошибка сервера' }, 500));
+    render(<AdminDashboard />);
+
+    expect(await screen.findByText('Не удалось загрузить, обновите страницу')).toBeInTheDocument();
+    expect(screen.queryByText(/^Обновлено в /)).not.toBeInTheDocument();
   });
 });

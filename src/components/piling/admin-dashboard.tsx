@@ -59,6 +59,10 @@ const daysUntil = (iso: string | null): number | null => {
   return Math.round((t.getTime() - today.getTime()) / 86_400_000);
 };
 
+/** «ЧЧ:ММ» по местному времени — отметка свежести аналитики (F-R109-3). */
+const formatClock = (d: Date): string =>
+  d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+
 // ── Period helpers ────────────────────────────────────────────────────────
 type PeriodMode = 'all' | 'today' | '7d' | 'custom';
 
@@ -89,6 +93,10 @@ export function AdminDashboard() {
   const [stale, setStale] = useState({ fleet: false, maint: false, recent: false, sites: false });
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  // Время последней успешной загрузки аналитики — «Обновлено в ЧЧ:ММ» под
+  // шапкой (F-R109-3). Дашборд держат открытым часами: без отметки цифры
+  // «сейчас» (парк, ТО, риски) не отличить от устаревших.
+  const [analyticsUpdatedAt, setAnalyticsUpdatedAt] = useState<Date | null>(null);
   // Справочник объектов читается один раз при монтировании; у него нет
   // собственного места в `loadOps`, поэтому повтор даёт отдельная кнопка
   // (иначе «объекты» навсегда остаются в списке устаревших, а фильтр
@@ -120,6 +128,7 @@ export function AdminDashboard() {
         return;
       }
       setAnalytics(((await res.json()).analytics ?? []) as SiteAnalyticsDTO[]);
+      setAnalyticsUpdatedAt(new Date());
     } catch {
       setLoadError('Не удалось загрузить, обновите страницу');
     } finally {
@@ -330,6 +339,9 @@ export function AdminDashboard() {
         <div>
           <h1 className="flex items-center gap-2 text-xl font-bold text-foreground"><LayoutGrid className="h-5 w-5 text-signal-strong" />Дашборд</h1>
           <p className="mt-0.5 text-sm text-muted-foreground">Оперативная сводка производства</p>
+          {analyticsUpdatedAt && (
+            <p className="mt-0.5 text-xs text-muted-foreground">Обновлено в {formatClock(analyticsUpdatedAt)}</p>
+          )}
         </div>
 
         {/* Фильтры: период + Объект + Установка.
