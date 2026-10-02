@@ -161,3 +161,27 @@ startup+interval запускали команду четыре раза. GREEN:
 Fallback: unified-worker вызывает три start-функции, существующий Sentry тест.
 Межпроцессная исключительность и отмена уже начатого прохода не реализуются.
 В прогоне видны Vite config и MaxListeners warnings; они не подавлялись.
+### I02 follow-up — монотонный срок lease
+
+Коммит 35b5ca49: performance.now вместо Date.now для локального TTL.
+При обратной коррекции wall-clock lease не продлевается. RED: 1 failed / 13 passed,
+exit 1; GREEN lease+health: 34 passed / 0 skipped, exit 0; tsc/ESLint/diff-check exit 0.
+Два файла +26/-5: source +5/-4, existing test +21/-1. Предел DB fencing сохраняется.
+
+### I04 — наблюдаемость операционной ленты
+
+Коммит 7cf94a71 (CODEX-S3-feedback-metrics), 8 файлов +155/-1:
+helper +24, audit-service +2, existing audit test +48, metrics route +3,
+его тест +40, worker health +2/-1, existing worker test +26, alerts +10.
+Один bounded counter без labels на процесс, общий globalThis объект для копий
+Next route bundles. App и worker exporters независимы; scrapes не сбрасывают его.
+Отказ FeedbackEvent увеличивает счётчик, бизнес-действие остаётся nonthrow;
+actor lookup failure при успешно записанном событии не увеличивает счётчик.
+RED audit 75 passed / 2 failed, exporter/rule 34 passed / 4 failed,
+module copies 77 passed / 1 failed. GREEN всех трёх файлов 116 passed / 0 skipped,
+exit 0; tsc/ESLint/js-yaml/diff-check exit 0. require(yaml) сначала exit 1
+(пакет отсутствует); использован уже имеющийся js-yaml, зависимости не ставились.
+Fallback callers recordAuditEvent и app/worker exporters; auth/security не менялись.
+После restart счётчик сбрасывается: это сигнал потерь ленты, не durable audit/hash-chain.
+Правило increase[5m] по pilingtrack-app|pilingtrack-workers: YAML/source проверены,
+PromQL runtime/production доставка не подтверждены.
