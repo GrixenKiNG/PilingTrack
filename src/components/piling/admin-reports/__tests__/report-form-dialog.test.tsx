@@ -198,7 +198,7 @@ describe('ReportFormDialog — конфликт 409 (F-R93-2)', () => {
     vi.mocked(toast.success).mockClear();
   });
 
-  it('перечитывает свежую версию, не закрывает форму и не советует терять правки', async () => {
+  it('не подменяет версию старых данных после 409 и не закрывает форму', async () => {
     authFetchMock.mockImplementation((url: string, init?: RequestInit) => {
       void init;
       if (url.startsWith('/api/reports/admin-upsert')) {
@@ -220,7 +220,7 @@ describe('ReportFormDialog — конфликт 409 (F-R93-2)', () => {
       <ReportFormDialog
         open
         onClose={onClose}
-        editReport={editReport}
+        editReport={{ ...editReport, version: 3 }}
         loadingReferenceData={false}
         dictionaryError={null}
         operators={[]}
@@ -236,19 +236,17 @@ describe('ReportFormDialog — конфликт 409 (F-R93-2)', () => {
     fireEvent.click(screen.getByRole('button', { name: /Сохранить/ }));
 
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith(
-      'Отчёт изменён другим пользователем. Ваши правки сохранены — нажмите «Сохранить» ещё раз.',
+      expect.stringContaining('Отчёт изменён другим пользователем.'),
     ));
     // Форма не закрыта — введённые сваи не потеряны.
     expect(onClose).not.toHaveBeenCalled();
 
-    // Повтор отправляет уже свежую версию, а не прежнюю.
+    // Чужая версия 7 не даёт разрешения перезаписать её данными версии 3.
     fireEvent.click(screen.getByRole('button', { name: /Сохранить/ }));
-    await waitFor(() => {
-      const posts = authFetchMock.mock.calls.filter(([u]) => String(u).startsWith('/api/reports/admin-upsert'));
-      expect(posts).toHaveLength(2);
-      const body = JSON.parse(String((posts[1][1] as RequestInit).body));
-      expect(body.version).toBe(7);
-    });
+    await waitFor(() => expect(authFetchMock.mock.calls.filter(([u]) => String(u).startsWith('/api/reports/admin-upsert'))).toHaveLength(2));
+    const posts = authFetchMock.mock.calls.filter(([u]) => String(u).startsWith('/api/reports/admin-upsert'));
+    const body = JSON.parse(String((posts[1][1] as RequestInit).body));
+    expect(body.version).toBe(3);
   });
 });
 

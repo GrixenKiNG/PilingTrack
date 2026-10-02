@@ -92,10 +92,6 @@ export function ReportFormDialog({
   const [tempDtDuration, setTempDtDuration] = useState('');
   const [tempDtComment, setTempDtComment] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  // Токен оптимистичной блокировки. При 409 (отчёт изменён другим) перечитываем
-  // свежую версию, не закрывая форму, — иначе повтор «Сохранить» снова получит
-  // 409, а совет «обновите страницу» стёр бы введённые сваи и простои.
-  const [currentVersion, setCurrentVersion] = useState<number | undefined>(editReport?.version);
   // Stable id so PhotoSection can attach a photo to the report before it's
   // submitted; if editing, we use the persisted reportId instead.
   const [draftReportId] = useState(() => crypto.randomUUID());
@@ -163,24 +159,6 @@ export function ReportFormDialog({
     toast.success('Простой добавлен');
   };
 
-  // Перечитать свежую версию отчёта после конфликта 409. Возвращает отчёт из
-  // того же списка отбора (отдельного GET по id у API нет), форму не трогает.
-  const refreshVersion = async (reportId: string) => {
-    if (!editReport) return;
-    try {
-      const params = new URLSearchParams({ userId: editReport.userId, siteId: editReport.siteId, limit: '100' });
-      const res = await authFetch(`/api/reports/all?${params.toString()}`);
-      if (!res.ok) return;
-      const data = await res.json();
-      const fresh = Array.isArray(data.reports)
-        ? (data.reports as ReportDTO[]).find((r) => r.reportId === reportId)
-        : undefined;
-      if (fresh && typeof fresh.version === 'number') setCurrentVersion(fresh.version);
-    } catch {
-      // Сеть не ответила — текст конфликта уже показан; повтор снова даст 409.
-    }
-  };
-
   const handleSubmit = async () => {
     if (!formUserId || !formSiteId || !formDate) {
       toast.error('Заполните оператора, объект и дату'); return;
@@ -198,7 +176,7 @@ export function ReportFormDialog({
           reportId, userId: formUserId, siteId: formSiteId, date: formDate,
           // Optimistic-concurrency token: reject (409) if the report advanced
           // since it was loaded into the dialog. Undefined when creating new.
-          version: currentVersion,
+          version: editReport?.version,
           shiftStart: formShiftStart, shiftEnd: formShiftEnd,
           equipmentId: formEquipmentId || undefined,
           piles: formPiles.map((p) => ({ id: editReport?.piles.some(row => row.id === p.id) ? p.id : undefined, picketId: p.picketId || undefined, pileGradeId: p.pileGradeId, count: p.count })),
@@ -216,11 +194,10 @@ export function ReportFormDialog({
       if (!res.ok) {
         const err = (await res.json().catch(() => ({}))) as { error?: unknown };
         const serverError = typeof err.error === 'string' ? err.error : '';
-        // 409 по версии: не советуем «обновите страницу» (это стёрло бы правки),
-        // а перечитываем свежую версию и оставляем форму открытой.
+        // Сохраняем токен старой формы: новая версия с прежними данными
+        // обошла бы защиту от перезаписи чужих изменений.
         if (res.status === 409 && serverError.includes('изменён другим пользователем')) {
-          await refreshVersion(reportId);
-          toast.error('Отчёт изменён другим пользователем. Ваши правки сохранены — нажмите «Сохранить» ещё раз.');
+          toast.error('Отчёт изменён другим пользователем. Скопируйте свои правки и откройте актуальный отчёт заново.');
           return;
         }
         // 403 от CSRF-проверки приходит английским текстом — заменяем на русский.
