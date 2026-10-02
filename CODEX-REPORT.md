@@ -148,3 +148,16 @@ Risk пользователю сообщён до правок. Перед пр�
 stop может ждать зависший Redis request, локальное лидерство снимается сразу.
 Docker daemon сейчас недоступен: настоящий Lua smoke и новый image build не выполнены.
 Независимое review потребовало monotonic deadline вместо Date.now; follow-up ниже.
+### I03 — неперекрывающиеся scheduler
+
+Коммит 1a2d340f (CODEX-S3-scheduler-overlap), 4 файла +118/-0:
+PM/readiness/projection-rebuild scheduler по +6, существующий sentry.test +100.
+Один активный проход на модуль/процесс; finally снимает guard после успеха,
+ошибки команды или heartbeat. Stop очищает timers, но не сбрасывает guard
+незавершённого прохода. Tenant loops, domain commands и интервалы сохранены.
+RED: 9 failed / 6 passed, exit 1 — пока первый pass/heartbeat заблокирован,
+startup+interval запускали команду четыре раза. GREEN: 37 passed / 0 skipped
+в sentry/heartbeat/unified/no-next, exit 0; tsc exit 0; scoped ESLint exit 0.
+Fallback: unified-worker вызывает три start-функции, существующий Sentry тест.
+Межпроцессная исключительность и отмена уже начатого прохода не реализуются.
+В прогоне видны Vite config и MaxListeners warnings; они не подавлялись.
