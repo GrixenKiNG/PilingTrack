@@ -286,6 +286,7 @@ N1–N5, S1, S2 и локальные I01–I04 выполнены. Незави
 ## Итоговый список путей и строк
 
 Ниже net additions/deletions относительно0ea0c6be, включая документы.
+Фактический diff: 48 путей, +3269/-210. В commit body f92863c9 число49 было ошибкой подсчёта; таблица и текущая команда подтверждают48.
 | Путь | + | - |
 |---|---:|---:|
 | .github/workflows/ci.yml | 27 | 0 |
@@ -335,4 +336,4 @@ N1–N5, S1, S2 и локальные I01–I04 выполнены. Незави
 | src/workers/unified-worker/pm-scheduler.ts | 6 | 0 |
 | src/workers/unified-worker/projection-rebuild-scheduler.ts | 6 | 0 |
 | src/workers/unified-worker/readiness-scheduler.ts | 6 | 0 |
-| CODEX-REPORT.md | 338 | 0 |
+| CODEX-REPORT.md | 339 | 0 |
