@@ -45,4 +45,16 @@ set -e
 [[ "$status" != 0 ]] || { echo 'FAIL: started with live old replicas' >&2; exit 1; }
 [[ "$before" == "$(docker compose ps -q | sort)" ]] || { echo 'FAIL: partial start on refusal' >&2; exit 1; }
 if grep -q '^START' output/codex-t4/d1-refusal.log; then echo 'FAIL: reached START on refusal' >&2; exit 1; fi
-echo 'PASS: stop -> verify -> start; live old replica blocks start (exit nonzero)'
+# Exit 0 alone is insufficient: worker shutdown catches can hide failed drain.
+cat >output/codex-t4/docker-shim/docker <<'SHIM'
+#!/usr/bin/env bash
+if [[ "$1" == logs ]]; then echo 'Worker shutdown failed'; exit 0; fi
+exec "$REAL_DOCKER" "$@"
+SHIM
+set +e
+REAL_DOCKER="$real_docker" PATH="$PWD/output/codex-t4/docker-shim:$PATH" bash scripts/replace-worker-generation.sh app workers >output/codex-t4/d1-drain-refusal.log 2>&1
+status=$?
+set -e
+[[ "$status" != 0 ]] || { echo 'FAIL: ignored failed drain with exit 0' >&2; exit 1; }
+if grep -q '^START' output/codex-t4/d1-drain-refusal.log; then echo 'FAIL: START after failed drain' >&2; exit 1; fi
+echo 'PASS: stop -> verify -> start; live old replica and failed drain block start'

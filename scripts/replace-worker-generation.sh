@@ -27,6 +27,7 @@ for id in "${old[@]}"; do
   # Prevent automatic resurrection of the old generation during the barrier.
   docker update --restart=no "$id" >/dev/null || die 'не удалось запретить перезапуск старой реплики'
 done
+stopped_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 echo "STOP: проект $project, старых реплик ${#old[@]}, таймаут ${timeout}с"
 "${compose[@]}" stop --timeout "$timeout" app workers || die 'остановка compose не выполнена; новое поколение не запущено'
 # Compose may omit one-off replicas; stop these by their captured IDs as well.
@@ -37,6 +38,10 @@ done
 for id in "${old[@]}"; do
   state=$(docker inspect --format '{{.State.Status}} {{.State.ExitCode}} {{.State.OOMKilled}}' "$id") || die 'не удалось проверить завершение старой реплики'
   [[ "$state" == 'exited 0 false' || "$state" == 'created 0 false' ]] || die "реплика $id не завершилась штатно ($state); проверьте drain и журналы, старта не будет"
+  shutdown_log=$(docker logs --since "$stopped_at" "$id" 2>&1) || die 'журнал остановки недоступен; завершение задач не подтверждено'
+  if grep -Eq '(Embedded worker|Worker|Redis|Prisma) shutdown failed|Shutdown deadline exceeded' <<<"$shutdown_log"; then
+    die "реплика $id сообщила об ошибке завершения задач; новое поколение не запущено"
+  fi
 done
 for service in app workers; do
   running=$(docker ps -q --filter "label=com.docker.compose.project=$project" --filter "label=com.docker.compose.service=$service") || die 'не удалось проверить отсутствие RUNNING'
