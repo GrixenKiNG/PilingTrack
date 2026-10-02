@@ -12,7 +12,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { authFetch } from '@/lib/api';
-import { LAYOUT_LOAD_FAILED_MESSAGE } from './use-layout-template';
+import { LAYOUT_LOAD_FAILED_MESSAGE, LAYOUT_OFFLINE_MESSAGE } from './use-layout-template';
 import {
   clonePageLayoutTemplate,
   type PageLayoutTemplate,
@@ -99,11 +99,18 @@ export function usePageLayoutTemplate(options: {
       toast.error(LAYOUT_LOAD_FAILED_MESSAGE);
       return;
     }
-    const res = await authFetch(endpoint, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(draft),
-    });
+    let res: Response;
+    try {
+      res = await authFetch(endpoint, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(draft),
+      });
+    } catch {
+      // Обрыв сети: черновик не тронут, правки можно повторить (F-R108-4).
+      toast.error(LAYOUT_OFFLINE_MESSAGE);
+      return;
+    }
     if (!res.ok) {
       toast.error(res.status === 403 ? 'Только администратор может сохранять раскладку' : 'Не удалось сохранить раскладку');
       return;
@@ -113,7 +120,14 @@ export function usePageLayoutTemplate(options: {
   }, [draft, endpoint, loadFailed]);
 
   const reset = useCallback(async () => {
-    const res = await authFetch(endpoint, { method: 'DELETE' });
+    let res: Response;
+    try {
+      res = await authFetch(endpoint, { method: 'DELETE' });
+    } catch {
+      // Обрыв сети: ничего не удалено, можно повторить (F-R108-4).
+      toast.error(LAYOUT_OFFLINE_MESSAGE);
+      return;
+    }
     if (!res.ok) {
       toast.error(res.status === 403 ? 'Только администратор может сбросить раскладку' : 'Не удалось сбросить раскладку');
       return;

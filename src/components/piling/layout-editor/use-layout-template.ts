@@ -23,6 +23,13 @@ import { cloneLayoutTemplate, type LayoutBlock, type LayoutBlockKind, type Layou
  */
 export const LAYOUT_LOAD_FAILED_MESSAGE = 'Не удалось загрузить вашу раскладку, обновите страницу';
 
+/**
+ * Показывается, когда запрос сохранения/сброса не дошёл: сеть оборвалась,
+ * `authFetch` бросил. Черновик остаётся, поэтому повтор вручную безопасен
+ * (F-R108-4).
+ */
+export const LAYOUT_OFFLINE_MESSAGE = 'Нет связи, изменения не сохранены — повторите';
+
 export interface LayoutController<T extends LayoutTemplate = LayoutTemplate> {
   template: T;
   draft: T;
@@ -153,11 +160,18 @@ export function useLayoutTemplate<T extends LayoutTemplate>(options: UseLayoutTe
       return;
     }
     onBeforeSave?.(template, draft);
-    const res = await authFetch(endpoint, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(draft),
-    });
+    let res: Response;
+    try {
+      res = await authFetch(endpoint, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(draft),
+      });
+    } catch {
+      // Обрыв сети: черновик не тронут, правки можно повторить (F-R108-4).
+      toast.error(LAYOUT_OFFLINE_MESSAGE);
+      return;
+    }
     if (!res.ok) {
       toast.error(res.status === 403 ? 'Только администратор может сохранять шаблон' : 'Не удалось сохранить шаблон');
       return;
@@ -169,7 +183,14 @@ export function useLayoutTemplate<T extends LayoutTemplate>(options: UseLayoutTe
   const reset = useCallback(async () => {
     // Remove the saved layout at this scope; a tile override falls back to the
     // base, the base falls back to the hardcoded default.
-    const res = await authFetch(endpoint, { method: 'DELETE' });
+    let res: Response;
+    try {
+      res = await authFetch(endpoint, { method: 'DELETE' });
+    } catch {
+      // Обрыв сети: ничего не удалено, можно повторить (F-R108-4).
+      toast.error(LAYOUT_OFFLINE_MESSAGE);
+      return;
+    }
     if (!res.ok) {
       toast.error(res.status === 403 ? 'Только администратор может сбросить шаблон' : 'Не удалось сбросить шаблон');
       return;
