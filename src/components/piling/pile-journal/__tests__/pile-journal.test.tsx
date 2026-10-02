@@ -222,3 +222,42 @@ describe('журнал забивки: перепутанный порядок �
     expect(screen.getByRole('button', { name: /Выгрузить журнал/ })).toBeDisabled();
   });
 });
+
+/**
+ * F-R107-2: стартовый фильтр — «Не разобранные». У объекта, где все сваи уже
+ * приняты, мастер читал «По этой выборке записей нет» и решал, что паспортов
+ * нет вовсе. Теперь пустой экран называет причину — фильтр — и даёт «Показать
+ * все», не меняя фильтр по умолчанию.
+ */
+describe('журнал забивки: пусто из-за фильтра «Не разобранные» (F-R107-2)', () => {
+  beforeEach(() => {
+    mocks.authFetch.mockReset();
+  });
+
+  it('пустая выборка под «Не разобранные» → объяснение и кнопка «Показать все»', async () => {
+    mocks.authFetch.mockImplementation(async (url: string) => {
+      if (url.startsWith('/api/sites/all')) return json({ sites: [] });
+      return json({ data: [], header, truncated: false });
+    });
+    render(<PileJournal />);
+
+    expect(await screen.findByText(/Все сваи объекта разобраны/)).toBeInTheDocument();
+
+    // Стартовый фильтр остался прежним — запрос ушёл с acceptance=PENDING.
+    const pileUrls = () => mocks.authFetch.mock.calls
+      .map(([url]) => String(url))
+      .filter((url) => url.startsWith('/api/pile-passports?'));
+    expect(new URLSearchParams(pileUrls()[0].split('?')[1]).get('acceptance')).toBe('PENDING');
+
+    // «Показать все» снимает статусный фильтр и показывает разобранные сваи.
+    mocks.authFetch.mockImplementation(async (url: string) => {
+      if (url.startsWith('/api/sites/all')) return json({ sites: [] });
+      return json({ data: [pileRow()], header, truncated: false });
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Показать все' }));
+
+    expect(await screen.findByText('С-130')).toBeInTheDocument();
+    const lastPileUrl = pileUrls().at(-1) as string;
+    expect(new URLSearchParams(lastPileUrl.split('?')[1]).get('acceptance')).toBeNull();
+  });
+});

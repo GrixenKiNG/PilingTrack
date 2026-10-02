@@ -307,10 +307,22 @@ export function PileJournal() {
 
       {rows === null ? <p className="text-sm text-muted-foreground">Загрузка журнала…</p> : null}
       {rows?.length === 0 ? (
-        <p className="rounded-md border border-border p-4 text-sm text-muted-foreground">
-          По этой выборке записей нет. Паспорта свай заводит машинист на вкладке «Сваи»,
-          мастер может дописать пропущенную сваю за него.
-        </p>
+        filters.status === 'PENDING' && !error ? (
+          // Пусто из-за стартового фильтра «Не разобранные» — это не «паспортов
+          // нет», а «все сваи уже разобраны». Объясняем фильтр и даём выход в «Все».
+          <div className="rounded-md border border-border p-4 text-sm text-muted-foreground">
+            <p>Все сваи объекта разобраны — среди неразобранных записей нет.</p>
+            <Button size="sm" variant="outline" className="mt-2 min-h-11 text-xs sm:min-h-8"
+              onClick={() => patch({ status: 'ALL' })}>
+              Показать все
+            </Button>
+          </div>
+        ) : (
+          <p className="rounded-md border border-border p-4 text-sm text-muted-foreground">
+            По этой выборке записей нет. Паспорта свай заводит машинист на вкладке «Сваи»,
+            мастер может дописать пропущенную сваю за него.
+          </p>
+        )
       ) : null}
 
       {rows && rows.length > 0 ? (
