@@ -131,3 +131,20 @@ YAML js-yaml exit 0 (30 rules); scoped diff-check exit 0.
 Callers fallback: tracker/aggregate/metrics route; consumer flags сверены с outbox-publisher.
 Schema/DB runtime не менялись. Promtool и real production series не проверены;
 стоимость нового агрегата на production dataset не измерялась. Владелец проверяет scrape/reload.
+### I02 — lease в Redis состояния
+
+Коммит d1f38b5a (CODEX-S3-worker-lease), 3 файла +356/-139.
+leader-election +129/-87, существующий тест +200/-52, runbook014 +27.
+Atomic owner-checked renew/release; single-flight/generation/stop-start barrier,
+снятие лидерства при Redis error/null, deadline и synchronous expiry check.
+RED: 10 failed / 2 passed, exit 1; TTL callback gap отдельно: 1 failed / 12 passed.
+GREEN root: 44 passed / 0 skipped в lease+health+workers, exit 0; tsc exit 0,
+ESLint exit 0/0 warnings, diff-check exit 0. В промежуточном combined прогоне
+43 passed / 1 failed был параллельный I04 RED, после wiring повтор прошёл.
+Fallback callers: standalone, unified и embedded outbox/projection; lag monitor.
+Risk пользователю сообщён до правок. Перед применением владелец останавливает
+ВСЕ старые standalone/unified/embedded workers; old-cache/new-state rolling mix опасен.
+Ключи/префикс/nodeId/TTL/renew interval сохранены. Нет DB fencing уже начатых операций;
+stop может ждать зависший Redis request, локальное лидерство снимается сразу.
+Docker daemon сейчас недоступен: настоящий Lua smoke и новый image build не выполнены.
+Независимое review потребовало monotonic deadline вместо Date.now; follow-up ниже.
