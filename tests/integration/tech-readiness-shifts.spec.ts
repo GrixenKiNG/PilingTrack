@@ -56,8 +56,9 @@ describe.runIf(Boolean(connectionString))('shifts and handovers on disposable Po
   `, [id, tenantId, equipmentId, state, version]);
 
   beforeAll(async () => {
+    if (!connectionString) throw new Error("DATABASE_URL_POSTGRES is required");
     await admin.connect(); await admin.query(`CREATE DATABASE "${database}"`);
-    const url = new URL(connectionString!); url.pathname = `/${database}`;
+    const url = new URL(connectionString); url.pathname = `/${database}`;
     sql = new Client({connectionString: url.toString()}); await sql.connect();
     await sql.query(`
       CREATE TYPE "MaintenanceType" AS ENUM ('EO','TO1','TO2','TO3','SEASONAL','REPAIR','FAULT','SCHEDULED','INSPECTION');
@@ -245,8 +246,9 @@ describe.runIf(Boolean(connectionString))('shifts and handovers on disposable Po
     const started = await prisma.shift.findUniqueOrThrow({where: {id: 'blocked-shift'},
       select: {state: true, startSnapshotId: true}});
     expect(started).toMatchObject({state: 'STARTED', startSnapshotId: expect.any(String)});
+    if (!started.startSnapshotId) throw new Error("STARTED shift must have a startSnapshotId");
     expect(await prisma.readinessScoreSnapshot.findUniqueOrThrow({
-      where: {id: started.startSnapshotId!}, select: {status: true, triggerId: true, facts: true},
+      where: {id: started.startSnapshotId}, select: {status: true, triggerId: true, facts: true},
     })).toMatchObject({
       status: 'READY', triggerId: 'blocked-shift:start:2026-08-01T12:00:00.000Z',
       facts: {permitValid: true, permitExpired: false, criticalDefect: false},

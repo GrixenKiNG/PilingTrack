@@ -32,8 +32,9 @@ describe.runIf(Boolean(connectionString))('readiness snapshot projection on disp
     maintenanceOverdueDays: 0, accepted: true, criticalDefect: false, findings: 0} as const;
 
   beforeAll(async () => {
+    if (!connectionString) throw new Error("DATABASE_URL_POSTGRES is required");
     await admin.connect(); await admin.query(`CREATE DATABASE "${database}"`);
-    const url = new URL(connectionString!); url.pathname = `/${database}`;
+    const url = new URL(connectionString); url.pathname = `/${database}`;
     sql = new Client({connectionString: url.toString()}); await sql.connect();
     await sql.query(`CREATE TABLE "ReadinessScoreSnapshot" (
       "id" TEXT PRIMARY KEY, "tenantId" TEXT NOT NULL, "equipmentId" TEXT NOT NULL, "shiftId" TEXT,

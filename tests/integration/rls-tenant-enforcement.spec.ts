@@ -46,10 +46,11 @@ describe.skipIf(!APP_ROLE_URL)('RLS отделяет тенантов по-на�
   let owner: any;
 
   beforeAll(async () => {
+    if (!APP_ROLE_URL) throw new Error("DATABASE_URL_APP_ROLE is required");
     const clientPath = path.join(process.cwd(), 'src', 'generated', 'postgres-client', 'client.js');
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { PrismaClient } = require(clientPath);
-    const raw = new PrismaClient({ adapter: new PrismaPg({ connectionString: APP_ROLE_URL! }) });
+    const raw = new PrismaClient({ adapter: new PrismaPg({ connectionString: APP_ROLE_URL }) });
     db = applyTenantGuc(raw);
     await raw.$queryRaw`SELECT 1`;
 
