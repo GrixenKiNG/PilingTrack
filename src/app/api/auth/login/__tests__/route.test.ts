@@ -9,11 +9,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextRequest, NextResponse } from 'next/server';
 
-const { authenticateMock, createResponseMock, auditMock, tenantMock } = vi.hoisted(() => ({
+const { authenticateMock, createResponseMock, auditMock, tenantMock, csrfMock } = vi.hoisted(() => ({
   authenticateMock: vi.fn(),
   createResponseMock: vi.fn(),
   auditMock: vi.fn().mockResolvedValue(undefined),
   tenantMock: vi.fn(() => ({ tenantId: 'tenant-1' })),
+  csrfMock: vi.fn((): unknown => null),
 }));
 
 vi.mock('@/services/auth/auth-service', () => ({
@@ -29,7 +30,7 @@ vi.mock('@/services/tenancy/tenant-context-service', () => ({
   resolveTenantContext: tenantMock,
 }));
 
-vi.mock('@/lib/csrf-protection', () => ({ withCsrf: () => null }));
+vi.mock('@/lib/csrf-protection', () => ({ withCsrf: csrfMock }));
 
 import { POST } from '../route';
 
@@ -47,6 +48,17 @@ describe('POST /api/auth/login', () => {
     createResponseMock.mockReset();
     auditMock.mockClear();
     createResponseMock.mockResolvedValue(NextResponse.json({ ok: true }));
+    csrfMock.mockReset();
+    csrfMock.mockReturnValue(null);
+  });
+
+  // Межсайтовый вход (login CSRF, аудит Codex out55, F09): отказ проверки
+  // возвращается до разбора тела и до проверки пароля.
+  it('returns the CSRF rejection before authenticating', async () => {
+    csrfMock.mockReturnValue(NextResponse.json({ error: 'CSRF validation failed: origin mismatch' }, { status: 403 }));
+    const res = await POST(jsonRequest({ email: 'a@b.ru', password: 'password123' }));
+    expect(res.status).toBe(403);
+    expect(authenticateMock).not.toHaveBeenCalled();
   });
 
   it('returns 400 on malformed email', async () => {
