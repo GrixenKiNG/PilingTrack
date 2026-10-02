@@ -30,7 +30,7 @@ export async function deliverQueuedAlert(event: {id?: string; tenantId?: string 
   // не глушится, даже если записано до появления правила incidentStopWork
   // со старым ruleId 'incident' (решение владельца 26.09.2026).
   const urgentIncident = alert.ruleId === 'incident' && alert.severity === 'critical';
-  const key = alert.ruleId && !urgentIncident ? RULE_NOTIFICATION_KEYS[alert.ruleId] : undefined;
+  const key = alert.notificationKey ?? (alert.ruleId && !urgentIncident ? RULE_NOTIFICATION_KEYS[alert.ruleId] : undefined);
   // Настройки тенанта читаем ДО транзакции (R85 §2): isNotificationEnabled идёт
   // через глобальный db, а внутри db.$transaction область помечена как «тенант
   // уже выставлен» (tenant-rls.ts runWithGucApplied), поэтому глобальное чтение

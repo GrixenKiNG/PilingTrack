@@ -13,17 +13,40 @@ import { NextRequest } from 'next/server';
 const mocks = vi.hoisted(() => ({
   sendAlert: vi.fn().mockResolvedValue(true),
   enabled: vi.fn().mockResolvedValue(true),
+  upsert: vi.fn(), find: vi.fn(), update: vi.fn(),
+  rows: new Map<string, { id: string; tenantId: string; published: boolean; payload: Record<string, unknown>; lastError: string | null }>(),
 }));
 
 vi.mock('@/core/notifications/telegram', () => ({
   telegramNotifier: { sendAlert: mocks.sendAlert },
 }));
+vi.mock('@/lib/db', () => {
+  const outboxEvent = { upsert: mocks.upsert, findFirst: mocks.find, update: mocks.update };
+  return { db: { outboxEvent, $transaction: async (fn: (tx: unknown) => Promise<unknown>) => fn({ outboxEvent, $queryRaw: vi.fn() }) } };
+});
 vi.mock('@/modules/settings', () => ({ isNotificationEnabled: mocks.enabled }));
 vi.mock('@/lib/logger', () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }));
 
 import { POST } from '../route';
 
 const TOKEN = 'super-secret-webhook-token';
+
+beforeEach(() => {
+  vi.stubEnv('DEFAULT_TENANT_ID', 'test-tenant');
+  mocks.rows.clear(); mocks.sendAlert.mockReset().mockResolvedValue(true); mocks.enabled.mockReset().mockResolvedValue(true);
+  mocks.upsert.mockReset().mockImplementation(async ({ create }) => {
+    const key = create.tenantId + ':' + create.dedupeKey;
+    if (!mocks.rows.has(key)) mocks.rows.set(key, { ...create, id: key, published: false, lastError: null });
+    return mocks.rows.get(key);
+  });
+  mocks.find.mockReset().mockImplementation(async ({ where }) => [...mocks.rows.values()].find(row => row.id === where.id && row.tenantId === where.tenantId));
+  mocks.update.mockReset().mockImplementation(async ({ where, data }) => {
+    const row = [...mocks.rows.values()].find(item => item.id === where.id);
+    if (!row) throw new Error('row missing'); Object.assign(row, data); return row;
+  });
+});
+afterEach(() => vi.unstubAllEnvs());
+
 
 function reqWithHeader(token: string | null): NextRequest {
   const headers: Record<string, string> = { 'content-type': 'application/json' };
@@ -122,15 +145,21 @@ describe('POST /api/alerts/webhook — payload validation', () => {
     expect(res.status).toBe(400);
   });
 
-  it('accepts a batch over 100 alerts but forwards only the first 100', async () => {
-    const alerts = Array.from({ length: 101 }, () => ({
-      status: 'firing',
-      labels: {},
+  it('I08: keeps the tail over 100 queued and forwards only the remaining alert on retry', async () => {
+    const alerts = Array.from({ length: 101 }, (_, index) => ({
+      status: 'firing', startsAt: '2026-10-02T00:00:00Z',
+      labels: { alertname: 'alert-' + index },
       annotations: {},
     }));
     const res = await POST(reqWithBody({ alerts }));
-    expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ ok: true, forwarded: 100 });
+    expect(res.status).toBe(503);
+    expect(await res.json()).toMatchObject({ ok: false, forwarded: 100 });
+    expect(mocks.rows.size).toBe(101);
+    mocks.sendAlert.mockClear();
+    const retry = await POST(reqWithBody({ alerts }));
+    expect(retry.status).toBe(200);
+    expect(await retry.json()).toEqual({ ok: true, forwarded: 101 });
+    expect(mocks.sendAlert).toHaveBeenCalledTimes(1);
   });
 
   it('accepts a valid firing alert and forwards it', async () => {
@@ -202,15 +231,21 @@ describe('POST /api/alerts/webhook — delivery failure', () => {
     expect(mocks.sendAlert).toHaveBeenCalledTimes(1);
   });
 
-  it('answers 200 when at least one message was delivered', async () => {
+  it('I08: partial batch returns 503; a reordered retry sends only the failed message', async () => {
     const alerts = [
-      { status: 'firing', labels: { severity: 'critical', alertname: 'rule-1' }, annotations: {} },
-      { status: 'firing', labels: { severity: 'warning', alertname: 'rule-2' }, annotations: {} },
+      { status: 'firing', startsAt: '2026-10-02T00:00:00Z', labels: { severity: 'critical', alertname: 'rule-1' }, annotations: {} },
+      { status: 'firing', startsAt: '2026-10-02T00:00:00Z', labels: { severity: 'warning', alertname: 'rule-2' }, annotations: {} },
     ];
     mocks.sendAlert.mockResolvedValueOnce(false).mockResolvedValueOnce(true);
     const res = await POST(reqWithBody({ alerts }));
-    expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ ok: true, forwarded: 1 });
+    expect(res.status).toBe(503);
+    expect(await res.json()).toMatchObject({ ok: false, forwarded: 1 });
+    mocks.sendAlert.mockClear().mockResolvedValue(true);
+    const retry = await POST(reqWithBody({ alerts: [...alerts].reverse() }));
+    expect(retry.status).toBe(200);
+    expect(await retry.json()).toEqual({ ok: true, forwarded: 2 });
+    expect(mocks.sendAlert).toHaveBeenCalledTimes(1);
+    expect(mocks.sendAlert.mock.calls[0][0].ruleId).toBe('rule-1');
   });
 
   it('answers 200 when the batch has only resolved alerts (no firing to deliver)', async () => {

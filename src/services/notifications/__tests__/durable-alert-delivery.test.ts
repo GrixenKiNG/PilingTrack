@@ -67,3 +67,9 @@ it('I08: partial receipts commit before retry; confirmed recipients survive anot
   expect(row.published).toBe(true);
   expect(row.payload).toMatchObject({ telegramDeliveredChatIds: ['A', 'B'] });
 });
+
+it('I08: queued Alertmanager notifications use systemAlerts, not a matching domain rule name', async () => {
+  const queued = { ...event, data: { ...event.data, notificationKey: 'systemAlerts' } };
+  await deliverQueuedAlert(queued);
+  expect(m.enabled).toHaveBeenCalledWith(event.tenantId, 'systemAlerts');
+});
