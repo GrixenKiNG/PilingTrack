@@ -57,6 +57,80 @@ describe('useReportsData — error visibility', () => {
 });
 
 /**
+ * F-R93-1: 403 на списке рисовался как «Сервер вернул ошибку.» с кнопкой
+ * «Повторить», которая отказывала всегда — причина не в сбое сервера, а в
+ * правах (режим «Действую как OPERATOR»). Текст и отсутствие повтора должны
+ * отличать 403 от 5xx.
+ */
+describe('useReportsData — 403 против 5xx', () => {
+  beforeEach(() => {
+    authFetchMock.mockReset();
+  });
+
+  it('403 → текст про права и errorForbidden=true', async () => {
+    authFetchMock.mockImplementation((url: string) => {
+      if (url.startsWith('/api/reports')) {
+        return Promise.resolve({ ok: false, status: 403, json: async () => ({ error: 'Доступ запрещён' }) });
+      }
+      return Promise.resolve(okJson({ sites: [], users: [] }));
+    });
+
+    const { result } = renderHook(() => useReportsData());
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.error).toBe('Нет прав на просмотр отчётов. Смените роль или обратитесь к администратору.');
+    expect(result.current.errorForbidden).toBe(true);
+  });
+
+  it('500 → прежний текст про сбой и errorForbidden=false (повтор осмыслен)', async () => {
+    authFetchMock.mockImplementation((url: string) => {
+      if (url.startsWith('/api/reports')) {
+        return Promise.resolve({ ok: false, status: 500, json: async () => ({}) });
+      }
+      return Promise.resolve(okJson({ sites: [], users: [] }));
+    });
+
+    const { result } = renderHook(() => useReportsData());
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.error).toBe('Не удалось загрузить отчёты. Сервер вернул ошибку.');
+    expect(result.current.errorForbidden).toBe(false);
+  });
+});
+
+/**
+ * F-R93-11: отказ «Загрузить ещё» ставил общий `error` и заменял весь список
+ * баннером — уже загруженные отчёты исчезали с экрана, хотя никуда не делись.
+ */
+describe('useReportsData — отказ догрузки не стирает список', () => {
+  beforeEach(() => {
+    authFetchMock.mockReset();
+  });
+
+  it('500 на догрузке → loadMoreError, список и error на месте', async () => {
+    authFetchMock.mockImplementation((url: string) => {
+      if (url.includes('cursor=')) {
+        return Promise.resolve({ ok: false, status: 500, json: async () => ({}) });
+      }
+      if (url.startsWith('/api/reports')) {
+        return Promise.resolve(okJson({ reports: [{ id: 'r1' }], hasMore: true, nextCursor: 'c1' }));
+      }
+      return Promise.resolve(okJson({ sites: [], users: [] }));
+    });
+
+    const { result } = renderHook(() => useReportsData());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.reports).toHaveLength(1);
+
+    await act(async () => { await result.current.loadMoreReports(); });
+
+    expect(result.current.loadMoreError).toBe('Не удалось догрузить отчёты. Сервер вернул ошибку.');
+    expect(result.current.error).toBeNull();
+    expect(result.current.reports).toHaveLength(1);
+  });
+});
+
+/**
  * F-R21-3: отказ чтения /api/dictionary/all диалог отчёта показывал как пустые
  * списки «Марка сваи / Тип скважины / Причина простоя» — то есть «данных нет».
  * Плюс после отказа `referenceDataLoadedRef` запрещал повторный запрос навсегда.

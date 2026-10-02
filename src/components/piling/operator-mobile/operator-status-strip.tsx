@@ -12,7 +12,9 @@ export function OperatorStatusStrip({online, items}: {online: boolean; items: Qu
     ? {
         icon: CircleAlert,
         title: `Нужно проверить: ${failed}`,
-        detail: 'Сервер отклонил запись — причина показана ниже',
+        detail: pending > 0
+          ? `Отклонено: ${failed} · ещё ждёт отправки: ${pending} — причина отказа ниже`
+          : 'Сервер отклонил запись — причина показана ниже',
         tone: 'danger' as const,
       }
     : !online

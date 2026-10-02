@@ -48,10 +48,12 @@ describe('projectWeeklyTrend — отсутствующий или невиди�
     infoMock.mockReset();
   });
 
-  it('объекта нет, но контекст организации есть → выход без ошибки, upsert не вызван', async () => {
+  it('объекта нет, контекст совпал с ожидаемой организацией → выход без ошибки, upsert не вызван', async () => {
     siteFindUniqueMock.mockResolvedValue(null);
 
-    await expect(withTenant('tenant-a', () => projectWeeklyTrend('site-gone'))).resolves.toBeUndefined();
+    await expect(
+      withTenant('tenant-a', () => projectWeeklyTrend('site-gone', null, 'tenant-a'))
+    ).resolves.toBeUndefined();
 
     expect(infoMock).toHaveBeenCalledWith(
       'Объект удалён — недельная сводка не пересчитывается',
@@ -60,11 +62,26 @@ describe('projectWeeklyTrend — отсутствующий или невиди�
     expect(upsertMock).not.toHaveBeenCalled();
   });
 
-  it('объекта нет и контекста нет → ошибка (RLS могла скрыть существующий объект)', async () => {
+  it('объекта нет, контекст — чужая организация → ошибка (RLS скрыла бы живой объект)', async () => {
     siteFindUniqueMock.mockResolvedValue(null);
 
-    await expect(projectWeeklyTrend('site-hidden')).rejects.toThrow(
-      'projectWeeklyTrend: site site-hidden not visible: no tenant context'
+    await expect(
+      withTenant('tenant-a', () => projectWeeklyTrend('site-gone', null, 'tenant-b'))
+    ).rejects.toThrow('projectWeeklyTrend: site site-gone not visible (context tenant-a, expected tenant-b)');
+
+    expect(infoMock).not.toHaveBeenCalled();
+    expect(upsertMock).not.toHaveBeenCalled();
+  });
+
+  it('объекта нет, ожидаемая организация не передана → ошибка (в т.ч. без контекста)', async () => {
+    siteFindUniqueMock.mockResolvedValue(null);
+
+    await expect(
+      withTenant('tenant-a', () => projectWeeklyTrend('site-gone'))
+    ).rejects.toThrow('projectWeeklyTrend: site site-gone not visible (context tenant-a, expected undefined)');
+
+    await expect(projectWeeklyTrend('site-hidden', null, null)).rejects.toThrow(
+      'projectWeeklyTrend: site site-hidden not visible (context null, expected null)'
     );
 
     expect(upsertMock).not.toHaveBeenCalled();

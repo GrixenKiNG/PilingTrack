@@ -24,6 +24,7 @@ import { computeHealthScore } from '@/modules/inspections/domain/inspection-logi
 import { healthScoreColor, LEVEL_LABEL, STATUS_LABEL, STATUS_STYLE, type InspectionLevel, type InspectionStatus } from './inspection-labels';
 import { InspectionItemPhotos } from './inspection-item-photos';
 import { YesNoControl, Status4Control, DoneControl, MeasureControl } from './inspection-controls';
+import { InspectionLoadError, catchText, extractApiError, isRetryableLoadError, loadErrorText } from './inspection-api-error';
 
 // ---------- types ----------
 
@@ -87,6 +88,8 @@ export function RunInspection({ inspectionId, onExit }: { inspectionId: string; 
 
   const [inspection, setInspection] = useState<InspectionDetail | null>(null);
   const [loading, setLoading] = useState(true);
+  // Почему карточка не показана: 403/404/5xx/обрыв — разные исходы (R100 №2).
+  const [loadError, setLoadError] = useState<InspectionLoadError | null>(null);
 
   // answers keyed by itemId
   const [answers, setAnswers] = useState<Record<string, ItemAnswer>>({});
@@ -109,9 +112,17 @@ export function RunInspection({ inspectionId, onExit }: { inspectionId: string; 
     setLoading(true);
     try {
       const res = await authFetch(`/api/inspections/${inspectionId}`);
-      if (!res.ok) throw new Error();
+      // 403 (нет права), 404 (чужой/удалённый осмотр), 5xx и обрыв нельзя
+      // показывать одним «Осмотр не найден.»: транзиентный сбой оставлял
+      // человека на тупиковом экране, хотя осмотр есть.
+      if (!res.ok) {
+        setLoadError(new InspectionLoadError(res.status));
+        setInspection(null);
+        return;
+      }
       const { inspection: data } = await res.json() as { inspection: InspectionDetail };
       setInspection(data);
+      setLoadError(null);
 
       // Initialize answer state from saved answers
       const init: Record<string, ItemAnswer> = {};
@@ -134,7 +145,8 @@ export function RunInspection({ inspectionId, onExit }: { inspectionId: string; 
       setPhotoCounts(initPhotos);
       setSignedByName(currentUser?.name ?? '');
     } catch {
-      toast.error('Не удалось загрузить осмотр');
+      setLoadError(new InspectionLoadError(null));
+      setInspection(null);
     } finally {
       setLoading(false);
     }
@@ -188,10 +200,12 @@ export function RunInspection({ inspectionId, onExit }: { inspectionId: string; 
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ answers: buildAnswerPayload() }),
       });
-      if (!res.ok) throw new Error((await res.json()).error || 'Ошибка сохранения');
+      // Текст отказа разбирается по статусу: 401/CSRF-403 приходят английскими,
+      // не-JSON тело (прокси) давало браузерное «Unexpected end of JSON input».
+      if (!res.ok) throw new Error(await extractApiError(res, 'Не удалось сохранить черновик'));
       if (!options?.silent) toast.success('Черновик сохранён');
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Ошибка');
+      toast.error(catchText(err, 'Ошибка сохранения'));
     } finally {
       setSaving(false);
     }
@@ -210,7 +224,7 @@ export function RunInspection({ inspectionId, onExit }: { inspectionId: string; 
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ answers: buildAnswerPayload() }),
       });
-      if (!putRes.ok) throw new Error((await putRes.json()).error || 'Ошибка сохранения');
+      if (!putRes.ok) throw new Error(await extractApiError(putRes, 'Не удалось сохранить осмотр'));
 
       // Complete
       const res = await authFetch(`/api/inspections/${inspectionId}/complete`, {
@@ -218,17 +232,16 @@ export function RunInspection({ inspectionId, onExit }: { inspectionId: string; 
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ signedByName: signedByName.trim() }),
       });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || 'Ошибка завершения');
-      }
+      if (!res.ok) throw new Error(await extractApiError(res, 'Не удалось завершить осмотр'));
       toast.success('Осмотр завершён');
+      setShowSign(false);
       if (onExit) onExit(); else router.push('/inspections');
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Ошибка');
+      // Подпись оставляем на экране: на отказе панель закрывалась, и введённое
+      // имя терялось — человек жал «Завершить осмотр» заново (R100 №7).
+      toast.error(catchText(err, 'Ошибка завершения'));
     } finally {
       setCompleting(false);
-      setShowSign(false);
     }
   };
 
@@ -294,12 +307,33 @@ export function RunInspection({ inspectionId, onExit }: { inspectionId: string; 
   }
 
   if (!inspection) {
+    // Отказ чтения не выдаём за «осмотр не найден»: 404 — чужой/удалённый,
+    // 403 — права, 5xx и обрыв — временный сбой, повторяемый (R100 №2).
+    const message = loadError
+      ? loadErrorText(loadError, {
+        forbidden: 'Нет прав на просмотр осмотра. Смените роль или обратитесь к администратору.',
+        notFound: 'Осмотр не найден или принадлежит другому оператору.',
+        server: 'Не удалось загрузить осмотр. Сервер вернул ошибку.',
+      })
+      : 'Осмотр не найден.';
     return (
       <div className="mx-auto max-w-xl px-4 py-8 text-center text-sm text-muted-foreground">
-        Осмотр не найден.{' '}
-        {onExit
-          ? <button type="button" onClick={onExit} className="text-signal-strong underline">К смене</button>
-          : <Link href="/inspections" className="text-signal-strong underline">К списку</Link>}
+        <p>{message}</p>
+        {isRetryableLoadError(loadError) && (
+          <Button
+            size="sm"
+            variant="outline"
+            className="mt-3 min-h-11 sm:min-h-0"
+            onClick={() => void load()}
+          >
+            Повторить
+          </Button>
+        )}
+        <p className="mt-3">
+          {onExit
+            ? <button type="button" onClick={onExit} className="text-signal-strong underline">К смене</button>
+            : <Link href="/inspections" className="text-signal-strong underline">К списку</Link>}
+        </p>
       </div>
     );
   }

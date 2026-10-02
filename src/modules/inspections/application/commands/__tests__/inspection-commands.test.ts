@@ -38,7 +38,7 @@ vi.mock('@/lib/db', () => {
   };
   return { db: client };
 });
-import { startInspection, startToInspection, saveAnswers, completeInspection, completeInspectionWithOutcome } from '../inspection-commands';
+import { startInspection, startToInspection, saveAnswers, completeInspectionWithOutcome } from '../inspection-commands';
 
 /** SQL тегированного шаблона с `?` вместо параметров — для проверки формы запроса. */
 const sqlOf = (call: unknown[]): string => (call[0] as TemplateStringsArray).join('?');
@@ -214,7 +214,7 @@ describe('completeInspection', () => {
       templateSnapshot: [{ id: 'i1', answerType: 'YES_NO', required: true, photoRequired: false }],
       answers: [],
     });
-    await expect(completeInspection('ins1', { tenantId: 'orion', signedByName: 'Иванов' }))
+    await expect(completeInspectionWithOutcome('ins1', { tenantId: 'orion', signedByName: 'Иванов' }))
       .rejects.toThrow(/не заполнен/i);
     expect(m.insUpdateMany).not.toHaveBeenCalled();
   });
@@ -231,7 +231,7 @@ describe('completeInspection', () => {
       templateSnapshot: [{ id: 'i1', answerType: 'YES_NO', required: true, photoRequired: false }],
       answers: [{ itemId: 'i1', result: 'YES', photoCount: 0 }],
     });
-    const res = await completeInspection('ins1', { tenantId: 'orion', signedByName: 'Иванов' });
+    const { inspection: res } = await completeInspectionWithOutcome('ins1', { tenantId: 'orion', signedByName: 'Иванов' });
     const call = m.insUpdateMany.mock.calls[0][0];
     expect(call.data.status).toBe('COMPLETED');
     expect(call.data.healthScore).toBe(100);
@@ -253,7 +253,7 @@ describe('completeInspection', () => {
     });
     m.insUpdateMany.mockResolvedValue({ count: 0 });
 
-    const res = await completeInspection('ins1', { tenantId: 'orion', signedByName: 'Иванов' });
+    const { inspection: res } = await completeInspectionWithOutcome('ins1', { tenantId: 'orion', signedByName: 'Иванов' });
 
     expect(m.insUpdateMany).toHaveBeenCalledTimes(1);
     expect(m.recUpdateMany).not.toHaveBeenCalled();
@@ -307,7 +307,7 @@ describe('completeInspection', () => {
     m.insFindUniqueOrThrow.mockResolvedValue({ id: 'ins1', status: 'COMPLETED', equipmentId: 'eq1' });
     m.defectCreate.mockResolvedValue({ id: 'd1' });
 
-    await completeInspection('ins1', { tenantId: 'orion', signedByName: 'Иванов' });
+    await completeInspectionWithOutcome('ins1', { tenantId: 'orion', signedByName: 'Иванов' });
 
     // Замок — первый оператор транзакции: раньше чтения открытых дефектов.
     expect(m.executeRaw).toHaveBeenCalledTimes(1);

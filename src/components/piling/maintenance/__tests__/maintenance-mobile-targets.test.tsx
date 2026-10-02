@@ -84,7 +84,10 @@ describe('журнал ТО: цель нажатия на телефоне (R73)
     }
 
     expect(screen.getByRole('button', { name: /Задача ТО/ })).toHaveClass('h-11', 'sm:h-9');
-    expect(screen.getByRole('link', { name: /План-график/ })).toHaveClass('h-11', 'sm:h-9');
+
+    // F-R94-3: мёртвая ссылка «План-график» убрана — она вела на экран без
+    // регламентов ТО (панель регламентов из интерфейса недостижима).
+    expect(screen.queryByRole('link', { name: /План-график/ })).toBeNull();
 
     // Пагинация: номера страниц выравниваются по соседним «‹/›» (те уже 44px).
     expect(screen.getByRole('button', { name: '1' })).toHaveClass('h-11', 'w-11', 'sm:h-8', 'sm:w-8');

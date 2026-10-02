@@ -38,6 +38,7 @@ vi.mock('../operator-concept.css', () => ({}));
 import {ApiError, QueuedOffline} from '@/components/piling/operator-mobile/api';
 import type {QueuedCommand} from '@/components/piling/operator-mobile/offline-queue';
 import {OperatorMobileApp} from '../operator-mobile-app';
+import {workStateFixture} from './fixtures';
 
 beforeEach(() => {
   api.fetchState.mockReset();
@@ -82,26 +83,7 @@ describe('v1: загрузка состояния не удалась', () => {
  * проверяется вся цепочка — отказ команды → `details` у `ApiError` → плашка
  * над экраном со списком.
  */
-const workState = {
-  phase: 'WORK',
-  productionDate: '2026-09-20',
-  shift: {id: 'shift-1', productionDate: '2026-09-20'},
-  assignment: {equipmentId: 'eq-1', equipmentName: 'Установка 12', siteName: 'Площадка А', lastMeter: null},
-  identity: {
-    ppe: {confirmed: true, missing: []},
-    briefing: {ok: true, acknowledgedAt: '2026-09-20T05:00:00.000Z'},
-    knowledge: {ok: true}, documents: [],
-  },
-  checklists: ['PRESHIFT_INSPECTION', 'SITE_READY', 'EO_BEFORE'].map((stage) => ({stage, done: true})),
-  permit: {allowed: true, blocks: []},
-  dictionaries: {pileGrades: [], drillingTypes: [], downtimeReasons: []},
-  production: {
-    piles: {count: 12, meters: 60},
-    drilling: {count: 4, meters: 24},
-    downtimeHours: 0,
-  },
-  entries: [], warnings: [], defects: [], incidents: [], progress: [],
-} as unknown as OperatorMobileState;
+const workState = workStateFixture();
 
 async function finishWork(failure: unknown) {
   api.fetchState.mockResolvedValue(workState);
@@ -160,6 +142,7 @@ describe('v1: перечитывание после успешной коман�
 
     // Принятая команда — прежний `STALE_SCREEN_NOTICE`, вместе с «не вводите
     // запись повторно»: здесь запись действительно записана.
+    // Копия STALE_SCREEN_NOTICE из operator-mobile-app.tsx — менять вместе.
     expect(await screen.findByText(
       'Записано. Экран не обновился — обновим, как появится связь. Не вводите запись повторно.',
     )).toBeInTheDocument();
@@ -300,6 +283,24 @@ describe('v1: истёкший вход на команде', () => {
     await sendFinishWork(new QueuedOffline('Выработка', 'после входа'));
 
     expect(screen.getByText(/Сессия истекла\. Записи сохранены на телефоне/)).toBeInTheDocument();
+    // До паузы экран ещё не ушёл: машинист успевает прочитать причину.
+    expect(window.location.pathname).not.toBe('/login');
+
+    act(() => { vi.advanceTimersByTime(2500); });
+
+    expect(window.location.pathname).toBe('/login');
+  });
+
+  it('401 на команде-переходе уводит на вход тем же уведомлением (R89, находка 5)', async () => {
+    // Команды перехода (`finish-work`, `close-shift`…) в очередь не кладутся,
+    // поэтому истёкший вход приходит сюда прямым `ApiError` 401, а не
+    // `QueuedOffline`. Раньше это был только текст отказа без перехода: машинист
+    // оставался на экране без входа и без действия.
+    await sendFinishWork(new ApiError(401, 'Войдите в систему'));
+
+    expect(screen.getByText(/Сессия истекла\. Записи сохранены на телефоне/)).toBeInTheDocument();
+    // Отказ команды на экран не попал: экран уходит на вход, а не разбирает ошибку.
+    expect(screen.queryByText('Войдите в систему')).not.toBeInTheDocument();
     // До паузы экран ещё не ушёл: машинист успевает прочитать причину.
     expect(window.location.pathname).not.toBe('/login');
 

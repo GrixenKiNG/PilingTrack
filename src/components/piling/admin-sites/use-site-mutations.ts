@@ -3,6 +3,7 @@
 import { Dispatch, SetStateAction, useState } from 'react';
 import { toast } from 'sonner';
 import { authFetch } from '@/lib/api';
+import { apiErrorMessage } from '@/lib/api-error-message';
 import type {
   DrillingPlanRow,
   PilePlanRow,
@@ -16,15 +17,34 @@ interface Options {
   setExpandedSiteId: Dispatch<SetStateAction<string | null>>;
 }
 
-/** Read the server's `{ error }` message from a failed response, falling back when absent/unparseable. */
-export async function extractApiError(res: Response, fallback: string): Promise<string> {
+/** Сбой связи — не ответ сервера: уведомление объясняет, что делать. */
+const NETWORK_ERROR = 'Нет соединения с сервером. Проверьте связь и повторите.';
+
+/** Тело отказа, если оно читается; иначе `undefined` (пустой/не-JSON ответ). */
+async function readErrorBody(res: Response): Promise<unknown> {
   try {
-    const body = await res.json();
-    const message = (body as { error?: unknown })?.error;
-    return typeof message === 'string' && message ? message : fallback;
+    return await res.json();
   } catch {
-    return fallback;
+    return undefined;
   }
+}
+
+/**
+ * Текст отказа сервера для уведомления.
+ *
+ * Тело читается целиком, а не только поле `error`: на 400 сервер отдаёт
+ * построчные `details` (поле + сообщение), которые раньше не показывались
+ * (находка 11). Технические ответы `auth.ts` и `csrf-protection.ts` приходят
+ * английскими («Unauthorized», «CSRF validation failed: …») — на русском
+ * экране они заменяются понятной формулировкой (находка 12).
+ */
+export async function extractApiError(res: Response, fallback: string): Promise<string> {
+  if (res.status === 401) return 'Сессия истекла — войдите снова.';
+  const message = apiErrorMessage(await readErrorBody(res), fallback);
+  if (res.status === 403 && message.startsWith('CSRF validation failed')) {
+    return 'Запрос отклонён проверкой безопасности. Обновите страницу и повторите.';
+  }
+  return message;
 }
 
 /**
@@ -69,13 +89,16 @@ export function useSiteMutations({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
-      if (!res.ok) throw new Error('Ошибка создания');
+      if (!res.ok) {
+        toast.error(await extractApiError(res, 'Не удалось создать объект'));
+        return false;
+      }
       const data = await res.json();
       setSites((prev) => [...prev, data.site]);
       toast.success('Объект создан');
       return true;
     } catch {
-      toast.error('Ошибка создания объекта');
+      toast.error(NETWORK_ERROR);
       return false;
     }
   };
@@ -126,7 +149,10 @@ export function useSiteMutations({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
-      if (!res.ok) throw new Error('Ошибка сохранения');
+      if (!res.ok) {
+        toast.error(await extractApiError(res, 'Не удалось сохранить объект'));
+        return false;
+      }
       const data = await res.json();
 
       setSites((prev) =>
@@ -151,7 +177,7 @@ export function useSiteMutations({
       toast.success('Объект сохранён');
       return true;
     } catch {
-      toast.error('Ошибка сохранения');
+      toast.error(NETWORK_ERROR);
       return false;
     }
   };
@@ -175,7 +201,7 @@ export function useSiteMutations({
       toast.success('Объект удалён');
       return true;
     } catch {
-      toast.error('Не удалось удалить объект');
+      toast.error(NETWORK_ERROR);
       return false;
     }
   };
@@ -190,7 +216,7 @@ export function useSiteMutations({
         body: JSON.stringify({ completed }),
       });
       if (!res.ok) {
-        toast.error(await extractApiError(res, 'Ошибка'));
+        toast.error(await extractApiError(res, 'Не удалось изменить отметку «Выполнен»'));
         return;
       }
       const data = await res.json();
@@ -204,7 +230,7 @@ export function useSiteMutations({
           : undefined,
       );
     } catch {
-      toast.error('Ошибка');
+      toast.error(NETWORK_ERROR);
     }
   };
 
@@ -217,14 +243,14 @@ export function useSiteMutations({
         body: JSON.stringify({ isActive: !site.isActive }),
       });
       if (!res.ok) {
-        toast.error(await extractApiError(res, 'Ошибка'));
+        toast.error(await extractApiError(res, 'Не удалось изменить активность объекта'));
         return;
       }
       const data = await res.json();
       setSites((prev) => prev.map((s) => (s.id === site.id ? data.site : s)));
       toast.success(site.isActive ? 'Объект деактивирован' : 'Объект активирован');
     } catch {
-      toast.error('Ошибка');
+      toast.error(NETWORK_ERROR);
     } finally {
       setTogglingId(null);
     }
@@ -242,7 +268,10 @@ export function useSiteMutations({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ type, name, parentId }),
       });
-      if (!res.ok) throw new Error('Ошибка добавления');
+      if (!res.ok) {
+        toast.error(await extractApiError(res, 'Не удалось добавить элемент'));
+        return false;
+      }
       const treeRes = await authFetch(`/api/sites/${siteId}`);
       if (treeRes.ok) {
         const data = await treeRes.json();
@@ -251,7 +280,7 @@ export function useSiteMutations({
       toast.success('Элемент добавлен');
       return true;
     } catch {
-      toast.error('Ошибка добавления');
+      toast.error(NETWORK_ERROR);
       return false;
     }
   };
@@ -263,15 +292,20 @@ export function useSiteMutations({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ type, itemId }),
       });
-      if (!res.ok) throw new Error('Ошибка удаления');
+      if (!res.ok) {
+        toast.error(await extractApiError(res, 'Не удалось удалить элемент иерархии'));
+        return false;
+      }
       const treeRes = await authFetch(`/api/sites/${siteId}`);
       if (treeRes.ok) {
         const data = await treeRes.json();
         setSiteTree((prev) => ({ ...prev, [siteId]: data.site }));
       }
       toast.success('Элемент удалён');
+      return true;
     } catch {
-      toast.error('Ошибка удаления');
+      toast.error(NETWORK_ERROR);
+      return false;
     }
   };
 

@@ -26,7 +26,7 @@ export class PrismaSiteRepository implements SiteRepository {
           completionDate: persistenceData.completionDate, isActive: persistenceData.isActive },
       });
       if (pendingEvents.length > 0) {
-        await tx.outboxEvent.createMany({ data: pendingEvents.map(toOutboxData) });
+        await tx.outboxEvent.createMany({ data: pendingEvents.map((e) => toOutboxData(e, state.tenantId ?? undefined)) });
       }
     });
 

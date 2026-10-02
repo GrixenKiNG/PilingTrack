@@ -94,4 +94,14 @@ describe('PrismaEquipmentRepository.save — transactional outbox', () => {
     expect(tx.equipment.upsert).toHaveBeenCalledTimes(1);
     expect(tx.outboxEvent.create).not.toHaveBeenCalled();
   });
+
+  it('writes the aggregate tenantId into the outbox row (F-R86-OUTBOX-TENANT)', async () => {
+    // Without it the consumer opens the tenant context with null → the strict
+    // RLS policy returns zero rows to the handler (silent no-op).
+    await repo.save(makeAggregate());
+
+    expect(tx.outboxEvent.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ tenantId: 'orion' }),
+    });
+  });
 });

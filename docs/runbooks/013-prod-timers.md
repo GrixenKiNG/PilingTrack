@@ -15,6 +15,16 @@
 проверка — всегда три команды: `list-timers` (жив ли), `journalctl` (что
 говорил в последний раз), и проверка результата (файл/метрика на месте).
 
+**Как читать этот ранбук: снимок ≠ текущий код ≠ боевой сервер.** Всё, что ниже
+про *устройство* таймеров, — снимок боевого сервера, снятый **29.09.2026** в
+режиме чтения: это историческая картина, а не текущий статус. С тех пор таймеры
+могли переставить, а переменные окружения — появиться. Ссылки вида
+`путь:строка` указывают на **текущий код репозитория**; код мог уйти вперёд
+снимка, и правка в репозитории **не означает, что она уже выложена на сервер**.
+Фактическое состояние хоста (какие таймеры включены, что задано в окружении)
+этим документом не проверяется — только командами из раздела «Общие команды» на
+самом сервере.
+
 ---
 
 ## Таймеры на боевом сервере (снимок 29.09.2026)
@@ -22,9 +32,33 @@
 | Таймер | Когда | Что запускает | Что будет, если он не отработал | Как проверить |
 |---|---|---|---|---|
 | `pilingtrack-disk-guard.timer` | каждые 15 мин (плюс через 5 мин после загрузки) | `scripts/disk-guard.sh` на хосте (не в Docker): смотрит заполнение `/`, порог **85 %**, при превышении шлёт критический алерт `HostDiskGuard` в вебхук Alertmanager → Telegram. Кулдаун 6 ч, чтобы не спамить. Специально независим от Prometheus/Docker-стека. | Диск заполняется молча. Алерты Prometheus по месту живут на том же диске и в этот момент сами мертвы — единственный независимый предупреждающий контур выключен. Следующий симптом — «не могу войти»/500 от приложения при 100 % диска (так было 2026-06-24). | `systemctl list-timers pilingtrack-disk-guard.timer`<br>`journalctl -u pilingtrack-disk-guard.service -n 20`<br>`df -h /` |
-| `pilingtrack-backup.timer` | ежедневно ~03:30 МСК, случайная задержка до 10 мин | `scripts/backup-postgres.sh`: `pg_dump` в custom-формате (gzip) → `/var/backups/pilingtrack/<db>-YYYYMMDD-HHMMSS.sql.gz`, хранение 30 дней; затем off-site-копия в Cloudflare R2 через `rclone` (сбой off-site только пишет warning и не валит задание); затем best-effort запись ключей `system:backup:*` в Redis для `/api/metrics` и health. | Нет свежего дампа → реальный RPO растёт и уходит за сутки. Автоматически это **никто не заметит**: метрика `backup_age_hours` на бою всегда `0` из-за выключенного гейта `BACKUP_ENABLED` (см. аудит R56), а алерт `OffsiteBackupNotSynced` по той же причине не может сработать. «Зелёная» панель бэкапов ничего не гарантирует. | `systemctl list-timers pilingtrack-backup.timer`<br>`journalctl -u pilingtrack-backup.service --since "2 days ago"`<br>`ls -lh /var/backups/pilingtrack/ \| tail -5`<br>`rclone lsl R2:pilingtrack/db-backups/ \| tail -5` |
+| `pilingtrack-backup.timer` | ежедневно ~03:30 МСК, случайная задержка до 10 мин | `scripts/backup-postgres.sh`: `pg_dump` в custom-формате (gzip) → `/var/backups/pilingtrack/<db>-YYYYMMDD-HHMMSS.sql.gz`, хранение 30 дней; затем off-site-копия в Cloudflare R2 через `rclone` (сбой off-site только пишет warning и не валит задание); затем best-effort запись ключей `system:backup:*` в Redis для `/api/metrics` и health. | Нет свежего дампа → реальный RPO растёт и уходит за сутки. Автоматически это **никто не заметит**: при выключенном гейте `BACKUP_ENABLED` (снимок 29.09.2026) метрика `backup_age_hours` показывает `0` — но это не «бэкап только что был», а «проверка выключена» (`source:'disabled'`, см. подраздел про текущий код ниже), а алерт `OffsiteBackupNotSynced` по той же причине не может сработать (аудит R56-dead-metrics.md, находка от 29.09.2026). «Зелёная» панель бэкапов ничего не гарантирует. | `systemctl list-timers pilingtrack-backup.timer`<br>`journalctl -u pilingtrack-backup.service --since "2 days ago"`<br>`ls -lh /var/backups/pilingtrack/ \| tail -5`<br>`rclone lsl R2:pilingtrack/db-backups/ \| tail -5` |
 | `pilingtrack-pitr-basebackup.timer` | по воскресеньям ~04:00 МСК, случайная задержка до 15 мин (в снимке 29.09 — ~04:03) | `scripts/pitr-basebackup.sh`: `pg_basebackup` → `/opt/pilingtrack/basebackups/base-<ts>.tar.gz`, хранение 4 копии (~4 недели), затем чистка старого через `pg_archivecleanup`. WAL-архивирование при этом **выключено** (`archive_mode=off` с 24.06.2026 после инцидента с заполненным диском — см. шапку runbook 009), так что восстановления «на любую секунду» нет: это просто недельный полный снимок БД. | Новые снимки не появляются; старые остаются на диске (ротация удаляет только после успешной новой копии), т.е. покрытие деградирует до «последняя удачная копия» и тихо стареет. PITR недоступен в любом случае — планировать восстановление можно только от ночного дампа (runbook 006) и этого недельного снимка. | `systemctl list-timers pilingtrack-pitr-basebackup.timer`<br>`journalctl -u pilingtrack-pitr-basebackup.service --since "30 days ago"`<br>`ls -lh /opt/pilingtrack/basebackups/` |
 | `pilingtrack-docker-prune.timer` | по воскресеньям ~04:10 МСК | Три команды прямо в юните: `docker builder prune -af --filter until=168h`, `docker image prune -af --filter until=168h`, `docker container prune -f --filter until=168h`. Юнит-файла и скрипта для него в репозитории **нет** — он существует только на сервере. | Кэш сборки и старые образы накапливаются; на 30-ГБ диске это упирается в «no space left on device» посреди сборки/экспорта образа (так было 2026-05-28: параллельная сборка app+workers забила диск до 100 %). Учти: сборка перед выкладкой и так требует 5–6 ГБ временного места. | `systemctl list-timers pilingtrack-docker-prune.timer`<br>`journalctl -u pilingtrack-docker-prune.service -n 30`<br>`docker system df` |
+
+### Как текущий код различает состояние бэкапа (это не снимок)
+
+Ссылки ниже — на **текущий код репозитория**; выложены ли эти правки на боевой
+сервер, из этого документа не следует (см. врезку в начале).
+
+- **Приставка ключа.** Приложение читает Redis через ioredis с
+  `keyPrefix: 'pilingtrack:'` (`src/lib/redis-cache.ts:64`), поэтому реальные
+  метки бэкапа — `pilingtrack:system:backup:*` (`last_timestamp`, `last_size`,
+  `s3_synced`). Пишет их хостовый `scripts/backup-postgres.sh` через
+  `redis-cli`, который приставку **не** добавляет: «сырое» имя
+  `system:backup:*` и имя, которое ищет приложение, — это **разные** ключи.
+- **`disabled` ≠ `missing` ≠ устаревший.** Проверка
+  `src/core/observability/health-tracker/checkers/backup.ts`: гейт
+  `isBackupMonitoringEnabled()` (`:17-21`) при пустом `BACKUP_ENABLED` в
+  `checkBackupStatus()` (`:78-80`) возвращает `{status:'up', source:'disabled'}`
+  **без возраста** — это «не проверялось», а не «всё свежо». `source:'missing'`
+  (`:86`, `:98`) означает, что метки в Redis нет и файловый фолбэк пуст. Если
+  метка есть, но её возраст больше `BACKUP_STALE_HOURS` = 26 ч или
+  `BACKUP_CRITICAL_HOURS` = 48 ч
+  (`src/core/observability/health-tracker/thresholds.ts:12-13`), статус —
+  `slow`/`down`: это **устаревший** (stale) бэкап. Именно по этим трём
+  состояниям и надо различать «мониторинг выключен», «нет данных» и «данные
+  просрочены».
 
 ---
 

@@ -123,13 +123,13 @@ export function OperatorMobileApp() {
   const [forbidden, setForbidden] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   /**
-   * Короткое уведомление над текущим экраном — «запись принята».
+   * Короткое уведомление над текущим экраном.
    *
-   * Держится отдельно от `actionError`: отказ команды и успешная команда,
-   * после которой не удалось перечитать состояние, — разные вещи, и красная
-   * плашка отказа здесь была бы неправдой. Пока это единственный повод для
-   * заметки: сбой «тихого» перечитывания после принятой команды (аудит R76,
-   * находка 9).
+   * Держится отдельно от `actionError`: отказ команды и короткая заметка о
+   * состоянии — разные вещи, и красная плашка отказа здесь была бы неправдой.
+   * Показывается, когда: экран остался несвежим после принятой команды (аудит
+   * R76, находка 9); сессия истекла; запись сохранена на устройстве; сервер
+   * ответил отказом 409. Это не плашка отказа.
    */
   const [notice, setNotice] = useState<string | null>(null);
   /**
@@ -321,6 +321,24 @@ export function OperatorMobileApp() {
   }, []);
 
   /**
+   * Уйти на вход с уведомлением об истёкшей сессии.
+   *
+   * Истёкший вход приходит двумя путями: отложенная запись (`QueuedOffline` с
+   * `reason === 'auth'`) и прямой 401 на команде-переходе (`close-shift`,
+   * `finish-work`, `submit-checklist`…), которая в очередь не кладётся. Делать
+   * в обоих случаях надо одно и то же, поэтому переход и текст собраны здесь:
+   * задержка нужна, чтобы машинист успел прочитать причину — без неё
+   * перезагрузка выглядит как сбой приложения.
+   */
+  const leaveToLogin = useCallback(() => {
+    setNotice(AUTH_EXPIRED_NOTICE);
+    authRedirectTimer.current = setTimeout(() => {
+      // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- намеренно: сессия истекла, полная перезагрузка сбрасывает кэш маршрутов и память вкладки прежнего входа
+      window.location.href = '/login';
+    }, AUTH_REDIRECT_MS);
+  }, []);
+
+  /**
    * Выполнить команду и сказать, получилось ли.
    *
    * ПОЧЕМУ ВОЗВРАЩАЕТ ПРИЗНАК. Экран очищает форму только по этому ответу.
@@ -382,11 +400,7 @@ export function OperatorMobileApp() {
           прочитать причину.
         */
         if (error.reason === 'auth') {
-          setNotice(AUTH_EXPIRED_NOTICE);
-          authRedirectTimer.current = setTimeout(() => {
-            // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- намеренно: сессия истекла, полная перезагрузка сбрасывает кэш маршрутов и память вкладки прежнего входа
-            window.location.href = '/login';
-          }, AUTH_REDIRECT_MS);
+          leaveToLogin();
         } else {
           /*
             ОБРЫВ СВЯЗИ — НЕ МОЛЧАНИЕ (аудит R76, находка 18). Запись легла на
@@ -399,6 +413,21 @@ export function OperatorMobileApp() {
           setNotice(error.message);
         }
         return true;
+      }
+      /*
+        ИСТЁКШИЙ ВХОД НА КОМАНДЕ-ПЕРЕХОДЕ (аудит R89, находка 5). 401 приходит
+        не только отложенной записью: у команд, которые в очередь не кладутся
+        (`close-shift`, `finish-work`, `submit-checklist`, `submit-report`,
+        `accept-equipment`, `confirm-ppe`, `acknowledge-briefing`), сервер
+        отвечает `ApiError` 401 напрямую. Раньше это был просто текст отказа
+        «Войдите в систему»: машинист оставался на экране без единого действия
+        и без входа. Теперь тот же уход на вход с уведомлением, что у
+        отложенной записи, — общий помощник `leaveToLogin`. Отказа команды при
+        этом не показываем: экран уходит на вход, а не разбирает ошибку.
+      */
+      if (error instanceof ApiError && error.status === 401) {
+        leaveToLogin();
+        return false;
       }
       setActionError(operatorErrorText(error));
       setActionErrorDetails(operatorErrorDetails(error));
@@ -431,7 +460,7 @@ export function OperatorMobileApp() {
     } finally {
       setBusy(false);
     }
-  }, [reload]);
+  }, [reload, leaveToLogin]);
 
   // Что лежит на устройстве и ещё не ушло: машинист видит это постоянно, а не
   // узнаёт по факту пропажи. Когда слать — решает общий хук (use-offline-queue).
@@ -448,6 +477,11 @@ export function OperatorMobileApp() {
           когда ниже ничего нет.
         */}
         <OperatorStatusStrip online={online} items={queued} />
+        {/*
+          Без `shownElsewhere`: `ErrorNote` на этом экране нет, и признак «причина
+          уже показана у кнопки» был бы неправдой — причина пропадала отовсюду
+          (F-R89-DUP-REJECT-b). Причина отказа печатается в карточке очереди.
+        */}
         <OfflineQueueBanner items={queued} onRetry={retryQueued} onDiscard={discardQueued} />
         <Screen
           title="Рабочее место машиниста"
@@ -480,7 +514,11 @@ export function OperatorMobileApp() {
           Плашка очереди — сразу под строкой состояния (аудит R76, находка 17).
           Строка состояния при отклонённых записях пишет «Сервер отклонил запись —
           причина показана ниже», а ниже ничего не было: карточки с причиной и
-          кнопками оставались на невидимом экране работы.
+          карточки с причиной и кнопками оставались на невидимом экране работы.
+
+          Без `shownElsewhere` по той же причине, что у отказа по роли:
+          `ErrorNote` здесь не рисуется, и причина обязана остаться в карточке
+          (F-R89-DUP-REJECT-b).
         */}
         <OfflineQueueBanner items={queued} onRetry={retryQueued} onDiscard={discardQueued} />
         <Screen
@@ -550,6 +588,43 @@ export function OperatorMobileApp() {
     `detour` — любой открытый шаг.
   */
   const tabsVisible = !detour && !checklist;
+
+  /*
+    ПОКАЗАНА ЛИ ПРИЧИНА ОТКАЗА НА ЭКРАНЕ (F-R89-DUP-REJECT-b).
+
+    `shownElsewhere` говорит плашке очереди: эту фразу уже печатает `ErrorNote`
+    у кнопки, в карточке её повторять незачем. Но `actionError` живёт дольше
+    своего экрана: его снимает только новое действие (`run`), а не перечитывание
+    состояния. Дойди экран до отказа загрузки («Нет связи», «Сервер не
+    отвечает») или до отказа по роли — `ErrorNote` там не рисуется вовсе, и
+    безусловный `shownElsewhere={actionError}` уносил причину отовсюду: строка
+    состояния обещала «причина показана ниже», а ниже её не было.
+
+    Поэтому признак считаем по фактической ветке: где `ErrorNote` есть —
+    причина показана у кнопки, где нет — `null`, и причина остаётся в карточке.
+  */
+  const rejectionShownOnScreen = (() => {
+    // Обходной просмотр — единственный без `ErrorNote`; остальные обходные
+    // экраны (ППО, инструктаж, знания) и чек-лист его рисуют.
+    if (detour?.kind === 'REVIEW') return null;
+    if (detour) return actionError;
+    if (checklist) return actionError;
+    // Вкладки вне «Работы»: происшествия (`MORE`) рисуют `ErrorNote`, «Техника» и «ТБ» — нет.
+    if (tabsVisible && workTab !== 'SHIFT') {
+      return workTab === 'MORE' ? actionError : null;
+    }
+    switch (state.phase) {
+      case 'ADMISSION':
+      case 'CLOSED':
+        return actionError;
+      // Без смены экран — `ShiftMissingScreen`, у него `ErrorNote` нет.
+      case 'WORK':
+      case 'CLOSING':
+        return shift ? actionError : null;
+      default:
+        return null;
+    }
+  })();
 
   const alarmingIncidents = state.incidents.filter(
     (incident) => isIncidentOpen(incident.reviewedAt),
@@ -825,12 +900,13 @@ export function OperatorMobileApp() {
         onOpen={(phase) => setDetour({kind: 'REVIEW', phase: phase as OperatorPhase})}
       />
       <OperatorStatusStrip online={online} items={queued} />
-      <OfflineQueueBanner items={queued} onRetry={retryQueued} onDiscard={discardQueued} />
+      <OfflineQueueBanner items={queued} onRetry={retryQueued} onDiscard={discardQueued} shownElsewhere={rejectionShownOnScreen} />
       {/*
-        Короткое уведомление о принятой записи, экран при этом остаётся
-        прежним (аудит R76, находка 9). Тон предупреждения, а не отказа:
-        запись на сервере есть, несвежим может быть только экран. `role`
-        без `alert` — объявление не должно прерывать чтение экрана.
+        Короткая заметка над экраном; повод бывает разный (аудит R76, находка
+        9): принятая запись с несвежим экраном; отказ 409 — записи на сервере
+        нет; запись сохранена на устройстве — на сервере её ещё нет; истёкшая
+        сессия. Тон предупреждения, а не отказа. `role` без `alert` —
+        объявление не должно прерывать чтение экрана.
       */}
       {notice ? (
         <div className="px-3 pt-2">

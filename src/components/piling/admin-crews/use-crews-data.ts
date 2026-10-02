@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { authFetch, isAbort, loadErrorMessage, loadJson } from '@/lib/api';
+import { catchText, extractApiError } from './crew-messages';
 import type { CrewDTO, EquipmentDTO, SiteDTO, UserDTO } from '@/lib/types';
 
 export interface UseCrewsDataReturn {
@@ -178,13 +179,17 @@ export function useCrewsData(): UseCrewsDataReturn {
       });
 
       if (!res.ok) {
-        throw new Error();
+        // Причина отказа (в т.ч. 409 «Установка уже закреплена за активной
+        // бригадой «X»») показывается человеку, а не тонет в общем тексте.
+        const prefix = crew.isActive ? 'Не удалось деактивировать' : 'Не удалось активировать';
+        toast.error(`${prefix}: ${await extractApiError(res, 'повторите позже')}`);
+        return;
       }
 
       const data = await res.json();
       setCrews(prev => prev.map(item => item.id === crew.id ? data.crew : item));
-    } catch {
-      toast.error('Ошибка изменения статуса');
+    } catch (err) {
+      toast.error(catchText(err, 'Ошибка изменения статуса'));
     }
   };
 
@@ -203,8 +208,7 @@ export function useCrewsData(): UseCrewsDataReturn {
     });
 
     if (!res.ok) {
-      const error = await res.json().catch(() => ({}));
-      throw new Error(error.error || 'Ошибка создания');
+      throw new Error(await extractApiError(res, 'Ошибка создания'));
     }
 
     const result = await res.json();
@@ -227,8 +231,7 @@ export function useCrewsData(): UseCrewsDataReturn {
     });
 
     if (!res.ok) {
-      const error = await res.json().catch(() => ({}));
-      throw new Error(error.error || 'Ошибка сохранения');
+      throw new Error(await extractApiError(res, 'Ошибка сохранения'));
     }
 
     const result = await res.json();
@@ -239,8 +242,7 @@ export function useCrewsData(): UseCrewsDataReturn {
     const res = await authFetch(`/api/crews/${id}`, { method: 'DELETE' });
 
     if (!res.ok) {
-      const error = await res.json().catch(() => ({}));
-      throw new Error(error.error || 'Ошибка удаления');
+      throw new Error(await extractApiError(res, 'Ошибка удаления'));
     }
   };
 

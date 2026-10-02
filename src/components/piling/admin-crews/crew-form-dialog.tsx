@@ -157,11 +157,18 @@ export function CrewFormDialog({
       return;
     }
 
+    // Пустое название сервер подставляет английским «Unnamed Crew» в русском
+    // интерфейсе — название обязательно (R102, важно №7).
+    if (!name.trim()) {
+      toast.error('Укажите название бригады');
+      return;
+    }
+
     await onSubmit({
       operatorId,
       equipmentId,
       siteId,
-      name: name.trim() || undefined,
+      name: name.trim(),
       assistantUserIds,
       assistantNames: selectedAssistantNames,
       isActive: mode === 'edit' ? active : true,
@@ -229,6 +236,10 @@ export function CrewFormDialog({
                     ))}
                   </SelectContent>
                 </Select>
+                {/* Пустой список читается как «операторов нет» — называем причину. */}
+                {availableOps.length === 0 && (
+                  <p className="text-xs text-muted-foreground">Нет активных машинистов — заведите пользователя с ролью «Машинист».</p>
+                )}
               </div>
 
               <div className="space-y-1.5">
@@ -247,6 +258,9 @@ export function CrewFormDialog({
                     ))}
                   </SelectContent>
                 </Select>
+                {equipment.length === 0 && (
+                  <p className="text-xs text-muted-foreground">Список установок пуст — заведите технику в разделе «Техника».</p>
+                )}
               </div>
 
               <div className="space-y-1.5">
@@ -265,10 +279,15 @@ export function CrewFormDialog({
                     ))}
                   </SelectContent>
                 </Select>
+                {sites.length === 0 && (
+                  <p className="text-xs text-muted-foreground">Список объектов пуст — заведите объект в разделе «Объекты».</p>
+                )}
               </div>
 
               <div className="space-y-1.5">
-                <Label>Название (необязательно)</Label>
+                <Label>
+                  Название <span className="text-destructive-strong">*</span>
+                </Label>
                 <Input
                   value={name}
                   onChange={event => setName(event.target.value)}
@@ -304,7 +323,7 @@ export function CrewFormDialog({
             </Button>
             <Button
               onClick={handleSubmit}
-              disabled={submitting || loadingReferenceData || !operatorId || !equipmentId || !siteId}
+              disabled={submitting || loadingReferenceData || !operatorId || !equipmentId || !siteId || !name.trim()}
               className="bg-signal text-white hover:bg-signal-strong"
             >
               {submitting

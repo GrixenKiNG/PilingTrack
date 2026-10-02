@@ -26,7 +26,7 @@ interface AddHierarchyDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   type: HierarchyType;
-  onAdd: (name: string) => Promise<void>;
+  onAdd: (name: string) => Promise<boolean>;
 }
 
 export function AddHierarchyDialog({ open, onOpenChange, type, onAdd }: AddHierarchyDialogProps) {
@@ -40,8 +40,10 @@ export function AddHierarchyDialog({ open, onOpenChange, type, onAdd }: AddHiera
     }
     setAdding(true);
     try {
-      await onAdd(name.trim());
-      setName('');
+      // Имя очищается только при успехе: при отказе набранное название
+      // пикета/куста терять нельзя (находка 10).
+      const ok = await onAdd(name.trim());
+      if (ok) setName('');
     } finally {
       setAdding(false);
     }

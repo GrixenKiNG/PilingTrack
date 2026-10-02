@@ -504,14 +504,3 @@ export async function completeInspectionWithOutcome(
     return { inspection, replayed: false };
   });
 }
-
-/**
- * Завершение осмотра. Обёртка над `completeInspectionWithOutcome` для
- * вызывающих, которым нужен только осмотр; признак повтора отбрасывается.
- */
-export async function completeInspection(
-  id: string,
-  ctx: { tenantId: string; signedByName: string; performerId?: string | null },
-) {
-  return (await completeInspectionWithOutcome(id, ctx)).inspection;
-}

@@ -22,6 +22,8 @@ import {
 } from '@/components/piling/icons/unified-icons';
 import { Button } from '@/components/ui/button';
 import { PhotoSection } from '@/components/piling/report-form/photo-section';
+import { authFetch } from '@/lib/api';
+import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { formatNumber, formatHours, formatRuDate } from '@/lib/format';
 import type { ReportDTO } from '@/lib/types';
@@ -65,6 +67,34 @@ export function ReportEvidencePreview({
   const efficiency = duration ? ((duration - totals.downtimeHours) / duration) * 100 : null;
   const downtimeMax = Math.max(...report.downtimes.map((item) => item.duration), 1);
   const workTotal = Math.max(totals.pileMeters + totals.drillingMeters, 1);
+
+  // Скачивание PDF через authFetch, а не прямой ссылкой: при 403/404/429/500
+  // ссылка уводила браузер на JSON-тело ошибки, и человек не понимал, где файл.
+  const downloadPdf = async () => {
+    try {
+      const res = await authFetch(`/api/reports/single-pdf?reportId=${encodeURIComponent(report.reportId)}`);
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { error?: unknown };
+        throw new Error(
+          typeof body.error === 'string' && body.error
+            ? body.error
+            : `Не удалось скачать PDF (код ${res.status}).`,
+        );
+      }
+      const url = URL.createObjectURL(await res.blob());
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `отчёт-${report.date}.pdf`;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      toast.error(
+        err instanceof TypeError
+          ? 'Нет связи с сервером. PDF не скачан — повторите при появлении сети.'
+          : err instanceof Error ? err.message : 'Не удалось скачать PDF',
+      );
+    }
+  };
   return (
     <aside className="self-start rounded-lg border border-border bg-card shadow-sm xl:sticky xl:top-4">
       <div className="border-b border-border bg-card p-3">
@@ -197,11 +227,9 @@ export function ReportEvidencePreview({
             <FileDown className="mr-1 h-3.5 w-3.5 shrink-0" />
             <span className="min-w-0 truncate">Открыть PDF</span>
           </Button>
-          <Button asChild variant="outline" className="h-9 min-w-0 px-2 text-xs">
-            <a href={`/api/reports/single-pdf?reportId=${encodeURIComponent(report.reportId)}`} download>
+          <Button onClick={downloadPdf} variant="outline" className="h-9 min-w-0 px-2 text-xs">
             <Download className="mr-1 h-3.5 w-3.5 shrink-0" />
             <span className="min-w-0 truncate">Скачать</span>
-            </a>
           </Button>
           <Button onClick={onPrint} variant="outline" className="h-9 min-w-0 px-2 text-xs">
             <Printer className="mr-1 h-3.5 w-3.5 shrink-0" />

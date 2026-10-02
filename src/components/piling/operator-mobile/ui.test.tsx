@@ -59,6 +59,11 @@ describe('рабочая оболочка машиниста', () => {
 
     rerender(<OperatorStatusStrip online items={failed} />);
     expect(screen.getByRole('status')).toHaveTextContent('Нужно проверить: 1');
+    expect(screen.getByRole('status')).toHaveTextContent('Сервер отклонил запись — причина показана ниже');
+
+    rerender(<OperatorStatusStrip online items={[...failed, ...pending]} />);
+    expect(screen.getByRole('status')).toHaveTextContent('Нужно проверить: 1');
+    expect(screen.getByRole('status')).toHaveTextContent('Отклонено: 1 · ещё ждёт отправки: 1 — причина отказа ниже');
   });
 });
 

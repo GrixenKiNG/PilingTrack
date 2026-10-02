@@ -7,8 +7,8 @@
  * поломку приложения вместо того, чтобы проверить связь.
  */
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
-import {ApiError, fetchKnowledgeAttempt, fetchState, operatorErrorDetails, operatorErrorText, QueuedOffline, sendCommand, uploadPhoto} from '../api';
-import {QueueOwnershipError, QueueStorageError, CSRF_REJECT_MESSAGE, readQueue} from '../offline-queue';
+import {ApiError, fetchKnowledgeAttempt, fetchState, isHumanRussianText, operatorErrorDetails, operatorErrorText, QueuedOffline, sendCommand, uploadPhoto} from '../api';
+import {QueueOwnershipError, QueueStorageError, CSRF_REJECT_MESSAGE, CSRF_REJECT_NOT_QUEUED_MESSAGE, readQueue} from '../offline-queue';
 
 describe('operatorErrorText', () => {
   it('сетевой сбой — «Нет связи с сервером…», а не английская строка браузера', () => {
@@ -72,9 +72,43 @@ describe('operatorErrorText', () => {
     expect(new QueuedOffline('Выработка', 'при связи').reason).toBe('network');
   });
 
+  // Сервер ответил отказом — связь есть, ждать надо не её (аудит R89, находка 4).
+  it('отказ сервера помечен как server и говорит про сервер, а не про связь', () => {
+    expect(new QueuedOffline('Выработка', 'сервер').reason).toBe('server');
+    expect(operatorErrorText(new QueuedOffline('Выработка', 'сервер')))
+      .toBe('Выработка: сервер не принял запись, повторим автоматически');
+  });
+
   it('прочая ошибка — общий совет повторить', () => {
     expect(operatorErrorText(new Error('что-то не сошлось')))
       .toBe('Не удалось выполнить действие. Повторите.');
+  });
+});
+
+/**
+ * Признак «строка написана для человека по-русски» (R90, находка 4).
+ *
+ * Правило вынесено в один помощник: по нему отбираются подробности отказа,
+ * русский текст подтверждения снимка и причина отказа в плашке очереди.
+ * Кириллица — единственный доступный признак, что строку можно показать
+ * машинисту: английский текст сетевого сбоя и технические сообщения ему ничего
+ * не говорят.
+ */
+describe('isHumanRussianText', () => {
+  it('кириллица — строка для человека', () => {
+    expect(isHumanRussianText('Смена закрыта')).toBe(true);
+    expect(isHumanRussianText('  Смена закрыта  ')).toBe(true);
+    expect(isHumanRussianText('Сервер временно недоступен (код 502).')).toBe(true);
+  });
+
+  it('латиница, пустая строка, одни пробелы и не строка — не для человека', () => {
+    expect(isHumanRussianText('Failed to fetch')).toBe(false);
+    expect(isHumanRussianText('CSRF validation failed: origin mismatch')).toBe(false);
+    expect(isHumanRussianText('')).toBe(false);
+    expect(isHumanRussianText('   ')).toBe(false);
+    expect(isHumanRussianText(null)).toBe(false);
+    expect(isHumanRussianText(undefined)).toBe(false);
+    expect(isHumanRussianText(7)).toBe(false);
   });
 });
 
@@ -172,9 +206,7 @@ describe('fetchKnowledgeAttempt', () => {
     const error = await fetchKnowledgeAttempt().catch((caught: unknown) => caught);
     expect(error).toBeInstanceOf(ApiError);
     expect((error as ApiError).status).toBe(502);
-    expect(operatorErrorText(error)).toBe(
-      'Сервер временно недоступен (код 502). Запись сохранена — отправим автоматически.',
-    );
+    expect(operatorErrorText(error)).toBe('Сервер временно недоступен (код 502).');
     vi.unstubAllGlobals();
   });
 
@@ -300,6 +332,22 @@ describe('sendCommand и CSRF-отказ', () => {
     expect(queue[0]).toMatchObject({clientCommandId: 'c1', state: 'PENDING', lastError: CSRF_REJECT_MESSAGE});
   });
 
+  // Команда-переход в очередь не попадает: обещание «запись сохранена на
+  // телефоне и уйдёт после обновления» было бы ложью — закрывать нечего, а
+  // смену после обновления придётся закрывать заново (аудит R89, находка 1).
+  it('403 CSRF на команде-переходе — текст без обещания сохранения, в очередь ничего не ложится', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(
+      JSON.stringify({error: 'CSRF validation failed: origin mismatch'}), {status: 403})));
+    const error = await sendCommand({command: 'close-shift', shiftId: 's1', comment: ''})
+      .catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(ApiError);
+    expect((error as ApiError).reason).toBe('csrf');
+    expect(operatorErrorText(error)).toBe(CSRF_REJECT_NOT_QUEUED_MESSAGE);
+    expect(operatorErrorText(error)).not.toMatch(/сохранена/);
+    expect(readQueue()).toHaveLength(0);
+  });
+
   it('403 «Нет доступа» — отказ по существу: запись FAILED, как раньше', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response(
       JSON.stringify({error: 'Нет доступа'}), {status: 403})));
@@ -311,6 +359,69 @@ describe('sendCommand и CSRF-отказ', () => {
     const queue = readQueue();
     expect(queue).toHaveLength(1);
     expect(queue[0]).toMatchObject({clientCommandId: 'c1', state: 'FAILED', lastError: 'Нет доступа'});
+  });
+});
+
+/**
+ * Повод отложения в очереди (аудит R89, находка 4).
+ *
+ * Уведомление на экране показывает `QueuedOffline.message` как есть. Для
+ * серверного отказа (503/429/500) прежний текст «сохранено на устройстве,
+ * отправим при связи» отправлял машиниста искать связь, которой не занимался:
+ * связь есть, отказал сервер. Признак — сервер ответил HTTP-статусом
+ * (`ApiError`); обрыв сети и таймаут статуса не несут.
+ */
+describe('sendCommand: повод отложения в очереди', () => {
+  const command = {
+    command: 'log-production' as const,
+    clientCommandId: 'c1',
+    shiftId: 's1',
+    entry: {kind: 'PILES' as const, pileGradeId: 'g1', count: 12},
+  };
+
+  beforeEach(() => {
+    const store = new Map<string, string>();
+    Object.defineProperty(globalThis, 'localStorage', {
+      configurable: true,
+      value: {
+        getItem: (key: string) => store.get(key) ?? null,
+        setItem: (key: string, value: string) => { store.set(key, value); },
+        removeItem: (key: string) => { store.delete(key); },
+        clear: () => { store.clear(); },
+      },
+    });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('503 HTML — сервер отказал: повод server и текст про сервер, а не про связь', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('<html>503</html>', {status: 503})));
+    const error = await sendCommand(command).catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(QueuedOffline);
+    expect((error as QueuedOffline).reason).toBe('server');
+    expect(operatorErrorText(error)).toBe('Выработка: сервер не принял запись, повторим автоматически');
+    expect(readQueue()[0]).toMatchObject({clientCommandId: 'c1', state: 'PENDING'});
+  });
+
+  it('обрыв сети — повод network и прежний текст про связь', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => { throw new TypeError('Failed to fetch'); }));
+    const error = await sendCommand(command).catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(QueuedOffline);
+    expect((error as QueuedOffline).reason).toBe('network');
+    expect(operatorErrorText(error)).toBe('Выработка: сохранено на устройстве, отправим при связи');
+  });
+
+  it('401 — повод auth, как было', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(
+      JSON.stringify({error: 'Войдите в систему'}), {status: 401})));
+    const error = await sendCommand(command).catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(QueuedOffline);
+    expect((error as QueuedOffline).reason).toBe('auth');
   });
 });
 
@@ -396,6 +507,60 @@ describe('таймаут запроса', () => {
 
     expect(mediaId).toBe('m1');
     expect(timeouts).toEqual([20_000, 120_000, 20_000]);
+  });
+});
+
+/**
+ * Текст отказа на шаге получения ссылки на снимок (аудит R89, находка 2).
+ *
+ * Раньше этот шаг отдавал в интерфейс СЫРУЮ английскую строку сервера:
+ * «CSRF validation failed: origin mismatch» (расхождение `Origin` и `Host`) или
+ * «Unauthorized» (истёкшая сессия, `lib/auth.ts`). Машинист читал её вместо
+ * «обновите страницу». Теперь отказ разбирается теми же правилами, что у
+ * команд: CSRF-403 → русский текст без обещания сохранения (снимок в очередь не
+ * попадает), прочий некириллический отказ → общая фраза, русский текст сервера
+ * показываем как есть.
+ */
+describe('uploadPhoto: отказ на получении ссылки на снимок', () => {
+  const file = new File(['x'], 'photo.jpg', {type: 'image/jpeg'});
+
+  /** Первый шаг — получение ссылки: ответ задаёт сам тест. */
+  function stubGrant(grant: () => Response) {
+    vi.stubGlobal('fetch', vi.fn(async () => grant()));
+  }
+
+  it('403 CSRF — русский текст про обновление, без обещания сохранения и английского', async () => {
+    stubGrant(() => new Response(
+      JSON.stringify({error: 'CSRF validation failed: origin mismatch'}), {status: 403}));
+    const error = await uploadPhoto({file, clientCommandId: 'c1'}).catch((caught: unknown) => caught);
+    vi.unstubAllGlobals();
+
+    expect(error).toBeInstanceOf(ApiError);
+    expect((error as ApiError).status).toBe(403);
+    expect((error as ApiError).reason).toBe('csrf');
+    expect(operatorErrorText(error)).toBe(CSRF_REJECT_NOT_QUEUED_MESSAGE);
+    expect(operatorErrorText(error)).not.toMatch(/сохранена|CSRF validation/);
+  });
+
+  it('401 «Unauthorized» — русский текст, без английского', async () => {
+    stubGrant(() => new Response(JSON.stringify({error: 'Unauthorized'}), {status: 401}));
+    const error = await uploadPhoto({file, clientCommandId: 'c1'}).catch((caught: unknown) => caught);
+    vi.unstubAllGlobals();
+
+    expect(error).toBeInstanceOf(ApiError);
+    expect((error as ApiError).status).toBe(401);
+    expect(operatorErrorText(error)).toBe('Не удалось получить ссылку для снимка');
+  });
+
+  it('русский текст сервера — показываем как есть', async () => {
+    stubGrant(() => new Response(
+      JSON.stringify({error: 'Экран доступен только машинисту'}), {status: 403}));
+    const error = await uploadPhoto({file, clientCommandId: 'c1'}).catch((caught: unknown) => caught);
+    vi.unstubAllGlobals();
+
+    expect(error).toBeInstanceOf(ApiError);
+    expect((error as ApiError).reason).toBeUndefined();
+    expect(operatorErrorText(error)).toBe('Экран доступен только машинисту');
   });
 });
 
@@ -676,20 +841,25 @@ describe('ответ 200 без поля data — не успех', () => {
  * схемы «Некорректная команда» (рассогласование приложения и сервера). На
  * способность записи отправиться повтором это не влияет: решает статус
  * (`classifyFailure`), а не текст.
+ *
+ * ПОЧЕМУ У ЧТЕНИЯ НЕТ «ЗАПИСЬ СОХРАНЕНА» (F-V1-STATE-5XX-TEXT). Общий текст 5xx
+ * читают и `fetchState`, и вопросы проверки знаний — там записи нет, и обещание
+ * повтора обманывало бы машиниста. Добавка живёт только на пути очереди, где
+ * запись правда на устройстве: у `sendCommand` очередной команды она попадает
+ * в причину записи (`lastError`).
  */
 describe('ошибочный статус без разобранного тела', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
   });
 
-  it('502 с HTML — код в тексте, а не общая фраза про связь', async () => {
+  it('502 с HTML на чтении состояния — код в тексте, без обещания сохранить запись', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response('<html>502 Bad Gateway</html>', {status: 502})));
     const error = await fetchState({}).catch((caught: unknown) => caught);
 
     expect(error).toBeInstanceOf(ApiError);
     expect((error as ApiError).status).toBe(502);
-    expect(operatorErrorText(error))
-      .toBe('Сервер временно недоступен (код 502). Запись сохранена — отправим автоматически.');
+    expect(operatorErrorText(error)).toBe('Сервер временно недоступен (код 502).');
   });
 
   it('404 с HTML — отказ сервера с кодом', async () => {
@@ -730,7 +900,7 @@ describe('ошибочный статус без разобранного тел
     expect(operatorErrorText(error)).toBe('Нет связи с сервером. Проверьте интернет и повторите.');
   });
 
-  it('5xx с HTML на команде — запись остаётся ждать отправки', async () => {
+  it('5xx с HTML на очередной команде — запись ждёт отправки, а текст обещает повтор', async () => {
     const store = new Map<string, string>();
     Object.defineProperty(globalThis, 'localStorage', {
       configurable: true,
@@ -741,7 +911,7 @@ describe('ошибочный статус без разобранного тел
         clear: () => { store.clear(); },
       },
     });
-    vi.stubGlobal('fetch', vi.fn(async () => new Response('<html>503</html>', {status: 503})));
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('<html>502 Bad Gateway</html>', {status: 502})));
     const command = {
       command: 'log-production' as const,
       clientCommandId: 'c1',
@@ -751,7 +921,13 @@ describe('ошибочный статус без разобранного тел
 
     const error = await sendCommand(command).catch((caught: unknown) => caught);
 
+    // Запись легла в очередь на устройстве — это принято, а не отказ.
     expect(error).toBeInstanceOf(QueuedOffline);
-    expect(readQueue()[0]).toMatchObject({clientCommandId: 'c1', state: 'PENDING'});
+    const queue = readQueue();
+    expect(queue[0]).toMatchObject({clientCommandId: 'c1', state: 'PENDING'});
+    // Добавка про сохранённую запись правдива только здесь и доходит до
+    // машиниста в плашке очереди (F-V1-STATE-5XX-TEXT).
+    expect(queue[0].lastError)
+      .toBe('Сервер временно недоступен (код 502). Запись сохранена — отправим автоматически.');
   });
 });

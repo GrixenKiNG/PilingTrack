@@ -10,12 +10,17 @@
  *
  * Тест обходит только статические импорты/реэкспорты (без `import type` и без
  * динамических `import()`), резолвит `@/` → `src/`, относительные пути и
- * `.ts`/`.tsx`/`index.ts`, пакеты не обходит.
+ * `.ts`/`.tsx`/`index.ts`. Сами пакеты не обходим, но у каждого пакета из
+ * статического графа читаем `node_modules/<pkg>/package.json` и считаем
+ * нарушением `next` в его `dependencies`/`peerDependencies` (кроме
+ * необязательного peer — `peerDependenciesMeta.next.optional === true`):
+ * такой пакет тоже упадёт при загрузке в образе без `node_modules/next`.
  */
 
 import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
+import { builtinModules } from 'node:module';
 import * as ts from 'typescript';
 
 // happy-dom подменяет import.meta.url не-file-схемой, поэтому корень берём из cwd:
@@ -25,9 +30,11 @@ const ENTRY = 'src/workers/unified-worker.ts';
 
 /**
  * Уже существующие нарушения, найденные сторожем при первом запуске.
- * Ключ — путь файла от корня, значения — какие `next*` он импортирует.
+ * Ключ — путь файла от корня, значения — какие специфики он импортирует.
  * Чинить их в этой задаче нельзя: каждая запись — отдельный дефект,
- * который надо разобрать самостоятельно (F-R87-CHAIN-METADATA-b: разобрать).
+ * который надо разобрать самостоятельно. Прямой импорт `next*` —
+ * «F-R87-CHAIN-METADATA-b: разобрать», пакет, зависящий от `next`, —
+ * «T-WORKER-PKG-NEXT-DEPS: разобрать».
  */
 const KNOWN_VIOLATIONS: Record<string, string[]> = {};
 
@@ -90,6 +97,63 @@ function isNextSpecifier(specifier: string): boolean {
     || specifier.startsWith('@sentry/nextjs/');
 }
 
+const BUILTIN_MODULES = new Set(builtinModules);
+
+/** Встроенный модуль node: `fs`, `node:fs`, `node:fs/promises` — в node_modules его нет. */
+function isBuiltinSpecifier(specifier: string): boolean {
+  const bare = specifier.startsWith('node:') ? specifier.slice('node:'.length) : specifier;
+  return BUILTIN_MODULES.has(bare) || BUILTIN_MODULES.has(bare.split('/')[0]);
+}
+
+type SpecifierPackage =
+  | { kind: 'package'; name: string }
+  | { kind: 'builtin' }
+  | { kind: 'local' };
+
+/**
+ * Пакет из специфика: `zod` → `zod`, `@sentry/node/x` → `@sentry/node`.
+ * Встроенный модуль node (`node:fs`) и локальный путь (`@/…`, `./…`) — не пакет.
+ */
+function packageFromSpecifier(specifier: string): SpecifierPackage {
+  if (specifier.startsWith('.') || specifier.startsWith('@/') || specifier.startsWith('/')) {
+    return { kind: 'local' };
+  }
+  if (isBuiltinSpecifier(specifier)) return { kind: 'builtin' };
+  const segments = specifier.split('/');
+  return specifier.startsWith('@')
+    ? { kind: 'package', name: segments.slice(0, 2).join('/') }
+    : { kind: 'package', name: segments[0] };
+}
+
+interface PackageManifest {
+  dependencies?: Record<string, string>;
+  peerDependencies?: Record<string, string>;
+  peerDependenciesMeta?: Record<string, { optional?: boolean }>;
+}
+
+/**
+ * Пакет требует `next` при загрузке. Необязательный peer не в счёт
+ * (`peerDependenciesMeta.next.optional === true`): без `next` пакет работает.
+ */
+function requiresNext(manifest: PackageManifest): boolean {
+  if (manifest.dependencies?.next !== undefined) return true;
+  if (manifest.peerDependencies?.next !== undefined) {
+    return manifest.peerDependenciesMeta?.next?.optional !== true;
+  }
+  return false;
+}
+
+/** Манифест установленного пакета; `null` — пакета (или его package.json) в node_modules нет. */
+function readPackageManifest(name: string): PackageManifest | null {
+  const manifestPath = path.join(ROOT, 'node_modules', name, 'package.json');
+  if (!fs.existsSync(manifestPath)) return null;
+  try {
+    return JSON.parse(fs.readFileSync(manifestPath, 'utf8')) as PackageManifest;
+  } catch {
+    return null;
+  }
+}
+
 /** Специфики динамических `import('…')` со строковым литералом — во всём файле. */
 function dynamicSpecifiers(source: string): string[] {
   const sourceFile = ts.createSourceFile('source.ts', source, ts.ScriptTarget.Latest, true);
@@ -138,7 +202,16 @@ function walkWorkerGraph(): { visited: number; violations: string[]; unresolved:
       } else if (specifier.startsWith('.')) {
         target = resolveFile(path.resolve(path.dirname(file), specifier));
       } else {
-        continue; // пакет (node_modules) — не обходим
+        // Пакет не обходим, но читаем его манифест: пакет с `next` в
+        // dependencies/peerDependencies упадёт при загрузке в образе без
+        // node_modules/next — та же поломка, что и прямой импорт `next`.
+        const dependency = packageFromSpecifier(specifier);
+        if (dependency.kind === 'package') {
+          const manifest = readPackageManifest(dependency.name);
+          if (!manifest) unresolved.push(`${relative} -> ${specifier}`);
+          else if (requiresNext(manifest)) violations.push(`${relative} -> ${specifier}`);
+        }
+        continue;
       }
       if (!target) {
         unresolved.push(`${relative} -> ${specifier}`);
@@ -190,12 +263,65 @@ describe('извлечение статических импортов чере�
   });
 });
 
+describe('разбор пакета из специфика (T-WORKER-PKG-NEXT-DEPS)', () => {
+  it('берёт имя пакета без подпути', () => {
+    expect(packageFromSpecifier('zod')).toEqual({ kind: 'package', name: 'zod' });
+    expect(packageFromSpecifier('dotenv/config')).toEqual({ kind: 'package', name: 'dotenv' });
+  });
+
+  it('берёт scope-пакет из специфика с подпутём', () => {
+    expect(packageFromSpecifier('@sentry/node/x')).toEqual({ kind: 'package', name: '@sentry/node' });
+    expect(packageFromSpecifier('@prisma/adapter-pg')).toEqual({
+      kind: 'package',
+      name: '@prisma/adapter-pg',
+    });
+  });
+
+  it('считает встроенные модули node не пакетом', () => {
+    expect(packageFromSpecifier('node:fs')).toEqual({ kind: 'builtin' });
+    expect(packageFromSpecifier('fs')).toEqual({ kind: 'builtin' });
+    expect(packageFromSpecifier('node:async_hooks')).toEqual({ kind: 'builtin' });
+    expect(packageFromSpecifier('node:fs/promises')).toEqual({ kind: 'builtin' });
+  });
+
+  it('считает локальные пути не пакетом', () => {
+    expect(packageFromSpecifier('@/lib/trace-context')).toEqual({ kind: 'local' });
+    expect(packageFromSpecifier('../worker')).toEqual({ kind: 'local' });
+    expect(packageFromSpecifier('./safe')).toEqual({ kind: 'local' });
+  });
+});
+
+describe('пакет требует next (T-WORKER-PKG-NEXT-DEPS)', () => {
+  it('нарушение: next в dependencies', () => {
+    expect(requiresNext({ dependencies: { next: '16.0.0' } })).toBe(true);
+  });
+
+  it('нарушение: next в peerDependencies без пометки optional', () => {
+    expect(requiresNext({ peerDependencies: { next: '>=14' } })).toBe(true);
+    expect(
+      requiresNext({ peerDependencies: { next: '>=14' }, peerDependenciesMeta: { next: { optional: false } } }),
+    ).toBe(true);
+  });
+
+  it('не нарушение: next только как необязательный peer', () => {
+    expect(
+      requiresNext({ peerDependencies: { next: '>=14' }, peerDependenciesMeta: { next: { optional: true } } }),
+    ).toBe(false);
+  });
+
+  it('не нарушение: next нет ни в dependencies, ни в peerDependencies', () => {
+    expect(requiresNext({ dependencies: { zod: '4.0.0' } })).toBe(false);
+    expect(requiresNext({})).toBe(false);
+  });
+});
+
 describe('граф воркеров не тянет next (F-R87-CHAIN-METADATA-b)', () => {
   it('ни один файл статического графа unified-worker не импортирует next', () => {
     const { visited, violations, unresolved } = walkWorkerGraph();
 
     // Граф обязан быть непустым и разрешённым: нерезолвнутый локальный импорт
-    // означает слепое место обхода, а не отсутствие нарушения.
+    // или импорт пакета, которого нет в node_modules, означает слепое место
+    // обхода, а не отсутствие нарушения.
     expect(visited).toBeGreaterThan(100);
     expect([...unresolved].sort()).toEqual([]);
 
