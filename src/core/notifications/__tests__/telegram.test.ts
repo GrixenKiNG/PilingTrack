@@ -28,6 +28,8 @@ vi.mock('@/lib/logger', () => ({
 }));
 
 import { telegramNotifier } from '../telegram';
+import { createTelegramDeliveryProgress } from '../telegram-delivery-progress';
+import type { Prisma } from '@/generated/postgres-client/client';
 
 describe('telegramNotifier — botToken decryption', () => {
   let fetchMock: ReturnType<typeof vi.fn>;
@@ -43,7 +45,7 @@ describe('telegramNotifier — botToken decryption', () => {
     process.env.DEFAULT_TENANT_ID = 'test-tenant';
     fetchMock = vi.fn().mockResolvedValue({
       ok: true,
-      json: async () => ({ result: { title: 'Test Chat' } }),
+      json: async () => ({ ok: true, result: { title: 'Test Chat' } }),
       text: async () => '',
     });
     vi.stubGlobal('fetch', fetchMock);
@@ -147,7 +149,7 @@ describe('telegramNotifier — доставка во все конфигурац
     process.env.DEFAULT_TENANT_ID = 'test-tenant';
     fetchMock = vi.fn().mockResolvedValue({
       ok: true,
-      json: async () => ({ result: {} }),
+      json: async () => ({ ok: true, result: {} }),
       text: async () => '',
     });
     vi.stubGlobal('fetch', fetchMock);
@@ -186,15 +188,41 @@ describe('telegramNotifier — доставка во все конфигурац
     isEncryptedMock.mockReturnValue(false);
     fetchMock
       .mockResolvedValueOnce({ ok: false, status: 400, text: async () => 'bad chat' })
-      .mockResolvedValueOnce({ ok: true, text: async () => '' });
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ ok: true }), text: async () => '' });
 
     const res = await telegramNotifier.sendAlert({ severity: 'critical', message: 'тревога' });
 
-    expect(res).toBe(true);
+    expect(res).toBe(false);
     expect(sentChatIds()).toEqual(['-100A', '-100B']);
   });
 
-  it('считает доставку неуспешной, только если упали все чаты', async () => {
+  it('I08: persists a partial batch and retries only unconfirmed chats after restart', async () => {
+    findManyMock.mockResolvedValue([{ botToken: 'test-a', chatId: 'A', enabled: true }, { botToken: 'test-b', chatId: 'B', enabled: true }]);
+    isEncryptedMock.mockReturnValue(false);
+    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({ ok: true }) })
+      .mockRejectedValueOnce(new Error('ambiguous timeout'));
+    let payload: Prisma.JsonValue = { message: 'batch' };
+    const progress = () => createTelegramDeliveryProgress(payload, async next => { payload = JSON.parse(JSON.stringify(next)); });
+    expect(await telegramNotifier.sendMessage('batch', progress())).toBe(false);
+    expect(payload).toEqual({ message: 'batch', telegramDeliveredChatIds: ['A'] });
+    expect(sentChatIds()).toEqual(['A', 'B']);
+    fetchMock.mockClear().mockResolvedValue({ ok: true, json: async () => ({ ok: true }) });
+    // Fresh progress reconstructed from persisted JSON, no in-memory delivery cache.
+    expect(await telegramNotifier.sendMessage('batch', progress())).toBe(true);
+    expect(sentChatIds()).toEqual(['B']);
+    expect(payload).toEqual({ message: 'batch', telegramDeliveredChatIds: ['A', 'B'] });
+  });
+
+  it('I08: HTTP success without a Telegram acknowledgement stays unconfirmed', async () => {
+    findManyMock.mockResolvedValue([{ botToken: 'test-a', chatId: 'A', enabled: true }]);
+    isEncryptedMock.mockReturnValue(false);
+    fetchMock.mockResolvedValue({ ok: true, json: async () => ({ ok: false }) });
+    const confirm = vi.fn();
+    expect(await telegramNotifier.sendMessage('batch', { deliveredChatIds: new Set(), confirm })).toBe(false);
+    expect(confirm).not.toHaveBeenCalled();
+  });
+
+  it('считает доставку неуспешной, если упали все чаты', async () => {
     findManyMock.mockResolvedValue([
       { botToken: '999:token-a', chatId: '-100A', enabled: true },
       { botToken: '999:token-b', chatId: '-100B', enabled: true },
@@ -228,7 +256,7 @@ describe('telegramNotifier — человекочитаемые поля и зо
       { botToken: '999:plain-token', chatId: '-100123', enabled: true },
     ]);
     isEncryptedMock.mockReturnValue(false);
-    fetchMock = vi.fn().mockResolvedValue({ ok: true, text: async () => '' });
+    fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ ok: true }), text: async () => '' });
     vi.stubGlobal('fetch', fetchMock);
   });
 
@@ -289,7 +317,7 @@ describe('telegramNotifier — человекочитаемые поля и зо
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date('2026-09-26T21:30:00Z'));
 
-    fetchMock.mockResolvedValue({ ok: true, text: async () => '' });
+    fetchMock.mockResolvedValue({ ok: true, json: async () => ({ ok: true }), text: async () => '' });
     await telegramNotifier.sendAlert({
       severity: 'medium',
       message: 'тревога',
@@ -317,7 +345,7 @@ describe('telegramNotifier — чтение настроек внутри чуж
     findManyMock.mockReset();
     isEncryptedMock.mockReset().mockReturnValue(false);
     process.env.DEFAULT_TENANT_ID = 'orion';
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, text: async () => '' }));
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({ ok: true }), text: async () => '' }));
   });
 
   afterEach(() => {

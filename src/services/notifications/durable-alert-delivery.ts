@@ -1,3 +1,4 @@
+import {createTelegramDeliveryProgress} from '@/core/notifications/telegram-delivery-progress';
 import {alertSchema} from '@/core/notifications/durable-alert';
 
 /**
@@ -39,14 +40,20 @@ export async function deliverQueuedAlert(event: {id?: string; tenantId?: string 
   // Serialize competing workers; a replay of an already delivered row is a no-op.
   // Telegram does not support idempotency keys: an ambiguous network failure can
   // still repeat a message. Include the stable event id for recognition.
-  await db.$transaction(async tx => {
+  const complete = await db.$transaction(async tx => {
     await tx.$queryRaw`SELECT id FROM "OutboxEvent" WHERE id = ${event.id} AND "tenantId" = ${event.tenantId} FOR UPDATE`;
     const row = await tx.outboxEvent.findFirst({where: {id: event.id, tenantId: event.tenantId}});
-    if (!row || row.published) return;
+    if (!row || row.published) return true;
     if (!suppressed) {
-      const delivered = await telegramNotifier.sendAlert({...alert, message: alert.message + '\nСобытие: ' + event.id});
-      if (!delivered) throw new Error('Telegram delivery failed; retained for retry');
+      const progress = createTelegramDeliveryProgress(row.payload, async payload => {
+        await tx.outboxEvent.update({where: {id: row.id}, data: {payload}});
+      });
+      const delivered = await telegramNotifier.sendAlert({...alert, message: alert.message + '\nСобытие: ' + event.id}, progress);
+      // Commit acknowledged chats before throwing to the outbox retry loop.
+      if (!delivered) return false;
     }
     await tx.outboxEvent.update({where: {id: row.id}, data: {published: true, publishedAt: new Date(), lastError: null}});
-  }, {timeout: 15_000});
+    return true;
+  }, {timeout: 60_000});
+  if (!complete) throw new Error('Telegram delivery failed; retained for retry');
 }

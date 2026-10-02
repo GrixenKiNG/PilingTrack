@@ -1,3 +1,4 @@
+import type { TelegramDeliveryProgress } from './telegram-delivery-progress';
 /**
  * Telegram Notification Service — Production Integration
  *
@@ -91,23 +92,21 @@ async function loadConfigsForTenant(tenantId: string): Promise<TelegramBotConfig
   }
 }
 
-/**
- * Доставка во все чаты тенанта. Отказ по одному чату не должен срывать
- * отправку в остальные: общий результат — `false` только если не дошло ни до
- * одного чата.
- */
+/** Complete only when every enabled chat has a confirmed delivery. */
 async function deliverToAll(
   configs: TelegramBotConfig[],
   send: (config: TelegramBotConfig) => Promise<boolean>,
+  progress?: TelegramDeliveryProgress,
 ): Promise<boolean> {
   if (configs.length === 0) return false;
-
-  let anySuccess = false;
+  let allSucceeded = true;
   for (const config of configs) {
+    if (progress?.deliveredChatIds.has(config.chatId)) continue;
     const ok = await send(config);
-    if (ok) anySuccess = true;
+    if (ok) await progress?.confirm(config.chatId);
+    else allSucceeded = false;
   }
-  return anySuccess;
+  return allSucceeded;
 }
 
 // ============================================================
@@ -220,7 +219,8 @@ async function sendTelegramMessage(
       return false;
     }
 
-    return true;
+    const result = await response.json();
+    return result.ok === true;
   } catch (error) {
     logger.error('Failed to send Telegram message', error);
     return false;
@@ -244,13 +244,14 @@ async function sendTelegramDocument(
     const arr = new Uint8Array(data);
     form.append('document', new Blob([arr], { type: 'application/pdf' }), filename);
 
-    const response = await fetch(url, { method: 'POST', body: form });
+    const response = await fetch(url, { method: 'POST', body: form, signal: AbortSignal.timeout(5000) });
     if (!response.ok) {
       const err = await response.text();
       logger.error('Telegram sendDocument error', new Error(err), { status: response.status });
       return false;
     }
-    return true;
+    const result = await response.json();
+    return result.ok === true;
   } catch (error) {
     logger.error('Failed to send Telegram document', error);
     return false;
@@ -265,7 +266,7 @@ export class TelegramNotifier {
   /**
    * Send an alert notification.
    */
-  async sendAlert(alert: AlertPayload): Promise<boolean> {
+  async sendAlert(alert: AlertPayload, progress?: TelegramDeliveryProgress): Promise<boolean> {
     const configs = await getConfigs();
     if (configs.length === 0) {
       logger.warn('Telegram not configured — skipping alert');
@@ -274,7 +275,7 @@ export class TelegramNotifier {
 
     const { text, parse_mode } = buildAlertMessage(alert);
     const success = await deliverToAll(configs, (config) =>
-      sendTelegramMessage(config, text, parse_mode),
+      sendTelegramMessage(config, text, parse_mode), progress,
     );
 
     if (success) {
@@ -290,11 +291,11 @@ export class TelegramNotifier {
   /**
    * Send a plain text message (not an alert).
    */
-  async sendMessage(text: string): Promise<boolean> {
+  async sendMessage(text: string, progress?: TelegramDeliveryProgress): Promise<boolean> {
     const configs = await getConfigs();
     if (configs.length === 0) return false;
 
-    return deliverToAll(configs, (config) => sendTelegramMessage(config, text, 'HTML'));
+    return deliverToAll(configs, (config) => sendTelegramMessage(config, text, 'HTML'), progress);
   }
 
   /**
@@ -304,6 +305,7 @@ export class TelegramNotifier {
     filename: string,
     data: Buffer,
     caption?: string,
+    progress?: TelegramDeliveryProgress,
   ): Promise<boolean> {
     const configs = await getConfigs();
     if (configs.length === 0) {
@@ -311,7 +313,7 @@ export class TelegramNotifier {
       return false;
     }
 
-    return deliverToAll(configs, (config) => sendTelegramDocument(config, filename, data, caption));
+    return deliverToAll(configs, (config) => sendTelegramDocument(config, filename, data, caption), progress);
   }
 
   /**

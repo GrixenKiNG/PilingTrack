@@ -362,3 +362,15 @@ describe('Outbox Publisher', () => {
     });
   });
 });
+
+it('I08: DLQ carries latest committed delivery receipts rather than the batch snapshot', async () => {
+  const original = createOutboxEvent({ attempts: 4, type: 'NotificationDeliveryRequested', payload: { message: 'batch' } });
+  const currentPayload = { message: 'batch', telegramDeliveredChatIds: ['A'] };
+  mocks.mockFindMany.mockReset().mockResolvedValue([original]);
+  mocks.mockFindUnique.mockReset().mockResolvedValue({ payload: currentPayload });
+  mocks.mockUpdate.mockReset().mockResolvedValue({});
+  vi.mocked(dlqModule.moveToDlq).mockClear();
+  await publishOutboxEvents(async () => { throw new Error('B unavailable'); });
+  expect(dlqModule.moveToDlq).toHaveBeenCalledWith(original.id, original.type, original.aggregateId,
+    currentPayload, expect.any(Error), 5, expect.any(Object));
+});
