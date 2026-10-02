@@ -16,11 +16,20 @@ import { createTemplateHistory, type TemplateHistory } from './layout-history';
 import { placeBlock, resizeBlock } from './layout-placement';
 import { cloneLayoutTemplate, type LayoutBlock, type LayoutBlockKind, type LayoutTemplate } from './layout-template';
 
+/**
+ * Показывается, когда сохранённую раскладку не удалось прочитать: стандартная
+ * показана только для отрисовки, сохранять её нельзя — иначе PUT затрёт
+ * настоящую сохранённую раскладку (F-R108-1).
+ */
+export const LAYOUT_LOAD_FAILED_MESSAGE = 'Не удалось загрузить вашу раскладку, обновите страницу';
+
 export interface LayoutController<T extends LayoutTemplate = LayoutTemplate> {
   template: T;
   draft: T;
   editing: boolean;
   dirty: boolean;
+  /** true, если GET шаблона завершился сбоем (не-ok/обрыв) — сохранение запрещено. */
+  loadFailed: boolean;
   canUndo: boolean;
   canRedo: boolean;
   startEditing(): void;
@@ -63,26 +72,36 @@ export function useLayoutTemplate<T extends LayoutTemplate>(options: UseLayoutTe
   const [template, setTemplate] = useState<T>(() => cloneLayoutTemplate(defaultTemplate));
   const [draft, setDraft] = useState<T>(() => cloneLayoutTemplate(defaultTemplate));
   const [editing, setEditing] = useState(false);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [historyState, setHistoryState] = useState({ canUndo: false, canRedo: false });
   const historyRef = useRef<TemplateHistory<T>>(createTemplateHistory(defaultTemplate));
 
-  const loadTemplate = useCallback(async (): Promise<T> => {
+  const loadTemplate = useCallback(async (): Promise<{ initial: T; failed: boolean }> => {
     let serverTemplate = cloneLayoutTemplate(defaultTemplate);
+    let failed = false;
     try {
       const res = await authFetch(endpoint);
       if (res.ok) {
         const body: unknown = await res.json();
         serverTemplate = validate(body) ?? serverTemplate;
+      } else {
+        // не-ok (5xx/403/обрыв на сервере) — «раскладки нет» сервер отдаёт как
+        // 200 со стандартным шаблоном (layout-service.ts), значит это сбой чтения
+        failed = true;
       }
     } catch {
-      // network/parse failure — fall back to the default so the page still renders
+      // network/parse failure — standard template is shown for rendering only, saving stays blocked
+      failed = true;
     }
+    // При сбое не подставляем локальный seed: он может быть устаревшим, а
+    // показанный шаблон всё равно нельзя сохранять, пока он не перечитан.
+    if (failed) return { initial: serverTemplate, failed: true };
     const isServerDefault = JSON.stringify(serverTemplate) === JSON.stringify(defaultTemplate);
     if (isServerDefault && loadLocalSeed) {
       const local = loadLocalSeed();
-      if (local && JSON.stringify(local) !== JSON.stringify(defaultTemplate)) return local;
+      if (local && JSON.stringify(local) !== JSON.stringify(defaultTemplate)) return { initial: local, failed: false };
     }
-    return serverTemplate;
+    return { initial: serverTemplate, failed: false };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- reload when the scope (endpoint) changes; surface config is fixed per surfaceId
   }, [endpoint]);
 
@@ -95,7 +114,12 @@ export function useLayoutTemplate<T extends LayoutTemplate>(options: UseLayoutTe
 
   useEffect(() => {
     let active = true;
-    void loadTemplate().then((initial) => { if (active) applyLoaded(initial); });
+    void loadTemplate().then(({ initial, failed }) => {
+      if (active) {
+        applyLoaded(initial);
+        setLoadFailed(failed);
+      }
+    });
     return () => { active = false; };
   }, [loadTemplate, applyLoaded]);
 
@@ -123,6 +147,11 @@ export function useLayoutTemplate<T extends LayoutTemplate>(options: UseLayoutTe
   }, [draft, template, onDraftDiscarded]);
 
   const saveDraft = useCallback(async () => {
+    if (loadFailed) {
+      // Читали сбой: под стандартной раскладкой может быть сохранённая — не затираем её.
+      toast.error(LAYOUT_LOAD_FAILED_MESSAGE);
+      return;
+    }
     onBeforeSave?.(template, draft);
     const res = await authFetch(endpoint, {
       method: 'PUT',
@@ -135,7 +164,7 @@ export function useLayoutTemplate<T extends LayoutTemplate>(options: UseLayoutTe
     }
     setTemplate(cloneLayoutTemplate(draft));
     setEditing(false);
-  }, [draft, template, endpoint, onBeforeSave]);
+  }, [draft, template, endpoint, onBeforeSave, loadFailed]);
 
   const reset = useCallback(async () => {
     // Remove the saved layout at this scope; a tile override falls back to the
@@ -145,8 +174,9 @@ export function useLayoutTemplate<T extends LayoutTemplate>(options: UseLayoutTe
       toast.error(res.status === 403 ? 'Только администратор может сбросить шаблон' : 'Не удалось сбросить шаблон');
       return;
     }
-    const initial = await loadTemplate();
+    const { initial, failed } = await loadTemplate();
     applyLoaded(initial);
+    setLoadFailed(failed);
     onAfterReset?.();
   }, [endpoint, loadTemplate, applyLoaded, onAfterReset]);
 
@@ -214,6 +244,7 @@ export function useLayoutTemplate<T extends LayoutTemplate>(options: UseLayoutTe
     draft,
     editing,
     dirty: JSON.stringify(template) !== JSON.stringify(draft),
+    loadFailed,
     ...historyState,
     startEditing,
     cancelEditing,

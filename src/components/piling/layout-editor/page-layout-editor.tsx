@@ -10,6 +10,7 @@
 import { useEffect } from 'react';
 import { ArrowUp, ArrowDown, RotateCcw, Save } from '@/components/piling/icons/unified-icons';
 import type { PageLayoutController } from './use-page-layout-template';
+import { LAYOUT_LOAD_FAILED_MESSAGE } from './use-layout-template';
 import { PageLayoutRenderer, type RenderablePageWidget } from './page-layout-renderer';
 import { WIDGET_SIZES, type WidgetSize } from './page-layout-template';
 
@@ -48,13 +49,19 @@ export function PageLayoutEditor({
           <button
             type="button"
             onClick={() => void controller.saveDraft()}
-            disabled={!controller.dirty}
+            disabled={!controller.dirty || controller.loadFailed}
             className="inline-flex min-h-9 items-center gap-1.5 rounded-lg bg-info-strong px-3 text-xs font-semibold text-white hover:bg-info-strong disabled:opacity-40"
           >
             <Save className="h-3.5 w-3.5" /> Сохранить
           </button>
         </div>
       </div>
+
+      {controller.loadFailed && (
+        <p role="alert" className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs font-medium text-destructive-strong">
+          {LAYOUT_LOAD_FAILED_MESSAGE}
+        </p>
+      )}
 
       <ul className="divide-y divide-border rounded-xl border border-border">
         {rows.map((w, index) => {
