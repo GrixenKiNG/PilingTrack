@@ -28,6 +28,7 @@ import {
   TYPE_LABEL, STATUS_LABEL, PRIORITY_LABEL, MAINTENANCE_TYPE_OPTIONS,
   type MaintenanceType, type MaintenanceStatus, type MaintenancePriority,
 } from './maintenance-labels';
+import { maintenanceErrorText, maintenanceCatchText } from './maintenance-helpers';
 
 export interface WorkOrderFormValues {
   type: MaintenanceType;
@@ -195,13 +196,13 @@ export function WorkOrderFormDialog({
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || 'Ошибка сохранения');
+        throw new Error(maintenanceErrorText(res.status, err.error));
       }
       toast.success(editingId ? 'Наряд обновлён' : 'Наряд создан');
       onOpenChange(false);
       onSaved();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Ошибка');
+      toast.error(maintenanceCatchText(err, 'Ошибка'));
     } finally {
       setBusy(false);
     }

@@ -26,6 +26,7 @@ import {
   CreationForm, FormSection, FormLabel, TilePicker, CharCount, type TileOption,
 } from '@/components/piling/forms/creation-form';
 import type { MaintenanceType, MaintenancePriority } from './maintenance-labels';
+import { maintenanceErrorText, maintenanceCatchText } from './maintenance-helpers';
 
 const TITLE_MAX = 100;
 const DESCRIPTION_MAX = 500;
@@ -120,14 +121,14 @@ export function MaintenanceRequestForm() {
       });
       if (!response.ok) {
         const body = await response.json().catch(() => ({}));
-        throw new Error(body.error || 'Не удалось создать заявку');
+        throw new Error(maintenanceErrorText(response.status, body.error));
       }
       toast.success('Заявка создана');
       // Возвращаем на доску, а не на созданную запись: заявку заводят одну за
       // другой, и чаще нужен список, чем только что заполненная карточка.
       router.push('/admin/maintenance');
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Не удалось создать заявку');
+      toast.error(maintenanceCatchText(error, 'Не удалось создать заявку'));
     } finally {
       setBusy(false);
     }

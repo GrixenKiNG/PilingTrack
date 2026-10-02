@@ -41,7 +41,7 @@ import {
   type MaintenanceStatus,
   type MaintenancePriority,
 } from './maintenance-labels';
-import { buildMaintenanceQuery, resolveAssigneeName, type MaintenanceFilter } from './maintenance-helpers';
+import { buildMaintenanceQuery, resolveAssigneeName, maintenanceErrorText, maintenanceCatchText, type MaintenanceFilter } from './maintenance-helpers';
 import {
   crewForRecord,
   type AssigneeOption,
@@ -54,6 +54,7 @@ import { QuickChip } from './maintenance-board-bits';
 import { MaintenanceDetailPanel } from './maintenance-detail-panel';
 import { WorkOrderTable } from './work-order-table';
 import { WorkOrderFormDialog } from './work-order-form-dialog';
+import { ConfirmActionDialog } from '@/components/piling/confirm-action-dialog';
 
 const ALL = '__all__';
 const PAGE_SIZE_OPTIONS = [10, 25, 50] as const;
@@ -75,6 +76,9 @@ export function MaintenanceBoard() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingEquipmentId, setEditingEquipmentId] = useState<string | null>(null);
   const [busyAction, setBusyAction] = useState<string | null>(null);
+  // Наряд, ожидающий подтверждения закрытия: закрытие необратимо (сдвиг
+  // регламента и запись показания счётчика), а «галочка» стоит в ряду действий.
+  const [pendingDone, setPendingDone] = useState<WorkOrderRow | null>(null);
   const [pageSize, setPageSize] = useState<number>(10);
   const [page, setPage] = useState(1);
 
@@ -87,10 +91,15 @@ export function MaintenanceBoard() {
     setLoading(true);
     try {
       const res = await authFetch(`/api/maintenance${buildMaintenanceQuery(filter)}`);
-      if (!res.ok) throw new Error();
+      // 403 (нет права), 5xx и прочие отказы — разные причины: раньше все они
+      // звучали как «не удалось загрузить», и отказ по правам не отличался от сбоя.
+      if (!res.ok) {
+        toast.error(maintenanceErrorText(res.status));
+        return;
+      }
       setRecords(((await res.json()).records ?? []) as WorkOrderRow[]);
-    } catch {
-      toast.error('Не удалось загрузить наряды ТО');
+    } catch (err) {
+      toast.error(maintenanceCatchText(err, 'Не удалось загрузить наряды ТО'));
     } finally {
       setLoading(false);
     }
@@ -210,12 +219,19 @@ export function MaintenanceBoard() {
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || 'Ошибка сохранения');
+        if (res.status === 409) {
+          // Наряд изменили или приняли, пока экран был открыт. Перечитываем его,
+          // иначе повтор кнопкой снова упрётся в тот же 409.
+          toast.error('Запись изменилась — данные обновлены, повторите действие.');
+          await load();
+          return;
+        }
+        throw new Error(maintenanceErrorText(res.status, err.error));
       }
       toast.success(status === 'DONE' ? 'ТО закрыто' : 'Статус обновлён');
       await load();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Ошибка сохранения');
+      toast.error(maintenanceCatchText(err, 'Ошибка сохранения'));
     } finally {
       setBusyAction(null);
     }
@@ -229,12 +245,12 @@ export function MaintenanceBoard() {
       const res = await authFetch(`/api/equipment/${record.equipmentId}/maintenance/${record.id}`, { method: 'DELETE' });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || 'Ошибка удаления');
+        throw new Error(maintenanceErrorText(res.status, err.error));
       }
       toast.success('ТО удалено');
       await load();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Ошибка удаления');
+      toast.error(maintenanceCatchText(err, 'Ошибка удаления'));
     } finally {
       setBusyAction(null);
     }
@@ -335,11 +351,14 @@ export function MaintenanceBoard() {
             <Button onClick={() => { setEditingId(null); setEditingEquipmentId(null); setDialogOpen(true); }} size="sm" className="h-11 bg-signal text-white hover:bg-signal-strong sm:h-9">
               <Plus className="mr-1.5 h-4 w-4" /> Задача ТО
             </Button>
-            <Button variant="outline" size="sm" className="h-11 sm:h-9" asChild>
-              {/* План-график ТО — это регламенты в модуле техготовности, а не
-                  редактор чек-листов осмотра, куда вела кнопка раньше. */}
-              <Link href="/admin/to?view=plans"><CalendarDays className="mr-1.5 h-4 w-4" /> План-график</Link>
-            </Button>
+            {/* Кнопка «План-график» вела на /admin/to?view=plans, а тот режим
+                открывает раздел «Обслуживание» без регламентов ТО: ссылка
+                обещала экран, которого нет. Панель регламентов из интерфейса
+                недостижима, поэтому вместо мёртвой ссылки — честная подпись. */}
+            <span className="flex h-9 items-center gap-1.5 text-xs text-muted-foreground">
+              <CalendarDays className="h-4 w-4" />
+              План-график ТО настраивается в техподдержке
+            </span>
           </div>
         </section>
 
@@ -356,7 +375,7 @@ export function MaintenanceBoard() {
               busyAction={busyAction}
               onSelect={setSelectedId}
               onEdit={openEdit}
-              onDone={(record) => void updateRecordStatus(record, 'DONE')}
+              onDone={(record) => setPendingDone(record)}
               onDelete={(record) => void deleteRecord(record)}
             />
           )}
@@ -422,9 +441,20 @@ export function MaintenanceBoard() {
         crew={selected ? crewForRecord(selected, crewByEquipment) : null}
         assigneeName={selected ? resolveAssigneeName(selected.assigneeId, assigneeNames) : '—'}
         busyAction={busyAction}
-        onClose={(record) => updateRecordStatus(record, 'DONE')}
+        onClose={async (record) => { setPendingDone(record); }}
       />
       </div>
+
+      <ConfirmActionDialog
+        open={Boolean(pendingDone)}
+        onOpenChange={(open) => { if (!open) setPendingDone(null); }}
+        title="Закрыть наряд ТО?"
+        description={pendingDone
+          ? `Наряд «${pendingDone.title}» будет отмечен выполненным: регламент ТО сдвинется, а показание счётчика запишется в журнал.`
+          : ''}
+        confirmLabel="Закрыть наряд"
+        onConfirm={() => { const record = pendingDone; if (record) void updateRecordStatus(record, 'DONE'); }}
+      />
 
       <WorkOrderFormDialog
         open={dialogOpen}

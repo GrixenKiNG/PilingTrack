@@ -34,3 +34,30 @@ const TRANSITIONS: Record<MaintenanceStatus, MaintenanceStatus[]> = {
 export function nextStatusActions(status: MaintenanceStatus): MaintenanceStatus[] {
   return TRANSITIONS[status] ?? [];
 }
+
+/**
+ * Текст отказа по HTTP-статусу для экранов ТО.
+ *
+ * Компоненты клали в тост серверный `err.error` как есть: на истёкшую сессию
+ * механик читал английское «Unauthorized», а отказ по правам (403) ничем не
+ * отличался от сбоя сервера. 401/403/404 и 5xx объясняются по-русски, остальное
+ * (400/409 и т.п.) остаётся серверным сообщением — оно по делу.
+ */
+export function maintenanceErrorText(status: number, serverError?: unknown): string {
+  if (status === 401) return 'Сессия истекла — войдите снова.';
+  if (status === 403) return 'Нет прав на обслуживание. Смените роль или обратитесь к администратору.';
+  if (status === 404) return 'Наряд не найден (возможно, удалён).';
+  if (status >= 500) return 'Сервер временно недоступен — повторите позже.';
+  const text = typeof serverError === 'string' ? serverError.trim() : '';
+  return text || 'Не удалось выполнить действие.';
+}
+
+/**
+ * Текст тоста из пойманного исключения: обрыв сети (`fetch` бросает `TypeError`
+ * с английским «Failed to fetch») объясняется по-русски, остальное берётся из
+ * сообщения ошибки.
+ */
+export function maintenanceCatchText(cause: unknown, fallback: string): string {
+  if (cause instanceof TypeError) return 'Нет связи с сервером — повторите при появлении сети.';
+  return cause instanceof Error && cause.message ? cause.message : fallback;
+}
