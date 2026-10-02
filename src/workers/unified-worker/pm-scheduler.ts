@@ -64,7 +64,11 @@ async function notifyOverdue(
   }
 }
 
+let passRunning = false;
+
 async function runOnce(): Promise<void> {
+  if (passRunning) return;
+  passRunning = true;
   try {
     // Перечень организаций — из таблицы Tenant, а не из MaintenancePlan:
     // под строгими политиками RLS запрос без объявленной организации вернул бы
@@ -84,6 +88,8 @@ async function runOnce(): Promise<void> {
       error: error instanceof Error ? error.message : String(error),
     });
     Sentry.captureException(error, { tags: { task: 'pm-scheduler' } });
+  } finally {
+    passRunning = false;
   }
 }
 
