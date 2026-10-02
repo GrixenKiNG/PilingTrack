@@ -3,7 +3,6 @@
  */
 
 import { db, DEFAULT_TX_OPTIONS } from '@/lib/db';
-import { getRequestTenantId } from '@/core/security/tenant-context';
 import { CrewAggregate } from '../domain';
 import { toPrismaData, fromPrismaToState, toOutboxData } from './crew.prisma.mapper';
 
@@ -27,12 +26,6 @@ export class PrismaCrewRepository implements CrewRepository {
     const state = aggregate.getState();
     const persistenceData = toPrismaData(aggregate);
     const pendingEvents = aggregate.getPendingEvents();
-    // У бригады нет своей колонки tenantId — её организация это организация
-    // объекта (site). Здесь она уже известна: команды бригады ходят только из
-    // запроса, а обёртка маршрута открывает контекст и кладёт туда тенанта
-    // (F-R86-OUTBOX-TENANT). Лишний запрос за объектом не делаем.
-    const tenantId = getRequestTenantId() ?? undefined;
-
     // Transactional outbox: crew data + outbox events + caller hooks in one tx
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Prisma interactive-transaction callback client type isn't cleanly exported
     await db.$transaction(async (tx: any) => {
@@ -49,6 +42,10 @@ export class PrismaCrewRepository implements CrewRepository {
       });
 
       if (pendingEvents.length > 0) {
+        // Platform ADMIN may have another tenant: the crew belongs to its Site.
+        const site = await tx.site.findUnique({ where: { id: state.siteId }, select: { tenantId: true } });
+        if (!site?.tenantId) throw new Error("Crew outbox requires Site.tenantId");
+        const tenantId = site.tenantId;
         const outboxRecords = pendingEvents.map((event) => {
           const data = toOutboxData(event, tenantId);
           return {
