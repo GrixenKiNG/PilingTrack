@@ -3,9 +3,15 @@ import { join } from 'path';
 
 // PDF storage: when S3_ENDPOINT (or AWS S3 creds) is configured, store in S3
 // under the `pdf-results/` prefix; otherwise fall back to local filesystem at
-// `storage/pdf-results/`. Local mode is fine for dev — files are short-lived
-// (TTL ~1 hour) — but S3 is preferred for production so files survive
+// `storage/pdf-results/`. S3 is preferred for production so files survive
 // container restarts and are available across multiple app replicas.
+//
+// Retention: the ~1 hour TTL of PDF job metadata in Redis (RESULTS_TTL in
+// `pdf-queue.ts`) expires only the queue entry — it does NOT delete the PDF
+// object from S3 or the local file. No cleanup removes these files
+// automatically, and no retention policy for them is approved yet (decide it
+// before adding any deletion). These PDFs are temporary generation results,
+// separate from report attachments (`Media`).
 function isS3Enabled(): boolean {
   return Boolean(
     process.env.S3_ENDPOINT && process.env.S3_ACCESS_KEY_ID && process.env.S3_SECRET_ACCESS_KEY
