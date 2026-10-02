@@ -130,3 +130,13 @@ Media строит ключи `media/<tenant>/<entityType>/<entityId>/...` (`src
 Для алерта без корректного startsAt идентичность сомнительна: новый id и возможный повтор согласно решению владельца, без вечной ошибочной дедупликации следующей аварии. Settings systemAlerts проверяются и у queued доставки по отдельному validated notificationKey; они не подменяются совпавшим именем доменного правила. При DLQ маршрут не выдаёт её за доставку, нужна обычная ручная проверка/повтор DLQ. Shared-secret auth/validation не ослаблялись; DB-запись/доставка идут в контексте DEFAULT_TENANT_ID, при его отсутствии 503 без записи.
 
 Тесты: реальный durable handler с mocked DB/Telegram; A failed/B delivered →503; повтор перевёрнутой пачки → только A, 200. Пачка 101 →503/100 delivered/101 queued; повтор → одна отправка и 200/101. Scoped exit0: 3 файла/44 passed/0 skipped (m7-webhook-tests.log). Последние tsc/lint exit0 (final2-tsc.log/final2-lint.log), 7 прежних warnings. После дополнения повторён весь Vitest; результат в финальной таблице ниже. Живая БД/Alertmanager/Telegram не проверялись.
+### M3, финальный smoke после всех правок
+
+Исходное и оба итоговых повторения workers build/smoke завершились exit0. Последний повтор с runtime-кодом `a7edca31`:
+
+- `docker build -f Dockerfile.workers --target runner -t codex-workers:smoke .` — exit0; output/codex-t3/final2-workers-build.log.
+- Git Bash `bash scripts/smoke-workers-image.sh codex-workers:smoke` — exit0; фактический старт и Arming подтверждены, output/codex-t3/final2-workers-smoke.log. Скрипт принимает ровно один аргумент, создаёт codex-workers-smoke-* с network none и убирает контейнер по trap.
+- `docker image rm codex-workers:smoke` — exit0, tag удалён. Cache Docker не чистился. pilingtrack-* контейнеры не затрагивались.
+- App smoke в deploy-prod.sh отсутствует, поэтому условная часть M3 не применима; app build через Next остаётся заблокирован окружением.
+
+Это проверка загрузки worker runtime без Next, а не живого Redis/БД, Telegram или выполнения opt-in cleanup на S3. Последний build имел image manifest sha256:4c349721fa9baf59977c4e68a008479e500d3e2ba5d22b1547d9f6ccbc3fd32e до удаления codex-tag.
