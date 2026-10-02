@@ -73,10 +73,20 @@ export function BriefingJournalPrint() {
       const [journal, settings] = await Promise.all([
         fetch(`/api/briefings/journal?${search.toString()}`, { credentials: 'same-origin' }),
         fetch('/api/settings', { credentials: 'same-origin' }),
-      ]);
+      ]).catch(() => {
+        // Обрыв сети fetch отдаёт браузерной строкой «Failed to fetch» — на
+        // листе журнала по охране труда такая строка попадать не должна.
+        throw new Error('Нет связи с сервером. Журнал не загружен.');
+      });
       if (!journal.ok) {
+        // 401 приходит английским «Unauthorized» — заменяем на понятное человеку
+        // у принтера действие. Остальные отказы сервера уже на русском, их берём
+        // как есть, без технического «Сервер вернул N».
+        if (journal.status === 401) {
+          throw new Error('Сессия истекла — откройте журнал заново из приложения.');
+        }
         const body = await journal.json().catch(() => ({}));
-        throw new Error(body.error || `Сервер вернул ${journal.status}`);
+        throw new Error(body.error || 'Сервер временно недоступен. Повторите позже.');
       }
       const body = await journal.json();
       // Хронология: журнал читают и подписывают сверху вниз по возрастанию даты.
