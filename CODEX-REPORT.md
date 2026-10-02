@@ -95,7 +95,11 @@ Compose label — [build source](https://github.com/docker/compose/blob/v2/pkg/c
 
 ## Поток 2
 
-codex/integration-1002 в D:\PillingR\wt-codex2 завершён независимо.
+Исходный поток codex/integration-1002 в D:\PillingR\wt-codex2 завершён независимо.
+На финальной read-only проверке wt-codex2 уже на integration/codex-1002,
+HEAD0e806627 (merge приёмки), дерево чистое. Я ветку не переключал и merge не делал.
+35integrationpass относятся к исходному срезу53d30263; этот новый integration HEAD
+повторно не проверялся и не выдаётся за тот же испытанный срез.
 Коммиты2f3ef53b,6c84ff00,a82f6b26,96a904c5;отчёт53d30263.
 35passed/0failed/0skipped на PostgreSQL16,107миграций;
 restore84таблицы/107миграций/76RLS,successful13с,данные только синтетического стенда.
@@ -225,3 +229,111 @@ Owner inputs30ГБ/3.8ГБ и historical build peak5–6ГБ не выданы �
 Actual backend/common storage mount неизвестен; полный S3 inventory и media/off-site
 восстановление не подтверждены. Политика хранения/cleanup/load budget не реализованы:
 I11 целиком остаётся открытой, никаких удалений/prune/lifecycle не было.
+## Итоговые обязательные проверки после исходных изменений S3
+
+Каждая проверка — отдельная команда с её реальным exit. Никаких passWithNoTests,
+новых skips, подмены DB/env, повышения timeout или удаления assertions не было.
+
+| Команда | Exit | Фактический результат |
+|---|---:|---|
+| Проверка/очистка .next/dev/types | 0 | Абсолютный путь проверен внутри wt-codex; каталога нет, удаление не требовалось |
+| npx.cmd tsc --noEmit | 0 | После всех текущих исходных изменений S3 |
+| npm.cmd run lint | 0 | 0 errors, 7 исходных warnings; Text integrity check passed |
+| npm.cmd run test:unit — первый итоговый | 1 | 2734 passed / 8 failed / 60 skipped; 311 файлов:301passed/2failed/8skipped;94.00s |
+| npx.cmd vitest run src/workers/__tests__/unified-worker.test.ts | 0 | 11 passed / 0 skipped,5.30s; исходный30s timeout не изменён |
+| npm.cmd run test:unit — полный повтор после lint | 1 | 2735 passed / 7 failed / 60 skipped;311файлов:302passed/1failed/8skipped;92.57s |
+| npx.cmd playwright test --list | 0 | 99 тестов / 11 файлов, коллекция не уменьшилась; browser scenarios не запускались |
+| npm.cmd run build | 1 | Validate-env: нет DATABASE_PROVIDER/SESSION_SECRET; Next build и его route types не достигнуты |
+| git diff 0ea0c6be --check | 0 | После всех исходных изменений, scope без whitespace errors |
+
+Оставшиеся семь failures — исходные daily-summary; отдельная задача H15 готова,
+но её исправление не выдаётся за выполненную инициативу Codex. Дополнительный
+workers health import timeout был в первом полном прогоне; отдельно и на полном
+повторе он не воспроизвёлся. Причина не установлена, нельзя обещать отсутствие flakiness.
+Vite config и MaxListeners warnings видны, не подавлялись.
+
+Запуск lint сначала не состоялся из-за timeout автоматической проверки разрешений;
+одна разрешённая повторная попытка выполнилась и закончилась exit0. Это не отказ
+по безопасности, недоступных по этому согласованию действий в итоге не осталось.
+
+N1/N5 реальный runner build и startup smoke прошли ДО исходных изменений S3.
+После S3 Docker daemon недоступен: новый runner build, live Lua и повторный Docker
+smoke не выполнены. API/worker unit, no-next guard и tsc не заменяют эти проверки.
+Production/GitHub workflow/promtool/реальные browser роли не проверены.
+
+Перед финальным docs-коммитом дополнительно: npx.cmd tsc --noEmit exit0;
+четыре focused guards:40passed/0skipped, exit0. Исходники после полного unit не менялись.
+
+## Что остаётся сделать и почему
+
+- I05: техническая полнота исправлена; бизнес-контракт draft/submitted, history
+  pagination и freshness существующей projection не приняты. Текущие правила сохранены.
+- I08: partial delivery retry не менялся; нужны политика дублей и стабильная
+  идентичность/граница acknowledgement. Наивный503 whole batch не внедрялся.
+- I09/I10: 15 задач Hermes подготовлены, не исполнены; закрытие всех90аудитов не заявляется.
+- I11: только безопасный измерительный первый шаг; retention/delete/S3 lifecycle,
+  фактический VPS peak и полный S3 inventory не реализованы без решения владельца.
+- I06/I07 выполнены в отдельной ветке потока2; приёмка/перенос и повтор проверки — Claude.
+- I12: production/TLS/app-guard/reload/off-site/media/роль/offline требуют владельца/Claude.
+- Применение I02 требует согласованной остановки ВСЕХ старых embedded/standalone/unified
+  workers; old-cache/new-state смешивать нельзя. Этот шаг на сервере не выполнялся.
+
+N1–N5, S1, S2 и локальные I01–I04 выполнены. Независимые части I05/I11 выполнены
+и проверены; остальные условия этапа2 перечислены выше как незавершённые.
+Не заявляю «весь этап2 завершён», зелёный full unit/build или production acceptance.
+Удалённых файлов/экспортов нет; защищённые/frozen области оставлены по правилам.
+
+## Итоговый список путей и строк
+
+Ниже net additions/deletions относительно0ea0c6be, включая документы.
+Фактический diff: 48 путей, +3269/-210. В commit body f92863c9 число49 было ошибкой подсчёта; таблица и текущая команда подтверждают48.
+| Путь | + | - |
+|---|---:|---:|
+| .github/workflows/ci.yml | 27 | 0 |
+| .github/workflows/deploy.yml | 15 | 0 |
+| docs/runbooks/008-manual-deploy.md | 5 | 0 |
+| docs/runbooks/014-post-deploy-2026-10.md | 27 | 0 |
+| docs/strategy/CAPACITY-RETENTION-2026Q4.md | 77 | 0 |
+| docs/strategy/STRATEGY-2026Q4.md | 163 | 0 |
+| docs/strategy/hermes-tasks/H01.md | 41 | 0 |
+| docs/strategy/hermes-tasks/H02.md | 41 | 0 |
+| docs/strategy/hermes-tasks/H03.md | 41 | 0 |
+| docs/strategy/hermes-tasks/H04.md | 41 | 0 |
+| docs/strategy/hermes-tasks/H05.md | 41 | 0 |
+| docs/strategy/hermes-tasks/H06.md | 41 | 0 |
+| docs/strategy/hermes-tasks/H07.md | 41 | 0 |
+| docs/strategy/hermes-tasks/H08.md | 41 | 0 |
+| docs/strategy/hermes-tasks/H09.md | 41 | 0 |
+| docs/strategy/hermes-tasks/H10.md | 41 | 0 |
+| docs/strategy/hermes-tasks/H11.md | 41 | 0 |
+| docs/strategy/hermes-tasks/H12.md | 41 | 0 |
+| docs/strategy/hermes-tasks/H13.md | 41 | 0 |
+| docs/strategy/hermes-tasks/H14.md | 41 | 0 |
+| docs/strategy/hermes-tasks/H15.md | 41 | 0 |
+| observability/prometheus/alerts.yml | 122 | 13 |
+| scripts/backup.sh | 5 | 5 |
+| scripts/deploy-prod.sh | 13 | 1 |
+| scripts/pdf-storage-inventory.cjs | 57 | 0 |
+| scripts/smoke-workers-image.sh | 46 | 0 |
+| src/app/api/__tests__/route-guards.test.ts | 323 | 0 |
+| src/app/api/metrics/__tests__/route.test.ts | 171 | 3 |
+| src/app/api/metrics/route.ts | 24 | 6 |
+| src/core/infrastructure/__tests__/leader-election.test.ts | 220 | 52 |
+| src/core/infrastructure/leader-election.ts | 130 | 87 |
+| src/core/observability/__tests__/backup-redis-keys.test.ts | 88 | 0 |
+| src/core/observability/__tests__/lag-monitor.test.ts | 136 | 0 |
+| src/core/observability/audit-feedback-metrics.ts | 24 | 0 |
+| src/core/observability/lag-monitor.ts | 41 | 21 |
+| src/lib/__tests__/pdf-generator.test.ts | 111 | 0 |
+| src/modules/equipment/application/queries/__tests__/equipment-query.service.test.ts | 101 | 3 |
+| src/modules/equipment/application/queries/equipment-query.service.ts | 28 | 17 |
+| src/services/audit/__tests__/audit-service.test.ts | 48 | 0 |
+| src/services/audit/audit-service.ts | 2 | 0 |
+| src/workers/__tests__/unified-worker.test.ts | 53 | 0 |
+| src/workers/__tests__/workers-image-smoke.test.ts | 136 | 0 |
+| src/workers/unified-worker/__tests__/sentry.test.ts | 100 | 0 |
+| src/workers/unified-worker/health-server.ts | 4 | 2 |
+| src/workers/unified-worker/pm-scheduler.ts | 6 | 0 |
+| src/workers/unified-worker/projection-rebuild-scheduler.ts | 6 | 0 |
+| src/workers/unified-worker/readiness-scheduler.ts | 6 | 0 |
+| CODEX-REPORT.md | 339 | 0 |
