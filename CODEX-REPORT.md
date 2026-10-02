@@ -115,3 +115,19 @@ outbox/projections сохранены. Исходные lint warnings/daily-summ
 ## Этап 2
 
 S1 — 30650eec: стратегия 2026Q4, 6 измерений, 10 рисков, 12 инициатив. Source-reference check: 33 существующих пути, 0 missing; tsc exit 0; четыре существующих guard-файла: 40 passed / 0 skipped, exit 0. Подсчёт Node: 1230 файлов TS/TSX без generated, 41 крупный, 32 production / 9 test. S2 — da6b7077: 15 документов H01–H15, каждый +41/-0, общий +615/-0; точные whitelist, критерии, тесты, зависимости и стоп-условия. tsc exit 0; guards первый 39 passed / 1 failed (smoke timeout 5000ms), повтор 40 passed / 0 skipped exit 0; таймауты/assertions не изменены. Codex инициативы дополняются после отдельных коммитов.
+
+### I01 — настоящая очередь проекций
+
+Коммит 1df899d5 (CODEX-S3-projection-lag), 5 файлов +219/-26.
+projected:false независимо от published и retry; один агрегат count+oldest.
+Ошибочный сбор отклоняется и сохраняет предыдущий snapshot, freshness timestamp не обновляется.
+Null/invalid snapshot экспортирует timestamp=0; добавлены три правила projection warn/high и stale sample.
+Новый lag-monitor.test.ts +136; прочие пути: lag-monitor +41/-21, alerts +31,
+metrics route +1/-3, его существующий тест +10/-2.
+RED: 23 passed / 10 failed, exit 1, после устранения test dynamic-import race
+локальной загрузкой одного DB-client на snapshot. GREEN: 67 passed / 0 skipped
+в четырёх файлах, exit 0; актуальный общий tsc exit 0; ESLint exit 0/0 warnings;
+YAML js-yaml exit 0 (30 rules); scoped diff-check exit 0.
+Callers fallback: tracker/aggregate/metrics route; consumer flags сверены с outbox-publisher.
+Schema/DB runtime не менялись. Promtool и real production series не проверены;
+стоимость нового агрегата на production dataset не измерялась. Владелец проверяет scrape/reload.
