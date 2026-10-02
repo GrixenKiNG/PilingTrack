@@ -170,8 +170,11 @@ export function PileJournal() {
     try {
       const response = await authFetch(`/api/pile-passports/export?${journalParams(filters).toString()}`);
       if (!response.ok) {
+        // Истёкшая сессия приходит английским «Unauthorized», а ответ прокси
+        // без тела — техническим статусом. Человеку нужен русский текст.
+        if (response.status === 401) throw new Error('Сессия истекла — войдите заново.');
         const body = await response.json().catch(() => ({}));
-        throw new Error(body.error || `Сервер ответил ${response.status}`);
+        throw new Error(body.error || 'Сервер не выдал журнал — повторите или обратитесь к администратору.');
       }
       objectUrl = URL.createObjectURL(await response.blob());
       const link = document.createElement('a');
@@ -180,7 +183,13 @@ export function PileJournal() {
       link.click();
       toast.success('Журнал выгружен');
     } catch (exportError) {
-      toast.error(exportError instanceof Error ? exportError.message : 'Не удалось выгрузить журнал');
+      // fetch без сети бросает TypeError с английским «Failed to fetch» — в
+      // русском интерфейсе это не сообщение.
+      toast.error(
+        exportError instanceof TypeError
+          ? 'Нет связи с сервером, выгрузка не выполнена — повторите'
+          : exportError instanceof Error ? exportError.message : 'Не удалось выгрузить журнал',
+      );
     } finally {
       if (objectUrl) URL.revokeObjectURL(objectUrl);
       setExporting(false);

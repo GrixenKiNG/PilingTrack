@@ -5,8 +5,9 @@
  * Правка — только телефон: `h-11 … sm:h-8` у кнопок фиксированной высоты,
  * `min-h-11 … sm:min-h-8` у чипов-фильтров. На десктопе вид не меняется.
  */
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { toast } from 'sonner';
 import type { PilePassportRow } from '@/modules/reports/application/queries/pile-passport.service';
 
 const mocks = vi.hoisted(() => ({ authFetch: vi.fn() }));
@@ -136,5 +137,57 @@ describe('журнал забивки: цель нажатия на телефо
     fireEvent.click(screen.getByText('С-130'));
     const accept = await screen.findByRole('button', { name: 'Принять сваю' });
     expect(accept.closest('.field-type')).not.toBeNull();
+  });
+});
+
+/**
+ * F-R107-3: выгрузка .xlsx при сбое показывала технический/английский текст —
+ * обрыв сети («Failed to fetch»), истёкшую сессию («Unauthorized») или голый
+ * статус ответа. Мастер подшивает журнал как документ и по такому сообщению не
+ * понимает, повторить выгрузку или идти к администратору.
+ */
+describe('журнал забивки: сбой выгрузки .xlsx (F-R107-3)', () => {
+  const EXPORT_BUTTON = /Выгрузить журнал/;
+
+  beforeEach(() => {
+    mocks.authFetch.mockReset();
+    vi.mocked(toast.error).mockClear();
+  });
+
+  /** Журнал загружен, но выгрузка отвечает заданным образом. */
+  async function renderWithExport(respond: () => Response | Promise<Response>) {
+    await renderJournal();
+    mocks.authFetch.mockImplementation(async (url: string) => {
+      if (url.startsWith('/api/sites/all')) return json({ sites: [] });
+      if (url.startsWith('/api/pile-passports/export')) return respond();
+      return json({ data: [pileRow()], header, truncated: false });
+    });
+    fireEvent.click(screen.getByRole('button', { name: EXPORT_BUTTON }));
+  }
+
+  it('обрыв сети → русский текст, а не «Failed to fetch»', async () => {
+    await renderWithExport(() => {
+      throw new TypeError('Failed to fetch');
+    });
+
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith('Нет связи с сервером, выгрузка не выполнена — повторите'),
+    );
+    expect(toast.error).not.toHaveBeenCalledWith('Failed to fetch');
+  });
+
+  it('истёкшая сессия (401) → русский текст вместо «Unauthorized»', async () => {
+    await renderWithExport(() => json({ error: 'Unauthorized' }, 401));
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Сессия истекла — войдите заново.'));
+    expect(toast.error).not.toHaveBeenCalledWith('Unauthorized');
+  });
+
+  it('ответ без тела (502) → понятный текст, а не «Сервер ответил 502»', async () => {
+    await renderWithExport(() => new Response('', { status: 502 }));
+
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith('Сервер не выдал журнал — повторите или обратитесь к администратору.'),
+    );
   });
 });
