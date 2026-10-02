@@ -324,3 +324,15 @@ docker compose rm -f app workers
 docker rmi pilingtrack-app:latest pilingtrack-workers:latest
 docker compose build app workers && docker compose up -d app workers
 ```
+
+## Смена поколения workers (I02)
+
+У app по умолчанию встроены outbox/projection workers. Для этого релиза используйте
+`WORKER_GENERATION_EXTERNAL_STOPPED=1 bash scripts/deploy-prod.sh --replace-worker-generation app workers`.
+До подтверждения вручную остановите все standalone/systemd/pm2/другие хосты; отключите их автоматический рестарт.
+Режим заменяет app и workers вместе: stop всех реплик → проверка фактического завершения (exit 0, без OOM) и отсутствия RUNNING → up нового поколения.
+One-off реплики того же compose-проекта тоже учитываются. Ошибка проверки оставляет сервисы остановленными; не обходите барьер обычным up.
+При откате после переключения тегов применяйте тот же `scripts/replace-worker-generation.sh app workers` с подтверждением внешних остановок.
+Compose ждёт 30 секунд; внутренний WORKER_SHUTDOWN_TIMEOUT_MS старого worker по умолчанию 8000.
+Больший compose timeout не продлевает внутренний дедлайн: exit 1 после 8 секунд блокирует старт и требует проверки drain/незавершённых задач.
+Перед новым запуском подтвердите, что внешние старые процессы действительно завершены.

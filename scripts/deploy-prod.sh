@@ -26,6 +26,8 @@ KEY="${DEPLOY_KEY:-$HOME/.ssh/orionpiling}"
 DIR=/opt/pilingtrack
 SSH=(ssh -i "$KEY" -o ConnectTimeout=30 -o ServerAliveInterval=15 "$HOST")
 
+REPLACE_GENERATION=0
+if [ "${1:-}" = --replace-worker-generation ]; then REPLACE_GENERATION=1; shift; fi
 SERVICES=("$@")
 [ ${#SERVICES[@]} -eq 0 ] && SERVICES=(app workers)
 
@@ -40,6 +42,15 @@ dockerfile_of() {
     *) die "неизвестный сервис: $1" ;;
   esac
 }
+
+# App starts embedded workers by default; an app-only deploy needs the barrier too.
+if [[ " ${SERVICES[*]} " == *" workers "* || " ${SERVICES[*]} " == *" app "* ]]; then
+  [ "$REPLACE_GENERATION" = 1 ] || die 'для app/workers нужен --replace-worker-generation (остановка всего старого поколения)'
+  if [[ " ${SERVICES[*]} " == *" migrate "* ]]; then SERVICES=(migrate app workers); else SERVICES=(app workers); fi
+  [ "${WORKER_GENERATION_EXTERNAL_STOPPED:-0}" = 1 ] || die 'сначала остановите все внешние воркеры и подтвердите WORKER_GENERATION_EXTERNAL_STOPPED=1'
+fi
+
+for svc in "${SERVICES[@]}"; do dockerfile_of "$svc" >/dev/null; done
 
 # ── 1. Предпроверка ─────────────────────────────────────────
 step "Предпроверка"
@@ -99,13 +110,15 @@ docker save "${IMAGES[@]}" | gzip -1 | "${SSH[@]}" 'gunzip | docker load'
 step "Переключение"
 UP=()
 for svc in "${SERVICES[@]}"; do [ "$svc" != migrate ] && UP+=("$svc"); done
+SWITCH="docker compose up -d --no-build ${UP[*]}"
+if [ "$REPLACE_GENERATION" = 1 ]; then SWITCH="WORKER_GENERATION_EXTERNAL_STOPPED=1 WORKER_GENERATION_PROJECT=pilingtrack bash scripts/replace-worker-generation.sh ${UP[*]}"; fi
 "${SSH[@]}" "set -e
   cd $DIR
   git pull -q origin main
   [ \"\$(git rev-parse --short HEAD)\" = $SHA ] || { echo 'git на сервере не совпал с $SHA'; exit 1; }
   for svc in ${SERVICES[*]}; do docker tag pilingtrack-\$svc:$SHA pilingtrack-\$svc:latest; done
   export APP_VERSION=$SHA
-  docker compose up -d --no-build ${UP[*]}"
+  $SWITCH"
 
 # ── 6. Проверка ─────────────────────────────────────────────
 step "Проверка"
@@ -127,4 +140,4 @@ step "Проверка"
 
 echo
 echo "✔ выкачено $SHA. Откат:"
-echo "  ssh -i $KEY $HOST \"cd $DIR && for s in ${UP[*]}; do docker tag pilingtrack-\\\$s:$ROLLBACK pilingtrack-\\\$s:latest; done && docker compose up -d --no-build ${UP[*]}\""
+echo "  ssh -i $KEY $HOST \"cd $DIR && for s in ${UP[*]}; do docker tag pilingtrack-\\\$s:$ROLLBACK pilingtrack-\\\$s:latest; done && WORKER_GENERATION_EXTERNAL_STOPPED=1 bash scripts/replace-worker-generation.sh ${UP[*]}\""
