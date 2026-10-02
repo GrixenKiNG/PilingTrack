@@ -20,6 +20,21 @@ interface Options {
 /** Сбой связи — не ответ сервера: уведомление объясняет, что делать. */
 const NETWORK_ERROR = 'Нет соединения с сервером. Проверьте связь и повторите.';
 
+/** Сервер ответил, но ответ не разобран или обработка упала: связи это не касается. */
+const UNEXPECTED_ERROR = 'Сервер ответил неожиданно, повторите позже.';
+
+/**
+ * Текст уведомления из пойманного исключения.
+ *
+ * Обрыв `fetch` бросает `TypeError` («Failed to fetch») — только он и означает
+ * отсутствие связи. Не-JSON тело от прокси/шлюза и ошибки разбора ответа
+ * приходят другим исключением: это ответ сервера, и выдавать его за «Нет
+ * соединения» нельзя (F-M4-SITES).
+ */
+export function catchText(cause: unknown): string {
+  return cause instanceof TypeError ? NETWORK_ERROR : UNEXPECTED_ERROR;
+}
+
 /** Тело отказа, если оно читается; иначе `undefined` (пустой/не-JSON ответ). */
 async function readErrorBody(res: Response): Promise<unknown> {
   try {
@@ -97,8 +112,8 @@ export function useSiteMutations({
       setSites((prev) => [...prev, data.site]);
       toast.success('Объект создан');
       return true;
-    } catch {
-      toast.error(NETWORK_ERROR);
+    } catch (error) {
+      toast.error(catchText(error));
       return false;
     }
   };
@@ -176,8 +191,8 @@ export function useSiteMutations({
       });
       toast.success('Объект сохранён');
       return true;
-    } catch {
-      toast.error(NETWORK_ERROR);
+    } catch (error) {
+      toast.error(catchText(error));
       return false;
     }
   };
@@ -200,8 +215,8 @@ export function useSiteMutations({
       setExpandedSiteId((prev) => (prev === siteId ? null : prev));
       toast.success('Объект удалён');
       return true;
-    } catch {
-      toast.error(NETWORK_ERROR);
+    } catch (error) {
+      toast.error(catchText(error));
       return false;
     }
   };
@@ -229,8 +244,8 @@ export function useSiteMutations({
           ? { duration: 10_000, action: { label: 'Отменить', onClick: () => { void handleSetCompleted(site, !completed, false); } } }
           : undefined,
       );
-    } catch {
-      toast.error(NETWORK_ERROR);
+    } catch (error) {
+      toast.error(catchText(error));
     }
   };
 
@@ -249,8 +264,8 @@ export function useSiteMutations({
       const data = await res.json();
       setSites((prev) => prev.map((s) => (s.id === site.id ? data.site : s)));
       toast.success(site.isActive ? 'Объект деактивирован' : 'Объект активирован');
-    } catch {
-      toast.error(NETWORK_ERROR);
+    } catch (error) {
+      toast.error(catchText(error));
     } finally {
       setTogglingId(null);
     }
@@ -279,8 +294,8 @@ export function useSiteMutations({
       }
       toast.success('Элемент добавлен');
       return true;
-    } catch {
-      toast.error(NETWORK_ERROR);
+    } catch (error) {
+      toast.error(catchText(error));
       return false;
     }
   };
@@ -303,8 +318,8 @@ export function useSiteMutations({
       }
       toast.success('Элемент удалён');
       return true;
-    } catch {
-      toast.error(NETWORK_ERROR);
+    } catch (error) {
+      toast.error(catchText(error));
       return false;
     }
   };
