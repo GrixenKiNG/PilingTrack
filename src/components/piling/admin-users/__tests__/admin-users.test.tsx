@@ -21,6 +21,7 @@ vi.mock('@/components/piling/ops-shell/use-entity-history', () => ({
 }));
 
 import { AdminUsers } from '../admin-users';
+import { CreateUserDialog, EditUserDialog } from '../user-dialogs';
 
 function operationalUser(overrides: Partial<OperationalUserDTO> = {}): OperationalUserDTO {
   return {
@@ -222,5 +223,38 @@ describe('AdminUsers', () => {
     await waitFor(() =>
       expect(authFetchMock.mock.calls.some(([, init]) => (init as RequestInit | undefined)?.method === 'PATCH')).toBe(true),
     );
+  });
+});
+
+/**
+ * R121-5: у полей пользователя не было maxLength, а zod-схема маршрута
+ * (`userBaseSchema`) ограничивает имя 200, email 255, телефон 30, пароль 100.
+ * Форма отправляла заведомо отклоняемый запрос и получала только
+ * «Некорректные данные» без имени поля и предела.
+ */
+describe('диалоги пользователя: пределы длины как в zod-схеме (R121)', () => {
+  it('создание: имя/email/телефон/пароль ограничены по длине', () => {
+    render(<CreateUserDialog open onOpenChange={vi.fn()} onSubmit={vi.fn()} />);
+
+    expect(screen.getByPlaceholderText('Иванов Иван')).toHaveAttribute('maxLength', '200');
+    expect(screen.getByPlaceholderText('ivan@piling.ru')).toHaveAttribute('maxLength', '255');
+    expect(screen.getByPlaceholderText('+7 999 000-00-00')).toHaveAttribute('maxLength', '30');
+    expect(screen.getByPlaceholderText('Минимум 8 символов')).toHaveAttribute('maxLength', '100');
+  });
+
+  it('правка: имя/email/телефон/пароль ограничены по длине', () => {
+    render(
+      <EditUserDialog
+        open
+        user={operationalUser()}
+        onOpenChange={vi.fn()}
+        onSubmit={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByDisplayValue('Анна Сидорова')).toHaveAttribute('maxLength', '200');
+    expect(screen.getByDisplayValue('anna@example.test')).toHaveAttribute('maxLength', '255');
+    expect(screen.getByDisplayValue(/799/)).toHaveAttribute('maxLength', '30');
+    expect(screen.getByPlaceholderText('••••••••')).toHaveAttribute('maxLength', '100');
   });
 });

@@ -47,6 +47,19 @@ const RoleOptions = () => (
   </>
 );
 
+/**
+ * Пределы длины полей пользователя — как в zod-схеме маршрута
+ * (`src/lib/validation-schemas.ts`: `userBaseSchema`). Схему не меняем: если
+ * серверный предел правят, правим и здесь — иначе форма отправляет заведомо
+ * отклоняемый запрос, а человек видит только «Некорректные данные».
+ */
+const USER_FIELD_MAX = {
+  name: 200,
+  email: 255,
+  phone: 30,
+  password: 100,
+} as const;
+
 interface CreateProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -126,6 +139,7 @@ export function CreateUserDialog({ open, onOpenChange, onSubmit }: CreateProps) 
               setErrors((prev) => ({ ...prev, name: '' }));
             }}
             placeholder="Иванов Иван"
+            maxLength={USER_FIELD_MAX.name}
           />
           <FormField
             label="Email"
@@ -137,12 +151,14 @@ export function CreateUserDialog({ open, onOpenChange, onSubmit }: CreateProps) 
               setErrors((prev) => ({ ...prev, email: '' }));
             }}
             placeholder="ivan@piling.ru"
+            maxLength={USER_FIELD_MAX.email}
           />
           <FormField
             label="Телефон"
             value={phone}
             onChange={setPhone}
             placeholder="+7 999 000-00-00"
+            maxLength={USER_FIELD_MAX.phone}
           />
           <FormField
             label="Пароль"
@@ -154,6 +170,7 @@ export function CreateUserDialog({ open, onOpenChange, onSubmit }: CreateProps) 
               setErrors((prev) => ({ ...prev, password: '' }));
             }}
             placeholder="Минимум 8 символов"
+            maxLength={USER_FIELD_MAX.password}
           />
           <div className="space-y-1.5">
             <Label htmlFor={`${uid}-role`}>Роль</Label>
@@ -264,6 +281,7 @@ export function EditUserDialog({ open, user, onOpenChange, onSubmit }: EditProps
               setName(v);
               setErrors((prev) => ({ ...prev, name: '' }));
             }}
+            maxLength={USER_FIELD_MAX.name}
           />
           <FormField
             label="Email"
@@ -274,11 +292,13 @@ export function EditUserDialog({ open, user, onOpenChange, onSubmit }: EditProps
               setEmail(v);
               setErrors((prev) => ({ ...prev, email: '' }));
             }}
+            maxLength={USER_FIELD_MAX.email}
           />
           <FormField
             label="Телефон"
             value={phone}
             onChange={setPhone}
+            maxLength={USER_FIELD_MAX.phone}
           />
           <FormField
             label="Новый пароль (оставьте пустым, чтобы не менять)"
@@ -290,6 +310,7 @@ export function EditUserDialog({ open, user, onOpenChange, onSubmit }: EditProps
               setErrors((prev) => ({ ...prev, password: '' }));
             }}
             placeholder="••••••••"
+            maxLength={USER_FIELD_MAX.password}
           />
           <div className="space-y-1.5">
             <Label htmlFor={`${uid}-role`}>Роль</Label>
@@ -382,18 +403,20 @@ interface FormFieldProps {
   value: string;
   type?: 'text' | 'email' | 'password';
   inputMode?: 'text' | 'numeric' | 'email';
+  maxLength?: number;
   error?: string;
   placeholder?: string;
   onChange: (value: string) => void;
 }
 
-function FormField({ label, value, type = 'text', inputMode, error, placeholder, onChange }: FormFieldProps) {
+function FormField({ label, value, type = 'text', inputMode, maxLength, error, placeholder, onChange }: FormFieldProps) {
   return (
     <div className="space-y-1.5">
       <Label>{label}</Label>
       <Input
         type={type}
         inputMode={inputMode}
+        maxLength={maxLength}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
