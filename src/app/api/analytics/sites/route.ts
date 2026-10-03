@@ -34,5 +34,7 @@ export const GET = withApi(
 
     return NextResponse.json({ analytics });
   },
-  { domain: 'analytics', cache: true, cacheTTL: 60_000 }
+  // Redis invalidation is shared with workers; a process-local response cache
+  // would keep stale KPI after the worker has invalidated Redis.
+  { domain: 'analytics' }
 );
