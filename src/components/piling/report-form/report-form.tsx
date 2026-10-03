@@ -178,10 +178,15 @@ export function ReportForm({ onExit, anchor }: { onExit?: () => void; anchor?: s
     || Boolean(pendingPile || pendingDrilling || pendingDowntime);
 
   const submitWithPending = () => {
-    void handleSubmit({ pile: pendingPile, drilling: pendingDrilling, downtime: pendingDowntime });
-    if (pendingPile) { temp.setTempPileGrade(''); temp.setTempPileCount(''); }
-    if (pendingDrilling) { temp.setTempDrillType(''); temp.setTempDrillCount(''); temp.setTempDrillMetersPerUnit(''); }
-    if (pendingDowntime) { temp.setTempDowntimeReason(''); temp.setTempDowntimeDuration(''); temp.setTempDowntimeComment(''); }
+    // Поля очищаем только если хук принял строку (проверка прошла и она ушла в
+    // состояние). При отказе проверки — «Выберите установку», нецелые моточасы,
+    // нет строк — набранное остаётся, иначе оператор теряет ввод (F-R111-2).
+    void handleSubmit({ pile: pendingPile, drilling: pendingDrilling, downtime: pendingDowntime }).then((accepted) => {
+      if (!accepted) return;
+      if (pendingPile) { temp.setTempPileGrade(''); temp.setTempPileCount(''); }
+      if (pendingDrilling) { temp.setTempDrillType(''); temp.setTempDrillCount(''); temp.setTempDrillMetersPerUnit(''); }
+      if (pendingDowntime) { temp.setTempDowntimeReason(''); temp.setTempDowntimeDuration(''); temp.setTempDowntimeComment(''); }
+    });
   };
 
   const handleSiteChange = (val: string) => {
