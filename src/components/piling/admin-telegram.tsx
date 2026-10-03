@@ -82,7 +82,7 @@ export function AdminTelegram() {
             : 'Соединение установлено',
         );
       } else {
-        toast.error(`Ошибка: ${data.error || 'Не удалось подключиться'}`);
+        toast.error(data.error || 'Не удалось подключиться — проверьте токен и повторите');
       }
     } catch {
       toast.error('Ошибка тестирования');

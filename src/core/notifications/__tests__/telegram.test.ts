@@ -27,7 +27,7 @@ vi.mock('@/lib/logger', () => ({
   logger: { warn: vi.fn(), error: vi.fn(), info: vi.fn() },
 }));
 
-import { telegramNotifier } from '../telegram';
+import { telegramNotifier, describeTelegramError } from '../telegram';
 
 describe('telegramNotifier — botToken decryption', () => {
   let fetchMock: ReturnType<typeof vi.fn>;
@@ -86,10 +86,10 @@ describe('telegramNotifier — botToken decryption', () => {
     expect(fetchMock.mock.calls[0][0]).toContain('999:plain-token');
   });
 
-  it('returns Not configured when no enabled config row exists', async () => {
+  it('returns a Russian message when no enabled config row exists', async () => {
     findManyMock.mockResolvedValue([]);
     const res = await telegramNotifier.testConnection();
-    expect(res).toEqual({ ok: false, error: 'Not configured' });
+    expect(res).toEqual({ ok: false, error: 'Telegram не настроен — добавьте канал в настройках' });
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
@@ -109,7 +109,7 @@ describe('telegramNotifier — botToken decryption', () => {
   it('fails closed (no config, no DB call) when DEFAULT_TENANT_ID is unset', async () => {
     delete process.env.DEFAULT_TENANT_ID;
     const res = await telegramNotifier.testConnection();
-    expect(res).toEqual({ ok: false, error: 'Not configured' });
+    expect(res).toEqual({ ok: false, error: 'Telegram не настроен — добавьте канал в настройках' });
     expect(findManyMock).not.toHaveBeenCalled();
   });
 
@@ -361,7 +361,8 @@ describe('telegramNotifier — тайм-аут проверки канала (F-
 
     const res = await pending;
     expect(res.ok).toBe(false);
-    expect(res.error).toBe('The operation was aborted due to timeout');
+    // F-R120-2: текст тайм-аута теперь человекочитаемый, а не имя DOMException.
+    expect(res.error).toBe('Telegram не ответил за 5 секунд — проверьте доступ в интернет');
   });
 });
 
@@ -405,5 +406,54 @@ describe('telegramNotifier — чтение настроек внутри чуж
 
     expect(tenantSeenByQuery).toBe('orion');
     expect(sent).toBe(true);
+  });
+});
+
+/**
+ * F-R120-2: кнопка «Тест» показывала сырой ответ Telegram API
+ * (`{"ok":false,"error_code":401,…}`) или английское «Not configured».
+ * Частые отказы переводим в русский с подсказкой, остальное — «Telegram отказал: …».
+ */
+describe('describeTelegramError — сопоставление отказов Telegram (F-R120-2)', () => {
+  it('токен неверный (401 Unauthorized)', () => {
+    expect(describeTelegramError('{"ok":false,"error_code":401,"description":"Unauthorized"}'))
+      .toBe('Токен бота неверный — проверьте токен в настройках');
+  });
+
+  it('чат не найден', () => {
+    expect(describeTelegramError('{"ok":false,"error_code":400,"description":"Bad Request: chat not found"}'))
+      .toBe('Чат не найден — проверьте ID чата');
+  });
+
+  it('бот заблокирован пользователем', () => {
+    expect(describeTelegramError('{"ok":false,"error_code":403,"description":"Forbidden: bot was blocked by the user"}'))
+      .toBe('Бот заблокирован — разблокируйте его в чате');
+  });
+
+  it('недостаточно прав на отправку', () => {
+    expect(describeTelegramError('{"ok":false,"error_code":400,"description":"Bad Request: not enough rights to send text messages to the chat"}'))
+      .toBe('Недостаточно прав — добавьте бота в чат с правом отправки');
+  });
+
+  it('тайм-аут запроса', () => {
+    expect(describeTelegramError('The operation was aborted due to timeout'))
+      .toBe('Telegram не ответил за 5 секунд — проверьте доступ в интернет');
+  });
+
+  it('прочий ответ — короткий текст «Telegram отказал: …»', () => {
+    expect(describeTelegramError('Internal Server Error'))
+      .toBe('Telegram отказал: Internal Server Error');
+  });
+
+  it('длинный незнакомый ответ обрезается', () => {
+    const raw = 'x'.repeat(200);
+    const result = describeTelegramError(raw);
+    expect(result.startsWith('Telegram отказал: ')).toBe(true);
+    expect(result.length).toBeLessThanOrEqual('Telegram отказал: '.length + 120);
+    expect(result.endsWith('…')).toBe(true);
+  });
+
+  it('пустой ответ — понятный фолбэк', () => {
+    expect(describeTelegramError('')).toBe('Telegram отказал: неизвестная ошибка');
   });
 });
