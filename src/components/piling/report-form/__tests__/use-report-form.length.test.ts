@@ -261,3 +261,30 @@ describe('useReportForm — отказ проверки не стирает на
     }
   });
 });
+
+
+describe('useReportForm — 409 сохраняет свои правки', () => {
+  afterEach(() => { storeState.selectedSiteId = ''; });
+  it('не перечитывает чужую версию и не очищает набранную строку', async () => {
+    storeState.selectedSiteId = 'site-1';
+    authFetchMock.mockReset();
+    vi.mocked(toast.error).mockClear();
+    authFetchMock.mockImplementation((url: string) => {
+      if (url.startsWith('/api/reports/upsert')) return Promise.resolve({ ok: false, status: 409, json: async () => ({ error: 'Conflict' }) });
+      if (url.startsWith('/api/reports/edit')) return Promise.resolve(okJson({ report: { reportId: 'r1', version: 1, piles: [{ id: 'p1', pileGradeId: 'g1', count: 4 }] } }));
+      if (url.startsWith('/api/dictionary/all')) return Promise.resolve(okJson({ pileGrades: [GRADE], drillingTypes: [], downtimeReasons: [] }));
+      return Promise.resolve(okJson({ data: [] }));
+    });
+    const { result } = renderHook(() => useReportForm());
+    await waitFor(() => expect(result.current.piles).toHaveLength(1));
+    const rows = result.current.piles;
+    authFetchMock.mockClear();
+    let accepted: boolean | undefined;
+    await act(async () => { accepted = await result.current.handleSubmit({ pile: { gradeId: 'g1', count: 2 } }); });
+    expect(accepted).toBe(false);
+    expect(result.current.piles).toEqual(rows);
+    expect(result.current.submittedAt).toBeNull();
+    expect(authFetchMock.mock.calls.filter(([url]) => String(url).startsWith('/api/reports/edit'))).toHaveLength(0);
+    expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('Ваши правки сохранены в форме'));
+  });
+});

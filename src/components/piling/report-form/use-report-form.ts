@@ -437,12 +437,13 @@ export function useReportForm(): UseReportFormReturn {
       const res = await authFetch('/api/reports/upsert', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       const result = await res.json().catch(() => null);
       if (res.status === 409) {
-        // Someone saved this report after we loaded it. Don't overwrite their
-        // edit — tell the operator and reload so they see the current data.
-        toast.error(result?.error || 'Отчёт был изменён другим пользователем. Данные обновлены.');
+        // Keep the loaded version and local edits; reloading here erased them.
+        if (pending?.pile) setPiles(piles);
+        if (pending?.drilling) setDrillings(drillings);
+        if (pending?.downtime) setDowntimes(downtimes);
+        toast.error('Отчёт изменён другим пользователем. Ваши правки сохранены в форме. Скопируйте их и обновите форму, затем повторите отправку.');
         hapticError();
-        loadData();
-        return true;
+        return false;
       }
       if (!res.ok) throw new Error(apiErrorMessage(result, 'Ошибка отправки отчёта'));
       toast.success('Отчёт успешно отправлен!'); hapticSuccess();
