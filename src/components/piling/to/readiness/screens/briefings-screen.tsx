@@ -52,11 +52,9 @@ function signatureCell(iso: string | null) {
     : <span className="text-muted-foreground">—</span>;
 }
 
-/** Календарный день `ГГГГ-ММ-ДД` по местным часам — сравнение «сегодня/вчера». */
-function dayKey(date: Date): string {
-  const month = `${date.getMonth() + 1}`.padStart(2, '0');
-  const day = `${date.getDate()}`.padStart(2, '0');
-  return `${date.getFullYear()}-${month}-${day}`;
+/** Календарный день `ГГГГ-ММ-ДД` в поясе тенанта — сравнение «сегодня/вчера». */
+function dayKey(date: Date, timezone: string): string {
+  return date.toLocaleDateString('en-CA', { timeZone: timezone });
 }
 
 /** Шаги панели регистрации: путь от выбора человека до подписи. */
@@ -174,11 +172,13 @@ export function BriefingsScreen(props: ReferenceUiProps) {
    */
   const stats = useMemo(() => {
     const list = rows ?? [];
-    const today = new Date();
-    const todayKey = dayKey(today);
-    const yesterdayKey = dayKey(new Date(today.getTime() - 86_400_000));
-    const todayCount = list.filter((row) => dayKey(new Date(row.recordedAt)) === todayKey).length;
-    const yesterdayCount = list.filter((row) => dayKey(new Date(row.recordedAt)) === yesterdayKey).length;
+    const timezone = props.bootstrap?.tenant.timezone ?? 'Europe/Moscow';
+    const todayKey = dayKey(new Date(), timezone);
+    const yesterday = new Date(`${todayKey}T12:00:00.000Z`);
+    yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+    const yesterdayKey = yesterday.toISOString().slice(0, 10);
+    const todayCount = list.filter((row) => dayKey(new Date(row.recordedAt), timezone) === todayKey).length;
+    const yesterdayCount = list.filter((row) => dayKey(new Date(row.recordedAt), timezone) === yesterdayKey).length;
     const delta = todayCount - yesterdayCount;
     const inPeriod = (day: string) => fromDay <= day && day <= toDay;
     return {
@@ -191,7 +191,7 @@ export function BriefingsScreen(props: ReferenceUiProps) {
       targeted: list.filter((row) => row.type === 'TARGETED').length,
       objectBriefings: list.filter((row) => row.kind === 'INSTRUCTION').length,
     };
-  }, [rows, fromDay, toDay]);
+  }, [rows, fromDay, toDay, props.bootstrap?.tenant.timezone]);
 
   /** Опции фильтра «Объект» — уникальные площадки из загруженных строк. */
   const siteOptions = useMemo(() => Array.from(new Set(
