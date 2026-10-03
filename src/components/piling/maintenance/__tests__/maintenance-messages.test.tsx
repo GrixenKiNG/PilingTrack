@@ -31,6 +31,7 @@ vi.mock('@/components/piling/confirm-action-dialog', () => ({
 
 import { MaintenanceBoard } from '../maintenance-board';
 import { WorkOrderDetail } from '../work-order-detail';
+import { WorkOrderFormDialog } from '../work-order-form-dialog';
 import type { WorkOrderRow } from '../maintenance-board-model';
 
 const json = (body: unknown, status = 200) =>
@@ -301,5 +302,56 @@ describe('контур ТО: моменты времени — дата и вр�
     expect(await screen.findAllByText(MSK_MOMENT)).not.toHaveLength(0);
     // Прежде «Закрыто» и таймлайн несли UTC-день 25.09.
     expect(screen.queryByText(/25\.09\.2026/)).toBeNull();
+  });
+});
+
+describe('форма наряда ТО: моточасы — целое, не меньше 0 (F-R121-2)', () => {
+  /*
+    Схема маршрута требует engineHoursAtService: int ≥ 0
+    (app/api/equipment/[id]/maintenance/route.ts). Поле ничего не проверяло:
+    механик вписывал дробное показание счётчика («12345.5») и получал 400
+    «Некорректные данные» без имени поля. Теперь дробь/минус отклоняются до
+    отправки с понятным текстом, а не уходят на сервер.
+  */
+  function mockDialog() {
+    mocks.authFetch.mockImplementation(async (url: string, init?: RequestInit) => {
+      if (url === '/api/maintenance/assignees') return json({ users: [] });
+      if (init?.method === 'POST') return json({ record: record() }, 201);
+      return json({});
+    });
+  }
+
+  const postCalls = () =>
+    mocks.authFetch.mock.calls.filter(([, init]) => (init as RequestInit | undefined)?.method === 'POST');
+
+  async function fillDialog(hours?: string) {
+    mockDialog();
+    render(<WorkOrderFormDialog open onOpenChange={() => {}} equipmentId="eq-1" onSaved={() => {}} />);
+    fireEvent.change(await screen.findByLabelText('Название *'), { target: { value: 'ТО-1' } });
+    if (hours !== undefined) {
+      fireEvent.change(screen.getByLabelText('Моточасы'), { target: { value: hours } });
+    }
+    fireEvent.click(screen.getByRole('button', { name: 'Создать' }));
+  }
+
+  it('дробные моточасы не уходят на сервер и объясняются до отправки', async () => {
+    await fillDialog('12345.5');
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Моточасы — целое число, без дробной части'));
+    expect(postCalls()).toHaveLength(0);
+  });
+
+  it('отрицательные моточасы отклоняются до отправки', async () => {
+    await fillDialog('-1');
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Моточасы не могут быть отрицательными'));
+    expect(postCalls()).toHaveLength(0);
+  });
+
+  it('целые неотрицательные моточасы уходят на сервер', async () => {
+    await fillDialog('12345');
+
+    await waitFor(() => expect(postCalls()).toHaveLength(1));
+    expect(toast.error).not.toHaveBeenCalledWith('Моточасы — целое число, без дробной части');
   });
 });
