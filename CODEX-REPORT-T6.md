@@ -109,3 +109,7 @@ Green exit0:3files36pass0skip (logout,session-service,existing api-error tests),
 В ревью отмечено: проверка `window.open(..., ''noopener'')` в журнале инструктажей может ошибочно объявлять блокировку, потому что noopener возвращает null и при открытом окне. Проверка настоящим браузером и исправление после слияния. Несущественные ограничения: XLSX пустота пока определяется только при наличии серверного заголовка; `catchText` трактует TypeError как сетевой сбой. Большие файлы и повторяющиеся сообщения не рефакторились.
 
 Слияние: конфликтов осталось 0; версия `expectedUpdatedAt`, перечитывание после 409, новый `extractApiError`, `onSaved` и все группы тестов сохранены. Затронутые тесты после объединения: exit 0, 28 files / 235 passed / 0 skipped (`output/codex-t6/f7-merge-tests.log`). Graph detect-changes exit 1 (CLI недоступен); ручной анализ staged diff и зависимостей, diff-check exit 0. Chromium до исправления печати: `returnedNull=true, popupOpened=true`, exit 0 — ложный тост подтверждён.
+
+### F7: исправленная регрессия печати Hermes
+
+Chromium подтвердил: noopener возвращает null даже при открытом окне. Теперь синхронно открывается пустое окно, при null сообщается реальная блокировка; иначе opener обнуляется до перехода на печатную форму. Красный тест exit 1 (1 passed / 1 failed), зелёный exit 0 (2 passed / 0 skipped). GitNexus impact/detect exit 1, UNKNOWN; текстовые зависимости и diff проверены, diff-check exit 0. Настоящий браузерный сценарий печати включён в F8.
