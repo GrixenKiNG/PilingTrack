@@ -55,6 +55,37 @@ async function exportFailureMessage(response: Response): Promise<string> {
   return serverMessage || 'Не удалось сформировать экспорт';
 }
 
+/** Ответ сервера, брошенный загрузчиком: сетевую ошибку от отказа отличает статус. */
+function isResponseLike(value: unknown): value is { status: number; json: () => Promise<unknown> } {
+  return typeof value === 'object' && value !== null
+    && typeof (value as { status?: unknown }).status === 'number'
+    && typeof (value as { json?: unknown }).json === 'function';
+}
+
+/**
+ * Понятный русский текст отказа загрузки: истёкшая сессия (401), отсутствие
+ * прав (403), сбой сервера (5xx) и обрыв связи объясняются по-разному.
+ *
+ * Раньше экраны брали `body.error` до разбора статуса: сервер на 401 отдаёт
+ * английское «Unauthorized» (`src/lib/auth.ts`), и человек читал его на
+ * русском экране допусков; обрыв связи приходил браузерной строкой «Failed to
+ * fetch» из `catch`. Загрузчики бросают сам ответ (`throw response`), поэтому
+ * статус доступен и здесь; текст сервера (уже по-русски) показываем как есть.
+ */
+export async function loadFailureMessage(error: unknown, fallback: string): Promise<string> {
+  if (isResponseLike(error)) {
+    const body = await error.json().catch(() => null) as { error?: { message?: string } | string } | null;
+    const serverMessage = typeof body?.error === 'string' ? body.error : body?.error?.message;
+    if (error.status === 401) return 'Сессия истекла — войдите заново и повторите.';
+    if (error.status === 403) return serverMessage || 'Недостаточно прав для просмотра этого раздела.';
+    if (error.status >= 500) return serverMessage || 'Сервер временно недоступен. Повторите попытку позже.';
+    return serverMessage || fallback;
+  }
+  // fetch отверг запрос без ответа сервера — это обрыв связи, а не отказ данных.
+  if (error instanceof TypeError) return 'Нет связи с сервером. Проверьте подключение и повторите.';
+  return error instanceof Error && error.message ? error.message : fallback;
+}
+
 export function ReadinessFiltersBar({filters, onChange, mode}: {
   filters: ReadinessUrlFilters;
   onChange: (next: ReadinessUrlFilters) => void;

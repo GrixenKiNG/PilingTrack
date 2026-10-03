@@ -36,7 +36,7 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { COMPACT_KPI_GRID, ScreenTitle, card } from '../settings/shared-ui';
 import { kpiGridStyle } from '@/components/piling/kpi-tile';
-import { RefKpi } from './shared';
+import { loadFailureMessage, RefKpi } from './shared';
 import type { ReferenceUiProps } from './types';
 
 interface ClearanceRow {
@@ -148,16 +148,13 @@ export function SafetyOverviewScreen(props: ReferenceUiProps) {
   const load = useCallback(async () => {
     try {
       const response = await authFetch('/api/safety/clearance');
-      if (!response.ok) {
-        const body = await response.json().catch(() => ({}));
-        throw new Error(body.error || `Сервер вернул ${response.status}`);
-      }
+      if (!response.ok) throw response;
       setData((await response.json()) as Overview);
       setFailed(null);
     } catch (error) {
       // Пустой обзор читается как «всё в порядке» — на экране охраны труда
       // это худшая из подмен.
-      setFailed(error instanceof Error ? error.message : 'Не удалось загрузить сводку');
+      setFailed(await loadFailureMessage(error, 'Не удалось загрузить сводку'));
       setData(null);
     }
   }, []);

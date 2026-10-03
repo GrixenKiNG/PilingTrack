@@ -22,7 +22,7 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { COMPACT_KPI_GRID, ScreenTitle, card } from '../settings/shared-ui';
 import { kpiGridStyle } from '@/components/piling/kpi-tile';
-import { RefKpi } from './shared';
+import { loadFailureMessage, RefKpi } from './shared';
 import { EquipmentPermitMatrix } from './equipment-permit-matrix';
 
 interface ClearanceDocument {
@@ -76,16 +76,13 @@ export function MyClearanceScreen() {
   const load = useCallback(async () => {
     try {
       const response = await authFetch('/api/safety/my-clearance');
-      if (!response.ok) {
-        const body = await response.json().catch(() => ({}));
-        throw new Error(body.error || `Сервер вернул ${response.status}`);
-      }
+      if (!response.ok) throw response;
       setData((await response.json()) as SelfView);
       setFailed(null);
     } catch (error) {
       // Пустой экран вместо ошибки человек прочитает как «у меня всё в
       // порядке» — на своём допуске это худшая из подмен.
-      setFailed(error instanceof Error ? error.message : 'Не удалось загрузить допуск');
+      setFailed(await loadFailureMessage(error, 'Не удалось загрузить допуск'));
       setData(null);
     }
   }, []);

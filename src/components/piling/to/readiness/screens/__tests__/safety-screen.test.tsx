@@ -73,3 +73,36 @@ describe('SafetyScreen — ссылка «Карточка» видна по п�
     expect(screen.getByRole('button', { name: 'Карточка ТБ и допуски' })).toBeInTheDocument();
   });
 });
+
+/**
+ * Раньше экран брал `body.error` до разбора статуса: на истёкшую сессию
+ * сервер отдаёт английское «Unauthorized», а обрыв связи приходил браузерной
+ * строкой «Failed to fetch» — на русском экране допусков.
+ */
+const failed = (status: number, body: unknown = null) =>
+  ({ ok: false, status, json: async () => body }) as unknown as Response;
+
+describe('SafetyScreen — отказ загрузки объясняется по-русски (F-R110-1,2)', () => {
+  it('истёкшая сессия (401) просит войти заново, а не «Unauthorized»', async () => {
+    authFetch.mockResolvedValue(failed(401, { error: 'Unauthorized' }));
+    render(<SafetyScreen {...propsFor()} />);
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Сессия истекла');
+    expect(screen.queryByText('Unauthorized')).not.toBeInTheDocument();
+  });
+
+  it('отказ по правам (403) показывает текст сервера', async () => {
+    authFetch.mockResolvedValue(failed(403, { error: 'Недостаточно прав для просмотра допусков' }));
+    render(<SafetyScreen {...propsFor()} />);
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Недостаточно прав для просмотра допусков');
+  });
+
+  it('обрыв связи отличается от отказа сервера, а не «Failed to fetch»', async () => {
+    authFetch.mockRejectedValue(new TypeError('Failed to fetch'));
+    render(<SafetyScreen {...propsFor()} />);
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Нет связи с сервером');
+    expect(screen.queryByText('Failed to fetch')).not.toBeInTheDocument();
+  });
+});

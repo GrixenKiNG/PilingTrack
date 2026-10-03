@@ -26,7 +26,7 @@ import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { COMPACT_KPI_GRID, ScreenTitle, card } from '../settings/shared-ui';
 import { kpiGridStyle } from '@/components/piling/kpi-tile';
-import { RefKpi } from './shared';
+import { loadFailureMessage, RefKpi } from './shared';
 import { EquipmentPermitMatrix } from './equipment-permit-matrix';
 import { EmployeeCard, type ClearanceRow } from './employee-card';
 import { usePilingStore } from '@/lib/store';
@@ -96,16 +96,13 @@ export function SafetyScreen(props: ReferenceUiProps) {
   const load = useCallback(async () => {
     try {
       const response = await authFetch('/api/safety/clearance');
-      if (!response.ok) {
-        const body = await response.json().catch(() => ({}));
-        throw new Error(body.error || `Сервер вернул ${response.status}`);
-      }
+      if (!response.ok) throw response;
       setData((await response.json()) as ClearanceOverview);
       setFailed(null);
     } catch (error) {
       // Пустой список вместо ошибки читался бы как «все допущены» — на экране
       // допусков это худшая из возможных подмен.
-      setFailed(error instanceof Error ? error.message : 'Не удалось загрузить допуски');
+      setFailed(await loadFailureMessage(error, 'Не удалось загрузить допуски'));
       setData(null);
     }
   }, []);
