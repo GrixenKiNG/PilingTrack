@@ -10,6 +10,7 @@ const EMPTY_FILTERS: FleetFilterState = {
   equipmentStatus: '',
   reportStatus: '',
   crew: '',
+  search: '',
 };
 
 function card(over: Partial<FleetCard>): FleetCard {
@@ -111,5 +112,24 @@ describe('applyFleetFilters', () => {
 
   it('returns nothing when no card matches', () => {
     expect(applyFleetFilters(fleet, { ...EMPTY_FILTERS, crew: 'Бр-9' })).toEqual([]);
+  });
+
+  it('filters by free text over name, model and inventory number', () => {
+    const rig = card({ id: 'r1', name: 'СП-49', model: 'Liebherr LRH 100', inventoryNumber: '12345' });
+    const other = card({ id: 'r2', name: 'СГ-1', model: 'Sany', inventoryNumber: null });
+
+    expect(applyFleetFilters([rig, other], { ...EMPTY_FILTERS, search: 'LRH 100' }).map((c) => c.id)).toEqual(['r1']);
+    expect(applyFleetFilters([rig, other], { ...EMPTY_FILTERS, search: 'сп-49' }).map((c) => c.id)).toEqual(['r1']);
+    expect(applyFleetFilters([rig, other], { ...EMPTY_FILTERS, search: '12345' }).map((c) => c.id)).toEqual(['r1']);
+    expect(applyFleetFilters([rig, other], { ...EMPTY_FILTERS, search: 'чего-то нет' })).toEqual([]);
+  });
+
+  // Поиск один: он не должен различать «ё»/«е» и спотыкаться о лишние пробелы.
+  it('search ignores «ё»/«е» and repeated spaces', () => {
+    const kopior = card({ id: 'k', name: 'Копёр', model: '' });
+    const other = card({ id: 'o', name: 'СГ-1', model: '' });
+
+    expect(applyFleetFilters([kopior, other], { ...EMPTY_FILTERS, search: 'копер' }).map((c) => c.id)).toEqual(['k']);
+    expect(applyFleetFilters([kopior, other], { ...EMPTY_FILTERS, search: '  копёр  ' }).map((c) => c.id)).toEqual(['k']);
   });
 });

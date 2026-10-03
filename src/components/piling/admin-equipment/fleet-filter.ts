@@ -6,6 +6,7 @@
 import type { FleetCard } from './fleet-types';
 import type { FleetFilterState } from './equipment-filters';
 import { KIND_LABEL } from './equipment-status';
+import { normalizeSearch } from '@/components/piling/to/readiness/shared/text-search';
 
 export interface FleetFilterOptions {
   sites: string[];
@@ -32,7 +33,9 @@ export function buildFleetFilterOptions(cards: FleetCard[]): FleetFilterOptions 
 
 /** Keep only cards matching every set filter; an empty field means "no filter". */
 export function applyFleetFilters(cards: FleetCard[], filters: FleetFilterState): FleetCard[] {
+  const query = normalizeSearch(filters.search);
   return cards.filter((c) => {
+    if (query && !normalizeSearch([c.name, c.model, c.inventoryNumber ?? ''].join(' ')).includes(query)) return false;
     if (filters.site && c.assignedSiteName !== filters.site) return false;
     if (filters.kind && c.kind !== filters.kind) return false;
     if (filters.equipmentStatus && c.equipmentStatus !== filters.equipmentStatus) return false;
