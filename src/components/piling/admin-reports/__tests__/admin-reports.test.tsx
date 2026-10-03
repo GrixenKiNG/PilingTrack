@@ -317,3 +317,31 @@ describe('AdminReports — пустая выгрузка (F-R115-5)', () => {
     }
   });
 });
+
+/**
+ * F-R128-1: смена фильтра/периода и удаление отчёта выставляли loading=true и
+ * подменяли скелетоном весь экран (шапку, KPI, панель фильтров) — фильтры
+ * выглядели сброшенными, страница мигала. Полноэкранный скелетон теперь только
+ * на первой загрузке, когда списка ещё нет.
+ */
+describe('AdminReports — повторная загрузка не гасит экран (F-R128-1)', () => {
+  beforeEach(() => {
+    authFetchMock.mockReset();
+    reportsState.current = baseState();
+  });
+
+  it('при повторной загрузке (список уже есть) фильтры остаются на месте', () => {
+    reportsState.current = baseState({ loading: true, reports: [report] });
+    render(<AdminReports />);
+
+    expect(screen.getByRole('button', { name: 'Все' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Сегодня' })).toBeInTheDocument();
+  });
+
+  it('на первой загрузке (список пуст) показывается скелетон без фильтров', () => {
+    reportsState.current = baseState({ loading: true, reports: [] });
+    render(<AdminReports />);
+
+    expect(screen.queryByRole('button', { name: 'Все' })).not.toBeInTheDocument();
+  });
+});

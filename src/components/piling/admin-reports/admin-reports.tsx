@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { FileText, Filter } from '@/components/piling/icons/unified-icons';
+import { FileText, Filter, Loader2 } from '@/components/piling/icons/unified-icons';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { PdfPreviewDialog } from '@/components/piling/pdf-preview-dialog';
@@ -246,7 +246,10 @@ export function AdminReports() {
     return `${roleLabel}: ${report.lastEditedByName}`;
   };
 
-  if (loading) {
+  // F-R128-1: полноэкранный скелетон только при первой загрузке. При смене
+  // фильтра/периода и удалении отчёта список уже есть — гасить экран нельзя,
+  // иначе шапка и панель фильтров пропадают и выглядят сброшенными.
+  if (loading && reports.length === 0) {
     return (
       <div className="space-y-4 p-4 lg:p-6">
         <Skeleton className="h-8 w-48" />
@@ -363,7 +366,12 @@ export function AdminReports() {
               </div>
             </div>
 
-            <section className="min-w-0 overflow-hidden rounded-lg border border-border bg-card shadow-sm">
+            <section className="relative min-w-0 overflow-hidden rounded-lg border border-border bg-card shadow-sm">
+              {loading ? (
+                <div className="absolute inset-0 z-10 grid place-items-center bg-card/70">
+                  <Loader2 aria-label="Обновление списка отчётов" className="h-6 w-6 animate-spin text-muted-foreground" />
+                </div>
+              ) : null}
               <div className="hidden border-b border-border bg-muted/80 px-3 py-2 text-2xs font-semibold uppercase tracking-wide text-muted-foreground lg:grid lg:grid-cols-[116px_minmax(170px,1.2fr)_minmax(150px,1fr)_86px_92px_86px_152px]">
                 <span>Дата</span>
                 <span>Объект / установка</span>
