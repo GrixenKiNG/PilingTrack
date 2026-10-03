@@ -7,6 +7,9 @@
  *
  * F-R120-4 (находка 4): отказ сохранения/удаления объясняется человеку — тело
  * ответа (400 с полем, 404) больше не выбрасывается ради «Ошибка сохранения».
+ *
+ * F-R120-7 (находка 7): сбой чтения списка показывается ошибкой с «Повторить»,
+ * а не пустым состоянием «Нет конфигураций Telegram».
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
@@ -140,5 +143,33 @@ describe('AdminTelegram: отказ API объясняется (R120 наход�
     await waitFor(() => expect(toast.error).toHaveBeenCalled());
     expect(String(vi.mocked(toast.error).mock.calls[0][0])).toContain('уже удалили');
     expect(vi.mocked(toast.error)).not.toHaveBeenCalledWith('Ошибка удаления');
+  });
+});
+
+describe('AdminTelegram: сбой чтения списка не выдаётся за пустой список (R120 находка 7)', () => {
+  beforeEach(() => {
+    mocks.authFetch.mockReset();
+    vi.mocked(toast.error).mockClear();
+  });
+
+  it('403 показывает причину отказа и «Повторить», а не «Нет конфигураций»', async () => {
+    mocks.authFetch.mockResolvedValue(json({ error: 'Нет доступа' }, 403));
+    render(<AdminTelegram />);
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Нет доступа к настройкам Telegram');
+    expect(screen.queryByText('Нет конфигураций Telegram')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Повторить' })).toBeTruthy();
+  });
+
+  it('«Повторить» перечитывает список и показывает каналы', async () => {
+    mocks.authFetch
+      .mockResolvedValueOnce(json({ error: 'Сбой' }, 500))
+      .mockResolvedValueOnce(json({ configs: [config()] }));
+    render(<AdminTelegram />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Повторить' }));
+
+    expect(await screen.findAllByRole('button', { name: 'Тест' })).toHaveLength(1);
+    expect(screen.queryByRole('alert')).toBeNull();
   });
 });
