@@ -261,3 +261,35 @@ describe('журнал забивки: пусто из-за фильтра «Н�
     expect(new URLSearchParams(lastPileUrl.split('?')[1]).get('acceptance')).toBeNull();
   });
 });
+
+/**
+ * F-R115-10: пустая выборка отдавала файл с одним титулом и зелёный тост
+ * «Журнал выгружен». Мастер подшивал пустой документ и решал, что свай нет по
+ * ошибке фильтра. Теперь пустая выборка объясняется, а файл не запрашивается.
+ */
+describe('журнал забивки: пустая выгрузка (F-R115-10)', () => {
+  beforeEach(() => {
+    mocks.authFetch.mockReset();
+    vi.mocked(toast.success).mockClear();
+    vi.mocked(toast.error).mockClear();
+  });
+
+  it('пустая выборка → сообщение вместо «Журнал выгружен», файл не запрашивается', async () => {
+    mocks.authFetch.mockImplementation(async (url: string) => {
+      if (url.startsWith('/api/sites/all')) return json({ sites: [] });
+      if (url.startsWith('/api/pile-passports/export')) return json({}, 200);
+      return json({ data: [], header, truncated: false });
+    });
+    render(<PileJournal />);
+    expect(await screen.findByText(/Все сваи объекта разобраны/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /Выгрузить журнал/ }));
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith(
+      'По этой выборке свай нет — выгружать нечего. Измените фильтр или период.',
+    ));
+    expect(toast.success).not.toHaveBeenCalled();
+    expect(mocks.authFetch.mock.calls
+      .some(([url]) => String(url).startsWith('/api/pile-passports/export'))).toBe(false);
+  });
+});
