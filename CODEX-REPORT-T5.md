@@ -67,3 +67,23 @@ use-report-form.ts больше не вызывает loadData на 409, воз�
 PUT требует ISO expectedUpdatedAt; list DTO передаёт updatedAt, detail уже имел его. updateEquipment с token выполняет FOR UPDATE tenant+id, сравнение, core/metadata/meter/outbox в одной транзакции, timestamp продвигается минимум на 1мс. Клиенты списка/toggle/detail передают исходный token, при 409 перечитывают и показывают сообщение; detail item меняется и форма повторно инициализируется. Старый внутренний service контракт без token сохранён; HTTP без token теперь 400, внешним legacy клиентам нужно обновление. Миграции нет.
 
 Real PG red exit1, 1 failed: stale save разрешён; green exit0, 3 passed/0 skipped: последовательный stale409, одновременные записи дают один успех/один409 с согласованным паспортом, неверное показание422 откатывает всю карточку. Route red exit1, 5 passed/1 failed (после изоляции mock200!=400; первый mock500 не считается доказательством); green exit0, 7 passed. Focused existing command/meter/route 34 passed/0 skip exit0. List token red21 passed/1failed exit1, green22 passed exit0. tsc exit0. lint exit0 с1warning нового E3 non-null; устранено, повтор E7. GitNexus impact updateEquipment/metadata/listAllEquipment exit1, fallback callers проверены; риск графа неизвестен, замороженные/защищённые файлы не правились. E3 commit48ef20cc.
+
+## E5 — производительность
+
+Собственный seed: 10 дополнительных объектов,30 установок,2000 submitted отчётов на 200 датах по году,20000 PileWork count=1 и20000 PilePassport. Существующие E1 fixtures остаются, поэтому total отчётов немного >2000. Общий годовой period штатно422 (лимит2000), измерена выборка одного объекта200 отчётов. Прямой fixture seed заполняет ReportAnalytics, не объявляется проверкой projection/write workflow. Все HTTP GET200,30 последовательных замеров после1 прогрева, тело прочитано целиком; _ts выключает process cache, удаляются только analytics keys собственного cache Redis. Это локальный стенд, не боевая нагрузка/конкурентный stress.
+
+| GET | p50 мс | p95 мс | байт ответа |
+|---|---:|---:|---:|
+|Главная /api/monitoring/fleet|82.3|93.8|20792|
+|Отчёты список /api/reports/all?limit=25|108.4|337.8|199721|
+|Отчёты год/объект /api/reports/period?dateFrom=2025-10-04&dateTo=2026-10-03&siteId=codex-perf-68017589ba90-site-0|90.8|234.2|455037|
+|Журнал /api/pile-passports|126.6|182.4|443242|
+|Парк /api/equipment|23.8|39.2|7537|
+|План-факт /api/analytics/sites?dateFrom=2025-10-04&dateTo=2026-10-03|454.2|488.5|4620|
+|Аналитика /api/admin/analytics/overview?dateFrom=2025-10-04&dateTo=2026-10-03|269.1|312.2|17567|
+
+SQL query tracing (включая BEGIN/set_config/COMMIT): Fleet30=28, Journal10=14, Journal500=14, Reports200=15. Journal10 и500 оба14 запросов — N+1 по количеству строк не подтверждён; fleet/reports используют bulk includes, абсолютное число само по себе не доказательство N+1.
+
+EXPLAIN ANALYZE BUFFERS: journal использует индекс tenant/drivenAt с501 строкой; aggregate полного года читает20к строк закономерно. Actual analytics SQL под non-BYPASS app + transaction-local tenant: два чтения PileWork и около20к Report index probes на каждом проходе. Объединены периодный FILTER и накопительный SUM в одном aggregate, security/RLS не менялись. На том же PG, чередующийся порядок old/new,30 замеров: before p50=438.7 p95=595.7 EXPLAIN=440.876; after p50=230.5 p95=310.9 EXPLAIN=229.229. Выборки старого/нового SQL равны для года и короткого периода (equal=true). Это SQL измерение, HTTP после новой сборки отдельноE7; не выдаётся за HTTP ускорение. План/BUFs сохранены output/codex-t5/e5-analytics-compare.json и e5-performance.json.
+
+Red узкий8тестов: exit1,7passed/1failed (JOIN PileWork дважды); green exit0,8passed. Real PG semantic test exit0,1passed/0skip: period7/42м,alltime11/66м,draft100 исключён. Новые индексы не нужны по этим данным; миграций нет. GitNexus impact/detect недоступны exit1, fallback rg+diff; graph risk UNKNOWN. E4 commit76122b97.

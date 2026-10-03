@@ -89,8 +89,8 @@ export async function getSiteAnalytics(opts: SiteAnalyticsOptions) {
       COALESCE(d.total_meters, 0)::float    AS "actualDrilling",
       COALESCE(d.total_count, 0)::int       AS "actualDrillingCount",
       COALESCE(dt.total_duration, 0)::float AS "totalDowntime",
-      COALESCE(p_all.total_piles, 0)::int   AS "actualPilesAllTime",
-      COALESCE(p_all.total_pile_meters, 0)::float AS "actualPileMetersAllTime",
+      COALESCE(p.total_piles_all, 0)::int   AS "actualPilesAllTime",
+      COALESCE(p.total_pile_meters_all, 0)::float AS "actualPileMetersAllTime",
       COALESCE(d_all.total_meters, 0)::float AS "actualDrillingAllTime",
       COALESCE(rc.report_count, 0)::int     AS "totalReports"
     FROM "Site" s
@@ -122,12 +122,14 @@ export async function getSiteAnalytics(opts: SiteAnalyticsOptions) {
     LEFT JOIN (
       SELECT
         r."siteId",
-        SUM(pw.count)::int AS total_piles,
-        SUM(pw.count * (COALESCE(pg."lengthMm", 0)::float / 1000))::float AS total_pile_meters
+        SUM(pw.count) FILTER (WHERE r.date >= ${dateFrom} AND r.date <= ${dateTo})::int AS total_piles,
+        SUM(pw.count * (COALESCE(pg."lengthMm", 0)::float / 1000)) FILTER (WHERE r.date >= ${dateFrom} AND r.date <= ${dateTo})::float AS total_pile_meters,
+        SUM(pw.count)::int AS total_piles_all,
+        SUM(pw.count * (COALESCE(pg."lengthMm", 0)::float / 1000))::float AS total_pile_meters_all
       FROM "Report" r
       JOIN "PileWork" pw ON pw."reportId" = r.id
       JOIN "PileGrade" pg ON pg.id = pw."pileGradeId"
-      WHERE r.date >= ${dateFrom} AND r.date <= ${dateTo} AND r.status = ${SUBMITTED_REPORT_STATUS}
+      WHERE r.status = ${SUBMITTED_REPORT_STATUS}
       GROUP BY r."siteId"
     ) p ON p."siteId" = s.id
     LEFT JOIN (
@@ -147,17 +149,6 @@ export async function getSiteAnalytics(opts: SiteAnalyticsOptions) {
       WHERE r.date >= ${dateFrom} AND r.date <= ${dateTo} AND r.status = ${SUBMITTED_REPORT_STATUS}
       GROUP BY r."siteId"
     ) dt ON dt."siteId" = s.id
-    LEFT JOIN (
-      SELECT
-        r."siteId",
-        SUM(pw.count)::int AS total_piles,
-        SUM(pw.count * (COALESCE(pg."lengthMm", 0)::float / 1000))::float AS total_pile_meters
-      FROM "Report" r
-      JOIN "PileWork" pw ON pw."reportId" = r.id
-      JOIN "PileGrade" pg ON pg.id = pw."pileGradeId"
-      WHERE r.status = ${SUBMITTED_REPORT_STATUS}
-      GROUP BY r."siteId"
-    ) p_all ON p_all."siteId" = s.id
     LEFT JOIN (
       SELECT r."siteId", SUM(ld.meters)::float AS total_meters
       FROM "Report" r
