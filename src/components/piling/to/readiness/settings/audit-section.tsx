@@ -23,7 +23,8 @@ interface AuditSettingsProps {
   audit: ReadinessAuditEnvelope | null;
   bootstrap: ReadinessBootstrap | null;
   canExport: boolean;
-  onExport: (events: ReadinessAuditEventDto[]) => void;
+  /** Возвращает промис: пока выгрузка идёт, кнопка блокируется и показывает ход. */
+  onExport: (events: ReadinessAuditEventDto[]) => Promise<void>;
   filtersBar: React.ReactNode;
 }
 
@@ -32,6 +33,15 @@ export function AuditSettings({ audit, bootstrap, canExport, onExport, filtersBa
   const verification = audit?.verification;
   const [query, setQuery] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // Пока выгрузка журнала идёт, кнопка блокируется и показывает ход: без этого
+  // повторный клик запускал вторую полную выгрузку цепочки аудита втихую.
+  const [exportPending, setExportPending] = useState(false);
+
+  const handleExport = async () => {
+    setExportPending(true);
+    try { await onExport(events); }
+    finally { setExportPending(false); }
+  };
 
   const normalized = query.trim().toLocaleLowerCase('ru-RU');
   const visible = events.filter((event) => !normalized || [
@@ -171,11 +181,11 @@ export function AuditSettings({ audit, bootstrap, canExport, onExport, filtersBa
             <p className="mt-2 text-2xs text-muted-foreground">Каждая запись подписана хешем предыдущей — задним числом журнал не переписать.</p>
           </section>
           <Button
-            disabled={!canExport}
+            disabled={!canExport || exportPending}
             className="min-h-11 w-full bg-signal-strong hover:bg-signal-strong"
-            onClick={() => onExport(events)}
+            onClick={() => void handleExport()}
           >
-            Экспорт журнала
+            {exportPending ? 'Готовим файл…' : 'Экспорт журнала'}
           </Button>
         </aside>
       </div>

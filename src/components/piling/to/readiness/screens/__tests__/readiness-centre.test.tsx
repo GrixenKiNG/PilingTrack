@@ -5,6 +5,8 @@ import { DEFAULT_READINESS_RULES } from '@/modules/readiness';
 import { ReadinessCentre } from '../readiness-centre';
 import { PermitsScreen } from '../permits-screen';
 import { ReportsScreen } from '../reports-screen';
+import { SettingsWorkspace } from '../settings-workspace';
+import { bootstrapEnvelope } from '../../api/__tests__/fixtures';
 
 const { authFetch } = vi.hoisted(() => ({ authFetch: vi.fn() }));
 vi.mock('@/lib/api', () => ({ authFetch }));
@@ -107,5 +109,34 @@ describe('Экспорт технической готовности — инд�
 
     await act(async () => { finish(); });
     expect(await screen.findByRole('button', { name: 'Экспорт отчёта' })).toBeEnabled();
+  });
+});
+
+describe('Экспорт справочника и журнала аудита — индикатор и защита от повторного нажатия (F-R115-3)', () => {
+  it('«Справочники»: кнопка «Экспорт» блокируется и показывает ход выгрузки', async () => {
+    authFetch.mockResolvedValue({ ok: true, json: async () => ({}) });
+    let finish: () => void = () => {};
+    downloadReadinessExport.mockReturnValue(new Promise<void>((resolve) => { finish = resolve; }));
+    render(<SettingsWorkspace {...propsFor({ settingsSection: 'dictionaries' })} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Экспорт' }));
+    expect(await screen.findByRole('button', { name: 'Готовим файл…' })).toBeDisabled();
+
+    await act(async () => { finish(); });
+    expect(await screen.findByRole('button', { name: 'Экспорт' })).toBeEnabled();
+  });
+
+  it('«Аудит»: кнопка «Экспорт журнала» блокируется и показывает ход выгрузки', async () => {
+    const base = bootstrapEnvelope().data;
+    const bootstrap = { ...base, capabilities: { ...base.capabilities, entities: { ...base.capabilities.entities, audit: { read: true, export: true } } } };
+    let finish: () => void = () => {};
+    downloadReadinessExport.mockReturnValue(new Promise<void>((resolve) => { finish = resolve; }));
+    render(<SettingsWorkspace {...propsFor({ settingsSection: 'audit', bootstrap })} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Экспорт журнала' }));
+    expect(await screen.findByRole('button', { name: 'Готовим файл…' })).toBeDisabled();
+
+    await act(async () => { finish(); });
+    expect(await screen.findByRole('button', { name: 'Экспорт журнала' })).toBeEnabled();
   });
 });
