@@ -99,6 +99,13 @@ function engineHoursError(value: string): string | null {
 interface AssigneeOption { id: string; name: string }
 interface EquipmentOption { id: string; name: string }
 
+/** Моменты загруженной записи как есть (ISO) — чтобы не переписать их днём из поля. */
+interface LoadedMoments {
+  scheduledAt: string | null;
+  startedAt: string | null;
+  completedAt: string | null;
+}
+
 export function WorkOrderFormDialog({
   open, onOpenChange, equipmentId, editingId, initial, onSaved,
 }: WorkOrderFormDialogProps) {
@@ -109,6 +116,10 @@ export function WorkOrderFormDialog({
   const [loadedEquipmentId, setLoadedEquipmentId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(false);
+  // Моменты правящейся записи целиком. В полях дат стоит только день, и без этой
+  // памяти «Сохранить» без единой правки отправляло день вместо момента — время
+  // закрытия/начала терялось (F-R122-1).
+  const [loadedMoments, setLoadedMoments] = useState<LoadedMoments | null>(null);
 
   const set = <K extends keyof WorkOrderFormValues>(key: K, value: WorkOrderFormValues[K]) =>
     setForm((p) => ({ ...p, [key]: value }));
@@ -138,6 +149,11 @@ export function WorkOrderFormDialog({
           const { record } = await res.json();
           setLoadedEquipmentId(record.equipmentId ?? null);
           setEquipmentSel(record.equipmentId ?? equipmentId ?? '');
+          setLoadedMoments({
+            scheduledAt: record.scheduledAt ?? null,
+            startedAt: record.startedAt ?? null,
+            completedAt: record.completedAt ?? null,
+          });
           setForm({
             type: (record.type as MaintenanceType) || 'SCHEDULED',
             status: (record.status as MaintenanceStatus) || 'PLANNED',
@@ -160,6 +176,7 @@ export function WorkOrderFormDialog({
         setForm({ ...EMPTY_FORM, ...initial });
         setEquipmentSel(equipmentId ?? '');
         setLoadedEquipmentId(null);
+        setLoadedMoments(null);
       }
 
       await Promise.all(reqs);
@@ -190,6 +207,12 @@ export function WorkOrderFormDialog({
     }
     setBusy(true);
     try {
+      // Поле даты хранит только день. Если человек его не менял, уходит исходный
+      // момент целиком: иначе «2026-09-25» превращался бы в полночь UTC и
+      // переписывал сохранённое время закрытия (26.09 00:30 МСК → 25.09 03:00) —
+      // тем же моментом потом датировалось показание счётчика (F-R122-1).
+      const moment = (value: string, original: string | null): string | null =>
+        (loadedMoments && value === toInputDate(original) ? original : (value || null));
       const payload = {
         type: form.type,
         status: form.status,
@@ -200,9 +223,9 @@ export function WorkOrderFormDialog({
         workDone: form.workDone.trim() || null,
         partsUsedText: form.partsUsedText.trim() || null,
         assigneeId: form.assigneeId || null,
-        scheduledAt: form.scheduledAt || null,
-        startedAt: form.startedAt || null,
-        completedAt: form.completedAt || null,
+        scheduledAt: moment(form.scheduledAt, loadedMoments?.scheduledAt ?? null),
+        startedAt: moment(form.startedAt, loadedMoments?.startedAt ?? null),
+        completedAt: moment(form.completedAt, loadedMoments?.completedAt ?? null),
         engineHoursAtService: form.engineHoursAtService || null,
         laborHours: form.laborHours || null,
         cost: form.cost || null,

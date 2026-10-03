@@ -393,3 +393,57 @@ describe('фото наряда ТО: обрыв сети объясняется
     ));
   });
 });
+
+describe('форма наряда ТО: сохранение без правок не переписывает моменты (F-R122-1)', () => {
+  /*
+    «Полное редактирование» заполняло поля дат через `iso.slice(0, 10)` (UTC-день)
+    и всегда отправляло их обратно. Наряд, закрытый 26.09 в 00:30 МСК (в базе
+    2026-09-25T21:30Z), после «Сохранить» без единой правки получал
+    completedAt = 2026-09-25T00:00Z — в карточке «закрыт 25.09 03:00», и тем же
+    моментом датировалась запись показания счётчика. Теперь неизменённое поле
+    отправляет исходный момент целиком.
+  */
+  const CLOSED = '2026-09-25T21:30:00.000Z';
+
+  function mockEdit() {
+    mocks.authFetch.mockImplementation(async (url: string, init?: RequestInit) => {
+      if (url === '/api/maintenance/assignees') return json({ users: [] });
+      if (init?.method === 'PUT') return json({ record: record() });
+      return json({ record: { ...record(), status: 'DONE', startedAt: CLOSED, completedAt: CLOSED } });
+    });
+  }
+
+  const putBody = (): Record<string, unknown> => {
+    const call = mocks.authFetch.mock.calls.find(([, init]) => (init as RequestInit | undefined)?.method === 'PUT');
+    return JSON.parse(String((call?.[1] as RequestInit | undefined)?.body));
+  };
+
+  it('«Сохранить» без правок оставляет исходные startedAt/completedAt', async () => {
+    mockEdit();
+    render(<WorkOrderFormDialog open onOpenChange={() => {}} equipmentId="eq-1" editingId="wo-1" onSaved={() => {}} />);
+
+    await screen.findByLabelText('Название *');
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить' }));
+
+    await waitFor(() => expect(mocks.authFetch.mock.calls.some(([, init]) =>
+      (init as RequestInit | undefined)?.method === 'PUT')).toBe(true));
+    const body = putBody();
+    expect(body.completedAt).toBe(CLOSED);
+    expect(body.startedAt).toBe(CLOSED);
+    // Прежний код отправлял UTC-день «2026-09-25» и терял время закрытия.
+    expect(body.completedAt).not.toBe('2026-09-25');
+  });
+
+  it('изменённая человеком дата уходит как выбранный день', async () => {
+    mockEdit();
+    render(<WorkOrderFormDialog open onOpenChange={() => {}} equipmentId="eq-1" editingId="wo-1" onSaved={() => {}} />);
+
+    await screen.findByLabelText('Название *');
+    fireEvent.change(screen.getByLabelText('Выполнено'), { target: { value: '2026-09-26' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить' }));
+
+    await waitFor(() => expect(mocks.authFetch.mock.calls.some(([, init]) =>
+      (init as RequestInit | undefined)?.method === 'PUT')).toBe(true));
+    expect(putBody().completedAt).toBe('2026-09-26');
+  });
+});
