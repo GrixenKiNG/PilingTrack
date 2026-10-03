@@ -1,72 +1,65 @@
 ---
 name: deploy
-description: Generate a ready-to-paste deploy command block for orionpiling.ru, auto-detecting whether a new Prisma migration needs to be included in the build.
+description: Generate owner-reviewed deploy commands for orionpiling.ru with migrations, blue-green HTTP and the worker generation barrier.
 ---
 
 # Deploy to orionpiling.ru
 
-Выкладку выполняет оператор только по явной команде владельца, по одному шагу с чтением результата. Этот навык готовит команды, не разрешает автономную выкладку.
+Выкладку выполняет оператор только по явной команде владельца, по одному шагу с чтением результата. Этот навык готовит команды, не разрешает автономную выкладку. Ответ по-русски.
 
-Основной путь с локальной сборкой, передачей готовых образов и барьером:
+## Предпроверки
 
-```bash
-WORKER_GENERATION_EXTERNAL_STOPPED=1 bash scripts/deploy-prod.sh --replace-worker-generation app workers
-```
+1. Принятый main=origin/main, чистое дерево. OLD_SHA взять из фактически обслуживающего /api/health; git HEAD сервера и :latest не доказывают serving version. Сверить диапазон миграций, без OLD_SHA не утверждать их отсутствие.
+2. Проверить реальные exits/ограничения отчётаT7, репетицию на копии данных, SQL integrity prechecks отдельно по012, expected migration_name. Две RLS-миграцииG1 — отдельное решение владельца. Для blue-green проверить совместимость со старым app; лишь после этого BLUEGREEN_MIGRATIONS_COMPATIBLE=1.
+3. Проверить backup/диск/здоровье DB/state Redis/cache Redis/S3, сохранить фактические rollback imageIDs app/workers. Не удалять volumes/rollback ради места. Сборка локально последовательно, workers smoke до первого SSH.
+4. Внешние standalone/systemd/pm2/другие хосты и их автозапуск остановить, подтвердить завершение in-flight. Лишь после этого WORKER_GENERATION_EXTERNAL_STOPPED=1. Unique lease owner не является DB fencing.
+5. До первого перехода владелец готовит managed Caddy import/snippet по008, свободный loopback3001, сеть. Неизвестный config helper отклоняет. App-guard и другие мониторы перевести на стабильный proxy URL.
+6. Проверить текущую суммарную память VPS + второй app до1GiB. Caps сервисов превышают3.8GB, swap4GB не гарантирует отсутствие OOM; стендT7 не включает всех сервисов/ОС. Без запаса overlap не принят.
 
-`--replace-worker-generation` обязателен и только первым аргументом. `ws` сервиса нет. Скрипт требует main=origin/main и чистое дерево; app-only/workers-only заменяет оба сервиса (app содержит embedded workers), новые миграции добавляют migrate автоматически. Smoke workers выполняется до первого SSH. VPS 30GB не используется для сборки по основному пути; подробности — ранбуки008/016.
+7. Blue-green требует полного S3 backend app/workers и отсутствия файлов/links в их /app/storage; helper отказывает, а не удаляет локальные PDF. Проверить диск для merged .next/static и временной копии: старые chunks сохраняются без автоматического удаления. Выполняет один оператор, concurrent CI/deploy отключить. WebSocket/SSE не считать доказанными длинным HTTP-тестом; подробности008.
 
-## Перед подготовкой команд
+## Основной блок на машине сборки
 
-1. Сравнить фактический OLD_SHA на сервере с RELEASE_SHA, не HEAD~1. Найти новые prisma/migrations/**. Если OLD_SHA неизвестен, не утверждать отсутствие миграций.
-2. Проверить отчёт, финальные checks и репетицию миграций на копии данных; каждый integrity precheck выполнять отдельно. Проверить диск и оба сохранённых rollback tags/imageIDs. Не удалять тома/откатные образы ради места.
-3. Оператор останавливает все внешние standalone/systemd/pm2/другие хосты и их автозапуск, проверяет завершение операций. Лишь после этого допустимо WORKER_GENERATION_EXTERNAL_STOPPED=1. Живые one-off и неоднородные/не RUNNING старые реплики helper отклоняет до STOP: разобраться вручную.
-4. Согласовать окно недоступности: STOP → VERIFY → START, без rolling-up.
+    git status --short
+    git branch --show-current
+    git fetch origin main
+    git rev-parse HEAD
+    git rev-parse origin/main
 
-## Основной блок (на машине сборки)
+После ручных подтверждений:
 
-Отвечать по-русски. Если диапазон содержит миграции, отметить необходимость migrate; deploy-prod.sh добавляет его сам.
+    WORKER_GENERATION_EXTERNAL_STOPPED=1 bash scripts/deploy-prod.sh app workers
 
-```bash
-git status --short
-git branch --show-current
-git fetch origin main
-git rev-parse HEAD
-git rev-parse origin/main
-# После ручного подтверждения внешней остановки и всех предпроверок:
-WORKER_GENERATION_EXTERNAL_STOPPED=1 bash scripts/deploy-prod.sh --replace-worker-generation app workers
-```
+Для новых совместимых миграций после prechecks/репетиции/решения владельца:
 
-После выкладки сверить SHA, app/workers healthy, deep-health и зависимости, один лидер каждого ресурса, outbox/Telegram. При миграциях проверить именно ожидаемую запись _prisma_migrations (finished_at, без rolled_back_at), не доверять одному exit0.
+    BLUEGREEN_MIGRATIONS_COMPATIBLE=1 WORKER_GENERATION_EXTERNAL_STOPPED=1 bash scripts/deploy-prod.sh app workers
 
-## Ручной запасной путь (сервер, только по команде владельца)
+Новые миграции добавляют migrate автоматически, свежий образ выполняется до cutover. Candidate health/readiness/SHA/страницы/отказ неавторизованным API → Caddy validate/reload → drain → F1 dedicated workers → подтверждённая остановка old app. Оба HTTP-слота EMBEDDED_WORKERS=disabled; первоначальный legacy embedded app завершает F1. Worker compose base+prod, без bluegreen overlay.
 
-Сначала убедиться в достаточном свободном месте (≥8GB), сохранить прежние imageIDs/теги ДО build. Собирать последовательно; при новых миграциях сначала migrate. Пример ниже выполняется по одной команде, не unattended block.
+Отказ candidate до reload сохраняет old. Отказ до успешного F1 возвращает proxy/прежние workers; RECOVERED/exit1 не успех. OUTAGE требует ручной проверки, не обычного compose up. После успешного F1 ошибка уборки сохраняет новый app.
 
-```bash
-cd /opt/pilingtrack
-df -h /
-# Сохранить оба app/workers rollback tags; при миграциях также migrate.
-git pull origin main
-# Только при новых миграциях:
-docker compose build migrate
-docker compose build app
-docker compose build workers
-bash scripts/smoke-workers-image.sh pilingtrack-workers:latest
-# После ручного подтверждения внешней остановки:
-WORKER_GENERATION_EXTERNAL_STOPPED=1 bash scripts/replace-worker-generation.sh app workers
-```
+## После переключения
 
-## Откат
+    node scripts/prod-smoke.mjs --url https://orionpiling.ru --sha "$SHA"
+    curl --fail --silent --show-error https://orionpiling.ru/api/health/deep
+    docker compose ps workers
+    docker ps --filter label=com.docker.compose.project=pilingtrack-blue --filter label=com.docker.compose.service=app
+    docker ps --filter label=com.docker.compose.project=pilingtrack-green --filter label=com.docker.compose.service=app
 
-После проверки наличия двух сохранённых тегов и совместимости схемы/compose, внешние новые исполнители остановлены:
+Проверить SHA/active slot, DB/Redis/storage/schedulers, одного фактического лидера каждого ресурса в одном state Redis, отсутствие embedded workers/старых RUNNING, outbox/Telegram. Redis GET не доказывает отсутствие старого процесса. Проверить migration_name+finished_at без rolled_back_at и политики012. Не выводить секреты/полное environment.
 
-```bash
-cd /opt/pilingtrack
-docker tag "pilingtrack-app:$ROLLBACK" pilingtrack-app:latest
-docker tag "pilingtrack-workers:$ROLLBACK" pilingtrack-workers:latest
-WORKER_GENERATION_EXTERNAL_STOPPED=1 bash scripts/replace-worker-generation.sh app workers
-```
+## Откат принятого blue-green релиза
 
-Барьер сохраняет imageIDs/restart policies/число реплик, принимает app0/143, workers только0, проверяет OOM/drain/RUNNING. При отказе после STOP автоматически возвращает старое поколение (при удалённых IDs — прежние образы с текущим compose); exit остаётся1 и печатается RECOVERED. При невозможности возврата — OUTAGE: не запускать параллельных лидеров. Только после ручной проверки безопасен аварийный `cd /opt/pilingtrack && docker compose up -d app workers`.
+После schema/compose, наличия rollback tags, фактического OLD_SHA и остановки внешних новых исполнителей:
 
-Автовозврат образов не откатывает миграции или env/volumes/topology. Проблема схемы требует отдельного решения владельца. Полная процедура и evidence — ранбуки008/016 и CODEX-REPORT-T6.md.
+    cd /opt/pilingtrack
+    docker tag "pilingtrack-workers:$ROLLBACK" pilingtrack-workers:latest
+    WORKER_GENERATION_EXTERNAL_STOPPED=1 bash scripts/replace-app-bluegreen.sh "pilingtrack-app:$ROLLBACK" "$OLD_SHA"
+
+Те же candidate gates и F1; схема/миграции/env/volumes не откатываются образами. Отказ восстановления — ручная проверка владельца.
+
+## Legacy и ручной запасной путь
+
+--replace-worker-generation сохранён только ДО blue-green; read-only preflight отказывает при любом RUNNING blue/green app. Не использовать replace-worker-generation.sh app workers или compose up app workers после нового режима: они стартуют base app с embedded workers рядом с HTTP-слотами.
+
+Ручная сборка только по решению владельца с отдельной проверкой диска/rollback. Образы/Caddy/worker compose должны соответствовать принятому коду; HTTP менять через replace-app-bluegreen.sh, не обходить gates. Полная процедура008/016 и фактические проверкиT7.

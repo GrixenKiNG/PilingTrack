@@ -1,5 +1,63 @@
 # Runbook 008 — Manual deploy to prod (controlled generation replacement)
 
+## Текущий порядок G2: два HTTP-слота и отдельный барьер workers
+
+Этот раздел заменяет прежние инструкции STOP app перед START app и старый rollback ниже. Production здесь не выполнялся. Команды выполняет оператор только по явному решению владельца, по одному шагу с чтением результата.
+
+1. Принять код/проверки CODEX-REPORT-T7.md в main; проверить main=origin/main и чистое дерево. OLD_SHA взять из фактически обслуживающего /api/health, RELEASE_SHA из принятого коммита. Сохранить реальные imageIDs app и всех workers и rollback tags. deploy-prod.sh снимает эти IDs, не считает :latest доказательством обслуживающей версии.
+2. Проверить резервную копию, свободный диск, здоровье PG/state Redis/cache Redis/S3. Внешние standalone/systemd/pm2/другие хосты и их автозапуск остановить до WORKER_GENERATION_EXTERNAL_STOPPED=1. Redis lease с уникальным owner не является DB fencing и не заменяет завершения операций.
+3. Однократная подготовка Caddy владельцем (репозиторные шаблоны deploy/Caddyfile.prod и deploy/app-upstream.caddy): внутри существующего site/handle, проксирующего app, заменить только его reverse_proxy на отдельную строку import app-upstream.caddy. Файл /etc/caddy/app-upstream.caddy должен содержать единственную строку reverse_proxy 127.0.0.1:3000 для исходного legacy app. Сохранить Caddyfile, выполнить caddy validate и caddy reload, проверить прежний SHA через домен. TLS/другие handle оставить как были. Helper отказывается от неизвестного snippet, symlink или отсутствующего import; не правит произвольный host config. Порт3001 должен быть свободен и loopback-only.
+4. Проверить existing network pilingtrack_pilingtrack; при другом имени задать BLUEGREEN_APP_NETWORK. HTTP-слоты используют base + prod + bluegreen compose; depends_on сброшен только для slot app. Workers используют base + prod, без bluegreen overlay. BLUEGREEN_WORKER_COMPOSE_FILES задаёт реальные worker compose-файлы при нестандартном запуске.
+5. Перевести существующий app-guard на стабильный https://orionpiling.ru/api/health через APP_GUARD_HEALTH_URL в его конфигурации запуска. Старый default 127.0.0.1:3000 после green проверяет пустой порт. Проверить другие мониторы, привязанные к старому порту/container_name; не запускать второй guard.
+6. Решить миграции G1 по012: SQL prechecks отдельно, репетиция на копии, совместимость со СТАРЫМ app. При новых миграциях отдельно подтвердить BLUEGREEN_MIGRATIONS_COMPATIBLE=1; без него default deploy откажет до удалённых tag/git изменений. Migrate до candidate; схема не откатывается заменой образов.
+7. Проверить память всего VPS перед overlap. App cap1GiB/heap512MiB, два app временно; workers512MiB, PG1GiB, state Redis256MiB, MinIO512MiB, дополнительно cache Redis/monitoring/PgBouncer/Caddy/ОС. Сумма caps превышает3.8GB уже без части сервисов. Swap4GB не гарантирует задержки или отсутствие OOM. Стендовый пикT7 не включает весь VPS. Без подтверждённого запаса overlap не выполнять, решение владельца.
+
+Основная команда на машине сборки после подтверждений:
+
+    WORKER_GENERATION_EXTERNAL_STOPPED=1 bash scripts/deploy-prod.sh app workers
+
+Только для диапазона с новыми совместимыми миграциями:
+
+    BLUEGREEN_MIGRATIONS_COMPATIBLE=1 WORKER_GENERATION_EXTERNAL_STOPPED=1 bash scripts/deploy-prod.sh app workers
+
+Локальные build/workers smoke до передачи. Candidate в pilingtrack-blue/pilingtrack-green, 127.0.0.1:3000/3001, у обоих EMBEDDED_WORKERS=disabled. Gates: container health, readiness, SHA, / и /login, отказ неавторизованным API. Затем snippet → caddy validate → caddy reload → proxy SHA → drain → F1 STOP/VERIFY/START workers → остановка/exit0/143 без OOM старого HTTP app. При первом переходе legacy embedded app завершает F1; новый HTTP обслуживает.
+
+До reload отказ candidate сохраняет прежний upstream. До завершения F1 отказ возвращает прежний snippet с проверкой прежнего SHA; F1 восстанавливает workers/legacy app. Exit1/RECOVERED не успех. При неподтверждённом восстановлении OUTAGE, оба app сохранены для ручной проверки. После успешного F1 ошибка уборки сохраняет новый app. Не запускать прежнее поколение обычным compose up.
+
+После переключения отдельно:
+
+    node scripts/prod-smoke.mjs --url https://orionpiling.ru --sha "$SHA"
+    curl --fail --silent --show-error https://orionpiling.ru/api/health/deep
+    docker compose ps workers
+    docker ps --filter label=com.docker.compose.project=pilingtrack-blue --filter label=com.docker.compose.service=app
+    docker ps --filter label=com.docker.compose.project=pilingtrack-green --filter label=com.docker.compose.service=app
+
+Проверить active SHA/health, зависимости/storage/schedulers, отсутствие embedded leaders в HTTP, unique owner dedicated workers в одном state Redis и отсутствие старых RUNNING исполнителей, outbox/проекции/Telegram. Gates helper не заменяют эти проверки. Не выводить секреты/полное environment. Миграции: expected migration_name+finished_at без rolled_back_at, политики по012.
+
+Откат принятого HTTP-релиза тем же helper после проверки schema/compose и остановки внешних новых исполнителей; OLD_SHA — версия сохранённого app:
+
+    cd /opt/pilingtrack
+    docker tag "pilingtrack-workers:$ROLLBACK" pilingtrack-workers:latest
+    WORKER_GENERATION_EXTERNAL_STOPPED=1 bash scripts/replace-app-bluegreen.sh "pilingtrack-app:$ROLLBACK" "$OLD_SHA"
+
+Не применять replace-worker-generation.sh app workers после blue-green: он стартует base app с embedded workers рядом со слотами. Флаг deploy-prod.sh --replace-worker-generation только ДО blue-green; read-only preflight отказывает при любом RUNNING blue/green app.
+
+### Storage, старые вкладки и границы переключения
+
+Перед candidate проверяются /app/storage старого HTTP app и всех старых dedicated workers. Файлы/links или недоступная проверка блокируют переключение. Для deployment-проектов все проверяемые процессы обязаны иметь полный S3 backend (endpoint+access+secret, проверяются только booleans, значения не печатаются); одного S3_BUCKET недостаточно. Это исключает новые локальные PDF во время drain. Общий filesystem backend этим helper не принят: сначала отдельное решение владельца по переносу/сохранности, не автоматический docker cp business files. Только одноразовый codex-* HTTP-стенд без business writes может работать без S3.
+
+До START candidate получает старые .next/static, затем новые файлы поверх совпадающих путей. Next индексирует объединённые assets при старте: открытая старая вкладка продолжает получать chunks после удаления old app. Передача только static, без storage/source/secrets. Так как old runtime мог уже содержать assets прежних переключений, каталог на writable layer и временная копия растут с числом выкладок. Автоматического удаления старых chunks нет; перед выкладкой проверить диск для образов, merged static и временной копии. Политику хранения/очистки сначала принимает владелец.
+
+Стоп старого HTTP/legacy default30s, стендовый90s fixture использует WORKER_GENERATION_STOP_TIMEOUT_SECONDS=120. Выбрать deadline по реальным uploads/requests и подтвердить его в целевом запуске helper; локальная переменная CLI автоматически не означает её передачу через SSH.
+
+Контролируемый тест длинного конечного HTTP-ответа не доказывает сохранение WebSocket/SSE любого срока. Caddy по умолчанию закрывает WebSocket при reload; текущий bare snippet не добавляет stream_close_delay. Если такой протокол используется, сначала отдельная проверка и согласование managed config. Источник поведения: https://caddyserver.com/docs/caddyfile/directives/reverse_proxy
+
+Выкладку выполняет один оператор; CI/другие deploy на это время отключить. Helper lock защищает переключение, но не предварительные remote tags/git/migrate. Concurrent release может поменять mutable workers:latest до F1. Не запускать два deploy одновременно; полноценный общий release-lock потребует отдельной реализации/репетиции.
+
+## Исторический порядок до G2
+
+Ниже сохранены прежняя диагностика и история I02/F1. STOP app, legacy deploy/rollback и аварийный compose up app workers не применять после HTTP-слотов. Актуальный порядок выше.
+
 For automated deploy via GitHub Actions, see `007-github-actions-deploy.md`.
 This runbook is for the case when you SSH in and deploy by hand —
 hotfixes, CI outages, or just verifying a deploy lands cleanly.
