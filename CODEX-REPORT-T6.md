@@ -70,7 +70,7 @@ Docs не запускают production и не дают Codex права на �
 
 ## F6 / ревью №7 — health/lag snapshots между Next bundles
 
-Вероятная находка подтверждена на реальном production Next с собственным PG/2Redis: build exit0,107миграций, metrics authenticated own ADMIN,4samples/45s —lag_snapshot_timestamp_seconds0 иhealth_snapshot_age_seconds-1 (f6-metrics-before.log). Никакого production доступа. Дополнительные red module-reset tests exit1:29pass/2fail: новый экземпляр модуля терял произведённый snapshot. Исправлено: typed globalThis holders только для last successful health/lag snapshots; module copies instrumentation/API в одном процессе делят snapshot. Ошибка collection не обновляет timestamp (прежний test сохранён), monitor lifecycle не переносился/не дублировался, разные процессы сохраняют собственные timestamps. Green exit0/4files67pass0skip (producer/consumer,metrics,deep-health), f6-7-green.log. Production green перепроверяется F8 после финальной сборки; не заявляется по unit. Диагностический supervisor exit0/CLEANUP done, собственные PG/2Redis удалены. Impact getLagMetrics/getCurrentStatus/detect1 unavailable UNKNOWN; fallback consumers metrics/system/status/deep-health/aggregate; diffcheck0. PDF commitf12534cb.
+Вероятная находка подтверждена на реальном production Next с собственным PG/2Redis: build exit0,107миграций, metrics authenticated own ADMIN,4samples/45s —lag_snapshot_timestamp_seconds0 иhealth_snapshot_age_seconds-1 (f6-metrics-before.log). Никакого production доступа. Дополнительные red module-reset tests exit1:29pass/2fail: новый экземпляр модуля терял произведённый snapshot. Исправлено: typed globalThis holders только для last successful health/lag snapshots; module copies instrumentation/API в одном процессе делят snapshot. Ошибка collection не обновляет timestamp (прежний test сохранён), monitor lifecycle не переносился/не дублировался, разные процессы сохраняют собственные timestamps. Green exit0/4files67pass0skip (producer/consumer,metrics,deep-health), f6-7-green.log. Production green подтверждён в F8 на финальной сборке отдельной строгой проверкой; результат ниже. Диагностический supervisor exit0/CLEANUP done, собственные PG/2Redis удалены. Impact getLagMetrics/getCurrentStatus/detect1 unavailable UNKNOWN; fallback consumers metrics/system/status/deep-health/aggregate; diffcheck0. PDF commitf12534cb.
 
 ## F6 / ревью №8 — GitHub deploy обходил барьер
 
@@ -82,7 +82,7 @@ Docs не запускают production и не дают Codex права на �
 
 Подтверждено: route игнорировал false; logoutClient finally стирал UI даже при non-ok/network. Red существующего route suite расширен4essential guards, exit1:2pass4fail. Route теперь false→503 с понятным отказом, без cookie/cache clearing и audit успешного logout. Клиент non-ok/network показывает toast, возвращает false, сохраняет store/session; success возвращает true и очищает state. Общий helper нужен потому, что shell и frozen operator вызывают его через void: unhandled exception не вводилась, caller экраны не редактировались. Auth/session/revocation/RLS implementation не менялся; подтверждённая security находка позволяет route/helper и отдельный SECURITY commit, test-first выполнен.
 
-Green exit0:3files36pass0skip (logout,session-service,existing api-error tests), f6-9-red/green.log. Legacy/invalid/expired token с false теперь консервативно отказывает503, а не обещает revocation; без token anonymous logout остаётся200. AuthFetch401 cleanup по-прежнему сбрасывает уже неподтверждённую локальную сессию, explicit logout — только success. Реальный Redis outage proof планируется F8; unit mock не выдаётся за него. Impact revokeSessionToken/logoutClient/detect1 unavailable UNKNOWN; fallback2shell+frozenoperator callers; diffcheck0. Workflow commit4ecd6e3e.
+Green exit0:3files36pass0skip (logout,session-service,existing api-error tests), f6-9-red/green.log. Legacy/invalid/expired token с false теперь консервативно отказывает503, а не обещает revocation; без token anonymous logout остаётся200. AuthFetch401 cleanup по-прежнему сбрасывает уже неподтверждённую локальную сессию, explicit logout — только success. Результаты настоящего Redis отказа и браузерного сценария приведены в F8; unit mock не выдаётся за реальный отказ. Impact revokeSessionToken/logoutClient/detect1 unavailable UNKNOWN; fallback2shell+frozenoperator callers; diffcheck0. Workflow commit4ecd6e3e.
 
 ## F6 — находка 10: недоступность KPI аналитики
 
@@ -114,7 +114,7 @@ Green exit0:3files36pass0skip (logout,session-service,existing api-error tests),
 
 Chromium подтвердил: noopener возвращает null даже при открытом окне. Теперь синхронно открывается пустое окно, при null сообщается реальная блокировка; иначе opener обнуляется до перехода на печатную форму. Красный тест exit 1 (1 passed / 1 failed), зелёный exit 0 (2 passed / 0 skipped). GitNexus impact/detect exit 1, UNKNOWN; текстовые зависимости и diff проверены, diff-check exit 0. Настоящий браузерный сценарий печати включён в F8.
 
-## F8 — выполненные проверки, до завершения Playwright
+## F8 — выполненные проверки
 
 Стенд: собственный `codex-pg-*`, все 107 миграций, роль `pilingtrack_identity`, два отдельных `codex-redis-*` (state/cache), приватный `codex-s3-*` с HTTPS proxy и проверкой PUT/GET/DELETE. Пароли и ключи генерируются только в памяти; на диск сохраняется только публичный CA, удаляемый supervisor. Собственные ADMIN/DISPATCHER/OPERATOR/ASSISTANT и роли создаются в этой базе. Production не используется.
 
@@ -125,7 +125,7 @@ Chromium подтвердил: noopener возвращает null даже пр�
 - Дополнительный F2 red на сохранённом маршруте T5: exit 1, новый DB-тест failed, 4 прочих теста намеренно не выбраны (`-t F2:`). После восстановленной связи старый route вернул 503 вместо 200. Текущий route точно восстановлен (`git diff --exit-code`:0); зелёный F2 входит в полный PG прогон выше. Проверены новая опубликованная строка с attempts=0 и receipts A/B, сохранённые старый outbox с attempts=5 и настоящая pending DLQ.
 - Production metrics: до F6№7 четыре пробы давали lag timestamp=0 / health age=-1 (exit 0 у диагностического скрипта, это не успех freshness). Теперь строгая проверка exit 0: четыре пробы за 45s, health age 7.059–7.078s, lag timestamp увеличивается 1791042643.798 → 1791042683.937. Проверяется возраст обоих снимков ≤90s и обновление timestamp.
 - Logout: сетевое выключение собственного Redis дало timeout ответа 45s, exit 1; Docker stop/start поменял динамический опубликованный порт. Redis восстановлен на исходном фиксированном порту. Этот опыт не считается зелёным. Отдельный настоящий отказ SET (`CONFIG SET min-replicas-to-write 1`) на том же собственном Redis: exit 0, API503, видимый русский тост, дашборд/сессия сохранены; после возврата настройки в finally выход API200 и экран входа. Auth/security/rate-limiter source не менялись. Полный сетевой отказ может задерживать запрос до слоя revoke — остаётся ограничением проверки/риском, точный источник задержки не доказан.
-- `npx playwright test --list` (эквивалент `node node_modules/@playwright/test/cli.js test --list`): exit 0, 117 tests / 12 files; база T5 108, добавлено 9 (3 сценария × 3 браузерных проекта). Полный прогон выполняется, результат будет ниже. F4 браузерная проверка тестирует реальную кнопку/отправляемый configId, HTTP конфигураций и тест-ответ подменены; серверные guards отдельно проверены route/service тестами. F7 печать использует настоящую BriefingRecord в своей базе, row удаляется в finally.
+- `npx playwright test --list` (эквивалент `node node_modules/@playwright/test/cli.js test --list`): exit 0, 117 tests / 12 files; база T5 108, добавлено 9 (3 сценария × 3 браузерных проекта). Итоговый полный прогон завершён; результат и таблица ниже. F4 браузерная проверка тестирует реальную кнопку/отправляемый configId, HTTP конфигураций и тест-ответ подменены; серверные guards отдельно проверены route/service тестами. F7 печать использует настоящую BriefingRecord в своей базе, row удаляется в finally.
 - `docker build --pull=false -f Dockerfile.workers --target runner -t codex-workers-t6:f8 .`: exit 0. `bash scripts/smoke-workers-image.sh codex-workers-t6:f8`: exit 0, старт и Arming подтверждены.
 - `bash scripts/test-worker-generation.sh`: exit 0, 6 PASS / 0 FAIL; реальные Node SIGTERM app143, worker143, live one-off, preflight, partial START rollback, failed drain rollback. Свои контейнеры/сети/тестовый тег удалены скриптом.
 - `node scripts/test-deploy-workflow.cjs`: exit 0, локальный SSH shim, сеть/SSH сервер не использованы.
@@ -136,7 +136,7 @@ Chromium подтвердил: noopener возвращает null даже пр�
 
 Первый полный Playwright: exit 1, 105 passed / 3 failed / 9 skipped (117). Все три отказа — новый сценарий печати в трёх проектах; KPI/Telegram и прежние сценарии прошли. Диагностический повтор только печати: exit 1, 3 failed; настоящий bootstrap вернул `503: Tenant settings are not configured`. Канонический адрес журнала — `/admin/safety?view=briefings`; переход с `/admin/to` исправлен в тесте, но причина API503 отдельно доказана.
 
-Сид T5 создавал Tenant, но не TenantSettings. Тестовый сид `e2e/fixtures/disposable-seed.mjs` теперь создаёт настройки обоих собственных тенантов, как это уже делал role-audit fixture. В работающую собственную базу добавлены те же строки отдельной защищённой командой (localhost/codex_test/piling/codex-pg guard); существующие данные не перезаписывались. Продуктовый bootstrap сохраняет отказ при отсутствующих настройках, ответ не подменён. Impact CLI exit 1 UNKNOWN; найден единственный caller test-day-stand. Повтор печати/полный Playwright — ниже после завершения.
+Сид T5 создавал Tenant, но не TenantSettings. Тестовый сид `e2e/fixtures/disposable-seed.mjs` теперь создаёт настройки обоих собственных тенантов, как это уже делал role-audit fixture. В работающую собственную базу добавлены те же строки отдельной защищённой командой (localhost/codex_test/piling/codex-pg guard); существующие данные не перезаписывались. Продуктовый bootstrap сохраняет отказ при отсутствующих настройках, ответ не подменён. Impact CLI exit 1 UNKNOWN; найден единственный caller test-day-stand. Повтор печати и итоговый полный Playwright приведены ниже.
 
 ## Перед выкладкой владельцу
 
@@ -159,3 +159,143 @@ Chromium подтвердил: noopener возвращает null даже пр�
 Печать после дополнения сида: отдельный Chromium exit 0 / 1 passed. Следующий полный Playwright на той же БД: exit 1, 107 passed / 1 failed / 9 skipped. F4/F6/F7 прошли во всех трёх проектах, включая настоящий bootstrap и печатную запись. Единственный отказ — прежний T5 key path при INSERT draft: `Report_user_site_date_without_shift_key`. Прежний первый прогон сохранял свои отчёты в одноразовой БД (в finally закрывает соединение); повтор всего набора на той же базе не предусматривался. Продуктовый индекс/код/тестовые assertions не ослаблялись, чужие строки не удалялись. Для воспроизводимого полного итогового прогона запускается новая собственная база и новый стенд с исправленным сидом.
 
 Просмотрены PNG KPI (Chromium) и печати (Mobile Safari): производственные плитки показывают недоступность, независимые данные отображаются; документ содержит свою строку. Это не проверка всей широкой печатной таблицы на мобильном экране.
+
+## Коммиты T6
+
+Один логический фикс — отдельный коммит; no-ff merge Hermes содержит исходные дневные коммиты. Финальный коммит отчёта указан в сообщении владельцу.
+
+| Commit | Изменение |
+|---|---|
+|28898142|(CODEX-F1) Возвращать старое поколение при отказе барьера и проверять настоящий SIGTERM|
+|576990ec|(CODEX-F2) Создавать новую попытку алерта после DLQ|
+|9ff444c0|(CODEX-F3) Отключать постоянно недоступный Telegram-чат и сохранять повторы временных ошибок|
+|e2803183|(CODEX-F4) SECURITY Проверять выбранный Telegram-канал в организации пользователя|
+|91005228|(CODEX-F5) Согласовать команды выкладки и возврата поколения во всех инструкциях|
+|b3320b02|(CODEX-F6) Доставлять плановые напоминания Alertmanager в новых временных окнах|
+|f12534cb|(CODEX-F6) Дать загрузке PDF отдельный бюджет без истечения транзакции receipts|
+|d575a1fc|(CODEX-F6) Делить health и lag snapshots между instrumentation и API bundles|
+|4ecd6e3e|(CODEX-F6) Не позволять GitHub выкладке обходить внешний и compose барьеры|
+|dce0b38b|(CODEX-F6) SECURITY Не сообщать об успешном выходе без записанного отзыва сессии|
+|9f8b8720|(CODEX-F6) Показывать недоступность производственных KPI при сбое аналитики|
+|409c457b|(CODEX-F6) Продолжать пересчёт тренда после удаления объекта|
+|d240a5fe|(CODEX-F6) Отменять очистку временных PDF при остановке воркера|
+|eba3cf3a|(CODEX-F7) Записать ревью новых дневных правок Hermes|
+|4fab0117|(CODEX-F7) Слить дневные правки Hermes с сохранением проверки версий|
+|803dea4f|(CODEX-F7) Не сообщать о блокировке успешно открытого окна печати|
+|966265ac|(CODEX-F8) Дополнить одноразовый сид и проверить реальные отказы|
+
+## Изменённые файлы относительно b1d988e8
+
+Таблица включает слитые изменения Hermes. Числа — добавленные/удалённые строки по git diff --numstat; удалённых файлов нет. Пути относительно D:\PillingR\wt-codex6.
+
+| Файл | + | − |
+|---|---:|---:|
+|.claude/skills/deploy/SKILL.md|40|64|
+|.github/workflows/deploy.yml|27|17|
+|CLAUDE.md|1|1|
+|CODEX-REPORT-T6.md|301|0|
+|docs/runbooks/008-manual-deploy.md|24|45|
+|docs/runbooks/016-release-2026-10.md|7|7|
+|e2e/fixtures/disposable-seed.mjs|1|1|
+|e2e/release-critical-path.spec.ts|56|0|
+|scripts/deploy-prod.sh|2|2|
+|scripts/replace-worker-generation.sh|107|48|
+|scripts/test-deploy-workflow.cjs|39|0|
+|scripts/test-worker-generation.sh|87|54|
+|src/app/(app)/__tests__/layout.test.tsx|93|0|
+|src/app/(app)/layout.tsx|63|53|
+|src/app/api/alerts/webhook/__tests__/route.test.ts|35|2|
+|src/app/api/alerts/webhook/route.ts|15|4|
+|src/app/api/auth/logout/__tests__/route.test.ts|42|4|
+|src/app/api/auth/logout/route.ts|4|2|
+|src/app/api/notifications/telegram/test/__tests__/route.test.ts|51|0|
+|src/app/api/notifications/telegram/test/route.ts|13|2|
+|src/components/piling/__tests__/admin-dashboard.test.tsx|14|1|
+|src/components/piling/__tests__/admin-telegram.test.tsx|136|0|
+|src/components/piling/admin-dashboard.tsx|3|3|
+|src/components/piling/admin-equipment/__tests__/equipment-mobile-targets.test.tsx|137|1|
+|src/components/piling/admin-equipment/admin-equipment.tsx|1|1|
+|src/components/piling/admin-equipment/detail/__tests__/equipment-detail-overview.test.tsx|133|2|
+|src/components/piling/admin-equipment/detail/equipment-detail.tsx|14|5|
+|src/components/piling/admin-equipment/detail/equipment-photos.tsx|16|5|
+|src/components/piling/admin-equipment/detail/equipment-report-export.tsx|65|5|
+|src/components/piling/admin-equipment/equipment-filters.tsx|5|4|
+|src/components/piling/admin-equipment/equipment-table.tsx|13|1|
+|src/components/piling/admin-equipment/use-equipment-list.ts|4|6|
+|src/components/piling/admin-reports/__tests__/admin-reports.test.tsx|111|0|
+|src/components/piling/admin-reports/__tests__/report-filters.test.tsx|32|0|
+|src/components/piling/admin-reports/admin-reports.tsx|22|2|
+|src/components/piling/admin-reports/report-filters.tsx|3|3|
+|src/components/piling/admin-reports/report-thumbnail.tsx|17|2|
+|src/components/piling/admin-sites/site-editor/__tests__/plan-section-field-labels.test.tsx|41|0|
+|src/components/piling/admin-sites/site-editor/drilling-plan-section.tsx|3|0|
+|src/components/piling/admin-sites/site-editor/pile-plan-section.tsx|3|1|
+|src/components/piling/admin-telegram.tsx|67|9|
+|src/components/piling/inspections/__tests__/inspection-messages.test.tsx|18|0|
+|src/components/piling/inspections/inspection-item-photos.tsx|16|5|
+|src/components/piling/maintenance/__tests__/maintenance-messages.test.tsx|18|0|
+|src/components/piling/maintenance/__tests__/maintenance-mobile-targets.test.tsx|22|0|
+|src/components/piling/maintenance/maintenance-board.tsx|5|5|
+|src/components/piling/maintenance/work-order-photos.tsx|16|5|
+|src/components/piling/monitoring/__tests__/fleet-dashboard-template.test.tsx|70|1|
+|src/components/piling/monitoring/fleet-dashboard.tsx|39|9|
+|src/components/piling/to/readiness/screens/__tests__/briefings-screen.test.tsx|78|0|
+|src/components/piling/to/readiness/screens/__tests__/readiness-centre.test.tsx|39|0|
+|src/components/piling/to/readiness/screens/__tests__/safety-screen.test.tsx|101|1|
+|src/components/piling/to/readiness/screens/briefings-screen.tsx|10|1|
+|src/components/piling/to/readiness/screens/employee-card.tsx|4|7|
+|src/components/piling/to/readiness/screens/knowledge-screen.tsx|2|2|
+|src/components/piling/to/readiness/screens/safety-overview-screen.tsx|8|12|
+|src/components/piling/to/readiness/screens/shared.tsx|7|0|
+|src/core/notifications/__tests__/telegram.test.ts|69|8|
+|src/core/notifications/telegram.ts|53|23|
+|src/core/observability/__tests__/health-tracker.test.ts|10|0|
+|src/core/observability/__tests__/lag-monitor.test.ts|7|0|
+|src/core/observability/health-tracker/tracker.ts|6|4|
+|src/core/observability/lag-monitor.ts|7|5|
+|src/lib/api.ts|11|2|
+|src/lib/pdf-generator/__tests__/cleanup.test.ts|22|0|
+|src/lib/pdf-generator/cleanup.ts|12|5|
+|src/modules/reports/application/projections/projection-worker.ts|1|1|
+|src/workers/__tests__/projection-worker.test.ts|16|1|
+|src/workers/__tests__/workers-image-smoke.test.ts|4|1|
+|src/workers/unified-worker/__tests__/pdf-cleanup-scheduler.test.ts|23|2|
+|src/workers/unified-worker/pdf-cleanup-scheduler.ts|14|5|
+|tests/integration/disposable-m6-m8.spec.ts|55|0|
+
+## F8 — итог на чистом стенде
+
+Итоговый полный `npx playwright test --workers=2 --reporter=list` через disposable-https fixture: exit 0, 108 passed / 9 skipped / 0 failed, 117 tests / 12 files, 7.0m. Новые F4/F6/F7 прошли во всех трёх проектах: Chromium, Mobile Safari, Mobile Chrome. Отчёт → отправка → проекция/KPI → PDF воркером, ТО и подтверждение удаления, семь ролей, существующие operator/ORION и мобильные сценарии выполнены на новой собственной БД. Девять прежних условных пропусков (повтор desktop key paths на mobile, Safari rate/photo/editor ограничения) не выданы за passed; новых skip нет.
+
+Финальные доказательства: `output/codex-t5/f8-playwright-fresh-result.json` содержит exit 0, полный журнал рядом `f8-playwright-fresh.log`; PNG KPI и печати сохранены в `test-results/release-critical-path-*`. Bootstrap и печатная запись настоящие, только сценарии отказа аналитики и отправки выбранного configId используют описанную выше HTTP подмену. Финальный production build после исправления сида также exit 0 (`output/codex-t5/stand-build.log`, `output/codex-t6/f8-fresh-manager.log`).
+
+| Проверка | Exit | Итог |
+|---|---:|---|
+| Безопасное удаление собственной .next/dev/types перед первым tsc | 0 | Только внутри wt-codex6 |
+| npx tsc --noEmit | 0 | Финальный literal npx.cmd, f8-npx-tsc-final.log |
+| npm run lint | 0 | 0 errors / 0 warnings, text integrity passed |
+| npm run test:unit | 0 | 3127 passed / 250 skipped; 340 files passed / 14 skipped |
+| npx playwright test --list | 0 | Финальный literal npx.cmd:117 tests / 12 files |
+| npm run build | 0 | Финальная сборка с seed TenantSettings, production Next |
+| Vitest integration config, реальный codex-pg | 0 | 204 passed / 0 skipped, 10 files |
+| Полный Playwright, свежий одноразовый стенд | 0 | 108 passed / 9 skipped / 0 failed, 7.0m |
+| Docker build workers runner | 0 | codex-workers-t6:f8, без новых зависимостей |
+| bash scripts/smoke-workers-image.sh codex-workers-t6:f8 | 0 | Start + Arming |
+| bash scripts/test-worker-generation.sh | 0 | 6 PASS / 0 FAIL, реальный Node SIGTERM |
+| node scripts/test-deploy-workflow.cjs | 0 | Локальный shim, без SSH/сети |
+| Строгая production metrics freshness проверка | 0 | 4 samples, обе метрики обновляются |
+| Logout при реальном отказе записи собственного Redis | 0 | 503 сохраняет UI, восстановление → 200/login |
+| GitNexus detect-changes --scope all --repo . | 1 | CLI недоступен, UNKNOWN; fallback rg+diff |
+| git diff --check | 0 | Нет whitespace ошибок |
+| Supervisor stop / очистка своего стенда | 0 | CLEANUP done; собственный PG удалён shell trap |
+| Удаление двух собственных временных image tags | 0 | Только codex-workers-t6:f8 и codex-s3-t5:e7 |
+| Проверка удаления контейнеров/портов/CA | 0 | codex-* список пуст,50180/50181 не слушают, CA отсутствует |
+
+Supervisor остановлен штатной командой stop после успешного Playwright; его собственные процессы app/workers и HTTPS proxy закрыты. Собственные PG/Redis/S3 контейнеры удалены, публичный CA удалён; временные теги codex удалены. Контейнеры/теги pilingtrack не изменялись. Сохранены только игнорируемые журналы, тестовые helper scripts и визуальные доказательства; секреты на диск не сохранялись. Рабочая ветка остаётся codex/night-1004, push/merge в main/выкладка не выполнялись.
+
+Несущественные ограничения ревью Hermes, оставленные по E6:
+
+| Область | Ограничение | Решение |
+|---|---|---|
+| XLSX export | Пустой набор определяется клиентом только при серверном row-count header | Не изменять соседний контракт вне задачи |
+| catchText / TypeError | Общий текст сетевого отказа также может скрывать иную TypeError | Записать для ревью; массовый refactor не выполнять |
