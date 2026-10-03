@@ -294,6 +294,7 @@ export function CrewFormDialog({
                   value={name}
                   onChange={event => setName(event.target.value)}
                   placeholder="Бригада №1"
+                  maxLength={200}
                   className="h-11"
                 />
               </div>

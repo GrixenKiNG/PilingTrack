@@ -148,4 +148,21 @@ describe('CrewFormDialog — справочники и название (F-R102-
     await waitFor(() => expect(onSubmit).toHaveBeenCalled());
     expect(onSubmit.mock.calls[0][0]).toMatchObject({ name: 'Бригада №2' });
   });
+
+  /**
+   * R121-8: «Название» бригады не имело maxLength, хотя createCrewSchema и
+   * updateCrewSchema (src/lib/validation-schemas.ts) ограничивают имя 200
+   * символами. Длинное имя уходило на сервер и возвращало 400 без имени поля.
+   */
+  it('название ограничено длиной 200, как в схеме маршрута', () => {
+    render(
+      <CrewFormDialog
+        open onClose={vi.fn()} mode="create" editItem={null}
+        operators={[]} equipment={[]} sites={[]} assistants={[]}
+        loadingReferenceData={false} referenceError={null} onSubmit={vi.fn()} submitting={false}
+      />,
+    );
+
+    expect(screen.getByPlaceholderText('Бригада №1')).toHaveAttribute('maxLength', '200');
+  });
 });
