@@ -9,6 +9,7 @@ import { QueryErrorBanner } from '@/components/piling/async-ui';
 import { usePilingStore } from '@/lib/store';
 import { can } from '@/services/auth/authorization-service';
 import { authFetch } from '@/lib/api';
+import { catchText } from '@/components/piling/admin-crews/crew-messages';
 import { cn } from '@/lib/utils';
 import { pluralizeRu } from '@/lib/format';
 import type { ReportDTO } from '@/lib/types';
@@ -151,7 +152,8 @@ export function AdminReports() {
       if (effectivePreview?.reportId === report.reportId) setPreviewReport(null);
       await loadReports();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Не удалось удалить отчёт');
+      // Обрыв сети fetch бросает TypeError с английским «Failed to fetch» (F-R112-1).
+      toast.error(catchText(err, 'Не удалось удалить отчёт'));
     } finally {
       setDeletingId(null);
       setPendingDeleteReport(null);

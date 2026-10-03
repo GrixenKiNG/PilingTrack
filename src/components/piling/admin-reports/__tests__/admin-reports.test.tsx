@@ -118,6 +118,20 @@ describe('AdminReports — удаление отчёта (F-R93-7)', () => {
 
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Отчёт уже удалён — обновите список.'));
   });
+
+  // F-R112-1: при обрыве сети fetch бросает TypeError, и тост печатал английское
+  // «Failed to fetch» — на русском экране это не сообщение.
+  it('обрыв сети при удалении → русский текст вместо «Failed to fetch» (F-R112-1)', async () => {
+    authFetchMock.mockRejectedValue(new TypeError('Failed to fetch'));
+
+    render(<AdminReports />);
+    fireEvent.click(screen.getByRole('button', { name: 'Удалить' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Удалить отчёт' }));
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith(
+      'Нет соединения с сервером. Проверьте связь и повторите.',
+    ));
+  });
 });
 
 describe('AdminReports — выгрузка без сети (F-R93-8)', () => {

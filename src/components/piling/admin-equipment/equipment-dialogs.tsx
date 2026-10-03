@@ -13,6 +13,7 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import { pluralizeRu } from '@/lib/format';
+import { catchText } from '@/components/piling/admin-crews/crew-messages';
 import type { EquipmentDTO } from '@/lib/types';
 import {
   EquipmentForm,
@@ -85,7 +86,8 @@ export function CreateEquipmentDialog({ open, onOpenChange, onSubmit }: CreatePr
       onOpenChange(false);
       toast.success('Установка создана');
     } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : 'Ошибка создания установки');
+      // Обрыв сети fetch бросает TypeError с английским «Failed to fetch» (F-R112-1).
+      toast.error(catchText(err, 'Ошибка создания установки'));
     } finally {
       setSubmitting(false);
     }
@@ -160,7 +162,8 @@ export function EditEquipmentDialog({ open, item, onOpenChange, onSubmit }: Edit
       onOpenChange(false);
       toast.success('Установка сохранена');
     } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : 'Ошибка сохранения');
+      // Обрыв сети fetch бросает TypeError с английским «Failed to fetch» (F-R112-1).
+      toast.error(catchText(err, 'Ошибка сохранения'));
     } finally {
       setSubmitting(false);
     }
@@ -215,7 +218,8 @@ export function DeleteEquipmentDialog({
       onOpenChange(false);
       toast.success('Установка удалена');
     } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : 'Ошибка удаления установки');
+      // Обрыв сети fetch бросает TypeError с английским «Failed to fetch» (F-R112-1).
+      toast.error(catchText(err, 'Ошибка удаления установки'));
     } finally {
       setSubmitting(false);
     }

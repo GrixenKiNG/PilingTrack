@@ -16,6 +16,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Cog, Droplets, Activity } from '@/components/piling/icons/unified-icons';
 import { authFetch } from '@/lib/api';
+import { catchText } from '@/components/piling/admin-crews/crew-messages';
 import { cn } from '@/lib/utils';
 import { formatNum, formatRelative } from '@/lib/format';
 
@@ -168,7 +169,8 @@ export function EquipmentMonitoring({ equipmentId }: Props) {
       const data = await res.json();
       setRecords(Array.isArray(data.records) ? data.records : []);
     } catch (err) {
-      setError((err as Error).message);
+      // Обрыв сети fetch бросает TypeError с английским «Failed to fetch» (F-R112-1).
+      setError(catchText(err, 'Не удалось загрузить телеметрию'));
     }
   }, [equipmentId, from, to]);
 

@@ -12,6 +12,7 @@ import { useState } from 'react';
 import { Pencil, Trash2, Plus, FileText, Loader2 } from '@/components/piling/icons/unified-icons';
 import { toast } from 'sonner';
 import { authFetch } from '@/lib/api';
+import { catchText } from '@/components/piling/admin-crews/crew-messages';
 import { formatRuDate } from '@/lib/format';
 import { documentExpiry } from '@/lib/document-expiry';
 import { Button } from '@/components/ui/button';
@@ -137,7 +138,8 @@ export function EquipmentDocuments({ equipmentId, documents, canManage, onChange
       setDialogOpen(false);
       await onChanged();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Ошибка');
+      // Обрыв сети fetch бросает TypeError с английским «Failed to fetch» (F-R112-1).
+      toast.error(catchText(err, 'Ошибка'));
     } finally {
       setBusy(false);
     }
@@ -153,7 +155,8 @@ export function EquipmentDocuments({ equipmentId, documents, canManage, onChange
       toast.success('Документ удалён');
       await onChanged();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Ошибка');
+      // Обрыв сети fetch бросает TypeError с английским «Failed to fetch» (F-R112-1).
+      toast.error(catchText(err, 'Ошибка'));
     } finally {
       setDeletingId(null);
       setPendingDelete(null);

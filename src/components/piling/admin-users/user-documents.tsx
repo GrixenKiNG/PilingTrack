@@ -17,6 +17,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Plus, Pencil, Trash2, Loader2, FileText } from '@/components/piling/icons/unified-icons';
 import { toast } from 'sonner';
 import { authFetch } from '@/lib/api';
+import { catchText } from '@/components/piling/admin-crews/crew-messages';
 import { formatRuDate } from '@/lib/format';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -185,7 +186,8 @@ export function UserDocuments({ userId }: { userId: string }) {
       setForm(EMPTY_FORM);
       await load();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Ошибка');
+      // Обрыв сети fetch бросает TypeError с английским «Failed to fetch» (F-R112-1).
+      toast.error(catchText(err, 'Ошибка'));
     } finally {
       setBusy(false);
     }
@@ -198,7 +200,8 @@ export function UserDocuments({ userId }: { userId: string }) {
       toast.success('Документ удалён');
       await load();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Ошибка');
+      // Обрыв сети fetch бросает TypeError с английским «Failed to fetch» (F-R112-1).
+      toast.error(catchText(err, 'Ошибка'));
     }
   };
 

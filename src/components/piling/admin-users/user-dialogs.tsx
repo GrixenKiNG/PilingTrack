@@ -32,6 +32,7 @@ import {
 } from '@/components/ui/select';
 import type { OperationalUserDTO, UserRole } from '@/lib/types';
 import { cn } from '@/lib/utils';
+import { catchText } from '@/components/piling/admin-crews/crew-messages';
 import type { CreateUserInput, UpdateUserInput } from './use-users-list';
 
 const RoleOptions = () => (
@@ -98,7 +99,8 @@ export function CreateUserDialog({ open, onOpenChange, onSubmit }: CreateProps) 
       onOpenChange(false);
       toast.success('Пользователь создан');
     } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : 'Ошибка создания');
+      // Обрыв сети fetch бросает TypeError с английским «Failed to fetch» (F-R112-1).
+      toast.error(catchText(err, 'Ошибка создания'));
     } finally {
       setSubmitting(false);
     }
@@ -235,7 +237,8 @@ export function EditUserDialog({ open, user, onOpenChange, onSubmit }: EditProps
       onOpenChange(false);
       toast.success('Пользователь обновлён');
     } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : 'Ошибка сохранения');
+      // Обрыв сети fetch бросает TypeError с английским «Failed to fetch» (F-R112-1).
+      toast.error(catchText(err, 'Ошибка сохранения'));
     } finally {
       setSubmitting(false);
     }
@@ -340,7 +343,8 @@ export function DeleteUserDialog({ open, user, onOpenChange, onConfirm }: Delete
       onOpenChange(false);
       toast.success('Пользователь удалён');
     } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : 'Ошибка удаления');
+      // Обрыв сети fetch бросает TypeError с английским «Failed to fetch» (F-R112-1).
+      toast.error(catchText(err, 'Ошибка удаления'));
     } finally {
       setSubmitting(false);
     }
