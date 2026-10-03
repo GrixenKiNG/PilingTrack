@@ -8,7 +8,7 @@
  * <button>, видимая дорожка остаётся 40×24 (образец — workspace-settings.tsx).
  * На десктопе (sm и шире) вид не меняется.
  */
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { toast } from 'sonner';
 
@@ -23,6 +23,7 @@ import { EquipmentCardBlockContent } from '../equipment-card-block';
 import { EquipmentFilters, EMPTY_FILTERS } from '../equipment-filters';
 import { EquipmentTable } from '../equipment-table';
 import { EquipmentForm, EMPTY_EQUIPMENT_FORM } from '../equipment-form';
+import { useEquipmentList } from '../use-equipment-list';
 import { DEFAULT_EQUIPMENT_CARD_TEMPLATE } from '../equipment-card-template';
 import { HistoryTable, Section, type TimelineRow } from '../detail/equipment-detail-parts';
 import { EquipmentPhotos } from '../detail/equipment-photos';
@@ -353,5 +354,24 @@ describe('фото установки: отказ открытия объясн�
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith(
       'Нет прав на просмотр фото. Смените роль или обратитесь к администратору.',
     ));
+  });
+});
+
+/*
+  F-R119-7 (повтор R97 №10): создание установки показывало серверный отказ как
+  есть — английское «Unauthorized» на русском экране; 400 нёс построчные
+  `details`, но читалось только общее «Некорректные данные».
+*/
+describe('список установок: отказ создания объясняется по-русски (F-R119-7)', () => {
+  it('401 при создании → «Сессия истекла», а не серверное «Unauthorized»', async () => {
+    mocks.authFetch.mockImplementation(async (_url: string, init?: RequestInit) => {
+      if (init?.method === 'POST') return json({ error: 'Unauthorized' }, 401);
+      return json({ data: [] });
+    });
+    const { result } = renderHook(() => useEquipmentList());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    await expect(result.current.create({ name: 'СГ-1' }))
+      .rejects.toThrow('Сессия истекла — войдите снова.');
   });
 });

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { authFetch } from '@/lib/api';
+import { extractApiError } from '@/components/piling/admin-crews/crew-messages';
 import type { EquipmentDTO } from '@/lib/types';
 
 /**
@@ -66,8 +67,7 @@ export function useEquipmentList() {
       body: JSON.stringify(payload),
     });
     if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.error || 'Ошибка создания');
+      throw new Error(await extractApiError(res, 'Ошибка создания'));
     }
     const data = await res.json();
     setEquipment((prev) => [...prev, data.equipment]);
@@ -80,8 +80,7 @@ export function useEquipmentList() {
       body: JSON.stringify(payload),
     });
     if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.error || 'Ошибка сохранения');
+      throw new Error(await extractApiError(res, 'Ошибка сохранения'));
     }
     const data = await res.json();
     setEquipment((prev) => prev.map((e) => (e.id === id ? data.equipment : e)));
@@ -90,8 +89,7 @@ export function useEquipmentList() {
   const remove = async (id: string) => {
     const res = await authFetch(`/api/equipment/${id}`, { method: 'DELETE' });
     if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.error || 'Ошибка удаления');
+      throw new Error(await extractApiError(res, 'Ошибка удаления'));
     }
     setEquipment((prev) => prev.filter((e) => e.id !== id));
   };

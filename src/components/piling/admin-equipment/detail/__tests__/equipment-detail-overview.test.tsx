@@ -17,6 +17,7 @@ vi.mock('@/lib/api', async (importOriginal) => ({
 }));
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
+import { toast } from 'sonner';
 import { OverviewTiles } from '../equipment-detail-overview';
 import { EquipmentDetail } from '../equipment-detail';
 import { usePilingStore } from '@/lib/store';
@@ -171,5 +172,55 @@ describe('EquipmentDetail — обновление списка парка по�
     fireEvent.click(await screen.findByRole('button', { name: 'Сохранить' }));
 
     await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1));
+  });
+});
+
+/*
+  R119 №7 (повтор R97 №10) и №6 (повтор R97 №9): отказ сохранения карточки
+  показывался как есть — английское «Unauthorized» и «CSRF validation failed: …»
+  на русском экране, а построчные `details` 400-ответа отбрасывались, читалось
+  только «Некорректные данные».
+*/
+describe('EquipmentDetail — текст отказа сохранения (F-R119-6, F-R119-7)', () => {
+  beforeEach(() => {
+    mocks.authFetch.mockReset();
+    vi.mocked(toast.error).mockClear();
+    usePilingStore.setState({ currentUser: { role: 'ADMIN' } as never });
+  });
+
+  /** Открывает карточку, жмёт «Редактировать» → «Сохранить» с заданным ответом PUT. */
+  async function save(putResponse: () => Response) {
+    mocks.authFetch.mockImplementation(async (_url: string, init?: RequestInit) => {
+      if (init?.method === 'PUT') return putResponse();
+      return json(detailsResponse('eq-1', 'СГ-1'));
+    });
+
+    render(<EquipmentDetail equipmentId="eq-1" embedded />);
+    await screen.findAllByText('СГ-1');
+    fireEvent.click(screen.getByRole('button', { name: /Редактировать/ }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Сохранить' }));
+  }
+
+  it('401 → «Сессия истекла», а не серверное «Unauthorized»', async () => {
+    await save(() => json({ error: 'Unauthorized' }, 401));
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Сессия истекла — войдите снова.'));
+    expect(toast.error).not.toHaveBeenCalledWith('Unauthorized');
+  });
+
+  it('CSRF-403 → русский текст про проверку безопасности', async () => {
+    await save(() => json({ error: 'CSRF validation failed: origin mismatch' }, 403));
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith(
+      'Запрос отклонён проверкой безопасности. Обновите страницу и повторите.',
+    ));
+  });
+
+  it('400 с построчными details показывает причину поля, а не только «Некорректные данные»', async () => {
+    await save(() => json({ error: 'Некорректные данные', details: [{ field: 'name', message: 'Required' }] }, 400));
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith(
+      expect.stringContaining('Поле name: обязательное поле'),
+    ));
   });
 });

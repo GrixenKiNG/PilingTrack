@@ -18,7 +18,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { authFetch } from '@/lib/api';
-import { catchText } from '@/components/piling/admin-crews/crew-messages';
+import { catchText, extractApiError } from '@/components/piling/admin-crews/crew-messages';
 import { cn } from '@/lib/utils';
 import { KIND_LABELS } from '../equipment-form';
 import { EditEquipmentDialog } from '../equipment-dialogs';
@@ -136,8 +136,9 @@ export function EquipmentDetail({ equipmentId, embedded = false, onSaved }: Prop
       body: JSON.stringify(payload),
     });
     if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.error || 'Ошибка сохранения');
+      // 401 и CSRF-403 приходят английскими, а 400 несёт построчные `details`
+      // (R97 №9–№10): показываем причину по-русски (R119 №6–№7).
+      throw new Error(await extractApiError(res, 'Ошибка сохранения'));
     }
     await refresh();
     // Список парка слева кормится снимком /monitoring/fleet — без этого
