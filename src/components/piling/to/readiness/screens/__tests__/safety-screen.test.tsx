@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ReferenceUiProps } from '../types';
 import { usePilingStore } from '@/lib/store';
 import { SafetyScreen } from '../safety-screen';
+import { KnowledgeScreen } from '../knowledge-screen';
 
 const { authFetch } = vi.hoisted(() => ({ authFetch: vi.fn() }));
 vi.mock('@/lib/api', () => ({ authFetch }));
@@ -104,5 +105,22 @@ describe('SafetyScreen — отказ загрузки объясняется п
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Нет связи с сервером');
     expect(screen.queryByText('Failed to fetch')).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * F-R110-3: плитки «Сдавали проверку» и «Срок вышел» считались от `rows ?? []`
+ * ещё до ответа и при отказе. Экран проверки знаний заявлял «нарушений нет»,
+ * хотя данные не прочитаны. Соседняя плитка «Всего попыток» уже гейтилась
+ * `rows?.length ?? '—'`.
+ */
+describe('KnowledgeScreen — плитки не показывают ложный ноль (F-R110-3)', () => {
+  it('при отказе загрузки все три плитки показывают «—», а не 0', async () => {
+    authFetch.mockRejectedValue(new TypeError('Failed to fetch'));
+    render(<KnowledgeScreen />);
+
+    await screen.findByRole('alert');
+    expect(screen.queryAllByText('0')).toHaveLength(0);
+    expect(screen.getAllByText('—')).toHaveLength(3);
   });
 });

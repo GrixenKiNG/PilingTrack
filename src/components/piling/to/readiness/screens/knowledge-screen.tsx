@@ -89,9 +89,9 @@ export function KnowledgeScreen() {
       />
 
       <section className={COMPACT_KPI_GRID} style={kpiGridStyle(3)}>
-        <RefKpi icon="accepted" label="Сдавали проверку" tone="success" value={latest.length}
+        <RefKpi icon="accepted" label="Сдавали проверку" tone="success" value={rows === null ? '—' : latest.length}
           detail="человек с записью в журнале" />
-        <RefKpi icon="defect" label="Срок вышел" tone="danger" value={expired} alert={expired > 0}
+        <RefKpi icon="defect" label="Срок вышел" tone="danger" value={rows === null ? '—' : expired} alert={expired > 0}
           detail="требуется пересдача" />
         <RefKpi icon="documents" label="Всего попыток" tone="info" value={rows?.length ?? '—'}
           detail="записей за всё время" />
