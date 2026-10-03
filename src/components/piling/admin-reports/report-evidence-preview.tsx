@@ -6,7 +6,7 @@
  * Выделено из admin-reports.tsx (аудит A-8).
  */
 
-import { type ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import {
   CheckCircle2,
   Clock,
@@ -52,6 +52,11 @@ export function ReportEvidencePreview({
   onPreviewPdf: (r: ReportDTO) => void;
   onPrint: () => void;
 }) {
+  // Идёт выгрузка одного PDF: маршрут single-pdf сам ограничивает частоту (429),
+  // поэтому до ответа кнопка «Скачать» заблокирована — повторный клик не должен
+  // запускать вторую пересборку PDF и получать «Слишком много выгрузок подряд».
+  const [downloading, setDownloading] = useState(false);
+
   if (!report) {
     return (
       <aside className="min-h-56 rounded-lg border border-border bg-card p-3 text-sm text-muted-foreground shadow-sm xl:sticky xl:top-4">
@@ -69,6 +74,8 @@ export function ReportEvidencePreview({
   // Скачивание PDF через authFetch, а не прямой ссылкой: при 403/404/429/500
   // ссылка уводила браузер на JSON-тело ошибки, и человек не понимал, где файл.
   const downloadPdf = async () => {
+    if (downloading) return;
+    setDownloading(true);
     try {
       const res = await authFetch(`/api/reports/single-pdf?reportId=${encodeURIComponent(report.reportId)}`);
       if (!res.ok) {
@@ -91,6 +98,8 @@ export function ReportEvidencePreview({
           ? 'Нет связи с сервером. PDF не скачан — повторите при появлении сети.'
           : err instanceof Error ? err.message : 'Не удалось скачать PDF',
       );
+    } finally {
+      setDownloading(false);
     }
   };
   return (
@@ -225,9 +234,9 @@ export function ReportEvidencePreview({
             <FileDown className="mr-1 h-3.5 w-3.5 shrink-0" />
             <span className="min-w-0 truncate">Открыть PDF</span>
           </Button>
-          <Button onClick={downloadPdf} variant="outline" className="h-9 min-w-0 px-2 text-xs">
+          <Button onClick={downloadPdf} disabled={downloading} variant="outline" className="h-9 min-w-0 px-2 text-xs">
             <Download className="mr-1 h-3.5 w-3.5 shrink-0" />
-            <span className="min-w-0 truncate">Скачать</span>
+            <span className="min-w-0 truncate">{downloading ? 'Скачивание…' : 'Скачать'}</span>
           </Button>
           <Button onClick={onPrint} variant="outline" className="h-9 min-w-0 px-2 text-xs">
             <Printer className="mr-1 h-3.5 w-3.5 shrink-0" />

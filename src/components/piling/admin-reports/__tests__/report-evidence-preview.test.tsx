@@ -106,3 +106,35 @@ describe('ReportEvidencePreview — скачивание PDF (F-R93-5)', () => {
     ));
   });
 });
+
+/**
+ * F-R115-4: «Скачать» у одного отчёта не блокировалась на время запроса, а
+ * маршрут single-pdf сам ограничивает частоту (429): два быстрых клика давали
+ * вторую пересборку PDF и «Слишком много выгрузок подряд» вместо файла.
+ */
+describe('ReportEvidencePreview — защита от повторного «Скачать» (F-R115-4)', () => {
+  beforeEach(() => {
+    authFetchMock.mockReset();
+    vi.mocked(toast.error).mockClear();
+  });
+
+  it('во время скачивания кнопка заблокирована и подписана «Скачивание…», второй запрос не уходит', async () => {
+    let resolveFetch: (value: unknown) => void = () => {};
+    authFetchMock.mockImplementation(() => new Promise((resolve) => { resolveFetch = resolve; }));
+
+    renderPreview();
+    const button = screen.getByRole('button', { name: /Скачать/ });
+
+    fireEvent.click(button);
+    await waitFor(() => expect(button).toBeDisabled());
+    expect(button).toHaveTextContent('Скачивание…');
+
+    // Повторный клик во время выгрузки не должен запускать вторую пересборку PDF.
+    fireEvent.click(button);
+    expect(authFetchMock).toHaveBeenCalledTimes(1);
+
+    resolveFetch({ ok: false, status: 500, json: async () => ({}) });
+    await waitFor(() => expect(button).not.toBeDisabled());
+    expect(button).toHaveTextContent('Скачать');
+  });
+});
