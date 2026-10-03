@@ -247,3 +247,59 @@ describe('доска нарядов ТО: 409 обещает обновлени�
     expect(toast.error).not.toHaveBeenCalledWith('Данные изменил другой пользователь, обновите страницу.');
   });
 });
+
+describe('контур ТО: моменты времени — дата и время по Москве (F-R114-2)', () => {
+  /*
+    00:30 МСК 26.09 — это 21:30 UTC 25.09. formatRuDate режет UTC-день, поэтому
+    закрытие, начало работ и приёмка датировались вчерашним «25.09.2026»; момент
+    должен идти через форматтер с явным поясом (общий @/lib/timezone) и показывать
+    время. Плановая дата (scheduledAt) — это день, её сдвигать не нужно.
+  */
+  const MOMENT = '2026-09-25T21:30:00.000Z';
+  const MSK_MOMENT = '26 сент. 2026 г., 00:30';
+
+  function momentRecord() {
+    return {
+      ...record(),
+      status: 'DONE',
+      createdAt: MOMENT,
+      completedAt: MOMENT,
+      acceptedAt: MOMENT,
+      createdById: 'u1',
+      closedById: 'u1',
+      acceptedById: 'u1',
+      people: { u1: 'Иванов' },
+    };
+  }
+
+  function mockMoment() {
+    mocks.authFetch.mockImplementation(async (url: string) => {
+      if (url === '/api/maintenance/assignees') return json({ users: [] });
+      if (url.startsWith('/api/media')) return json({ data: [] });
+      if (url === '/api/maintenance/wo-1') return json({ record: momentRecord() });
+      return json({ records: [momentRecord()] });
+    });
+  }
+
+  it('карточка: «факт», приёмка и «кто и когда» — по Москве, а не UTC-днём', async () => {
+    mockMoment();
+    render(<WorkOrderDetail recordId="wo-1" />);
+
+    expect(await screen.findByText(`факт ${MSK_MOMENT}`)).toBeInTheDocument();
+    expect(screen.getByText(`✓ Принято ${MSK_MOMENT}`)).toBeInTheDocument();
+    // Заявку открыл / Закрыл наряд / Принял работу — каждый с моментом по Москве.
+    expect(screen.getAllByText(MSK_MOMENT)).toHaveLength(3);
+    // Прежний вывод брал UTC-день и печатал 25.09.
+    expect(screen.queryByText('факт 25.09.2026')).toBeNull();
+  });
+
+  it('панель наряда: закрытие — моментом по Москве, UTC-дня на экране нет', async () => {
+    mockMoment();
+    render(<MaintenanceBoard />);
+
+    expect(await screen.findByText('Закрыто')).toBeInTheDocument();
+    expect(await screen.findAllByText(MSK_MOMENT)).not.toHaveLength(0);
+    // Прежде «Закрыто» и таймлайн несли UTC-день 25.09.
+    expect(screen.queryByText(/25\.09\.2026/)).toBeNull();
+  });
+});

@@ -9,6 +9,7 @@
 import Link from 'next/link';
 import { CheckCircle2, FileText, Loader2, Printer } from '@/components/piling/icons/unified-icons';
 import { formatRuDate } from '@/lib/format';
+import { formatDateTimeInTimezone } from '@/lib/timezone';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import {
@@ -84,7 +85,7 @@ export function MaintenanceDetailPanel({
                 <div className="h-full rounded-full bg-signal" style={{ width: `${progress}%` }} />
               </div>
               <MetricLine label="Порог ТО" value={interval != null ? `${interval} м/ч` : 'не задан'} />
-              <MetricLine label="Закрыто" value={record.completedAt ? `${formatRuDate(record.completedAt)} (${hours ?? '—'} м/ч)` : 'не закрывалось'} />
+              <MetricLine label="Закрыто" value={record.completedAt ? `${formatDateTimeInTimezone(record.completedAt)} (${hours ?? '—'} м/ч)` : 'не закрывалось'} />
             </div>
           </PanelSection>
 
@@ -126,8 +127,8 @@ export function MaintenanceDetailPanel({
           <PanelSection title="Состояние наряда">
             <div className="space-y-3 text-xs">
               <TimelineLine tone="green" date={formatRuDate(record.scheduledAt)} text="Плановая дата ТО" actor="План" />
-              <TimelineLine tone="green" date={formatRuDate(record.startedAt)} text={record.startedAt ? 'Работы начаты' : 'Работы не начаты'} actor={assigneeName} />
-              <TimelineLine tone={record.completedAt ? 'green' : 'orange'} date={formatRuDate(record.completedAt)} text={record.completedAt ? 'ТО закрыто' : 'Закрытие ожидается'} actor={assigneeName} />
+              <TimelineLine tone="green" date={record.startedAt ? formatDateTimeInTimezone(record.startedAt) : '—'} text={record.startedAt ? 'Работы начаты' : 'Работы не начаты'} actor={assigneeName} />
+              <TimelineLine tone={record.completedAt ? 'green' : 'orange'} date={record.completedAt ? formatDateTimeInTimezone(record.completedAt) : '—'} text={record.completedAt ? 'ТО закрыто' : 'Закрытие ожидается'} actor={assigneeName} />
             </div>
             <Link href={`/admin/maintenance/${record.id}`} className="mt-3 inline-flex min-h-11 items-center text-xs font-medium text-info-strong hover:text-info-strong sm:min-h-0">
               Показать все события

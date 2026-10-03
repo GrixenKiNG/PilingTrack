@@ -15,6 +15,7 @@ import { ArrowLeft, Camera, ClipboardCheck, Loader2, UserCog, Wrench } from '@/c
 import { toast } from 'sonner';
 import { authFetch } from '@/lib/api';
 import { formatRuDate } from '@/lib/format';
+import { formatDateTimeInTimezone } from '@/lib/timezone';
 import { usePilingStore } from '@/lib/store';
 import { resolveEffectiveRole } from '@/lib/types';
 import { Button } from '@/components/ui/button';
@@ -301,7 +302,7 @@ export function WorkOrderDetail({ recordId }: { recordId: string }) {
           <span>{TYPE_LABEL[record.type]}</span>
           <span>приоритет: {PRIORITY_LABEL[record.priority]}</span>
           {record.scheduledAt && <span>план {formatRuDate(record.scheduledAt)}</span>}
-          {record.completedAt && <span>факт {formatRuDate(record.completedAt)}</span>}
+          {record.completedAt && <span>факт {formatDateTimeInTimezone(record.completedAt)}</span>}
         </div>
         {record.description && <p className="mt-2 text-sm text-muted-foreground">{record.description}</p>}
         {record.status === 'CANCELLED' && (
@@ -453,7 +454,7 @@ export function WorkOrderDetail({ recordId }: { recordId: string }) {
         <h2 className="mb-2 flex items-center gap-2 text-sm font-semibold text-foreground"><ClipboardCheck className="h-4 w-4 text-muted-foreground" />Приёмка</h2>
         {record.acceptedAt ? (
           <p className="text-sm text-success-strong">
-            ✓ Принято {formatRuDate(record.acceptedAt)}
+            ✓ Принято {formatDateTimeInTimezone(record.acceptedAt)}
           </p>
         ) : isAdmin ? (
           <div className="flex items-center justify-between gap-3">
@@ -490,7 +491,7 @@ function PersonRow({ label, name, at, fallback }: {
       <dt className="shrink-0 text-xs text-muted-foreground">{label}</dt>
       <dd className={cn('text-right text-sm', name ? 'font-medium text-foreground' : 'text-muted-foreground')}>
         {name ?? fallback}
-        {name && at && <span className="ml-1.5 text-xs font-normal text-muted-foreground">{formatRuDate(at)}</span>}
+        {name && at && <span className="ml-1.5 text-xs font-normal text-muted-foreground">{formatDateTimeInTimezone(at)}</span>}
       </dd>
     </div>
   );
