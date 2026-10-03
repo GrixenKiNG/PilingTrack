@@ -13,7 +13,7 @@ import { toast } from 'sonner';
 import { authFetch } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { LoadFailure, loadFailureText } from '@/components/piling/to/load-failure';
+import { LoadFailure, loadFailureText, catchText } from '@/components/piling/to/load-failure';
 
 interface MeterReading {
   id: string;
@@ -121,7 +121,8 @@ export function MeterReadingsPanel({
       const list = await load(equipmentId);
       onChanged?.(latestHours(list));
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Не удалось сохранить показание');
+      // Обрыв сети fetch бросает TypeError с английским «Failed to fetch» (F-R112-2).
+      toast.error(catchText(err, 'Не удалось сохранить показание'));
     } finally {
       setSubmitting(false);
     }

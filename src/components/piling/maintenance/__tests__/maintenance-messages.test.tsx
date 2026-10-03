@@ -32,6 +32,7 @@ vi.mock('@/components/piling/confirm-action-dialog', () => ({
 import { MaintenanceBoard } from '../maintenance-board';
 import { WorkOrderDetail } from '../work-order-detail';
 import { WorkOrderFormDialog } from '../work-order-form-dialog';
+import { WorkOrderPhotos } from '../work-order-photos';
 import type { WorkOrderRow } from '../maintenance-board-model';
 
 const json = (body: unknown, status = 200) =>
@@ -353,5 +354,24 @@ describe('форма наряда ТО: моточасы — целое, не м
 
     await waitFor(() => expect(postCalls()).toHaveLength(1));
     expect(toast.error).not.toHaveBeenCalledWith('Моточасы — целое число, без дробной части');
+  });
+});
+
+describe('фото наряда ТО: обрыв сети объясняется по-русски (F-R112-2)', () => {
+  it('загрузка фото без связи — русский текст, а не «Failed to fetch»', async () => {
+    mocks.authFetch.mockImplementation(async (_url: string, init?: RequestInit) => {
+      if (init?.method === 'POST') throw new TypeError('Failed to fetch');
+      return json({ data: [] });
+    });
+    const { container } = render(<WorkOrderPhotos recordId="wo-1" />);
+    await waitFor(() => expect(mocks.authFetch).toHaveBeenCalled());
+
+    const input = container.querySelector('input[type="file"]') as HTMLInputElement;
+    fireEvent.change(input, { target: { files: [new File(['x'], 'p.png', { type: 'image/png' })] } });
+
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith('Нет связи с сервером — повторите при появлении сети.'),
+    );
+    expect(toast.error).not.toHaveBeenCalledWith('Failed to fetch');
   });
 });

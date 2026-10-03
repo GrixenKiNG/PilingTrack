@@ -16,7 +16,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import type { PmDueStatus } from '@/lib/pm-due';
-import { LoadFailure, loadFailureText } from '@/components/piling/to/load-failure';
+import { LoadFailure, loadFailureText, catchText } from '@/components/piling/to/load-failure';
 
 interface PlanDue {
   status: PmDueStatus;
@@ -136,7 +136,8 @@ export function MaintenancePlansPanel({ equipmentId }: { equipmentId: string }) 
       resetForm();
       await load(equipmentId);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Не удалось сохранить регламент');
+      // Обрыв сети fetch бросает TypeError с английским «Failed to fetch» (F-R112-2).
+      toast.error(catchText(err, 'Не удалось сохранить регламент'));
     } finally {
       setSubmitting(false);
     }
