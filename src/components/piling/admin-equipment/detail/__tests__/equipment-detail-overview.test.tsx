@@ -6,9 +6,20 @@
  * режет дату без `new Date()` — то есть дата без времени не съезжает на сутки
  * в поясе западнее UTC.
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
+
+const mocks = vi.hoisted(() => ({ authFetch: vi.fn() }));
+
+vi.mock('@/lib/api', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/api')>()),
+  authFetch: mocks.authFetch,
+}));
+vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+
 import { OverviewTiles } from '../equipment-detail-overview';
+import { EquipmentDetail } from '../equipment-detail';
+import { usePilingStore } from '@/lib/store';
 import type { TimelineRow } from '../equipment-detail-parts';
 import type { EquipmentDTO } from '@/lib/types';
 
@@ -51,6 +62,9 @@ function row(date: string): TimelineRow {
   };
 }
 
+const json = (body: unknown, status = 200) =>
+  new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
+
 describe('OverviewTiles — даты обзора (F-R114-1)', () => {
   it('«Ближайшее ТО» и «Последний отчёт» печатаются как ДД.ММ.ГГГГ', () => {
     render(
@@ -91,5 +105,40 @@ describe('OverviewTiles — даты обзора (F-R114-1)', () => {
 
     // Обе ячейки (Ближайшее ТО, Последний отчёт) — прочерк.
     expect(screen.getAllByText('—').length).toBeGreaterThanOrEqual(2);
+  });
+});
+
+/*
+  R119 №13: при переключении установок правая панель до ответа `/details`
+  показывала паспорт, статус и имя ПРЕДЫДУЩЕЙ машины — loading выставлялся
+  только при монтировании, а смена `equipmentId` его не поднимала.
+*/
+describe('EquipmentDetail — смена установки (F-R119-13)', () => {
+  const details = (id: string, name: string) => ({
+    equipment: { id, name, kind: 'PILE_DRIVER', isActive: true, model: null, inventoryNumber: null },
+    crew: null,
+    telematicsDevices: [],
+    documents: [],
+    stats30d: { reportCount: 0, piles: 0, pileMeters: 0, drillingCount: 0, drillingMeters: 0, downtimeHours: 0 },
+    timeline: [],
+  });
+
+  beforeEach(() => {
+    mocks.authFetch.mockReset();
+    usePilingStore.setState({ currentUser: { role: 'ADMIN' } as never });
+  });
+
+  it('пока грузится новая установка, данные прежней не показываются', async () => {
+    mocks.authFetch.mockImplementation(async (url: string) => {
+      if (url === '/api/equipment/eq-1/details') return json(details('eq-1', 'СГ-1'));
+      return new Promise(() => {}); // eq-2 ещё грузится
+    });
+
+    const { rerender } = render(<EquipmentDetail equipmentId="eq-1" embedded />);
+    expect((await screen.findAllByText('СГ-1')).length).toBeGreaterThan(0);
+
+    rerender(<EquipmentDetail equipmentId="eq-2" embedded />);
+
+    expect(screen.queryAllByText('СГ-1')).toHaveLength(0);
   });
 });

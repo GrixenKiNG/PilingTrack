@@ -81,7 +81,10 @@ export function EquipmentDetail({ equipmentId, embedded = false }: Props) {
   }, [equipmentId]);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- loads data on mount / dependency change; the async loader sets state
+    // Смена установки: показываем скелетон, а не паспорт предыдущей машины
+    // (R119 №13) — до этого loading выставлялся только при монтировании.
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- сброс состояния на смену зависимости; данные затем загрузит refresh
+    setLoading(true);
     void refresh();
   }, [refresh]);
 
