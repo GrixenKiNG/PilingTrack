@@ -125,6 +125,12 @@ for service in app workers; do
   [[ -z "$running" ]] || die "осталась RUNNING реплика $service"
 done
 echo 'VERIFY: все старые реплики завершены, RUNNING отсутствуют'
+# Snapshot ALL old services for rollback, but START scales only selected services.
+# Compose rejects --scale app=N when the requested workers-only app is disabled.
+start_scales=()
+for service in "${services[@]}"; do
+  if [[ "${counts[$service]}" -gt 0 ]]; then start_scales+=(--scale "$service=${counts[$service]}"); fi
+done
 echo "START: ${services[*]}"
 start_attempted=1
-"${compose[@]}" up -d --no-build --force-recreate --wait --wait-timeout "$timeout" "${scales[@]}" "${services[@]}" || die 'запуск нового поколения не выполнен'
+"${compose[@]}" up -d --no-build --force-recreate --wait --wait-timeout "$timeout" "${start_scales[@]}" "${services[@]}" || die 'запуск нового поколения не выполнен'

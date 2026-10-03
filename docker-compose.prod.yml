@@ -22,7 +22,7 @@
 services:
   app:
     ports: !override
-      - "127.0.0.1:3000:3000"
+      - "127.0.0.1:${APP_HOST_PORT:-3000}:3000"
     environment:
       - HOSTNAME=0.0.0.0
       # Cap Node heap so the in-app /api/health memory check doesn't sit

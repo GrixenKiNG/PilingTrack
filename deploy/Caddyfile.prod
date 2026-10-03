@@ -2,7 +2,10 @@
 # PilingTrack — Production Caddy configuration
 # ------------------------------------------------------------
 # Lives on the VPS at /etc/caddy/Caddyfile. This file is the
-# source of truth — server config should mirror it exactly.
+# source of truth for site/TLS/headers. The managed upstream snippet changes
+# with the active HTTP slot; never overwrite it from the initial template.
+# Before first blue-green only: install deploy/app-upstream.caddy alongside
+# this Caddyfile, validate, reload, then verify the old SHA (runbook008).
 #
 # Deploy:
 #   scp deploy/Caddyfile.prod user1@<host>:/tmp/Caddyfile
@@ -50,7 +53,7 @@ orionpiling.ru, www.orionpiling.ru {
 
 	# ----- Next.js app -----
 	handle {
-		reverse_proxy 127.0.0.1:3000
+		import app-upstream.caddy
 	}
 
 	# TLS. Caddy enables OCSP stapling by default.

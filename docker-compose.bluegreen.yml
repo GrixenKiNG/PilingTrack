@@ -1,0 +1,12 @@
+# HTTP-only slot in a separate project; dependencies and workers stay in the
+# original project. Never apply this overlay to the worker-generation barrier.
+services:
+  app:
+    depends_on: !reset {}
+    environment:
+      - EMBEDDED_WORKERS=disabled
+    stop_grace_period: 30s
+networks:
+  pilingtrack:
+    name: ${BLUEGREEN_APP_NETWORK:?existing application network is required}
+    external: true

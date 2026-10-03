@@ -58,18 +58,20 @@ services:
   # Next.js Application
   # ============================================================
   app:
+    image: ${APP_IMAGE:-pilingtrack-app:latest}
     build:
       context: .
       dockerfile: Dockerfile
       target: runner
       args:
         APP_VERSION: ${APP_VERSION:-unknown}
-    container_name: pilingtrack-app
+    container_name: ${APP_CONTAINER_NAME:-pilingtrack-app}
     restart: unless-stopped
     ports:
-      - "3000:3000"
+      - "${APP_HOST_PORT:-3000}:3000"
     environment:
       - NODE_ENV=production
+      - EMBEDDED_WORKERS=${EMBEDDED_WORKERS:-default}
       # Runtime goes through PgBouncer (transaction pooling).
       # `pgbouncer=true` tells Prisma to disable prepared-statement caching,
       # which is required in transaction pool mode.

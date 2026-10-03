@@ -50,6 +50,13 @@ for id in $old; do
 done
 node -e 'const s=require("fs").readFileSync("output/codex-t6/f1-order.log","utf8");if(!(s.indexOf("STOP")<s.indexOf("VERIFY")&&s.indexOf("VERIFY")<s.indexOf("START")))process.exit(1)'
 echo 'PASS: real Node app SIGTERM 143 accepted'
+# Blue-green retires legacy embedded app but START requests dedicated workers only.
+old_app=$(docker compose ps -q app)
+bash scripts/replace-worker-generation.sh workers >output/codex-t6/f1-workers-only.log
+[[ -z "$(docker ps -q --filter "label=com.docker.compose.project=$COMPOSE_PROJECT_NAME" --filter 'label=com.docker.compose.service=app')" ]] || { echo 'FAIL: legacy app restarted with workers-only' >&2; exit 1; }
+[[ "$(docker compose ps -q workers | wc -l)" -eq 2 ]] || { echo 'FAIL: workers-only replica count' >&2; exit 1; }
+[[ "$(docker inspect --format '{{.State.Status}} {{.State.ExitCode}} {{.State.OOMKilled}}' "$old_app")" == 'exited 143 false' ]] || { echo 'FAIL: legacy app not safely retired' >&2; exit 1; }
+echo 'PASS: workers-only START preserves two worker replicas and leaves legacy app stopped'
 # A real worker exits 143: old running replicas and policies must return.
 write_compose 143
 docker compose up -d --force-recreate --scale workers=2
