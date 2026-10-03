@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { OperationalUserDTO } from '@/lib/types';
 
@@ -179,5 +179,37 @@ describe('AdminUsers', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Заблокировать доступ' }));
 
     expect(toggleActive).toHaveBeenCalledTimes(1);
+  });
+
+  /**
+   * R113-6: «Требовать для смены» и «Отключить» в справочнике видов документов
+   * меняли допуск операторов к смене одним кликом, без вопроса и пояснения.
+   */
+  it('«Требовать для смены» спрашивает подтверждение и шлёт PATCH только после согласия (R113-6)', async () => {
+    authFetchMock.mockImplementation(async (_url: string, init?: RequestInit) => init?.method === 'PATCH'
+      ? { ok: true, json: async () => ({}) }
+      : {
+          ok: true,
+          json: async () => ({
+            types: [{
+              id: 'type-1', name: 'Медосмотр', requiresExpiry: true, defaultValidMonths: 12,
+              leadTimeDays: 30, requiredForOperator: false, isActive: true, documentCount: 0,
+            }],
+          }),
+        });
+    render(<AdminUsers />);
+
+    fireEvent.click(screen.getByRole('button', { name: /Виды документов/ }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Требовать для смены' }));
+
+    const dialog = await screen.findByRole('alertdialog');
+    expect(within(dialog).getByText(/операторы без действующего документа не начнут смену/)).toBeInTheDocument();
+    expect(authFetchMock.mock.calls.some(([, init]) => (init as RequestInit | undefined)?.method === 'PATCH')).toBe(false);
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Требовать для смены' }));
+
+    await waitFor(() =>
+      expect(authFetchMock.mock.calls.some(([, init]) => (init as RequestInit | undefined)?.method === 'PATCH')).toBe(true),
+    );
   });
 });
