@@ -425,14 +425,11 @@ export function SafetyOverviewScreen(props: ReferenceUiProps) {
                   <PilingIcon name="risk" size={14} decorative />
                   Происшествия
                 </Button>
-                <Button variant="outline" className="justify-start" onClick={() => props.onViewChange('knowledge')}>
-                  <PilingIcon name="accepted" size={14} decorative />
-                  Назначить проверку знаний
-                </Button>
-                <Button variant="outline" className="justify-start" onClick={() => props.onViewChange('instructions')}>
-                  <PilingIcon name="add" size={14} decorative />
-                  Добавить инструкцию
-                </Button>
+                {/* Кнопок «Назначить проверку знаний» и «Добавить инструкцию»
+                    здесь нет: таких действий в системе не существует — проверку
+                    работник проходит сам на своём экране, а редакцию инструкции
+                    выкладывает разработчик. Кнопки вели на экраны, которые прямо
+                    это сообщают, — то есть в тупик. */}
                 <Button variant="outline" className="justify-start" onClick={() => props.onViewChange('reports')}>
                   <PilingIcon name="download" size={14} decorative />
                   Сформировать выгрузку

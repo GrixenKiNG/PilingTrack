@@ -328,9 +328,6 @@ export function EmployeeCard({
                   <div className="mt-0.5 font-semibold">{row.knowledge.validUntil ? formatRuDate(row.knowledge.validUntil) : '—'}</div>
                 </div>
               </div>
-              <Button variant="outline" className="mt-3" onClick={() => onGoTo('knowledge')}>
-                Назначить повторно
-              </Button>
             </section>
           )}
 

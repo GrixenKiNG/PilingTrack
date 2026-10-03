@@ -5,6 +5,7 @@ import { usePilingStore } from '@/lib/store';
 import { SafetyScreen } from '../safety-screen';
 import { KnowledgeScreen } from '../knowledge-screen';
 import { EmployeeCard } from '../employee-card';
+import { SafetyOverviewScreen } from '../safety-overview-screen';
 
 const { authFetch } = vi.hoisted(() => ({ authFetch: vi.fn() }));
 vi.mock('@/lib/api', () => ({ authFetch }));
@@ -146,5 +147,49 @@ describe('EmployeeCard — дата инструктажа не выдаётся
     fireEvent.click(screen.getByRole('tab', { name: 'Проверка знаний' }));
 
     expect(screen.queryByText('Дата проверки')).not.toBeInTheDocument();
+  });
+});
+
+/** Ответ «Обзора ТБ», достаточный, чтобы отрисовались быстрые действия. */
+const overviewFixture = {
+  rows: [],
+  todayByType: {},
+  incidents: { last30: 0, previous30: 0 },
+  totals: {
+    people: 0, cleared: 0, blocked: 0, expiring: 0,
+    knowledgeOverdue: 0, briefingsOverdue: 0, awaitingAcquaintance: 0,
+  },
+  requiredTypesConfigured: true,
+};
+
+const renderOverview = async () => {
+  authFetch.mockImplementation(async (url: string) => (url.includes('/api/safety/clearance')
+    ? { ok: true, json: async () => overviewFixture }
+    : { ok: true, json: async () => ({ rows: [] }) }));
+  render(<SafetyOverviewScreen {...propsFor()} />);
+  await screen.findByText('Быстрые действия');
+};
+
+/**
+ * F-R110-5: кнопки «Назначить проверку знаний» и «Добавить инструкцию» вели на
+ * экраны, которые прямо говорят, что таких действий в системе нет
+ * (`knowledge-screen.tsx`, `instructions-screen.tsx`). Человек жал кнопку и
+ * попадал в список без нужного действия.
+ */
+describe('SafetyOverviewScreen — кнопки-тупики убраны (F-R110-5)', () => {
+  it('нет кнопок «Назначить проверку знаний» и «Добавить инструкцию»', async () => {
+    await renderOverview();
+
+    expect(screen.queryByRole('button', { name: 'Назначить проверку знаний' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Добавить инструкцию' })).not.toBeInTheDocument();
+  });
+
+  it('в карточке сотрудника нет кнопки «Назначить повторно»', async () => {
+    authFetch.mockResolvedValue({ ok: true, json: async () => ({ rows: [] }) });
+    render(<EmployeeCard row={row} editable={false} onBack={vi.fn()} onGoTo={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Проверка знаний' }));
+
+    expect(screen.queryByRole('button', { name: 'Назначить повторно' })).not.toBeInTheDocument();
   });
 });
