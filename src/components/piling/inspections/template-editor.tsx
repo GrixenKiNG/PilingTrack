@@ -25,7 +25,7 @@ import { QueryErrorBanner } from '@/components/piling/async-ui';
 import { LEVEL_LABEL, type InspectionLevel } from './inspection-labels';
 import { InspectionLoadError, isRetryableLoadError, loadErrorText } from './inspection-api-error';
 import {
-  BLOCK_LABEL, HAMMER_LABEL, SectionEditor, emptySection, uid,
+  BLOCK_LABEL, HAMMER_LABEL, LIMITS, SectionEditor, emptySection, uid,
   type AnswerType, type BlockType, type HammerKind, type SectionDraft,
 } from './template-editor-parts';
 
@@ -118,10 +118,26 @@ export function TemplateEditor({ templateId }: TemplateEditorProps) {
   // Submit
   const submit = async () => {
     if (!name.trim()) { toast.error('Введите название шаблона'); return; }
-    for (const s of sections) {
+    if (name.trim().length > LIMITS.name) { toast.error(`Название шаблона длиннее ${LIMITS.name} символов`); return; }
+    if (blockType === 'BASE' && appliesToModel.trim().length > LIMITS.appliesToModel) {
+      toast.error(`Применимость длиннее ${LIMITS.appliesToModel} символов`); return;
+    }
+    // Пределы полей — как в схеме маршрута: сообщение называет раздел и пункт,
+    // иначе 400 «Некорректные данные» не подсказывал, что править (F-R121-3).
+    for (let si = 0; si < sections.length; si++) {
+      const s = sections[si];
       if (!s.title.trim()) { toast.error('Заполните заголовок каждого раздела'); return; }
-      for (const it of s.items) {
+      if (s.title.trim().length > LIMITS.sectionTitle) {
+        toast.error(`Раздел ${si + 1}: заголовок длиннее ${LIMITS.sectionTitle} символов`); return;
+      }
+      for (let ii = 0; ii < s.items.length; ii++) {
+        const it = s.items[ii];
         if (!it.text.trim()) { toast.error('Заполните текст каждого пункта'); return; }
+        const where = `Раздел ${si + 1}, пункт ${ii + 1}`;
+        if (it.text.trim().length > LIMITS.itemText) { toast.error(`${where}: текст длиннее ${LIMITS.itemText} символов`); return; }
+        if (it.unit.trim().length > LIMITS.itemUnit) { toast.error(`${where}: единица измерения длиннее ${LIMITS.itemUnit} символов`); return; }
+        if (it.norm.trim().length > LIMITS.itemNorm) { toast.error(`${where}: норма длиннее ${LIMITS.itemNorm} символов`); return; }
+        if (it.provenance.trim().length > LIMITS.itemProvenance) { toast.error(`${where}: источник длиннее ${LIMITS.itemProvenance} символов`); return; }
       }
     }
 
@@ -239,6 +255,7 @@ export function TemplateEditor({ templateId }: TemplateEditorProps) {
             id="tpl-name"
             value={name}
             onChange={(e) => setName(e.target.value)}
+            maxLength={LIMITS.name}
             placeholder="Напр. ЕО — экскаватор-сваевдавливатель"
           />
         </div>
@@ -276,6 +293,7 @@ export function TemplateEditor({ templateId }: TemplateEditorProps) {
               id="tpl-model"
               value={appliesToModel}
               onChange={(e) => setAppliesToModel(e.target.value)}
+              maxLength={LIMITS.appliesToModel}
               placeholder="Banut 655 (пусто = общий блок для всех)"
             />
           </div>
