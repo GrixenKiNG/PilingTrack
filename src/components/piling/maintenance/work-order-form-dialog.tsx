@@ -28,6 +28,7 @@ import {
   TYPE_LABEL, STATUS_LABEL, PRIORITY_LABEL, MAINTENANCE_TYPE_OPTIONS,
   type MaintenanceType, type MaintenanceStatus, type MaintenancePriority,
 } from './maintenance-labels';
+import { maintenanceErrorText, maintenanceCatchText } from './maintenance-helpers';
 
 export interface WorkOrderFormValues {
   type: MaintenanceType;
@@ -78,6 +79,22 @@ const EMPTY_FORM: WorkOrderFormValues = {
 
 const toInputDate = (iso: string | null | undefined): string => (iso ? iso.slice(0, 10) : '');
 const numToStr = (v: number | string | null | undefined): string => (v != null && v !== '' ? String(v) : '');
+
+/**
+ * Моточасы в схеме наряда — целое число, не меньше 0
+ * (app/api/equipment/[id]/maintenance/route.ts, engineHoursAtService). Пустое
+ * поле допустимо. Возвращает текст отказа или null — проверка идёт до отправки,
+ * чтобы человек не получал общее «Некорректные данные» на дробное показание
+ * счётчика.
+ */
+function engineHoursError(value: string): string | null {
+  if (value.trim() === '') return null;
+  const hours = Number(value);
+  if (!Number.isFinite(hours)) return 'Моточасы — введите число';
+  if (!Number.isInteger(hours)) return 'Моточасы — целое число, без дробной части';
+  if (hours < 0) return 'Моточасы не могут быть отрицательными';
+  return null;
+}
 
 interface AssigneeOption { id: string; name: string }
 interface EquipmentOption { id: string; name: string }
@@ -166,6 +183,11 @@ export function WorkOrderFormDialog({
       toast.error('Выберите установку');
       return;
     }
+    const hoursError = engineHoursError(form.engineHoursAtService);
+    if (hoursError) {
+      toast.error(hoursError);
+      return;
+    }
     setBusy(true);
     try {
       const payload = {
@@ -195,13 +217,13 @@ export function WorkOrderFormDialog({
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || 'Ошибка сохранения');
+        throw new Error(maintenanceErrorText(res.status, err.error));
       }
       toast.success(editingId ? 'Наряд обновлён' : 'Наряд создан');
       onOpenChange(false);
       onSaved();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Ошибка');
+      toast.error(maintenanceCatchText(err, 'Ошибка'));
     } finally {
       setBusy(false);
     }
@@ -314,8 +336,9 @@ export function WorkOrderFormDialog({
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               <div>
                 <Label htmlFor="wo-hours">Моточасы</Label>
-                <Input id="wo-hours" type="number" min={0} value={form.engineHoursAtService}
+                <Input id="wo-hours" type="number" min={0} step={1} value={form.engineHoursAtService}
                   onChange={(e) => set('engineHoursAtService', e.target.value)} />
+                <p className="mt-1 text-xs text-muted-foreground">Целое число, не меньше 0</p>
               </div>
               <div>
                 <Label htmlFor="wo-labor">Трудоч.</Label>

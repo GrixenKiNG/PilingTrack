@@ -62,7 +62,6 @@ describe('withCsrf — gating', () => {
   it.each([
     '/api/ready',
     '/api/health',
-    '/api/auth/login',
     '/api/auth/me',
   ])('skips %s (exempt path, exact match)', (path) => {
     const res = withCsrf(makeRequest({ path, method: 'POST' }));
@@ -86,6 +85,48 @@ describe('withCsrf — gating', () => {
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- test: value is established by the setup/fixture above
     const body = await res!.json();
     expect(body.error).toMatch(/missing origin/i);
+  });
+});
+
+// ============================================================
+// Вход: защита от login CSRF (аудит Codex out55, F09)
+// ============================================================
+
+// Вход полностью освобождали от проверки: «сессии ещё нет — подделывать
+// нечего». Но чужой сайт мог отправить форму входа с учётными данными
+// атакующего, и браузер сотрудника получал чужую сессию — дальнейшие записи
+// уходили под чужим именем. Браузерные признаки межсайтового запроса теперь
+// отклоняются и на входе; запрос вообще без браузерных заголовков (скрипты
+// смоука, curl) по-прежнему проходит: подделать запрос из чужого браузера,
+// не отправив ни Origin, ни Sec-Fetch-Site, нельзя.
+describe('withCsrf — /api/auth/login', () => {
+  const path = '/api/auth/login';
+
+  it('отклоняет вход с чужим Origin', () => {
+    const res = withCsrf(makeRequest({ path, origin: 'https://evil.example' }));
+    expect(res?.status).toBe(403);
+  });
+
+  it('отклоняет вход с sec-fetch-site=cross-site', () => {
+    const res = withCsrf(makeRequest({ path, secFetchSite: 'cross-site' }));
+    expect(res?.status).toBe(403);
+  });
+
+  it('отклоняет вход с чужим Referer без Origin', () => {
+    const res = withCsrf(makeRequest({ path, referer: 'https://evil.example/form' }));
+    expect(res?.status).toBe(403);
+  });
+
+  it('пропускает вход со своего адреса', () => {
+    const res = withCsrf(makeRequest({
+      path, origin: 'https://app.orionpiling.ru', secFetchSite: 'same-origin',
+    }));
+    expect(res).toBeNull();
+  });
+
+  it('пропускает вход без браузерных заголовков (скрипты, curl)', () => {
+    const res = withCsrf(makeRequest({ path }));
+    expect(res).toBeNull();
   });
 });
 

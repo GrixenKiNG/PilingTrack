@@ -35,6 +35,12 @@ export interface UseReportsDataReturn {
    *  show a real error state instead of a silently-empty list — see the
    *  2026-05-30 incident where a failing query rendered as "no reports". */
   error: string | null;
+  /** Отказ по правам (403) на чтение списка: повтор бесполезен, кнопки
+   *  «Повторить» быть не должно — причина не в сбое сервера. */
+  errorForbidden: boolean;
+  /** Отказ догрузки («Загрузить ещё») — показывается под кнопкой, список на экране
+   *  не пропадает. */
+  loadMoreError: string | null;
   /** Списки для отбора прочитаны не полностью — фильтр показывает не всё. */
   filterError: string | null;
   /** Справочники формы отчёта (марки свай, типы скважин, причины простоя) не
@@ -82,6 +88,8 @@ export function useReportsData(): UseReportsDataReturn {
   const [serverSums, setServerSums] = useState<JournalSums | null>(null);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [errorForbidden, setErrorForbidden] = useState(false);
+  const [loadMoreError, setLoadMoreError] = useState<string | null>(null);
 
   const referenceDataLoadedRef = useRef(false);
   const referenceDataPromiseRef = useRef<Promise<void> | null>(null);
@@ -193,6 +201,8 @@ export function useReportsData(): UseReportsDataReturn {
     const loadReports = async () => {
       setLoading(true);
       setError(null);
+      setErrorForbidden(false);
+      setLoadMoreError(null);
       try {
         let url: string;
         if (periodActive && periodFrom && periodTo) {
@@ -226,7 +236,13 @@ export function useReportsData(): UseReportsDataReturn {
           // HTTP error (e.g. 500): fetch resolves with res.ok=false and does
           // NOT throw, so without this branch the list would render empty as
           // if there were simply no reports. Surface it as a real error.
-          setError('Не удалось загрузить отчёты. Сервер вернул ошибку.');
+          // 403 — это не сбой: дело в правах, «Повторить» не поможет.
+          if (res.status === 403) {
+            setError('Нет прав на просмотр отчётов. Смените роль или обратитесь к администратору.');
+            setErrorForbidden(true);
+          } else {
+            setError('Не удалось загрузить отчёты. Сервер вернул ошибку.');
+          }
           setHasMore(false);
           setServerSums(null);
           setNextCursor(null);
@@ -235,6 +251,7 @@ export function useReportsData(): UseReportsDataReturn {
       } catch (error) {
         if (isMounted && !(error instanceof Error && error.name === 'AbortError')) {
           setError('Не удалось загрузить отчёты. Проверьте соединение.');
+          setErrorForbidden(false);
           setHasMore(false);
           setServerSums(null);
           setNextCursor(null);
@@ -264,14 +281,20 @@ export function useReportsData(): UseReportsDataReturn {
   const loadMoreReports = useCallback(async () => {
     if (periodActive || loadingMore || !hasMore || !nextCursor) return;
     setLoadingMore(true);
-    setError(null);
+    setLoadMoreError(null);
     try {
       const params = new URLSearchParams({ cursor: nextCursor, limit: String(REPORTS_PAGE_LIMIT) });
       if (filterSiteId !== 'all') params.set('siteId', filterSiteId);
       if (filterUserId !== 'all') params.set('userId', filterUserId);
       const res = await authFetch(`/api/reports/all?${params.toString()}`);
       if (!res.ok) {
-        setError('Не удалось догрузить отчёты. Сервер вернул ошибку.');
+        // Отказ догрузки не должен заменять уже загруженный список баннером
+        // ошибки: данные никуда не делись, показать надо только хвост.
+        setLoadMoreError(
+          res.status === 403
+            ? 'Нет прав на просмотр отчётов.'
+            : 'Не удалось догрузить отчёты. Сервер вернул ошибку.',
+        );
         toast.error('Ошибка догрузки отчётов');
         return;
       }
@@ -281,7 +304,7 @@ export function useReportsData(): UseReportsDataReturn {
       setHasMore(Boolean(data.hasMore));
       setNextCursor(data.nextCursor ?? null);
     } catch {
-      setError('Не удалось догрузить отчёты. Проверьте соединение.');
+      setLoadMoreError('Не удалось догрузить отчёты. Проверьте соединение.');
       toast.error('Ошибка догрузки отчётов');
     } finally {
       setLoadingMore(false);
@@ -311,7 +334,7 @@ export function useReportsData(): UseReportsDataReturn {
     filterSiteId, setFilterSiteId,
     filterUserId, setFilterUserId,
     periodFrom, setPeriodFrom, periodTo, setPeriodTo,
-    periodActive, loading, loadingReferenceData, loadingMore, hasMore, totalReports, serverSums, error, filterError, dictionaryError,
+    periodActive, loading, loadingReferenceData, loadingMore, hasMore, totalReports, serverSums, error, errorForbidden, loadMoreError, filterError, dictionaryError,
     handleApplyPeriod, handleResetPeriod, loadMoreReports, loadReports, loadReferenceData,
   };
 }

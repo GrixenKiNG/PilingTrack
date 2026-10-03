@@ -21,7 +21,11 @@ import { positiveIntEnv } from './env-int';
 const INTERVAL = positiveIntEnv('READINESS_SCHEDULER_INTERVAL_MS', 60 * 60 * 1000);
 const STARTUP_DELAY = positiveIntEnv('READINESS_SCHEDULER_STARTUP_DELAY_MS', 90000);
 
+let passRunning = false;
+
 async function runOnce(): Promise<void> {
+  if (passRunning) return;
+  passRunning = true;
   try {
     // Перечень организаций берётся из таблицы Tenant, а не из Shift.
     // Politики RLS на Shift строгие: запрос без объявленной организации
@@ -43,6 +47,8 @@ async function runOnce(): Promise<void> {
       error: error instanceof Error ? error.message : String(error),
     });
     Sentry.captureException(error, { tags: { task: 'readiness-scheduler' } });
+  } finally {
+    passRunning = false;
   }
 }
 

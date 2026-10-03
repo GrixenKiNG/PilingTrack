@@ -38,6 +38,7 @@ describe('session-service', () => {
       isRevoked: async (jti) => revoked.has(jti),
       revoke: async (jti) => {
         revoked.add(jti);
+        return true;
       },
     });
   });
@@ -191,6 +192,7 @@ describe('session-service', () => {
         },
         async revoke(jti, ttl) {
           entries.set(jti, Math.floor(Date.now() / 1000) + ttl);
+          return true;
         },
       };
     }
@@ -245,6 +247,22 @@ describe('session-service', () => {
         const storedExp = store.entries.get(payload!.jti!);
         // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- test: value is established by the setup/fixture above
         expect(storedExp).toBe(payload!.exp);
+      } finally {
+        restore();
+      }
+    });
+
+    // Redis недоступен — отзыв не записан. Раньше revokeSessionToken всё равно
+    // отвечал true, и выход выглядел успешным, хотя токен оставался рабочим
+    // до истечения (аудит Codex out55, F02).
+    it('revokeSessionToken returns false when the store did not persist the revocation', async () => {
+      const restore = __setRevocationStoreForTests({
+        isRevoked: async () => false,
+        revoke: async () => false,
+      });
+      try {
+        const token = await createSessionToken(mockUser);
+        expect(await revokeSessionToken(token)).toBe(false);
       } finally {
         restore();
       }

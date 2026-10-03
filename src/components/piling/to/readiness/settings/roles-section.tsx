@@ -90,13 +90,13 @@ export function RolesSettings({ bootstrap }: RolesSettingsProps) {
       .then(async (response) => {
         // 403 у роли без права настраивать — раздел остаётся «только смотреть».
         if (!response.ok) {
-          if (response.status !== 403 && active) toast.error('Не удалось сохранить настройку');
+          if (response.status !== 403 && active) toast.error('Не удалось загрузить настройки ролей');
           return;
         }
         const body = await response.json() as { data?: AccessMatrixState };
         if (active && body.data) setState(body.data);
       })
-      .catch(() => { if (active) toast.error('Не удалось сохранить настройку'); });
+      .catch(() => { if (active) toast.error('Не удалось загрузить настройки ролей'); });
     return () => { active = false; };
   }, []);
 
@@ -105,13 +105,13 @@ export function RolesSettings({ bootstrap }: RolesSettingsProps) {
     void authFetch('/api/users?limit=100')
       .then(async (response) => {
         if (!response.ok) {
-          if (active) toast.error('Не удалось сохранить настройку');
+          if (active) toast.error('Не удалось загрузить настройки ролей');
           return;
         }
         const body = await response.json() as { users?: DirectoryUser[] };
         if (active && Array.isArray(body.users)) setDirectory(body.users);
       })
-      .catch(() => { if (active) toast.error('Не удалось сохранить настройку'); });
+      .catch(() => { if (active) toast.error('Не удалось загрузить настройки ролей'); });
     return () => { active = false; };
   }, []);
 

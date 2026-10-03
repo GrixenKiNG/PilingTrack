@@ -50,7 +50,58 @@ docker builder prune -af          # reclaim this build's cache before the next
 docker compose build workers
 # NOTE: if the diff adds a new prisma/migrations/* folder, build `migrate`
 # too (separately, same pattern) — see the "Migrations" section below.
+```
 
+## Smoke образа workers перед выкладкой
+
+**Зачем.** 01.10.2026 выкладка уронила воркеров на старте: в образе
+`Dockerfile.workers` нет `node_modules/next` (строка `rm -rf node_modules/next`),
+а `@sentry/nextjs` при загрузке тянет `next/constants` — `Cannot find module`.
+Все юнит-тесты и `tsc` при этом были зелёные: они проверяют код, а не собранный
+образ, который никто ни разу не запускал. Smoke ниже запускает **тот же образ**,
+что уедет на бой, поэтому ловит именно эту поломку до переключения контейнеров.
+
+**Когда обязателен** — если в диапазоне выкладки есть хотя бы одно:
+
+- изменения в `src/workers/**`;
+- изменения в `Dockerfile.workers`;
+- изменения в `package.json` / `package-lock.json`;
+- новые импорты в модулях, которые подключает воркер (что-то из `src/`, попавшее
+  в статический граф `unified-worker`).
+
+**Команды** (локально, на машине сборки; адреса фиктивные — база и Redis тут не
+нужны):
+
+```bash
+docker build -f Dockerfile.workers --target runner -t pilingtrack-workers:smoke .
+
+docker run --rm --name wsmoke \
+  -e NODE_ENV=production \
+  -e DATABASE_URL=postgresql://u:p@127.0.0.1:1/x \
+  -e DATABASE_URL_POSTGRES=postgresql://u:p@127.0.0.1:1/x \
+  -e REDIS_URL=redis://127.0.0.1:1 \
+  pilingtrack-workers:smoke
+# через ~45 с остановить (Ctrl+C или из другого терминала):
+docker rm -f wsmoke
+```
+
+**Как читать вывод.**
+
+- Строк `Cannot find module …` / `MODULE_NOT_FOUND` быть **не должно** — это та
+  самая поломка.
+- Должны появиться `Unified Worker Service starting` и хотя бы одна
+  `Arming … worker` (outbox, projection и т.д.).
+- Ошибки подключения к базе и Redis — **ожидаемы**: адреса фиктивные, до сети
+  дело не доходит.
+
+**Сторож кода — не замена smoke.** `src/workers/__tests__/no-next-in-workers.test.ts`
+обходит статический граф воркеров и валит сборку на импорте `next`/`@sentry/nextjs`
+(и на пакете с `next` в `dependencies`). Но он видит только исходники: ни `npm prune
+--omit=dev`, ни `rm -rf node_modules/next`, ни реальный `node_modules` образа он не
+проверяет. Поэтому оба нужны: сторож ловит импорт в коде на каждом прогоне тестов,
+smoke выше подтверждает, что собранный образ действительно стартует.
+
+```bash
 # Atomic swap. Compose stops the old container only after the new one
 # starts and reports healthy. If the new container fails to start,
 # the old one keeps running.
@@ -59,6 +110,11 @@ docker compose up -d app workers
 
 Add `ws` to both lines only if the WebSocket server changed (rare —
 look for `src/core/realtime/server/` in the diff).
+
+## Workers image smoke
+
+`bash scripts/deploy-prod.sh` автоматически проверяет образ workers после локальной сборки, до первого SSH; ошибка smoke останавливает выкладку.
+Аварийный обход — только `SKIP_WORKERS_SMOKE=1`, с предупреждением о непроверенном образе.
 
 ## Post-deploy check (mandatory — the deploy is not done until this passes)
 
@@ -268,3 +324,15 @@ docker compose rm -f app workers
 docker rmi pilingtrack-app:latest pilingtrack-workers:latest
 docker compose build app workers && docker compose up -d app workers
 ```
+
+## Смена поколения workers (I02)
+
+У app по умолчанию встроены outbox/projection workers. Для этого релиза используйте
+`WORKER_GENERATION_EXTERNAL_STOPPED=1 bash scripts/deploy-prod.sh --replace-worker-generation app workers`.
+До подтверждения вручную остановите все standalone/systemd/pm2/другие хосты; отключите их автоматический рестарт.
+Режим заменяет app и workers вместе: stop всех реплик → проверка фактического завершения (exit 0, без OOM) и отсутствия RUNNING → up нового поколения.
+One-off реплики того же compose-проекта тоже учитываются. Ошибка проверки оставляет сервисы остановленными; не обходите барьер обычным up.
+При откате после переключения тегов применяйте тот же `scripts/replace-worker-generation.sh app workers` с подтверждением внешних остановок.
+Compose ждёт 30 секунд; внутренний WORKER_SHUTDOWN_TIMEOUT_MS старого worker по умолчанию 8000.
+Больший compose timeout не продлевает внутренний дедлайн: exit 1 после 8 секунд блокирует старт и требует проверки drain/незавершённых задач.
+Перед новым запуском подтвердите, что внешние старые процессы действительно завершены.

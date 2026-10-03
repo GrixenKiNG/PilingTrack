@@ -39,13 +39,13 @@ export function IntegrationsSettings({ devices, bootstrap }: IntegrationsSetting
     void authFetch('/api/telegram/configs')
       .then(async (response) => {
         if (!response.ok) {
-          if (active) toast.error('Не удалось сохранить настройку');
+          if (active) toast.error('Не удалось загрузить настройки интеграций');
           return;
         }
         const body = await response.json() as { configs?: unknown[] };
         if (active) setTelegramCount(Array.isArray(body.configs) ? body.configs.length : 0);
       })
-      .catch(() => { if (active) toast.error('Не удалось сохранить настройку'); });
+      .catch(() => { if (active) toast.error('Не удалось загрузить настройки интеграций'); });
     return () => { active = false; };
   }, []);
 

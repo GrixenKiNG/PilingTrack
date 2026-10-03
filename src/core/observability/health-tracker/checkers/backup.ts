@@ -1,8 +1,10 @@
 import { promises as fs } from 'fs';
 import path from 'path';
-// Ключи system:backup:* пишет scripts/backup-postgres.sh в инстанс состояния
-// (REDIS_URL). Через getRedisClient с prod-контейнером на боку (REDIS_URL_CACHE)
-// они не находятся — та же ловушка двух Redis, что и с пульсом служб, из-за
+// Ключи бэкапа лежат в Redis как pilingtrack:system:backup:* — приставку
+// keyPrefix ioredis добавляет к каждому обращению сама. Пишет их
+// scripts/backup-postgres.sh в инстанс состояния (REDIS_URL). Через
+// getRedisClient с prod-контейнером на боку (REDIS_URL_CACHE) они не
+// находятся — та же ловушка двух Redis, что и с пульсом служб, из-за
 // которой метрики бэкапа оставались нулями (F-OFFSITE-SIGNAL-b).
 import { getStateRedisClient } from '@/lib/redis-cache';
 import {

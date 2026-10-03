@@ -209,3 +209,55 @@ describe('useReportForm — построчные ошибки сервера д�
     }
   });
 });
+
+describe('useReportForm — отказ проверки не стирает набранную строку (F-R111-2)', () => {
+  // Форма очищала поля ввода сразу после вызова handleSubmit, даже когда та
+  // выходила на проверке раньше переноса строки в состояние. Признак возврата
+  // `false` — единственное, по чему форма понимает: стирать нельзя.
+  beforeEach(() => {
+    vi.mocked(toast.error).mockClear();
+    storeState.selectedSiteId = '';
+    authFetchMock.mockReset();
+    authFetchMock.mockImplementation((url: string) => {
+      if (url.startsWith('/api/dictionary/all')) {
+        return Promise.resolve(okJson({ pileGrades: [GRADE], drillingTypes: [], downtimeReasons: [] }));
+      }
+      if (url.startsWith('/api/sites')) return Promise.resolve(okJson({ data: [] }));
+      if (url.startsWith('/api/equipment')) return Promise.resolve(okJson({ data: [] }));
+      return Promise.resolve(okJson({}));
+    });
+  });
+
+  it('возвращает false и не отправляет, когда объект не выбран', async () => {
+    const { result } = renderHook(() => useReportForm());
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    let accepted: boolean | undefined;
+    await act(async () => {
+      accepted = await result.current.handleSubmit({ pile: { gradeId: 'g1', count: 2 } });
+    });
+
+    expect(accepted).toBe(false);
+    expect(authFetchMock).not.toHaveBeenCalledWith('/api/reports/upsert', expect.anything());
+  });
+
+  it('возвращает true, когда строка принята и отчёт уходит на сервер', async () => {
+    storeState.selectedSiteId = 'site-1';
+    try {
+      const { result } = renderHook(() => useReportForm());
+
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      let accepted: boolean | undefined;
+      await act(async () => {
+        accepted = await result.current.handleSubmit({ pile: { gradeId: 'g1', count: 2 } });
+      });
+
+      expect(accepted).toBe(true);
+      expect(authFetchMock).toHaveBeenCalledWith('/api/reports/upsert', expect.anything());
+    } finally {
+      storeState.selectedSiteId = '';
+    }
+  });
+});

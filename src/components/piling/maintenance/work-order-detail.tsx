@@ -15,6 +15,7 @@ import { ArrowLeft, Camera, ClipboardCheck, Loader2, UserCog, Wrench } from '@/c
 import { toast } from 'sonner';
 import { authFetch } from '@/lib/api';
 import { formatRuDate } from '@/lib/format';
+import { formatDateTimeInTimezone } from '@/lib/timezone';
 import { usePilingStore } from '@/lib/store';
 import { resolveEffectiveRole } from '@/lib/types';
 import { Button } from '@/components/ui/button';
@@ -29,7 +30,7 @@ import {
   STATUS_LABEL, STATUS_STYLE, PRIORITY_LABEL, PRIORITY_STYLE, TYPE_LABEL,
   type MaintenanceStatus, type MaintenancePriority, type MaintenanceType,
 } from './maintenance-labels';
-import { nextStatusActions, resolveAssigneeName } from './maintenance-helpers';
+import { nextStatusActions, resolveAssigneeName, maintenanceErrorText, maintenanceCatchText } from './maintenance-helpers';
 import { WorkOrderFormDialog } from './work-order-form-dialog';
 import { WorkOrderPhotos } from './work-order-photos';
 
@@ -96,6 +97,10 @@ export function WorkOrderDetail({ recordId }: { recordId: string }) {
   const [record, setRecord] = useState<WorkOrderRecord | null>(null);
   const [assignees, setAssignees] = useState<AssigneeOption[]>([]);
   const [quick, setQuick] = useState<QuickFields | null>(null);
+  // Почему наряд не показан: HTTP-статус отказа чтения или 'network' при обрыве.
+  // Раньше любой не-ok давал «Наряд не найден.» — 403 (нет права) и 5xx путались
+  // с «запись удалена».
+  const [loadError, setLoadError] = useState<number | 'network' | null>(null);
   const [loading, setLoading] = useState(true);
   const [savingStatus, setSavingStatus] = useState<MaintenanceStatus | null>(null);
   const [savingQuick, setSavingQuick] = useState(false);
@@ -117,12 +122,18 @@ export function WorkOrderDetail({ recordId }: { recordId: string }) {
     setLoading(true);
     try {
       const res = await authFetch(`/api/maintenance/${recordId}`);
-      if (!res.ok) throw new Error();
+      if (!res.ok) {
+        setLoadError(res.status);
+        setRecord(null);
+        return;
+      }
       const rec = (await res.json()).record as WorkOrderRecord;
       setRecord(rec);
       setQuick(quickFromRecord(rec));
+      setLoadError(null);
     } catch {
-      toast.error('Не удалось загрузить наряд');
+      // fetch без сети бросает TypeError — это обрыв, а не «наряд не найден».
+      setLoadError('network');
       setRecord(null);
     } finally {
       setLoading(false);
@@ -147,7 +158,15 @@ export function WorkOrderDetail({ recordId }: { recordId: string }) {
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      toast.error(err.error || 'Ошибка сохранения');
+      if (res.status === 409) {
+        // 409 — запись изменили или приняли, пока форма была открыта.
+        // Перечитываем наряд, чтобы повтор не упёрся в тот же конфликт: совет
+        // «обновите страницу» без перечитывания повторялся бесконечно.
+        await load();
+        toast.error('Запись изменилась — данные обновлены, повторите действие.');
+        return false;
+      }
+      toast.error(maintenanceErrorText(res.status, err.error));
       return false;
     }
     return true;
@@ -191,12 +210,12 @@ export function WorkOrderDetail({ recordId }: { recordId: string }) {
       const res = await authFetch(`/api/maintenance/${recordId}/accept`, { method: 'POST' });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || 'Не удалось принять');
+        throw new Error(maintenanceErrorText(res.status, err.error));
       }
       toast.success('Принято');
       await load();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Ошибка');
+      toast.error(maintenanceCatchText(err, 'Ошибка'));
     } finally {
       setAccepting(false);
     }
@@ -215,10 +234,24 @@ export function WorkOrderDetail({ recordId }: { recordId: string }) {
   }
 
   if (!record || !quick) {
+    // Сбой повторяемый — обрыв связи и 5xx; 403/404 повтором не лечатся.
+    const retryable = loadError === 'network' || (typeof loadError === 'number' && loadError >= 500);
+    const message = loadError === 'network'
+      ? 'Нет связи с сервером — повторите при появлении сети.'
+      : typeof loadError === 'number'
+        ? maintenanceErrorText(loadError)
+        : 'Наряд не найден.';
     return (
       <div className="mx-auto w-full max-w-3xl px-4 py-6">
         <BackLink />
-        <p className="mt-6 rounded-lg bg-muted px-3 py-6 text-center text-sm text-muted-foreground">Наряд не найден.</p>
+        <div className="mt-6 rounded-lg bg-muted px-3 py-6 text-center text-sm text-muted-foreground">
+          <p>{message}</p>
+          {retryable && (
+            <Button size="sm" variant="outline" className="mt-3 min-h-11 sm:min-h-0" onClick={() => void load()}>
+              Повторить
+            </Button>
+          )}
+        </div>
       </div>
     );
   }
@@ -269,7 +302,7 @@ export function WorkOrderDetail({ recordId }: { recordId: string }) {
           <span>{TYPE_LABEL[record.type]}</span>
           <span>приоритет: {PRIORITY_LABEL[record.priority]}</span>
           {record.scheduledAt && <span>план {formatRuDate(record.scheduledAt)}</span>}
-          {record.completedAt && <span>факт {formatRuDate(record.completedAt)}</span>}
+          {record.completedAt && <span>факт {formatDateTimeInTimezone(record.completedAt)}</span>}
         </div>
         {record.description && <p className="mt-2 text-sm text-muted-foreground">{record.description}</p>}
         {record.status === 'CANCELLED' && (
@@ -421,7 +454,7 @@ export function WorkOrderDetail({ recordId }: { recordId: string }) {
         <h2 className="mb-2 flex items-center gap-2 text-sm font-semibold text-foreground"><ClipboardCheck className="h-4 w-4 text-muted-foreground" />Приёмка</h2>
         {record.acceptedAt ? (
           <p className="text-sm text-success-strong">
-            ✓ Принято {formatRuDate(record.acceptedAt)}
+            ✓ Принято {formatDateTimeInTimezone(record.acceptedAt)}
           </p>
         ) : isAdmin ? (
           <div className="flex items-center justify-between gap-3">
@@ -458,7 +491,7 @@ function PersonRow({ label, name, at, fallback }: {
       <dt className="shrink-0 text-xs text-muted-foreground">{label}</dt>
       <dd className={cn('text-right text-sm', name ? 'font-medium text-foreground' : 'text-muted-foreground')}>
         {name ?? fallback}
-        {name && at && <span className="ml-1.5 text-xs font-normal text-muted-foreground">{formatRuDate(at)}</span>}
+        {name && at && <span className="ml-1.5 text-xs font-normal text-muted-foreground">{formatDateTimeInTimezone(at)}</span>}
       </dd>
     </div>
   );

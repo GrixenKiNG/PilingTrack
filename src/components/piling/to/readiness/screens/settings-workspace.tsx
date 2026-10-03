@@ -35,7 +35,7 @@ const SETTINGS_ITEMS: Array<{
   { id: 'audit', label: 'Аудит', icon: FileBarChart },
 ];
 
-function downloadCsv(filename: string, _rows: Array<Array<string | number | null | undefined>>) {
+async function downloadCsv(filename: string, _rows: Array<Array<string | number | null | undefined>>) {
   const dataset = filename.includes('audit') ? 'audit'
     : filename.includes('dictionary') ? 'dictionary'
       : filename.includes('permit') ? 'permits'
@@ -46,8 +46,11 @@ function downloadCsv(filename: string, _rows: Array<Array<string | number | null
     const value = params.get(key);
     if (value) (filters as Record<string, string>)[key] = value;
   }
-  void downloadReadinessExport(dataset, filters)
-    .catch((error) => toast.error(error instanceof Error ? error.message : 'Не удалось сформировать экспорт'));
+  try {
+    await downloadReadinessExport(dataset, filters);
+  } catch (error) {
+    toast.error(error instanceof Error ? error.message : 'Не удалось сформировать экспорт');
+  }
 }
 
 
@@ -95,7 +98,10 @@ export function SettingsWorkspace(props: ReferenceUiProps) {
           <DictionariesSettings
             equipment={props.equipment}
             bootstrap={props.bootstrap}
-            onExport={() => void downloadReadinessExport('dictionary', props.filters).catch((error) => toast.error(error instanceof Error ? error.message : 'Не удалось сформировать экспорт'))}
+            onExport={async () => {
+              try { await downloadReadinessExport('dictionary', props.filters); }
+              catch (error) { toast.error(error instanceof Error ? error.message : 'Не удалось сформировать экспорт'); }
+            }}
           />
         )}
         {props.settingsSection === 'notifications' && <NotificationsSettings isAdmin={props.bootstrap?.actor.role === 'ADMIN'} />}

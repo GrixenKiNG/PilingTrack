@@ -14,6 +14,7 @@ import Link from 'next/link';
 import { Pencil, Trash2, Plus, Wrench, Loader2, CheckCircle2, PlayCircle } from '@/components/piling/icons/unified-icons';
 import { toast } from 'sonner';
 import { authFetch } from '@/lib/api';
+import { catchText } from '@/components/piling/admin-crews/crew-messages';
 import { formatRuDate } from '@/lib/format';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -117,7 +118,8 @@ export function EquipmentMaintenance({ equipmentId }: { equipmentId: string }) {
       }
       await load();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Ошибка');
+      // Обрыв сети fetch бросает TypeError с английским «Failed to fetch» (F-R112-1).
+      toast.error(catchText(err, 'Ошибка'));
     } finally {
       setPendingId(null);
     }
@@ -131,7 +133,8 @@ export function EquipmentMaintenance({ equipmentId }: { equipmentId: string }) {
       toast.success('Запись удалена');
       await load();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Ошибка');
+      // Обрыв сети fetch бросает TypeError с английским «Failed to fetch» (F-R112-1).
+      toast.error(catchText(err, 'Ошибка'));
     } finally {
       setPendingId(null);
       setPendingDelete(null);

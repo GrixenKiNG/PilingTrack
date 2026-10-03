@@ -44,7 +44,7 @@ export function AdminTelegram() {
   const [newChatId, setNewChatId] = useState('');
   const [saving, setSaving] = useState(false);
   const [togglingId, setTogglingId] = useState<string | null>(null);
-  const [testing, setTesting] = useState(false);
+  const [testingId, setTestingId] = useState<string | null>(null);
   const [pendingDelete, setPendingDelete] = useState<TelegramConfigDTO | null>(null);
 
   const openCreate = () => {
@@ -70,10 +70,17 @@ export function AdminTelegram() {
     setEditingId(null);
   };
 
-  const handleTest = async () => {
-    setTesting(true);
+  const handleTest = async (config: TelegramConfigDTO) => {
+    setTestingId(config.id);
     try {
-      const res = await authFetch('/api/notifications/telegram/test', { method: 'POST' });
+      // Канал проверяем именно тот, у которого нажата кнопка: без id сервер
+      // брал первую включённую запись, и админ у второго бота видел результат
+      // первого (F-R120-1).
+      const res = await authFetch('/api/notifications/telegram/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ configId: config.id }),
+      });
       const data = await res.json();
       if (res.ok && data.ok) {
         toast.success(
@@ -82,12 +89,12 @@ export function AdminTelegram() {
             : 'Соединение установлено',
         );
       } else {
-        toast.error(`Ошибка: ${data.error || 'Не удалось подключиться'}`);
+        toast.error(data.error || 'Не удалось подключиться — проверьте токен и повторите');
       }
     } catch {
       toast.error('Ошибка тестирования');
     } finally {
-      setTesting(false);
+      setTestingId(null);
     }
   };
 
@@ -284,11 +291,11 @@ export function AdminTelegram() {
                   </div>
                   <div className="flex items-center justify-end gap-2 mt-3">
                     <button
-                      onClick={handleTest}
-                      disabled={testing || !config.enabled}
+                      onClick={() => handleTest(config)}
+                      disabled={testingId !== null || !config.enabled}
                       className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-info-strong transition-colors px-2 py-1.5 rounded-lg hover:bg-info/10 disabled:opacity-50"
                     >
-                      {testing ? (
+                      {testingId === config.id ? (
                         <Loader2 className="w-3.5 h-3.5 animate-spin" />
                       ) : (
                         <Send className="w-3.5 h-3.5" />

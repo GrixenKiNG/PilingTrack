@@ -3,7 +3,7 @@ import {formatRuDate} from '@/lib/format';
 import {formatDateInTimezone} from '@/lib/timezone';
 
 const FORMULA_PREFIX = /^(?:[\t\r]|\s*[=+\-@])/;
-// То же исключение, что в CSV отчётов (report-query.service.ts): обычные числа
+// То же исключение, что в CSV отчётов (report-export.service.ts): обычные числа
 // не трогаем, иначе «-5» уехало бы в файл текстом и колонка перестала бы
 // суммироваться, а «-5+A1» апостроф получит.
 const PLAIN_NUMBER = /^-?\d+([.,]\d+)?$/;

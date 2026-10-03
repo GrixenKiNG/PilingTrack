@@ -9,6 +9,7 @@ import { QueryErrorBanner } from '@/components/piling/async-ui';
 import { usePilingStore } from '@/lib/store';
 import { can } from '@/services/auth/authorization-service';
 import { authFetch } from '@/lib/api';
+import { catchText } from '@/components/piling/admin-crews/crew-messages';
 import { cn } from '@/lib/utils';
 import { pluralizeRu } from '@/lib/format';
 import type { ReportDTO } from '@/lib/types';
@@ -47,7 +48,7 @@ export function AdminReports() {
     filterSiteId, setFilterSiteId,
     filterUserId, setFilterUserId,
     periodFrom, setPeriodFrom, periodTo, setPeriodTo,
-    periodActive, loading, loadingReferenceData, loadingMore, hasMore, error, filterError, dictionaryError,
+    periodActive, loading, loadingReferenceData, loadingMore, hasMore, error, errorForbidden, loadMoreError, filterError, dictionaryError,
     handleApplyPeriod, handleResetPeriod, loadMoreReports, loadReports, loadReferenceData, totalReports, serverSums,
   } = useReportsData();
 
@@ -103,7 +104,13 @@ export function AdminReports() {
       link.click();
       toast.success(`Выгружено за период ${dateFrom} — ${dateTo}`);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Не удалось выгрузить отчёты');
+      // fetch без сети бросает TypeError с английским «Failed to fetch» —
+      // в русском интерфейсе это не сообщение.
+      toast.error(
+        err instanceof TypeError
+          ? 'Нет связи с сервером. Выгрузка не выполнена — повторите при появлении сети.'
+          : err instanceof Error ? err.message : 'Не удалось выгрузить отчёты',
+      );
     } finally {
       if (objectUrl) URL.revokeObjectURL(objectUrl);
       setExporting(false);
@@ -131,13 +138,22 @@ export function AdminReports() {
         body: JSON.stringify({ reportId: report.reportId }),
       });
       if (!res.ok) {
-        const msg = await res.text().catch(() => '');
-        throw new Error(`Ошибка удаления (${res.status}): ${msg.slice(0, 200)}`);
+        // Русский разбор отказа: сырое тело JSON с кодом статуса диспетчеру ни
+        // о чём не говорит, а 404 («уже удалён») нужно отличить от 403 и 5xx.
+        if (res.status === 403) {
+          throw new Error('Отчёт не удалён: нет прав на удаление. Обратитесь к администратору.');
+        }
+        if (res.status === 404) {
+          throw new Error('Отчёт уже удалён — обновите список.');
+        }
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || `Не удалось удалить отчёт (код ${res.status}).`);
       }
       if (effectivePreview?.reportId === report.reportId) setPreviewReport(null);
       await loadReports();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Не удалось удалить отчёт');
+      // Обрыв сети fetch бросает TypeError с английским «Failed to fetch» (F-R112-1).
+      toast.error(catchText(err, 'Не удалось удалить отчёт'));
     } finally {
       setDeletingId(null);
       setPendingDeleteReport(null);
@@ -234,7 +250,7 @@ export function AdminReports() {
           <QueryErrorBanner
             title="Не удалось загрузить отчёты"
             message={error}
-            onRetry={loadReports}
+            onRetry={errorForbidden ? undefined : loadReports}
           />
         </div>
       ) : (
@@ -373,6 +389,21 @@ export function AdminReports() {
                       >
                         {loadingMore ? 'Загрузка...' : 'Загрузить ещё отчёты'}
                       </Button>
+                      {loadMoreError ? (
+                        <div className="mt-2 flex flex-col items-center gap-1">
+                          <span className="text-xs text-destructive-strong">{loadMoreError}</span>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={() => void loadMoreReports()}
+                            disabled={loadingMore}
+                            className="border-border bg-card"
+                          >
+                            Повторить
+                          </Button>
+                        </div>
+                      ) : null}
                     </div>
                   )}
                 </>

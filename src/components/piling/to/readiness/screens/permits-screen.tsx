@@ -57,6 +57,10 @@ export function PermitsScreen(props: ReferenceUiProps) {
   const [commandText, setCommandText] = useState('');
   const [commandError, setCommandError] = useState<string | null>(null);
   const [commandPending, setCommandPending] = useState(false);
+  // Выгрузка идёт не мгновенно (serializable-транзакция на сервере), поэтому
+  // кнопка блокируется и показывает ход: без этого двойной клик отправлял две
+  // полные выгрузки, а человек не видел, что что-то происходит.
+  const [exportPending, setExportPending] = useState(false);
   // Сроки документов экипажей: те же данные, что во вкладке «Документы».
   const canReadDocuments = !!props.bootstrap && can(props.bootstrap.actor, 'users.documents.read_all');
   const documentActorKey = props.bootstrap ? [props.bootstrap.actor.id, props.bootstrap.actor.role, props.bootstrap.actor.actingAs].join(':') : '';
@@ -142,6 +146,13 @@ export function PermitsScreen(props: ReferenceUiProps) {
     props.onRetry();
   };
 
+  const exportPermits = async () => {
+    setExportPending(true);
+    try { await downloadReadinessExport('permits', props.filters); }
+    catch (error) { toast.error(error instanceof Error ? error.message : 'Не удалось сформировать экспорт'); }
+    finally { setExportPending(false); }
+  };
+
   if (composing) {
     return (
       <PermitForm
@@ -157,7 +168,7 @@ export function PermitsScreen(props: ReferenceUiProps) {
 
   return (
     <>
-      <ScreenTitle heading="Наряд-допуски" subtitle="Проверка условий и разрешений на выполнение работ" actions={<div className="flex gap-2"><Button variant="outline" onClick={() => void downloadReadinessExport('permits', props.filters).catch((error) => toast.error(error instanceof Error ? error.message : 'Не удалось сформировать экспорт'))}>Экспорт</Button>{/* Установку выбирают в самой форме, поэтому кнопка больше не ждёт
+      <ScreenTitle heading="Наряд-допуски" subtitle="Проверка условий и разрешений на выполнение работ" actions={<div className="flex gap-2"><Button variant="outline" disabled={exportPending} onClick={() => void exportPermits()}>{exportPending ? 'Готовим файл…' : 'Экспорт'}</Button>{/* Установку выбирают в самой форме, поэтому кнопка больше не ждёт
                 выделенной строки в списке — раньше она была недоступна, пока
                 пользователь не догадается кликнуть установку. */}
             <Button type="button" disabled={!props.bootstrap?.capabilities.entities.permit.edit} onClick={() => setComposing(true)} className="min-h-11 bg-signal-strong hover:bg-signal-strong">+ Создать наряд</Button></div>} />

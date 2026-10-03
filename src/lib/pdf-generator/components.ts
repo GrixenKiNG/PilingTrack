@@ -1,5 +1,5 @@
 import { COLORS, CONTENT_WIDTH, PAGE } from './constants';
-import { formatNumber, formatRuDate, safeText } from './format';
+import { formatNumber, formatRuDate, safeText, statusLabel } from './format';
 import { sumDowntime, sumDrilling, sumPiles } from './period-row';
 import { formatDowntimeHours } from '@/lib/downtime-hours';
 import type { PdfDoc, PeriodReportRow } from './types';
@@ -214,7 +214,7 @@ export function addPeriodTable(doc: PdfDoc, reports: PeriodReportRow[]) {
 
 export function addReportBreakdown(doc: PdfDoc, report: PeriodReportRow, index: number) {
   ensureSpace(doc, 54);
-  const title = `${index}. ${formatRuDate(report.date || '')} | ${report.site?.name || 'Объект'} | ${report.user?.name || 'Оператор'}`;
+  const title = `${index}. ${formatRuDate(report.date || '')} | ${report.site?.name || 'Объект'} | ${report.user?.name || 'Оператор'} | ${statusLabel(report.status || '')}`;
   doc.font('Bold').fontSize(9.5).fillColor(COLORS.dark);
   doc.text(title, PAGE.left, doc.y, { width: CONTENT_WIDTH });
   doc.moveDown(0.25);

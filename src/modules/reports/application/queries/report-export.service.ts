@@ -1,3 +1,4 @@
+import { isSubmittedReport } from '@/lib/report-status';
 /**
  * Report Export Service — выгрузки отчётов (CSV и Excel).
  *
@@ -343,8 +344,9 @@ export async function exportReportsXlsx(filters: ReportExportFilters): Promise<B
   // --- Лист 2: итоги по отчёту. ---
   const totals: (string | number | null)[][] = [[
     'ID отчёта', 'Дата', 'Смена', 'Объект', 'Оператор', 'Установка',
-    'Свай, всего', 'Свай, м.п.', 'Бурение, скв.', 'Бурение, м', 'Простой, ч', 'Остаток топлива, %', 'Примечание',
+    'Свай, всего', 'Свай, м.п.', 'Бурение, скв.', 'Бурение, м', 'Простой, ч', 'Остаток топлива, %', 'Примечание', 'Статус',
   ]];
+  const drafts: (string | number | null)[][] = [totals[0]];
   for (const r of reports) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
     const piles = (r.piles as any[]).reduce((s, p) => s + p.count, 0);
@@ -359,23 +361,16 @@ export async function exportReportsXlsx(filters: ReportExportFilters): Promise<B
     const meters = (r.drillings as any[]).reduce((s, d) => s + d.meters, 0);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
     const downtime = (r.downtimes as any[]).reduce((s, d) => s + d.duration, 0);
-    totals.push([
+    (isSubmittedReport(r) ? totals : drafts).push([
       r.reportId, formatRuDate(r.date), shiftLabel(r.shiftType), r.site.name, r.user.name, r.equipment?.name || r.crew?.equipment?.name || '',
       piles, pileMeters, wells, meters, downtime, r.endingFuelPercent ?? null,
-      pilesWithoutLength ? PILE_METERS_INCOMPLETE_NOTE : '',
+      pilesWithoutLength ? PILE_METERS_INCOMPLETE_NOTE : '', reportStatusExportLabel(r.status),
     ]);
-  }
-
-  // Итоги периода подписаны, если в него попали несданные смены: иначе по
-  // листу «Итоги» не понять, почему сумма больше аналитики (решение владельца
-  // 26.09.2026 — черновики остаются в выгрузке, но помечены).
-  const draftCount = reports.filter((r) => r.status === 'draft').length;
-  if (draftCount > 0) {
-    totals.push([`Включены несданные смены: ${draftCount}`]);
   }
 
   return buildXlsx([
     { name: 'Детализация', rows: detail },
     { name: 'Итоги', rows: totals },
+    ...(drafts.length > 1 ? [{ name: 'Черновики', rows: drafts }] : []),
   ]);
 }

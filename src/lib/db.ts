@@ -80,7 +80,7 @@ function createPrismaClient(): PostgresPrismaClient {
   // migrations URL), so PgBouncer sat idle while app/workers/ws all connected
   // to postgres directly (audit H5). Transaction pooling is safe here: the
   // only tenant-context mechanism in use is transaction-local set_config
-  // (withTenantContext); the session-level SET variant has no callers.
+  // (withTenantContext); the session-level SET variant was removed 01.10.2026.
   const url = process.env.DATABASE_URL || process.env.DATABASE_URL_POSTGRES;
   if (!url) {
     throw new Error(

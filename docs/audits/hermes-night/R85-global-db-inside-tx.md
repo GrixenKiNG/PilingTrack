@@ -125,3 +125,57 @@
    `runOutsideGucScope` и её тест в этой ветке (после слияния) не проверялись на достаточность.
 8. **Что именно кладёт `DEFAULT_TENANT_ID`** в контекст тенанта в воркерах (влияет на то, помечается ли
    область в не-HTTP-путях, отличных от публикатора outbox) — не прослеживал до конца.
+
+## Текущий статус находок (проверка 2026-10-02, CX-H09)
+
+Раздел добавлен позже, таблицы находок и «Не проверено» выше не переписаны — это снимок на дату отчёта.
+Общего вывода «R85 закрыт» нет: из 10 позиций закрыты две, по которым был боевой дефект (№1 и №2), плюс
+сопутствующая №9; остальные семь остаются открытыми или латентными.
+
+Перенос исправления. `git merge-base --is-ancestor e2e90e13 HEAD` → **exit 0**: коммит `e2e90e13`
+(30.09.2026, «PDF отчёта снова доходит — настройки бота читаются с тенантом и изнутри транзакции») уже
+предок `HEAD`. Это противоречит §6 «Методики» («NOT ANCESTOR») — там зафиксировано состояние на момент
+составления отчёта, до того как ветка `fix/telegram-pdf-rls` пришла в `main` (`0a48fa06`) и оттуда сюда.
+Проверен не только ancestry, но и код: `src/core/security/tenant-rls.ts:46-63` содержит `runOutsideGucScope`,
+`src/core/notifications/telegram.ts:22,56` его вызывает. Выключатель алертов вынесен отдельным коммитом
+`d7a57cdc` (01.10.2026), `git merge-base --is-ancestor d7a57cdc HEAD` → **exit 0**.
+
+| # | severity | статус на 2026-10-02 | подтверждение текущим кодом | что осталось |
+|---|---|---|---|---|
+| 1 | критично | **закрыто** | `telegram.ts:56` — `getConfigs` выполняет чтение внутри `runWithTenantContext(() => runOutsideGucScope(…))`, то есть снимает унаследованную пометку; `event-handlers.ts:621` по-прежнему зовёт `sendDocument` изнутри `$transaction`, но настройки бота теперь доезжают. Тест-регрессия `src/core/notifications/__tests__/telegram.test.ts:328-343` («запрос настроек несёт тенанта, даже если вызван из области `runWithGucApplied`») | — |
+| 2 | критично | **закрыто** | `durable-alert-delivery.ts:33-38` — `isNotificationEnabled` вынесен **до** `db.$transaction` (`:42`), комментарий со ссылкой на R85 §2; внутри транзакции остались блокировка строки (`:43`), повторное чтение `:44`, отправка `:47` и `tx.outboxEvent.update` (`:50`). Тест `src/services/notifications/__tests__/durable-alert-delivery.test.ts:15` («reads the notification switch outside the transaction (R85 §2)») | отправка алерта (`:47`) по-прежнему внутри транзакции, но опирается на исправленный путь №9 — отдельной правки не требует |
+| 3 | важно | **не закрыто** (латентно) | `tenant-rls.ts:198-212` без изменений: при пометке `resolveGucTenantId()` (`:71-74`) возвращает `null`, и `wrapRawQuery` (`:203-204`) отдаёт исходный вызов без `set_config` — сырой SQL в помеченной области уходит без тенанта | правка не сделана; граф вызовов заново не строился (только чтение кода), «сегодня не вызывается» принято как в исходном отчёте |
+| 4 | важно | **не закрыто** (латентно) | `outbox-publisher.ts:52-54` — параметр всё ещё `tx: any` с `eslint-disable`. Единственный живой вызов — `src/app/api/reports/delete/route.ts:116`, передаёт `tx` | типизация `Prisma.TransactionClient` не сделана |
+| 5 | важно | **не закрыто** (латентно) | `settings-service.ts:22-25` — `readSettings(tenantId, client = db)`, `:39-42` — `getSettings` без клиента. Добавлен только комментарий `:73-76`: внутри транзакции `runWithTenantContext` не помогает, такие вызовы надо выносить наружу | клиент не сделан обязательным ни в одной из 4 функций класса |
+| 6 | важно | **не закрыто** (латентно) | `src/app/api/readiness/handovers/[id]/accept/route.ts:15` — прежний вложенный `withReadinessTenantTransaction` внутри `resolveConflictDetails`. Он вызывается только из `catch` после исчерпания попыток (`tenant-transaction.ts:99-114`), то есть вне открытой транзакции | диагностику в ту же транзакцию не перевели |
+| 7 | мелочь | **не закрыто** (латентно) | `feedback-event-service.ts:112-131` — глобальный `db.feedbackEvent.create` без изменений. Выборочно сверил места вызова: `app/api/reports/single-pdf/route.ts:118,132,259,273`, `app/api/feedback/events/route.ts:147`, `reports/delete/route.ts:185`, `reports/upsert/route.ts:28,130` — все в ветках обработки ошибок, после транзакции | предупреждающего комментария/клиента нет |
+| 8 | мелочь | **не закрыто** (латентно) | `audit-service.ts:935-943` (`resolveActor` → глобальный `db.user.findUnique`), `:953-975` (`recordAuditEvent`) — без изменений | — |
+| 9 | мелочь | **закрыто** | `telegram.ts:39-64` — `getConfigs` обёрнут в `runOutsideGucScope`, поэтому `runWithGucApplied` больше не глушит доставку тенанта; пояснение в комментарии `:52-55`. Это и есть механизм, закрывающий №1 | — |
+| 10 | мелочь | **не закрыто** | `tenant-enforcement.ts:246-256` — пометки `@deprecated` нет. Вызывающих в коде по-прежнему нет: `rg setPostgresTenantContext` даёт только объявление, комментарий `:264` и реэкспорт `src/core/security/index.ts:17` | образец не помечен как ненадёжный |
+
+Итог по позициям: закрыты №1, №2, №9 (3 из 10); №3, №4, №5, №6, №7, №8, №10 остаются — по одному
+незакрытому пункту на каждую, без общего заявления о закрытии R85.
+
+### Команды проверки (каждая — отдельно, exit как есть)
+
+1. `git merge-base --is-ancestor e2e90e13 HEAD` → **exit 0** (коммит — предок `HEAD`).
+2. `git merge-base --is-ancestor d7a57cdc HEAD` → **exit 0**.
+3. `git diff --check` → **exit 0** (проверено перед коммитом; пробельных ошибок нет).
+4. `node node_modules/vitest/vitest.mjs run src/core/notifications/__tests__ src/services/notifications/__tests__ src/core/security/__tests__/tenant-rls.test.ts`
+   → **exit 0**, Test Files 3 passed (3), Tests **37 passed (37)**, skipped 0. Это подтверждает только
+   локальное поведение (в т.ч. тест-регрессию №1); на живой базе ничего не воспроизводилось.
+5. `tsc` и `eslint` для исходников не запускались: единственный изменённый путь — этот документ,
+   править в `src/**` было нечего.
+
+Сверка текущих реализаций выполнена `rg` (без чтения `.env`): `rg -n "runOutsideGucScope|runWithGucApplied|isGucApplied" src/`,
+`rg -n "sendDocument|loadSingleReportPdfContext" src/services/reports/event-handlers.ts`,
+`rg -n "saveToOutbox" src/`, `rg -n "setPostgresTenantContext" src/ e2e/ tests/`,
+`rg -n "recordFeedbackEvent\(" src/`, `rg -n "resolveConflictDetails" src/modules/readiness/infrastructure/tenant-transaction.ts`.
+
+### Без изменений и риски
+
+- В `src/**`, `prisma/**` и тестах ничего не менялось — отчёт только читал код; `.env*` не читался.
+- Прод, живая база и браузер не проверялись (запрет AGENTS.md и задачи): боевое поведение политик RLS
+  по-прежнему не подтверждено; «закрыто» здесь означает «исправление есть в этой ветке и покрыто
+  юнит-тестом», а не «проверено на бою».
+- Риск по №3-№8 и №10 сохраняется в исходном виде; №5 остаётся поверхностью класса ошибок №1/№2.

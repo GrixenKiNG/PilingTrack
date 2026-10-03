@@ -128,7 +128,7 @@ async function projectEvent(event: ReportDomainEvent) {
       enrichedEvent.type.startsWith('Drilling')
     ) {
       if (enrichedEvent.siteId) {
-        await projectWeeklyTrend(enrichedEvent.siteId, reportDate);
+        await projectWeeklyTrend(enrichedEvent.siteId, reportDate, enrichedEvent.tenantId);
       }
     }
   } catch (error) {

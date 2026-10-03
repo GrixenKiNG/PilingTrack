@@ -1,6 +1,7 @@
 import http from 'http';
 import { logger } from '@/lib/logger';
-import { HEALTH_PORT } from './config';
+import { exportAuditFeedbackMetricsPrometheus } from '@/core/observability/audit-feedback-metrics';
+import { ENABLED_WORKERS, HEALTH_PORT } from './config';
 import { workerStates } from './state';
 
 export function startHealthServer(): http.Server {
@@ -42,6 +43,7 @@ export function startHealthServer(): http.Server {
       res.writeHead(200, { 'Content-Type': 'text/plain' });
 
       const lines = Object.values(workerStates).flatMap((worker) => [
+        `worker_enabled{name="${worker.name}"} ${ENABLED_WORKERS.includes(worker.name) ? 1 : 0}`,
         `worker_status{name="${worker.name}"} ${worker.status === 'running' ? 1 : 0}`,
         `worker_is_leader{name="${worker.name}"} ${worker.isLeader ? 1 : 0}`,
         `worker_uptime_seconds{name="${worker.name}"} ${
@@ -49,7 +51,7 @@ export function startHealthServer(): http.Server {
         }`,
       ]);
 
-      res.end(lines.join('\n') + '\n');
+      res.end(lines.join('\n') + '\n' + exportAuditFeedbackMetricsPrometheus());
       return;
     }
 

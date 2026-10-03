@@ -1,3 +1,4 @@
+import { SUBMITTED_REPORT_STATUS } from '@/lib/report-status';
 /**
  * Report Query Service — CQRS Read Side
  *
@@ -89,7 +90,7 @@ export async function getReportsByPeriod(
  * дашборд; черновик в итоги не входит ни на одном экране.
  */
 async function sumSubmittedReports(where: Record<string, unknown>) {
-  const reportWhere = { ...where, status: 'submitted' };
+  const reportWhere = { ...where, status: SUBMITTED_REPORT_STATUS };
   const [reports, pilesByGrade, drilling, downtime] = await Promise.all([
     db.report.count({ where: reportWhere }),
     db.pileWork.groupBy({ by: ['pileGradeId'], where: { report: reportWhere }, _sum: { count: true } }),

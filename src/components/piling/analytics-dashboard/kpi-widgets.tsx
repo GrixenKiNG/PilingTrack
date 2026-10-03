@@ -108,6 +108,24 @@ export function buildAnalyticsKpiWidgets(d: AnalyticsKpiData): Record<string, Re
   };
 }
 
+/**
+ * Плитки-заглушки для предпросмотра в настройках, когда живые данные парка не
+ * пришли. Показывать «Установок 0» / «Объектов 0» на отказе загрузки нельзя:
+ * нули читаются как реальный пустой парк (R106 №6).
+ */
+function buildAnalyticsKpiPlaceholders(): Record<string, RenderablePageWidget> {
+  const out: Record<string, RenderablePageWidget> = {};
+  for (const w of ANALYTICS_DASHBOARD_WIDGETS) {
+    if (w.zone !== 'kpi') continue;
+    out[w.id] = {
+      id: w.id,
+      title: w.title,
+      render: () => <KpiTile id={w.id} label={w.title} value="—" hint="данные не загрузились" />,
+    };
+  }
+  return out;
+}
+
 /** Labelled placeholders for the tab-section widgets (used in the configurator). */
 function buildSectionPlaceholders(): Record<string, RenderablePageWidget> {
   const out: Record<string, RenderablePageWidget> = {};
@@ -139,6 +157,7 @@ export function useAnalyticsDashboardLayout(): PageLayoutController {
 export function AnalyticsDashboardLayoutEditor() {
   const controller = useAnalyticsDashboardLayout();
   const [data, setData] = useState<AnalyticsKpiData | null>(null);
+  const [previewError, setPreviewError] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -148,9 +167,17 @@ export function AnalyticsDashboardLayoutEditor() {
           authFetch('/api/monitoring/fleet'),
           authFetch('/api/sites/all'),
         ]);
-        const fleet = fleetRes.ok ? await fleetRes.json() : null;
-        const sites = sitesRes.ok ? await sitesRes.json() : [];
+        // Оба источника обязательны для честного предпросмотра: рисовать
+        // плитки из нулей на отказе (403/5xx) — значит выдавать «Установок 0»
+        // за реальные данные пустого парка (R106 №6).
+        if (!fleetRes.ok || !sitesRes.ok) {
+          if (active) { setData(null); setPreviewError(true); }
+          return;
+        }
+        const fleet = await fleetRes.json();
+        const sites = await sitesRes.json();
         if (!active) return;
+        setPreviewError(false);
         const t = fleet?.totals ?? {};
         setData({
           totalEquipment: t.totalEquipment ?? 0,
@@ -164,19 +191,25 @@ export function AnalyticsDashboardLayoutEditor() {
           operatorsOnShiftToday: t.operatorsOnShiftToday ?? 0,
         });
       } catch {
-        if (active) setData(null);
+        if (active) { setData(null); setPreviewError(true); }
       }
     })();
     return () => { active = false; };
   }, []);
 
   const widgets = {
-    ...buildAnalyticsKpiWidgets(data ?? {
-      totalEquipment: 0, sitesCount: 0, pilesToday: 0, pileMetersToday: 0,
-      drillingToday: 0, drillingCountToday: 0, downtimeHoursToday: 0, crewsOnShiftToday: 0, operatorsOnShiftToday: 0,
-    }),
+    ...(data ? buildAnalyticsKpiWidgets(data) : buildAnalyticsKpiPlaceholders()),
     ...buildSectionPlaceholders(),
   };
 
-  return <PageLayoutEditor title="Дашборд аналитики" controller={controller} widgets={widgets} />;
+  return (
+    <>
+      {previewError && (
+        <p className="mb-2 text-xs text-warning-strong" role="status">
+          Данные парка не загрузились — плитки показаны без значений.
+        </p>
+      )}
+      <PageLayoutEditor title="Дашборд аналитики" controller={controller} widgets={widgets} />
+    </>
+  );
 }

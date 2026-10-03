@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import {
   Loader2,
   Pencil,
@@ -115,6 +115,7 @@ export function CrewFormDialog({
   onSubmit,
   submitting,
 }: CrewFormDialogProps) {
+  const uid = useId();
   const [operatorId, setOperatorId] = useState(editItem?.operatorId || '');
   const [equipmentId, setEquipmentId] = useState(editItem?.equipmentId || '');
   const [siteId, setSiteId] = useState(editItem?.siteId || '');
@@ -157,11 +158,18 @@ export function CrewFormDialog({
       return;
     }
 
+    // Пустое название сервер подставляет английским «Unnamed Crew» в русском
+    // интерфейсе — название обязательно (R102, важно №7).
+    if (!name.trim()) {
+      toast.error('Укажите название бригады');
+      return;
+    }
+
     await onSubmit({
       operatorId,
       equipmentId,
       siteId,
-      name: name.trim() || undefined,
+      name: name.trim(),
       assistantUserIds,
       assistantNames: selectedAssistantNames,
       isActive: mode === 'edit' ? active : true,
@@ -214,11 +222,11 @@ export function CrewFormDialog({
           ) : (
             <div className="space-y-3">
               <div className="space-y-1.5">
-                <Label>
+                <Label htmlFor={`${uid}-operator`}>
                   Оператор <span className="text-destructive-strong">*</span>
                 </Label>
                 <Select value={operatorId} onValueChange={setOperatorId}>
-                  <SelectTrigger className="h-11 w-full">
+                  <SelectTrigger id={`${uid}-operator`} className="h-11 w-full">
                     <SelectValue placeholder="Выберите оператора" />
                   </SelectTrigger>
                   <SelectContent>
@@ -229,14 +237,18 @@ export function CrewFormDialog({
                     ))}
                   </SelectContent>
                 </Select>
+                {/* Пустой список читается как «операторов нет» — называем причину. */}
+                {availableOps.length === 0 && (
+                  <p className="text-xs text-muted-foreground">Нет активных машинистов — заведите пользователя с ролью «Машинист».</p>
+                )}
               </div>
 
               <div className="space-y-1.5">
-                <Label>
+                <Label htmlFor={`${uid}-equipment`}>
                   Установка <span className="text-destructive-strong">*</span>
                 </Label>
                 <Select value={equipmentId} onValueChange={setEquipmentId}>
-                  <SelectTrigger className="h-11 w-full">
+                  <SelectTrigger id={`${uid}-equipment`} className="h-11 w-full">
                     <SelectValue placeholder="Выберите установку" />
                   </SelectTrigger>
                   <SelectContent>
@@ -247,14 +259,17 @@ export function CrewFormDialog({
                     ))}
                   </SelectContent>
                 </Select>
+                {equipment.length === 0 && (
+                  <p className="text-xs text-muted-foreground">Список установок пуст — заведите технику в разделе «Техника».</p>
+                )}
               </div>
 
               <div className="space-y-1.5">
-                <Label>
+                <Label htmlFor={`${uid}-site`}>
                   Объект <span className="text-destructive-strong">*</span>
                 </Label>
                 <Select value={siteId} onValueChange={setSiteId}>
-                  <SelectTrigger className="h-11 w-full">
+                  <SelectTrigger id={`${uid}-site`} className="h-11 w-full">
                     <SelectValue placeholder="Выберите объект" />
                   </SelectTrigger>
                   <SelectContent>
@@ -265,11 +280,17 @@ export function CrewFormDialog({
                     ))}
                   </SelectContent>
                 </Select>
+                {sites.length === 0 && (
+                  <p className="text-xs text-muted-foreground">Список объектов пуст — заведите объект в разделе «Объекты».</p>
+                )}
               </div>
 
               <div className="space-y-1.5">
-                <Label>Название (необязательно)</Label>
+                <Label htmlFor={`${uid}-name`}>
+                  Название <span className="text-destructive-strong">*</span>
+                </Label>
                 <Input
+                  id={`${uid}-name`}
                   value={name}
                   onChange={event => setName(event.target.value)}
                   placeholder="Бригада №1"
@@ -304,7 +325,7 @@ export function CrewFormDialog({
             </Button>
             <Button
               onClick={handleSubmit}
-              disabled={submitting || loadingReferenceData || !operatorId || !equipmentId || !siteId}
+              disabled={submitting || loadingReferenceData || !operatorId || !equipmentId || !siteId || !name.trim()}
               className="bg-signal text-white hover:bg-signal-strong"
             >
               {submitting

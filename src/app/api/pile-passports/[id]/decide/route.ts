@@ -13,6 +13,10 @@ export const runtime = 'nodejs';
 const decideSchema = z.object({
   acceptance: z.enum(['ACCEPTED', 'NEEDS_REDRIVE']),
   note: z.string().max(2000).optional(),
+}).superRefine((value, ctx) => {
+  if (value.acceptance === 'NEEDS_REDRIVE' && !value.note?.trim()) {
+    ctx.addIssue({ code: 'custom', path: ['note'], message: 'Укажите, почему свая идёт на добивку' });
+  }
 });
 
 /** Решение мастера по свае: принять либо отправить на добивку. */
@@ -29,7 +33,7 @@ export const POST = withMutation(
     const parsed = decideSchema.safeParse(await readJsonBody(request));
     if (!parsed.success) {
       return NextResponse.json(
-        { error: 'Некорректное решение', details: parsed.error.issues },
+        { error: parsed.error.issues.find((issue) => issue.code === 'custom')?.message ?? 'Некорректное решение', details: parsed.error.issues },
         { status: 400 },
       );
     }

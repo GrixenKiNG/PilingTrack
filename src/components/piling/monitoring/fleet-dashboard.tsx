@@ -52,6 +52,22 @@ function sortCards(cards: FleetCard[], sortBy: SortBy): FleetCard[] {
   return sorted;
 }
 
+/**
+ * Причина отказа снимка — разная, и текст должен быть разным.
+ *
+ * Раньше любой не-ok ответ назывался «Сервис мониторинга временно недоступен.»,
+ * а таймаут и мусорный ответ — «Нет соединения»: сбой БД (500), ограничение
+ * частоты (429) и отсутствие сети выглядели одинаково, и человек шёл чинить
+ * интернет вместо того, чтобы просто повторить запрос.
+ */
+function fleetFailureMessage(status: number): string {
+  if (status === 429) return 'Слишком много запросов — сервис ограничил частоту.';
+  if (status >= 500) return 'Сервер мониторинга временно недоступен.';
+  if (status === 403) return 'Нет доступа к мониторингу. Обратитесь к администратору.';
+  if (status === 401) return 'Сессия истекла — войдите снова.';
+  return `Не удалось загрузить снимок мониторинга (код ${status}).`;
+}
+
 export function FleetDashboard() {
   const [snap, setSnap] = useState<FleetSnapshot | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -67,16 +83,22 @@ export function FleetDashboard() {
       const res = await authFetch(url, {signal: AbortSignal.timeout(15_000)});
       if (request !== snapshotRequest.current) return;
       if (!res.ok) {
-        setError('Сервис мониторинга временно недоступен.');
+        setError(fleetFailureMessage(res.status));
         return;
       }
       const data: FleetSnapshot = await res.json();
       if (request !== snapshotRequest.current) return;
       setSnap(data);
       setError(null);
-    } catch {
+    } catch (err) {
       if (request !== snapshotRequest.current) return;
-      setError('Нет соединения с сервисом мониторинга.');
+      // AbortSignal.timeout отклоняет запрос DOMException с именем TimeoutError:
+      // это не обрыв сети — связь есть, сервер не ответил вовремя. Имя читаем
+      // через свойство: DOMException в браузере не обязан быть instanceof Error.
+      const timedOut = typeof err === 'object' && err !== null && (err as { name?: unknown }).name === 'TimeoutError';
+      setError(timedOut
+        ? 'Сервер не ответил за 15 секунд. Повторите попытку.'
+        : 'Нет соединения с сервисом мониторинга.');
     }
   }, []);
 
@@ -103,6 +125,18 @@ export function FleetDashboard() {
     document.addEventListener('visibilitychange', refresh);
     return () => { clearInterval(timer); window.removeEventListener('online', refresh); document.removeEventListener('visibilitychange', refresh); };
   }, [fetchSnapshot]);
+
+  // Метка «Данные обновлены N назад» считается на рендер (formatRelative смотрит
+  // на Date.now()). При потере связи опрос каждые 30 с ставит одну и ту же строку
+  // ошибки, React пропускает повторный рендер (bailout) — и метка замирает на
+  // последнем успешном кадре, хотя числа давно устарели. Отдельный тик раз в 30 с
+  // перерисовывает подпись, чтобы относительное время росло; таймер снимается при
+  // размонтировании.
+  const [, setClockTick] = useState(0);
+  useEffect(() => {
+    const timer = setInterval(() => setClockTick((t) => t + 1), 30_000);
+    return () => clearInterval(timer);
+  }, []);
 
   // Связь — это ответ последнего опроса, а не сокет.
   const conn: Connection = error ? 'offline' : snap ? 'live' : 'connecting';
@@ -137,7 +171,7 @@ export function FleetDashboard() {
       <div className="p-6">
         <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-destructive-strong">
           <p className="text-sm font-semibold">Мониторинг не загрузился</p>
-          <p className="mt-1 text-sm">{error} Проверьте подключение и повторите попытку.</p>
+          <p className="mt-1 text-sm">{error} Повторите попытку.</p>
           <button
             type="button"
             onClick={() => void fetchSnapshot({ bust: true })}

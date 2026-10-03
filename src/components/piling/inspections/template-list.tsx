@@ -15,8 +15,10 @@ import { Plus, Trash2, ClipboardCheck } from '@/components/piling/icons/unified-
 import { toast } from 'sonner';
 import { authFetch } from '@/lib/api';
 import { Button } from '@/components/ui/button';
+import { QueryErrorBanner } from '@/components/piling/async-ui';
 import { cn } from '@/lib/utils';
 import { LEVEL_LABEL, LEVEL_STYLE, type InspectionLevel } from './inspection-labels';
+import { InspectionLoadError, isRetryableLoadError, loadErrorText } from './inspection-api-error';
 
 interface TemplateRow {
   id: string;
@@ -31,15 +33,25 @@ export function TemplateList() {
   const [templates, setTemplates] = useState<TemplateRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  // Почему список пуст: отказ чтения вместо «шаблонов нет» (R100 №3).
+  const [loadError, setLoadError] = useState<InspectionLoadError | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const res = await authFetch('/api/checklist-templates');
-      if (!res.ok) throw new Error();
+      // 403 (у раскладки раздела право `inspection.perform`, у API —
+      // `maintenance.manage`) раньше выглядел как «Шаблонов пока нет.».
+      if (!res.ok) {
+        setLoadError(new InspectionLoadError(res.status));
+        setTemplates([]);
+        return;
+      }
       setTemplates(((await res.json()).templates ?? []) as TemplateRow[]);
+      setLoadError(null);
     } catch {
-      toast.error('Не удалось загрузить шаблоны');
+      setLoadError(new InspectionLoadError(null));
+      setTemplates([]);
     } finally {
       setLoading(false);
     }
@@ -78,6 +90,16 @@ export function TemplateList() {
 
       {loading ? (
         <p className="rounded-lg bg-muted px-3 py-6 text-center text-sm text-muted-foreground">Загрузка…</p>
+      ) : loadError ? (
+        <QueryErrorBanner
+          title="Не удалось загрузить шаблоны"
+          message={loadErrorText(loadError, {
+            forbidden: 'Нет прав на чек-листы. Обратитесь к администратору.',
+            notFound: 'Шаблоны не найдены.',
+            server: 'Не удалось загрузить шаблоны. Сервер вернул ошибку.',
+          })}
+          onRetry={isRetryableLoadError(loadError) ? () => void load() : undefined}
+        />
       ) : templates.length === 0 ? (
         <p className="rounded-lg bg-muted px-3 py-6 text-center text-sm text-muted-foreground">
           Шаблонов пока нет.

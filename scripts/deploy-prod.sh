@@ -26,6 +26,8 @@ KEY="${DEPLOY_KEY:-$HOME/.ssh/orionpiling}"
 DIR=/opt/pilingtrack
 SSH=(ssh -i "$KEY" -o ConnectTimeout=30 -o ServerAliveInterval=15 "$HOST")
 
+REPLACE_GENERATION=0
+if [ "${1:-}" = --replace-worker-generation ]; then REPLACE_GENERATION=1; shift; fi
 SERVICES=("$@")
 [ ${#SERVICES[@]} -eq 0 ] && SERVICES=(app workers)
 
@@ -41,6 +43,15 @@ dockerfile_of() {
   esac
 }
 
+for svc in "${SERVICES[@]}"; do dockerfile_of "$svc" >/dev/null; done
+
+# App starts embedded workers by default; an app-only deploy needs the barrier too.
+if [[ " ${SERVICES[*]} " == *" workers "* || " ${SERVICES[*]} " == *" app "* ]]; then
+  [ "$REPLACE_GENERATION" = 1 ] || die 'для app/workers нужен --replace-worker-generation (остановка всего старого поколения)'
+  if [[ " ${SERVICES[*]} " == *" migrate "* ]]; then SERVICES=(migrate app workers); else SERVICES=(app workers); fi
+  [ "${WORKER_GENERATION_EXTERNAL_STOPPED:-0}" = 1 ] || die 'сначала остановите все внешние воркеры и подтвердите WORKER_GENERATION_EXTERNAL_STOPPED=1'
+fi
+
 # ── 1. Предпроверка ─────────────────────────────────────────
 step "Предпроверка"
 [ "$(git rev-parse --abbrev-ref HEAD)" = main ] || die "не на ветке main"
@@ -48,6 +59,16 @@ git diff --quiet && git diff --cached --quiet || die "есть незакомм�
 git fetch -q origin main
 SHA=$(git rev-parse --short HEAD)
 [ "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)" ] || die "HEAD не совпадает с origin/main — сначала git push"
+# Workers проверяем до первого SSH, чтобы сломанный образ не касался сервера.
+if [[ " ${SERVICES[*]} " == *" workers "* ]]; then
+  step "Сборка workers (Dockerfile.workers → runner)"
+  docker build -f Dockerfile.workers --target runner --build-arg "APP_VERSION=$SHA" -t "pilingtrack-workers:$SHA" .
+  if [ "${SKIP_WORKERS_SMOKE:-0}" = 1 ]; then
+    echo "⚠ АВАРИЙНЫЙ ОБХОД: SKIP_WORKERS_SMOKE=1 — образ workers НЕ ПРОВЕРЕН" >&2
+  else
+    bash "$(dirname "${BASH_SOURCE[0]}")/smoke-workers-image.sh" "pilingtrack-workers:$SHA"
+  fi
+fi
 OLD=$("${SSH[@]}" "git -C $DIR rev-parse --short HEAD")
 echo "сервер: $OLD → выкатываем: $SHA; сервисы: ${SERVICES[*]}"
 
@@ -63,7 +84,9 @@ IMAGES=()
 for svc in "${SERVICES[@]}"; do
   read -r file target <<<"$(dockerfile_of "$svc")"
   step "Сборка $svc ($file → $target)"
-  docker build -f "$file" --target "$target" --build-arg "APP_VERSION=$SHA" -t "pilingtrack-$svc:$SHA" .
+  if [ "$svc" != workers ]; then
+    docker build -f "$file" --target "$target" --build-arg "APP_VERSION=$SHA" -t "pilingtrack-$svc:$SHA" .
+  fi
   IMAGES+=("pilingtrack-$svc:$SHA")
 done
 
@@ -87,13 +110,15 @@ docker save "${IMAGES[@]}" | gzip -1 | "${SSH[@]}" 'gunzip | docker load'
 step "Переключение"
 UP=()
 for svc in "${SERVICES[@]}"; do [ "$svc" != migrate ] && UP+=("$svc"); done
+SWITCH="docker compose up -d --no-build ${UP[*]}"
+if [ "$REPLACE_GENERATION" = 1 ]; then SWITCH="WORKER_GENERATION_EXTERNAL_STOPPED=1 WORKER_GENERATION_PROJECT=pilingtrack bash scripts/replace-worker-generation.sh ${UP[*]}"; fi
 "${SSH[@]}" "set -e
   cd $DIR
   git pull -q origin main
   [ \"\$(git rev-parse --short HEAD)\" = $SHA ] || { echo 'git на сервере не совпал с $SHA'; exit 1; }
   for svc in ${SERVICES[*]}; do docker tag pilingtrack-\$svc:$SHA pilingtrack-\$svc:latest; done
   export APP_VERSION=$SHA
-  docker compose up -d --no-build ${UP[*]}"
+  $SWITCH"
 
 # ── 6. Проверка ─────────────────────────────────────────────
 step "Проверка"
@@ -115,4 +140,4 @@ step "Проверка"
 
 echo
 echo "✔ выкачено $SHA. Откат:"
-echo "  ssh -i $KEY $HOST \"cd $DIR && for s in ${UP[*]}; do docker tag pilingtrack-\\\$s:$ROLLBACK pilingtrack-\\\$s:latest; done && docker compose up -d --no-build ${UP[*]}\""
+echo "  ssh -i $KEY $HOST \"cd $DIR && for s in ${UP[*]}; do docker tag pilingtrack-\\\$s:$ROLLBACK pilingtrack-\\\$s:latest; done && WORKER_GENERATION_EXTERNAL_STOPPED=1 bash scripts/replace-worker-generation.sh ${UP[*]}\""

@@ -16,29 +16,27 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const {
   findManyMock, upsertMock, deleteManyMock, findUniqueMock, analyticsUpsertMock, invalidateAnalyticsMock,
   outboxFindUnique, outboxUpdate, sendDocument, findFirstMock, isNotifMock, getSettingsMock, sendAlertMock,
-  redisGetClientMock, redisGetMock, redisSetMock, userFindFirst, recordAuditEventMock,
-} = vi.hoisted(() => ({
-  findManyMock: vi.fn(),
-  upsertMock: vi.fn(),
-  deleteManyMock: vi.fn(),
-  findUniqueMock: vi.fn(),
-  analyticsUpsertMock: vi.fn(),
-  invalidateAnalyticsMock: vi.fn(),
-  outboxFindUnique: vi.fn(),
-  outboxUpdate: vi.fn(),
-  sendDocument: vi.fn(),
-  findFirstMock: vi.fn(),
-  isNotifMock: vi.fn(),
-  getSettingsMock: vi.fn(),
-  sendAlertMock: vi.fn(),
-  redisGetClientMock: vi.fn(),
-  redisGetMock: vi.fn(),
-  redisSetMock: vi.fn(),
-  userFindFirst: vi.fn(),
-  recordAuditEventMock: vi.fn(),
-}));
+  redisGetClientMock, redisGetMock, redisSetMock, userFindFirst, recordAuditEventMock, dbClient,
+} = vi.hoisted(() => {
+  const findManyMock = vi.fn();
+  const upsertMock = vi.fn();
+  const deleteManyMock = vi.fn();
+  const findUniqueMock = vi.fn();
+  const analyticsUpsertMock = vi.fn();
+  const invalidateAnalyticsMock = vi.fn();
+  const outboxFindUnique = vi.fn();
+  const outboxUpdate = vi.fn();
+  const sendDocument = vi.fn();
+  const findFirstMock = vi.fn();
+  const isNotifMock = vi.fn();
+  const getSettingsMock = vi.fn();
+  const sendAlertMock = vi.fn();
+  const redisGetClientMock = vi.fn();
+  const redisGetMock = vi.fn();
+  const redisSetMock = vi.fn();
+  const userFindFirst = vi.fn();
+  const recordAuditEventMock = vi.fn();
 
-vi.mock('@/lib/db', () => {
   const client = {
     report: { findMany: findManyMock, findUnique: findUniqueMock, findFirst: findFirstMock },
     user: { findFirst: userFindFirst },
@@ -48,7 +46,24 @@ vi.mock('@/lib/db', () => {
     $queryRaw: vi.fn(),
     $transaction: (fn: (tx: unknown) => unknown) => fn(client),
   };
-  return { db: client };
+
+  return {
+    findManyMock, upsertMock, deleteManyMock, findUniqueMock, analyticsUpsertMock, invalidateAnalyticsMock,
+    outboxFindUnique, outboxUpdate, sendDocument, findFirstMock, isNotifMock, getSettingsMock, sendAlertMock,
+    redisGetClientMock, redisGetMock, redisSetMock, userFindFirst, recordAuditEventMock, dbClient: client,
+  };
+});
+
+vi.mock('@/lib/db', () => ({ db: dbClient }));
+
+// Обработчики подписаны на события и берут db динамическим `await import(...)`,
+// а emitDomainEvent запускает их разом (Promise.allSettled). Vitest не подменяет
+// один и тот же модуль, когда его одновременно импортируют несколько
+// обработчиков: второй импорт уходит в настоящий `@/lib/db` и до живого
+// подключения к базе. Кладём тот же клиент в кэш Prisma (`globalThis.prisma`),
+// которым пользуется настоящий модуль, — тогда ни один путь не идёт в БД.
+beforeEach(() => {
+  (globalThis as unknown as { prisma?: unknown }).prisma = dbClient;
 });
 
 // След в ленте пишет audit-service; здесь проверяется контракт обработчика —
@@ -584,4 +599,32 @@ describe('аудит автосдачи отчёта планировщиком 
       metadata: expect.objectContaining({ operatorName: null }),
     }));
   });
+});
+
+it('I05: daily projection is unchanged by draft work and changes after submission', async () => {
+  const report = { status: 'draft', piles: [{ count: 2 }], drillings: [{ meters: 18 }], downtimes: [{ duration: 1.5 }] };
+  findManyMock.mockReset().mockImplementation(async ({ where }) => report.status === where.status ? [report] : []);
+  upsertMock.mockReset(); deleteManyMock.mockReset();
+  await recomputeSiteDailySummary('site_A', '2026-10-02');
+  expect(upsertMock).not.toHaveBeenCalled();
+  expect(deleteManyMock).toHaveBeenCalledTimes(1);
+  report.status = 'submitted';
+  await recomputeSiteDailySummary('site_A', '2026-10-02');
+  expect(upsertMock.mock.calls[0][0].create).toMatchObject({ reportCount: 1, totalPiles: 2, totalDrilling: 18, totalDowntime: 1.5 });
+});
+it('I08: partial PDF batch retains per-chat receipts before a retry', async () => {
+  let row = { published: false, payload: { autoClosed: true } };
+  outboxFindUnique.mockReset().mockImplementation(async () => row);
+  outboxUpdate.mockReset().mockImplementation(async ({ data }) => { row = { ...row, ...data }; });
+  sendDocument.mockReset().mockImplementationOnce(async (_file, _data, _caption, progress) => { await progress.confirm('A'); return false; });
+  await expect(deliverReportPdf({ id: 'partial-pdf', aggregateId: 'r1' })).rejects.toThrow();
+  expect(row.published).toBe(false);
+  expect(row.payload).toMatchObject({ autoClosed: true, telegramDeliveredChatIds: ['A'] });
+  sendDocument.mockImplementationOnce(async (_file, _data, _caption, progress) => {
+    expect([...progress.deliveredChatIds]).toEqual(['A']);
+    await progress.confirm('B'); return true;
+  });
+  await deliverReportPdf({ id: 'partial-pdf', aggregateId: 'r1' });
+  expect(row.published).toBe(true);
+  expect(row.payload).toMatchObject({ telegramDeliveredChatIds: ['A', 'B'] });
 });

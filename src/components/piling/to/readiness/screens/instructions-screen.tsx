@@ -25,7 +25,7 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { COMPACT_KPI_GRID, ScreenTitle, card } from '../settings/shared-ui';
 import { kpiGridStyle } from '@/components/piling/kpi-tile';
-import { RefKpi } from './shared';
+import { loadFailureMessage, RefKpi } from './shared';
 
 export function InstructionsScreen() {
   const [rows, setRows] = useState<BriefingJournalEntry[] | null>(null);
@@ -34,14 +34,11 @@ export function InstructionsScreen() {
   const load = useCallback(async () => {
     try {
       const response = await authFetch('/api/briefings/journal?kind=INSTRUCTION');
-      if (!response.ok) {
-        const body = await response.json().catch(() => ({}));
-        throw new Error(body.error || `Сервер вернул ${response.status}`);
-      }
+      if (!response.ok) throw response;
       setRows(((await response.json()).rows ?? []) as BriefingJournalEntry[]);
       setFailed(null);
     } catch (error) {
-      setFailed(error instanceof Error ? error.message : 'Не удалось загрузить ознакомления');
+      setFailed(await loadFailureMessage(error, 'Не удалось загрузить ознакомления'));
       setRows(null);
     }
   }, []);

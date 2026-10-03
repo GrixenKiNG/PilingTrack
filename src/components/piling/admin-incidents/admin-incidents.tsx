@@ -5,6 +5,7 @@ import {
   INCIDENT_CATEGORY_LABELS, INCIDENT_SEVERITY_LABELS, INCIDENT_SIGN_LABELS,
   type IncidentCategory, type IncidentSeverity, type IncidentSign,
 } from '@/modules/operator-mobile/contracts';
+import {authFetch} from '@/lib/api';
 import {cn} from '@/lib/utils';
 import {usePilingStore} from '@/lib/store';
 import {resolveEffectiveRole} from '@/lib/types';
@@ -51,17 +52,36 @@ const formatMoment = (iso: string) => new Date(iso).toLocaleString('ru-RU', {
   day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
 });
 
+/**
+ * Текст отказа для человека. Серверный `error` показываем как есть, а не-JSON
+ * ответ шлюза (502/504 HTML) — понятной строкой вместо английского SyntaxError.
+ */
+async function readErrorMessage(response: Response): Promise<string> {
+  try {
+    const body = await response.json();
+    if (typeof body?.error === 'string' && body.error) return body.error;
+  } catch {
+    // Страница ошибки прокси вместо JSON — ниже подставим понятный текст.
+  }
+  return 'Сервер вернул неожиданный ответ. Повторите попытку.';
+}
+
 async function fetchIncidents(
   scope: 'open' | 'all',
 ): Promise<{rows: IncidentRow[]} | {error: string}> {
+  let response: Response;
   try {
-    const response = await fetch(`/api/admin/incidents?scope=${scope}`, {credentials: 'same-origin'});
-    const body = await response.json();
-    if (!response.ok) return {error: body?.error ?? 'Не удалось загрузить происшествия'};
-    return {rows: body.data as IncidentRow[]};
-  } catch (error) {
-    return {error: error instanceof Error ? error.message : 'Не удалось загрузить происшествия'};
+    response = await authFetch(`/api/admin/incidents?scope=${scope}`);
+  } catch {
+    // Браузер отдаёт «Failed to fetch»/«NetworkError…» — человеку нужен русский текст.
+    return {error: 'Нет связи с сервером. Проверьте интернет и повторите.'};
   }
+  if (!response.ok) return {error: await readErrorMessage(response)};
+  const body = await response.json().catch(() => null);
+  if (!body || !Array.isArray(body.data)) {
+    return {error: 'Сервер вернул неожиданный ответ. Повторите попытку.'};
+  }
+  return {rows: body.data as IncidentRow[]};
 }
 
 /**
@@ -83,9 +103,17 @@ export function AdminIncidents() {
   const [openForm, setOpenForm] = useState<string | null>(null);
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [reviewError, setReviewError] = useState<string | null>(null);
 
   const [reloadToken, setReloadToken] = useState(0);
-  const load = useCallback(() => setReloadToken((token) => token + 1), []);
+  // Перезагрузка чистит прошлый список и отказ: старые строки не должны
+  // показываться под сообщением об ошибке нового отбора.
+  const load = useCallback(() => {
+    setRows(null);
+    setError(null);
+    setReloadToken((token) => token + 1);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -100,23 +128,37 @@ export function AdminIncidents() {
 
   const review = async (id: string) => {
     setBusy(true);
-    setError(null);
+    setReviewError(null);
+    setNotice(null);
     try {
-      const response = await fetch('/api/admin/incidents', {
+      const response = await authFetch('/api/admin/incidents', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        credentials: 'same-origin',
         body: JSON.stringify({id, note: note.trim()}),
       });
-      const body = await response.json();
-      if (!response.ok) throw new Error(body?.error ?? 'Не удалось записать разбор');
+      if (response.status === 409) {
+        // Происшествие разобрали, пока форма была открыта. Перечитываем список и
+        // закрываем форму: иначе строка снова предложит «Разобрать», а повтор
+        // упрётся в тот же отказ — круг без выхода.
+        setOpenForm(null);
+        setNote('');
+        setNotice('Это происшествие уже разобрали — список обновлён');
+        load();
+        return;
+      }
+      if (!response.ok) {
+        // Отказ показываем рядом с формой, а не вверху страницы: в длинном
+        // списке верхний абзац остаётся за экраном.
+        setReviewError(await readErrorMessage(response));
+        return;
+      }
       // Форма закрывается только после ответа сервера — вывод разбора человек
       // пишет один раз, и терять его из-за оборвавшегося запроса нельзя.
       setOpenForm(null);
       setNote('');
       load();
-    } catch (reviewError) {
-      setError(reviewError instanceof Error ? reviewError.message : 'Не удалось записать разбор');
+    } catch {
+      setReviewError('Нет связи с сервером. Проверьте интернет и повторите.');
     } finally {
       setBusy(false);
     }
@@ -130,9 +172,11 @@ export function AdminIncidents() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Происшествия</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            {unreviewed > 0
-              ? `Ждут разбора: ${unreviewed}`
-              : 'Неразобранных происшествий нет'}
+            {rows === null
+              ? (error ? 'Не удалось загрузить — счёт неизвестен' : null)
+              : unreviewed > 0
+                ? `Ждут разбора: ${unreviewed}`
+                : 'Неразобранных происшествий нет'}
           </p>
         </div>
         <div className="flex gap-2" role="group" aria-label="Что показывать">
@@ -140,7 +184,13 @@ export function AdminIncidents() {
             <button
               key={id}
               type="button"
-              onClick={() => setScope(id)}
+              onClick={() => {
+                // Смена отбора начинается с чистого экрана: иначе при отказе
+                // под ошибкой останутся строки прежней вкладки.
+                if (id !== scope) { setRows(null); setError(null); }
+                setScope(id);
+                setNotice(null);
+              }}
               className={cn(
                 'min-h-9 rounded-md border px-3 text-sm font-medium transition-colors',
                 scope === id ? 'border-signal bg-signal/10 text-signal' : 'bg-card hover:bg-muted',
@@ -153,13 +203,26 @@ export function AdminIncidents() {
       </header>
 
       {error ? (
-        <p className="rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm text-destructive">
-          {error}
-        </p>
+        <div className="space-y-2">
+          <p className="rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+            {error}
+          </p>
+          <button
+            type="button"
+            onClick={() => {setNotice(null); load();}}
+            className="min-h-9 rounded-md border bg-card px-4 text-sm font-medium transition-colors hover:bg-muted"
+          >
+            Повторить
+          </button>
+        </div>
+      ) : null}
+
+      {notice ? (
+        <p className="rounded-md border border-signal/40 bg-signal/5 px-3 py-2 text-sm">{notice}</p>
       ) : null}
 
       {rows === null ? (
-        <p className="text-sm text-muted-foreground">Загружаем…</p>
+        error ? null : <p className="text-sm text-muted-foreground">Загружаем…</p>
       ) : rows.length === 0 ? (
         <p className="rounded-md border bg-card px-4 py-8 text-center text-sm text-muted-foreground">
           {scope === 'open'
@@ -240,6 +303,7 @@ export function AdminIncidents() {
                       value={note}
                       onChange={(event) => setNote(event.target.value)}
                       rows={3}
+                      maxLength={4000}
                       placeholder="Разобрали с бригадой, зону оградили, инструктаж повторили"
                       className="w-full rounded-md border bg-card px-3 py-2 text-sm shadow-xs"
                     />
@@ -254,17 +318,20 @@ export function AdminIncidents() {
                       </button>
                       <button
                         type="button"
-                        onClick={() => {setOpenForm(null); setNote('');}}
+                        onClick={() => {setOpenForm(null); setNote(''); setReviewError(null);}}
                         className="min-h-9 rounded-md border bg-card px-4 text-sm font-medium transition-colors hover:bg-muted"
                       >
                         Отмена
                       </button>
                     </div>
+                    {reviewError ? (
+                      <p className="text-sm text-destructive">{reviewError}</p>
+                    ) : null}
                   </div>
                 ) : (
                   <button
                     type="button"
-                    onClick={() => {setOpenForm(row.id); setNote('');}}
+                    onClick={() => {setOpenForm(row.id); setNote(''); setReviewError(null);}}
                     className="mt-3 min-h-9 rounded-md border bg-card px-4 text-sm font-medium transition-colors hover:bg-muted"
                   >
                     Разобрать

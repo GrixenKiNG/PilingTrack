@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { Plus, Pencil, Trash2, HardHat, Drill, Clock, Wrench, Loader2 } from '@/components/piling/icons/unified-icons';
 import { toast } from 'sonner';
 import { authFetch } from '@/lib/api';
@@ -58,6 +58,7 @@ export function ReportFormDialog({
   operators, sites, pileGrades, drillingTypes, downtimeReasons, equipment,
   onSuccess,
 }: ReportFormDialogProps) {
+  const uid = useId();
   const [formUserId, setFormUserId] = useState(editReport?.userId || '');
   const [formSiteId, setFormSiteId] = useState(editReport?.siteId || '');
   const [formDate, setFormDate] = useState(editReport?.date || getTodayInTimezone());
@@ -191,11 +192,31 @@ export function ReportFormDialog({
           downtimes: formDowntimes.map((d) => ({ id: editReport?.downtimes.some(row => row.id === d.id) ? d.id : undefined, reasonId: d.reasonId, duration: d.duration, comment: d.comment || undefined })),
         }),
       });
-      if (!res.ok) { const err = await res.json(); throw new Error(apiErrorMessage(err, 'Ошибка сохранения')); }
+      if (!res.ok) {
+        const err = (await res.json().catch(() => ({}))) as { error?: unknown };
+        const serverError = typeof err.error === 'string' ? err.error : '';
+        // Сохраняем токен старой формы: новая версия с прежними данными
+        // обошла бы защиту от перезаписи чужих изменений.
+        if (res.status === 409 && serverError.includes('изменён другим пользователем')) {
+          toast.error('Отчёт изменён другим пользователем. Скопируйте свои правки и откройте актуальный отчёт заново.');
+          return;
+        }
+        // 403 от CSRF-проверки приходит английским текстом — заменяем на русский.
+        if (res.status === 403 && serverError.includes('CSRF')) {
+          toast.error('Запрос отклонён проверкой безопасности. Обновите страницу и повторите сохранение.');
+          return;
+        }
+        throw new Error(apiErrorMessage(err, 'Ошибка сохранения'));
+      }
       toast.success(editReport ? 'Отчёт обновлён' : 'Отчёт создан');
       handleClose(); onSuccess();
     } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : 'Ошибка сохранения');
+      // fetch без сети бросает TypeError («Failed to fetch») — показываем русский текст.
+      if (err instanceof TypeError) {
+        toast.error('Нет связи с сервером. Проверьте интернет и нажмите «Сохранить» ещё раз.');
+      } else {
+        toast.error(err instanceof Error ? err.message : 'Ошибка сохранения');
+      }
     } finally { setSubmitting(false); }
   };
 
@@ -224,37 +245,37 @@ export function ReportFormDialog({
           {/* Operator, Site, Date, Shift, Equipment */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label className="text-xs font-medium text-muted-foreground">Оператор</Label>
+              <Label htmlFor={`${uid}-operator`} className="text-xs font-medium text-muted-foreground">Оператор</Label>
               <Select value={formUserId} onValueChange={setFormUserId}>
-                <SelectTrigger className="h-10"><SelectValue placeholder="Выберите оператора" /></SelectTrigger>
+                <SelectTrigger id={`${uid}-operator`} className="h-10"><SelectValue placeholder="Выберите оператора" /></SelectTrigger>
                 <SelectContent>
                   {operators.map((op) => <SelectItem key={op.id} value={op.id}>{op.name}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs font-medium text-muted-foreground">Объект</Label>
+              <Label htmlFor={`${uid}-site`} className="text-xs font-medium text-muted-foreground">Объект</Label>
               <Select value={formSiteId} onValueChange={setFormSiteId}>
-                <SelectTrigger className="h-10"><SelectValue placeholder="Выберите объект" /></SelectTrigger>
+                <SelectTrigger id={`${uid}-site`} className="h-10"><SelectValue placeholder="Выберите объект" /></SelectTrigger>
                 <SelectContent>
                   {sites.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs font-medium text-muted-foreground">Дата</Label>
-              <Input type="date" value={formDate} onChange={(e) => setFormDate(e.target.value)} className="h-10 font-mono" />
+              <Label htmlFor={`${uid}-date`} className="text-xs font-medium text-muted-foreground">Дата</Label>
+              <Input id={`${uid}-date`} type="date" value={formDate} onChange={(e) => setFormDate(e.target.value)} className="h-10 font-mono" />
             </div>
             <div className="grid grid-cols-2 gap-2">
-              <div className="space-y-1.5"><Label className="text-xs font-medium text-muted-foreground">Начало</Label>
-                <Input type="time" value={formShiftStart} onChange={(e) => setFormShiftStart(e.target.value)} className="h-10 font-mono" /></div>
-              <div className="space-y-1.5"><Label className="text-xs font-medium text-muted-foreground">Конец</Label>
-                <Input type="time" value={formShiftEnd} onChange={(e) => setFormShiftEnd(e.target.value)} className="h-10 font-mono" /></div>
+              <div className="space-y-1.5"><Label htmlFor={`${uid}-shift-start`} className="text-xs font-medium text-muted-foreground">Начало</Label>
+                <Input id={`${uid}-shift-start`} type="time" value={formShiftStart} onChange={(e) => setFormShiftStart(e.target.value)} className="h-10 font-mono" /></div>
+              <div className="space-y-1.5"><Label htmlFor={`${uid}-shift-end`} className="text-xs font-medium text-muted-foreground">Конец</Label>
+                <Input id={`${uid}-shift-end`} type="time" value={formShiftEnd} onChange={(e) => setFormShiftEnd(e.target.value)} className="h-10 font-mono" /></div>
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5"><Wrench className="w-3.5 h-3.5" />Установка</Label>
+              <Label htmlFor={`${uid}-equipment`} className="text-xs font-medium text-muted-foreground flex items-center gap-1.5"><Wrench className="w-3.5 h-3.5" />Установка</Label>
               <Select value={formEquipmentId} onValueChange={setFormEquipmentId}>
-                <SelectTrigger className="h-10"><SelectValue placeholder="Выберите установку..." /></SelectTrigger>
+                <SelectTrigger id={`${uid}-equipment`} className="h-10"><SelectValue placeholder="Выберите установку..." /></SelectTrigger>
                 <SelectContent>
                   {equipment.map((eq) => <SelectItem key={eq.id} value={eq.id}>{eq.name}</SelectItem>)}
                 </SelectContent>
@@ -281,7 +302,7 @@ export function ReportFormDialog({
               </Select>
               <Input type="number" placeholder="Кол-во" value={tempPileCount} onChange={(e) => setTempPileCount(e.target.value)}
                 min="1" className="w-20 h-9 font-mono text-sm" />
-              <Button onClick={addPile} size="sm" className="h-9 bg-signal hover:bg-signal-strong text-white px-3"><Plus className="w-4 h-4" /></Button>
+              <Button onClick={addPile} aria-label="Добавить сваю" size="sm" className="h-9 bg-signal hover:bg-signal-strong text-white px-3"><Plus className="w-4 h-4" /></Button>
             </div>
             {tempPileGrade && Number(tempPileCount) > 0 && (
               <p className="mb-2 rounded-md border border-signal/30 bg-signal/10 px-3 py-2 text-xs text-signal-strong">
@@ -331,7 +352,7 @@ export function ReportFormDialog({
                 min="1" className="w-20 h-9 font-mono text-sm" />
               <Input type="number" step="0.1" placeholder="м/шт" value={tempDrillMetersPerUnit} onChange={(e) => setTempDrillMetersPerUnit(e.target.value)}
                 min="0.1" className="w-20 h-9 font-mono text-sm" />
-              <Button onClick={addDrilling} size="sm" className="h-9 bg-info-strong hover:bg-info-strong text-white px-3"><Plus className="w-4 h-4" /></Button>
+              <Button onClick={addDrilling} aria-label="Добавить бурение" size="sm" className="h-9 bg-info-strong hover:bg-info-strong text-white px-3"><Plus className="w-4 h-4" /></Button>
             </div>
             {formDrillings.length > 0 && (
               <div className="space-y-1 max-h-40 overflow-y-auto custom-scrollbar">
@@ -373,7 +394,7 @@ export function ReportFormDialog({
                   </Select>
                   <Input type="number" step="0.5" placeholder="Часы" value={tempDtDuration} onChange={(e) => setTempDtDuration(e.target.value)}
                     min="0.5" className="w-20 h-9 font-mono text-sm" />
-                  <Button onClick={addDowntime} size="sm" className="h-9 bg-warning-strong hover:bg-warning-strong text-white px-3"><Plus className="w-4 h-4" /></Button>
+                  <Button onClick={addDowntime} aria-label="Добавить простой" size="sm" className="h-9 bg-warning-strong hover:bg-warning-strong text-white px-3"><Plus className="w-4 h-4" /></Button>
                 </div>
                 <Input placeholder="Комментарий (необязательно)" value={tempDtComment} onChange={(e) => setTempDtComment(e.target.value)} className="h-9 text-sm" />
                 {formDowntimes.length > 0 && (

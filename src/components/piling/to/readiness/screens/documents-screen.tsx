@@ -25,7 +25,7 @@ import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { COMPACT_KPI_GRID, ScreenTitle, card } from '../settings/shared-ui';
 import { kpiGridStyle } from '@/components/piling/kpi-tile';
-import { RefKpi } from './shared';
+import { loadFailureMessage, RefKpi } from './shared';
 import type { ReferenceUiProps } from './types';
 
 interface ControlRow {
@@ -51,16 +51,13 @@ export function DocumentsScreen(props: ReferenceUiProps) {
   const load = useCallback(async () => {
     try {
       const response = await authFetch('/api/user-documents/control');
-      if (!response.ok) {
-        const body = await response.json().catch(() => ({}));
-        throw new Error(body.error || `Сервер вернул ${response.status}`);
-      }
+      if (!response.ok) throw response;
       setRows(((await response.json()).documents ?? []) as ControlRow[]);
       setFailed(null);
     } catch (error) {
       // Молчаливый пустой список читался бы как «всё в порядке» — худшая из
       // возможных ошибок на экране контроля просрочки.
-      setFailed(error instanceof Error ? error.message : 'Не удалось загрузить документы');
+      setFailed(await loadFailureMessage(error, 'Не удалось загрузить документы'));
       setRows(null);
     }
   }, []);

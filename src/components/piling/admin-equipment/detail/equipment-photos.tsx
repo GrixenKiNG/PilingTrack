@@ -15,6 +15,7 @@ import Image from 'next/image';
 import { Camera, Loader2, Trash2 } from '@/components/piling/icons/unified-icons';
 import { toast } from 'sonner';
 import { authFetch } from '@/lib/api';
+import { catchText } from '@/components/piling/admin-crews/crew-messages';
 import { getThumbnailUrl } from '@/lib/media-thumbnails';
 import { ConfirmActionDialog } from '@/components/piling/confirm-action-dialog';
 
@@ -114,7 +115,8 @@ export function EquipmentPhotos({ equipmentId }: Props) {
       toast.success('Фото загружено');
       await refresh();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Ошибка загрузки');
+      // Обрыв сети fetch бросает TypeError с английским «Failed to fetch» (F-R112-1).
+      toast.error(catchText(err, 'Ошибка загрузки'));
     } finally {
       setBusy(false);
       if (inputRef.current) inputRef.current.value = '';
@@ -129,7 +131,8 @@ export function EquipmentPhotos({ equipmentId }: Props) {
       toast.success('Фото удалено');
       setPhotos((prev) => prev.filter((p) => p.id !== id));
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Ошибка удаления');
+      // Обрыв сети fetch бросает TypeError с английским «Failed to fetch» (F-R112-1).
+      toast.error(catchText(err, 'Ошибка удаления'));
     } finally {
       setBusy(false);
       setPendingDeleteId(null);

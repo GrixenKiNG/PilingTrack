@@ -1,3 +1,5 @@
+import { createTelegramDeliveryProgress } from '@/core/notifications/telegram-delivery-progress';
+import { SUBMITTED_REPORT_STATUS } from '@/lib/report-status';
 /**
  * Event Handlers — Concrete handlers for domain events
  *
@@ -173,7 +175,7 @@ export async function recomputeSiteDailySummary(siteId: string, date: string) {
   // Только сданные: черновик идущей смены попадал в итог дня лишь тогда, когда
   // кто-то другой сдавал отчёт по тому же объекту, — и цифры дня плавали.
   const reports = await db.report.findMany({
-    where: { siteId, date, status: 'submitted' },
+    where: { siteId, date, status: SUBMITTED_REPORT_STATUS },
     select: {
       piles: { select: { count: true } },
       drillings: { select: { meters: true } },
@@ -614,14 +616,20 @@ export async function deliverReportPdf(event: { id?: string; aggregateId: string
   // Строку события блокируем на время отправки: outbox-публикатор крутится и в
   // app, и в workers, а Telegram ключей идемпотентности не знает. Кто пришёл
   // вторым, видит published=true и выходит.
-  await db.$transaction(async (tx) => {
+  const complete = await db.$transaction(async (tx) => {
     await tx.$queryRaw`SELECT id FROM "OutboxEvent" WHERE id = ${event.id} FOR UPDATE`;
-    const row = await tx.outboxEvent.findUnique({ where: { id: event.id }, select: { published: true } });
-    if (!row || row.published) return;
-    const sent = await telegramNotifier.sendDocument(filename, pdfBuffer, caption);
-    if (!sent) throw new Error('Telegram не принял PDF отчёта; событие останется на повтор');
+    const row = await tx.outboxEvent.findUnique({ where: { id: event.id }, select: { published: true, payload: true } });
+    if (!row || row.published) return true;
+    const progress = createTelegramDeliveryProgress(row.payload, async (payload) => {
+      await tx.outboxEvent.update({ where: { id: event.id }, data: { payload } });
+    });
+    const sent = await telegramNotifier.sendDocument(filename, pdfBuffer, caption, progress);
+    // A partial batch must commit receipts before the outbox schedules retry.
+    if (!sent) return false;
     await tx.outboxEvent.update({ where: { id: event.id }, data: { published: true, publishedAt: new Date(), lastError: null } });
+    return true;
   }, { timeout: 60_000 });
+  if (!complete) throw new Error('Telegram не принял PDF отчёта; событие останется на повтор');
 }
 
 // ============================================================

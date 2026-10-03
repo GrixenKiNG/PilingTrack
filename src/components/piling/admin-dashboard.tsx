@@ -31,10 +31,11 @@ import {
   RefreshCw,
 } from '@/components/piling/icons/unified-icons';
 import { authFetch } from '@/lib/api';
+import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { formatCountMeters, formatNumber } from '@/lib/format';
 import { getTodayInTimezone } from '@/lib/timezone';
-import { QueryErrorBanner, useMinSkeletonDuration } from '@/components/piling/async-ui';
+import { useMinSkeletonDuration } from '@/components/piling/async-ui';
 import { Skeleton } from '@/components/ui/skeleton';
 import { computeDashboardKpis } from '@/components/piling/dashboard-kpis';
 import { formatDowntimeHours } from '@/lib/downtime-hours';
@@ -57,6 +58,10 @@ const daysUntil = (iso: string | null): number | null => {
   const today = new Date(); today.setHours(0, 0, 0, 0); t.setHours(0, 0, 0, 0);
   return Math.round((t.getTime() - today.getTime()) / 86_400_000);
 };
+
+/** «ЧЧ:ММ» по местному времени — отметка свежести аналитики (F-R109-3). */
+const formatClock = (d: Date): string =>
+  d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
 
 // ── Period helpers ────────────────────────────────────────────────────────
 type PeriodMode = 'all' | 'today' | '7d' | 'custom';
@@ -88,6 +93,15 @@ export function AdminDashboard() {
   const [stale, setStale] = useState({ fleet: false, maint: false, recent: false, sites: false });
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  // Время последней успешной загрузки аналитики — «Обновлено в ЧЧ:ММ» под
+  // шапкой (F-R109-3). Дашборд держат открытым часами: без отметки цифры
+  // «сейчас» (парк, ТО, риски) не отличить от устаревших.
+  const [analyticsUpdatedAt, setAnalyticsUpdatedAt] = useState<Date | null>(null);
+  // Справочник объектов читается один раз при монтировании; у него нет
+  // собственного места в `loadOps`, поэтому повтор даёт отдельная кнопка
+  // (иначе «объекты» навсегда остаются в списке устаревших, а фильтр
+  // «Объект» — пустым, F-R109-2).
+  const [sitesAttempt, setSitesAttempt] = useState(0);
 
   // Filters. Default 'all' — dispatcher opens the dashboard to a cumulative
   // (since-the-start) picture first; "Сегодня" is an explicit, secondary choice.
@@ -108,10 +122,15 @@ export function AdminDashboard() {
       if (range.to) params.set('dateTo', range.to);
       if (siteFilter !== 'all') params.set('siteId', siteFilter);
       const res = await authFetch(`/api/analytics/sites?${params.toString()}`);
-      if (!res.ok) throw new Error('analytics');
+      if (!res.ok) {
+        // 403 — это не сеть: у роли нет прав на аналитику, повтор не поможет.
+        setLoadError(res.status === 403 ? 'Нет прав на аналитику' : 'Не удалось загрузить, обновите страницу');
+        return;
+      }
       setAnalytics(((await res.json()).analytics ?? []) as SiteAnalyticsDTO[]);
+      setAnalyticsUpdatedAt(new Date());
     } catch {
-      setLoadError('Не удалось загрузить сводку. Проверьте сеть и повторите.');
+      setLoadError('Не удалось загрузить, обновите страницу');
     } finally {
       setLoading(false);
     }
@@ -134,7 +153,11 @@ export function AdminDashboard() {
     }
   }, [canReadMaintenance]);
 
-  const refreshAll = useCallback(() => { void loadAnalytics(); void loadOps(); }, [loadAnalytics, loadOps]);
+  const refreshAll = useCallback(() => {
+    void loadAnalytics(); void loadOps();
+    // «Обновить дашборд» перечитывает и справочник объектов — баннер обещает это.
+    setSitesAttempt((n) => n + 1);
+  }, [loadAnalytics, loadOps]);
 
   // eslint-disable-next-line react-hooks/set-state-in-effect -- loads data on mount / dependency change; the async loader sets state
   useEffect(() => { void loadAnalytics(); }, [loadAnalytics]);
@@ -151,6 +174,7 @@ export function AdminDashboard() {
           return;
         }
         const sites = ((await res.json()).sites ?? []) as SiteOption[];
+        if (cancelled) return;
         setSiteOptions(sites.map((s) => ({ id: s.id, name: s.name })));
         setStale((prev) => ({ ...prev, sites: false }));
       })
@@ -158,7 +182,7 @@ export function AdminDashboard() {
         if (!cancelled) setStale((prev) => ({ ...prev, sites: true }));
       });
     return () => { cancelled = true; };
-  }, []);
+  }, [sitesAttempt]);
 
   // Skeleton only on the very first load — filter changes patch numbers in place.
   const showSkeleton = useMinSkeletonDuration(loading && !fleet && analytics.length === 0);
@@ -281,7 +305,6 @@ export function AdminDashboard() {
     stale.fleet && 'парк установок',
     stale.maint && 'техническое обслуживание',
     stale.recent && 'отчёты',
-    stale.sites && 'объекты',
   ].filter(Boolean).join(', ');
 
   if (showSkeleton) {
@@ -294,14 +317,6 @@ export function AdminDashboard() {
         <div className="grid gap-3 lg:grid-cols-3">
           {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-64 w-full" />)}
         </div>
-      </div>
-    );
-  }
-
-  if (loadError) {
-    return (
-      <div className="p-4 lg:p-5">
-        <QueryErrorBanner message={loadError} onRetry={refreshAll} retrying={loading} />
       </div>
     );
   }
@@ -325,6 +340,9 @@ export function AdminDashboard() {
         <div>
           <h1 className="flex items-center gap-2 text-xl font-bold text-foreground"><LayoutGrid className="h-5 w-5 text-signal-strong" />Дашборд</h1>
           <p className="mt-0.5 text-sm text-muted-foreground">Оперативная сводка производства</p>
+          {analyticsUpdatedAt && (
+            <p className="mt-0.5 text-xs text-muted-foreground">Обновлено в {formatClock(analyticsUpdatedAt)}</p>
+          )}
         </div>
 
         {/* Фильтры: период + Объект + Установка.
@@ -378,10 +396,25 @@ export function AdminDashboard() {
         </div>
       </div>
 
-      {(stale.fleet || stale.maint || stale.recent || stale.sites) && (
+      {(stale.fleet || stale.maint || stale.recent) && (
         <div className="flex items-start gap-2 rounded-lg border border-warning/30 bg-warning/10 px-3 py-2.5 text-sm text-warning-strong" role="status">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
           Сводка неполная: не удалось обновить данные по разделам — {staleSourceNames}. Нажмите «Обновить дашборд».
+        </div>
+      )}
+
+      {/* Сбой справочника объектов объясняется отдельно и лечится кнопкой:
+          «Обновить дашборд» раньше его не перечитывал, и пустой фильтр
+          «Объект» выглядел как «объектов в системе нет» (F-R109-2). */}
+      {stale.sites && (
+        <div className="flex items-center gap-2 rounded-lg border border-warning/30 bg-warning/10 px-3 py-2.5 text-sm text-warning-strong" role="status">
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          <span className="flex-1">Объекты не загрузились</span>
+          <Button type="button" size="sm" variant="outline"
+            onClick={() => setSitesAttempt((n) => n + 1)}
+            className="min-h-11 shrink-0 sm:min-h-8">
+            Повторить
+          </Button>
         </div>
       )}
 
@@ -399,7 +432,11 @@ export function AdminDashboard() {
       <div className="grid gap-3 lg:grid-cols-3 [&>*]:min-w-0">
         <div className="space-y-3 lg:col-span-2">
           <Section icon={Building2} title="План-факт по объектам" footerLabel="Все объекты" onFooter={() => router.push('/admin/sites')}>
-            {planRows.length === 0 ? <Empty text="Для выбранного периода нет объектов с планом" /> : (
+            {loadError ? (
+              /* Сбой аналитики объясняется на месте, только в своём блоке:
+                 парк, ТО и риски приходят другими выборками и остаются. */
+              <Empty text={loadError} tone="danger" />
+            ) : planRows.length === 0 ? <Empty text="Для выбранного периода нет объектов с планом" /> : (
               <div className="grid gap-2 p-3 sm:grid-cols-2">
                 {planRows.map((a) => <PlanTile key={a.siteId} a={a} />)}
               </div>

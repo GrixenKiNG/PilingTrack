@@ -145,15 +145,25 @@ describe('authenticateUserByEmailPassword — кого пускать', () => {
 });
 
 describe('authenticateUserByEmailPassword — форматы хранимого пароля', () => {
-  it('пускает по устаревшему SHA-256 и тут же пересохраняет пароль в bcrypt', async () => {
+  // Поддержка SHA-256 без соли снята 01.10.2026: на бою все пароли в bcrypt,
+  // а ветка SHA-256 отвечала быстрее bcrypt — по времени ответа было видно,
+  // какие учётки ещё на старом хеше (аудит Codex out55, F01).
+  it('НЕ пускает по устаревшему SHA-256 и не переписывает хеш', async () => {
     findUniqueMock.mockResolvedValue(userRow({ password: sha256OfPassword }));
 
     const result = await authenticateUserByEmailPassword('operator@piling.ru', PASSWORD, '10.0.0.1');
 
-    expect(result.user).not.toBeNull();
-    expect(updateMock).toHaveBeenCalledTimes(1);
-    const written = updateMock.mock.calls[0][0].data.password as string;
-    expect(written.startsWith('$2')).toBe(true);
+    expect(result.user).toBeNull();
+    expect(updateMock).not.toHaveBeenCalled();
+  });
+
+  it('на хеше неизвестного формата тратит время на bcrypt, как на настоящем', async () => {
+    findUniqueMock.mockResolvedValue(userRow({ password: sha256OfPassword }));
+
+    const startedAt = performance.now();
+    await authenticateUserByEmailPassword('operator@piling.ru', PASSWORD, '10.0.0.1');
+
+    expect(performance.now() - startedAt).toBeGreaterThan(50);
   });
 
   it('НЕ пускает, когда в базе лежит открытый пароль', async () => {

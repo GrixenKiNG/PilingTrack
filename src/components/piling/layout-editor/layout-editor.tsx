@@ -14,7 +14,7 @@ import { LayoutCanvas } from './layout-canvas';
 import { LayoutInspector } from './layout-inspector';
 import type { RenderBlockContent } from './layout-renderer';
 import type { LayoutBlock, LayoutBlockKind } from './layout-template';
-import type { LayoutController } from './use-layout-template';
+import { LAYOUT_LOAD_FAILED_MESSAGE, type LayoutController } from './use-layout-template';
 
 const toolbarButton = 'min-h-11 rounded-lg border border-border bg-card px-3 text-sm font-semibold text-foreground hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-info/30';
 
@@ -77,6 +77,20 @@ export function LayoutEditor({
     }
     if (wasEditingRef.current && onClose) onClose();
   }, [controller.editing, onClose]);
+
+  // Пока есть несохранённые правки, предупреждаем при закрытии/перезагрузке
+  // вкладки: уход в обход кнопки «Закрыть» иначе молча теряет черновик
+  // (F-R108-2). Событие `beforeunload` обрабатывается браузером как вопрос
+  // «покинуть страницу?» — достаточно отменить его (preventDefault/returnValue).
+  useEffect(() => {
+    if (!controller.editing || !controller.dirty) return;
+    const warnBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', warnBeforeUnload);
+    return () => window.removeEventListener('beforeunload', warnBeforeUnload);
+  }, [controller.editing, controller.dirty]);
 
   if (!visible) return null;
   if (!controller.editing) {
@@ -154,11 +168,16 @@ export function LayoutEditor({
         <button type="button" className={toolbarButton} disabled={!controller.canRedo} onClick={controller.redo}>Повторить</button>
         <button type="button" className={toolbarButton} aria-pressed={preview} onClick={() => setPreview((value) => !value)}>Предпросмотр</button>
         <button type="button" className={toolbarButton} onClick={() => { void controller.reset(); setSelectedBlockId(null); }}>Сбросить</button>
-        <button type="button" className="min-h-11 rounded-lg bg-info-strong px-4 text-sm font-semibold text-white hover:bg-info-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-info/30" onClick={() => void controller.saveDraft()}>Сохранить шаблон</button>
+        <button type="button" className="min-h-11 rounded-lg bg-info-strong px-4 text-sm font-semibold text-white hover:bg-info-strong disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-info/30" disabled={controller.loadFailed} onClick={() => void controller.saveDraft()}>Сохранить шаблон</button>
         {!preview && <button type="button" className={`${toolbarButton} lg:hidden`} onClick={() => setMobilePanel('library')}>Блоки</button>}
         {!preview && <button type="button" className={`${toolbarButton} lg:hidden`} onClick={() => setMobilePanel('inspector')}>Свойства</button>}
         <button type="button" className={toolbarButton} onClick={closeEditor}>Закрыть</button>
       </header>
+      {controller.loadFailed && (
+        <div role="alert" className="border-b border-destructive/40 bg-destructive/10 px-3 py-2 text-sm font-medium text-destructive-strong">
+          {LAYOUT_LOAD_FAILED_MESSAGE}
+        </div>
+      )}
       <div className={`relative grid min-h-0 flex-1 ${preview ? 'grid-cols-1' : 'grid-cols-1 lg:grid-cols-[240px_minmax(320px,1fr)_300px]'}`}>
         {!preview && (
           <aside className={`${mobilePanel === 'library' ? 'absolute inset-y-0 left-0 z-30 block w-[min(90vw,320px)] shadow-2xl' : 'hidden'} overflow-y-auto border-r border-border bg-muted p-4 lg:static lg:block lg:w-auto lg:shadow-none`}>

@@ -4,8 +4,9 @@ import type {
   ChecklistAnswer, ChecklistStage, KnowledgeQuestion, OperatorMobileState,
 } from '@/modules/operator-mobile/contracts';
 import {
-  AUTH_WAIT_MESSAGE, classifyFailure, commandLabel, CSRF_REJECT_MESSAGE, enqueue, isCsrfFailure,
-  isQueueable, markAttempt, QueueOwnershipError, QueueStorageError, readQueue, resolve,
+  AUTH_WAIT_MESSAGE, classifyFailure, commandLabel, CSRF_REJECT_MESSAGE,
+  CSRF_REJECT_NOT_QUEUED_MESSAGE, enqueue, isCsrfFailure, isQueueable, markAttempt,
+  QueueOwnershipError, QueueStorageError, readQueue, resolve,
 } from './offline-queue';
 
 /**
@@ -33,6 +34,15 @@ export class ApiError extends Error {
     this.name = 'ApiError';
   }
 }
+
+/**
+ * Общий текст сетевого сбоя: обрыв связи, истёкший таймаут запроса.
+ *
+ * Обе ветви `operatorErrorText` отвечают машинисту одним и тем же, поэтому текст
+ * живёт в одной константе — иначе правка формулировки в одной ветви дала бы два
+ * разных ответа на один и тот же сбой (R90, находка 6).
+ */
+const NETWORK_FAILURE_TEXT = 'Нет связи с сервером. Проверьте интернет и повторите.';
 
 /**
  * Текст ошибки для машиниста.
@@ -66,10 +76,24 @@ export function operatorErrorText(error: unknown): string {
   // обрыв связи: на связь и надо смотреть, запись при этом остаётся на
   // устройстве и уйдёт повтором (R76, находка 13).
   if (error instanceof DOMException && (error.name === 'TimeoutError' || error.name === 'AbortError')) {
-    return 'Нет связи с сервером. Проверьте интернет и повторите.';
+    return NETWORK_FAILURE_TEXT;
   }
-  if (error instanceof TypeError) return 'Нет связи с сервером. Проверьте интернет и повторите.';
+  if (error instanceof TypeError) return NETWORK_FAILURE_TEXT;
   return 'Не удалось выполнить действие. Повторите.';
+}
+
+/**
+ * Признак строки, написанной для человека по-русски.
+ *
+ * Сервер пишет машинисту русским текстом, а технические сообщения приходят
+ * английскими: сетевой сбой браузера («Failed to fetch»), разбор схемы запроса
+ * (zod issues), служебные строки медиа-маршрута. Кириллица — единственный
+ * доступный признак «это можно показывать»: английское и техническое машинисту
+ * ничего не говорит. Непустая — пустая строка и одни пробелы признаком не
+ * считаются (R90, находка 4).
+ */
+export function isHumanRussianText(text: unknown): text is string {
+  return typeof text === 'string' && text.trim() !== '' && /[А-Яа-яЁё]/.test(text);
 }
 
 /**
@@ -102,7 +126,7 @@ export function operatorErrorDetails(error: unknown): string[] {
   for (const item of error.details) {
     const text = typeof item === 'string' ? item : detailText(item);
     // Кириллица — признак того, что строку писал человек для человека.
-    if (text && /[А-Яа-яЁё]/.test(text)) lines.push(text.trim());
+    if (isHumanRussianText(text)) lines.push(text.trim());
   }
   return lines;
 }
@@ -145,10 +169,16 @@ const NOT_SERVER_JSON =
  * ошибке шлюза связь есть — сервер (или прокси перед ним) отдал отказ. Одна
  * фраза отправляла машиниста «искать связь» при живом сервере. Код называем,
  * чтобы диспетчер мог разобраться.
+ *
+ * ПОЧЕМУ БЕЗ «ЗАПИСЬ СОХРАНЕНА». Этот разбор обслуживает и ЧТЕНИЕ — загрузку
+ * состояния смены (`fetchState`) и вопросов проверки знаний, — где никакой
+ * записи не сохраняется, и обещание повтора там вводило бы в заблуждение
+ * (F-V1-STATE-5XX-TEXT). Добавку про сохранённую запись несёт только путь
+ * очереди, где она правдива: `withQueuedFailureNote` в `sendCommand`.
  */
 function unparsedFailureText(status: number): string {
   if (status >= 500) {
-    return `Сервер временно недоступен (код ${status}). Запись сохранена — отправим автоматически.`;
+    return `Сервер временно недоступен (код ${status}).`;
   }
   if (status >= 400) {
     return `Сервер отказал (код ${status}). Обновите экран и повторите.`;
@@ -170,25 +200,53 @@ const BAD_COMMAND_TEXT_FROM_SERVER = 'Некорректная команда';
 const BAD_COMMAND_HINT =
   'Не удалось отправить — обновите экран и повторите. Если повторяется, сообщите администратору.';
 
-async function parse<T>(response: Response): Promise<T> {
+/**
+ * Отказ сервера → `ApiError` с понятным машинисту текстом. Общий разбор для
+ * команд, чтения состояния, вопросов проверки знаний и получения ссылки на
+ * снимок.
+ *
+ * ПОЧЕМУ ОБЩИЙ. Поток снимка разбирал ответ сам и отдавал в интерфейс СЫРУЮ
+ * английскую строку сервера — «CSRF validation failed: origin mismatch» или
+ * «Unauthorized» (аудит R89, находка 2). Те же правила, что у прочих запросов,
+ * убирают её из формы снимка.
+ *
+ * `csrfMessage` — что сказать про 403 CSRF: у команды в очереди обещание
+ * «запись сохранена на телефоне» правдиво, у команды-перехода и снимка — нет
+ * (аудит R89, находка 1). `fallback` — общая фраза, когда сервер не дал
+ * понятного текста. `russianOnly` — брать текст сервера только с кириллицей:
+ * тело маршрута медиа приносит служебные английские строки, а машинисту они
+ * ничего не говорят.
+ */
+function rejectionError(
+  status: number,
+  payload: {error?: unknown; details?: unknown} | null,
+  options: {csrfMessage: string; fallback: string; russianOnly?: boolean},
+): ApiError {
+  const serverText = typeof payload?.error === 'string' ? payload.error : null;
+  // Отказ CSRF-проверки приходит английской строкой (`csrf-protection.ts`:
+  // `CSRF validation failed: …`) при расхождении `Origin` и `Host` — так
+  // бывает, когда приложение открыто по IP, через прокси или вкладка
+  // пережила смену адреса. Машинисту нужен русский выход «обновите
+  // страницу», а не английская строка, и признак `reason`, по которому
+  // очередь оставит запись `PENDING` (аудит R76, находка 12).
+  if (status === 403 && serverText !== null && serverText.startsWith('CSRF validation failed')) {
+    return new ApiError(403, options.csrfMessage, payload?.details, 'csrf');
+  }
+  if (serverText !== null && (!options.russianOnly || isHumanRussianText(serverText))) {
+    return new ApiError(status,
+      serverText === BAD_COMMAND_TEXT_FROM_SERVER ? BAD_COMMAND_HINT : serverText, payload?.details);
+  }
+  return new ApiError(status, options.fallback, payload?.details);
+}
+
+async function parse<T>(response: Response, csrfMessage = CSRF_REJECT_MESSAGE): Promise<T> {
   const payload = await response.json().catch(() => null) as
     {data?: T; error?: string; details?: unknown} | null;
   if (!response.ok) {
-    // Отказ CSRF-проверки приходит английской строкой (`csrf-protection.ts`:
-    // `CSRF validation failed: …`) при расхождении `Origin` и `Host` — так
-    // бывает, когда приложение открыто по IP, через прокси или вкладка
-    // пережила смену адреса. Машинисту нужен русский выход «обновите
-    // страницу», а не английская строка, и признак `reason`, по которому
-    // очередь оставит запись `PENDING` (аудит R76, находка 12).
-    if (response.status === 403
-      && typeof payload?.error === 'string'
-      && payload.error.startsWith('CSRF validation failed')) {
-      throw new ApiError(403, CSRF_REJECT_MESSAGE, payload.details, 'csrf');
-    }
-    const message = typeof payload?.error === 'string'
-      ? (payload.error === BAD_COMMAND_TEXT_FROM_SERVER ? BAD_COMMAND_HINT : payload.error)
-      : unparsedFailureText(response.status);
-    throw new ApiError(response.status, message, payload?.details);
+    throw rejectionError(response.status, payload, {
+      csrfMessage,
+      fallback: unparsedFailureText(response.status),
+    });
   }
   // Успех — только разобранный ответ нашего сервера. Сеть гостиницы или
   // оператора связи отдаёт на перехваченный запрос свою страницу входа со
@@ -420,14 +478,22 @@ type Command =
  * (`network`): у первого есть выход — войти снова, и о нём экран обязан сказать
  * вслух, у второго делать нечего, кроме ожидания. Текст «отправим после входа»
  * для этого не годится: по строке нельзя принять решение (аудит R76, находка 8).
+ *
+ * Третий повод — `server` (аудит R89, находка 4): сервер ОТВЕТИЛ отказом
+ * (503/429/500 и прочие временные статусы), значит связь есть, а ждать надо не
+ * её. Уведомление «сохранено на устройстве, отправим при связи» отправляло
+ * машиниста искать связь при живом сервере — для этого повода текст другой.
+ * Экран ведёт `server` как `network` (форма закрывается, уведомление с текстом).
  */
 export class QueuedOffline extends Error {
-  readonly reason: 'auth' | 'network';
+  readonly reason: 'auth' | 'network' | 'server';
 
-  constructor(readonly label: string, when: 'при связи' | 'после входа' = 'при связи') {
-    super(`${label}: сохранено на устройстве, отправим ${when}`);
+  constructor(readonly label: string, when: 'при связи' | 'после входа' | 'сервер' = 'при связи') {
+    super(when === 'сервер'
+      ? `${label}: сервер не принял запись, повторим автоматически`
+      : `${label}: сохранено на устройстве, отправим ${when}`);
     this.name = 'QueuedOffline';
-    this.reason = when === 'после входа' ? 'auth' : 'network';
+    this.reason = when === 'после входа' ? 'auth' : when === 'сервер' ? 'server' : 'network';
   }
 }
 
@@ -449,10 +515,32 @@ async function postCommand<T>(command: unknown): Promise<T> {
       body: JSON.stringify(command),
       signal: timeout.signal,
     });
-    return await parse<T>(response);
+    // Команда-переход (`close-shift`, `finish-work` и прочие неочередные) в
+    // очередь не попадает: при CSRF-отказе обещать «запись сохранена на
+    // телефоне и уйдёт после обновления» было бы ложью — сохранять нечего, а
+    // после обновления действие придётся повторить (аудит R89, находка 1).
+    return await parse<T>(response,
+      isQueueable(command) ? CSRF_REJECT_MESSAGE : CSRF_REJECT_NOT_QUEUED_MESSAGE);
   } finally {
     timeout.cleanup();
   }
+}
+
+/**
+ * Дополнение к отказу сервера у команды, которая уже легла в очередь.
+ *
+ * ПОЧЕМУ ТОЛЬКО ЗДЕСЬ. Общий текст 5xx (`unparsedFailureText`) обслуживает и
+ * чтение состояния смены, и вопросы проверки знаний, где никакой записи не
+ * сохраняется, — там «Запись сохранена — отправим автоматически» обещало бы
+ * то, чего нет (F-V1-STATE-5XX-TEXT). Здесь же команда действительно лежит на
+ * устройстве и уйдёт повтором, поэтому обещание правдиво и вводит его только
+ * путь очереди. Разбор тела ответа не повторяем: берём готовый текст ошибки.
+ */
+const QUEUED_FAILURE_NOTE = ' Запись сохранена — отправим автоматически.';
+
+function withQueuedFailureNote(error: unknown): unknown {
+  if (!(error instanceof ApiError) || error.status < 500) return error;
+  return new ApiError(error.status, `${error.message}${QUEUED_FAILURE_NOTE}`, error.details, error.reason);
 }
 
 export async function sendCommand<T = unknown>(command: Command): Promise<T> {
@@ -495,7 +583,12 @@ export async function sendCommand<T = unknown>(command: Command): Promise<T> {
     const result = await postCommand<T>(command);
     resolve(command.clientCommandId, queuedAt);
     return result;
-  } catch (error) {
+  } catch (caught) {
+    // Отказ сервера у команды из очереди: 5xx дополняем обещанием повтора —
+    // запись правда на устройстве и уйдёт сама (F-V1-STATE-5XX-TEXT). Текст
+    // попадёт и машинисту в плашку очереди через `markAttempt`, и в решение о
+    // судьбе записи ниже.
+    const error = withQueuedFailureNote(caught);
     // CSRF-403 — временный отказ, хотя и 403: причина (расхождение `Origin` и
     // `Host`) снимается перезагрузкой страницы. Запись остаётся `PENDING` и
     // уйдёт сама, а машинист читает русское указание (`ApiError.message`).
@@ -517,7 +610,12 @@ export async function sendCommand<T = unknown>(command: Command): Promise<T> {
     markAttempt(command.clientCommandId,
       kind === 'auth' ? AUTH_WAIT_MESSAGE : error instanceof Error ? error.message : 'Не отправлено',
       false, queuedAt);
-    throw new QueuedOffline(commandLabel(command), kind === 'auth' ? 'после входа' : 'при связи');
+    // Сервер ответил отказом (есть HTTP-статус) — связь есть, дело в сервере:
+    // уведомление не должно отправлять машиниста искать связь (аудит R89,
+    // находка 4). Без статуса (обрыв сети, таймаут) — прежний повод.
+    const serverRefused = error instanceof ApiError && error.status >= 400;
+    throw new QueuedOffline(commandLabel(command),
+      kind === 'auth' ? 'после входа' : serverRefused ? 'сервер' : 'при связи');
   }
 }
 
@@ -572,12 +670,23 @@ export async function uploadPhoto(input: {
       }),
       signal: grantTimeout.signal,
     });
-    // Медиа-маршрут отвечает объектом напрямую, без обёртки `data` — здесь
-    // разбираем его сами, а не общим `parse`.
+    // Медиа-маршрут отвечает объектом напрямую, без обёртки `data`, поэтому
+    // разбираем его сами, но ОТКАЗ разбираем общими правилами: раньше сюда
+    // попадала сырая английская строка сервера — «CSRF validation failed:
+    // origin mismatch» или «Unauthorized» (аудит R89, находка 2). Снимок в
+    // очередь не попадает, поэтому у CSRF-отказа текст без обещания
+    // сохранения, а некириллический отказ заменяется общей фразой.
     const granted = await grant.json().catch(() => null) as
       {mediaId?: string; uploadUrl?: string; error?: string} | null;
-    if (!grant.ok || !granted?.mediaId || !granted.uploadUrl) {
-      throw new ApiError(grant.status, granted?.error ?? 'Не удалось получить ссылку для снимка');
+    if (!grant.ok) {
+      throw rejectionError(grant.status, granted, {
+        csrfMessage: CSRF_REJECT_NOT_QUEUED_MESSAGE,
+        fallback: 'Не удалось получить ссылку для снимка',
+        russianOnly: true,
+      });
+    }
+    if (!granted?.mediaId || !granted.uploadUrl) {
+      throw new ApiError(grant.status, 'Не удалось получить ссылку для снимка');
     }
     const {mediaId, uploadUrl} = granted;
 
@@ -605,13 +714,14 @@ export async function uploadPhoto(input: {
       // недоступен» / «Содержимое файла не соответствует заявленному типу…»
       // (`media-service.ts:244,268-271`). Раньше любой ответ подменялся общей фразой,
       // и машинист жал то же битое фото снова вместо того, чтобы снять заново.
-      // Разбираем тело тем же способом, что на первом шаге (`:397-401`): понятный
+      // Разбираем тело тем же способом, что и отказ на первом шаге — запросе
+      // ссылки (`rejectionError`): понятный
       // русский текст из поля `error` показываем, иначе (не JSON, чужая/английская
       // строка) — общую фразу (аудит R76, находка 11).
       if (!confirmed.ok) {
         const body = await confirmed.json().catch(() => null) as {error?: string} | null;
-        const reason = typeof body?.error === 'string' && /[А-Яа-яЁё]/.test(body.error)
-          ? body.error
+        const reason = isHumanRussianText(body?.error)
+          ? body?.error
           : 'Снимок не подтверждён сервером';
         throw new ApiError(confirmed.status, reason);
       }

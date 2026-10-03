@@ -3,7 +3,7 @@
 import { PermittedEntityHistory } from '@/components/piling/ops-shell/permitted-entity-history';
 import { useAbility } from '@/lib/use-ability';
 import { useEffect, useMemo, useState } from 'react';
-import { Plus, Users, UserCog, Wrench, MapPin, Pencil, Trash2, Power, PowerOff } from '@/components/piling/icons/unified-icons';
+import { Plus, Users, UserCog, Wrench, MapPin, Pencil, Power, PowerOff } from '@/components/piling/icons/unified-icons';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -26,6 +26,7 @@ import {
   type OpsKpiItem,
 } from '@/components/piling/ops-shell';
 import { useCrewsData } from './use-crews-data';
+import { catchText } from './crew-messages';
 import { CrewFormDialog } from './crew-form-dialog';
 import { DeleteDialog } from './delete-dialog';
 
@@ -150,7 +151,7 @@ export function AdminCrews() {
       setCrews((prev) => [...prev, crew]);
       setShowCreate(false);
       toast.success('Бригада создана');
-    } catch (err) { toast.error(err instanceof Error ? err.message : 'Ошибка создания бригады'); }
+    } catch (err) { toast.error(catchText(err, 'Ошибка создания бригады')); }
     finally { setSubmitting(false); }
   };
 
@@ -162,7 +163,7 @@ export function AdminCrews() {
       setCrews((prev) => prev.map((c) => (c.id === editItem.id ? crew : c)));
       setEditItem(null);
       toast.success('Бригада сохранена');
-    } catch (err) { toast.error(err instanceof Error ? err.message : 'Ошибка сохранения'); }
+    } catch (err) { toast.error(catchText(err, 'Ошибка сохранения')); }
     finally { setSubmitting(false); }
   };
 
@@ -171,11 +172,12 @@ export function AdminCrews() {
     setSubmitting(true);
     try {
       await deleteCrew(deleteItem.id);
-      setCrews((prev) => prev.filter((c) => c.id !== deleteItem.id));
+      // Сервер только деактивирует бригаду: строка остаётся в списке со
+      // статусом «Неактивна» и кнопкой «Активировать», как обещает диалог.
+      setCrews((prev) => prev.map((c) => (c.id === deleteItem.id ? { ...c, isActive: false } : c)));
       setDeleteItem(null);
-      if (activeId === deleteItem.id) setActiveId(null);
-      toast.success('Бригада удалена');
-    } catch (err) { toast.error(err instanceof Error ? err.message : 'Ошибка удаления бригады'); }
+      toast.success('Бригада деактивирована — её можно активировать снова');
+    } catch (err) { toast.error(catchText(err, 'Ошибка деактивации бригады')); }
     finally { setSubmitting(false); }
   };
 
@@ -266,11 +268,16 @@ function CrewDetail({ crew, canManage, onEdit, onDelete, onToggle }: { crew: Cre
     <OpsDetailPanel title={crew.name || 'Без названия'} subtitle={`Бригада · ${crew.site?.name ?? '—'}`} status={<OpsRiskBadge level={risk.level} label={risk.label} />}>
       {canManage && <div className="flex flex-wrap gap-2">
         <Button size="sm" variant="outline" onClick={onEdit} className="h-11 text-xs sm:h-8"><Pencil className="mr-1 h-3.5 w-3.5" />Редактировать</Button>
-        <Button size="sm" variant="outline" onClick={onToggle} className="h-11 text-xs sm:h-8">
+        {/*
+          Одно действие вместо двух: «Удалить» и «Деактивировать» приводили к
+          одному результату (isActive=false), но путали — у «Удалить» было
+          подтверждение, у мгновенной «Деактивировать» нет. Деактивация
+          подтверждается, активация выполняется сразу.
+        */}
+        <Button size="sm" variant="outline" onClick={crew.isActive ? onDelete : onToggle} className="h-11 text-xs sm:h-8">
           {crew.isActive ? <PowerOff className="mr-1 h-3.5 w-3.5" /> : <Power className="mr-1 h-3.5 w-3.5" />}
           {crew.isActive ? 'Деактивировать' : 'Активировать'}
         </Button>
-        <Button size="sm" variant="outline" onClick={onDelete} className="h-11 text-xs text-destructive-strong hover:bg-destructive/10 sm:h-8"><Trash2 className="mr-1 h-3.5 w-3.5" />Удалить</Button>
       </div>}
 
       <div className="grid grid-cols-2 divide-x rounded-md border border-border bg-muted">

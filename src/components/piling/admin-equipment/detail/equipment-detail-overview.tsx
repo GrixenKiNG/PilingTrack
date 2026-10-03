@@ -8,7 +8,7 @@
 import { type ReactNode } from 'react';
 import { KIND_LABELS } from '../equipment-form';
 import { type TimelineRow } from './equipment-detail-parts';
-import { formatCountMeters, formatFixed } from '@/lib/format';
+import { formatCountMeters, formatFixed, formatRuDate } from '@/lib/format';
 import type { EquipmentDTO, EquipmentKindDTO } from '@/lib/types';
 import { formatDowntimeHours } from '@/lib/downtime-hours';
 
@@ -155,7 +155,7 @@ export function OverviewTiles({
           ['Статус', eq.isActive ? 'В эксплуатации' : 'Списана'],
           ['Моточасы', eq.engineHoursTotal != null ? `${formatFixed(Number(eq.engineHoursTotal), 0)} ч` : '—'],
           ['Телематика', devicesCount > 0 ? `${devicesCount} устройств` : 'не подключена'],
-          ['Последний отчёт', timeline[0]?.date || '—'],
+          ['Последний отчёт', formatRuDate(timeline[0]?.date)],
         ]}
       />
       <OverviewTile
@@ -170,7 +170,7 @@ export function OverviewTiles({
       <OverviewTile
         title="ТО и обслуживание"
         rows={[
-          ['Ближайшее ТО', eq.nextMaintenanceDate ? String(eq.nextMaintenanceDate).slice(0, 10) : '—'],
+          ['Ближайшее ТО', formatRuDate(eq.nextMaintenanceDate)],
           ['Моточасы ТО', eq.nextMaintenanceAtHours != null ? `${formatFixed(Number(eq.nextMaintenanceAtHours), 0)} ч` : '—'],
           ['Замечания', timeline.some((row) => row.downtimeHours && row.downtimeHours > 0) ? 'есть простой' : 'нет'],
         ]}
