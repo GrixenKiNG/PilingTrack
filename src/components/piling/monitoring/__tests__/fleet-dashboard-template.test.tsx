@@ -94,6 +94,16 @@ describe('FleetDashboard shared equipment template', () => {
     });
   };
 
+  /** Снимок вернул 200, но тело не разбирается в JSON (битый/обрезанный ответ). */
+  const fleetReturnsBadBody = () => {
+    const base = mocks.authFetch.getMockImplementation();
+    if (!base) throw new Error('authFetch mock is not configured');
+    mocks.authFetch.mockImplementation(async (url: string, init?: RequestInit) =>
+      url.startsWith('/api/monitoring/fleet')
+        ? { ok: true, status: 200, json: async () => { throw new SyntaxError('Unexpected token < in JSON'); } }
+        : base(url, init));
+  };
+
   it('applies one saved template to all visible equipment cards', async () => {
     // Шаблон приходит с сервера уже сохранённым: редактор переехал в
     // «Настройки → Шаблоны плиток», и на мониторинге его больше нет. Проверяем
@@ -241,6 +251,20 @@ describe('FleetDashboard shared equipment template', () => {
 
     const text = await screen.findByText(/Нет доступа к мониторингу/);
     expect(text.textContent).toBe('Нет доступа к мониторингу. Обратитесь к администратору.');
+  });
+
+  /**
+   * R118 №3: `res.json()` стоял внутри общего try, и 200 с битым телом
+   * подписывался «Нет соединения» — человека отправляли чинить интернет,
+   * хотя сервер ответил.
+   */
+  it('битый 200 — «некорректный ответ сервера», а не обрыв связи (R118 №3)', async () => {
+    fleetReturnsBadBody();
+
+    render(<FleetDashboard />);
+
+    expect(await screen.findByText(/Некорректный ответ сервера/)).toBeInTheDocument();
+    expect(screen.queryByText(/Нет соединения с сервисом мониторинга/)).not.toBeInTheDocument();
   });
 
   /**

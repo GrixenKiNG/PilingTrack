@@ -92,7 +92,17 @@ export function FleetDashboard() {
         setError(fleetFailureMessage(res.status));
         return;
       }
-      const data: FleetSnapshot = await res.json();
+      // Разбор тела — в отдельном try: 200 с битым/обрезанным телом (прокси,
+      // таймаут шлюза) попадал в общий catch и выдавался за обрыв связи, хотя
+      // сервер ответил. Человека отправляли «чинить интернет» вместо повтора.
+      let data: FleetSnapshot;
+      try {
+        data = await res.json() as FleetSnapshot;
+      } catch {
+        if (request !== snapshotRequest.current) return;
+        setError('Некорректный ответ сервера. Повторите попытку.');
+        return;
+      }
       if (request !== snapshotRequest.current) return;
       setSnap(data);
       setError(null);
