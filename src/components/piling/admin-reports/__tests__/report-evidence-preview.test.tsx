@@ -49,13 +49,21 @@ function renderPreview() {
     <ReportEvidencePreview
       report={report}
       history={{ data: null, loading: false, error: false }}
-      formatDate={(d) => d}
       onClose={vi.fn()}
       onPreviewPdf={vi.fn()}
       onPrint={vi.fn()}
     />,
   );
 }
+
+describe('ReportEvidencePreview — единый формат даты (F-R114-7)', () => {
+  it('дата в шапке панели совпадает с блоком фактов (formatRuDate)', () => {
+    renderPreview();
+
+    expect(screen.getByText(/Доказательства смены · 01\.09\.2026/)).toBeInTheDocument();
+    expect(screen.queryByText(/сент\./)).not.toBeInTheDocument();
+  });
+});
 
 describe('ReportEvidencePreview — скачивание PDF (F-R93-5)', () => {
   beforeEach(() => {

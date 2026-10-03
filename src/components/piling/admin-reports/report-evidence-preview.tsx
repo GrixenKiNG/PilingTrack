@@ -40,7 +40,6 @@ import { formatDowntimeHours } from '@/lib/downtime-hours';
 export function ReportEvidencePreview({
   report,
   history,
-  formatDate,
   onClose,
   onEdit,
   onPreviewPdf,
@@ -48,7 +47,6 @@ export function ReportEvidencePreview({
 }: {
   report: ReportDTO | null;
   history: { data: ReportHistory | null; loading: boolean; error: boolean };
-  formatDate: (d: string) => string;
   onClose: () => void;
   onEdit?: (r: ReportDTO) => void;
   onPreviewPdf: (r: ReportDTO) => void;
@@ -101,7 +99,7 @@ export function ReportEvidencePreview({
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <h2 className="truncate text-base font-semibold text-foreground">Отчёт #{report.reportId}</h2>
-            <p className="mt-0.5 text-2xs text-muted-foreground">Доказательства смены · {formatDate(report.date)}</p>
+            <p className="mt-0.5 text-2xs text-muted-foreground">Доказательства смены · {formatRuDate(report.date)}</p>
             <span className={cn(
               'mt-1 inline-block rounded px-2 py-0.5 text-3xs font-medium',
               report.status === 'submitted' ? 'bg-success/10 text-success-strong' : 'bg-muted text-muted-foreground',

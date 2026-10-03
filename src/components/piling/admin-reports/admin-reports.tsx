@@ -446,7 +446,6 @@ export function AdminReports() {
             <ReportEvidencePreview
               report={effectivePreview}
               history={reportHistory}
-              formatDate={formatDate}
               onClose={() => setPreviewReport(null)}
               onEdit={mayManage ? (r) => { setEditReport(r); setShowCreateDialog(true); } : undefined}
               onPreviewPdf={handlePreviewPdf}
