@@ -120,6 +120,9 @@ export function WorkOrderFormDialog({
   // памяти «Сохранить» без единой правки отправляло день вместо момента — время
   // закрытия/начала терялось (F-R122-1).
   const [loadedMoments, setLoadedMoments] = useState<LoadedMoments | null>(null);
+  // Сбой чтения правящейся записи: форму показывать нельзя — иначе «Сохранить»
+  // уходит с полями предыдущего открытия (F-R122-2).
+  const [recordLoadFailed, setRecordLoadFailed] = useState(false);
 
   const set = <K extends keyof WorkOrderFormValues>(key: K, value: WorkOrderFormValues[K]) =>
     setForm((p) => ({ ...p, [key]: value }));
@@ -127,6 +130,11 @@ export function WorkOrderFormDialog({
   // Подготовка диалога при открытии: справочники + префилл редактируемой записи.
   const prepare = useCallback(async () => {
     setLoading(true);
+    // Сбрасываем прежние значения при каждом открытии: сбой чтения не должен
+    // оставлять на экране поля предыдущего наряда (F-R122-2).
+    setRecordLoadFailed(false);
+    setForm(EMPTY_FORM);
+    setLoadedMoments(null);
     try {
       const reqs: Promise<void>[] = [];
 
@@ -181,6 +189,9 @@ export function WorkOrderFormDialog({
 
       await Promise.all(reqs);
     } catch {
+      // Сбой именно чтения правящейся записи (или обрыв при её загрузке): форму
+      // не рисуем, иначе «Сохранить» уйдёт с чужими полями (F-R122-2).
+      if (editingId) setRecordLoadFailed(true);
       toast.error('Не удалось загрузить данные наряда');
     } finally {
       setLoading(false);
@@ -261,6 +272,15 @@ export function WorkOrderFormDialog({
 
         {loading ? (
           <p className="rounded-lg bg-muted px-3 py-6 text-center text-sm text-muted-foreground">Загрузка…</p>
+        ) : recordLoadFailed ? (
+          // Не показываем форму с чужими/пустыми полями: без прочитанной записи
+          // «Сохранить» переписал бы наряд значениями предыдущего открытия (F-R122-2).
+          <div className="rounded-lg bg-muted px-3 py-6 text-center text-sm text-muted-foreground">
+            <p>Не удалось загрузить наряд для правки</p>
+            <Button size="sm" variant="outline" className="mt-3 min-h-11 sm:min-h-0" onClick={() => void prepare()}>
+              Повторить
+            </Button>
+          </div>
         ) : (
           <div className="space-y-3">
             {!equipmentId && (
@@ -403,7 +423,7 @@ export function WorkOrderFormDialog({
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>Отмена</Button>
-          <Button onClick={submit} disabled={busy || loading} className="bg-signal hover:bg-signal-strong text-white">
+          <Button onClick={submit} disabled={busy || loading || recordLoadFailed} className="bg-signal hover:bg-signal-strong text-white">
             {busy && <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />}
             {editingId ? 'Сохранить' : 'Создать'}
           </Button>

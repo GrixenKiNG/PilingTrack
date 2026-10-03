@@ -470,3 +470,73 @@ describe('доска нарядов ТО: отменённый наряд нел
     expect(screen.getByRole('button', { name: 'Закрыть ТО' })).toBeDisabled();
   });
 });
+
+describe('доска нарядов ТО: сбой чтения — отказ, а не «нарядов нет» (F-R122-11)', () => {
+  /*
+    На сбое загрузки рядом с красным тостом оставался серый текст «Нарядов по
+    выбранным фильтрам не найдено.»: журнал не прочитан, а экран утверждал, что
+    нарядов нет. Теперь это блок отказа с кнопкой «Повторить».
+  */
+  it('5xx → блок отказа с повтором вместо строки «не найдено»', async () => {
+    mocks.authFetch.mockResolvedValue(json({ error: 'x' }, 503));
+    render(<MaintenanceBoard />);
+
+    expect(await screen.findByText('Сервер временно недоступен — повторите позже.')).toBeInTheDocument();
+    expect(screen.queryByText('Нарядов по выбранным фильтрам не найдено.')).toBeNull();
+
+    const before = mocks.authFetch.mock.calls
+      .filter(([u]) => String(u).startsWith('/api/maintenance')).length;
+    fireEvent.click(screen.getByRole('button', { name: 'Повторить' }));
+    await waitFor(() =>
+      expect(mocks.authFetch.mock.calls
+        .filter(([u]) => String(u).startsWith('/api/maintenance')).length).toBeGreaterThan(before),
+    );
+  });
+});
+
+describe('фото наряда ТО: сбой чтения галереи — отказ, а не «фото нет» (F-R122-10)', () => {
+  /*
+    Отказ чтения `/api/media?...` отдавал пустой список, и панель показывала
+    «Загрузить первое фото», хотя снимки есть. Теперь это отдельное состояние с
+    повтором.
+  */
+  it('500 → «Не удалось загрузить фото» с повтором, без «Загрузить первое фото»', async () => {
+    mocks.authFetch.mockResolvedValue(json({ error: 'x' }, 500));
+    render(<WorkOrderPhotos recordId="wo-1" />);
+
+    expect(await screen.findByText('Не удалось загрузить фото')).toBeInTheDocument();
+    expect(screen.queryByText('Загрузить первое фото')).toBeNull();
+
+    const before = mocks.authFetch.mock.calls.length;
+    fireEvent.click(screen.getByRole('button', { name: 'Повторить' }));
+    await waitFor(() => expect(mocks.authFetch.mock.calls.length).toBeGreaterThan(before));
+  });
+});
+
+describe('форма наряда ТО: сбой чтения записи не рисует чужую форму (F-R122-2)', () => {
+  /*
+    `throw` при чтении наряда для правки попадал в общий catch: тост был, но форма
+    оставалась с полями предыдущего открытия (или пустой) и «Сохранить» была
+    активна — правка ушла бы на сервер с чужими данными. Теперь формы нет.
+  */
+  it('500 на чтении наряда → отказ с повтором, формы и «Сохранить» нет', async () => {
+    mocks.authFetch.mockImplementation(async (url: string) => {
+      if (url === '/api/maintenance/assignees') return json({ users: [] });
+      return json({ error: 'x' }, 500);
+    });
+    render(<WorkOrderFormDialog open onOpenChange={() => {}} equipmentId="eq-1" editingId="wo-1" onSaved={() => {}} />);
+
+    expect(await screen.findByText('Не удалось загрузить наряд для правки')).toBeInTheDocument();
+    // Форма не нарисована — полей чужого/прошлого наряда нет.
+    expect(screen.queryByLabelText('Название *')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Сохранить' })).toBeDisabled();
+
+    const before = mocks.authFetch.mock.calls
+      .filter(([u]) => u === '/api/maintenance/wo-1').length;
+    fireEvent.click(screen.getByRole('button', { name: 'Повторить' }));
+    await waitFor(() =>
+      expect(mocks.authFetch.mock.calls
+        .filter(([u]) => u === '/api/maintenance/wo-1').length).toBeGreaterThan(before),
+    );
+  });
+});
