@@ -11,6 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { formatFixed } from '@/lib/format';
 import type { PileGradeDTO } from '@/lib/types';
 import type { PilePlanRow } from '../types';
 import { emptyPilePlanRow, totalPileCount, totalPileMeters } from './plan-helpers';
@@ -101,7 +102,7 @@ export function PilePlanSection({ plans, setPlans, pileGrades }: PilePlanSection
               </div>
               <span className="text-3xs font-mono text-muted-foreground w-14 text-right flex-shrink-0">
                 {row.count * row.metersPerUnit > 0
-                  ? `${(row.count * row.metersPerUnit).toFixed(1)} м`
+                  ? `${formatFixed(row.count * row.metersPerUnit, 1)} м`
                   : '—'}
               </span>
               <button
@@ -126,7 +127,7 @@ export function PilePlanSection({ plans, setPlans, pileGrades }: PilePlanSection
               <span className="font-mono font-semibold">{totalPileCount(plans)}</span> свай
             </span>
             <span className="text-foreground">
-              <span className="font-mono font-semibold">{totalPileMeters(plans).toFixed(1)}</span> м
+              <span className="font-mono font-semibold">{formatFixed(totalPileMeters(plans), 1)}</span> м
             </span>
           </div>
         </div>

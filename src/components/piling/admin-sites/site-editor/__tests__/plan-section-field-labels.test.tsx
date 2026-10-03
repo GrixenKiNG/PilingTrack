@@ -74,3 +74,22 @@ describe('сводка плана: метры с запятой (R129 #1)', () =
     expect(screen.getByText('120,5 м')).toBeInstanceOf(HTMLSpanElement);
   });
 });
+
+/**
+ * R129 #2: строка плана свай и «Итого» печатали метры через .toFixed(1) —
+ * точкой и без пробела в разрядах («420.5 м», «3684.0»).
+ */
+describe('план свай: метры строки и итога с запятой (R129 #2)', () => {
+  it('строка и «Итого» печатаются по-русски', () => {
+    render(
+      <PilePlanSection
+        plans={[{ tempId: 't1', pileGradeId: 'pg-1', count: 4, metersPerUnit: 105.125 }]}
+        setPlans={vi.fn()}
+        pileGrades={[{ id: 'pg-1', name: 'С 100.30', isActive: true }]}
+      />,
+    );
+
+    expect(screen.getByText('420,5 м')).toBeInstanceOf(HTMLSpanElement);
+    expect(screen.getByText('420,5')).toBeInstanceOf(HTMLSpanElement);
+  });
+});
