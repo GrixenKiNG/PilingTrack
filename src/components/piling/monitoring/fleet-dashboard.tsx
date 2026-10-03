@@ -118,6 +118,19 @@ export function FleetDashboard() {
     }
   }, []);
 
+  // «Повторить загрузку» на полноэкранном отказе была тихой: повторный сбой
+  // не менял экран, и человек жал кнопку снова и снова. Пока запрос идёт,
+  // кнопка заблокирована и подписана «Повторяем…».
+  const [retrying, setRetrying] = useState(false);
+  const retryLoad = useCallback(async () => {
+    setRetrying(true);
+    try {
+      await fetchSnapshot({ bust: true });
+    } finally {
+      setRetrying(false);
+    }
+  }, [fetchSnapshot]);
+
   // Refetch after an admin uploads/replaces an equipment photo so the new
   // card.photoUrl shows up without waiting for the next 30-second refresh.
   const onPhotoUploaded = useCallback(() => {
@@ -190,10 +203,11 @@ export function FleetDashboard() {
           <p className="mt-1 text-sm">{error}</p>
           <button
             type="button"
-            onClick={() => void fetchSnapshot({ bust: true })}
-            className="mt-3 inline-flex min-h-11 items-center text-sm font-semibold text-destructive-strong underline underline-offset-2 sm:min-h-0"
+            onClick={() => void retryLoad()}
+            disabled={retrying}
+            className="mt-3 inline-flex min-h-11 items-center text-sm font-semibold text-destructive-strong underline underline-offset-2 disabled:opacity-60 sm:min-h-0"
           >
-            Повторить загрузку
+            {retrying ? 'Повторяем…' : 'Повторить загрузку'}
           </button>
         </div>
       </div>

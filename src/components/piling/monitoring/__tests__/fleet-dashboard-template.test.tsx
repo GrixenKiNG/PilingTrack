@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { FleetCard, FleetSnapshot } from '@/components/piling/admin-equipment/fleet-types';
 import { DEFAULT_EQUIPMENT_TILE_TEMPLATE } from '../equipment-tile-template';
@@ -265,6 +265,29 @@ describe('FleetDashboard shared equipment template', () => {
 
     expect(await screen.findByText(/Некорректный ответ сервера/)).toBeInTheDocument();
     expect(screen.queryByText(/Нет соединения с сервисом мониторинга/)).not.toBeInTheDocument();
+  });
+
+  /**
+   * R118 №5: «Повторить загрузку» на полноэкранном отказе была тихой — повторный
+   * сбой не менял экран. Пока запрос идёт, кнопка заблокирована и подписана
+   * «Повторяем…».
+   */
+  it('блокирует «Повторить загрузку» на время повтора (R118 №5)', async () => {
+    fleetFailsWith(500);
+
+    render(<FleetDashboard />);
+
+    const retry = await screen.findByRole('button', { name: 'Повторить загрузку' });
+
+    // Повторный запрос «висит» — проверяем состояние занятости, не дожидаясь его.
+    const base = mocks.authFetch.getMockImplementation();
+    if (!base) throw new Error('authFetch mock is not configured');
+    mocks.authFetch.mockImplementation((url: string, init?: RequestInit) =>
+      url.startsWith('/api/monitoring/fleet') ? new Promise(() => {}) : base(url, init));
+
+    fireEvent.click(retry);
+
+    expect(screen.getByRole('button', { name: 'Повторяем…' })).toBeDisabled();
   });
 
   /**
