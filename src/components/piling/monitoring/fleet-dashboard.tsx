@@ -126,6 +126,18 @@ export function FleetDashboard() {
     return () => { clearInterval(timer); window.removeEventListener('online', refresh); document.removeEventListener('visibilitychange', refresh); };
   }, [fetchSnapshot]);
 
+  // Метка «Данные обновлены N назад» считается на рендер (formatRelative смотрит
+  // на Date.now()). При потере связи опрос каждые 30 с ставит одну и ту же строку
+  // ошибки, React пропускает повторный рендер (bailout) — и метка замирает на
+  // последнем успешном кадре, хотя числа давно устарели. Отдельный тик раз в 30 с
+  // перерисовывает подпись, чтобы относительное время росло; таймер снимается при
+  // размонтировании.
+  const [, setClockTick] = useState(0);
+  useEffect(() => {
+    const timer = setInterval(() => setClockTick((t) => t + 1), 30_000);
+    return () => clearInterval(timer);
+  }, []);
+
   // Связь — это ответ последнего опроса, а не сокет.
   const conn: Connection = error ? 'offline' : snap ? 'live' : 'connecting';
 

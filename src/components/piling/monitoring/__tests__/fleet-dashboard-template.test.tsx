@@ -1,5 +1,5 @@
-import { render, screen, waitFor } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { act, render, screen, waitFor } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { FleetCard, FleetSnapshot } from '@/components/piling/admin-equipment/fleet-types';
 import { DEFAULT_EQUIPMENT_TILE_TEMPLATE } from '../equipment-tile-template';
 import { FleetDashboard } from '../fleet-dashboard';
@@ -218,5 +218,41 @@ describe('FleetDashboard shared equipment template', () => {
     render(<FleetDashboard />);
 
     expect(await screen.findByText(/Нет соединения с сервисом мониторинга/)).toBeInTheDocument();
+  });
+
+  /**
+   * F-R118-1: подпись «Данные обновлены N назад» вычислялась один раз на рендер.
+   * При потере связи опрос каждые 30 с ставит одну и ту же строку ошибки, React
+   * пропускает повторный рендер (bailout) — и метка замирала на последнем
+   * успешном кадре, хотя числа уже устарели. Теперь отдельный тик раз в 30 с
+   * пересчитывает относительное время.
+   */
+  describe('F-R118-1: отметка свежести пересчитывается по таймеру', () => {
+    beforeEach(() => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      vi.setSystemTime(new Date('2026-07-04T12:00:00.000Z'));
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('без свежих данных «Данные обновлены N назад» продолжает расти', async () => {
+      render(<FleetDashboard />);
+      await waitFor(() => expect(screen.getAllByTestId('equipment-tile')).toHaveLength(2));
+      expect(screen.getByText(/Данные обновлены только что/)).toBeInTheDocument();
+
+      // Сервер не отвечает: опросы «висят» и не меняют состояние панели, так что
+      // пересчитать подпись может только собственный тик. Раньше она так и
+      // застывала на «только что», сколько бы часов ни прошло.
+      const base = mocks.authFetch.getMockImplementation();
+      if (!base) throw new Error('authFetch mock is not configured');
+      mocks.authFetch.mockImplementation((url: string, init?: RequestInit) =>
+        url.startsWith('/api/monitoring/fleet') ? new Promise(() => {}) : base(url, init));
+
+      await act(async () => { vi.advanceTimersByTime(120_000); });
+
+      expect(screen.getByText(/Данные обновлены 2 мин назад/)).toBeInTheDocument();
+    });
   });
 });
