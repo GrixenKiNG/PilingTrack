@@ -1,7 +1,19 @@
 #!/usr/bin/env bash
 # Barrier shared by deploy and rollback. No SSH, build, or image tag changes here.
 set -euo pipefail
-die() { echo "✖ Смена поколения: $*" >&2; exit 1; }
+stop_started=0
+die() {
+  echo "✖ Смена поколения: $*" >&2
+  if [[ "$stop_started" == 1 ]]; then
+    echo 'Сайт может быть недоступен: остановка уже началась. Устраните причину отказа и проверьте внешние процессы. Для отката сначала переключите оба образа на сохранённые теги по ранбуку 016.' >&2
+    printf 'Повтор безопасного запуска: ' >&2
+    if [[ -n "${COMPOSE_FILE:-}" ]]; then printf 'COMPOSE_FILE=%q ' "$COMPOSE_FILE" >&2; fi
+    printf 'WORKER_GENERATION_PROJECT=%q WORKER_GENERATION_STOP_TIMEOUT_SECONDS=%q WORKER_GENERATION_EXTERNAL_STOPPED=1 bash scripts/replace-worker-generation.sh' "$project" "$timeout" >&2
+    printf ' %q' "${services[@]}" >&2
+    printf '\n' >&2
+  fi
+  exit 1
+}
 project="${WORKER_GENERATION_PROJECT:-pilingtrack}"
 [[ "$project" =~ ^[a-z0-9][a-z0-9_-]*$ ]] || die 'неверное имя compose-проекта'
 [[ "${WORKER_GENERATION_EXTERNAL_STOPPED:-0}" == 1 ]] || die 'подтвердите остановку внешних standalone/systemd/pm2/других хостов: WORKER_GENERATION_EXTERNAL_STOPPED=1'
@@ -28,6 +40,7 @@ for id in "${old[@]}"; do
   docker update --restart=no "$id" >/dev/null || die 'не удалось запретить перезапуск старой реплики'
 done
 stopped_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+stop_started=1
 echo "STOP: проект $project, старых реплик ${#old[@]}, таймаут ${timeout}с"
 "${compose[@]}" stop --timeout "$timeout" app workers || die 'остановка compose не выполнена; новое поколение не запущено'
 # Compose may omit one-off replicas; stop these by their captured IDs as well.
@@ -37,7 +50,9 @@ for id in "${old[@]}"; do
 done
 for id in "${old[@]}"; do
   state=$(docker inspect --format '{{.State.Status}} {{.State.ExitCode}} {{.State.OOMKilled}}' "$id") || die 'не удалось проверить завершение старой реплики'
-  [[ "$state" == 'exited 0 false' || "$state" == 'created 0 false' ]] || die "реплика $id не завершилась штатно ($state); проверьте drain и журналы, старта не будет"
+  service=$(docker inspect --format '{{index .Config.Labels "com.docker.compose.service"}}' "$id") || die 'не удалось определить сервис старой реплики'
+  [[ "$service" == app || "$service" == workers ]] || die 'неизвестный сервис старой реплики'
+  [[ "$state" == 'exited 0 false' || "$state" == 'created 0 false' || ( "$service" == app && "$state" == 'exited 143 false' ) ]] || die "реплика $id не завершилась штатно ($state); проверьте drain и журналы, старта не будет"
   shutdown_log=$(docker logs --since "$stopped_at" "$id" 2>&1) || die 'журнал остановки недоступен; завершение задач не подтверждено'
   if grep -Eq '(Embedded worker|Worker|Redis|Prisma) shutdown failed|Shutdown deadline exceeded' <<<"$shutdown_log"; then
     die "реплика $id сообщила об ошибке завершения задач; новое поколение не запущено"

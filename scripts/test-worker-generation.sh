@@ -11,7 +11,7 @@ cat > "$COMPOSE_FILE" <<'YAML'
 services:
   app:
     image: alpine:3.21
-    command: [sh, -c, 'trap "exit 0" TERM INT; while :; do sleep 1 & wait $$!; done']
+    command: [sh, -c, 'trap "exit 143" TERM INT; while :; do sleep 1 & wait $!; done']
   workers:
     image: alpine:3.21
     command: [sh, -c, 'trap "exit 0" TERM INT; while :; do sleep 1 & wait $$!; done']
@@ -57,4 +57,21 @@ status=$?
 set -e
 [[ "$status" != 0 ]] || { echo 'FAIL: ignored failed drain with exit 0' >&2; exit 1; }
 if grep -q '^START' output/codex-t4/d1-drain-refusal.log; then echo 'FAIL: START after failed drain' >&2; exit 1; fi
-echo 'PASS: stop -> verify -> start; live old replica and failed drain block start'
+# Workers must still reject 143, unlike the app's conventional SIGTERM exit.
+docker compose up -d
+cat >output/codex-t4/docker-shim/docker <<'SHIM'
+#!/usr/bin/env bash
+if [[ "$1" == inspect && "$3" == '{{.State.Status}} {{.State.ExitCode}} {{.State.OOMKilled}}' ]]; then
+  service=$("$REAL_DOCKER" inspect --format '{{index .Config.Labels "com.docker.compose.service"}}' "$4")
+  if [[ "$service" == workers ]]; then echo 'exited 143 false'; exit 0; fi
+fi
+exec "$REAL_DOCKER" "$@"
+SHIM
+set +e
+REAL_DOCKER="$real_docker" PATH="$PWD/output/codex-t4/docker-shim:$PATH" bash scripts/replace-worker-generation.sh app workers >output/codex-t4/e0a-workers-refusal.log 2>&1
+status=$?
+set -e
+[[ "$status" != 0 ]] || { echo 'FAIL: accepted workers exit 143' >&2; exit 1; }
+if grep -q '^START' output/codex-t4/e0a-workers-refusal.log; then echo 'FAIL: START after workers 143' >&2; exit 1; fi
+grep -q 'WORKER_GENERATION_EXTERNAL_STOPPED=1' output/codex-t4/e0a-workers-refusal.log || { echo 'FAIL: missing recovery command' >&2; exit 1; }
+echo 'PASS: app 143 accepted; workers 143, live old replica and failed drain block start with recovery instructions'
