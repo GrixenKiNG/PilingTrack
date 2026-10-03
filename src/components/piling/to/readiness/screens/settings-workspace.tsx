@@ -35,6 +35,9 @@ const SETTINGS_ITEMS: Array<{
   { id: 'audit', label: 'Аудит', icon: FileBarChart },
 ];
 
+/** Ключи фильтров ленты аудита — те же, что активны в режиме 'audit' панели фильтров. */
+const AUDIT_FILTER_KEYS = ['from', 'to', 'eventType', 'actor'] as const;
+
 async function downloadCsv(filename: string, _rows: Array<Array<string | number | null | undefined>>) {
   const dataset = filename.includes('audit') ? 'audit'
     : filename.includes('dictionary') ? 'dictionary'
@@ -116,6 +119,7 @@ export function SettingsWorkspace(props: ReferenceUiProps) {
             audit={props.audit}
             bootstrap={props.bootstrap}
             canExport={Boolean(props.bootstrap?.capabilities.entities.audit.export)}
+            activeFilterCount={AUDIT_FILTER_KEYS.filter((key) => Boolean(props.filters[key])).length}
             filtersBar={<ReadinessFiltersBar filters={props.filters} onChange={props.onFiltersChange} mode="audit" />}
             onExport={(events) => downloadCsv('readiness-audit.csv', [['Последовательность', 'Дата', 'Автор', 'Действие', 'Объект', 'Hash'], ...events.map((event) => [event.sequence, event.occurredAt, event.actor.name, auditActionLabel(event.action), `${auditEntityLabel(event.entity.type)}:${event.entity.id}`, event.hash])])}
           />

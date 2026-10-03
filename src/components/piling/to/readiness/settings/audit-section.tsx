@@ -8,7 +8,7 @@ import { formatDateTimeInTimezone } from '@/lib/timezone';
 import { cn } from '@/lib/utils';
 import type { ReadinessAuditEnvelope, ReadinessAuditEventDto, ReadinessBootstrap } from '../api/contracts';
 import { handoverRoleLabel } from '../handover-journal';
-import { auditActionLabel, auditActionMark, auditEntityLabel, isCriticalAuditAction } from './audit-labels';
+import { auditActionLabel, auditActionMark, auditEmptyMessage, auditEntityLabel, auditImportanceLabel, isCriticalAuditAction } from './audit-labels';
 import { InfoRow, ScreenTitle, SettingsKpis, StatusPill, card } from './shared-ui';
 
 const AUDIT_TONE: Record<string, string> = {
@@ -23,12 +23,14 @@ interface AuditSettingsProps {
   audit: ReadinessAuditEnvelope | null;
   bootstrap: ReadinessBootstrap | null;
   canExport: boolean;
+  /** Сколько фильтров ленты сейчас активно: отличает «журнал пуст» от «фильтр не нашёл». */
+  activeFilterCount: number;
   /** Возвращает промис: пока выгрузка идёт, кнопка блокируется и показывает ход. */
   onExport: (events: ReadinessAuditEventDto[]) => Promise<void>;
   filtersBar: React.ReactNode;
 }
 
-export function AuditSettings({ audit, bootstrap, canExport, onExport, filtersBar }: AuditSettingsProps) {
+export function AuditSettings({ audit, bootstrap, canExport, activeFilterCount, onExport, filtersBar }: AuditSettingsProps) {
   const events = audit?.data ?? [];
   const verification = audit?.verification;
   const [query, setQuery] = useState('');
@@ -93,7 +95,7 @@ export function AuditSettings({ audit, bootstrap, canExport, onExport, filtersBa
           </div>
           <div className="overflow-x-auto">
             <div className="hidden min-w-[820px] grid-cols-[128px_140px_minmax(0,1fr)_150px_96px_20px] gap-2 border-y border-border px-4 py-2 text-3xs font-semibold uppercase text-muted-foreground md:grid">
-              <span>Время</span><span>Пользователь</span><span>Действие</span><span>Объект</span><span>Результат</span><span />
+              <span>Время</span><span>Пользователь</span><span>Действие</span><span>Объект</span><span>Важность</span><span />
             </div>
             <div className="hidden max-h-[520px] min-w-[820px] divide-y divide-border overflow-y-auto md:block">
               {visible.map((event) => {
@@ -124,7 +126,7 @@ export function AuditSettings({ audit, bootstrap, canExport, onExport, filtersBa
                       <span className="block truncate">{auditEntityLabel(event.entity.type)}</span>
                       <small className="block truncate font-mono text-muted-foreground">{event.entity.id.slice(0, 12) || '—'}</small>
                     </span>
-                    <span>{critical ? <StatusPill tone="danger">Критично</StatusPill> : <StatusPill tone="success">Успешно</StatusPill>}</span>
+                    <span><StatusPill tone={critical ? 'danger' : 'neutral'}>{auditImportanceLabel(event.action)}</StatusPill></span>
                     <ChevronRight className="h-4 w-4 text-muted-foreground" />
                   </button>
                 );
@@ -139,7 +141,7 @@ export function AuditSettings({ audit, bootstrap, canExport, onExport, filtersBa
               <article key={event.id} className="rounded-lg border border-border p-3 text-xs">
                 <div className="flex items-start justify-between gap-2">
                   <b className="flex min-w-0 items-center gap-2"><ActionIcon className={cn('h-4 w-4 shrink-0', AUDIT_TONE[mark.tone])} />{auditActionLabel(event.action)}</b>
-                  {isCriticalAuditAction(event.action) ? <StatusPill tone="danger">Критично</StatusPill> : <StatusPill tone="success">Успешно</StatusPill>}
+                  {isCriticalAuditAction(event.action) ? <StatusPill tone="danger">Критично</StatusPill> : <StatusPill tone="neutral">Обычное</StatusPill>}
                 </div>
                 <div className="mt-2 text-muted-foreground">{event.actor.name || 'Система'} · {handoverRoleLabel(event.actor.actingAs || event.actor.role) ?? 'PilingTrack'}</div>
                 <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-2xs text-muted-foreground">
@@ -150,7 +152,7 @@ export function AuditSettings({ audit, bootstrap, canExport, onExport, filtersBa
               );
             })}
           </div>
-          {visible.length === 0 && <div className="py-10 text-center text-sm text-muted-foreground">{events.length === 0 ? 'События аудита недоступны в текущем источнике.' : 'По запросу ничего не найдено.'}</div>}
+          {visible.length === 0 && <div className="py-10 text-center text-sm text-muted-foreground">{auditEmptyMessage(audit !== null, activeFilterCount, events.length)}</div>}
           <div className="border-t border-border p-3 text-xs text-muted-foreground">
             Показано {visible.length} из {verification?.eventCount ?? events.length} событий
           </div>

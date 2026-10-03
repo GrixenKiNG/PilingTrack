@@ -157,3 +157,26 @@ export function auditEntityLabel(type: string): string {
 export function isCriticalAuditAction(action: string): boolean {
   return CRITICAL_ACTIONS.has(action);
 }
+
+/**
+ * Важность записи для колонки журнала. Раньше колонка «Результат» показывала
+ * «Критично/Успешно» — важность была смешана с исходом: «Наряд согласован
+ * администратором» читалось как «Результат: Критично», а «Наряд-допуск истёк»
+ * — как «Успешно». Но запись журнала всегда уже состоялась, поэтому колонка
+ * говорит именно о важности действия, а не об исходе (R125 №2).
+ */
+export function auditImportanceLabel(action: string): string {
+  return isCriticalAuditAction(action) ? 'Критично' : 'Обычное';
+}
+
+/**
+ * Текст пустого состояния ленты. Раньше и «источник не ответил», и «журнал
+ * пуст», и «фильтр ничего не нашёл» показывали одно «События аудита недоступны
+ * в текущем источнике»: диспетчер читал это как поломку источника и жал
+ * «Повторить» вместо сброса фильтра (R125 №1).
+ */
+export function auditEmptyMessage(sourceAvailable: boolean, filterCount: number, loadedCount: number): string {
+  if (!sourceAvailable) return 'События аудита недоступны в текущем источнике.';
+  if (loadedCount > 0) return 'По запросу ничего не найдено.';
+  return filterCount > 0 ? 'По фильтру ничего не найдено.' : 'В журнале пока нет событий.';
+}
