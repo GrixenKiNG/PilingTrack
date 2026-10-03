@@ -83,7 +83,9 @@ const DEFAULT_CONFIG: LagMonitorConfig = {
 // ============================================================
 
 let monitorStarted = false;
-let lastKnownMetrics: LagMetrics | null = null;
+// Next instrumentation and route bundles can instantiate this module separately.
+const lagGlobal = globalThis as typeof globalThis & { __pilingtrackLagSnapshot?: { value: LagMetrics | null } };
+const sharedLag = lagGlobal.__pilingtrackLagSnapshot ??= { value: null };
 let config: LagMonitorConfig;
 
 async function getDbClient() {
@@ -254,7 +256,7 @@ async function collectLagMetrics(): Promise<LagMetrics> {
     timestamp: new Date().toISOString(),
   };
 
-  lastKnownMetrics = metrics;
+  sharedLag.value = metrics;
   return metrics;
 }
 
@@ -363,15 +365,15 @@ export function startLagMonitor(userConfig?: Partial<LagMonitorConfig>): void {
  * Get the most recent lag metrics.
  */
 export function getLagMetrics(): LagMetrics | null {
-  return lastKnownMetrics;
+  return sharedLag.value;
 }
 
 /**
  * Get current lag alerts.
  */
 export function getLagAlerts(): LagAlert[] {
-  if (!lastKnownMetrics) return [];
-  return evaluateAlerts(lastKnownMetrics);
+  if (!sharedLag.value) return [];
+  return evaluateAlerts(sharedLag.value);
 }
 
 /**
