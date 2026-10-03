@@ -66,6 +66,7 @@ export function EquipmentMaintenance({ equipmentId }: { equipmentId: string }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [pendingDelete, setPendingDelete] = useState<MaintenanceRow | null>(null);
+  const [pendingDone, setPendingDone] = useState<MaintenanceRow | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -191,7 +192,7 @@ export function EquipmentMaintenance({ equipmentId }: { equipmentId: string }) {
                     </button>
                   )}
                   {st !== 'DONE' && st !== 'CANCELLED' && (
-                    <button onClick={() => patchStatus(r, 'DONE')} disabled={pendingId === r.id}
+                    <button onClick={() => setPendingDone(r)} disabled={pendingId === r.id}
                     aria-label={`Отметить «${r.title}» выполненным`}
                     className="flex h-11 w-11 items-center justify-center rounded-md text-success-strong transition-colors hover:bg-success/10 hover:text-success-strong disabled:opacity-50" title="Выполнено">
                       <CheckCircle2 className="w-3.5 h-3.5" />
@@ -220,6 +221,16 @@ export function EquipmentMaintenance({ equipmentId }: { equipmentId: string }) {
         equipmentId={equipmentId}
         editingId={editingId}
         onSaved={load}
+      />
+      <ConfirmActionDialog
+        open={Boolean(pendingDone)}
+        onOpenChange={(open) => { if (!open) setPendingDone(null); }}
+        title="Отметить наряд выполненным?"
+        description={pendingDone
+          ? `Наряд «${pendingDone.title}» будет закрыт: сдвинется срок следующего ТО и запишется показание счётчика моточасов на момент выполнения.`
+          : ''}
+        confirmLabel="Выполнено"
+        onConfirm={() => { const row = pendingDone; setPendingDone(null); if (row) void patchStatus(row, 'DONE'); }}
       />
       <ConfirmActionDialog
         open={Boolean(pendingDelete)}
