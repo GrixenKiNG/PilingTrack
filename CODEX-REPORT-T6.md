@@ -63,3 +63,7 @@ Docs не запускают production и не дают Codex права на �
 ## F6 / ревью №3 — плановые повторы Alertmanager
 
 Подтверждено: labels+startsAt подавлял повтор навсегда. В dedupe identity добавлено UTC окно по реальному observability/alertmanager/alertmanager.yml:critical1h, остальные4h. В одном окне транспортный retry/reordered batch по-прежнему шлёт только недоставленные; в новом окне создаётся новый durable event и напоминание снова доставляется. На границе окна возможен дубль transport retry (решение владельца: дубль лучше потери). При изменении repeat_interval нужно синхронно изменить эти две константы; нет нового env flag. Red exit1:17pass/2fail, green exit0:19pass/0skip, f6-3-red/green.log. Impact/detect exit1 unavailable UNKNOWN, fallback Alertmanager route verified; diffcheck0. F5 commit91005228.
+
+## F6 / ревью №6 — PDF upload timeout
+
+5000ms подтверждено в source; реальное время production upload не измерялось. Red с управляемыми таймерами: upload подтверждается через6s, прежний abort5s => exit1/33pass1fail. Исправлено:30s максимум одного PDF-запроса и45s всей sendDocument рассылки (включая config read), чтобы receipts успели commit в существующей60s транзакции. Оставшиеся после бюджета чаты возвращают transient false и идут в retry, подтверждённые не дублируются. GetChat/sendMessage остаются5s. Telegram ambiguous timeout по-прежнему может дать дубль, BotAPI не поддерживает idempotency. Green exit0/2files58pass0skip, f6-6-red/green.log; impact/detect1 unavailable UNKNOWN; diffcheck0. Новых env flags/deps нет. Находка3 commitb3320b02.

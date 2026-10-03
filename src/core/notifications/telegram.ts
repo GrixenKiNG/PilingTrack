@@ -256,8 +256,11 @@ async function sendTelegramDocument(
   config: TelegramBotConfig,
   filename: string,
   data: Buffer,
-  caption?: string,
+  caption: string | undefined,
+  deadline: number,
 ): Promise<DeliveryResult> {
+  const timeout = Math.min(30_000, deadline - Date.now());
+  if (timeout <= 0) return false;
   try {
     const url = `${process.env.TELEGRAM_API_BASE || 'https://api.telegram.org'}/bot${config.botToken}/sendDocument`;
     const form = new FormData();
@@ -269,7 +272,7 @@ async function sendTelegramDocument(
     const arr = new Uint8Array(data);
     form.append('document', new Blob([arr], { type: 'application/pdf' }), filename);
 
-    const response = await fetch(url, { method: 'POST', body: form, signal: AbortSignal.timeout(5000) });
+    const response = await fetch(url, { method: 'POST', body: form, signal: AbortSignal.timeout(timeout) });
     if (!response.ok) {
       const err = await response.text();
       logger.error('Telegram sendDocument error', new Error(err), { status: response.status });
@@ -372,13 +375,15 @@ export class TelegramNotifier {
     caption?: string,
     progress?: TelegramDeliveryProgress,
   ): Promise<boolean> {
+    // Leave room to commit receipts inside the existing 60s outbox transaction.
+    const deadline = Date.now() + 45_000;
     const configs = await getConfigs();
     if (configs.length === 0) {
       logger.warn('Telegram not configured — skipping document');
       return false;
     }
 
-    return deliverToAll(configs, (config) => sendTelegramDocument(config, filename, data, caption), progress);
+    return deliverToAll(configs, (config) => sendTelegramDocument(config, filename, data, caption, deadline), progress);
   }
 
   /**

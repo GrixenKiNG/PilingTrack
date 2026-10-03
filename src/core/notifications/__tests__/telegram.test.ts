@@ -264,6 +264,25 @@ describe('telegramNotifier — доставка во все конфигурац
     expect(confirm).not.toHaveBeenCalled();
   });
 
+  it('F6 review6: a PDF upload acknowledged after 6s succeeds within a bounded 30s budget', async () => {
+    findManyMock.mockResolvedValue([{ botToken: 'test-a', chatId: 'A', enabled: true }]);
+    vi.useFakeTimers();
+    const timeout = vi.spyOn(AbortSignal, 'timeout').mockImplementation(ms => {
+      const controller = new AbortController();
+      setTimeout(() => controller.abort(), ms); return controller.signal;
+    });
+    fetchMock.mockImplementation((_url, init: RequestInit) => new Promise((resolve, reject) => {
+      init.signal?.addEventListener('abort', () => reject(new Error('timeout')), { once: true });
+      setTimeout(() => resolve({ ok: true, json: async () => ({ ok: true }) }), 6000);
+    }));
+    try {
+      const pending = telegramNotifier.sendDocument('slow.pdf', Buffer.from('%PDF'));
+      await vi.waitFor(() => expect(fetchMock).toHaveBeenCalled());
+      await vi.advanceTimersByTimeAsync(6000);
+      expect(await pending).toBe(true);
+      expect(timeout).toHaveBeenCalledWith(30_000);
+    } finally { timeout.mockRestore(); vi.useRealTimers(); }
+  });
   it('считает доставку неуспешной, если упали все чаты', async () => {
     findManyMock.mockResolvedValue([
       { botToken: '999:token-a', chatId: '-100A', enabled: true },
