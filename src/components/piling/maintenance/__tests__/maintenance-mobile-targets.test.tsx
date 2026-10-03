@@ -9,7 +9,7 @@
  * `data-[size=default]:h-9` самого SelectTrigger (у него выше специфичность).
  * На десктопе (sm и шире) вид не меняется.
  */
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({ authFetch: vi.fn(), loadJson: vi.fn() }));
@@ -20,6 +20,7 @@ vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 import { MaintenanceBoard } from '../maintenance-board';
 import { MaintenanceDetailPanel } from '../maintenance-detail-panel';
 import { WorkOrderDetail } from '../work-order-detail';
+import { WorkOrderTable } from '../work-order-table';
 import { STATUS_LABEL } from '../maintenance-labels';
 import type { WorkOrderRow } from '../maintenance-board-model';
 
@@ -113,6 +114,34 @@ describe('журнал ТО: назначение фильтров озвучи�
     ]) {
       expect(screen.getByLabelText(label)).toBeInstanceOf(HTMLButtonElement);
     }
+  });
+});
+
+describe('таблица нарядов ТО: выбор с клавиатуры (R116 #14)', () => {
+  it('строка фокусируется и выбирает наряд клавишами Enter и Space', () => {
+    const onSelect = vi.fn();
+    render(
+      <WorkOrderTable
+        records={[record()]}
+        selectedId="wo-1"
+        crewByEquipment={new Map()}
+        busyAction={null}
+        onSelect={onSelect}
+        onEdit={vi.fn()}
+        onDone={vi.fn()}
+        onDelete={vi.fn()}
+      />,
+    );
+
+    const row = screen.getByText('СП-49').closest('tr');
+    if (!row) throw new Error('Строка наряда не найдена');
+    expect(row).toHaveAttribute('tabindex', '0');
+    expect(row).toHaveAttribute('aria-selected', 'true');
+
+    fireEvent.keyDown(row, { key: 'Enter' });
+    fireEvent.keyDown(row, { key: ' ' });
+    expect(onSelect).toHaveBeenCalledTimes(2);
+    expect(onSelect).toHaveBeenCalledWith('wo-1');
   });
 });
 
