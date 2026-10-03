@@ -301,6 +301,71 @@ describe('telegramNotifier — человекочитаемые поля и зо
 });
 
 /**
+ * F-R120-3: кнопка «Тест» дергала `getChat` без `AbortSignal.timeout` —
+ * при недоступном Telegram (чёрная дыра сети, блокировка) запрос висел
+ * бесконечно, а спиннер на экране настроек не останавливался. `sendMessage`
+ * тайм-аут уже имел. Теперь у обоих запросов один и тот же лимит 5 с.
+ */
+describe('telegramNotifier — тайм-аут проверки канала (F-R120-3)', () => {
+  let fetchMock: ReturnType<typeof vi.fn>;
+  const originalDefaultTenantId = process.env.DEFAULT_TENANT_ID;
+
+  beforeEach(() => {
+    findManyMock.mockReset();
+    decryptMock.mockReset();
+    isEncryptedMock.mockReset().mockReturnValue(false);
+    process.env.DEFAULT_TENANT_ID = 'test-tenant';
+    findManyMock.mockResolvedValue([
+      { botToken: '999:plain-token', chatId: '-100123', enabled: true },
+    ]);
+    fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    if (originalDefaultTenantId === undefined) delete process.env.DEFAULT_TENANT_ID;
+    else process.env.DEFAULT_TENANT_ID = originalDefaultTenantId;
+  });
+
+  it('ограничивает getChat тем же тайм-аутом 5 с, что и sendMessage', async () => {
+    const timeoutSpy = vi.spyOn(AbortSignal, 'timeout');
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({ result: { title: 'Test Chat' } }),
+      text: async () => '',
+    });
+
+    await telegramNotifier.testConnection();
+
+    expect(timeoutSpy).toHaveBeenCalledWith(5000);
+    expect(fetchMock.mock.calls[0][1].signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it('зависший getChat завершается ошибкой тайм-аута, а не бесконечным ожиданием', async () => {
+    const controller = new AbortController();
+    vi.spyOn(AbortSignal, 'timeout').mockReturnValue(controller.signal);
+    fetchMock.mockImplementation(
+      (_url: string, init: RequestInit) =>
+        new Promise((_resolve, reject) => {
+          init.signal?.addEventListener('abort', () =>
+            reject(new DOMException('The operation was aborted due to timeout', 'TimeoutError')),
+          );
+        }),
+    );
+
+    const pending = telegramNotifier.testConnection();
+    // Дать коду дойти до fetch и повесить обработчик на сигнал.
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    controller.abort();
+
+    const res = await pending;
+    expect(res.ok).toBe(false);
+    expect(res.error).toBe('The operation was aborted due to timeout');
+  });
+});
+
+/**
  * PDF отчёта не доходил в Telegram ни разу с 25.09.2026: обработчик шлёт его
  * изнутри `db.$transaction(async (tx) => …)` (блокировка строки события,
  * event-handlers.ts), а обёртка транзакции помечает область «тенант уже в

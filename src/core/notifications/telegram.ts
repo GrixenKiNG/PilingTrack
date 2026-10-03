@@ -324,6 +324,7 @@ export class TelegramNotifier {
     try {
       const url = `${process.env.TELEGRAM_API_BASE || 'https://api.telegram.org'}/bot${config.botToken}/getChat`;
       const response = await fetch(url, {
+        signal: AbortSignal.timeout(5000),
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ chat_id: config.chatId }),
