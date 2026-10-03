@@ -216,3 +216,40 @@ describe('AdminTelegram: ID чата проверяется до сохране�
     expect(toast.error).not.toHaveBeenCalled();
   });
 });
+
+/**
+ * F-R112-4: подписи значений канала были английскими — «Chat ID:» и «Token:»
+ * при уже русских подписях формы, и то же вкрапление стояло в предупреждении
+ * об удалении канала.
+ */
+describe('AdminTelegram: русские подписи значений канала (F-R112-4)', () => {
+  beforeEach(() => {
+    mocks.authFetch.mockReset();
+    vi.mocked(toast.error).mockClear();
+  });
+
+  it('в карточке «ID чата:» и «Токен:», а не «Chat ID:»/«Token:»', async () => {
+    mocks.authFetch.mockResolvedValue(json({ configs: [config()] }));
+    render(<AdminTelegram />);
+
+    expect(await screen.findByText('ID чата: -100123')).toBeInTheDocument();
+    expect(screen.getByText('Токен: ••••oken')).toBeInTheDocument();
+    expect(screen.queryByText(/Chat ID/)).toBeNull();
+    expect(screen.queryByText(/Token:/)).toBeNull();
+  });
+
+  it('предупреждение об удалении называет «ID чата», а не «Chat ID»', async () => {
+    mocks.authFetch.mockImplementation((_url: string, init?: RequestInit) =>
+      init?.method === 'DELETE'
+        ? Promise.resolve(json({ ok: true }))
+        : Promise.resolve(json({ configs: [config()] })),
+    );
+    render(<AdminTelegram />);
+    await screen.findAllByRole('button', { name: 'Тест' });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Удалить' }));
+
+    expect(await screen.findByText(/\(ID чата: -100123\)/)).toBeInTheDocument();
+    expect(screen.queryByText(/Chat ID/)).toBeNull();
+  });
+});

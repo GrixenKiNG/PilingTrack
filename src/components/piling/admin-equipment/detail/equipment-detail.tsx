@@ -283,7 +283,7 @@ export function EquipmentDetail({ equipmentId, embedded = false, onSaved }: Prop
                       </div>
                       <div className="flex items-center gap-2 text-xs">
                         <TelematicsStatusBadge status={d.status} />
-                        {d.lastSeenAt && <span className="text-muted-foreground">last seen {formatRelative(d.lastSeenAt)}</span>}
+                        {d.lastSeenAt && <span className="text-muted-foreground">последний раз {formatRelative(d.lastSeenAt)}</span>}
                       </div>
                     </div>
                   ))}
@@ -456,7 +456,7 @@ export function EquipmentDetail({ equipmentId, embedded = false, onSaved }: Prop
                 </div>
                 <div className="flex items-center gap-2 text-xs">
                   <TelematicsStatusBadge status={d.status} />
-                  {d.lastSeenAt && <span className="text-muted-foreground">last seen {formatRelative(d.lastSeenAt)}</span>}
+                  {d.lastSeenAt && <span className="text-muted-foreground">последний раз {formatRelative(d.lastSeenAt)}</span>}
                 </div>
               </div>
             ))}

@@ -13,6 +13,7 @@ import {
 } from '@/components/piling/icons/unified-icons';
 import { toast } from 'sonner';
 import { authFetch } from '@/lib/api';
+import { catchText } from '@/components/piling/admin-crews/crew-messages';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -150,7 +151,7 @@ export function AdminDlq() {
       toast.success(action === 'retry' ? 'Повтор поставлен в очередь' : 'Событие отброшено');
       await load();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Ошибка');
+      toast.error(catchText(e, 'Ошибка'));
     } finally {
       setActingId(null);
     }

@@ -325,11 +325,11 @@ export function AdminTelegram() {
                           {config.label}
                         </p>
                         <p className="text-xs text-muted-foreground font-mono mt-0.5">
-                          Chat ID: {config.chatId}
+                          ID чата: {config.chatId}
                         </p>
                         <p className="text-3xs text-muted-foreground font-mono">
                           {config.hasBotToken
-                            ? `Token: ••••${config.botTokenHint}`
+                            ? `Токен: ••••${config.botTokenHint}`
                             : 'Токен не задан — введите заново'}
                         </p>
                       </div>
@@ -462,7 +462,7 @@ export function AdminTelegram() {
         onOpenChange={(open) => { if (!open) setPendingDelete(null); }}
         title="Удалить канал уведомлений?"
         description={pendingDelete
-          ? `Канал «${pendingDelete.label}» (Chat ID: ${pendingDelete.chatId}) будет удалён без возможности восстановления.`
+          ? `Канал «${pendingDelete.label}» (ID чата: ${pendingDelete.chatId}) будет удалён без возможности восстановления.`
           : ''}
         confirmLabel="Удалить"
         onConfirm={() => { if (pendingDelete) void handleDelete(pendingDelete.id); }}

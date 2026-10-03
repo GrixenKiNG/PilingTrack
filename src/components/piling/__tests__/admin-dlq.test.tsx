@@ -194,3 +194,33 @@ describe('AdminDlq: защита от двойного нажатия', () => {
     });
   });
 });
+
+/**
+ * F-R112-4: обрыв связи `fetch` бросает `TypeError` с английским «Failed to
+ * fetch», а экран печатал `e.message` как есть — при «Повтор»/«Отбросить» без
+ * сети админ видел чужую английскую строку вместо объяснения.
+ */
+describe('AdminDlq: обрыв сети объясняется по-русски (F-R112-4)', () => {
+  beforeEach(() => {
+    mocks.authFetch.mockReset();
+    mocks.confirm.mockReset();
+    mocks.confirm.mockReturnValue(true);
+    window.confirm = mocks.confirm;
+    vi.mocked(toast.error).mockReset();
+  });
+
+  it('обрыв связи при повторе даёт русский текст, а не «Failed to fetch»', async () => {
+    mocks.authFetch.mockImplementation((_url: string, init?: RequestInit) => {
+      if (init?.method === 'POST') return Promise.reject(new TypeError('Failed to fetch'));
+      return Promise.resolve(json({ entries: [makeEntry()], stats }));
+    });
+    render(<AdminDlq />);
+    await screen.findByText('Доставка PDF отчёта');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Повтор' }));
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalled());
+    expect(toast.error).toHaveBeenCalledWith('Нет соединения с сервером. Проверьте связь и повторите.');
+    expect(vi.mocked(toast.error).mock.calls[0][0]).not.toContain('Failed to fetch');
+  });
+});
