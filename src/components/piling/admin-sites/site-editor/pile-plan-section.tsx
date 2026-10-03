@@ -63,7 +63,7 @@ export function PilePlanSection({ plans, setPlans, pileGrades }: PilePlanSection
                   setPlans(plans.map((p) => (p.tempId === row.tempId ? { ...p, pileGradeId: val } : p)))
                 }
               >
-                <SelectTrigger className="h-8 text-xs flex-1 min-w-0">
+                <SelectTrigger className="h-8 text-xs flex-1 min-w-0" aria-label="Марка сваи">
                   <SelectValue placeholder="Марка сваи" />
                 </SelectTrigger>
                 <SelectContent>
@@ -83,6 +83,7 @@ export function PilePlanSection({ plans, setPlans, pileGrades }: PilePlanSection
                     setPlans(plans.map((p) => (p.tempId === row.tempId ? { ...p, count: Number(e.target.value) || 0 } : p)))
                   }
                   placeholder="шт"
+                  aria-label="Количество, шт"
                   className="h-8 w-16 text-xs font-mono text-center"
                 />
                 <Input
@@ -94,6 +95,7 @@ export function PilePlanSection({ plans, setPlans, pileGrades }: PilePlanSection
                     setPlans(plans.map((p) => (p.tempId === row.tempId ? { ...p, metersPerUnit: Number(e.target.value) || 0 } : p)))
                   }
                   placeholder="м/шт"
+                  aria-label="Длина одной сваи, м/шт"
                   className="h-8 w-18 text-xs font-mono text-center"
                 />
               </div>

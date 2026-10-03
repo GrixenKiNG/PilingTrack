@@ -47,6 +47,7 @@ export function DrillingPlanSection({ plans, setPlans }: DrillingPlanSectionProp
                   setPlans(plans.map((p) => (p.tempId === row.tempId ? { ...p, diameter: Number(e.target.value) || 0 } : p)))
                 }
                 placeholder="⌀ мм"
+                aria-label="Диаметр, мм"
                 className="h-8 w-20 text-xs font-mono text-center"
               />
               <Input
@@ -57,6 +58,7 @@ export function DrillingPlanSection({ plans, setPlans }: DrillingPlanSectionProp
                   setPlans(plans.map((p) => (p.tempId === row.tempId ? { ...p, count: Number(e.target.value) || 0 } : p)))
                 }
                 placeholder="шт"
+                aria-label="Количество, шт"
                 className="h-8 w-16 text-xs font-mono text-center"
               />
               <Input
@@ -68,6 +70,7 @@ export function DrillingPlanSection({ plans, setPlans }: DrillingPlanSectionProp
                   setPlans(plans.map((p) => (p.tempId === row.tempId ? { ...p, metersPerUnit: Number(e.target.value) || 0 } : p)))
                 }
                 placeholder="м/шт"
+                aria-label="Длина бурения на единицу, м/шт"
                 className="h-8 w-18 text-xs font-mono text-center"
               />
               <span className="text-3xs font-mono text-muted-foreground w-14 text-right flex-shrink-0">

@@ -6,9 +6,21 @@
  * режет дату без `new Date()` — то есть дата без времени не съезжает на сутки
  * в поясе западнее UTC.
  */
-import { describe, it, expect } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+
+const mocks = vi.hoisted(() => ({ authFetch: vi.fn() }));
+
+vi.mock('@/lib/api', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/api')>()),
+  authFetch: mocks.authFetch,
+}));
+vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+
+import { toast } from 'sonner';
 import { OverviewTiles } from '../equipment-detail-overview';
+import { EquipmentDetail } from '../equipment-detail';
+import { usePilingStore } from '@/lib/store';
 import type { TimelineRow } from '../equipment-detail-parts';
 import type { EquipmentDTO } from '@/lib/types';
 
@@ -48,6 +60,21 @@ function row(date: string): TimelineRow {
     piles: null,
     drillingMeters: null,
     downtimeHours: null,
+  };
+}
+
+const json = (body: unknown, status = 200) =>
+  new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
+
+/** Ответ GET /api/equipment/:id/details — минимум, нужный карточке. */
+function detailsResponse(id: string, name: string) {
+  return {
+    equipment: { id, name, kind: 'PILE_DRIVER', isActive: true, model: null, inventoryNumber: null },
+    crew: null,
+    telematicsDevices: [],
+    documents: [],
+    stats30d: { reportCount: 0, piles: 0, pileMeters: 0, drillingCount: 0, drillingMeters: 0, downtimeHours: 0 },
+    timeline: [],
   };
 }
 
@@ -91,5 +118,109 @@ describe('OverviewTiles — даты обзора (F-R114-1)', () => {
 
     // Обе ячейки (Ближайшее ТО, Последний отчёт) — прочерк.
     expect(screen.getAllByText('—').length).toBeGreaterThanOrEqual(2);
+  });
+});
+
+/*
+  R119 №13: при переключении установок правая панель до ответа `/details`
+  показывала паспорт, статус и имя ПРЕДЫДУЩЕЙ машины — loading выставлялся
+  только при монтировании, а смена `equipmentId` его не поднимала.
+*/
+describe('EquipmentDetail — смена установки (F-R119-13)', () => {
+  beforeEach(() => {
+    mocks.authFetch.mockReset();
+    usePilingStore.setState({ currentUser: { role: 'ADMIN' } as never });
+  });
+
+  it('пока грузится новая установка, данные прежней не показываются', async () => {
+    mocks.authFetch.mockImplementation(async (url: string) => {
+      if (url === '/api/equipment/eq-1/details') return json(detailsResponse('eq-1', 'СГ-1'));
+      return new Promise(() => {}); // eq-2 ещё грузится
+    });
+
+    const { rerender } = render(<EquipmentDetail equipmentId="eq-1" embedded />);
+    expect((await screen.findAllByText('СГ-1')).length).toBeGreaterThan(0);
+
+    rerender(<EquipmentDetail equipmentId="eq-2" embedded />);
+
+    expect(screen.queryAllByText('СГ-1')).toHaveLength(0);
+  });
+});
+
+/*
+  R119 №5: после успешной правки обновлялась только правая карточка, а список
+  парка кормится снимком GET /api/monitoring/fleet — переименованная установка
+  оставалась в плитке слева со старым именем до перезагрузки страницы.
+*/
+describe('EquipmentDetail — обновление списка парка после правки (F-R119-5)', () => {
+  beforeEach(() => {
+    mocks.authFetch.mockReset();
+    usePilingStore.setState({ currentUser: { role: 'ADMIN' } as never });
+  });
+
+  it('после успешного сохранения зовёт onSaved (перечитать снимок)', async () => {
+    const onSaved = vi.fn();
+    mocks.authFetch.mockImplementation(async (_url: string, init?: RequestInit) => {
+      if (init?.method === 'PUT') return json({ equipment: { id: 'eq-1' } });
+      return json(detailsResponse('eq-1', 'СГ-1'));
+    });
+
+    render(<EquipmentDetail equipmentId="eq-1" embedded onSaved={onSaved} />);
+    await screen.findAllByText('СГ-1');
+
+    fireEvent.click(screen.getByRole('button', { name: /Редактировать/ }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Сохранить' }));
+
+    await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1));
+  });
+});
+
+/*
+  R119 №7 (повтор R97 №10) и №6 (повтор R97 №9): отказ сохранения карточки
+  показывался как есть — английское «Unauthorized» и «CSRF validation failed: …»
+  на русском экране, а построчные `details` 400-ответа отбрасывались, читалось
+  только «Некорректные данные».
+*/
+describe('EquipmentDetail — текст отказа сохранения (F-R119-6, F-R119-7)', () => {
+  beforeEach(() => {
+    mocks.authFetch.mockReset();
+    vi.mocked(toast.error).mockClear();
+    usePilingStore.setState({ currentUser: { role: 'ADMIN' } as never });
+  });
+
+  /** Открывает карточку, жмёт «Редактировать» → «Сохранить» с заданным ответом PUT. */
+  async function save(putResponse: () => Response) {
+    mocks.authFetch.mockImplementation(async (_url: string, init?: RequestInit) => {
+      if (init?.method === 'PUT') return putResponse();
+      return json(detailsResponse('eq-1', 'СГ-1'));
+    });
+
+    render(<EquipmentDetail equipmentId="eq-1" embedded />);
+    await screen.findAllByText('СГ-1');
+    fireEvent.click(screen.getByRole('button', { name: /Редактировать/ }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Сохранить' }));
+  }
+
+  it('401 → «Сессия истекла», а не серверное «Unauthorized»', async () => {
+    await save(() => json({ error: 'Unauthorized' }, 401));
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Сессия истекла — войдите снова.'));
+    expect(toast.error).not.toHaveBeenCalledWith('Unauthorized');
+  });
+
+  it('CSRF-403 → русский текст про проверку безопасности', async () => {
+    await save(() => json({ error: 'CSRF validation failed: origin mismatch' }, 403));
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith(
+      'Запрос отклонён проверкой безопасности. Обновите страницу и повторите.',
+    ));
+  });
+
+  it('400 с построчными details показывает причину поля, а не только «Некорректные данные»', async () => {
+    await save(() => json({ error: 'Некорректные данные', details: [{ field: 'name', message: 'Required' }] }, 400));
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith(
+      expect.stringContaining('Поле name: обязательное поле'),
+    ));
   });
 });

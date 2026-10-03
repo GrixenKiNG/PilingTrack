@@ -44,7 +44,7 @@ export function ReportFilters({
       <Filter className="hidden h-4 w-4 flex-shrink-0 text-muted-foreground sm:block" />
       {sites.length > 0 && (
         <Select value={filterSiteId} onValueChange={onFilterSiteChange}>
-          <SelectTrigger className="h-10 w-full sm:max-w-xs">
+          <SelectTrigger className="h-10 w-full sm:max-w-xs" aria-label="Фильтр по объекту">
             <SelectValue placeholder="Все объекты" />
           </SelectTrigger>
           <SelectContent>
@@ -57,7 +57,7 @@ export function ReportFilters({
       )}
       {equipment.length > 0 && (
         <Select value={filterEquipmentId} onValueChange={onFilterEquipmentChange}>
-          <SelectTrigger className="h-10 w-full sm:max-w-xs">
+          <SelectTrigger className="h-10 w-full sm:max-w-xs" aria-label="Фильтр по установке">
             <SelectValue placeholder="Все установки" />
           </SelectTrigger>
           <SelectContent>
@@ -70,7 +70,7 @@ export function ReportFilters({
       )}
       {operators.length > 0 && (
         <Select value={filterUserId} onValueChange={onFilterUserChange}>
-          <SelectTrigger className="h-10 w-full sm:max-w-xs">
+          <SelectTrigger className="h-10 w-full sm:max-w-xs" aria-label="Фильтр по оператору">
             <SelectValue placeholder="Все операторы" />
           </SelectTrigger>
           <SelectContent>

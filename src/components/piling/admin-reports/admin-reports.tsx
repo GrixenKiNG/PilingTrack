@@ -37,6 +37,11 @@ const QUICK_FILTERS: Array<{ key: QuickFilter; label: string }> = [
   { key: 'edited', label: 'Изменены админом' },
 ];
 
+/** Строк данных в CSV: первая строка — шапка, пустые строки не считаем. */
+function countCsvDataRows(text: string): number {
+  return text.split('\n').slice(1).filter((line) => line.trim() !== '').length;
+}
+
 export function AdminReports() {
   const currentUser = usePilingStore(s => s.currentUser);
   const actingAs = usePilingStore(s => s.actingAs);
@@ -99,10 +104,25 @@ export function AdminReports() {
         throw new Error(body.error || `Сервер ответил ${response.status}`);
       }
 
-      objectUrl = URL.createObjectURL(await response.blob());
+      const blob = await response.blob();
+      // Пустой период сервер отдаёт как 200 — CSV из одной шапки. Не выдаём
+      // это за успешную выгрузку: считаем строки данных (F-R115-5). Число
+      // строк XLSX клиенту не видно, для него ждём заголовок сервера.
+      const rowCountHeader = response.headers.get('x-export-row-count');
+      const dataRows = rowCountHeader !== null ? Number(rowCountHeader)
+        : format === 'csv' ? countCsvDataRows(await blob.text()) : null;
+      if (dataRows === 0) {
+        toast.error('За выбранный период отчётов нет — выгружать нечего. Измените период или фильтры.');
+        return;
+      }
+      objectUrl = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = objectUrl;
-      link.download = `pilingtrack-reports-${dateFrom}_${dateTo}.${format}`;
+      // Имя файла берём у сервера (Content-Disposition), как это делает
+      // техготовность: своё имя с датой периода расходилось с заголовком
+      // сервера, и один документ ходил под двумя разными именами (F-R115-14).
+      link.download = response.headers.get('content-disposition')?.match(/filename="([^"]+)"/)?.[1]
+        ?? `pilingtrack-reports-${dateFrom}_${dateTo}.${format}`;
       link.click();
       toast.success(`Выгружено за период ${dateFrom} — ${dateTo}`);
     } catch (err) {

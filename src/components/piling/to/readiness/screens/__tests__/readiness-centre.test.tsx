@@ -19,6 +19,9 @@ vi.mock('../shared', async (original) => ({
   downloadReadinessExport,
 }));
 
+const { toastWarning } = vi.hoisted(() => ({ toastWarning: vi.fn() }));
+vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn(), warning: toastWarning, info: vi.fn() } }));
+
 /**
  * Два разных показателя были подписаны похоже: доля шагов процедуры («3 из 5 ·
  * 60 %») и балл готовности (0–100) читались как одно число. Совпадение
@@ -42,6 +45,7 @@ afterEach(() => {
   cleanup();
   authFetch.mockReset();
   downloadReadinessExport.mockReset();
+  toastWarning.mockReset();
 });
 
 /** Ответ-отказ выгрузки: функция читает только ok/status/json. */
@@ -83,6 +87,41 @@ describe('downloadReadinessExport — отказ объясняется поня
   it('сбой сервера (5xx) объясняется отдельно от ошибки данных', async () => {
     authFetch.mockResolvedValue(failedExport(500, { error: 'Внутренняя ошибка сервера. Повторите попытку; если повторится — сообщите администратору.' }));
     await expect((await realDownload())('reports', {})).rejects.toThrow('Внутренняя ошибка сервера');
+  });
+});
+
+/**
+ * F-R115-11: пустой набор сервер отдаёт как 200 — CSV из одной шапки. Клиент не
+ * читал `x-export-row-count`, и файл без строк выглядел как успешная выгрузка.
+ */
+describe('downloadReadinessExport — пустой набор не выдаётся за успех (F-R115-11)', () => {
+  it('x-export-row-count: 0 → предупреждение; непустой набор — без предупреждения', async () => {
+    const urlGlobal = URL as unknown as { createObjectURL?: unknown; revokeObjectURL?: unknown };
+    const originalCreate = urlGlobal.createObjectURL;
+    const originalRevoke = urlGlobal.revokeObjectURL;
+    urlGlobal.createObjectURL = vi.fn(() => 'blob:export');
+    urlGlobal.revokeObjectURL = vi.fn();
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+    try {
+      authFetch.mockResolvedValue(new Response('Шапка\n', {
+        status: 200,
+        headers: { 'x-export-row-count': '0', 'content-disposition': 'attachment; filename="pilingtrack-readiness-audit.csv"' },
+      }));
+      await (await realDownload())('audit', {});
+      expect(toastWarning).toHaveBeenCalledWith('В выгрузке нет строк данных — по выбранному фильтру ничего не найдено.');
+
+      toastWarning.mockClear();
+      authFetch.mockResolvedValue(new Response('Шапка\n1,2,3\n', {
+        status: 200,
+        headers: { 'x-export-row-count': '3' },
+      }));
+      await (await realDownload())('audit', {});
+      expect(toastWarning).not.toHaveBeenCalled();
+    } finally {
+      urlGlobal.createObjectURL = originalCreate;
+      urlGlobal.revokeObjectURL = originalRevoke;
+      click.mockRestore();
+    }
   });
 });
 

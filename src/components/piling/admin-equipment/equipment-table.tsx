@@ -66,12 +66,24 @@ export function EquipmentTable({
             const reportStatus = REPORT_STATUS_META[c.reportStatus];
             const flag = getMaintenanceFlag(c);
             const t = c.todayTotals;
+            // Строка открывала карточку только мышью (R116 #12): повторяем
+            // паттерн словарной таблицы — фокус, Enter/Space и aria-selected.
+            const onRowKeyDown = (event: React.KeyboardEvent<HTMLTableRowElement>) => {
+              if (event.target !== event.currentTarget) return;
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                onSelect(c.id);
+              }
+            };
             return (
               <tr
                 key={c.id}
+                tabIndex={0}
+                aria-selected={selectedId === c.id}
                 onClick={() => onSelect(c.id)}
+                onKeyDown={onRowKeyDown}
                 className={cn(
-                  'cursor-pointer transition-colors hover:bg-muted',
+                  'cursor-pointer transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-inset focus-visible:ring-ring/50',
                   selectedId === c.id && 'bg-info/10/60',
                 )}
               >

@@ -59,13 +59,19 @@ function sortCards(cards: FleetCard[], sortBy: SortBy): FleetCard[] {
  * а таймаут и мусорный ответ — «Нет соединения»: сбой БД (500), ограничение
  * частоты (429) и отсутствие сети выглядели одинаково, и человек шёл чинить
  * интернет вместо того, чтобы просто повторить запрос.
+ *
+ * Совет повторного запроса был жёстким хвостом у всех отказов сразу: таймаут
+ * («…Повторите попытку.») превращался в «…Повторите попытку. Повторите
+ * попытку.», а 401/403 советовали повторить то, что повтором не чинится (идёт
+ * редирект на вход / нет прав). Теперь совет живёт внутри текста только там,
+ * где повтор уместен, и экран его не дописывает.
  */
 function fleetFailureMessage(status: number): string {
-  if (status === 429) return 'Слишком много запросов — сервис ограничил частоту.';
-  if (status >= 500) return 'Сервер мониторинга временно недоступен.';
+  if (status === 429) return 'Слишком много запросов — сервис ограничил частоту. Повторите попытку.';
+  if (status >= 500) return 'Сервер мониторинга временно недоступен. Повторите попытку.';
   if (status === 403) return 'Нет доступа к мониторингу. Обратитесь к администратору.';
   if (status === 401) return 'Сессия истекла — войдите снова.';
-  return `Не удалось загрузить снимок мониторинга (код ${status}).`;
+  return `Не удалось загрузить снимок мониторинга (код ${status}). Повторите попытку.`;
 }
 
 export function FleetDashboard() {
@@ -86,7 +92,17 @@ export function FleetDashboard() {
         setError(fleetFailureMessage(res.status));
         return;
       }
-      const data: FleetSnapshot = await res.json();
+      // Разбор тела — в отдельном try: 200 с битым/обрезанным телом (прокси,
+      // таймаут шлюза) попадал в общий catch и выдавался за обрыв связи, хотя
+      // сервер ответил. Человека отправляли «чинить интернет» вместо повтора.
+      let data: FleetSnapshot;
+      try {
+        data = await res.json() as FleetSnapshot;
+      } catch {
+        if (request !== snapshotRequest.current) return;
+        setError('Некорректный ответ сервера. Повторите попытку.');
+        return;
+      }
       if (request !== snapshotRequest.current) return;
       setSnap(data);
       setError(null);
@@ -98,9 +114,22 @@ export function FleetDashboard() {
       const timedOut = typeof err === 'object' && err !== null && (err as { name?: unknown }).name === 'TimeoutError';
       setError(timedOut
         ? 'Сервер не ответил за 15 секунд. Повторите попытку.'
-        : 'Нет соединения с сервисом мониторинга.');
+        : 'Нет соединения с сервисом мониторинга. Повторите попытку.');
     }
   }, []);
+
+  // «Повторить загрузку» на полноэкранном отказе была тихой: повторный сбой
+  // не менял экран, и человек жал кнопку снова и снова. Пока запрос идёт,
+  // кнопка заблокирована и подписана «Повторяем…».
+  const [retrying, setRetrying] = useState(false);
+  const retryLoad = useCallback(async () => {
+    setRetrying(true);
+    try {
+      await fetchSnapshot({ bust: true });
+    } finally {
+      setRetrying(false);
+    }
+  }, [fetchSnapshot]);
 
   // Refetch after an admin uploads/replaces an equipment photo so the new
   // card.photoUrl shows up without waiting for the next 30-second refresh.
@@ -171,13 +200,14 @@ export function FleetDashboard() {
       <div className="p-6">
         <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-destructive-strong">
           <p className="text-sm font-semibold">Мониторинг не загрузился</p>
-          <p className="mt-1 text-sm">{error} Повторите попытку.</p>
+          <p className="mt-1 text-sm">{error}</p>
           <button
             type="button"
-            onClick={() => void fetchSnapshot({ bust: true })}
-            className="mt-3 inline-flex min-h-11 items-center text-sm font-semibold text-destructive-strong underline underline-offset-2 sm:min-h-0"
+            onClick={() => void retryLoad()}
+            disabled={retrying}
+            className="mt-3 inline-flex min-h-11 items-center text-sm font-semibold text-destructive-strong underline underline-offset-2 disabled:opacity-60 sm:min-h-0"
           >
-            Повторить загрузку
+            {retrying ? 'Повторяем…' : 'Повторить загрузку'}
           </button>
         </div>
       </div>

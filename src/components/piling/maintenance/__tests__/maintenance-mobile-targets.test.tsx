@@ -94,6 +94,28 @@ describe('журнал ТО: цель нажатия на телефоне (R73)
   });
 });
 
+describe('журнал ТО: назначение фильтров озвучивается (R116 #10)', () => {
+  beforeEach(() => {
+    mocks.loadJson.mockResolvedValue({});
+    mocks.authFetch.mockResolvedValue(json({ records: [] }));
+  });
+
+  it('пять селектов фильтра имеют доступное имя, а не только placeholder', async () => {
+    render(<MaintenanceBoard />);
+    await screen.findByText(/Нарядов по выбранным фильтрам не найдено/);
+
+    for (const label of [
+      'Фильтр по установке',
+      'Фильтр по объекту',
+      'Фильтр по исполнителю',
+      'Фильтр по типу ТО',
+      'Фильтр по приоритету',
+    ]) {
+      expect(screen.getByLabelText(label)).toBeInstanceOf(HTMLButtonElement);
+    }
+  });
+});
+
 describe('панель наряда ТО: цель нажатия на телефоне (R73)', () => {
   it('«Закрыть ТО» / «Печать» / «Показать все события» — не ниже 44px', () => {
     render(
