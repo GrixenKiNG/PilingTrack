@@ -33,6 +33,9 @@ import { apiErrorMessage } from '@/lib/api-error-message';
 import type { TelegramConfigDTO } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
+// Формат ID чата: число (у групп и каналов отрицательное) или @имя канала.
+const CHAT_ID_PATTERN = /^-?\d+$|^@[A-Za-z0-9_]{5,}$/;
+
 /**
  * Текст отказа API для тоста.
  *
@@ -153,6 +156,14 @@ export function AdminTelegram() {
     // an empty field means "keep the current token" (it's never re-shown).
     if (!newLabel.trim() || !newChatId.trim() || (!isEdit && !newBotToken.trim())) {
       toast.error('Заполните все поля');
+      return;
+    }
+    // Формат ID чата проверяем до отправки: без этого опечатка или вставленный
+    // «Chat ID: -100…» сохранялись с enabled=true, и алерты о дефектах молча не
+    // доходили (F-R120-5). Серверная схема формат не проверяет — принимает
+    // любую непустую строку.
+    if (!CHAT_ID_PATTERN.test(newChatId.trim())) {
+      toast.error('ID чата — число (например, -1001234567890) или имя канала вида @name');
       return;
     }
     setSaving(true);

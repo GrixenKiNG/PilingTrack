@@ -10,6 +10,9 @@
  *
  * F-R120-7 (находка 7): сбой чтения списка показывается ошибкой с «Повторить»,
  * а не пустым состоянием «Нет конфигураций Telegram».
+ *
+ * F-R120-5 (находка 5): ID чата проверяется до отправки — опечатка не
+ * сохраняется как рабочий канал.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
@@ -171,5 +174,45 @@ describe('AdminTelegram: сбой чтения списка не выдаётс�
 
     expect(await screen.findAllByRole('button', { name: 'Тест' })).toHaveLength(1);
     expect(screen.queryByRole('alert')).toBeNull();
+  });
+});
+
+describe('AdminTelegram: ID чата проверяется до сохранения (R120 находка 5)', () => {
+  beforeEach(() => {
+    mocks.authFetch.mockReset();
+    vi.mocked(toast.error).mockClear();
+  });
+
+  it('не отправляет на сервер ID чата не в формате числа или @имени', async () => {
+    mocks.authFetch.mockImplementation((_url: string, init?: RequestInit) =>
+      init?.method === 'POST'
+        ? new Promise<Response>(() => {})
+        : Promise.resolve(json({ configs: [] })),
+    );
+    render(<AdminTelegram />);
+    await screen.findByText('Нет конфигураций Telegram');
+
+    fillCreateDialog({ label: 'Ночной чат', token: '123:ABC', chatId: 'Chat ID: -100123' });
+    submitCreateDialog();
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalled());
+    expect(String(vi.mocked(toast.error).mock.calls[0][0])).toContain('ID чата');
+    expect(posts()).toHaveLength(0);
+  });
+
+  it('ID чата числом или @именем уходит на сервер', async () => {
+    mocks.authFetch.mockImplementation((_url: string, init?: RequestInit) =>
+      init?.method === 'POST'
+        ? new Promise<Response>(() => {})
+        : Promise.resolve(json({ configs: [] })),
+    );
+    render(<AdminTelegram />);
+    await screen.findByText('Нет конфигураций Telegram');
+
+    fillCreateDialog({ label: 'Ночной чат', token: '123:ABC', chatId: '@night_chat' });
+    submitCreateDialog();
+
+    await waitFor(() => expect(posts()).toHaveLength(1));
+    expect(toast.error).not.toHaveBeenCalled();
   });
 });
