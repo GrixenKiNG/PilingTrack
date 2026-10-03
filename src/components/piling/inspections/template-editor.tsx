@@ -50,6 +50,11 @@ export function TemplateEditor({ templateId }: TemplateEditorProps) {
   // Почему шаблон не показан: пустая форма под заголовком «Редактировать
   // шаблон» выглядела как «шаблон пуст», а сохранение затирало живой (R100 №4).
   const [loadError, setLoadError] = useState<InspectionLoadError | null>(null);
+  // Правка шаблона на сервере — это деактивация прежней строки и создание
+  // новой, причём не в одной транзакции (template-commands.ts). Сбой между
+  // шагами оставляет чек-лист без действующей версии, а человек видел только
+  // «Ошибка» и считал шаблон целым (R123 №1).
+  const [saveFailed, setSaveFailed] = useState(false);
 
   // Load existing template
   const loadTemplate = useCallback(async () => {
@@ -165,6 +170,7 @@ export function TemplateEditor({ templateId }: TemplateEditorProps) {
       })),
     };
 
+    setSaveFailed(false);
     setBusy(true);
     try {
       const url = isNew ? '/api/checklist-templates' : `/api/checklist-templates/${templateId}`;
@@ -183,6 +189,9 @@ export function TemplateEditor({ templateId }: TemplateEditorProps) {
     } catch (err) {
       // Обрыв сети fetch бросает TypeError с английским «Failed to fetch» (F-R112-2).
       toast.error(catchText(err, 'Ошибка'));
+      // Правка упала: прежняя версия на сервере уже снята, а новая не создана —
+      // говорим об этом строкой, а не только общим тостом (R123 №1).
+      if (!isNew) setSaveFailed(true);
     } finally {
       setBusy(false);
     }
@@ -245,6 +254,16 @@ export function TemplateEditor({ templateId }: TemplateEditorProps) {
           Отмена
         </Button>
       </div>
+
+      {/* Сбой правки в форме незаметен: на сервере это деактивация прежней
+          версии и создание новой, поэтому сообщаем, что действующей версии
+          могло не остаться, и отправляем проверять список (R123 №1). */}
+      {saveFailed && (
+        <p role="alert" className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive-strong">
+          Сохранение не завершилось: прежняя версия шаблона могла быть снята, а новая не выпущена.
+          Проверьте список шаблонов — возможно, чек-лист больше не действует.
+        </p>
+      )}
 
       {/* General fields */}
       <div className="rounded-lg border bg-card p-4 space-y-3">

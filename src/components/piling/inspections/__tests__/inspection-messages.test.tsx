@@ -242,6 +242,39 @@ describe('редактор шаблона (F-R100-4, F-R100-5)', () => {
   });
 });
 
+describe('редактор шаблона: сбой сохранения правки (F-R123-1)', () => {
+  it('ошибка при сохранении правки объясняет, что действующая версия могла исчезнуть', async () => {
+    mocks.authFetch.mockImplementation(async (_url: string, init?: RequestInit) => (
+      init?.method === 'PUT' ? json({ error: 'Ошибка БД' }, 500) : json(templatePayload)
+    ));
+    render(<TemplateEditor templateId="tpl-1" />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Сохранить' }));
+
+    // На сервере правка — деактивация прежней версии + создание новой без
+    // транзакции: сбой оставляет чек-лист без действующей версии, и человек
+    // должен узнать об этом не из одного слова «Ошибка».
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('прежняя версия шаблона могла быть снята');
+    expect(alert).toHaveTextContent('Проверьте список шаблонов');
+    // Форма и кнопка на месте: повтор возможен, введённое не потеряно.
+    expect(screen.getByRole('button', { name: 'Сохранить' })).toBeInTheDocument();
+  });
+
+  it('создание нового шаблона сбоем не пугает архивом (строки нет)', async () => {
+    mocks.authFetch.mockResolvedValue(json({ error: 'Ошибка БД' }, 500));
+    render(<TemplateEditor templateId="new" />);
+
+    fireEvent.change(screen.getByLabelText('Название *'), { target: { value: 'ЕО — экскаватор' } });
+    fireEvent.change(screen.getByPlaceholderText('Напр. Двигатель'), { target: { value: 'Двигатель' } });
+    fireEvent.change(screen.getByPlaceholderText('Проверить уровень масла…'), { target: { value: 'Проверить масло' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Создать шаблон' }));
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalled());
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+});
+
 describe('редактор шаблона: пределы длины полей как в схеме маршрута (F-R121-3)', () => {
   it('у названия, раздела и полей пункта стоит maxLength по схеме', () => {
     render(<TemplateEditor templateId="new" />);
