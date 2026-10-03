@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import {
   Activity, CircleUserRound, FileText, History, KeyRound, MapPin,
   Pencil, Power, PowerOff, Trash2,
@@ -16,6 +17,7 @@ import {
   useEntityHistory,
 } from '@/components/piling/ops-shell';
 import { UserDocuments } from './user-documents';
+import { ConfirmActionDialog } from '@/components/piling/confirm-action-dialog';
 
 const USER_TABS = [
   { value: 'overview', label: 'Обзор', icon: CircleUserRound },
@@ -56,6 +58,7 @@ interface UserDetailProps {
 export function UserDetail({ user, isSelf, onEdit, onDelete, onToggle }: UserDetailProps) {
   const risk = resolveRisk([[!user.isActive, 'critical', 'Заблокирован']], 'Доступ включён');
   const history = useEntityHistory('users', user.id);
+  const [confirmBlock, setConfirmBlock] = useState(false);
 
   return (
     <OpsDetailPanel
@@ -131,7 +134,7 @@ export function UserDetail({ user, isSelf, onEdit, onDelete, onToggle }: UserDet
               <Pencil className="h-3.5 w-3.5" />Редактировать
             </Button>
             {!isSelf && (
-              <Button size="sm" variant="outline" onClick={onToggle} className="h-11 text-xs sm:h-8">
+              <Button size="sm" variant="outline" onClick={() => { if (user.isActive) setConfirmBlock(true); else onToggle(); }} className="h-11 text-xs sm:h-8">
                 {user.isActive ? <PowerOff className="h-3.5 w-3.5" /> : <Power className="h-3.5 w-3.5" />}
                 {user.isActive ? 'Заблокировать' : 'Разблокировать'}
               </Button>
@@ -153,6 +156,14 @@ export function UserDetail({ user, isSelf, onEdit, onDelete, onToggle }: UserDet
           <OpsHistoryList entries={history.entries} loading={history.loading} error={history.error} title="История изменений" />
         </TabsContent>
       </Tabs>
+      <ConfirmActionDialog
+        open={confirmBlock}
+        onOpenChange={setConfirmBlock}
+        title="Заблокировать пользователя?"
+        description={`${user.name} сразу потеряет доступ и будет выведен из системы.`}
+        confirmLabel="Заблокировать доступ"
+        onConfirm={() => { setConfirmBlock(false); onToggle(); }}
+      />
     </OpsDetailPanel>
   );
 }

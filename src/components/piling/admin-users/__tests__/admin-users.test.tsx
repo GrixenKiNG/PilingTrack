@@ -149,4 +149,35 @@ describe('AdminUsers', () => {
     }
     expect(screen.getByLabelText('Удалить вид «Медосмотр»')).toHaveClass('h-11', 'w-11', 'sm:h-8', 'sm:w-8');
   });
+
+  /**
+   * R113-5: «Заблокировать» отправляла PUT /api/users {isActive:false} одним
+   * кликом. Блокировка повышает sessionVersion и немедленно выкидывает человека
+   * из системы — рядом удаление подтверждение имело, блокировка нет.
+   */
+  it('блокировка спрашивает подтверждение и вызывает toggleActive только после согласия (R113-5)', async () => {
+    const toggleActive = vi.fn();
+    useUsersListMock.mockReturnValue({
+      users: [operationalUser()],
+      loading: false,
+      error: null,
+      retry: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+      remove: vi.fn(),
+      toggleActive,
+    });
+    render(<AdminUsers />);
+
+    // Radix Tabs переключает вкладку по mousedown, не по click.
+    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Доступ' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Заблокировать' }));
+
+    expect(await screen.findByRole('alertdialog')).toBeInTheDocument();
+    expect(toggleActive).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Заблокировать доступ' }));
+
+    expect(toggleActive).toHaveBeenCalledTimes(1);
+  });
 });
