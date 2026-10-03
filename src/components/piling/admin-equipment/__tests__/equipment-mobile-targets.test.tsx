@@ -236,6 +236,30 @@ describe('фильтры парка: назначение селектов оз�
   });
 });
 
+describe('таблица установок: строку открывают с клавиатуры (R116 #12)', () => {
+  it('строка фокусируема, Enter и Space открывают карточку', () => {
+    const onSelect = vi.fn();
+    render(<EquipmentTable cards={[card()]} selectedId={null} onSelect={onSelect} />);
+
+    const row = screen.getByText('СП-49').closest('tr');
+    if (!row) throw new Error('строка установки не найдена');
+    expect(row).toHaveAttribute('tabindex', '0');
+
+    fireEvent.keyDown(row, { key: 'Enter' });
+    fireEvent.keyDown(row, { key: ' ' });
+
+    expect(onSelect).toHaveBeenCalledTimes(2);
+    expect(onSelect).toHaveBeenCalledWith('eq-1');
+  });
+
+  it('aria-selected отмечает открытую установку', () => {
+    render(<EquipmentTable cards={[card()]} selectedId="eq-1" onSelect={() => {}} />);
+
+    const row = screen.getByText('СП-49').closest('tr');
+    expect(row).toHaveAttribute('aria-selected', 'true');
+  });
+});
+
 describe('форма установки: лимиты полей как в zod-схеме маршрута (R121)', () => {
   it('текстовые поля ограничены по длине из схемы', () => {
     render(<EquipmentForm state={EMPTY_EQUIPMENT_FORM} onChange={() => {}} />);
