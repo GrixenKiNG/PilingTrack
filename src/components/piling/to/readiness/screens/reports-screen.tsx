@@ -16,6 +16,7 @@ import type { ReadinessShiftDto } from '../api/contracts';
 import { type ReadinessUrlFilters } from '../api/client';
 import { describeBlockers } from './blocker-guidance';
 import { RefKpi, downloadReadinessExport } from './shared';
+import { normalizeSearch } from '../shared/text-search';
 import type { ReferenceUiProps } from './types';
 
 /** Период отчёта по умолчанию, если фильтр дат не задан. */
@@ -225,14 +226,14 @@ export function ReportsScreen(props: ReferenceUiProps) {
     .sort((left, right) => new Date(right.at).getTime() - new Date(left.at).getTime());
   // Поле поиска над журналом было мёртвым: ни значения, ни обработчика — текст
   // вводился и ничего не менял. Ищем по всему, что в строке видно.
-  const journalQuery = journalSearch.trim().toLocaleLowerCase('ru-RU');
+  const journalQuery = normalizeSearch(journalSearch);
   const journalRows = journalQuery === '' ? allJournalRows : allJournalRows.filter((record) => [
     record.event,
     record.reason,
     record.actor,
     record.equipmentId ? nameByEquipment.get(record.equipmentId) : null,
     record.equipmentId ? siteByEquipment.get(record.equipmentId) : null,
-  ].some((value) => value?.toLocaleLowerCase('ru-RU').includes(journalQuery)));
+  ].some((value) => value != null && normalizeSearch(value).includes(journalQuery)));
   /**
    * Причины блокировки — по фактам авторитетных снимков.
    *

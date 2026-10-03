@@ -15,6 +15,7 @@ import { PRIORITY_LABEL, STATUS_LABEL, type MaintenancePriority, type Maintenanc
 import type { MaintenanceSummary } from '../../readiness-design-views';
 import { DefectsPanel } from './defects-panel';
 import { EquipmentPhoto, RefKpi } from './shared';
+import { normalizeSearch } from '../shared/text-search';
 import type { ReferenceUiProps } from './types';
 
 /**
@@ -93,8 +94,8 @@ export function MaintenanceScreen(props: ReferenceUiProps) {
     if (maintenanceFilter === 'CRITICAL' && !['CRITICAL', 'HIGH'].includes(record.priority)) return false;
     if (maintenanceFilter === 'ACTIVE' && !['IN_PROGRESS', 'ASSIGNED'].includes(record.status)) return false;
     if (maintenanceFilter === 'PLANNED' && !['PLANNED', 'ASSIGNED'].includes(record.status)) return false;
-    const query = maintenanceQuery.trim().toLocaleLowerCase('ru-RU');
-    return !query || record.title.toLocaleLowerCase('ru-RU').includes(query) || record.equipment?.name.toLocaleLowerCase('ru-RU').includes(query);
+    const query = normalizeSearch(maintenanceQuery);
+    return !query || normalizeSearch(record.title).includes(query) || normalizeSearch(record.equipment?.name ?? '').includes(query);
   });
 
   return (

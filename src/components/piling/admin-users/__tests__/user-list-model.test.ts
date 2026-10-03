@@ -107,6 +107,28 @@ describe('filterOperationalUsers', () => {
     }
   );
 
+  /*
+    «ё» и «е» в русских именах — одна буква. Пока поиск не нормализовал их,
+    набранное «петр» находило «Иван Петров», но не «Пётр Новиков»: человек с
+    «ё» в имени был невидим для запроса с «е».
+  */
+  it.each(['петр', 'ПЁТР', 'петр новиков'])(
+    'finds a name with «ё» typed with «е»: %s',
+    (search) => {
+      const result = filterOperationalUsers(users, { quick: 'all', search, now: NOW });
+
+      expect(result.map((item) => item.id)).toContain('u5');
+    }
+  );
+
+  // Копипаст из письма приносит двойные пробелы: «Иван␣␣Петров» должен
+  // находиться, а не молча давать пусто.
+  it('collapses repeated spaces in the query', () => {
+    const result = filterOperationalUsers(users, { quick: 'all', search: 'иван  петров', now: NOW });
+
+    expect(result.map((item) => item.id)).toEqual(['u2']);
+  });
+
   it('does not mark a newly-created user with no activity as inactive for 30 days', () => {
     const recent = user('recent', {
       lastActivityAt: null,

@@ -32,6 +32,7 @@ import { toast } from 'sonner';
 import { COMPACT_KPI_GRID, ScreenTitle, card } from '../settings/shared-ui';
 import { kpiGridStyle } from '@/components/piling/kpi-tile';
 import { RefKpi } from './shared';
+import { normalizeSearch } from '../shared/text-search';
 import type { ReferenceUiProps } from './types';
 
 type KindFilter = BriefingKind | '';
@@ -203,17 +204,17 @@ export function BriefingsScreen(props: ReferenceUiProps) {
     (rows ?? []).map((row) => row.instructorName).filter(Boolean),
   )).sort((a, b) => a.localeCompare(b, 'ru')), [rows]);
 
-  const needle = query.trim().toLocaleLowerCase('ru-RU');
+  const needle = normalizeSearch(query);
   const visible = (rows ?? []).filter((row) => {
     if (needle) {
-      const haystack = [
+      const haystack = normalizeSearch([
         row.userName,
         row.userRole,
         ROLE_LABELS[row.userRole as UserRole] ?? '',
         row.siteName ?? '',
         row.documentTitle,
         row.documentCode,
-      ].join(' ').toLocaleLowerCase('ru-RU');
+      ].join(' '));
       if (!haystack.includes(needle)) return false;
     }
     if (site && (row.siteName ?? '') !== site) return false;

@@ -13,6 +13,7 @@ import { cn } from '@/lib/utils';
 import { HAMMER_LABEL, type EquipmentOption } from '../../to-module-bits';
 import type { ReadinessBootstrap } from '../api/contracts';
 import { ScreenTitle, SettingsKpis, StatusPill, card } from './shared-ui';
+import { normalizeSearch } from '../shared/text-search';
 
 interface DictionariesSettingsProps {
   equipment: EquipmentOption[];
@@ -87,10 +88,10 @@ export function DictionariesSettings({ equipment, bootstrap, onExport }: Diction
     return () => { active = false; };
   }, []);
 
-  const normalized = query.trim().toLocaleLowerCase('ru-RU');
+  const normalized = normalizeSearch(query);
   const rows = equipment.filter((item) =>
     (status === 'ALL' || (status === 'ACTIVE' ? item.isActive : !item.isActive))
-    && (!normalized || `${item.name} ${item.model ?? ''}`.toLocaleLowerCase('ru-RU').includes(normalized)));
+    && (!normalized || normalizeSearch(`${item.name} ${item.model ?? ''}`).includes(normalized)));
 
   // Записи приезжают вместе с архивными (F-R29-2), поэтому «Записей» считает
   // только действующие — иначе число прыгало бы при архивации. Архивные

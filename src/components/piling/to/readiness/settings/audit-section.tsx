@@ -10,6 +10,7 @@ import type { ReadinessAuditEnvelope, ReadinessAuditEventDto, ReadinessBootstrap
 import { handoverRoleLabel } from '../handover-journal';
 import { auditActionLabel, auditActionMark, auditEmptyMessage, auditEntityLabel, auditImportanceLabel, isCriticalAuditAction } from './audit-labels';
 import { InfoRow, ScreenTitle, SettingsKpis, StatusPill, card } from './shared-ui';
+import { normalizeSearch } from '../shared/text-search';
 
 const AUDIT_TONE: Record<string, string> = {
   success: 'text-success-strong',
@@ -45,13 +46,13 @@ export function AuditSettings({ audit, bootstrap, canExport, activeFilterCount, 
     finally { setExportPending(false); }
   };
 
-  const normalized = query.trim().toLocaleLowerCase('ru-RU');
-  const visible = events.filter((event) => !normalized || [
+  const normalized = normalizeSearch(query);
+  const visible = events.filter((event) => !normalized || normalizeSearch([
     auditActionLabel(event.action),
     auditEntityLabel(event.entity.type),
     event.actor.name ?? '',
     event.action,
-  ].join(' ').toLocaleLowerCase('ru-RU').includes(normalized));
+  ].join(' ')).includes(normalized));
 
   const selected = visible.find((event) => event.id === selectedId) ?? visible[0] ?? null;
   const lastDay = events.filter((event) => Date.now() - new Date(event.occurredAt).getTime() < 86_400_000);

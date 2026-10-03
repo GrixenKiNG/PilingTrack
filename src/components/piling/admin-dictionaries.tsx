@@ -5,6 +5,7 @@ import { AlertCircle, AlertTriangle, Archive, Clock, Drill, Filter, HardHat, Plu
 import { toast } from 'sonner';
 import { authFetch } from '@/lib/api';
 import { catchText, extractApiError } from '@/components/piling/admin-crews/crew-messages';
+import { normalizeSearch } from '@/components/piling/to/readiness/shared/text-search';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -192,13 +193,13 @@ export function AdminDictionaries() {
   }, [inspectorTab, selectedId, historyAttempt]);
 
   const filtered = useMemo(() => {
-    const query = search.trim().toLocaleLowerCase('ru');
+    const query = normalizeSearch(search);
     return Object.fromEntries(KINDS.map(({ kind }) => [
       kind,
       data[kind]
         .filter((item) => filter === 'all' || (filter === 'active' ? item.isActive : !item.isActive))
         .filter((item) => !query || [item.name, item.code, item.sectionOrDiameter]
-          .some((value) => value?.toLocaleLowerCase('ru').includes(query))),
+          .some((value) => value ? normalizeSearch(value).includes(query) : false)),
     ])) as Record<DictionaryKind, RegistryItem[]>;
   }, [data, search, filter]);
 

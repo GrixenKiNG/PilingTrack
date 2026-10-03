@@ -14,6 +14,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { QueryErrorBanner } from '@/components/piling/async-ui';
+import { normalizeSearch } from '@/components/piling/to/readiness/shared/text-search';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Dialog,
@@ -404,11 +405,11 @@ function AssistantSelectorModal({
     }
   }, [open, selectedIds]);
 
-  const query = search.trim().toLowerCase();
+  const query = normalizeSearch(search);
   const filteredUsers = query
     ? assistantUsers.filter(user => (
-      user.name.toLowerCase().includes(query)
-      || user.email.toLowerCase().includes(query)
+      normalizeSearch(user.name).includes(query)
+      || normalizeSearch(user.email).includes(query)
     ))
     : assistantUsers;
 

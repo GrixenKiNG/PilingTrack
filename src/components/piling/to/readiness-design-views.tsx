@@ -23,6 +23,7 @@ import { KPI_GRID, KpiTile, kpiGridStyle } from '@/components/piling/kpi-tile';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
+import { normalizeSearch } from './readiness/shared/text-search';
 import { PRIORITY_LABEL, type MaintenancePriority } from '@/components/piling/maintenance/maintenance-labels';
 import { MaintenancePlansPanel } from './maintenance-plans-panel';
 import { MeterReadingsPanel } from './meter-readings-panel';
@@ -161,7 +162,7 @@ export function ReadinessFleetView({
   const summary = computeReadinessSummary(readiness);
   const filtered = equipment.filter((item) => {
     const state = readinessByEquipment[item.id];
-    const textMatch = `${item.name} ${item.model ?? ''}`.toLowerCase().includes(query.trim().toLowerCase());
+    const textMatch = normalizeSearch(`${item.name} ${item.model ?? ''}`).includes(normalizeSearch(query));
     const stateMatch = filter === 'all'
       || (filter === 'ready' && state?.status === 'READY')
       || (filter === 'attention' && ['ATTENTION', 'NO_DATA'].includes(state?.status))
@@ -395,8 +396,8 @@ export function ReadinessMaintenanceView({
   const [query, setQuery] = useState('');
   const stats = computeToStats(records);
   const filtered = records.filter((record) => {
-    const text = query.trim().toLowerCase();
-    return !text || `${record.title} ${TYPE_LABEL[record.type] ?? record.type} ${STATUS_LABEL[record.status] ?? record.status}`.toLowerCase().includes(text);
+    const text = normalizeSearch(query);
+    return !text || normalizeSearch(`${record.title} ${TYPE_LABEL[record.type] ?? record.type} ${STATUS_LABEL[record.status] ?? record.status}`).includes(text);
   });
   const selectedOrders = allMaintenance.filter((record) => !equipmentId || record.equipment?.id === equipmentId);
   const openOrders = selectedOrders.filter((record) => !['DONE', 'CANCELLED'].includes(record.status));

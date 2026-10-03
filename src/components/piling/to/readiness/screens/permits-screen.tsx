@@ -19,6 +19,7 @@ import type { WorkPermitDto } from '../api/contracts';
 import { CommandDialog } from '../shared/command-dialog';
 import { PermitForm } from '../forms/permit-form';
 import { ProcessRoleStrip, RefKpi, commandFailure, downloadReadinessExport } from './shared';
+import { normalizeSearch } from '../shared/text-search';
 import type { ReferenceUiProps } from './types';
 
 function EvidenceState({ state }: { state: string }) {
@@ -117,8 +118,8 @@ export function PermitsScreen(props: ReferenceUiProps) {
   const filteredPermits = props.permits.filter((permit) => {
     if (permitFilter !== 'ALL' && permit.state !== permitFilter) return false;
     const equipmentName = props.equipment.find((item) => item.id === permit.equipmentId)?.name ?? '';
-    const query = permitQuery.trim().toLocaleLowerCase('ru-RU');
-    return !query || permit.id.toLocaleLowerCase('ru-RU').includes(query) || equipmentName.toLocaleLowerCase('ru-RU').includes(query) || permit.scope.toLocaleLowerCase('ru-RU').includes(query);
+    const query = normalizeSearch(permitQuery);
+    return !query || normalizeSearch(permit.id).includes(query) || normalizeSearch(equipmentName).includes(query) || normalizeSearch(permit.scope).includes(query);
   });
   const runPermitAction = async (permit: WorkPermitDto, action: 'submit' | 'approve' | 'revoke', confirmed = false) => {
     if (!confirmed) { setCommand({permit, action}); setCommandText(''); setCommandError(null); return; }

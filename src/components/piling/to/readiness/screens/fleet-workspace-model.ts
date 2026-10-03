@@ -1,4 +1,5 @@
 import type { ReferenceUiProps } from './types';
+import { normalizeSearch } from '../shared/text-search';
 import { buildAuthoritativeReadinessPresentation, buildUnavailableReadinessPresentation } from '../authoritative-presentation';
 
 export type FleetGroup = 'ready' | 'attention' | 'blocked' | 'unknown';
@@ -77,13 +78,13 @@ export function buildFleetItems(props: Pick<ReferenceUiProps, 'equipment' | 'fle
 export type FleetItem = ReturnType<typeof buildFleetItems>[number];
 
 export function filterFleetItems(items: FleetItem[], view: FleetViewState): FleetItem[] {
-  const query = view.query.trim().toLocaleLowerCase('ru-RU');
+  const query = normalizeSearch(view.query);
   const priorities: Record<FleetGroup, number> = { blocked: 0, unknown: 1, attention: 2, ready: 3 };
   return items.filter((item) =>
     (view.status === 'all' || item.group === view.status)
     && (!view.site || item.site === view.site)
-    && [item.equipment.name, item.equipment.model, item.site, item.fleet?.assignedCrewName]
-      .filter(Boolean).join(' ').toLocaleLowerCase('ru-RU').includes(query),
+    && normalizeSearch([item.equipment.name, item.equipment.model, item.site, item.fleet?.assignedCrewName]
+      .filter(Boolean).join(' ')).includes(query),
   ).sort((a, b) => {
     const order = view.sort === 'priority' ? priorities[a.group] - priorities[b.group]
       : view.sort === 'hours' ? (b.equipment.engineHoursTotal ?? -1) - (a.equipment.engineHoursTotal ?? -1) : 0;
