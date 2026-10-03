@@ -1,9 +1,10 @@
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ReferenceUiProps } from '../types';
 import { usePilingStore } from '@/lib/store';
 import { SafetyScreen } from '../safety-screen';
 import { KnowledgeScreen } from '../knowledge-screen';
+import { EmployeeCard } from '../employee-card';
 
 const { authFetch } = vi.hoisted(() => ({ authFetch: vi.fn() }));
 vi.mock('@/lib/api', () => ({ authFetch }));
@@ -122,5 +123,28 @@ describe('KnowledgeScreen — плитки не показывают ложны�
     await screen.findByRole('alert');
     expect(screen.queryAllByText('0')).toHaveLength(0);
     expect(screen.getAllByText('—')).toHaveLength(3);
+  });
+});
+
+/**
+ * F-R110-4: во вкладке «Проверка знаний» карточка «Дата проверки» выводила
+ * `row.lastInstructionAt` — дату последнего ИНСТРУКТАЖА. Это другое событие, и
+ * по нему инженер ОТ принимал решение о пересдаче.
+ */
+describe('EmployeeCard — дата инструктажа не выдаётся за дату проверки знаний (F-R110-4)', () => {
+  it('во вкладке «Проверка знаний» нет карточки «Дата проверки» с чужой датой', async () => {
+    authFetch.mockResolvedValue({ ok: true, json: async () => ({ rows: [] }) });
+    render(
+      <EmployeeCard
+        row={{ ...row, lastInstructionAt: '2026-09-01T00:00:00.000Z' }}
+        editable={false}
+        onBack={vi.fn()}
+        onGoTo={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Проверка знаний' }));
+
+    expect(screen.queryByText('Дата проверки')).not.toBeInTheDocument();
   });
 });
