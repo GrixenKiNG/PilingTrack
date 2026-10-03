@@ -34,6 +34,29 @@ describe.skipIf(!enabled)('RLS on all deployed migrations, real application role
     });
   }
 
+  for (const table of tables) {
+    it(table + ': cannot update or delete another tenant row', async () => {
+      const foreignId = fixture.id(fixture.tenants[1], table);
+      await inTenant(fixture.app, fixture.tenants[0], async () => {
+        expect((await fixture.app.query('UPDATE "' + table + '" SET id = id WHERE id = $1', [foreignId])).rowCount).toBe(0);
+        expect((await fixture.app.query('DELETE FROM "' + table + '" WHERE id = $1', [foreignId])).rowCount).toBe(0);
+      });
+      expect((await fixture.owner.query('SELECT id FROM "' + table + '" WHERE id = $1', [foreignId])).rows).toEqual([{ id: foreignId }]);
+    });
+    it(table + ': missing tenant rejects insertion', async () => {
+      await fixture.app.query('BEGIN');
+      try {
+        await expect(fixture.insert(table, fixture.tenants[0], '-no-tenant')).rejects.toMatchObject({ code: '42501' });
+      } finally { await fixture.app.query('ROLLBACK'); }
+    });
+    it(table + ': own tenant can write', async () => {
+      await inTenant(fixture.app, fixture.tenants[0], async () => {
+        expect((await fixture.app.query('UPDATE "' + table + '" SET id = id WHERE id = $1', [fixture.id(fixture.tenants[0], table)])).rowCount).toBe(1);
+        if (table === 'BriefingRecord') expect((await fixture.insert(table, fixture.tenants[0], '-own')).rowCount).toBe(1);
+      });
+    });
+  }
+
   it('does not leak local tenant between transactions on the same backend (transaction-pool contract)', async () => {
     const backend = (await fixture.app.query('SELECT pg_backend_pid() AS pid')).rows[0].pid;
     for (const tenant of fixture.tenants) {

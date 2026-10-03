@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { Client } from 'pg';
 
-export const tables = ['Report', 'Site', 'Equipment', 'Inspection', 'Shift', 'AuditLog'] as const;
+export const tables = ['Report', 'Site', 'Equipment', 'Inspection', 'Shift', 'AuditLog', 'BriefingRecord'] as const;
 export type FixtureTable = typeof tables[number];
 
 export async function inTenant<T>(client: Client, tenant: string, work: () => Promise<T>): Promise<T> {
@@ -38,6 +38,7 @@ export async function createFixture() {
       case 'Report': return { ...base, reportId: base.id, userId: id(tenant, 'User'), siteId: id(tenant, 'Site'), date: '2026-10-02', updatedAt: new Date() };
       case 'Inspection': return { ...base, equipmentId: id(tenant, 'Equipment'), templateId: id(tenant, 'ChecklistTemplate'), level: 'EO', performedById: id(tenant, 'User'), inspectionDate: new Date(), templateSnapshot: '[]', updatedAt: new Date() };
       case 'Shift': return { ...base, equipmentId: id(tenant, 'Equipment'), type: 'DAY', productionDate: '2026-10-02', timezone: 'Europe/Moscow', createdById: id(tenant, 'User'), lastEditedById: id(tenant, 'User'), updatedAt: new Date() };
+      case 'BriefingRecord': return { ...base, userId: id(tenant, 'User'), kind: 'INSTRUCTION', userName: 'Disposable operator', userRole: 'OPERATOR', documentCode: 'codex', documentTitle: 'Disposable briefing', documentVersion: '1', recordedAt: new Date() };
       case 'AuditLog': return { ...base, entity: 'Report', entityId: id(tenant, 'Report'), action: 'codex.fixture' };
     }
   };
@@ -52,7 +53,7 @@ export async function createFixture() {
         await owner.query('BEGIN');
         try {
           for (const tenant of tenants) {
-            for (const table of ['AuditLog', 'Report', 'Shift', 'Inspection', 'ChecklistTemplate', 'Equipment', 'Site', 'User']) {
+            for (const table of ['BriefingRecord', 'AuditLog', 'Report', 'Shift', 'Inspection', 'ChecklistTemplate', 'Equipment', 'Site', 'User']) {
               await owner.query(`DELETE FROM "${table}" WHERE id = $1`, [id(tenant, table)]);
             }
             await owner.query('DELETE FROM "Tenant" WHERE id = $1', [tenant]);
@@ -71,7 +72,7 @@ export async function createFixture() {
         await insertRow(owner, 'Tenant', { id: tenant, slug: tenant, name: 'Disposable tenant', updatedAt: new Date() });
         await insertRow(owner, 'User', { id: id(tenant, 'User'), tenantId: tenant, email: `${tenant}@example.invalid`, name: 'Disposable operator', updatedAt: new Date() });
         await insertRow(owner, 'ChecklistTemplate', { id: id(tenant, 'ChecklistTemplate'), tenantId: tenant, name: 'Disposable EO', level: 'EO', updatedAt: new Date() });
-        for (const table of ['Site', 'Equipment', 'Report', 'Inspection', 'Shift', 'AuditLog'] as const) await insertRow(owner, table, row(table, tenant));
+        for (const table of ['Site', 'Equipment', 'Report', 'Inspection', 'Shift', 'AuditLog', 'BriefingRecord'] as const) await insertRow(owner, table, row(table, tenant));
       }
       await owner.query('COMMIT');
       seeded = true;
