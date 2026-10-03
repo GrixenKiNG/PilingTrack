@@ -49,13 +49,21 @@ function renderPreview() {
     <ReportEvidencePreview
       report={report}
       history={{ data: null, loading: false, error: false }}
-      formatDate={(d) => d}
       onClose={vi.fn()}
       onPreviewPdf={vi.fn()}
       onPrint={vi.fn()}
     />,
   );
 }
+
+describe('ReportEvidencePreview — единый формат даты (F-R114-7)', () => {
+  it('дата в шапке панели совпадает с блоком фактов (formatRuDate)', () => {
+    renderPreview();
+
+    expect(screen.getByText(/Доказательства смены · 01\.09\.2026/)).toBeInTheDocument();
+    expect(screen.queryByText(/сент\./)).not.toBeInTheDocument();
+  });
+});
 
 describe('ReportEvidencePreview — скачивание PDF (F-R93-5)', () => {
   beforeEach(() => {
@@ -96,5 +104,37 @@ describe('ReportEvidencePreview — скачивание PDF (F-R93-5)', () => {
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith(
       'Нет связи с сервером. PDF не скачан — повторите при появлении сети.',
     ));
+  });
+});
+
+/**
+ * F-R115-4: «Скачать» у одного отчёта не блокировалась на время запроса, а
+ * маршрут single-pdf сам ограничивает частоту (429): два быстрых клика давали
+ * вторую пересборку PDF и «Слишком много выгрузок подряд» вместо файла.
+ */
+describe('ReportEvidencePreview — защита от повторного «Скачать» (F-R115-4)', () => {
+  beforeEach(() => {
+    authFetchMock.mockReset();
+    vi.mocked(toast.error).mockClear();
+  });
+
+  it('во время скачивания кнопка заблокирована и подписана «Скачивание…», второй запрос не уходит', async () => {
+    let resolveFetch: (value: unknown) => void = () => {};
+    authFetchMock.mockImplementation(() => new Promise((resolve) => { resolveFetch = resolve; }));
+
+    renderPreview();
+    const button = screen.getByRole('button', { name: /Скачать/ });
+
+    fireEvent.click(button);
+    await waitFor(() => expect(button).toBeDisabled());
+    expect(button).toHaveTextContent('Скачивание…');
+
+    // Повторный клик во время выгрузки не должен запускать вторую пересборку PDF.
+    fireEvent.click(button);
+    expect(authFetchMock).toHaveBeenCalledTimes(1);
+
+    resolveFetch({ ok: false, status: 500, json: async () => ({}) });
+    await waitFor(() => expect(button).not.toBeDisabled());
+    expect(button).toHaveTextContent('Скачать');
   });
 });

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AlertCircle, AlertTriangle, Archive, Clock, Drill, Filter, HardHat, Plus, Ruler, Save, Search, X } from '@/components/piling/icons/unified-icons';
 import { toast } from 'sonner';
 import { authFetch } from '@/lib/api';
+import { catchText, extractApiError } from '@/components/piling/admin-crews/crew-messages';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -72,15 +73,6 @@ const KINDS: Array<{ kind: DictionaryKind; title: string; summaryTitle: string; 
   { kind: 'drillingType', title: 'Бурение', summaryTitle: 'Типы бурения', addLabel: 'Добавить тип бурения', icon: Drill, pilingIcon: 'drilling-auger' },
   { kind: 'downtimeReason', title: 'Простои', summaryTitle: 'Причины простоев', addLabel: 'Добавить причину простоя', icon: Clock, pilingIcon: 'downtime' },
 ];
-
-async function responseError(response: Response, fallback: string): Promise<string> {
-  try {
-    const payload = await response.json() as { error?: string };
-    return payload.error || fallback;
-  } catch {
-    return fallback;
-  }
-}
 
 export function AdminDictionaries() {
   const [data, setData] = useState<Record<DictionaryKind, RegistryItem[]>>({
@@ -284,7 +276,7 @@ export function AdminDictionaries() {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
-      if (!response.ok) throw new Error(await responseError(response, 'Не удалось сохранить'));
+      if (!response.ok) throw new Error(await extractApiError(response, 'Не удалось сохранить'));
       toast.success('Сохранено');
       selectItem({
         ...selectedItem,
@@ -294,7 +286,8 @@ export function AdminDictionaries() {
       });
       await loadData();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Не удалось сохранить');
+      // Обрыв сети fetch бросает TypeError с английским «Failed to fetch» (F-R112-3).
+      toast.error(catchText(error, 'Не удалось сохранить'));
     } finally {
       setSaving(false);
     }
@@ -328,12 +321,13 @@ export function AdminDictionaries() {
           ? { type: form.kind, ...value }
           : { type: form.kind, id: form.item?.id, name: value.name }),
       });
-      if (!response.ok) throw new Error(await responseError(response, 'Не удалось сохранить'));
+      if (!response.ok) throw new Error(await extractApiError(response, 'Не удалось сохранить'));
       toast.success(isCreate ? 'Элемент добавлен' : 'Переименовано');
       setForm(null);
       await loadData();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Не удалось сохранить');
+      // Обрыв сети fetch бросает TypeError с английским «Failed to fetch» (F-R112-3).
+      toast.error(catchText(error, 'Не удалось сохранить'));
     } finally {
       setSaving(false);
     }
@@ -348,7 +342,7 @@ export function AdminDictionaries() {
         body: JSON.stringify({ type: kind, id: item.id, isActive }),
       });
       if (!response.ok) {
-        toast.error(await responseError(response, 'Не удалось изменить статус'));
+        toast.error(await extractApiError(response, 'Не удалось изменить статус'));
         return;
       }
       toast.success(
@@ -361,7 +355,8 @@ export function AdminDictionaries() {
       if (selectedItem?.id === item.id) selectItem({ ...selectedItem, isActive });
       await loadData();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Не удалось изменить статус');
+      // Обрыв сети fetch бросает TypeError с английским «Failed to fetch» (F-R112-3).
+      toast.error(catchText(error, 'Не удалось изменить статус'));
     }
   };
 
@@ -403,12 +398,13 @@ export function AdminDictionaries() {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ type: 'pileGrade', id: lengthState.item.id, lengthMm, ...(confirmed ? { confirmRecalculate: true } : {}) }),
       });
-      if (!response.ok) throw new Error(await responseError(response, 'Не удалось сохранить длину'));
+      if (!response.ok) throw new Error(await extractApiError(response, 'Не удалось сохранить длину'));
       toast.success('Длина сохранена');
       setLengthState(null);
       await loadData();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Не удалось сохранить длину');
+      // Обрыв сети fetch бросает TypeError с английским «Failed to fetch» (F-R112-3).
+      toast.error(catchText(error, 'Не удалось сохранить длину'));
     } finally {
       setSaving(false);
     }
@@ -422,14 +418,15 @@ export function AdminDictionaries() {
         body: JSON.stringify({ type: confirmDelete.kind, id: confirmDelete.item.id }),
       });
       if (!response.ok) {
-        toast.error(await responseError(response, 'Не удалось удалить'));
+        toast.error(await extractApiError(response, 'Не удалось удалить'));
         return;
       }
       toast.success('Элемент удалён');
       setConfirmDelete(null);
       await loadData();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Не удалось удалить');
+      // Обрыв сети fetch бросает TypeError с английским «Failed to fetch» (F-R112-3).
+      toast.error(catchText(error, 'Не удалось удалить'));
     }
   };
 

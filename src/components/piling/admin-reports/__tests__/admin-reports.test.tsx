@@ -34,12 +34,18 @@ vi.mock('../report-form-dialog', () => ({ ReportFormDialog: () => null }));
 vi.mock('../report-evidence-preview', () => ({ ReportEvidencePreview: () => null }));
 vi.mock('@/components/piling/pdf-preview-dialog', () => ({ PdfPreviewDialog: () => null }));
 vi.mock('@/components/piling/confirm-action-dialog', () => ({
-  ConfirmActionDialog: ({ open, onConfirm }: { open: boolean; onConfirm: () => void }) =>
-    open ? <button type="button" onClick={() => void onConfirm()}>Удалить отчёт</button> : null,
+  ConfirmActionDialog: ({ open, onConfirm, description }: { open: boolean; onConfirm: () => void; description?: string }) =>
+    open ? (
+      <div>
+        <p>{description}</p>
+        <button type="button" onClick={() => void onConfirm()}>Удалить отчёт</button>
+      </div>
+    ) : null,
 }));
 vi.mock('../report-evidence-row', () => ({
-  ReportsHeader: ({ onExport, onExportXlsx }: { onExport?: () => void; onExportXlsx?: () => void }) => (
+  ReportsHeader: ({ onExport, onExportXlsx, exporting }: { onExport?: () => void; onExportXlsx?: () => void; exporting: 'csv' | 'xlsx' | null }) => (
     <div>
+      <span data-testid="export-state">{exporting ?? 'idle'}</span>
       <button type="button" onClick={onExport}>CSV</button>
       <button type="button" onClick={onExportXlsx}>Excel</button>
     </div>
@@ -131,6 +137,52 @@ describe('AdminReports — удаление отчёта (F-R93-7)', () => {
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith(
       'Нет соединения с сервером. Проверьте связь и повторите.',
     ));
+  });
+});
+
+describe('AdminReports — единый формат даты отчёта (F-R114-5)', () => {
+  beforeEach(() => {
+    authFetchMock.mockReset();
+    vi.mocked(toast.error).mockClear();
+    reportsState.current = baseState();
+  });
+
+  it('в подтверждении удаления дата — «ДД.ММ.ГГГГ», а не «1 сент. 2026 г.»', () => {
+    render(<AdminReports />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Удалить' }));
+
+    expect(screen.getByText(/Отчёт от 01\.09\.2026 \(Иван\) будет удалён/)).toBeInTheDocument();
+  });
+});
+
+/**
+ * F-R115-12: на время выгрузки обе кнопки («CSV» и «Excel») одновременно
+ * писали «Готовим…» — было не понять, какой файл готовится. Экран теперь
+ * помнит нажатый формат и до ответа сервера помечает только его.
+ */
+describe('AdminReports — пометка формата выгрузки (F-R115-12)', () => {
+  beforeEach(() => {
+    authFetchMock.mockReset();
+    vi.mocked(toast.error).mockClear();
+    reportsState.current = baseState();
+  });
+
+  it('во время выгрузки помечен только нажатый формат, после ответа — снова пусто', async () => {
+    let resolveFetch: (value: unknown) => void = () => {};
+    authFetchMock.mockImplementation(() => new Promise((resolve) => { resolveFetch = resolve; }));
+
+    render(<AdminReports />);
+    expect(screen.getByTestId('export-state')).toHaveTextContent('idle');
+
+    // Фильтр «Сегодня» задаёт период, который нужен выгрузке.
+    fireEvent.click(screen.getByRole('button', { name: 'Сегодня' }));
+    fireEvent.click(screen.getByRole('button', { name: 'CSV' }));
+
+    await waitFor(() => expect(screen.getByTestId('export-state')).toHaveTextContent('csv'));
+
+    resolveFetch({ ok: false, status: 500, json: async () => ({}) });
+    await waitFor(() => expect(screen.getByTestId('export-state')).toHaveTextContent('idle'));
   });
 });
 

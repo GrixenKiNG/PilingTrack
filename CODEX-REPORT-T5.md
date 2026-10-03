@@ -87,3 +87,19 @@ SQL query tracing (включая BEGIN/set_config/COMMIT): Fleet30=28, Journal1
 EXPLAIN ANALYZE BUFFERS: journal использует индекс tenant/drivenAt с501 строкой; aggregate полного года читает20к строк закономерно. Actual analytics SQL под non-BYPASS app + transaction-local tenant: два чтения PileWork и около20к Report index probes на каждом проходе. Объединены периодный FILTER и накопительный SUM в одном aggregate, security/RLS не менялись. На том же PG, чередующийся порядок old/new,30 замеров: before p50=438.7 p95=595.7 EXPLAIN=440.876; after p50=230.5 p95=310.9 EXPLAIN=229.229. Выборки старого/нового SQL равны для года и короткого периода (equal=true). Это SQL измерение, HTTP после новой сборки отдельноE7; не выдаётся за HTTP ускорение. План/BUFs сохранены output/codex-t5/e5-analytics-compare.json и e5-performance.json.
 
 Red узкий8тестов: exit1,7passed/1failed (JOIN PileWork дважды); green exit0,8passed. Real PG semantic test exit0,1passed/0skip: period7/42м,alltime11/66м,draft100 исключён. Новые индексы не нужны по этим данным; миграций нет. GitNexus impact/detect недоступны exit1, fallback rg+diff; graph risk UNKNOWN. E4 commit76122b97.
+
+## E6 — Hermes
+
+Рассмотрен diff b67fefb6..hermes/q4-0926 (123 src-файла). Вершина Hermes28265e0b, общий предок6a2a0cab; новые правки относительно предка —35файлов,676+/73-. Старые различия lease/security/PDF cleanup относительно релиза НЕ новые дневные изменения; трёхстороннее слияние их не откатывает. merge-tree exit0 d3dc36c6, точный diff результата —те же35UI/test files; защищённые auth/security/RLS и frozen ORION/operator не затронуты. Разрешённое локальное no-ff слияние без конфликтов, без push.
+
+| Область | Результат ревью | Ограничение |
+|---|---|---|
+| Users/document types, reset layout, закрытие ТО | подтверждение до mutation; объяснение последствий | текст ТО обещает показание, хотя без engineHoursAtService его нет: неточный текст, не повреждение данных |
+| PDF download, CSV/Excel | disabled pending, раздельная метка формата, общий date helper | не доказывает уникальность запросов между вкладками |
+| Journal export | пустая загруженная выборка не экспортируется как успех | сервер остаётся источником фильтров |
+| Catch/error helpers | русская ошибка сети; сохраняются business errors | TypeError может быть программной ошибкой; общий текст скрывает её природу, в workflow не подтверждено |
+| DLQ dates | явный MSK вместо зоны браузера | перед tenant2 проверить timezone организации |
+
+Новых серьёзных регрессий не подтверждено. Все изменённые Hermes тесты: exit0,13файлов/137passed/0skip. Дополнительной runtime правки нет. GitNexus impact exit1/fallback diff+search, graph riskUNKNOWN; проверка всей объединённой ветки —E7. E5 commit992c9fda.
+
+Пауза: автоматическая проверка разрешений не выполнила следующий focused test из-за usage limit reviewer; это не признание команды небезопасной. После команды пользователя «далее» стандартная проверка снова доступна, focused test реально выполнен с числами выше.

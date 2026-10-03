@@ -174,6 +174,12 @@ export function PileJournal() {
   };
 
   const exportJournal = async () => {
+    // Пустая выборка давала файл с одним титулом и зелёное «Журнал выгружен»:
+    // мастер подшивал пустой документ и решал, что свай нет по ошибке фильтра.
+    if (rows && rows.length === 0) {
+      toast.error('По этой выборке свай нет — выгружать нечего. Измените фильтр или период.');
+      return;
+    }
     setExporting(true);
     let objectUrl: string | null = null;
     try {

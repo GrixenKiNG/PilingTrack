@@ -23,6 +23,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import { LEVEL_LABEL, type InspectionLevel } from './inspection-labels';
+import { catchText } from './inspection-api-error';
 import { getConsumables } from '@/modules/inspections/domain/consumables';
 import { LubricationMap } from './lubrication-map';
 import { getTodayInTimezone } from '@/lib/timezone';
@@ -175,7 +176,8 @@ export function StartInspectionForm() {
       const { inspection } = await res.json();
       router.push(`/inspections/${inspection.id}`);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Ошибка');
+      // Обрыв сети fetch бросает TypeError с английским «Failed to fetch» (F-R112-2).
+      toast.error(catchText(err, 'Ошибка'));
     } finally {
       setBusy(false);
     }

@@ -16,7 +16,7 @@ import { Camera, Loader2, Trash2 } from '@/components/piling/icons/unified-icons
 import { toast } from 'sonner';
 import { authFetch } from '@/lib/api';
 import { getThumbnailUrl } from '@/lib/media-thumbnails';
-import { InspectionLoadError, isRetryableLoadError, loadErrorText } from './inspection-api-error';
+import { InspectionLoadError, isRetryableLoadError, loadErrorText, catchText } from './inspection-api-error';
 
 interface MediaRecord {
   id: string;
@@ -133,7 +133,8 @@ export function InspectionItemPhotos({ inspectionId, itemId, onCountChange }: Pr
       toast.success('Фото загружено');
       await refresh();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Ошибка загрузки');
+      // Обрыв сети fetch бросает TypeError с английским «Failed to fetch» (F-R112-2).
+      toast.error(catchText(err, 'Ошибка загрузки'));
     } finally {
       setBusy(false);
       if (inputRef.current) inputRef.current.value = '';
@@ -151,7 +152,8 @@ export function InspectionItemPhotos({ inspectionId, itemId, onCountChange }: Pr
       setPhotos(next);
       onCountChange?.(next.length);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Ошибка удаления');
+      // Обрыв сети fetch бросает TypeError с английским «Failed to fetch» (F-R112-2).
+      toast.error(catchText(err, 'Ошибка удаления'));
     } finally {
       setBusy(false);
     }

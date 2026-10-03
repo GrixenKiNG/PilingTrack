@@ -7,8 +7,9 @@
  * их не поднимает. Правка — только телефон: `h-11 … sm:h-9`; на десктопе (sm и
  * шире) высота прежняя (`min-height` сильнее `height`, поэтому сброс обязателен).
  */
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { toast } from 'sonner';
 
 const mocks = vi.hoisted(() => ({ authFetch: vi.fn() }));
 
@@ -83,5 +84,61 @@ describe('блок отказа загрузки: цель нажатия на �
 
     // `sm:min-h-8` возвращает десктопу штатные 32px кнопки `size="sm"`.
     expect(screen.getByRole('button', { name: 'Повторить' })).toHaveClass('min-h-11', 'shrink-0', 'sm:min-h-8');
+  });
+});
+
+describe('панели ТО: обрыв сети при сохранении — русский текст, а не «Failed to fetch» (F-R112-2)', () => {
+  // Запрос записи уходит немедленным отказом `TypeError` («Failed to fetch»),
+  // как при обрыве связи; чтение журнала на монтировании остаётся незавершённым.
+  const offlineOnWrite = () => {
+    mocks.authFetch.mockImplementation((_url: string, init?: RequestInit) =>
+      init?.method === 'POST' ? Promise.reject(new TypeError('Failed to fetch')) : new Promise(() => {}));
+  };
+
+  beforeEach(() => {
+    vi.mocked(toast.error).mockClear();
+  });
+
+  it('журнал топлива: сохранение без связи объясняется по-русски', async () => {
+    offlineOnWrite();
+    render(<FuelPanel equipmentId="eq-1" />);
+
+    fireEvent.click(screen.getByRole('button', { name: /Добавить запись/ }));
+    fireEvent.change(screen.getByPlaceholderText('напр. 200'), { target: { value: '10' } });
+    fireEvent.click(screen.getByRole('button', { name: /Сохранить/ }));
+
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith('Нет связи с сервером. Проверьте подключение и повторите.'),
+    );
+    expect(toast.error).not.toHaveBeenCalledWith('Failed to fetch');
+  });
+
+  it('журнал наработки: сохранение без связи объясняется по-русски', async () => {
+    offlineOnWrite();
+    render(<MeterReadingsPanel equipmentId="eq-1" />);
+
+    fireEvent.click(screen.getByRole('button', { name: /Добавить показание/ }));
+    fireEvent.change(screen.getByPlaceholderText('напр. 5670'), { target: { value: '100' } });
+    fireEvent.click(screen.getByRole('button', { name: /Сохранить/ }));
+
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith('Нет связи с сервером. Проверьте подключение и повторите.'),
+    );
+    expect(toast.error).not.toHaveBeenCalledWith('Failed to fetch');
+  });
+
+  it('регламенты ТО: сохранение без связи объясняется по-русски', async () => {
+    offlineOnWrite();
+    render(<MaintenancePlansPanel equipmentId="eq-1" />);
+
+    fireEvent.click(screen.getByRole('button', { name: /Добавить регламент/ }));
+    fireEvent.change(screen.getByPlaceholderText('Напр. ТО-1 по моточасам'), { target: { value: 'ТО-1' } });
+    fireEvent.change(screen.getByPlaceholderText('интервал, м/ч (напр. 250)'), { target: { value: '250' } });
+    fireEvent.click(screen.getByRole('button', { name: /Сохранить/ }));
+
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith('Нет связи с сервером. Проверьте подключение и повторите.'),
+    );
+    expect(toast.error).not.toHaveBeenCalledWith('Failed to fetch');
   });
 });

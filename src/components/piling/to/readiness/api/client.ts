@@ -54,6 +54,17 @@ function messageFromBody(body: unknown): string | null {
   return typeof error === 'string' && error.length > 0 ? error : null;
 }
 
+/**
+ * Серверное сообщение показываем, только если оно на русском (F-R112-3).
+ *
+ * Маршруты отдают `{ error: '…' }` дословно, и часть сообщений английская
+ * (например, 503 «Tenant settings are not configured» из модуля). Экран не
+ * показывает чужую строку: вместо неё — свой русский текст по коду статуса.
+ */
+function russianOr(message: string, fallback: string): string {
+  return /[А-Яа-яЁё]/.test(message) ? message : fallback;
+}
+
 function responseError(status: number, message: string, requestId: string | null) {
   if (status === 401) {
     return new ReadinessApiError('UNAUTHORIZED', 'Сессия завершена. Войдите повторно.', status, requestId);
@@ -65,9 +76,19 @@ function responseError(status: number, message: string, requestId: string | null
     return new ReadinessApiError('RATE_LIMITED', 'Слишком много запросов. Повторите через минуту.', status, requestId);
   }
   if (status >= 500) {
-    return new ReadinessApiError('UNAVAILABLE', message || 'Сервис технической готовности временно недоступен.', status, requestId);
+    return new ReadinessApiError(
+      'UNAVAILABLE',
+      russianOr(message, 'Сервис технической готовности временно недоступен.'),
+      status,
+      requestId,
+    );
   }
-  return new ReadinessApiError('REQUEST_FAILED', message || `Запрос завершился с кодом ${status}.`, status, requestId);
+  return new ReadinessApiError(
+    'REQUEST_FAILED',
+    russianOr(message, `Запрос завершился с кодом ${status}.`),
+    status,
+    requestId,
+  );
 }
 
 export async function fetchReadinessBootstrap(
