@@ -275,6 +275,41 @@ describe('редактор шаблона: сбой сохранения пра�
   });
 });
 
+describe('редактор шаблона: защита от одновременной правки (F-R123-2)', () => {
+  // Сервер выпускает версию деактивацией прежней строки и созданием новой без
+  // проверки версии: двое админов с одним шаблоном дают две действующие версии.
+  const templateWith = (isActive: boolean) =>
+    json({ template: { ...templatePayload.template, isActive } });
+
+  it('шаблон уже заменён другим администратором → PUT не уходит, есть объяснение', async () => {
+    mocks.authFetch.mockImplementation(async (_url: string, init?: RequestInit) => (
+      init?.method === 'PUT' ? json(templatePayload) : templateWith(false)
+    ));
+    render(<TemplateEditor templateId="tpl-1" />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Сохранить' }));
+
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('Шаблон уже изменён другим администратором');
+    expect(mocks.authFetch.mock.calls.some(([, init]) =>
+      (init as RequestInit | undefined)?.method === 'PUT',
+    )).toBe(false);
+  });
+
+  it('шаблон ещё действует → правка уходит на сервер (проверка не мешает)', async () => {
+    mocks.authFetch.mockImplementation(async (_url: string, init?: RequestInit) => (
+      init?.method === 'PUT' ? json(templatePayload) : templateWith(true)
+    ));
+    render(<TemplateEditor templateId="tpl-1" />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Сохранить' }));
+
+    await waitFor(() => expect(mocks.authFetch.mock.calls.some(([, init]) =>
+      (init as RequestInit | undefined)?.method === 'PUT',
+    )).toBe(true));
+  });
+});
+
 describe('редактор шаблона: пределы длины полей как в схеме маршрута (F-R121-3)', () => {
   it('у названия, раздела и полей пункта стоит maxLength по схеме', () => {
     render(<TemplateEditor templateId="new" />);
