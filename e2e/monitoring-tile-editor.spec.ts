@@ -1,4 +1,5 @@
-import { expect, test } from '@playwright/test';
+import { TEST_USERS } from './fixtures/auth.fixture';
+import { expect, test } from './fixtures/disposable.fixture';
 import { login } from './page-objects/login.page';
 
 const TEST_PNG = Buffer.from(
@@ -10,7 +11,7 @@ test.describe('monitoring equipment tile editor', () => {
   test('applies one layout with a different photo for every installation', async ({ page }, testInfo) => {
     test.skip(!['chromium', 'Mobile Chrome'].includes(testInfo.project.name));
 
-    await login(page, 'admin@piling.ru', 'admin123');
+    await login(page, TEST_USERS.admin.email, TEST_USERS.admin.password);
     await page.evaluate(async () => {
       localStorage.removeItem('monitoring-equipment-tile-template-v1');
       localStorage.removeItem('monitoring-equipment-tile-template-v1-migrated');
@@ -25,9 +26,10 @@ test.describe('monitoring equipment tile editor', () => {
     if (testInfo.project.name === 'Mobile Chrome') {
       await page.setViewportSize({ width: 390, height: 844 });
     }
-    await page.goto('/monitoring?design=1');
+    await page.goto('/admin/settings');
+    await page.getByRole('button', { name: 'Шаблоны плиток', exact: true }).click();
 
-    const editButton = page.getByRole('button', { name: 'Редактировать шаблон' });
+    const editButton = page.getByRole('button', { name: 'Открыть редактор плиток' });
     await expect(editButton).toBeVisible();
     await editButton.click();
     await expect(page.getByRole('dialog', { name: 'Редактор шаблона плитки' })).toBeVisible();
@@ -44,6 +46,7 @@ test.describe('monitoring equipment tile editor', () => {
     if (testInfo.project.name === 'Mobile Chrome') {
       await page.getByRole('button', { name: 'Блоки' }).click();
     }
+    test.skip(process.env.E2E_S3_READY !== 'true', 'Server photo workflow requires a disposable S3 fixture; PG/Redis stand does not verify it');
     await page.getByLabel('Загрузить фото').setInputFiles({
       name: 'installation.png',
       mimeType: 'image/png',
@@ -69,7 +72,8 @@ test.describe('monitoring equipment tile editor', () => {
       fullPage: true,
     });
 
-    await page.getByRole('button', { name: 'Сохранить' }).click();
+    await page.getByRole('button', { name: 'Сохранить шаблон' }).click();
+    await page.goto('/monitoring');
     const tiles = page.getByTestId('equipment-tile');
     const tileCount = await tiles.count();
     expect(tileCount).toBeGreaterThan(0);

@@ -1,16 +1,17 @@
-import {test,expect} from '@playwright/test';
+import {test,expect} from './fixtures/disposable.fixture';
 import { createRoleAuditFixture } from './fixtures/role-audit.mjs';
 import {login} from './page-objects/login.page';
 
 // Real, isolated accounts. No actingAs, shared production users or external bots.
 const homes={ADMIN:'/admin',DISPATCHER:'/admin',OPERATOR:'/operator',ASSISTANT:'/assistant',MECHANIC:'/admin/to',FOREMAN:'/admin',SAFETY_ENGINEER:'/admin/to'};
 test.describe('seven real roles',()=>{
- test.describe.configure({mode:'serial'});
+ test.describe.configure({mode:'default'});
  let fixture;
  test.beforeAll(async()=>{fixture=await createRoleAuditFixture()});
  for(const [role,home] of Object.entries(homes))test(role+' login, permissions and mobile layout',async({page},info)=>{
   const errors=[];page.on('pageerror',e=>errors.push(e.message));
   page.on('response',async response=>{if(response.status()>=400&&response.url().includes('/api/'))await info.attach('api-error',{body:JSON.stringify({url:response.url(),status:response.status(),body:await response.text().catch(()=>'<unavailable>')}),contentType:'application/json'}).catch(()=>{});});
+  await page.setViewportSize({width:1280,height:900});
   await login(page,fixture.users[role].email,fixture.password);
   await expect(page).toHaveURL(new RegExp(home+'$'));
   await expect(page.getByText('QA '+role,{exact:true}).first()).toBeVisible();
@@ -19,6 +20,11 @@ test.describe('seven real roles',()=>{
   else await expect(page).toHaveURL(new RegExp(home+'$'));
   await page.goto(home);
   if(role==='OPERATOR'||role==='ASSISTANT'){
+   if(role==='OPERATOR'){
+    await page.getByRole('button',{name:'Проверить средства защиты',exact:true}).click();
+    const [ppe]=await Promise.all([page.waitForResponse(r=>r.url().includes('/api/operator/mobile/command')),page.getByRole('button',{name:'Комплект в порядке',exact:true}).click()]);
+    expect(ppe.status()).toBe(200);
+   }
    await page.getByRole('button',{name:role==='OPERATOR'?'Прочитать инструкцию':'Пройти инструктаж',exact:true}).click();
    await page.getByRole('button',{name:'Прочитал и ознакомлен',exact:true}).click();
    const [response]=await Promise.all([page.waitForResponse(r=>r.url().includes('/api/operator/knowledge-attempt')),page.getByRole('button',{name:role==='OPERATOR'?'Пройти проверку знаний':'Пройти проверку',exact:true}).click()]);
@@ -35,6 +41,7 @@ test.describe('seven real roles',()=>{
   await page.screenshot({path:info.outputPath(role+'-mobile.png'),fullPage:true});expect(errors).toEqual([]);
  });
  test('monitoring and analytics expose failed refresh and recover',async({page})=>{
+  await page.setViewportSize({width:1280,height:900});
   await login(page,fixture.users.ADMIN.email,fixture.password);
   await page.goto('/monitoring');
   const heading=page.getByRole('heading',{name:'Аналитика по установкам',exact:true});

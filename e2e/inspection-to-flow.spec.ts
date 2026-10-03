@@ -1,4 +1,5 @@
-import { test, expect } from '@playwright/test';
+import { TEST_USERS } from './fixtures/auth.fixture';
+import { test, expect } from './fixtures/disposable.fixture';
 import { login } from './page-objects/login.page';
 
 /**
@@ -20,7 +21,7 @@ import { login } from './page-objects/login.page';
 test.describe('Inspection (ТО) flow', () => {
   test('admin starts ТО-1, answers an item and saves a draft', async ({ page }) => {
     // 1. Login (hydration-safe shared helper; see page-objects/login.page.ts)
-    await login(page, 'admin@piling.ru', 'admin123');
+    await login(page, TEST_USERS.admin.email, TEST_USERS.admin.password);
 
     // 2. Start-inspection form
     await page.goto('/inspections/new');
@@ -92,7 +93,7 @@ test.describe('Inspection (ТО) flow', () => {
   });
 
   test('hammer block resolves to a template on ТО levels', async ({ page }) => {
-    await login(page, 'admin@piling.ru', 'admin123');
+    await login(page, TEST_USERS.admin.email, TEST_USERS.admin.password);
 
     await page.goto('/inspections/new');
     await page.locator('#si-equipment').waitFor({ state: 'visible', timeout: 10000 });

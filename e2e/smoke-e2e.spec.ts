@@ -1,9 +1,10 @@
-import { test, expect } from '@playwright/test';
+import { TEST_USERS } from './fixtures/auth.fixture';
+import { test, expect } from './fixtures/disposable.fixture';
 import { login } from './page-objects/login.page';
 
 const USERS = {
-  admin: { email: 'admin@piling.ru', password: 'admin123' },
-  operator: { email: 'operator@piling.ru', password: 'operator123' },
+  admin: { email: TEST_USERS.admin.email, password: TEST_USERS.admin.password },
+  operator: { email: TEST_USERS.operator.email, password: TEST_USERS.operator.password },
 };
 
 test.describe('E2E — Full Application Flow', () => {
