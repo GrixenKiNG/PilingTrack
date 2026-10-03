@@ -34,7 +34,7 @@ it('shutdown aborts an in-flight cleanup and waits for it to settle', async () =
     signal = options.signal;
     return new Promise<void>(resolve => {
       finish = resolve;
-      signal?.addEventListener('abort', resolve as EventListener, { once: true });
+      signal?.addEventListener('abort', () => resolve(), { once: true });
     });
   });
   const stop = startPdfCleanupScheduler();

@@ -114,3 +114,59 @@ test('ADMIN deletes a cluster only after confirmation', async ({ page }, info) =
     await expect(page.getByText(name, { exact: true })).toHaveCount(0);
   } finally { await db.end(); }
 });
+
+test('F6 analytics failure marks production KPIs unavailable and refresh recovers', async ({ page }, info) => {
+  await page.route('**/api/analytics/sites*', route => route.fulfill({ status: 503, contentType: 'application/json', body: '{"error":"Own test outage"}' }));
+  await login(page, TEST_USERS.admin.email, TEST_USERS.admin.password);
+  await expect(page.getByText('Данные не загрузились', { exact: true })).toHaveCount(3);
+  const screenshot = info.outputPath('unavailable-kpi.png');
+  await page.screenshot({ path: screenshot });
+  await info.attach('unavailable-kpi', { path: screenshot, contentType: 'image/png' });
+  await page.unroute('**/api/analytics/sites*');
+  await page.getByRole('button', { name: 'Обновить дашборд', exact: true }).click();
+  await expect(page.getByText('Данные не загрузились', { exact: true })).toHaveCount(0);
+});
+
+test('F4 Telegram Test sends the selected second channel id from the real UI', async ({ page }) => {
+  await login(page, TEST_USERS.admin.email, TEST_USERS.admin.password);
+  await page.route('**/api/telegram/configs', route => route.fulfill({ contentType: 'application/json', body: JSON.stringify({ configs: [
+    { id: 'codex-ui-A', label: 'Own channel A', chatId: '-10011111111', enabled: true, botToken: 'masked' },
+    { id: 'codex-ui-B', label: 'Own channel B', chatId: '-10022222222', enabled: true, botToken: 'masked' },
+  ] }) }));
+  let selected: unknown;
+  await page.route('**/api/notifications/telegram/test', route => {
+    selected = route.request().postDataJSON();
+    return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ ok: true, chatTitle: 'Own channel B' }) });
+  });
+  await page.goto('/admin/telegram');
+  await page.getByRole('button', { name: 'Тест', exact: true }).nth(1).click();
+  await expect.poll(() => selected).toEqual({ configId: 'codex-ui-B' });
+});
+
+test('F7 briefing print opens with no opener and no false blocked toast', async ({ page }, info) => {
+  const db = await owner();
+  const id = 'codex-print-' + randomUUID();
+  try {
+    await db.query('INSERT INTO "BriefingRecord" (id,"tenantId","userId",kind,"userName","userRole","documentCode","documentTitle","documentVersion","recordedAt") VALUES ($1,$2,$3,$4,$5,$6,$7,$5,$8,now())', [id, 'codex-e1-a', 'codex-e1-operator', 'INSTRUCTION', 'Codex print proof', 'OPERATOR', 'CODEX-PRINT', '1']);
+    await login(page, TEST_USERS.admin.email, TEST_USERS.admin.password);
+    const bootstrap = await page.request.get('/api/readiness/bootstrap');
+    expect(bootstrap.status(), await bootstrap.text()).toBe(200);
+    await page.goto('/admin/safety?view=briefings');
+    const print = page.getByRole('button', { name: 'Печатная форма', exact: true });
+    await expect(print).toBeEnabled();
+    const popupPromise = page.waitForEvent('popup');
+    await print.click();
+    const popup = await popupPromise;
+    await popup.waitForURL(/\/print\/briefing-journal\?/);
+    expect(await popup.evaluate(() => window.opener === null)).toBe(true);
+    await expect(popup.getByText('Codex print proof', { exact: true }).first()).toBeVisible();
+    await expect(page.getByText('Браузер заблокировал окно печати. Разрешите всплывающие окна и повторите.', { exact: true })).toHaveCount(0);
+    const screenshot = info.outputPath('briefing-print.png');
+    await popup.screenshot({ path: screenshot });
+    await info.attach('briefing-print', { path: screenshot, contentType: 'image/png' });
+    await popup.close();
+  } finally {
+    await db.query('DELETE FROM "BriefingRecord" WHERE id=$1 AND "tenantId"=$2', [id, 'codex-e1-a']);
+    await db.end();
+  }
+});

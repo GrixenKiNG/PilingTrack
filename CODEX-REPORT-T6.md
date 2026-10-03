@@ -6,19 +6,19 @@
 
 | № ревью | Этап | Состояние |
 |---:|---|---|
-|1 — барьер SIGTERM/восстановление|F1|подтверждено: E0a принял app143, но не восстанавливал старое поколение; исправляется|
-|2 — DLQ → вечный503|F2|ожидает проверки/исправления|
-|3 — повторы Alertmanager|F6|ожидает проверки/исправления|
-|4 — Telegram configId|F4|ожидает проверки/исправления|
-|5 — постоянная ошибка чата|F3|ожидает проверки/исправления|
-|6 — PDF timeout5s|F6|ожидает проверки/исправления|
-|7 — свежесть health/lag metrics|F6|ожидает проверки/исправления|
-|8 — GitHub deploy без барьера|F6|ожидает проверки/исправления|
-|9 — logout игнорирует false|F6|ожидает проверки/исправления|
-|10 — KPI ошибки аналитики|F6|ожидает проверки/исправления|
-|11 — удаление объекта между trend queries|F6|ожидает проверки/исправления|
-|12 — cleanup удерживает shutdown|F6|ожидает проверки/исправления|
-|13 — команды выкладки|F5|ожидает исправления документации|
+|1 — барьер SIGTERM/восстановление|F1|подтверждено и исправлено; тесты/доказательства ниже|
+|2 — DLQ → вечный503|F2|подтверждено и исправлено; тесты/доказательства ниже|
+|3 — повторы Alertmanager|F6|подтверждено и исправлено; тесты/доказательства ниже|
+|4 — Telegram configId|F4|подтверждено и исправлено; тесты/доказательства ниже|
+|5 — постоянная ошибка чата|F3|подтверждено и исправлено; тесты/доказательства ниже|
+|6 — PDF timeout5s|F6|подтверждено и исправлено; тесты/доказательства ниже|
+|7 — свежесть health/lag metrics|F6|подтверждено и исправлено; тесты/доказательства ниже|
+|8 — GitHub deploy без барьера|F6|подтверждено и исправлено; тесты/доказательства ниже|
+|9 — logout игнорирует false|F6|подтверждено и исправлено; тесты/доказательства ниже|
+|10 — KPI ошибки аналитики|F6|подтверждено и исправлено; тесты/доказательства ниже|
+|11 — удаление объекта между trend queries|F6|подтверждено и исправлено; тесты/доказательства ниже|
+|12 — cleanup удерживает shutdown|F6|подтверждено и исправлено; тесты/доказательства ниже|
+|13 — команды выкладки|F5|подтверждено и исправлено; тесты/доказательства ниже|
 
 ## F1 — барьер смены поколения
 
@@ -44,7 +44,7 @@ Red f2-red.log exit1:16passed/1failed (реальный ответ503 вмест
 
 Подтверждено: прежний deliverToAll возвращал false после любого отказа. Теперь sendMessage/sendAlert/sendDocument различают transient false и permanent: Telegram401/403,400 с chat not found/blocked/not a member/deactivated/chat_write_forbidden. Остальные400,429,5xx, timeout/network остаются retry. Постоянный отказ отключает только соответствующий TelegramConfig (id+tenantId+enabled+updatedAt compare), дописывает понятную русскую причину в существующий label и logger.warn; токены не попадают в отметку. Обновление под tenant context и вне inherited GUC scope: global DB connection получает RLS tenant. При конкурирующей правке конфигурации/ошибке БД — retry, не отключение чужой новой настройки.
 
-Доставлено в A + B permanent => true, durable outbox published; подтверждение A сохраняется, B не выдаётся за доставленный. Если все чаты сломаны/нет рабочего — false, без ложной успешной доставки. Рабочий A + временный B => false, receipts A сохранены, повтор только B (существующий I08 test сохранён). Администратор видит отключённый канал и причину в label через существующий список настроек; кэш списка может обновиться в пределах его прежнего60s TTL. Схема/миграция/UI не менялись. После исправления бота канал нужно включить в настройках; label редактируется там же.
+Доставлено в A + B permanent => true, durable outbox published; подтверждение A сохраняется, B не выдаётся за доставленный. Если все чаты сломаны/нет рабочего — false, без ложной успешной доставки. Рабочий A + временный B => false, receipts A сохранены, повтор только B (существующий I08 test сохранён). Администратор видит отключённый канал и причину в label через существующий список настроек; список показывает изменение после перечитывания страницы/настроек. Схема/миграция/UI не менялись. После исправления бота канал нужно включить в настройках; label редактируется там же.
 
 Red первоначальный exit1:26passed/2failed alert+PDF; полный red с дополнительными классификациями на HEAD Telegram source exit1:28passed/4failed (f3-red-complete.log). Первый implementation run exit1:62passed/2failed — HTTP error branches ещё возвращали false; подключены к обработчику. Итог f3-complete.log exit0:3files/68passed/0skip (Telegram+durable alert+report PDF). Подготовлен дополнительный реальный PG/RLS test в существующем disposable-m6-m8.spec.ts; запуск F8, пока не считается passed. Impact deliverToAll/detect exit1 CLI unavailable; UNKNOWN, fallback callers alert/daily-summary/PDF/DLQ/PM. diff --check exit0. F2 commit576990ec.
 
@@ -113,3 +113,49 @@ Green exit0:3files36pass0skip (logout,session-service,existing api-error tests),
 ### F7: исправленная регрессия печати Hermes
 
 Chromium подтвердил: noopener возвращает null даже при открытом окне. Теперь синхронно открывается пустое окно, при null сообщается реальная блокировка; иначе opener обнуляется до перехода на печатную форму. Красный тест exit 1 (1 passed / 1 failed), зелёный exit 0 (2 passed / 0 skipped). GitNexus impact/detect exit 1, UNKNOWN; текстовые зависимости и diff проверены, diff-check exit 0. Настоящий браузерный сценарий печати включён в F8.
+
+## F8 — выполненные проверки, до завершения Playwright
+
+Стенд: собственный `codex-pg-*`, все 107 миграций, роль `pilingtrack_identity`, два отдельных `codex-redis-*` (state/cache), приватный `codex-s3-*` с HTTPS proxy и проверкой PUT/GET/DELETE. Пароли и ключи генерируются только в памяти; на диск сохраняется только публичный CA, удаляемый supervisor. Собственные ADMIN/DISPATCHER/OPERATOR/ASSISTANT и роли создаются в этой базе. Production не используется.
+
+- Первый tsc: exit 2, ошибка cast Promise resolve → EventListener в новом тесте F6№12. Исправлено на callback `() => resolve()`; повтор tsc exit 0. Первый build exit 1 на той же ошибке, supervisor очистил стенд. Повторный `npm run build` exit 0; приложение `next start` production и unified workers запущены. После добавления всех тестов `npx tsc --noEmit` (эквивалент `node node_modules/typescript/bin/tsc --noEmit`) exit 0. `.next/dev/types` перед первым запуском безопасно удалён только внутри рабочего дерева.
+- `npm run lint`: exit 0, ESLint 0 errors/0 warnings и Text integrity passed. Финальный повтор после тестовых изменений — журнал `f8-lint-final.log`.
+- Первый полный `npm run test:unit`: exit 1, 3126 passed / 1 failed / 250 skipped, 339 passed files / 1 failed / 14 skipped. Старый тест ожидал прямой compose up в workflow, который F6№8 специально заменил барьером. Тест теперь проверяет build → smoke → barrier, наличие внешнего подтверждения и отсутствие прямого up. Повтор полного Vitest: exit 0, 3127 passed / 250 skipped, 340 passed files / 14 skipped, всего 3377 tests / 354 files. Пропуски не выданы за выполненные интеграционные тесты.
+- `vitest --config vitest.integration.config.ts` на настоящем codex-pg: exit 0, 10 files / 204 passed / 0 skipped. Включает реальные RLS/DB транзакции F2/F3 и предыдущие M6–M8/E2–E4.
+- Дополнительный F2 red на сохранённом маршруте T5: exit 1, новый DB-тест failed, 4 прочих теста намеренно не выбраны (`-t F2:`). После восстановленной связи старый route вернул 503 вместо 200. Текущий route точно восстановлен (`git diff --exit-code`:0); зелёный F2 входит в полный PG прогон выше. Проверены новая опубликованная строка с attempts=0 и receipts A/B, сохранённые старый outbox с attempts=5 и настоящая pending DLQ.
+- Production metrics: до F6№7 четыре пробы давали lag timestamp=0 / health age=-1 (exit 0 у диагностического скрипта, это не успех freshness). Теперь строгая проверка exit 0: четыре пробы за 45s, health age 7.059–7.078s, lag timestamp увеличивается 1791042643.798 → 1791042683.937. Проверяется возраст обоих снимков ≤90s и обновление timestamp.
+- Logout: сетевое выключение собственного Redis дало timeout ответа 45s, exit 1; Docker stop/start поменял динамический опубликованный порт. Redis восстановлен на исходном фиксированном порту. Этот опыт не считается зелёным. Отдельный настоящий отказ SET (`CONFIG SET min-replicas-to-write 1`) на том же собственном Redis: exit 0, API503, видимый русский тост, дашборд/сессия сохранены; после возврата настройки в finally выход API200 и экран входа. Auth/security/rate-limiter source не менялись. Полный сетевой отказ может задерживать запрос до слоя revoke — остаётся ограничением проверки/риском, точный источник задержки не доказан.
+- `npx playwright test --list` (эквивалент `node node_modules/@playwright/test/cli.js test --list`): exit 0, 117 tests / 12 files; база T5 108, добавлено 9 (3 сценария × 3 браузерных проекта). Полный прогон выполняется, результат будет ниже. F4 браузерная проверка тестирует реальную кнопку/отправляемый configId, HTTP конфигураций и тест-ответ подменены; серверные guards отдельно проверены route/service тестами. F7 печать использует настоящую BriefingRecord в своей базе, row удаляется в finally.
+- `docker build --pull=false -f Dockerfile.workers --target runner -t codex-workers-t6:f8 .`: exit 0. `bash scripts/smoke-workers-image.sh codex-workers-t6:f8`: exit 0, старт и Arming подтверждены.
+- `bash scripts/test-worker-generation.sh`: exit 0, 6 PASS / 0 FAIL; реальные Node SIGTERM app143, worker143, live one-off, preflight, partial START rollback, failed drain rollback. Свои контейнеры/сети/тестовый тег удалены скриптом.
+- `node scripts/test-deploy-workflow.cjs`: exit 0, локальный SSH shim, сеть/SSH сервер не использованы.
+
+Сохранившиеся предупреждения: Next build сообщает об отсутствующем optional @valkey/valkey-glide (build exit 0, пакет не добавлялся); production `MaxListenersExceededWarning` stack ведёт в Next compiled compression/httpxy. Собственный SSE wrapper из E0c не в этом stack. Не исправлялся зависимостями/CSP/заглушением warning; остаётся ограничением T5. Vitest worker tests дают process-listener warnings; pg adapter — предупреждение о параллельных query на одном клиенте. Проверки не называют эти warnings lint errors.
+
+### F8: ошибки нового браузерного теста и исправление сида
+
+Первый полный Playwright: exit 1, 105 passed / 3 failed / 9 skipped (117). Все три отказа — новый сценарий печати в трёх проектах; KPI/Telegram и прежние сценарии прошли. Диагностический повтор только печати: exit 1, 3 failed; настоящий bootstrap вернул `503: Tenant settings are not configured`. Канонический адрес журнала — `/admin/safety?view=briefings`; переход с `/admin/to` исправлен в тесте, но причина API503 отдельно доказана.
+
+Сид T5 создавал Tenant, но не TenantSettings. Тестовый сид `e2e/fixtures/disposable-seed.mjs` теперь создаёт настройки обоих собственных тенантов, как это уже делал role-audit fixture. В работающую собственную базу добавлены те же строки отдельной защищённой командой (localhost/codex_test/piling/codex-pg guard); существующие данные не перезаписывались. Продуктовый bootstrap сохраняет отказ при отсутствующих настройках, ответ не подменён. Impact CLI exit 1 UNKNOWN; найден единственный caller test-day-stand. Повтор печати/полный Playwright — ниже после завершения.
+
+## Перед выкладкой владельцу
+
+- Новых миграций в T6 нет. `git diff --name-only b67fefb6..HEAD -- prisma/migrations` пуст: эта ветка не добавляет миграций и относительно релизной базы. Схема и миграции не редактировались. На тестовом PostgreSQL применены все существующие 107 миграций.
+- Перед сменой поколения проверить/остановить внешние экземпляры workers, затем подтвердить это через `WORKER_GENERATION_EXTERNAL_STOPPED=1`. App и workers обновляются вместе. Команда: `WORKER_GENERATION_EXTERNAL_STOPPED=1 bash scripts/deploy-prod.sh --replace-worker-generation app workers`. Флаг строго первым, `ws` не добавлять. Ничего из этой команды не выполнялось на сервере.
+- GitHub ручная выкладка тоже требует explicit external_workers_stopped=true, проходит общий барьер и сохраняет rollback image tags до build. Локальная проверка workflow использует shim SSH.
+- PDF_TEMP_CLEANUP_ENABLED по умолчанию остаётся выключенным. Если владелец решит включить: сначала dry-run (PDF_TEMP_CLEANUP_DRY_RUN по умолчанию true), проверить журнал кандидатов, затем отдельно разрешить удаление. Очищаются только временные UUID PDF старше 30 дней, не фотографии/Media/вложения.
+- Постоянно сломанные Telegram-каналы теперь отключаются с причиной в label. После исправления бота/чата администратор должен включить канал и при необходимости отредактировать label. Если все каналы сломаны, событие не выдаётся за доставленное.
+- Alertmanager repeat_interval в observability (critical 1h, остальные 4h) должен оставаться согласован с временными окнами в webhook. Повтор у границы окна может дать дубль: это соответствует решению владельца «дубль лучше потери».
+- F1 возврат фиксирует image/restart/число реплик, но при удалённых контейнерах использует текущий compose/env/volumes/command. Изменение топологии/env одновременно с таким релизом требует отдельной проверки владельца. При недоступном Docker/неостанавливаемом новом поколении скрипт сообщает OUTAGE; ручную аварийную команду выполнять только после проверки отсутствия параллельных RUNNING.
+
+## Что оставлено без изменений
+
+Защищённые auth/security/RLS/rate-limiter/CSRF, schema/migrations, Docker/compose, исходники operator*/ORION не менялись; выполнялись их существующие e2e. SECURITY-коммиты F4/F6№9 затрагивают HTTP route/клиентское поведение и не меняют модель доверия. У deploy-prod изменены только два комментария шапки. Нет удалённых файлов/экспортов: отдельное доказательство «не используется» не требуется. Удалённые Hermes кнопки UI не обещали реально существующие операции; их функции/файлы не удалялись. Устаревшие инструкции выкладки заменены по F5. Новых пакетов и изменений версий нет. Push/SSH/production deploy не выполнялись.
+
+Риски/непроверенное: GitNexus недоступен, все graph команды exit 1 и risk UNKNOWN — использованы разрешённые task fallback rg и diff, не выдано за green graph. Реальное время многомегабайтной загрузки Telegram через production Cloudflare не замерялось; проверены 6s unit delay и 30s/45s budget. Сетевой Redis outage в дополнительном опыте не подтвердил быстрый ответ logout; проверка настоящего отказа записи прошла. Сохранились Next compression/httpxy close-listener warnings и указанное выше optional-module warning. Общие TypeError-тексты и XLSX без row-count header — ограничения Hermes, без рефакторинга соседнего кода.
+
+### F8: повтор полного набора требует новой базы
+
+Печать после дополнения сида: отдельный Chromium exit 0 / 1 passed. Следующий полный Playwright на той же БД: exit 1, 107 passed / 1 failed / 9 skipped. F4/F6/F7 прошли во всех трёх проектах, включая настоящий bootstrap и печатную запись. Единственный отказ — прежний T5 key path при INSERT draft: `Report_user_site_date_without_shift_key`. Прежний первый прогон сохранял свои отчёты в одноразовой БД (в finally закрывает соединение); повтор всего набора на той же базе не предусматривался. Продуктовый индекс/код/тестовые assertions не ослаблялись, чужие строки не удалялись. Для воспроизводимого полного итогового прогона запускается новая собственная база и новый стенд с исправленным сидом.
+
+Просмотрены PNG KPI (Chromium) и печати (Mobile Safari): производственные плитки показывают недоступность, независимые данные отображаются; документ содержит свою строку. Это не проверка всей широкой печатной таблицы на мобильном экране.

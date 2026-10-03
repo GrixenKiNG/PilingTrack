@@ -3,7 +3,7 @@ const url=new URL(process.env.INTEGRATION_DATABASE_URL_OWNER||'http://invalid');
 const client=new Client({connectionString:url.toString()});
 (async()=>{await client.connect();try{await client.query('BEGIN');
 async function insert(table,row){const keys=Object.keys(row);await client.query('INSERT INTO "'+table+'" ('+keys.map(x=>'"'+x+'"').join(',')+') VALUES ('+keys.map((_,i)=>'$'+(i+1)).join(',')+')',Object.values(row));}
-const now=new Date();for(const tenant of ['codex-e1-a','codex-e1-b'])await insert('Tenant',{id:tenant,slug:tenant,name:tenant,updatedAt:now});
+const now=new Date();for(const tenant of ['codex-e1-a','codex-e1-b']){await insert('Tenant',{id:tenant,slug:tenant,name:tenant,updatedAt:now});await insert('TenantSettings',{id:tenant+'-settings',tenantId:tenant,companyName:'Codex test',notifications:{criticalDefect:false},updatedAt:now});}
 for(const role of ['ADMIN','DISPATCHER','OPERATOR','ASSISTANT','OPERATOR_B']){const actual=role==='OPERATOR_B'?'OPERATOR':role;await insert('User',{id:'codex-e1-'+role.toLowerCase(),tenantId:role==='OPERATOR_B'?'codex-e1-b':'codex-e1-a',email:process.env['E2E_'+role+'_EMAIL'],password:await bcrypt.hash(process.env['E2E_'+role+'_PASSWORD'],10),name:'Codex '+role,role:actual,updatedAt:now});}
 for(const suffix of ['a','b']){const tenant='codex-e1-'+suffix;const operator='codex-e1-'+(suffix==='a'?'operator':'operator_b');
 await insert('Site',{id:tenant+'-site',tenantId:tenant,name:'Codex объект '+suffix,updatedAt:now});await insert('PileField',{id:tenant+'-field',siteId:tenant+'-site',name:'Codex поле '+suffix,updatedAt:now});await insert('Cluster',{id:tenant+'-cluster',fieldId:tenant+'-field',name:'Codex куст '+suffix,updatedAt:now});

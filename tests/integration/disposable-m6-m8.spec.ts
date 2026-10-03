@@ -41,6 +41,7 @@ describe.skipIf(!enabled)('M6–M8 on disposable migrated Postgres', () => {
   afterAll(async () => {
     await db?.$disconnect(); vi.unstubAllEnvs();
     if (fixture) {
+      await fixture.owner.query('DELETE FROM "DeadLetterQueue" WHERE "tenantId" = $1', [tenant]);
       await fixture.owner.query('DELETE FROM "OutboxEvent" WHERE "tenantId" = $1', [tenant]);
       await fixture.owner.query('DELETE FROM "TelegramConfig" WHERE "tenantId" = $1', [tenant]);
       await fixture.owner.query('DELETE FROM "Media" WHERE "tenantId" = $1', [tenant]);
@@ -109,6 +110,9 @@ describe.skipIf(!enabled)('M6–M8 on disposable migrated Postgres', () => {
   it('F3: real RLS config marks permanent B disabled while outbox publishes delivery to A', async () => {
     const eventId = tenant + '-permanent-delivery';
     const alert = { severity: 'high', message: 'Permanent chat proof' };
+    for (const chat of ['A', 'B']) {
+      await fixture.owner.query('INSERT INTO "TelegramConfig" (id,"tenantId",label,"botToken","chatId","updatedAt") VALUES ($1,$2,$3,$4,$3,now()) ON CONFLICT (id) DO UPDATE SET enabled=true,label=EXCLUDED.label,"updatedAt"=now()', [tenant + '-chat-' + chat, tenant, chat, 'codex-fake-token']);
+    }
     await fixture.owner.query('INSERT INTO "OutboxEvent" (id,"tenantId",type,"aggregateType","aggregateId",payload,projected) VALUES ($1,$2,$3,$4,$1,$5,true)', [eventId, tenant, 'NotificationDeliveryRequested', 'Notification', JSON.stringify(alert)]);
     vi.stubGlobal('fetch', vi.fn(async (_url: string, options: RequestInit) => {
       const chat = JSON.parse(String(options.body)).chat_id;
@@ -122,6 +126,40 @@ describe.skipIf(!enabled)('M6–M8 on disposable migrated Postgres', () => {
       .toMatchObject({ published: true, payload: { telegramDeliveredChatIds: ['A'] } });
     expect((await fixture.owner.query('SELECT enabled,label FROM "TelegramConfig" WHERE id=$1 AND "tenantId"=$2', [tenant + '-chat-B', tenant])).rows[0])
       .toMatchObject({ enabled: false, label: expect.stringContaining('Чат не найден') });
+  });
+  it('F2: persisted DLQ then recovered webhook creates a fresh published attempt', async () => {
+    for (const chat of ['A', 'B']) {
+      await fixture.owner.query('INSERT INTO "TelegramConfig" (id,"tenantId",label,"botToken","chatId","updatedAt") VALUES ($1,$2,$3,$4,$3,now()) ON CONFLICT (id) DO UPDATE SET enabled=true,label=EXCLUDED.label,"updatedAt"=now()', [tenant + '-chat-' + chat, tenant, chat, 'codex-fake-token']);
+    }
+    const { POST } = await import('@/app/api/alerts/webhook/route');
+    const { NextRequest } = await import('next/server');
+    const { moveToDlq } = await import('@/core/outbox/dead-letter-queue');
+    const token = randomUUID(); vi.stubEnv('ALERTMANAGER_WEBHOOK_TOKEN', token);
+    const ruleId = tenant + '-dlq-proof';
+    const request = () => new NextRequest('http://localhost/api/alerts/webhook', {
+      method: 'POST', headers: { authorization: 'Bearer ' + token, 'content-type': 'application/json' },
+      body: JSON.stringify({ alerts: [{ status: 'firing', labels: { alertname: ruleId, severity: 'critical' }, annotations: { summary: 'Own DLQ test' }, startsAt: '2026-10-01T00:00:00Z' }] }),
+    });
+    let recovered = false; const sent: string[] = [];
+    vi.stubGlobal('fetch', vi.fn(async (_url: string, options: RequestInit) => {
+      if (!recovered) throw new Error('simulated Telegram outage');
+      sent.push(JSON.parse(String(options.body)).chat_id);
+      return { ok: true, json: async () => ({ ok: true }) };
+    }));
+    expect((await POST(request())).status).toBe(503);
+    const rows = () => fixture.owner.query('SELECT * FROM "OutboxEvent" WHERE "tenantId"=$1 AND payload->>\'ruleId\'=$2 ORDER BY "createdAt"', [tenant, ruleId]);
+    const original = (await rows()).rows[0];
+    await inContext(() => moveToDlq(original.id, original.type, original.aggregateId, original.payload, new Error('Telegram timeout'), 5, { tenantId: tenant, aggregateType: 'Notification', consumer: 'published', alertEnabled: async () => false }));
+    await inContext(() => db.outboxEvent.update({ where: { id: original.id }, data: { published: true, attempts: 5, lastError: 'Moved to DLQ: Telegram timeout' } }));
+    recovered = true;
+    expect((await POST(request())).status).toBe(200);
+    expect(sent).toEqual(['A', 'B']);
+    const attempts = (await rows()).rows;
+    expect(attempts).toHaveLength(2);
+    expect(attempts[0]).toMatchObject({ id: original.id, published: true, attempts: 5, lastError: 'Moved to DLQ: Telegram timeout' });
+    expect(attempts[1]).toMatchObject({ published: true, attempts: 0, payload: { telegramDeliveredChatIds: ['A', 'B'] } });
+    expect((await fixture.owner.query('SELECT "sourceOutboxId",status FROM "DeadLetterQueue" WHERE "tenantId"=$1', [tenant])).rows)
+      .toEqual([{ sourceOutboxId: original.id, status: 'pending' }]);
   });
   it('M8: real Media rows/files unchanged; dry-run deletes nothing; apply only old temporary UUID PDF', async () => {
     const { cleanupTemporaryPdfs } = await import('@/lib/pdf-generator/cleanup');
