@@ -281,3 +281,27 @@ describe('CrewFormDialog — справочники и название (F-R102-
     expect(screen.getByPlaceholderText('Бригада №1')).toHaveAttribute('maxLength', '200');
   });
 });
+
+/**
+ * R124-14: кнопка переключения статуса не блокировалась на время запроса —
+ * двойной клик по «Активировать» слал два PUT подряд.
+ */
+describe('AdminCrews — кнопка активации блокируется на время запроса (F-R124-14)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.hook.current = { ...baseHook(), crews: [{ ...crew, isActive: false } as CrewDTO] };
+  });
+
+  it('повторный клик по «Активировать» не шлёт второй запрос', async () => {
+    mocks.toggleActive.mockImplementation(() => new Promise(() => {}));
+    render(<AdminCrews />);
+
+    const activate = screen.getByRole('button', { name: 'Активировать' });
+    fireEvent.click(activate);
+
+    await waitFor(() => expect(activate).toBeDisabled());
+    fireEvent.click(activate);
+
+    expect(mocks.toggleActive).toHaveBeenCalledTimes(1);
+  });
+});

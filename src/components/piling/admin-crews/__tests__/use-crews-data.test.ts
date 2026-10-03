@@ -116,3 +116,55 @@ describe('useCrewsData — отказы мутаций (F-R102-4,5,6,10)', () =>
     await expect(result.current.deleteCrew('c1')).rejects.toThrow('Установка занята');
   });
 });
+
+/**
+ * R124-13: успешное переключение статуса не подтверждалось тостом — после
+ * «Активировать» не было уверенности, что запрос прошёл.
+ */
+describe('useCrewsData — подтверждение переключения статуса (F-R124-13)', () => {
+  beforeEach(() => {
+    authFetchMock.mockReset();
+    vi.mocked(toast.success).mockClear();
+  });
+
+  it('успешная активация подтверждается тостом', async () => {
+    routeCrews(() => json({ crew: { ...crew, isActive: true } }));
+
+    const { result } = renderHook(() => useCrewsData());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    await act(async () => { await result.current.toggleActive(crew); });
+
+    expect(toast.success).toHaveBeenCalledWith('Бригада активирована');
+  });
+});
+
+/**
+ * R124-16: справочники формы кэшировались на весь сеанс страницы — новый
+ * машинист или техника не появлялись в форме до перезагрузки. Теперь форма
+ * перечитывает их при каждом открытии.
+ */
+describe('useCrewsData — справочники формы (F-R124-16)', () => {
+  beforeEach(() => {
+    authFetchMock.mockReset();
+  });
+
+  it('справочники перечитываются при каждом открытии формы, а не кэшируются на сеанс', async () => {
+    authFetchMock.mockImplementation((url: string) => {
+      if (url === '/api/crews') return Promise.resolve(json({ data: [] }));
+      if (url === '/api/users') return Promise.resolve(json({ data: [] }));
+      if (url === '/api/equipment') return Promise.resolve(json({ data: [] }));
+      if (url === '/api/sites/all') return Promise.resolve(json({ sites: [] }));
+      return Promise.resolve(json({}));
+    });
+
+    const { result } = renderHook(() => useCrewsData());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    await act(async () => { await result.current.loadReferenceData(); });
+    await act(async () => { await result.current.loadReferenceData(); });
+
+    const userCalls = authFetchMock.mock.calls.filter(([url]) => url === '/api/users');
+    expect(userCalls).toHaveLength(2);
+  });
+});

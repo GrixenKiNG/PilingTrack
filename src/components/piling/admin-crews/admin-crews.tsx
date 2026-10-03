@@ -181,6 +181,14 @@ export function AdminCrews() {
     finally { setSubmitting(false); }
   };
 
+  // Кнопка активации блокируется на время запроса: двойной клик слал два PUT
+  // подряд (R124 №14).
+  const handleToggleActive = async () => {
+    if (!active) return;
+    setSubmitting(true);
+    try { await toggleActive(active); } finally { setSubmitting(false); }
+  };
+
   if (loading) {
     return (
       <div className="space-y-4 p-4 lg:p-6">
@@ -214,9 +222,10 @@ export function AdminCrews() {
             <CrewDetail
               crew={active}
               canManage={canManage}
+              busy={submitting}
               onEdit={() => setEditItem(active)}
               onDelete={() => setDeleteItem(active)}
-              onToggle={() => toggleActive(active)}
+              onToggle={handleToggleActive}
             />
           )
           : <OpsDetailEmpty message={loadError
@@ -262,7 +271,7 @@ export function AdminCrews() {
   );
 }
 
-function CrewDetail({ crew, canManage, onEdit, onDelete, onToggle }: { crew: Crew; canManage: boolean; onEdit: () => void; onDelete: () => void; onToggle: () => void }) {
+function CrewDetail({ crew, canManage, busy, onEdit, onDelete, onToggle }: { crew: Crew; canManage: boolean; busy: boolean; onEdit: () => void; onDelete: () => void; onToggle: () => void }) {
   const risk = crewRisk(crew);
   return (
     <OpsDetailPanel title={crew.name || 'Без названия'} subtitle={`Бригада · ${crew.site?.name ?? '—'}`} status={<OpsRiskBadge level={risk.level} label={risk.label} />}>
@@ -274,7 +283,7 @@ function CrewDetail({ crew, canManage, onEdit, onDelete, onToggle }: { crew: Cre
           подтверждение, у мгновенной «Деактивировать» нет. Деактивация
           подтверждается, активация выполняется сразу.
         */}
-        <Button size="sm" variant="outline" onClick={crew.isActive ? onDelete : onToggle} className="h-11 text-xs sm:h-8">
+        <Button size="sm" variant="outline" onClick={crew.isActive ? onDelete : onToggle} disabled={busy} className="h-11 text-xs sm:h-8">
           {crew.isActive ? <PowerOff className="mr-1 h-3.5 w-3.5" /> : <Power className="mr-1 h-3.5 w-3.5" />}
           {crew.isActive ? 'Деактивировать' : 'Активировать'}
         </Button>
