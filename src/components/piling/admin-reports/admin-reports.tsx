@@ -102,7 +102,11 @@ export function AdminReports() {
       objectUrl = URL.createObjectURL(await response.blob());
       const link = document.createElement('a');
       link.href = objectUrl;
-      link.download = `pilingtrack-reports-${dateFrom}_${dateTo}.${format}`;
+      // Имя файла берём у сервера (Content-Disposition), как это делает
+      // техготовность: своё имя с датой периода расходилось с заголовком
+      // сервера, и один документ ходил под двумя разными именами (F-R115-14).
+      link.download = response.headers.get('content-disposition')?.match(/filename="([^"]+)"/)?.[1]
+        ?? `pilingtrack-reports-${dateFrom}_${dateTo}.${format}`;
       link.click();
       toast.success(`Выгружено за период ${dateFrom} — ${dateTo}`);
     } catch (err) {

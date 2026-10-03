@@ -234,3 +234,48 @@ describe('миниатюра фото отчёта: отказ открытия 
     ));
   });
 });
+
+/**
+ * F-R115-14: клиент задавал своё имя файла через link.download, а сервер отдавал
+ * другое в Content-Disposition (с датой выгрузки) — один документ ходил под двумя
+ * именами. Теперь имя берётся у сервера, как это делает техготовность.
+ */
+describe('AdminReports — имя файла выгрузки (F-R115-14)', () => {
+  beforeEach(() => {
+    authFetchMock.mockReset();
+    vi.mocked(toast.error).mockClear();
+    vi.mocked(toast.success).mockClear();
+    reportsState.current = baseState();
+  });
+
+  it('имя файла берётся из Content-Disposition сервера', async () => {
+    const urlGlobal = URL as unknown as { createObjectURL?: unknown; revokeObjectURL?: unknown };
+    const originalCreate = urlGlobal.createObjectURL;
+    const originalRevoke = urlGlobal.revokeObjectURL;
+    urlGlobal.createObjectURL = vi.fn(() => 'blob:reports');
+    urlGlobal.revokeObjectURL = vi.fn();
+    authFetchMock.mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: new Headers({ 'content-disposition': 'attachment; filename="pilingtrack-reports-2026-10-03.csv"' }),
+      blob: async () => new Blob(['\uFEFFШапка;Дата\nстрока;01.09.2026\n']),
+    });
+    let downloaded = '';
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
+      downloaded = this.download;
+    });
+    try {
+      render(<AdminReports />);
+      // Фильтр «Сегодня» задаёт период, который нужен выгрузке.
+      fireEvent.click(screen.getByRole('button', { name: 'Сегодня' }));
+      fireEvent.click(screen.getByRole('button', { name: 'CSV' }));
+
+      await waitFor(() => expect(toast.success).toHaveBeenCalled());
+      expect(downloaded).toBe('pilingtrack-reports-2026-10-03.csv');
+    } finally {
+      urlGlobal.createObjectURL = originalCreate;
+      urlGlobal.revokeObjectURL = originalRevoke;
+      click.mockRestore();
+    }
+  });
+});
