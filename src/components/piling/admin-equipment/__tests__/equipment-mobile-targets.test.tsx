@@ -212,6 +212,30 @@ describe('форма установки: подписи связаны с пол
   });
 });
 
+describe('фильтры парка: назначение селектов озвучивается (R116 #9)', () => {
+  it('пять селектов имеют доступное имя, а не только выбранное значение', () => {
+    render(
+      <EquipmentFilters
+        sites={['Объект А']}
+        kinds={[{ value: 'PILE_DRIVER', label: 'Копёр' }]}
+        crews={['Бр-1']}
+        value={EMPTY_FILTERS}
+        onChange={() => {}}
+      />,
+    );
+
+    for (const label of [
+      'Фильтр по объекту',
+      'Фильтр по типу машины',
+      'Фильтр по статусу техники',
+      'Фильтр по статусу отчёта',
+      'Фильтр по бригаде',
+    ]) {
+      expect(screen.getByLabelText(label)).toBeInstanceOf(HTMLSelectElement);
+    }
+  });
+});
+
 describe('форма установки: лимиты полей как в zod-схеме маршрута (R121)', () => {
   it('текстовые поля ограничены по длине из схемы', () => {
     render(<EquipmentForm state={EMPTY_EQUIPMENT_FORM} onChange={() => {}} />);
