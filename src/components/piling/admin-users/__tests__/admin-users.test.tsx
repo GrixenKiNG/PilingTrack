@@ -258,3 +258,42 @@ describe('диалоги пользователя: пределы длины к�
     expect(screen.getByPlaceholderText('••••••••')).toHaveAttribute('maxLength', '100');
   });
 });
+
+/**
+ * R121 №9: в справочнике видов документов «Название» не имело maxLength
+ * (схема маршрута — 200), а «Срок, мес.» = «0» уходило на сервер как `0`,
+ * хотя zod требует `int ≥ 1` — 400 «Некорректные данные» без имени поля.
+ */
+describe('справочник видов документов: пределы полей как в схеме (R121)', () => {
+  it('название вида документа ограничено 200 знаками', async () => {
+    authFetchMock.mockResolvedValue({ ok: true, json: async () => ({ types: [] }) });
+    render(<AdminUsers />);
+
+    fireEvent.click(screen.getByRole('button', { name: /Виды документов/ }));
+
+    expect(await screen.findByLabelText('Название')).toHaveAttribute('maxLength', '200');
+  });
+
+  it('срок «0» уходит как «не задан», а не как отклоняемый сервером ноль', async () => {
+    authFetchMock.mockImplementation(async (_url: string, init?: RequestInit) => ({
+      ok: true,
+      json: async () => ((init?.method === 'POST') ? {} : { types: [] }),
+    }));
+    render(<AdminUsers />);
+
+    fireEvent.click(screen.getByRole('button', { name: /Виды документов/ }));
+    fireEvent.change(await screen.findByLabelText('Название'), { target: { value: 'Стропальщик' } });
+    fireEvent.change(screen.getByLabelText('Срок, мес.'), { target: { value: '0' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Добавить' }));
+
+    await waitFor(() => expect(
+      authFetchMock.mock.calls.some(([, init]) => (init as RequestInit | undefined)?.method === 'POST'),
+    ).toBe(true));
+    const post = authFetchMock.mock.calls.find(([, init]) => (init as RequestInit | undefined)?.method === 'POST');
+    expect(post).toBeTruthy();
+    expect(JSON.parse(String((post?.[1] as RequestInit).body))).toMatchObject({
+      name: 'Стропальщик',
+      defaultValidMonths: null,
+    });
+  });
+});

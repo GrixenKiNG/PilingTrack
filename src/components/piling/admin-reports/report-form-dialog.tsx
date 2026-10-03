@@ -26,6 +26,7 @@ import {
 } from '@/components/ui/select';
 import type { ReportDTO, SiteFlatDTO, PileGradeDTO, DrillingTypeDTO, DowntimeReasonDTO } from '@/lib/types';
 import { pileLengthMeters } from '@/lib/pile-length';
+import { DOWNTIME_MAX_HOURS } from '@/lib/downtime-hours';
 import { formatFixed, formatNumber } from '@/lib/format';
 import { getTodayInTimezone } from '@/lib/timezone';
 
@@ -158,6 +159,12 @@ export function ReportFormDialog({
   const addDowntime = () => {
     if (!tempDtReason || !tempDtDuration || Number(tempDtDuration) <= 0) {
       toast.error('Заполните причину и длительность'); return;
+    }
+    // Простой длиннее суток сервер отклоняет (`lib/downtime-hours.ts`:
+    // DOWNTIME_MAX_HOURS). Проверяем до отправки, иначе 400 «Некорректные
+    // данные» не называет ни поле, ни предел (R121 №4).
+    if (Number(tempDtDuration) > DOWNTIME_MAX_HOURS) {
+      toast.error(`Простой не может длиться больше ${DOWNTIME_MAX_HOURS} ч`); return;
     }
     setFormDowntimes((prev) => [...prev, { id: crypto.randomUUID(), reasonId: tempDtReason, duration: Number(tempDtDuration), comment: tempDtComment }]);
     setTempDtReason(''); setTempDtDuration(''); setTempDtComment('');
@@ -416,10 +423,10 @@ export function ReportFormDialog({
                     <SelectContent>{downtimeReasons.filter((r) => r.isActive).map((r) => <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}</SelectContent>
                   </Select>
                   <Input type="number" step="0.5" placeholder="Часы" value={tempDtDuration} onChange={(e) => setTempDtDuration(e.target.value)}
-                    min="0.5" className="w-20 h-9 font-mono text-sm" />
+                    min="0.5" max={DOWNTIME_MAX_HOURS} className="w-20 h-9 font-mono text-sm" />
                   <Button onClick={addDowntime} aria-label="Добавить простой" size="sm" className="h-9 bg-warning-strong hover:bg-warning-strong text-white px-3"><Plus className="w-4 h-4" /></Button>
                 </div>
-                <Input placeholder="Комментарий (необязательно)" value={tempDtComment} onChange={(e) => setTempDtComment(e.target.value)} className="h-9 text-sm" />
+                <Input placeholder="Комментарий (необязательно)" value={tempDtComment} onChange={(e) => setTempDtComment(e.target.value)} maxLength={1000} className="h-9 text-sm" />
                 {formDowntimes.length > 0 && (
                   <div className="space-y-1 max-h-40 overflow-y-auto custom-scrollbar">
                     {formDowntimes.map((dt) => (

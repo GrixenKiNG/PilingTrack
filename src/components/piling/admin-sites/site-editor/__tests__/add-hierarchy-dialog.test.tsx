@@ -40,3 +40,17 @@ describe('AddHierarchyDialog — доступное имя поля (F-R116-3)',
     expect(screen.getByLabelText('Название')).toBe(screen.getByRole('textbox'));
   });
 });
+
+/**
+ * R121 №14: «Название» пикета/куста/поля не имело maxLength, хотя
+ * createSiteHierarchySchema (src/lib/validation-schemas.ts) ограничивает его
+ * 200 символами. Длинное название уходило на сервер и возвращало 400 без
+ * имени поля, а форма проверяла только «не пусто».
+ */
+describe('AddHierarchyDialog — предел длины названия как в схеме (R121)', () => {
+  it('название узла ограничено 200 знаками', () => {
+    render(<AddHierarchyDialog open onOpenChange={vi.fn()} type="picket" onAdd={vi.fn().mockResolvedValue(true)} />);
+
+    expect(screen.getByRole('textbox')).toHaveAttribute('maxLength', '200');
+  });
+});

@@ -114,3 +114,21 @@ describe('UserDocuments — обрыв сети (F-R112-1)', () => {
     expect(await screen.findByText(/Удостоверение.*будет удалён без возможности восстановления/)).toBeInTheDocument();
   });
 });
+
+/**
+ * R121 №10: «Номер» и «Примечание» в диалоге документа не имели maxLength, хотя
+ * схема маршрута (`app/api/users/[id]/documents/route.ts`: `createSchema`)
+ * ограничивает номер 100 символами, примечание — 2000. Длинный номер
+ * удостоверения уходил на сервер и возвращал 400 с общим «Некорректные данные»
+ * без имени поля.
+ */
+describe('UserDocuments — пределы длины полей документа (R121)', () => {
+  it('номер ограничен 100, примечание — 2000 знаками, как в схеме маршрута', async () => {
+    documentsResponse = () => Promise.resolve(ok({ documents: [] }));
+    render(<UserDocuments userId="ivanov" />);
+    fireEvent.click(await screen.findByRole('button', { name: /Добавить/ }));
+
+    expect(screen.getByLabelText('Номер')).toHaveAttribute('maxLength', '100');
+    expect(screen.getByLabelText('Примечание')).toHaveAttribute('maxLength', '2000');
+  });
+});

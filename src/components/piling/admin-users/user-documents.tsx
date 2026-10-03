@@ -298,7 +298,7 @@ export function UserDocuments({ userId }: { userId: string }) {
             </div>
             <div className="space-y-1">
               <Label htmlFor={`${uid}-number`}>Номер</Label>
-              <Input id={`${uid}-number`} value={form.number} onChange={(e) => setForm((prev) => ({ ...prev, number: e.target.value }))} />
+              <Input id={`${uid}-number`} value={form.number} maxLength={100} onChange={(e) => setForm((prev) => ({ ...prev, number: e.target.value }))} />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
@@ -312,7 +312,7 @@ export function UserDocuments({ userId }: { userId: string }) {
             </div>
             <div className="space-y-1">
               <Label htmlFor={`${uid}-notes`}>Примечание</Label>
-              <Textarea id={`${uid}-notes`} rows={2} value={form.notes} onChange={(e) => setForm((prev) => ({ ...prev, notes: e.target.value }))} />
+              <Textarea id={`${uid}-notes`} rows={2} maxLength={2000} value={form.notes} onChange={(e) => setForm((prev) => ({ ...prev, notes: e.target.value }))} />
             </div>
           </div>
           <DialogFooter>

@@ -64,6 +64,7 @@ export function AddHierarchyDialog({ open, onOpenChange, type, onAdd }: AddHiera
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder={`Название ${TYPE_LABELS[type].toLowerCase()}`}
+              maxLength={200}
               className="h-11"
               onKeyDown={(e) => {
                 if (e.key === 'Enter') void submit();
