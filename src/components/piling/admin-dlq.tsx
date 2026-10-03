@@ -156,10 +156,12 @@ export function AdminDlq() {
     }
   };
 
-  const formatDate = (iso: string) => {
-    const d = new Date(iso);
-    return d.toLocaleString('ru-RU');
-  };
+  const formatDate = (iso: string) =>
+    new Intl.DateTimeFormat('ru-RU', {
+      day: '2-digit', month: '2-digit', year: 'numeric',
+      hour: '2-digit', minute: '2-digit',
+      timeZone: 'Europe/Moscow',
+    }).format(new Date(iso));
 
   return (
     <div className="space-y-4 p-4 lg:p-6">
