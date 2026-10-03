@@ -2,8 +2,8 @@
 #
 # Деплой на orionpiling.ru со сборкой образов ЛОКАЛЬНО.
 #
-#   bash scripts/deploy-prod.sh                 # app + workers
-#   bash scripts/deploy-prod.sh app workers ws  # явный список
+#   WORKER_GENERATION_EXTERNAL_STOPPED=1 bash scripts/deploy-prod.sh --replace-worker-generation app workers
+#   Флаг --replace-worker-generation только первым; ws отсутствует. Внешние workers остановить заранее.
 #
 # ЗАЧЕМ (23.09.2026). Сборка на VPS временно съедала 5–6 ГБ из 30 и довела
 # диск до 100% — рядом с работающей базой. Здесь образы собираются на машине

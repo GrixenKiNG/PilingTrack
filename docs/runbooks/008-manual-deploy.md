@@ -1,4 +1,4 @@
-# Runbook 008 — Manual deploy to prod (zero-downtime)
+# Runbook 008 — Manual deploy to prod (controlled generation replacement)
 
 For automated deploy via GitHub Actions, see `007-github-actions-deploy.md`.
 This runbook is for the case when you SSH in and deploy by hand —
@@ -12,7 +12,7 @@ missing env var) the prod app stayed dead for the duration of the
 fix-rebuild loop — observed at ≥15 min on 2026-05-21.
 
 The new sequence keeps the old container running until the new image is
-built and tested. `docker compose up -d` does the swap atomically.
+built and tested. The generation barrier then stops/verifies all old app/workers before START; plan a short outage window. It restores old images/restart policies on failure.
 
 ## Pre-flight
 
@@ -24,9 +24,13 @@ cd /opt/pilingtrack
 # Start the build at <=75% (≈7 GB free); even then it can dip toward 100%
 # mid-export. Free space first if tight:
 df -h /
-docker builder prune -af   # frees ~2-3 GB
-docker image prune -af     # frees more if old images linger
+# Если места недостаточно — остановиться и разобрать безопасную очистку; не удалять rollback images/volumes вслепую.
 
+# Перед git pull/build сохранить текущие app/workers images:
+OLD_SHA=$(git rev-parse --short HEAD)
+ROLLBACK="$OLD_SHA-$(date +%Y%m%d)"
+for svc in app workers; do docker tag "pilingtrack-$svc:latest" "pilingtrack-$svc:$ROLLBACK"; done
+# При новых миграциях сохранить migrate тоже. Проверить, что теги разрешаются в прежние imageIDs.
 # 2. Pull
 git pull origin main
 git log -1 --oneline       # confirm expected HEAD
@@ -102,18 +106,15 @@ docker rm -f wsmoke
 smoke выше подтверждает, что собранный образ действительно стартует.
 
 ```bash
-# Atomic swap. Compose stops the old container only after the new one
-# starts and reports healthy. If the new container fails to start,
-# the old one keeps running.
-docker compose up -d app workers
+# Внешние standalone/systemd/pm2/другие хосты заранее остановлены оператором.
+WORKER_GENERATION_EXTERNAL_STOPPED=1 bash scripts/replace-worker-generation.sh app workers
 ```
 
-Add `ws` to both lines only if the WebSocket server changed (rare —
-look for `src/core/realtime/server/` in the diff).
+`ws` сервиса нет; app и workers заменяются вместе, включая app-only запрос.
 
 ## Workers image smoke
 
-`bash scripts/deploy-prod.sh` автоматически проверяет образ workers после локальной сборки, до первого SSH; ошибка smoke останавливает выкладку.
+`WORKER_GENERATION_EXTERNAL_STOPPED=1 bash scripts/deploy-prod.sh --replace-worker-generation app workers` автоматически проверяет образ workers после локальной сборки, до первого SSH; ошибка smoke останавливает выкладку.
 Аварийный обход — только `SKIP_WORKERS_SMOKE=1`, с предупреждением о непроверенном образе.
 
 ## Post-deploy check (mandatory — the deploy is not done until this passes)
@@ -161,8 +162,10 @@ So when the diff includes a new migration, **rebuild `migrate` too**:
 git diff --name-only --diff-filter=A HEAD@{1}..HEAD -- 'prisma/migrations/**'
 
 # if yes, add `migrate` to the build line:
-docker compose build migrate app workers
-docker compose up -d app workers          # runs the fresh migrate via depends_on
+docker compose build migrate
+docker compose build app
+docker compose build workers
+WORKER_GENERATION_EXTERNAL_STOPPED=1 bash scripts/replace-worker-generation.sh app workers # fresh migrate via depends_on
 ```
 
 Then **verify the migration actually applied — don't trust exit 0**:
@@ -292,53 +295,29 @@ npm run backfill:analytics -- --days=2 # narrower window
 
 ## Rollback
 
-If the new deploy is bad:
+Сначала сохранить диагностику, проверить оба ранее сохранённых rollback tags и совместимость schema/compose. Остановить все внешние новые исполнители и их автозапуск. На сервере по команде владельца:
 
 ```bash
-git log --oneline -5
-git checkout <previous-good-sha>
-docker compose build app workers
-docker compose up -d app workers
+docker tag "pilingtrack-app:$ROLLBACK" pilingtrack-app:latest
+docker tag "pilingtrack-workers:$ROLLBACK" pilingtrack-workers:latest
+WORKER_GENERATION_EXTERNAL_STOPPED=1 bash scripts/replace-worker-generation.sh app workers
 ```
 
-Image registry isn't used here, so rollback also rebuilds. A future
-improvement (M-12 — not yet tagged): tag the previous image as
-`:previous` before deploy, so rollback is `docker tag previous latest
-&& up -d` (under 1 minute instead of 5).
-
-## When the old runbook IS the right choice
-
-If the build itself OOMs (this VPS has 3.8 GB RAM; large Turbopack
-builds occasionally OOM the kernel), the old `stop && rm` sequence
-frees the RAM of the running container so the build can complete.
-Symptoms:
-  - `docker compose build` exits with no clear error
-  - `dmesg | grep -i kill` shows OOM messages
-  - Available memory <500 MB during build
-
-In that case, take the outage knowingly:
-
-```bash
-docker compose stop app workers
-docker compose rm -f app workers
-docker rmi pilingtrack-app:latest pilingtrack-workers:latest
-docker compose build app workers && docker compose up -d app workers
-```
-
+Не пересобирать случайный предыдущий SHA и не удалять контейнеры/образы до снимка: это уничтожает возможность автоматического возврата. При OOM локальной сборки разбирать причину; не освобождать RAM сервера удалением работающего поколения. Полная ручная процедура —016, схема БД не откатывается заменой images.
 ## Смена поколения workers (I02)
 
 У app по умолчанию встроены outbox/projection workers. Для этого релиза используйте
 `WORKER_GENERATION_EXTERNAL_STOPPED=1 bash scripts/deploy-prod.sh --replace-worker-generation app workers`.
 До подтверждения вручную остановите все standalone/systemd/pm2/другие хосты; отключите их автоматический рестарт.
 Режим заменяет app и workers вместе: stop всех реплик → проверка фактического завершения (workers: exit 0; app: exit 0 или 143, без OOM) и отсутствия RUNNING → up нового поколения.
-One-off реплики того же compose-проекта тоже учитываются. Ошибка проверки оставляет сервисы остановленными; не обходите барьер обычным up.
+One-off реплики учитываются и отклоняются до STOP: оператор должен остановить/удалить их заранее. Все preflight проверки выполняются до restart=no; при отказе после STOP — автоматический возврат старого поколения, см. ниже.
 При откате после переключения тегов применяйте тот же `scripts/replace-worker-generation.sh app workers` с подтверждением внешних остановок.
 Compose ждёт 30 секунд; внутренний WORKER_SHUTDOWN_TIMEOUT_MS старого worker по умолчанию 8000.
 Больший compose timeout не продлевает внутренний дедлайн: exit 1 после 8 секунд блокирует старт и требует проверки drain/незавершённых задач.
 Перед новым запуском подтвердите, что внешние старые процессы действительно завершены.
 
-## Уточнение барьера после релиза 03.10 (E0a)
+## Уточнение барьера после релиза 03.10 (E0a/F1)
 
 Next standalone app штатно завершается по SIGTERM с exit 143; helper принимает его только для service=app при exited и OOM=false. Для workers по-прежнему требуется exit 0; killed/OOM/ошибки drain запрещают новое поколение. Встроенные workers app также проверяются по журналам shutdown.
 
-Если отказ произошёл после начала stop, helper явно сообщает о возможной недоступности и печатает готовую команду повторного безопасного запуска с project/timeout/COMPOSE_FILE. Сначала устраните причину и подтвердите внешний барьер; для отката переключите оба образа на сохранённые теги по разделу rollback ранбука 016, затем выполните напечатанную команду. Автоматического запуска при сомнительном drain нет; обычным compose up барьер не обходите.
+При отказе после STOP helper автоматически возвращает прежние контейнеры и restart-политики; если force-recreate удалил ID — запускает сохранённые immutable imageIDs с прежним числом реплик и restart, используя текущий compose. Перед возвратом частично поднятое новое поколение останавливается и проверяется отсутствие RUNNING. Exit остаётся1: RECOVERED означает восстановление старой версии, не успешную выкладку. Если Docker/остановка/возврат недоступны — OUTAGE и ручная проверка; только после проверки безопасна аварийная команда `cd /opt/pilingtrack && docker compose up -d app workers`. Автовозврат не откатывает миграции/env/volumes/topology. Обычным up барьер не обходить.
