@@ -80,6 +80,22 @@ const EMPTY_FORM: WorkOrderFormValues = {
 const toInputDate = (iso: string | null | undefined): string => (iso ? iso.slice(0, 10) : '');
 const numToStr = (v: number | string | null | undefined): string => (v != null && v !== '' ? String(v) : '');
 
+/**
+ * Моточасы в схеме наряда — целое число, не меньше 0
+ * (app/api/equipment/[id]/maintenance/route.ts, engineHoursAtService). Пустое
+ * поле допустимо. Возвращает текст отказа или null — проверка идёт до отправки,
+ * чтобы человек не получал общее «Некорректные данные» на дробное показание
+ * счётчика.
+ */
+function engineHoursError(value: string): string | null {
+  if (value.trim() === '') return null;
+  const hours = Number(value);
+  if (!Number.isFinite(hours)) return 'Моточасы — введите число';
+  if (!Number.isInteger(hours)) return 'Моточасы — целое число, без дробной части';
+  if (hours < 0) return 'Моточасы не могут быть отрицательными';
+  return null;
+}
+
 interface AssigneeOption { id: string; name: string }
 interface EquipmentOption { id: string; name: string }
 
@@ -165,6 +181,11 @@ export function WorkOrderFormDialog({
     const eqId = equipmentId ?? loadedEquipmentId ?? equipmentSel;
     if (!eqId) {
       toast.error('Выберите установку');
+      return;
+    }
+    const hoursError = engineHoursError(form.engineHoursAtService);
+    if (hoursError) {
+      toast.error(hoursError);
       return;
     }
     setBusy(true);
@@ -315,8 +336,9 @@ export function WorkOrderFormDialog({
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               <div>
                 <Label htmlFor="wo-hours">Моточасы</Label>
-                <Input id="wo-hours" type="number" min={0} value={form.engineHoursAtService}
+                <Input id="wo-hours" type="number" min={0} step={1} value={form.engineHoursAtService}
                   onChange={(e) => set('engineHoursAtService', e.target.value)} />
+                <p className="mt-1 text-xs text-muted-foreground">Целое число, не меньше 0</p>
               </div>
               <div>
                 <Label htmlFor="wo-labor">Трудоч.</Label>

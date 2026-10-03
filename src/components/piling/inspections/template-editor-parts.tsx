@@ -61,6 +61,21 @@ export interface SectionDraft {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+/**
+ * Пределы длины полей — ровно как в zod-схеме маршрута checklist-templates
+ * (`createSchema`). Без них форма отправляла заведомо отклоняемый запрос, а в
+ * ответ получалось общее «Некорректные данные» без имени поля (F-R121-3).
+ */
+export const LIMITS = {
+  name: 200,
+  sectionTitle: 200,
+  appliesToModel: 120,
+  itemText: 500,
+  itemUnit: 40,
+  itemNorm: 300,
+  itemProvenance: 120,
+} as const;
+
 let _seq = 0;
 export const uid = () => `k${++_seq}`;
 
@@ -102,6 +117,7 @@ function ItemRow({ item, onChange, onRemove, canRemove }: ItemRowProps) {
             rows={2}
             value={item.text}
             onChange={(e) => onChange({ text: e.target.value })}
+            maxLength={LIMITS.itemText}
             placeholder="Проверить уровень масла…"
             className="text-sm"
           />
@@ -135,6 +151,7 @@ function ItemRow({ item, onChange, onRemove, canRemove }: ItemRowProps) {
           <Input
             value={item.unit}
             onChange={(e) => onChange({ unit: e.target.value })}
+            maxLength={LIMITS.itemUnit}
             placeholder="мм, л, кПа…"
             className="h-8 text-sm"
           />
@@ -144,6 +161,7 @@ function ItemRow({ item, onChange, onRemove, canRemove }: ItemRowProps) {
           <Input
             value={item.norm}
             onChange={(e) => onChange({ norm: e.target.value })}
+            maxLength={LIMITS.itemNorm}
             placeholder="≥ 0.5"
             className="h-8 text-sm"
           />
@@ -153,6 +171,7 @@ function ItemRow({ item, onChange, onRemove, canRemove }: ItemRowProps) {
           <Input
             value={item.provenance}
             onChange={(e) => onChange({ provenance: e.target.value })}
+            maxLength={LIMITS.itemProvenance}
             placeholder="ГОСТ…"
             className="h-8 text-sm"
           />
@@ -253,6 +272,7 @@ export function SectionEditor({
           <Input
             value={section.title}
             onChange={(e) => onChange({ title: e.target.value })}
+            maxLength={LIMITS.sectionTitle}
             placeholder="Напр. Двигатель"
             className="text-sm"
           />

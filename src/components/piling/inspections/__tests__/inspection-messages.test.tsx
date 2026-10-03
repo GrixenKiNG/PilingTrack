@@ -227,6 +227,42 @@ describe('редактор шаблона (F-R100-4, F-R100-5)', () => {
   });
 });
 
+describe('редактор шаблона: пределы длины полей как в схеме маршрута (F-R121-3)', () => {
+  it('у названия, раздела и полей пункта стоит maxLength по схеме', () => {
+    render(<TemplateEditor templateId="new" />);
+
+    expect(screen.getByLabelText('Название *')).toHaveAttribute('maxlength', '200');
+    expect(screen.getByPlaceholderText('Banut 655 (пусто = общий блок для всех)')).toHaveAttribute('maxlength', '120');
+    expect(screen.getByPlaceholderText('Напр. Двигатель')).toHaveAttribute('maxlength', '200');
+    expect(screen.getByPlaceholderText('Проверить уровень масла…')).toHaveAttribute('maxlength', '500');
+    expect(screen.getByPlaceholderText('мм, л, кПа…')).toHaveAttribute('maxlength', '40');
+    expect(screen.getByPlaceholderText('≥ 0.5')).toHaveAttribute('maxlength', '300');
+    expect(screen.getByPlaceholderText('ГОСТ…')).toHaveAttribute('maxlength', '120');
+  });
+
+  it('пункт длиннее 500 символов не уходит на сервер: сообщение называет пункт', async () => {
+    render(<TemplateEditor templateId="new" />);
+
+    fireEvent.change(screen.getByLabelText('Название *'), { target: { value: 'ЕО — экскаватор' } });
+    fireEvent.change(screen.getByPlaceholderText('Напр. Двигатель'), { target: { value: 'Двигатель' } });
+    fireEvent.change(screen.getByPlaceholderText('Проверить уровень масла…'), { target: { value: 'x'.repeat(501) } });
+    fireEvent.click(screen.getByRole('button', { name: 'Создать шаблон' }));
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Раздел 1, пункт 1: текст длиннее 500 символов'));
+    expect(mocks.authFetch).not.toHaveBeenCalled();
+  });
+
+  it('название длиннее 200 символов отклоняется до отправки', async () => {
+    render(<TemplateEditor templateId="new" />);
+
+    fireEvent.change(screen.getByLabelText('Название *'), { target: { value: 'x'.repeat(201) } });
+    fireEvent.click(screen.getByRole('button', { name: 'Создать шаблон' }));
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Название шаблона длиннее 200 символов'));
+    expect(mocks.authFetch).not.toHaveBeenCalled();
+  });
+});
+
 describe('фото пункта осмотра: сбой чтения галереи (F-R100-8)', () => {
   it('500 → строка с причиной и «Повторить», счётчик не обнуляется', async () => {
     mocks.authFetch.mockResolvedValue(json({ error: 'x' }, 500));

@@ -340,3 +340,58 @@ describe('ReportFormDialog — архивная марка (F-R29-2)', () => {
     expect(screen.queryAllByText('СВ 300-80')).toHaveLength(1);
   });
 });
+
+describe('ReportFormDialog — доступные имена кнопок «+» (F-R116-1)', () => {
+  it('у каждой кнопки добавления своё имя, а не три одинаковых «кнопка»', () => {
+    render(
+      <ReportFormDialog
+        open
+        onClose={vi.fn()}
+        editReport={editReport}
+        loadingReferenceData={false}
+        dictionaryError={null}
+        operators={[]}
+        sites={[]}
+        pileGrades={[{ id: 'g1', name: 'С90.30', isActive: true, lengthMm: 9000 }]}
+        drillingTypes={[]}
+        downtimeReasons={[]}
+        equipment={[]}
+        onSuccess={vi.fn()}
+      />,
+    );
+
+    // Секция простоя скрыта, пока её не раскрыли ссылкой «+ Добавить».
+    expect(screen.queryByRole('button', { name: 'Добавить простой' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: '+ Добавить' }));
+
+    expect(screen.getByRole('button', { name: 'Добавить сваю' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Добавить бурение' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Добавить простой' })).toBeTruthy();
+  });
+});
+
+describe('ReportFormDialog — доступные имена полей смены (F-R116-3)', () => {
+  it('подписи «Дата», «Начало», «Конец» связаны с полями, а не висят рядом', () => {
+    render(
+      <ReportFormDialog
+        open
+        onClose={vi.fn()}
+        editReport={editReport}
+        loadingReferenceData={false}
+        dictionaryError={null}
+        operators={[]}
+        sites={[]}
+        pileGrades={[{ id: 'g1', name: 'С90.30', isActive: true, lengthMm: 9000 }]}
+        drillingTypes={[]}
+        downtimeReasons={[]}
+        equipment={[]}
+        onSuccess={vi.fn()}
+      />,
+    );
+
+    // Прежде подписи рисовались без htmlFor/id — скринридер читал поля «без имени».
+    expect(screen.getByLabelText('Дата')).toBeInstanceOf(HTMLInputElement);
+    expect(screen.getByLabelText('Начало')).toBeInstanceOf(HTMLInputElement);
+    expect(screen.getByLabelText('Конец')).toBeInstanceOf(HTMLInputElement);
+  });
+});

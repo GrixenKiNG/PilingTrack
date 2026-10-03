@@ -1,11 +1,14 @@
 'use client';
 
+import { useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import {
   Plus,
   Trash2,
   FolderTree,
 } from '@/components/piling/icons/unified-icons';
+import { ConfirmActionDialog } from '@/components/piling/confirm-action-dialog';
+import { pluralizeRu } from '@/lib/format';
 import type { SiteFullData } from './types';
 
 interface HierarchyTreeProps {
@@ -13,10 +16,53 @@ interface HierarchyTreeProps {
   siteId: string;
   tree: SiteFullData;
   onAdd: (type: 'field' | 'cluster' | 'picket', siteId: string, parentId: string) => void;
-  onDelete: (siteId: string, type: string, itemId: string) => void;
+  onDelete: (siteId: string, type: string, itemId: string) => void | Promise<void>;
+}
+
+/** Узел иерархии, выбранный для удаления: имя и число вложенных элементов. */
+interface PendingDelete {
+  type: 'field' | 'cluster' | 'picket';
+  itemId: string;
+  name: string;
+  childClusters: number;
+  childPickets: number;
+}
+
+const DELETE_LABEL: Record<PendingDelete['type'], string> = {
+  field: 'поле',
+  cluster: 'куст',
+  picket: 'пикет',
+};
+
+/**
+ * Текст подтверждения удаления узла иерархии.
+ *
+ * У поля и куста удаление каскадное — указано, сколько вложенного погибнет;
+ * у пикета теряется привязка выработки (F-R113-1).
+ */
+function deleteDescription(p: PendingDelete): string {
+  if (p.type === 'field') {
+    const nested = p.childClusters + p.childPickets > 0
+      ? ` Внутри: ${p.childClusters} ${pluralizeRu(p.childClusters, ['куст', 'куста', 'кустов'])}, ${p.childPickets} ${pluralizeRu(p.childPickets, ['пикет', 'пикета', 'пикетов'])} — они будут удалены.`
+      : ' Вложенных кустов и пикетов нет.';
+    return `Свайное поле «${p.name}» и всё, что внутри, будет удалено без возможности восстановления.${nested}`;
+  }
+  if (p.type === 'cluster') {
+    const nested = p.childPickets > 0
+      ? ` Внутри ${p.childPickets} ${pluralizeRu(p.childPickets, ['пикет', 'пикета', 'пикетов'])} — они будут удалены.`
+      : ' Вложенных пикетов нет.';
+    return `Куст «${p.name}» будет удалён без возможности восстановления.${nested}`;
+  }
+  return `Пикет «${p.name}» будет удалён. Выработка, привязанная к пикету, потеряет привязку к нему.`;
 }
 
 export function HierarchyTree({ readOnly = false, siteId, tree, onAdd, onDelete }: HierarchyTreeProps) {
+  const [pending, setPending] = useState<PendingDelete | null>(null);
+  const [busy, setBusy] = useState(false);
+  // Запрос уже отправлен: быстрый повторный клик (до того, как сработает
+  // `busy`) не должен отправить второй DELETE (F-R113-1).
+  const busyRef = useRef(false);
+
   return (
     <div className="pl-4 border-l-2 border-signal/30 space-y-2">
       {/* Fields */}
@@ -44,7 +90,11 @@ export function HierarchyTree({ readOnly = false, siteId, tree, onAdd, onDelete 
                   <Plus className="w-3 h-3" />
                 </button>}
                 {!readOnly && <button
-                  onClick={() => onDelete(siteId, 'field', field.id)}
+                  onClick={() => setPending({
+                    type: 'field', itemId: field.id, name: field.name,
+                    childClusters: field.clusters.length,
+                    childPickets: field.clusters.reduce((sum, c) => sum + c.pickets.length, 0),
+                  })}
                   className="min-h-11 min-w-11 rounded flex items-center justify-center hover:bg-destructive/10 text-muted-foreground hover:text-destructive-strong"
                   aria-label="Удалить поле"
                   title="Удалить поле"
@@ -72,7 +122,10 @@ export function HierarchyTree({ readOnly = false, siteId, tree, onAdd, onDelete 
                           <Plus className="w-2.5 h-2.5" />
                         </button>}
                         {!readOnly && <button
-                          onClick={() => onDelete(siteId, 'cluster', cluster.id)}
+                          onClick={() => setPending({
+                            type: 'cluster', itemId: cluster.id, name: cluster.name,
+                            childClusters: 0, childPickets: cluster.pickets.length,
+                          })}
                           className="min-h-11 min-w-11 rounded flex items-center justify-center hover:bg-destructive/10 text-muted-foreground hover:text-destructive-strong"
                           aria-label="Удалить куст"
                           title="Удалить куст"
@@ -95,7 +148,10 @@ export function HierarchyTree({ readOnly = false, siteId, tree, onAdd, onDelete 
                               {'\ud83d\udccd'} {picket.name}
                             </span>
                             {!readOnly && <button
-                              onClick={() => onDelete(siteId, 'picket', picket.id)}
+                              onClick={() => setPending({
+                                type: 'picket', itemId: picket.id, name: picket.name,
+                                childClusters: 0, childPickets: 0,
+                              })}
                               className="min-h-11 min-w-11 rounded flex items-center justify-center hover:bg-destructive/10 text-muted-foreground hover:text-destructive-strong"
                               aria-label="Удалить пикет"
                               title="Удалить пикет"
@@ -120,6 +176,27 @@ export function HierarchyTree({ readOnly = false, siteId, tree, onAdd, onDelete 
         <Plus className="w-3 h-3" />
         Добавить свайное поле
       </button>}
+
+      <ConfirmActionDialog
+        open={!!pending}
+        onOpenChange={(open) => { if (!open && !busy) setPending(null); }}
+        title={pending ? `Удалить ${DELETE_LABEL[pending.type]} «${pending.name}»?` : ''}
+        description={pending ? deleteDescription(pending) : ''}
+        confirmLabel="Удалить"
+        busy={busy}
+        onConfirm={async () => {
+          if (!pending || busyRef.current) return;
+          busyRef.current = true;
+          setBusy(true);
+          try {
+            await onDelete(siteId, pending.type, pending.itemId);
+            setPending(null);
+          } finally {
+            busyRef.current = false;
+            setBusy(false);
+          }
+        }}
+      />
     </div>
   );
 }
@@ -212,7 +289,7 @@ interface ExpandedTreeContentProps {
   siteId: string;
   tree: SiteFullData;
   onAdd: (type: 'field' | 'cluster' | 'picket', siteId: string, parentId: string) => void;
-  onDelete: (siteId: string, type: string, itemId: string) => void;
+  onDelete: (siteId: string, type: string, itemId: string) => void | Promise<void>;
 }
 
 export function ExpandedTreeContent({ siteId, tree, onAdd, onDelete }: ExpandedTreeContentProps) {

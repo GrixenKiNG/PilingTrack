@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { Loader2 } from '@/components/piling/icons/unified-icons';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -30,6 +30,7 @@ interface AddHierarchyDialogProps {
 }
 
 export function AddHierarchyDialog({ open, onOpenChange, type, onAdd }: AddHierarchyDialogProps) {
+  const uid = useId();
   const [name, setName] = useState('');
   const [adding, setAdding] = useState(false);
 
@@ -57,8 +58,9 @@ export function AddHierarchyDialog({ open, onOpenChange, type, onAdd }: AddHiera
         </DialogHeader>
         <div className="space-y-3">
           <div className="space-y-1.5">
-            <Label>Название</Label>
+            <Label htmlFor={`${uid}-name`}>Название</Label>
             <Input
+              id={`${uid}-name`}
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder={`Название ${TYPE_LABELS[type].toLowerCase()}`}

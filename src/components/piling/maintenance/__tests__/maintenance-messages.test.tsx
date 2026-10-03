@@ -31,6 +31,7 @@ vi.mock('@/components/piling/confirm-action-dialog', () => ({
 
 import { MaintenanceBoard } from '../maintenance-board';
 import { WorkOrderDetail } from '../work-order-detail';
+import { WorkOrderFormDialog } from '../work-order-form-dialog';
 import type { WorkOrderRow } from '../maintenance-board-model';
 
 const json = (body: unknown, status = 200) =>
@@ -245,5 +246,112 @@ describe('доска нарядов ТО: 409 обещает обновлени�
       expect(toast.error).toHaveBeenCalledWith('Запись изменилась — данные обновлены, повторите действие.'),
     );
     expect(toast.error).not.toHaveBeenCalledWith('Данные изменил другой пользователь, обновите страницу.');
+  });
+});
+
+describe('контур ТО: моменты времени — дата и время по Москве (F-R114-2)', () => {
+  /*
+    00:30 МСК 26.09 — это 21:30 UTC 25.09. formatRuDate режет UTC-день, поэтому
+    закрытие, начало работ и приёмка датировались вчерашним «25.09.2026»; момент
+    должен идти через форматтер с явным поясом (общий @/lib/timezone) и показывать
+    время. Плановая дата (scheduledAt) — это день, её сдвигать не нужно.
+  */
+  const MOMENT = '2026-09-25T21:30:00.000Z';
+  const MSK_MOMENT = '26 сент. 2026 г., 00:30';
+
+  function momentRecord() {
+    return {
+      ...record(),
+      status: 'DONE',
+      createdAt: MOMENT,
+      completedAt: MOMENT,
+      acceptedAt: MOMENT,
+      createdById: 'u1',
+      closedById: 'u1',
+      acceptedById: 'u1',
+      people: { u1: 'Иванов' },
+    };
+  }
+
+  function mockMoment() {
+    mocks.authFetch.mockImplementation(async (url: string) => {
+      if (url === '/api/maintenance/assignees') return json({ users: [] });
+      if (url.startsWith('/api/media')) return json({ data: [] });
+      if (url === '/api/maintenance/wo-1') return json({ record: momentRecord() });
+      return json({ records: [momentRecord()] });
+    });
+  }
+
+  it('карточка: «факт», приёмка и «кто и когда» — по Москве, а не UTC-днём', async () => {
+    mockMoment();
+    render(<WorkOrderDetail recordId="wo-1" />);
+
+    expect(await screen.findByText(`факт ${MSK_MOMENT}`)).toBeInTheDocument();
+    expect(screen.getByText(`✓ Принято ${MSK_MOMENT}`)).toBeInTheDocument();
+    // Заявку открыл / Закрыл наряд / Принял работу — каждый с моментом по Москве.
+    expect(screen.getAllByText(MSK_MOMENT)).toHaveLength(3);
+    // Прежний вывод брал UTC-день и печатал 25.09.
+    expect(screen.queryByText('факт 25.09.2026')).toBeNull();
+  });
+
+  it('панель наряда: закрытие — моментом по Москве, UTC-дня на экране нет', async () => {
+    mockMoment();
+    render(<MaintenanceBoard />);
+
+    expect(await screen.findByText('Закрыто')).toBeInTheDocument();
+    expect(await screen.findAllByText(MSK_MOMENT)).not.toHaveLength(0);
+    // Прежде «Закрыто» и таймлайн несли UTC-день 25.09.
+    expect(screen.queryByText(/25\.09\.2026/)).toBeNull();
+  });
+});
+
+describe('форма наряда ТО: моточасы — целое, не меньше 0 (F-R121-2)', () => {
+  /*
+    Схема маршрута требует engineHoursAtService: int ≥ 0
+    (app/api/equipment/[id]/maintenance/route.ts). Поле ничего не проверяло:
+    механик вписывал дробное показание счётчика («12345.5») и получал 400
+    «Некорректные данные» без имени поля. Теперь дробь/минус отклоняются до
+    отправки с понятным текстом, а не уходят на сервер.
+  */
+  function mockDialog() {
+    mocks.authFetch.mockImplementation(async (url: string, init?: RequestInit) => {
+      if (url === '/api/maintenance/assignees') return json({ users: [] });
+      if (init?.method === 'POST') return json({ record: record() }, 201);
+      return json({});
+    });
+  }
+
+  const postCalls = () =>
+    mocks.authFetch.mock.calls.filter(([, init]) => (init as RequestInit | undefined)?.method === 'POST');
+
+  async function fillDialog(hours?: string) {
+    mockDialog();
+    render(<WorkOrderFormDialog open onOpenChange={() => {}} equipmentId="eq-1" onSaved={() => {}} />);
+    fireEvent.change(await screen.findByLabelText('Название *'), { target: { value: 'ТО-1' } });
+    if (hours !== undefined) {
+      fireEvent.change(screen.getByLabelText('Моточасы'), { target: { value: hours } });
+    }
+    fireEvent.click(screen.getByRole('button', { name: 'Создать' }));
+  }
+
+  it('дробные моточасы не уходят на сервер и объясняются до отправки', async () => {
+    await fillDialog('12345.5');
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Моточасы — целое число, без дробной части'));
+    expect(postCalls()).toHaveLength(0);
+  });
+
+  it('отрицательные моточасы отклоняются до отправки', async () => {
+    await fillDialog('-1');
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Моточасы не могут быть отрицательными'));
+    expect(postCalls()).toHaveLength(0);
+  });
+
+  it('целые неотрицательные моточасы уходят на сервер', async () => {
+    await fillDialog('12345');
+
+    await waitFor(() => expect(postCalls()).toHaveLength(1));
+    expect(toast.error).not.toHaveBeenCalledWith('Моточасы — целое число, без дробной части');
   });
 });

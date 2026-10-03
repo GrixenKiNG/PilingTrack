@@ -18,6 +18,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { authFetch } from '@/lib/api';
+import { catchText } from '@/components/piling/admin-crews/crew-messages';
 import { cn } from '@/lib/utils';
 import { KIND_LABELS } from '../equipment-form';
 import { EditEquipmentDialog } from '../equipment-dialogs';
@@ -72,7 +73,8 @@ export function EquipmentDetail({ equipmentId, embedded = false }: Props) {
       setDetails(await res.json());
       setError(null);
     } catch (err) {
-      setError((err as Error).message);
+      // Обрыв сети fetch бросает TypeError с английским «Failed to fetch» (F-R112-1).
+      setError(catchText(err, 'Не удалось загрузить установку'));
     } finally {
       setLoading(false);
     }

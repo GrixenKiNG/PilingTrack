@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { authFetch } from '@/lib/api';
+import { catchText } from '@/components/piling/admin-crews/crew-messages';
 import type { FleetSnapshot } from './fleet-types';
 
 /**
@@ -25,7 +26,8 @@ export function useFleet() {
       setError(null);
     } catch (err: unknown) {
       if (err instanceof Error && err.name === 'AbortError') return;
-      setError((err as Error).message);
+      // Обрыв сети fetch бросает TypeError с английским «Failed to fetch» (F-R112-1).
+      setError(catchText(err, 'Не удалось загрузить парк техники'));
     } finally {
       setLoading(false);
     }

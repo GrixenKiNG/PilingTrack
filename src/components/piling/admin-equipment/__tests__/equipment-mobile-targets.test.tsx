@@ -8,7 +8,7 @@
  * <button>, видимая дорожка остаётся 40×24 (образец — workspace-settings.tsx).
  * На десктопе (sm и шире) вид не меняется.
  */
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({ authFetch: vi.fn() }));
@@ -182,5 +182,60 @@ describe('карточка установки: цель нажатия на те
     expect(screen.getByRole('button', { name: 'Развернуть историю' }))
       .toHaveClass('min-h-11', 'min-w-11', 'sm:min-h-0', 'sm:min-w-0');
     expect(screen.getByRole('button', { name: /Показать всю историю/ })).toHaveClass('min-h-11', 'sm:min-h-0');
+  });
+});
+
+describe('форма установки: подписи связаны с полями (R116)', () => {
+  it('поля вкладки «Основное» находятся по подписи (getByLabelText)', () => {
+    render(<EquipmentForm state={EMPTY_EQUIPMENT_FORM} onChange={() => {}} />);
+
+    // Текстовые поля: htmlFor/id через useId в хелпере Field.
+    for (const label of [
+      'Название *', 'Модель', 'Инвентарный номер', 'Госномер',
+      'Базовая машина / носитель', 'Серийный номер', 'Год выпуска', 'VIN',
+    ]) {
+      expect(screen.getByLabelText(label)).toBeInstanceOf(HTMLInputElement);
+    }
+    // Многострочное поле и селект Radix (SelectTrigger получает тот же id).
+    expect(screen.getByLabelText('Описание')).toBeInstanceOf(HTMLTextAreaElement);
+    expect(screen.getByLabelText('Тип машины')).toBeInstanceOf(HTMLButtonElement);
+  });
+
+  it('NumberField на вкладке «Тех. характеристики» тоже связан с подписью', () => {
+    render(<EquipmentForm state={EMPTY_EQUIPMENT_FORM} onChange={() => {}} />);
+
+    fireEvent.mouseDown(screen.getByRole('tab', { name: /Тех. характеристики/ }));
+
+    expect(screen.getByLabelText('Вес (т)')).toBeInstanceOf(HTMLInputElement);
+    expect(screen.getByLabelText('Вид молота (для чек-листа)')).toBeInstanceOf(HTMLButtonElement);
+  });
+});
+
+describe('форма установки: лимиты полей как в zod-схеме маршрута (R121)', () => {
+  it('текстовые поля ограничены по длине из схемы', () => {
+    render(<EquipmentForm state={EMPTY_EQUIPMENT_FORM} onChange={() => {}} />);
+
+    expect(screen.getByLabelText('Название *')).toHaveAttribute('maxLength', '200');
+    expect(screen.getByLabelText('Описание')).toHaveAttribute('maxLength', '2000');
+    expect(screen.getByLabelText('VIN')).toHaveAttribute('maxLength', '50');
+  });
+
+  it('числовые поля ограничены по min/max, целые — шагом 1', () => {
+    render(<EquipmentForm state={EMPTY_EQUIPMENT_FORM} onChange={() => {}} />);
+
+    fireEvent.mouseDown(screen.getByRole('tab', { name: /Тех. характеристики/ }));
+    const weight = screen.getByLabelText('Вес (т)');
+    expect(weight).toHaveAttribute('min', '0');
+    expect(weight).toHaveAttribute('max', '2000');
+    expect(weight).toHaveAttribute('step', '0.1');
+    const height = screen.getByLabelText('Высота (мм)');
+    expect(height).toHaveAttribute('max', '100000');
+    expect(height).toHaveAttribute('step', '1');
+
+    fireEvent.mouseDown(screen.getByRole('tab', { name: /Эксплуатация/ }));
+    const hours = screen.getByLabelText('Наработка моточасов');
+    expect(hours).toHaveAttribute('min', '0');
+    expect(hours).toHaveAttribute('max', '1000000');
+    expect(hours).toHaveAttribute('step', '1');
   });
 });

@@ -259,6 +259,46 @@ async function sendTelegramDocument(
 }
 
 // ============================================================
+// Error mapping
+// ============================================================
+
+/**
+ * F-R120-2: тост кнопки «Тест» показывал сырой ответ Telegram API
+ * (`{"ok":false,"error_code":401,…}`) либо английское «Not configured».
+ * Сопоставляем частые отказы с русским текстом и подсказкой, что делать;
+ * всё остальное сворачиваем в «Telegram отказал: <коротко>».
+ */
+const TELEGRAM_ERROR_HINTS: ReadonlyArray<readonly [RegExp, string]> = [
+  [/aborted due to timeout|timeouterror|timed out/i, 'Telegram не ответил за 5 секунд — проверьте доступ в интернет'],
+  [/unauthorized|invalid token|token.*not found/i, 'Токен бота неверный — проверьте токен в настройках'],
+  [/chat not found/i, 'Чат не найден — проверьте ID чата'],
+  [/blocked|user is deactivated|bot can't initiate/i, 'Бот заблокирован — разблокируйте его в чате'],
+  [/not enough rights|not a member|no rights|chat_write_forbidden/i, 'Недостаточно прав — добавьте бота в чат с правом отправки'],
+  [/chat_id is empty/i, 'Не указан ID чата — заполните поле «ID чата»'],
+];
+
+function extractTelegramDescription(raw: string): string {
+  try {
+    const parsed = JSON.parse(raw) as { description?: unknown };
+    if (parsed && typeof parsed.description === 'string' && parsed.description.trim()) {
+      return parsed.description.trim();
+    }
+  } catch {
+    // не JSON — ниже вернём исходный текст
+  }
+  return raw.trim() || 'неизвестная ошибка';
+}
+
+export function describeTelegramError(raw: string): string {
+  const description = extractTelegramDescription(raw);
+  for (const [pattern, message] of TELEGRAM_ERROR_HINTS) {
+    if (pattern.test(description)) return message;
+  }
+  const short = description.length > 120 ? `${description.slice(0, 117)}…` : description;
+  return `Telegram отказал: ${short}`;
+}
+
+// ============================================================
 // Notifier Service
 // ============================================================
 
@@ -321,11 +361,12 @@ export class TelegramNotifier {
    */
   async testConnection(): Promise<{ ok: boolean; chatTitle?: string; error?: string }> {
     const config = (await getConfigs())[0];
-    if (!config) return { ok: false, error: 'Not configured' };
+    if (!config) return { ok: false, error: 'Telegram не настроен — добавьте канал в настройках' };
 
     try {
       const url = `${process.env.TELEGRAM_API_BASE || 'https://api.telegram.org'}/bot${config.botToken}/getChat`;
       const response = await fetch(url, {
+        signal: AbortSignal.timeout(5000),
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ chat_id: config.chatId }),
@@ -333,13 +374,13 @@ export class TelegramNotifier {
 
       if (!response.ok) {
         const error = await response.text();
-        return { ok: false, error };
+        return { ok: false, error: describeTelegramError(error) };
       }
 
       const data = await response.json();
       return { ok: true, chatTitle: data.result?.title || data.result?.first_name };
     } catch (error) {
-      return { ok: false, error: error instanceof Error ? error.message : String(error) };
+      return { ok: false, error: describeTelegramError(error instanceof Error ? error.message : String(error)) };
     }
   }
 }

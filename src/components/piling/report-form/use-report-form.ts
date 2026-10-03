@@ -66,11 +66,13 @@ export interface UseReportFormReturn {
   removePile: (id: string) => void;
   removeDrilling: (id: string) => void;
   removeDowntime: (id: string) => void;
+  // `false` — проверка не пустила отправку, набранное в поля ещё никуда не
+  // ушло; форма по этому признаку решает, очищать ли поля ввода.
   handleSubmit: (pending?: {
     pile?: { gradeId: string; count: number };
     drilling?: { typeId: string; count: number; metersPerUnit: number };
     downtime?: { reasonId: string; duration: number; comment: string };
-  }) => Promise<void>;
+  }) => Promise<boolean>;
   getPileMetersPerUnit: (gradeId: string) => number;
   getPicketPath: (picketId: string) => string;
   getPileGradeName: (id: string) => string;
@@ -382,12 +384,15 @@ export function useReportForm(): UseReportFormReturn {
   const removeDrilling = (id: string) => setDrillings((prev) => prev.filter((d) => d.id !== id));
   const removeDowntime = (id: string) => setDowntimes((prev) => prev.filter((d) => d.id !== id));
 
+  // Возвращает признак «строка принята»: `false` — проверка не пустила отправку
+  // и набранное в поля ещё не попало ни в состояние, ни на сервер. Форма по
+  // этому признаку решает, стирать ли поля ввода (F-R111-2).
   const handleSubmit = async (pending?: {
     pile?: { gradeId: string; count: number };
     drilling?: { typeId: string; count: number; metersPerUnit: number };
     downtime?: { reasonId: string; duration: number; comment: string };
-  }) => {
-    if (!selectedSiteId || !user) { toast.error('Выберите объект'); return; }
+  }): Promise<boolean> => {
+    if (!selectedSiteId || !user) { toast.error('Выберите объект'); return false; }
     // Entry rows the operator filled but didn't confirm with the "+" button
     // still count — requiring the extra tap silently blocked whole reports.
     const effectivePiles: PileEntry[] = pending?.pile
@@ -399,8 +404,8 @@ export function useReportForm(): UseReportFormReturn {
     const effectiveDowntimes: DowntimeEntry[] = pending?.downtime
       ? [...downtimes, { id: crypto.randomUUID(), reasonId: pending.downtime.reasonId, duration: pending.downtime.duration, comment: pending.downtime.comment }]
       : downtimes;
-    if (effectivePiles.length === 0 && effectiveDrillings.length === 0 && effectiveDowntimes.length === 0) { toast.error('Добавьте хотя бы одну сваю, бурение или простой'); return; }
-    if (equipment.length > 0 && !selectedEquipmentId) { toast.error('Выберите установку'); return; }
+    if (effectivePiles.length === 0 && effectiveDrillings.length === 0 && effectiveDowntimes.length === 0) { toast.error('Добавьте хотя бы одну сваю, бурение или простой'); return false; }
+    if (equipment.length > 0 && !selectedEquipmentId) { toast.error('Выберите установку'); return false; }
     // Моточасы: сервер принимает только целое ≥ 0 (reportUpsertSchema:
     // `z.number().int().min(0).max(500_000)`). Раньше нецелое значение молча
     // выпадало из payload, а отчёт рапортовал успех — показание счётчика
@@ -410,7 +415,7 @@ export function useReportForm(): UseReportFormReturn {
     if (engineHoursProvided && !(Number.isInteger(parsedEngineHours) && parsedEngineHours >= 0)) {
       toast.error('Моточасы — целое число, не меньше 0');
       hapticError();
-      return;
+      return false;
     }
     // Reflect auto-committed rows in the UI so a failed submit doesn't lose them.
     if (pending?.pile) setPiles(effectivePiles);
@@ -437,7 +442,7 @@ export function useReportForm(): UseReportFormReturn {
         toast.error(result?.error || 'Отчёт был изменён другим пользователем. Данные обновлены.');
         hapticError();
         loadData();
-        return;
+        return true;
       }
       if (!res.ok) throw new Error(apiErrorMessage(result, 'Ошибка отправки отчёта'));
       toast.success('Отчёт успешно отправлен!'); hapticSuccess();
@@ -463,6 +468,8 @@ export function useReportForm(): UseReportFormReturn {
       toast.error(message); hapticError();
       pushClientFeedback({ level: 'warn', scope: 'reports', action: 'report.submit.client_failed', title: 'Отчёт не отправлен', message });
     } finally { setSubmitting(false); }
+    // Строки уже перенесены в состояние выше — набранное можно очищать.
+    return true;
   };
 
   return {

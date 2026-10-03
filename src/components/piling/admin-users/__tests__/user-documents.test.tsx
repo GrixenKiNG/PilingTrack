@@ -1,5 +1,6 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { toast } from 'sonner';
 
 const authFetchMock = vi.fn();
 vi.mock('@/lib/api', () => ({ authFetch: (...args: unknown[]) => authFetchMock(...args) }));
@@ -80,5 +81,26 @@ describe('UserDocuments ownership', () => {
       expect(screen.getByLabelText(label)).toHaveClass('min-h-11', 'min-w-11', 'sm:min-h-0', 'sm:min-w-0');
     }
     expect(screen.getByRole('button', { name: /Добавить/ })).toHaveClass('min-h-11', 'sm:min-h-0');
+  });
+});
+
+/**
+ * F-R112-1: обрыв сети при удалении документа показывал браузерное «Failed to
+ * fetch» — английскую строку на русском экране. Обрыв связи `fetch` бросает
+ * TypeError, и он должен превращаться в понятный русский текст.
+ */
+describe('UserDocuments — обрыв сети (F-R112-1)', () => {
+  it('удаление документа без связи → русский текст вместо «Failed to fetch»', async () => {
+    documentsResponse = () => Promise.resolve(ok({ documents: [docRow('doc-9', 'Удостоверение')] }));
+    render(<UserDocuments userId="ivanov" />);
+    await screen.findByText('Удостоверение');
+
+    authFetchMock.mockRejectedValue(new TypeError('Failed to fetch'));
+    fireEvent.click(screen.getByLabelText('Удалить документ'));
+    fireEvent.click(await screen.findByRole('button', { name: 'Удалить' }));
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith(
+      'Нет соединения с сервером. Проверьте связь и повторите.',
+    ));
   });
 });

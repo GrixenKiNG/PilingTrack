@@ -87,6 +87,15 @@ export function ReportsScreen(props: ReferenceUiProps) {
   const [reportPeriod, setReportPeriod] = useState<'day' | 'week'>('day');
   const [fleetMetric, setFleetMetric] = useState<'readiness' | 'usage'>('readiness');
   const [journalSearch, setJournalSearch] = useState('');
+  // Выгрузка отчёта — не мгновенная операция; кнопка блокируется и показывает
+  // ход, чтобы двойной клик не отправлял две полные выгрузки втихую.
+  const [exportPending, setExportPending] = useState(false);
+  const exportReport = async () => {
+    setExportPending(true);
+    try { await downloadReadinessExport('reports', props.filters); }
+    catch (error) { toast.error(error instanceof Error ? error.message : 'Не удалось сформировать экспорт'); }
+    finally { setExportPending(false); }
+  };
   const states = Object.values(props.readinessByEquipment);
   const authoritative = props.currentReadiness.length > 0 ? props.currentReadiness : null;
   const ready = authoritative
@@ -273,8 +282,8 @@ export function ReportsScreen(props: ReferenceUiProps) {
         heading="Отчёты"
         subtitle="Аналитика доказательной готовности"
         actions={(
-          <Button className="bg-signal-strong hover:bg-signal-strong" onClick={() => void downloadReadinessExport('reports', props.filters).catch((error) => toast.error(error instanceof Error ? error.message : 'Не удалось сформировать экспорт'))}>
-            Экспорт отчёта
+          <Button className="bg-signal-strong hover:bg-signal-strong" disabled={exportPending} onClick={() => void exportReport()}>
+            {exportPending ? 'Готовим файл…' : 'Экспорт отчёта'}
           </Button>
         )}
       />
