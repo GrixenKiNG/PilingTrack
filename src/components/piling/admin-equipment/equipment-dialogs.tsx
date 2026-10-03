@@ -184,7 +184,10 @@ export function DeleteEquipmentDialog({
         <DialogHeader>
           <DialogTitle className="text-destructive-strong">Удалить установку?</DialogTitle>
           <DialogDescription>
-            Установка «{item?.name}» будет удалена. Это действие нельзя отменить.
+            Установка «{item?.name}» будет удалена без возможности восстановления.
+            Удалить можно только установку, за которой нет истории: если у неё есть отчёты,
+            смены, осмотры, ТО, топливо или документы — удаление отклонится, а данные
+            сохранятся, установку нужно вывести из эксплуатации.
           </DialogDescription>
         </DialogHeader>
         {crewCount > 0 && (
@@ -193,12 +196,12 @@ export function DeleteEquipmentDialog({
             <p className="text-xs text-destructive-strong">
               Эта установка используется в <strong>{crewCount}</strong>{' '}
               {pluralizeRu(crewCount, ['бригаде', 'бригадах', 'бригадах'])}.
-              Удаление может повлиять на связанные записи.
+              Удаление будет отклонено — сначала выведите установку из эксплуатации, история сохранится.
             </p>
           </div>
         )}
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Отмена</Button>
+          <Button variant="outline" disabled={submitting} onClick={() => onOpenChange(false)}>Отмена</Button>
           <Button
             onClick={submit}
             disabled={submitting}
