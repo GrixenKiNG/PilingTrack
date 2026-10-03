@@ -210,3 +210,32 @@ describe('форма установки: подписи связаны с пол
     expect(screen.getByLabelText('Вид молота (для чек-листа)')).toBeInstanceOf(HTMLButtonElement);
   });
 });
+
+describe('форма установки: лимиты полей как в zod-схеме маршрута (R121)', () => {
+  it('текстовые поля ограничены по длине из схемы', () => {
+    render(<EquipmentForm state={EMPTY_EQUIPMENT_FORM} onChange={() => {}} />);
+
+    expect(screen.getByLabelText('Название *')).toHaveAttribute('maxLength', '200');
+    expect(screen.getByLabelText('Описание')).toHaveAttribute('maxLength', '2000');
+    expect(screen.getByLabelText('VIN')).toHaveAttribute('maxLength', '50');
+  });
+
+  it('числовые поля ограничены по min/max, целые — шагом 1', () => {
+    render(<EquipmentForm state={EMPTY_EQUIPMENT_FORM} onChange={() => {}} />);
+
+    fireEvent.mouseDown(screen.getByRole('tab', { name: /Тех. характеристики/ }));
+    const weight = screen.getByLabelText('Вес (т)');
+    expect(weight).toHaveAttribute('min', '0');
+    expect(weight).toHaveAttribute('max', '2000');
+    expect(weight).toHaveAttribute('step', '0.1');
+    const height = screen.getByLabelText('Высота (мм)');
+    expect(height).toHaveAttribute('max', '100000');
+    expect(height).toHaveAttribute('step', '1');
+
+    fireEvent.mouseDown(screen.getByRole('tab', { name: /Эксплуатация/ }));
+    const hours = screen.getByLabelText('Наработка моточасов');
+    expect(hours).toHaveAttribute('min', '0');
+    expect(hours).toHaveAttribute('max', '1000000');
+    expect(hours).toHaveAttribute('step', '1');
+  });
+});
