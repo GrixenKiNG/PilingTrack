@@ -38,4 +38,20 @@ describe('план бурения: поля строки имеют доступ
     expect(screen.getByLabelText('Количество, шт')).toBeInstanceOf(HTMLInputElement);
     expect(screen.getByLabelText('Длина бурения на единицу, м/шт')).toBeInstanceOf(HTMLInputElement);
   });
+
+  /**
+   * R121-7: диаметр бурения принимался без верхней границы, хотя схема
+   * маршрута (src/lib/validation-schemas.ts) допускает 0..999. «⌀ 1200»
+   * (опечатка) уходил на сервер и возвращал 400.
+   */
+  it('диаметр ограничен сверху 999, как в схеме маршрута', () => {
+    render(
+      <DrillingPlanSection
+        plans={[{ tempId: 'd1', diameter: 0, count: 0, metersPerUnit: 0 }]}
+        setPlans={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByLabelText('Диаметр, мм')).toHaveAttribute('max', '999');
+  });
 });

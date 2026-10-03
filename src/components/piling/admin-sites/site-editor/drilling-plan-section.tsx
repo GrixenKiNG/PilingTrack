@@ -42,6 +42,7 @@ export function DrillingPlanSection({ plans, setPlans }: DrillingPlanSectionProp
               <Input
                 type="number"
                 min="0"
+                max="999"
                 value={row.diameter || ''}
                 onChange={(e) =>
                   setPlans(plans.map((p) => (p.tempId === row.tempId ? { ...p, diameter: Number(e.target.value) || 0 } : p)))
