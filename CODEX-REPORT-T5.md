@@ -51,3 +51,9 @@ MaxListenersExceededWarning подтверждён на новом собран�
 GitNexus impact GET/invalidatePattern и detect-changes: exit 1 (CLI отсутствует, без установки). Разрешённый fallback rg выявил dashboard/sites callers и invalidateSiteAnalytics; diff --check exit 0. Graph risk неизвестен. Изменение касается только cache и тестового стенда; auth/security/RLS/schema/frozen product не менялись. Generated PDF лежит только в собственном storage/pdf-results, не добавляется в Git и будет удалён при cleanup.
 
 Коммит E1 runtime/cache: 28a45fa8. Второй E1 коммит сохраняет browser harness/fixtures/specs и инструкцию воспроизведения; окончательные проверки ветки — E7.
+
+## E2 — проверка IDOR
+
+Инвентаризация: docs/audits/codex-t5-idor.md — 81 маршрут/130 методов с ID в пути/теле/query, ссылки на guards. Static строки не объявляются runtime проверенными; покрытие дочерних существующих документов/briefing и всех readiness сущностей остаётся неполным. Native HTTP к production приложению стенда + настоящий PG: exit 0, 119 passed/0 skipped (e2-idor-green.log), две собственные роли B OPERATOR/ASSISTANT, существующие Equipment/Site/Inspection/Template/Report/User/Shift/Crew/Maintenance/Media A. Отказы 403/404; после запросов A не изменены. /crews/my безопасно игнорирует чужой operatorId и для обеих ролей возвращает только seeded B crew (200), это специально проверено, продукт не менялся. Некоторые child IDs отсутствующие, поэтому тест не доказывает запрет доступа к существующему child. Платформенные роли не изменены. Подтверждённой уязвимости не найдено; SECURITY правок нет.
+
+Диагностика теста: 96 passed/9 failed — неверные поля и несуществующие HTTP методы; исправлены контракты теста. Следующий 117 passed/2 failed — неверное ожидание 403 для безопасного crews/my. BASE_URL Vitest заменяет на /; run-day-check.cjs сохраняет реальный loopback URL в CODEX_STAND_URL, credentials остаются в памяти. E1 harness commit f32edbbf.
