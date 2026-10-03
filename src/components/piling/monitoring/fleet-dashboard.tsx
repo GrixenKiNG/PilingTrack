@@ -59,13 +59,19 @@ function sortCards(cards: FleetCard[], sortBy: SortBy): FleetCard[] {
  * а таймаут и мусорный ответ — «Нет соединения»: сбой БД (500), ограничение
  * частоты (429) и отсутствие сети выглядели одинаково, и человек шёл чинить
  * интернет вместо того, чтобы просто повторить запрос.
+ *
+ * Совет повторного запроса был жёстким хвостом у всех отказов сразу: таймаут
+ * («…Повторите попытку.») превращался в «…Повторите попытку. Повторите
+ * попытку.», а 401/403 советовали повторить то, что повтором не чинится (идёт
+ * редирект на вход / нет прав). Теперь совет живёт внутри текста только там,
+ * где повтор уместен, и экран его не дописывает.
  */
 function fleetFailureMessage(status: number): string {
-  if (status === 429) return 'Слишком много запросов — сервис ограничил частоту.';
-  if (status >= 500) return 'Сервер мониторинга временно недоступен.';
+  if (status === 429) return 'Слишком много запросов — сервис ограничил частоту. Повторите попытку.';
+  if (status >= 500) return 'Сервер мониторинга временно недоступен. Повторите попытку.';
   if (status === 403) return 'Нет доступа к мониторингу. Обратитесь к администратору.';
   if (status === 401) return 'Сессия истекла — войдите снова.';
-  return `Не удалось загрузить снимок мониторинга (код ${status}).`;
+  return `Не удалось загрузить снимок мониторинга (код ${status}). Повторите попытку.`;
 }
 
 export function FleetDashboard() {
@@ -98,7 +104,7 @@ export function FleetDashboard() {
       const timedOut = typeof err === 'object' && err !== null && (err as { name?: unknown }).name === 'TimeoutError';
       setError(timedOut
         ? 'Сервер не ответил за 15 секунд. Повторите попытку.'
-        : 'Нет соединения с сервисом мониторинга.');
+        : 'Нет соединения с сервисом мониторинга. Повторите попытку.');
     }
   }, []);
 
@@ -171,7 +177,7 @@ export function FleetDashboard() {
       <div className="p-6">
         <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-destructive-strong">
           <p className="text-sm font-semibold">Мониторинг не загрузился</p>
-          <p className="mt-1 text-sm">{error} Повторите попытку.</p>
+          <p className="mt-1 text-sm">{error}</p>
           <button
             type="button"
             onClick={() => void fetchSnapshot({ bust: true })}
