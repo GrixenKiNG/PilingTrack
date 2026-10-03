@@ -64,12 +64,14 @@ vi.mock('@/components/piling/to/readiness-reference-ui', () => ({
 vi.mock('@/components/piling/to/readiness/tech-readiness-module', () => ({
   TechReadinessModule: ({
     activeView,
+    moduleLabel,
     children,
   }: {
     activeView: string;
+    moduleLabel?: string;
     children: ReactNode;
   }) => (
-    <div data-testid="production-shell" data-active-view={activeView}>
+    <div data-testid="production-shell" data-active-view={activeView} data-module-label={moduleLabel}>
       {children}
     </div>
   ),
@@ -165,6 +167,15 @@ describe('ToModule production shell integration', () => {
     vi.restoreAllMocks();
     vi.unstubAllEnvs();
   });
+
+  it('называет модуль одним именем — «Техническая готовность» (F-R131-TOP, №1)', async () => {
+    await renderToModule('/admin/to');
+
+    expect(screen.getByTestId('production-shell')).toHaveAttribute(
+      'data-module-label',
+      'Техническая готовность',
+    );
+  }, 30_000);
 
   it('restores the initial view, settings section and equipment deep link', async () => {
     await renderToModule(

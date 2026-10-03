@@ -141,7 +141,7 @@ const SURFACE_ROUTE: Record<ModuleSurface, string> = {
 };
 
 const SURFACE_LABEL: Record<ModuleSurface, string> = {
-  readiness: 'Центр технической готовности',
+  readiness: 'Техническая готовность',
   safety: 'ТБ и допуски',
 };
 

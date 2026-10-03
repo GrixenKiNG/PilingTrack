@@ -9,6 +9,19 @@ beforeAll(() => {
 });
 
 describe('TechReadinessModule', () => {
+  it('называет себя одним именем по умолчанию — «Техническая готовность» (F-R131-TOP, №1)', () => {
+    render(
+      <TechReadinessModule activeView="readiness" onViewChange={() => undefined}>
+        <main>Рабочая область</main>
+      </TechReadinessModule>,
+    );
+
+    expect(screen.getByTestId('tech-readiness-module')).toHaveAttribute(
+      'aria-label',
+      'Техническая готовность',
+    );
+  });
+
   it('has one named tab panel, one live region and flow-safe geometry hooks', () => {
     render(
       <TechReadinessModule
