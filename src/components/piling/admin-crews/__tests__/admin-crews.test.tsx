@@ -101,6 +101,62 @@ describe('AdminCrews — одно действие деактивации (F-R10
   });
 });
 
+/**
+ * R124-5: помощник, чей пользователь удалён, не попадал в активный справочник
+ * и исчезал из состава формы, оставаясь в отправляемых `assistantUserIds`.
+ * Состав выглядел пустым, но сохранить бригаду было нельзя: сервер отбивал
+ * невидимого помощника 400, а убрать его из формы было нечем.
+ */
+describe('CrewFormDialog — удалённый помощник виден и удаляем (F-R124-5)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  const editWithDeletedAssistant = {
+    id: 'c1', name: 'Бригада 1', isActive: true,
+    operatorId: 'o1', equipmentId: 'e1', siteId: 's1',
+    assistants: [{ id: 'a1', crewId: 'c1', userId: 'u-del', name: 'Пётр Удалённый' }],
+  } as unknown as CrewDTO;
+
+  it('имя удалённого помощника остаётся в составе, а не подменяется пустотой', () => {
+    render(
+      <CrewFormDialog
+        open onClose={vi.fn()} mode="edit" editItem={editWithDeletedAssistant}
+        operators={[{ id: 'o1', name: 'Оператор' }] as unknown as UserDTO[]}
+        equipment={[{ id: 'e1', name: 'Техника' }] as unknown as EquipmentDTO[]}
+        sites={[{ id: 's1', name: 'Объект' }] as unknown as SiteDTO[]}
+        assistants={[]} loadingReferenceData={false} referenceError={null}
+        onSubmit={vi.fn()} submitting={false}
+      />,
+    );
+
+    expect(screen.getByText('Пётр Удалённый')).toBeInTheDocument();
+    expect(screen.getByText('1 помощник(ов) в составе бригады')).toBeInTheDocument();
+    expect(screen.queryByText('Помощники не выбраны')).toBeNull();
+  });
+
+  it('нераспознанный помощник подписан, а не показан сырым id', () => {
+    const withUnknown = {
+      ...editWithDeletedAssistant,
+      assistants: [{ id: 'a2', crewId: 'c1', userId: 'u-gone', name: '' }],
+    } as unknown as CrewDTO;
+
+    render(
+      <CrewFormDialog
+        open onClose={vi.fn()} mode="edit" editItem={withUnknown}
+        operators={[{ id: 'o1', name: 'Оператор' }] as unknown as UserDTO[]}
+        equipment={[{ id: 'e1', name: 'Техника' }] as unknown as EquipmentDTO[]}
+        sites={[{ id: 's1', name: 'Объект' }] as unknown as SiteDTO[]}
+        assistants={[]} loadingReferenceData={false} referenceError={null}
+        onSubmit={vi.fn()} submitting={false}
+      />,
+    );
+
+    expect(screen.getByText('Помощник удалён')).toBeInTheDocument();
+    expect(screen.queryByText('u-gone')).toBeNull();
+  });
+});
+
 describe('CrewFormDialog — справочники и название (F-R102-7,9)', () => {
   beforeEach(() => {
     vi.clearAllMocks();

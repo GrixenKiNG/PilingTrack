@@ -31,6 +31,9 @@ import {
 } from '@/components/ui/select';
 import type { CrewDTO, EquipmentDTO, SiteDTO, UserDTO } from '@/lib/types';
 
+/** Подпись помощника, чей пользователь удалён: вместо сырого id (R124 №5). */
+const DELETED_ASSISTANT_NAME = 'Помощник удалён';
+
 interface CrewFormDialogProps {
   open: boolean;
   onClose: () => void;
@@ -151,6 +154,23 @@ export function CrewFormDialog({
   const selectedAssistantNames = assistantUserIds
     .map(id => assistants.find(user => user.id === id)?.name)
     .filter((assistantName): assistantName is string => Boolean(assistantName));
+
+  /*
+    Помощник, чей пользователь удалён или отключён, не попадает в активный
+    справочник, но имя осталось в составе бригады (`editItem.assistants`).
+    Раньше он исчезал из формы, оставаясь в отправляемых `assistantUserIds`:
+    состав выглядел пустым, а сохранить бригаду было нельзя — сервер отбивал
+    невидимого помощника 400, убрать его из формы было нечем (R124 №5).
+  */
+  const assistantNameById: Record<string, string> = {};
+  for (const user of assistants) assistantNameById[user.id] = user.name;
+  for (const assistant of editItem?.assistants ?? []) {
+    if (assistant.userId && assistant.name && !assistantNameById[assistant.userId]) {
+      assistantNameById[assistant.userId] = assistant.name;
+    }
+  }
+  const assistantDisplayNames = assistantUserIds
+    .map(id => assistantNameById[id] ?? DELETED_ASSISTANT_NAME);
 
   const handleSubmit = async () => {
     if (!operatorId || !equipmentId || !siteId) {
@@ -301,7 +321,7 @@ export function CrewFormDialog({
 
               <AssistantSelector
                 label="Помощники"
-                names={selectedAssistantNames}
+                names={assistantDisplayNames}
                 onOpen={() => setShowAssistantDialog(true)}
               />
 
@@ -342,6 +362,7 @@ export function CrewFormDialog({
         open={showAssistantDialog}
         onClose={() => setShowAssistantDialog(false)}
         assistantUsers={assistants}
+        assistantNameById={assistantNameById}
         selectedIds={assistantUserIds}
         onToggleId={(selectedId) => setAssistantUserIds(prev => (
           prev.includes(selectedId)
@@ -361,6 +382,7 @@ function AssistantSelectorModal({
   open,
   onClose,
   assistantUsers,
+  assistantNameById,
   selectedIds,
   onToggleId,
   onRemoveId,
@@ -369,6 +391,7 @@ function AssistantSelectorModal({
   open: boolean;
   onClose: () => void;
   assistantUsers: UserDTO[];
+  assistantNameById: Record<string, string>;
   selectedIds: string[];
   onToggleId: (id: string) => void;
   onRemoveId: (id: string) => void;
@@ -440,11 +463,11 @@ function AssistantSelectorModal({
                   key={id}
                   className="inline-flex items-center gap-1 rounded-md border border-warning/30 bg-warning/10 px-2 py-1 text-xs font-medium text-warning-strong"
                 >
-                  {assistantUsers.find(user => user.id === id)?.name ?? id}
+                  {assistantNameById[id] ?? DELETED_ASSISTANT_NAME}
                   <button
                     type="button"
                     onClick={() => onRemoveId(id)}
-                    aria-label={`Удалить ассистента ${assistantUsers.find(user => user.id === id)?.name ?? id}`}
+                    aria-label={`Удалить ассистента ${assistantNameById[id] ?? DELETED_ASSISTANT_NAME}`}
                     title="Удалить ассистента"
                     className="flex min-h-11 min-w-11 items-center justify-center rounded text-warning-strong transition-colors hover:bg-warning/10 hover:text-warning-strong"
                   >
