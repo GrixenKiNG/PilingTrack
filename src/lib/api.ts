@@ -1,3 +1,4 @@
+import { toast } from 'sonner';
 import { usePilingStore } from '@/lib/store';
 import { pushClientFeedback } from '@/lib/client-feedback';
 import type { UserRole } from '@/lib/types';
@@ -134,12 +135,20 @@ export async function loadJson<T>(url: string, options: RequestInit = {}): Promi
 
 export async function logoutClient() {
   try {
-    await fetch('/api/auth/logout', {
+    const response = await fetch('/api/auth/logout', {
       method: 'POST',
       credentials: 'same-origin',
     });
-  } finally {
+    if (!response.ok) {
+      const body = await response.json().catch(() => null);
+      toast.error(typeof body?.error === 'string' ? body.error : 'Не удалось завершить сеанс. Повторите выход.');
+      return false;
+    }
     usePilingStore.getState().logout();
+    return true;
+  } catch {
+    toast.error('Нет соединения с сервером. Сеанс не завершён — повторите выход.');
+    return false;
   }
 }
 
