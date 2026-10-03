@@ -85,6 +85,7 @@ export function CreateSiteDialog({
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="Например: ЖК Солнечный"
+                  maxLength={200}
                   className="h-11"
                   autoFocus
                 />

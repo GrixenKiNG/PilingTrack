@@ -20,6 +20,26 @@ describe('EditSiteDialog', () => {
     expect(screen.getByRole('button', { name: 'Сохранить' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Повторить' })).toBeTruthy();
   });
+
+  /**
+   * R121-6: «Название объекта» не имело maxLength, а createSiteSchema
+   * (src/lib/validation-schemas.ts) ограничивает имя 200 символами. Длинное
+   * название уходило на сервер и возвращало 400 без имени поля.
+   */
+  it('название объекта ограничено длиной 200, как в схеме маршрута', async () => {
+    authFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ site: {} }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      }),
+    );
+    render(<EditSiteDialog
+      site={{ id: 's1', name: 'Объект 1', isActive: true, plannedPiles: 1, plannedDrilling: 1 }}
+      open onOpenChange={vi.fn()} loadingPileGrades={false} pileGrades={[]} onSave={vi.fn()}
+    />);
+
+    expect(await screen.findByLabelText('Название объекта')).toHaveAttribute('maxLength', '200');
+  });
 });
 
 // Guard инцидента 2026-07-17: сохранение объекта с опустевшим планом стёрло

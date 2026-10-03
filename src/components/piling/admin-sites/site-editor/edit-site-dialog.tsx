@@ -197,6 +197,7 @@ export function EditSiteDialog({
                   id={`${uid}-name`}
                   value={name}
                   onChange={(e) => setName(e.target.value)}
+                  maxLength={200}
                   className="h-11"
                   autoFocus
                 />
