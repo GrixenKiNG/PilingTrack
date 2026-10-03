@@ -447,3 +447,26 @@ describe('форма наряда ТО: сохранение без правок
     expect(putBody().completedAt).toBe('2026-09-26');
   });
 });
+
+describe('доска нарядов ТО: отменённый наряд нельзя «закрыть» (F-R122-6)', () => {
+  /*
+    Кнопки «Закрыть наряд ТО» и «Закрыть ТО» выключались только при DONE. У
+    отменённого наряда они оставались активны: PUT {status:'DONE'} переводил
+    CANCELLED → DONE, сдвигая регламент и записывая показание счётчика. Карточка
+    наряда кнопок для отменённого не показывает — правило теперь и здесь.
+  */
+  beforeEach(() => {
+    mocks.authFetch.mockImplementation(async (url: string, init?: RequestInit) => {
+      if (url.startsWith('/api/media')) return json({ data: [] });
+      if (init?.method === 'PUT') return json({ record: { ...record(), status: 'CANCELLED' } });
+      return json({ records: [{ ...record(), status: 'CANCELLED' }] });
+    });
+  });
+
+  it('«Закрыть наряд ТО» в журнале и «Закрыть ТО» в панели выключены', async () => {
+    render(<MaintenanceBoard />);
+
+    expect(await screen.findByRole('button', { name: 'Закрыть наряд ТО' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Закрыть ТО' })).toBeDisabled();
+  });
+});

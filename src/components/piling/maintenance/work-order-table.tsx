@@ -133,7 +133,10 @@ export function WorkOrderTable({
                     <button
                       type="button"
                       onClick={(event) => { event.stopPropagation(); onDone(record); }}
-                      disabled={busyAction === `${record.id}:DONE` || record.status === 'DONE'}
+                      // Отменённый наряд закрывать нельзя (F-R122-6): сервер статусных
+                      // переходов не проверяет и перевёл бы CANCELLED → DONE со сдвигом
+                      // регламента и записью показания счётчика.
+                      disabled={busyAction === `${record.id}:DONE` || record.status === 'DONE' || record.status === 'CANCELLED'}
                       className="inline-flex h-11 w-11 items-center justify-center rounded border border-border text-success-strong hover:bg-success/10 disabled:cursor-not-allowed disabled:opacity-40"
                       aria-label="Закрыть наряд ТО"
                       title="Закрыть наряд ТО"

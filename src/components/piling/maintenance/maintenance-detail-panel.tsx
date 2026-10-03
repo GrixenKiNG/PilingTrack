@@ -140,7 +140,9 @@ export function MaintenanceDetailPanel({
           <Button
             size="sm"
             className="h-11 bg-signal px-2 text-white hover:bg-signal-strong sm:h-9"
-            disabled={closeBusy || record.status === 'DONE'}
+            // Отменённый наряд закрыть нельзя (F-R122-6): PUT {status:'DONE'} вернул бы
+            // его из CANCELLED в DONE, сдвинув регламент и записав показание счётчика.
+            disabled={closeBusy || record.status === 'DONE' || record.status === 'CANCELLED'}
             onClick={() => void onClose(record)}
           >
             {closeBusy ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-1 h-4 w-4" />} Закрыть ТО
