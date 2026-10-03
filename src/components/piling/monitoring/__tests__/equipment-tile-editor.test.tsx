@@ -173,6 +173,7 @@ describe('EquipmentTileEditor', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Редактировать шаблон' }));
     fireEvent.click(screen.getByRole('button', { name: 'Сбросить' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Сбросить шаблон' }));
 
     await waitFor(() => expect(screen.queryByText('Новый текст')).not.toBeInTheDocument());
     // Reset removes the saved row (DELETE) and falls back to the default.
