@@ -43,8 +43,9 @@ vi.mock('@/components/piling/confirm-action-dialog', () => ({
     ) : null,
 }));
 vi.mock('../report-evidence-row', () => ({
-  ReportsHeader: ({ onExport, onExportXlsx }: { onExport?: () => void; onExportXlsx?: () => void }) => (
+  ReportsHeader: ({ onExport, onExportXlsx, exporting }: { onExport?: () => void; onExportXlsx?: () => void; exporting: 'csv' | 'xlsx' | null }) => (
     <div>
+      <span data-testid="export-state">{exporting ?? 'idle'}</span>
       <button type="button" onClick={onExport}>CSV</button>
       <button type="button" onClick={onExportXlsx}>Excel</button>
     </div>
@@ -152,6 +153,36 @@ describe('AdminReports — единый формат даты отчёта (F-R1
     fireEvent.click(screen.getByRole('button', { name: 'Удалить' }));
 
     expect(screen.getByText(/Отчёт от 01\.09\.2026 \(Иван\) будет удалён/)).toBeInTheDocument();
+  });
+});
+
+/**
+ * F-R115-12: на время выгрузки обе кнопки («CSV» и «Excel») одновременно
+ * писали «Готовим…» — было не понять, какой файл готовится. Экран теперь
+ * помнит нажатый формат и до ответа сервера помечает только его.
+ */
+describe('AdminReports — пометка формата выгрузки (F-R115-12)', () => {
+  beforeEach(() => {
+    authFetchMock.mockReset();
+    vi.mocked(toast.error).mockClear();
+    reportsState.current = baseState();
+  });
+
+  it('во время выгрузки помечен только нажатый формат, после ответа — снова пусто', async () => {
+    let resolveFetch: (value: unknown) => void = () => {};
+    authFetchMock.mockImplementation(() => new Promise((resolve) => { resolveFetch = resolve; }));
+
+    render(<AdminReports />);
+    expect(screen.getByTestId('export-state')).toHaveTextContent('idle');
+
+    // Фильтр «Сегодня» задаёт период, который нужен выгрузке.
+    fireEvent.click(screen.getByRole('button', { name: 'Сегодня' }));
+    fireEvent.click(screen.getByRole('button', { name: 'CSV' }));
+
+    await waitFor(() => expect(screen.getByTestId('export-state')).toHaveTextContent('csv'));
+
+    resolveFetch({ ok: false, status: 500, json: async () => ({}) });
+    await waitFor(() => expect(screen.getByTestId('export-state')).toHaveTextContent('idle'));
   });
 });
 

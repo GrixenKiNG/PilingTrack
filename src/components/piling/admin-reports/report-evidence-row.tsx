@@ -45,7 +45,8 @@ export function ReportsHeader({
   onPrint: () => void;
   onExport?: () => void;
   onExportXlsx?: () => void;
-  exporting: boolean;
+  /** Какой формат готовится прямо сейчас; null — ничего не выгружается. */
+  exporting: 'csv' | 'xlsx' | null;
   onCreate?: () => void;
 }) {
   return (
@@ -74,21 +75,21 @@ export function ReportsHeader({
         </Button>
         {onExport && <Button
           onClick={onExport}
-          disabled={exporting}
+          disabled={exporting !== null}
           variant="outline"
           className="h-11 border-border bg-card text-foreground sm:h-10"
         >
           <Download className="mr-1.5 h-4 w-4" />
-          {exporting ? 'Готовим…' : 'CSV'}
+          {exporting === 'csv' ? 'Готовим…' : 'CSV'}
         </Button>}
         {onExportXlsx && <Button
           onClick={onExportXlsx}
-          disabled={exporting}
+          disabled={exporting !== null}
           variant="outline"
           className="h-11 border-border bg-card text-foreground sm:h-10"
         >
           <Download className="mr-1.5 h-4 w-4" />
-          {exporting ? 'Готовим…' : 'Excel'}
+          {exporting === 'xlsx' ? 'Готовим…' : 'Excel'}
         </Button>}
         {onCreate && <Button
           onClick={onCreate}

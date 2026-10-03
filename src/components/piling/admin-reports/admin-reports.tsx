@@ -63,7 +63,7 @@ export function AdminReports() {
   const [pendingDeleteReport, setPendingDeleteReport] = useState<ReportDTO | null>(null);
   const [quickFilter, setQuickFilter] = useState<QuickFilter>('all');
   const [filterEquipmentId, setFilterEquipmentId] = useState('all');
-  const [exporting, setExporting] = useState(false);
+  const [exporting, setExporting] = useState<'csv' | 'xlsx' | null>(null);
 
   // Export the same filters as the visible list. An unbounded history needs
   // an explicit period because the export endpoint is limited to 92 days.
@@ -81,7 +81,9 @@ export function AdminReports() {
     const dateTo = quickFrom && periodActive && periodTo ? [quickTo, periodTo].sort()[0]
       : quickFrom ? quickTo : periodTo;
     if (dateFrom > dateTo) { toast.error('В выбранном пересечении дат нет отчётов.'); return; }
-    setExporting(true);
+    // Какой именно файл готовится: обе кнопки («CSV» и «Excel») раньше писали
+    // «Готовим…» одновременно, и было не понять, какая выгрузка идёт (F-R115-12).
+    setExporting(format);
     let objectUrl: string | null = null;
     try {
       const params = new URLSearchParams({ dateFrom, dateTo });
@@ -113,7 +115,7 @@ export function AdminReports() {
       );
     } finally {
       if (objectUrl) URL.revokeObjectURL(objectUrl);
-      setExporting(false);
+      setExporting(null);
     }
   };
   // The preview pane shows the user-selected report, falling back to the first
