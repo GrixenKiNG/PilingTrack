@@ -89,3 +89,9 @@ Green exit0:3files36pass0skip (logout,session-service,existing api-error tests),
 Подтверждена. При ответах аналитики 403/500 плитки свай, бурения и простоя показывали нули или предыдущие числа. Теперь они показывают «— / Данные не загрузились», без прогресса; независимые отчёты, парк и ТО сохраняются.
 
 Красный тест: `node node_modules/vitest/vitest.mjs run src/components/piling/__tests__/admin-dashboard.test.tsx`, exit 1, 7 passed / 2 failed. После изменения: тот же запуск exit 0, 9 passed / 0 skipped. Проверяется реальное содержимое KPI при обеих ошибках. GitNexus detect-changes exit 1 (CLI недоступен, UNKNOWN); ручной diff и поиск зависимостей выполнены. `git diff --check`: exit 0. Браузерная проверка — F8.
+
+## F6 — находка 11: удалённый объект в ежечасном пересчёте
+
+Подтверждена. Планировщик теперь передаёт `tenantId` третьим аргументом `projectWeeklyTrend(site.id, null, tenantId)`. Реальный контекст `forEachTenant` сохраняется: удалённый после выборки объект пропускается, следующий пересчитывается; скрытый объект с неверным контекстом по-прежнему вызывает ошибку.
+
+Красный тест планировщика: exit 1, 6 passed / 1 failed. После исправления тесты планировщика и fail-closed обработчика: exit 0, 12 passed / 0 skipped. GitNexus impact/detect-changes exit 1 (CLI недоступен, UNKNOWN); проверены все текстовые вызовы и diff. `git diff --check`: exit 0.
