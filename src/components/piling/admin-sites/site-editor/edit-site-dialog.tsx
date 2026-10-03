@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { Loader2 } from '@/components/piling/icons/unified-icons';
 import { toast } from 'sonner';
 import { authFetch } from '@/lib/api';
@@ -53,6 +53,7 @@ export function EditSiteDialog({
   pileGrades,
   onSave,
 }: EditSiteDialogProps) {
+  const uid = useId();
   const [name, setName] = useState('');
   const [active, setActive] = useState(true);
   // Координаты держим строками, а не числами: пустое поле должно означать
@@ -191,8 +192,9 @@ export function EditSiteDialog({
           ) : (
             <div className="space-y-4 pb-2">
               <div className="space-y-1.5">
-                <Label>Название объекта</Label>
+                <Label htmlFor={`${uid}-name`}>Название объекта</Label>
                 <Input
+                  id={`${uid}-name`}
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   className="h-11"

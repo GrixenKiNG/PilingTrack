@@ -31,3 +31,12 @@ describe('AddHierarchyDialog — имя сохраняется при отказ
     await waitFor(() => expect(screen.getByRole('textbox')).toHaveValue(''));
   });
 });
+
+describe('AddHierarchyDialog — доступное имя поля (F-R116-3)', () => {
+  it('подпись «Название» связана с полем ввода', () => {
+    render(<AddHierarchyDialog open onOpenChange={vi.fn()} type="picket" onAdd={vi.fn().mockResolvedValue(true)} />);
+
+    // Прежде Label рисовался рядом без htmlFor — поле не имело имени для СР.
+    expect(screen.getByLabelText('Название')).toBe(screen.getByRole('textbox'));
+  });
+});

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import {
   Loader2,
   Pencil,
@@ -115,6 +115,7 @@ export function CrewFormDialog({
   onSubmit,
   submitting,
 }: CrewFormDialogProps) {
+  const uid = useId();
   const [operatorId, setOperatorId] = useState(editItem?.operatorId || '');
   const [equipmentId, setEquipmentId] = useState(editItem?.equipmentId || '');
   const [siteId, setSiteId] = useState(editItem?.siteId || '');
@@ -221,11 +222,11 @@ export function CrewFormDialog({
           ) : (
             <div className="space-y-3">
               <div className="space-y-1.5">
-                <Label>
+                <Label htmlFor={`${uid}-operator`}>
                   Оператор <span className="text-destructive-strong">*</span>
                 </Label>
                 <Select value={operatorId} onValueChange={setOperatorId}>
-                  <SelectTrigger className="h-11 w-full">
+                  <SelectTrigger id={`${uid}-operator`} className="h-11 w-full">
                     <SelectValue placeholder="Выберите оператора" />
                   </SelectTrigger>
                   <SelectContent>
@@ -243,11 +244,11 @@ export function CrewFormDialog({
               </div>
 
               <div className="space-y-1.5">
-                <Label>
+                <Label htmlFor={`${uid}-equipment`}>
                   Установка <span className="text-destructive-strong">*</span>
                 </Label>
                 <Select value={equipmentId} onValueChange={setEquipmentId}>
-                  <SelectTrigger className="h-11 w-full">
+                  <SelectTrigger id={`${uid}-equipment`} className="h-11 w-full">
                     <SelectValue placeholder="Выберите установку" />
                   </SelectTrigger>
                   <SelectContent>
@@ -264,11 +265,11 @@ export function CrewFormDialog({
               </div>
 
               <div className="space-y-1.5">
-                <Label>
+                <Label htmlFor={`${uid}-site`}>
                   Объект <span className="text-destructive-strong">*</span>
                 </Label>
                 <Select value={siteId} onValueChange={setSiteId}>
-                  <SelectTrigger className="h-11 w-full">
+                  <SelectTrigger id={`${uid}-site`} className="h-11 w-full">
                     <SelectValue placeholder="Выберите объект" />
                   </SelectTrigger>
                   <SelectContent>
@@ -285,10 +286,11 @@ export function CrewFormDialog({
               </div>
 
               <div className="space-y-1.5">
-                <Label>
+                <Label htmlFor={`${uid}-name`}>
                   Название <span className="text-destructive-strong">*</span>
                 </Label>
                 <Input
+                  id={`${uid}-name`}
                   value={name}
                   onChange={event => setName(event.target.value)}
                   placeholder="Бригада №1"

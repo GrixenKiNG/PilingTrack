@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { Check, Loader2, Pencil, UserCog } from '@/components/piling/icons/unified-icons';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -54,6 +54,7 @@ interface CreateProps {
 }
 
 export function CreateUserDialog({ open, onOpenChange, onSubmit }: CreateProps) {
+  const uid = useId();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
@@ -155,9 +156,9 @@ export function CreateUserDialog({ open, onOpenChange, onSubmit }: CreateProps) 
             placeholder="Минимум 8 символов"
           />
           <div className="space-y-1.5">
-            <Label>Роль</Label>
+            <Label htmlFor={`${uid}-role`}>Роль</Label>
             <Select value={role} onValueChange={(value) => setRole(value as UserRole)}>
-              <SelectTrigger className="h-11 w-full">
+              <SelectTrigger id={`${uid}-role`} className="h-11 w-full">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -191,6 +192,7 @@ interface EditProps {
 }
 
 export function EditUserDialog({ open, user, onOpenChange, onSubmit }: EditProps) {
+  const uid = useId();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
@@ -290,9 +292,9 @@ export function EditUserDialog({ open, user, onOpenChange, onSubmit }: EditProps
             placeholder="••••••••"
           />
           <div className="space-y-1.5">
-            <Label>Роль</Label>
+            <Label htmlFor={`${uid}-role`}>Роль</Label>
             <Select value={role} onValueChange={(value) => setRole(value as UserRole)}>
-              <SelectTrigger className="h-11 w-full">
+              <SelectTrigger id={`${uid}-role`} className="h-11 w-full">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>

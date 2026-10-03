@@ -13,7 +13,7 @@
  * экран и выборка диспетчера не разошлись.
  */
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useId, useState } from 'react';
 import { Plus, Pencil, Trash2, Loader2, FileText } from '@/components/piling/icons/unified-icons';
 import { toast } from 'sonner';
 import { authFetch } from '@/lib/api';
@@ -80,6 +80,7 @@ export function UserDocuments({ userId }: { userId: string }) {
    * когда `owner` совпадает с текущим `userId`. Это ответ на вопрос «чьи это
    * данные», а не на вопрос «загрузилось ли что-нибудь».
    */
+  const uid = useId();
   const [loaded, setLoaded] = useState<{ owner: string; rows: DocumentRow[] } | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
   const [types, setTypes] = useState<DocumentType[]>([]);
@@ -285,9 +286,9 @@ export function UserDocuments({ userId }: { userId: string }) {
           </DialogHeader>
           <div className="space-y-3">
             <div className="space-y-1">
-              <Label>Вид документа</Label>
+              <Label htmlFor={`${uid}-type`}>Вид документа</Label>
               <Select value={form.typeId} onValueChange={(typeId) => setForm((prev) => ({ ...prev, typeId }))}>
-                <SelectTrigger><SelectValue placeholder="Выберите вид" /></SelectTrigger>
+                <SelectTrigger id={`${uid}-type`}><SelectValue placeholder="Выберите вид" /></SelectTrigger>
                 <SelectContent>
                   {types.map((type) => (
                     <SelectItem key={type.id} value={type.id}>{type.name}</SelectItem>
@@ -296,22 +297,22 @@ export function UserDocuments({ userId }: { userId: string }) {
               </Select>
             </div>
             <div className="space-y-1">
-              <Label>Номер</Label>
-              <Input value={form.number} onChange={(e) => setForm((prev) => ({ ...prev, number: e.target.value }))} />
+              <Label htmlFor={`${uid}-number`}>Номер</Label>
+              <Input id={`${uid}-number`} value={form.number} onChange={(e) => setForm((prev) => ({ ...prev, number: e.target.value }))} />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
-                <Label>Выдан</Label>
-                <Input type="date" value={form.issuedAt} onChange={(e) => onIssuedChange(e.target.value)} />
+                <Label htmlFor={`${uid}-issued`}>Выдан</Label>
+                <Input id={`${uid}-issued`} type="date" value={form.issuedAt} onChange={(e) => onIssuedChange(e.target.value)} />
               </div>
               <div className="space-y-1">
-                <Label>Действует до</Label>
-                <Input type="date" value={form.expiresAt} onChange={(e) => setForm((prev) => ({ ...prev, expiresAt: e.target.value }))} />
+                <Label htmlFor={`${uid}-expires`}>Действует до</Label>
+                <Input id={`${uid}-expires`} type="date" value={form.expiresAt} onChange={(e) => setForm((prev) => ({ ...prev, expiresAt: e.target.value }))} />
               </div>
             </div>
             <div className="space-y-1">
-              <Label>Примечание</Label>
-              <Textarea rows={2} value={form.notes} onChange={(e) => setForm((prev) => ({ ...prev, notes: e.target.value }))} />
+              <Label htmlFor={`${uid}-notes`}>Примечание</Label>
+              <Textarea id={`${uid}-notes`} rows={2} value={form.notes} onChange={(e) => setForm((prev) => ({ ...prev, notes: e.target.value }))} />
             </div>
           </div>
           <DialogFooter>

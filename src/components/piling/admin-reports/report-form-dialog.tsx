@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { Plus, Pencil, Trash2, HardHat, Drill, Clock, Wrench, Loader2 } from '@/components/piling/icons/unified-icons';
 import { toast } from 'sonner';
 import { authFetch } from '@/lib/api';
@@ -58,6 +58,7 @@ export function ReportFormDialog({
   operators, sites, pileGrades, drillingTypes, downtimeReasons, equipment,
   onSuccess,
 }: ReportFormDialogProps) {
+  const uid = useId();
   const [formUserId, setFormUserId] = useState(editReport?.userId || '');
   const [formSiteId, setFormSiteId] = useState(editReport?.siteId || '');
   const [formDate, setFormDate] = useState(editReport?.date || getTodayInTimezone());
@@ -267,37 +268,37 @@ export function ReportFormDialog({
           {/* Operator, Site, Date, Shift, Equipment */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label className="text-xs font-medium text-muted-foreground">Оператор</Label>
+              <Label htmlFor={`${uid}-operator`} className="text-xs font-medium text-muted-foreground">Оператор</Label>
               <Select value={formUserId} onValueChange={setFormUserId}>
-                <SelectTrigger className="h-10"><SelectValue placeholder="Выберите оператора" /></SelectTrigger>
+                <SelectTrigger id={`${uid}-operator`} className="h-10"><SelectValue placeholder="Выберите оператора" /></SelectTrigger>
                 <SelectContent>
                   {operators.map((op) => <SelectItem key={op.id} value={op.id}>{op.name}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs font-medium text-muted-foreground">Объект</Label>
+              <Label htmlFor={`${uid}-site`} className="text-xs font-medium text-muted-foreground">Объект</Label>
               <Select value={formSiteId} onValueChange={setFormSiteId}>
-                <SelectTrigger className="h-10"><SelectValue placeholder="Выберите объект" /></SelectTrigger>
+                <SelectTrigger id={`${uid}-site`} className="h-10"><SelectValue placeholder="Выберите объект" /></SelectTrigger>
                 <SelectContent>
                   {sites.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs font-medium text-muted-foreground">Дата</Label>
-              <Input type="date" value={formDate} onChange={(e) => setFormDate(e.target.value)} className="h-10 font-mono" />
+              <Label htmlFor={`${uid}-date`} className="text-xs font-medium text-muted-foreground">Дата</Label>
+              <Input id={`${uid}-date`} type="date" value={formDate} onChange={(e) => setFormDate(e.target.value)} className="h-10 font-mono" />
             </div>
             <div className="grid grid-cols-2 gap-2">
-              <div className="space-y-1.5"><Label className="text-xs font-medium text-muted-foreground">Начало</Label>
-                <Input type="time" value={formShiftStart} onChange={(e) => setFormShiftStart(e.target.value)} className="h-10 font-mono" /></div>
-              <div className="space-y-1.5"><Label className="text-xs font-medium text-muted-foreground">Конец</Label>
-                <Input type="time" value={formShiftEnd} onChange={(e) => setFormShiftEnd(e.target.value)} className="h-10 font-mono" /></div>
+              <div className="space-y-1.5"><Label htmlFor={`${uid}-shift-start`} className="text-xs font-medium text-muted-foreground">Начало</Label>
+                <Input id={`${uid}-shift-start`} type="time" value={formShiftStart} onChange={(e) => setFormShiftStart(e.target.value)} className="h-10 font-mono" /></div>
+              <div className="space-y-1.5"><Label htmlFor={`${uid}-shift-end`} className="text-xs font-medium text-muted-foreground">Конец</Label>
+                <Input id={`${uid}-shift-end`} type="time" value={formShiftEnd} onChange={(e) => setFormShiftEnd(e.target.value)} className="h-10 font-mono" /></div>
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5"><Wrench className="w-3.5 h-3.5" />Установка</Label>
+              <Label htmlFor={`${uid}-equipment`} className="text-xs font-medium text-muted-foreground flex items-center gap-1.5"><Wrench className="w-3.5 h-3.5" />Установка</Label>
               <Select value={formEquipmentId} onValueChange={setFormEquipmentId}>
-                <SelectTrigger className="h-10"><SelectValue placeholder="Выберите установку..." /></SelectTrigger>
+                <SelectTrigger id={`${uid}-equipment`} className="h-10"><SelectValue placeholder="Выберите установку..." /></SelectTrigger>
                 <SelectContent>
                   {equipment.map((eq) => <SelectItem key={eq.id} value={eq.id}>{eq.name}</SelectItem>)}
                 </SelectContent>
