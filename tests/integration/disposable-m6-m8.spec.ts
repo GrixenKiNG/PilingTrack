@@ -106,6 +106,23 @@ describe.skipIf(!enabled)('M6–M8 on disposable migrated Postgres', () => {
     await inContext(() => restarted.deliverQueuedAlert({ id: eventId, tenantId: tenant, data: alert })); expect(sent).toEqual([]);
   });
 
+  it('F3: real RLS config marks permanent B disabled while outbox publishes delivery to A', async () => {
+    const eventId = tenant + '-permanent-delivery';
+    const alert = { severity: 'high', message: 'Permanent chat proof' };
+    await fixture.owner.query('INSERT INTO "OutboxEvent" (id,"tenantId",type,"aggregateType","aggregateId",payload,projected) VALUES ($1,$2,$3,$4,$1,$5,true)', [eventId, tenant, 'NotificationDeliveryRequested', 'Notification', JSON.stringify(alert)]);
+    vi.stubGlobal('fetch', vi.fn(async (_url: string, options: RequestInit) => {
+      const chat = JSON.parse(String(options.body)).chat_id;
+      return chat === 'B'
+        ? { ok: false, status: 400, text: async () => '{"description":"Bad Request: chat not found"}' }
+        : { ok: true, json: async () => ({ ok: true }) };
+    }));
+    const { deliverQueuedAlert } = await import('@/services/notifications/durable-alert-delivery');
+    await inContext(() => deliverQueuedAlert({ id: eventId, tenantId: tenant, data: alert }));
+    expect((await fixture.owner.query('SELECT payload,published FROM "OutboxEvent" WHERE id=$1', [eventId])).rows[0])
+      .toMatchObject({ published: true, payload: { telegramDeliveredChatIds: ['A'] } });
+    expect((await fixture.owner.query('SELECT enabled,label FROM "TelegramConfig" WHERE id=$1 AND "tenantId"=$2', [tenant + '-chat-B', tenant])).rows[0])
+      .toMatchObject({ enabled: false, label: expect.stringContaining('Чат не найден') });
+  });
   it('M8: real Media rows/files unchanged; dry-run deletes nothing; apply only old temporary UUID PDF', async () => {
     const { cleanupTemporaryPdfs } = await import('@/lib/pdf-generator/cleanup');
     files = join(workspace, '.tmp', 'codex-d2-pdf-' + randomUUID());

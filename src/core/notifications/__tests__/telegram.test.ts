@@ -8,14 +8,14 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-const { findManyMock, decryptMock, isEncryptedMock } = vi.hoisted(() => ({
-  findManyMock: vi.fn(),
+const { findManyMock, updateManyMock, decryptMock, isEncryptedMock } = vi.hoisted(() => ({
+  findManyMock: vi.fn(), updateManyMock: vi.fn(),
   decryptMock: vi.fn(),
   isEncryptedMock: vi.fn(),
 }));
 
 vi.mock('@/lib/db', () => ({
-  db: { telegramConfig: { findMany: findManyMock } },
+  db: { telegramConfig: { findMany: findManyMock, updateMany: updateManyMock } },
 }));
 
 vi.mock('@/core/security/encryption', () => ({
@@ -36,7 +36,7 @@ describe('telegramNotifier — botToken decryption', () => {
   const originalDefaultTenantId = process.env.DEFAULT_TENANT_ID;
 
   beforeEach(() => {
-    findManyMock.mockReset();
+    findManyMock.mockReset(); updateManyMock.mockReset().mockResolvedValue({ count: 1 });
     decryptMock.mockReset();
     isEncryptedMock.mockReset();
     // getConfig() has no per-request tenant (this notifier is called from
@@ -143,7 +143,7 @@ describe('telegramNotifier — доставка во все конфигурац
   const originalDefaultTenantId = process.env.DEFAULT_TENANT_ID;
 
   beforeEach(() => {
-    findManyMock.mockReset();
+    findManyMock.mockReset(); updateManyMock.mockReset().mockResolvedValue({ count: 1 });
     decryptMock.mockReset();
     isEncryptedMock.mockReset();
     process.env.DEFAULT_TENANT_ID = 'test-tenant';
@@ -196,6 +196,36 @@ describe('telegramNotifier — доставка во все конфигурац
     expect(sentChatIds()).toEqual(['-100A', '-100B']);
   });
 
+  it.each(['alert', 'document'])('F3: %s delivered to A ignores permanently broken B and marks its setting', async (kind) => {
+    findManyMock.mockResolvedValue([
+      { id: 'config-a', label: 'Рабочий', tenantId: 'test-tenant', botToken: 'test-a', chatId: 'A', enabled: true },
+      { id: 'config-b', label: 'Сломанный', tenantId: 'test-tenant', botToken: 'test-b', chatId: 'B', enabled: true },
+    ]);
+    isEncryptedMock.mockReturnValue(false);
+    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({ ok: true }) })
+      .mockResolvedValueOnce({ ok: false, status: 400, text: async () => '{"ok":false,"description":"Bad Request: chat not found"}' });
+    let payload: Prisma.JsonValue = { message: 'batch' };
+    const progress = createTelegramDeliveryProgress(payload, async next => { payload = JSON.parse(JSON.stringify(next)); });
+    const result = kind === 'alert'
+      ? await telegramNotifier.sendAlert({ severity: 'high', message: 'batch' }, progress)
+      : await telegramNotifier.sendDocument('test.pdf', Buffer.from('%PDF'), undefined, progress);
+    expect(result).toBe(true);
+    expect(updateManyMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ id: 'config-b', tenantId: 'test-tenant', enabled: true }),
+      data: { enabled: false, label: expect.stringContaining('Чат не найден') },
+    }));
+    expect(payload).toMatchObject({ telegramDeliveredChatIds: ['A'] });
+  });
+  it.each([[403, 'Forbidden: bot was blocked', true], [401, 'Unauthorized', true], [429, 'Too Many Requests', false], [503, 'unavailable', false]] as const)('F3: status %s classifies permanent/transient failure', async (status, description, permanent) => {
+    findManyMock.mockResolvedValue([
+      { id: 'a', label: 'A', botToken: 'test-a', chatId: 'A', enabled: true },
+      { id: 'b', label: 'B', botToken: 'test-b', chatId: 'B', enabled: true },
+    ]);
+    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({ ok: true }) })
+      .mockResolvedValueOnce({ ok: false, status, text: async () => description });
+    expect(await telegramNotifier.sendMessage('batch')).toBe(permanent);
+    expect(updateManyMock).toHaveBeenCalledTimes(permanent ? 1 : 0);
+  });
   it('I08: persists a partial batch and retries only unconfirmed chats after restart', async () => {
     findManyMock.mockResolvedValue([{ botToken: 'test-a', chatId: 'A', enabled: true }, { botToken: 'test-b', chatId: 'B', enabled: true }]);
     isEncryptedMock.mockReturnValue(false);
@@ -248,7 +278,7 @@ describe('telegramNotifier — человекочитаемые поля и зо
   const originalDefaultTenantId = process.env.DEFAULT_TENANT_ID;
 
   beforeEach(() => {
-    findManyMock.mockReset();
+    findManyMock.mockReset(); updateManyMock.mockReset().mockResolvedValue({ count: 1 });
     decryptMock.mockReset();
     isEncryptedMock.mockReset();
     process.env.DEFAULT_TENANT_ID = 'test-tenant';
@@ -339,7 +369,7 @@ describe('telegramNotifier — тайм-аут проверки канала (F-
   const originalDefaultTenantId = process.env.DEFAULT_TENANT_ID;
 
   beforeEach(() => {
-    findManyMock.mockReset();
+    findManyMock.mockReset(); updateManyMock.mockReset().mockResolvedValue({ count: 1 });
     decryptMock.mockReset();
     isEncryptedMock.mockReset().mockReturnValue(false);
     process.env.DEFAULT_TENANT_ID = 'test-tenant';
@@ -408,7 +438,7 @@ describe('telegramNotifier — чтение настроек внутри чуж
   const originalDefaultTenantId = process.env.DEFAULT_TENANT_ID;
 
   beforeEach(() => {
-    findManyMock.mockReset();
+    findManyMock.mockReset(); updateManyMock.mockReset().mockResolvedValue({ count: 1 });
     isEncryptedMock.mockReset().mockReturnValue(false);
     process.env.DEFAULT_TENANT_ID = 'orion';
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({ ok: true }), text: async () => '' }));

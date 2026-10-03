@@ -27,6 +27,10 @@ import { runOutsideGucScope } from '@/core/security/tenant-rls';
 // ============================================================
 
 interface TelegramBotConfig {
+  id: string;
+  tenantId: string;
+  label: string;
+  updatedAt: Date;
   botToken: string;
   chatId: string;
   enabled: boolean;
@@ -83,7 +87,7 @@ async function loadConfigsForTenant(tenantId: string): Promise<TelegramBotConfig
       const botToken = raw.botToken && isEncrypted(raw.botToken)
         ? decrypt(raw.botToken)
         : raw.botToken;
-      unique.push({ botToken, chatId: raw.chatId, enabled: raw.enabled });
+      unique.push({ id: raw.id, tenantId, label: raw.label, updatedAt: raw.updatedAt, botToken, chatId: raw.chatId, enabled: raw.enabled });
     }
     return unique;
   } catch (err) {
@@ -92,21 +96,26 @@ async function loadConfigsForTenant(tenantId: string): Promise<TelegramBotConfig
   }
 }
 
-/** Complete only when every enabled chat has a confirmed delivery. */
+/** Retry transient failures; permanently disabled chats do not block working chats. */
+type DeliveryResult = boolean | 'permanent';
 async function deliverToAll(
   configs: TelegramBotConfig[],
-  send: (config: TelegramBotConfig) => Promise<boolean>,
+  send: (config: TelegramBotConfig) => Promise<DeliveryResult>,
   progress?: TelegramDeliveryProgress,
 ): Promise<boolean> {
   if (configs.length === 0) return false;
   let allSucceeded = true;
+  let anyDelivered = (progress?.deliveredChatIds.size ?? 0) > 0;
   for (const config of configs) {
     if (progress?.deliveredChatIds.has(config.chatId)) continue;
     const ok = await send(config);
-    if (ok) await progress?.confirm(config.chatId);
-    else allSucceeded = false;
+    if (ok === true) {
+      anyDelivered = true;
+      await progress?.confirm(config.chatId);
+    }
+    else if (ok !== 'permanent') allSucceeded = false;
   }
-  return allSucceeded;
+  return allSucceeded && anyDelivered;
 }
 
 // ============================================================
@@ -193,11 +202,27 @@ function escapeHtml(text: string): string {
 // Telegram Bot API Client
 // ============================================================
 
+async function recordTelegramFailure(config: TelegramBotConfig, status: number, raw: string): Promise<DeliveryResult> {
+  const permanent = status === 401 || status === 403 || (status === 400 && /chat not found|bot was blocked|user is deactivated|not a member|chat_write_forbidden/i.test(raw));
+  if (!permanent) return false;
+  const reason = describeTelegramError(raw);
+  const db = await getDbClient();
+  const marked = await runWithTenantContext(() => runOutsideGucScope(async () => {
+    setRequestTenantId(config.tenantId);
+    return db.telegramConfig.updateMany({
+      where: { id: config.id, tenantId: config.tenantId, enabled: true, updatedAt: config.updatedAt },
+      data: { enabled: false, label: config.label + ' — ' + reason },
+    });
+  }));
+  if (!marked.count) return false; // A concurrently edited config must be retried.
+  logger.warn('Telegram channel disabled after permanent delivery error', { configId: config.id, tenantId: config.tenantId, chatId: config.chatId, reason });
+  return 'permanent';
+}
 async function sendTelegramMessage(
   config: TelegramBotConfig,
   text: string,
   parse_mode = 'HTML'
-): Promise<boolean> {
+): Promise<DeliveryResult> {
   try {
     const url = `${process.env.TELEGRAM_API_BASE || 'https://api.telegram.org'}/bot${config.botToken}/sendMessage`;
 
@@ -216,11 +241,11 @@ async function sendTelegramMessage(
     if (!response.ok) {
       const error = await response.text();
       logger.error('Telegram API error', new Error(error), { status: response.status });
-      return false;
+      return await recordTelegramFailure(config, response.status, error);
     }
 
     const result = await response.json();
-    return result.ok === true;
+    return result.ok === true ? true : await recordTelegramFailure(config, result.error_code ?? 0, JSON.stringify(result));
   } catch (error) {
     logger.error('Failed to send Telegram message', error);
     return false;
@@ -232,7 +257,7 @@ async function sendTelegramDocument(
   filename: string,
   data: Buffer,
   caption?: string,
-): Promise<boolean> {
+): Promise<DeliveryResult> {
   try {
     const url = `${process.env.TELEGRAM_API_BASE || 'https://api.telegram.org'}/bot${config.botToken}/sendDocument`;
     const form = new FormData();
@@ -248,10 +273,10 @@ async function sendTelegramDocument(
     if (!response.ok) {
       const err = await response.text();
       logger.error('Telegram sendDocument error', new Error(err), { status: response.status });
-      return false;
+      return await recordTelegramFailure(config, response.status, err);
     }
     const result = await response.json();
-    return result.ok === true;
+    return result.ok === true ? true : await recordTelegramFailure(config, result.error_code ?? 0, JSON.stringify(result));
   } catch (error) {
     logger.error('Failed to send Telegram document', error);
     return false;
@@ -273,7 +298,7 @@ const TELEGRAM_ERROR_HINTS: ReadonlyArray<readonly [RegExp, string]> = [
   [/unauthorized|invalid token|token.*not found/i, 'Токен бота неверный — проверьте токен в настройках'],
   [/chat not found/i, 'Чат не найден — проверьте ID чата'],
   [/blocked|user is deactivated|bot can't initiate/i, 'Бот заблокирован — разблокируйте его в чате'],
-  [/not enough rights|not a member|no rights|chat_write_forbidden/i, 'Недостаточно прав — добавьте бота в чат с правом отправки'],
+  [/not enough rights|not a member|no rights|chat_write_forbidden|forbidden/i, 'Недостаточно прав — добавьте бота в чат с правом отправки'],
   [/chat_id is empty/i, 'Не указан ID чата — заполните поле «ID чата»'],
 ];
 
