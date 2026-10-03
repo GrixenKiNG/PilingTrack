@@ -297,3 +297,48 @@ describe('справочник видов документов: пределы �
     });
   });
 });
+
+/**
+ * F-R128-2: после создания, правки и блокировки/разблокировки пользователя
+ * `load()` ставил loading=true и гасил весь список «Пользователи» скелетоном.
+ * Полноэкранный скелетон теперь только на первой загрузке, когда списка ещё нет.
+ */
+describe('AdminUsers — повторная загрузка не гасит список (F-R128-2)', () => {
+  beforeEach(() => {
+    authFetchMock.mockReset();
+    window.history.replaceState(null, '', '/');
+  });
+
+  it('при повторной загрузке (список уже есть) таблица и фильтры остаются на месте', () => {
+    useUsersListMock.mockReturnValue({
+      users: [operationalUser()],
+      loading: true,
+      error: null,
+      retry: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+      remove: vi.fn(),
+      toggleActive: vi.fn(),
+    });
+    render(<AdminUsers />);
+
+    expect(screen.getByPlaceholderText('ФИО, email или телефон')).toBeInTheDocument();
+    expect(screen.getByText('Бригада / установка')).toBeInTheDocument();
+  });
+
+  it('на первой загрузке (список пуст) показывается скелетон без таблицы', () => {
+    useUsersListMock.mockReturnValue({
+      users: [],
+      loading: true,
+      error: null,
+      retry: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+      remove: vi.fn(),
+      toggleActive: vi.fn(),
+    });
+    render(<AdminUsers />);
+
+    expect(screen.queryByPlaceholderText('ФИО, email или телефон')).not.toBeInTheDocument();
+  });
+});
