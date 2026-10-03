@@ -429,11 +429,10 @@ export function SafetyOverviewScreen(props: ReferenceUiProps) {
                     здесь нет: таких действий в системе не существует — проверку
                     работник проходит сам на своём экране, а редакцию инструкции
                     выкладывает разработчик. Кнопки вели на экраны, которые прямо
-                    это сообщают, — то есть в тупик. */}
-                <Button variant="outline" className="justify-start" onClick={() => props.onViewChange('reports')}>
-                  <PilingIcon name="download" size={14} decorative />
-                  Сформировать выгрузку
-                </Button>
+                    это сообщают, — то есть в тупик.
+                    «Сформировать выгрузку» убрана по той же причине: вкладки
+                    «Отчёты» в «ТБ и допусках» нет (`SAFETY_TABS`), а клик
+                    переключал на раздел чужого модуля техготовности. */}
               </div>
             </section>
 

@@ -193,3 +193,16 @@ describe('SafetyOverviewScreen — кнопки-тупики убраны (F-R11
     expect(screen.queryByRole('button', { name: 'Назначить повторно' })).not.toBeInTheDocument();
   });
 });
+
+/**
+ * F-R110-6: «Сформировать выгрузку» переключала на view='reports', которого в
+ * SAFETY_TABS нет. Вкладка не подсвечивалась, а перезагрузка адреса
+ * `?view=reports` перенаправляла в /admin/to — раздел чужого модуля.
+ */
+describe('SafetyOverviewScreen — «Сформировать выгрузку» убрана (F-R110-6)', () => {
+  it('нет кнопки «Сформировать выгрузку», уводящей в чужой раздел', async () => {
+    await renderOverview();
+
+    expect(screen.queryByRole('button', { name: 'Сформировать выгрузку' })).not.toBeInTheDocument();
+  });
+});
