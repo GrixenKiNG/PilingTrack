@@ -280,3 +280,30 @@ describe('отчёт по установке: отказ выгрузки PDF о
     expect(toast.error).not.toHaveBeenCalledWith('Failed to fetch');
   });
 });
+
+/**
+ * F-R115-9: клик по фотографии установки при отказе скачивания молча ничего не
+ * делал — непонятно, нет прав, файла нет или пропала связь.
+ */
+describe('фото установки: отказ открытия объясняется по-русски (F-R115-9)', () => {
+  beforeEach(() => {
+    vi.mocked(toast.error).mockClear();
+  });
+
+  it('403 при открытии фото объясняется тостом, а не тишиной', async () => {
+    mocks.authFetch.mockImplementation(async (url: string) => {
+      if (url === '/api/media?entityType=equipment&entityId=eq-1') {
+        return json({ data: [{ id: 'm1', fileName: 'a.png', contentType: 'image/png', thumbnailKey: 'k' }] });
+      }
+      if (url.startsWith('/api/media/download-batch')) return json({ urls: { m1: 'https://cdn.example/x.jpg' } });
+      return json({ error: 'Доступ запрещён' }, 403);
+    });
+    render(<EquipmentPhotos equipmentId="eq-1" />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Открыть фото' }));
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith(
+      'Нет прав на просмотр фото. Смените роль или обратитесь к администратору.',
+    ));
+  });
+});

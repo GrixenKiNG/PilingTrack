@@ -146,11 +146,22 @@ export function EquipmentPhotos({ equipmentId }: Props) {
       window.open(tile.fullUrl, '_blank', 'noreferrer');
       return;
     }
-    const dl = await authFetch(`/api/media/${tile.id}/download`);
-    if (!dl.ok) return;
-    const url = (await dl.json()).url as string;
-    setPhotos((prev) => prev.map((p) => (p.id === tile.id ? { ...p, fullUrl: url } : p)));
-    window.open(url, '_blank', 'noreferrer');
+    try {
+      const dl = await authFetch(`/api/media/${tile.id}/download`);
+      // Тихий `return` на отказе давал клик без окна и без объяснения (F-R115-9).
+      if (!dl.ok) {
+        toast.error(dl.status === 403
+          ? 'Нет прав на просмотр фото. Смените роль или обратитесь к администратору.'
+          : 'Не удалось открыть фото. Повторите попытку.');
+        return;
+      }
+      const url = (await dl.json()).url as string;
+      setPhotos((prev) => prev.map((p) => (p.id === tile.id ? { ...p, fullUrl: url } : p)));
+      window.open(url, '_blank', 'noreferrer');
+    } catch (err) {
+      // Обрыв сети fetch бросает TypeError с английским «Failed to fetch» (F-R112-1).
+      toast.error(catchText(err, 'Не удалось открыть фото. Повторите попытку.'));
+    }
   };
 
   return (

@@ -60,6 +60,7 @@ vi.mock('../report-evidence-row', () => ({
 }));
 
 import { AdminReports } from '../admin-reports';
+import { ReportThumbnail } from '../report-thumbnail';
 
 const report = {
   id: 'r1',
@@ -203,6 +204,33 @@ describe('AdminReports — выгрузка без сети (F-R93-8)', () => {
 
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith(
       'Нет связи с сервером. Выгрузка не выполнена — повторите при появлении сети.',
+    ));
+  });
+});
+
+/**
+ * F-R115-9: клик по миниатюре фото отчёта при отказе скачивания молча ничего не
+ * делал — непонятно, нет прав, файла нет или пропала связь.
+ */
+describe('миниатюра фото отчёта: отказ открытия объясняется (F-R115-9)', () => {
+  beforeEach(() => {
+    authFetchMock.mockReset();
+    vi.mocked(toast.error).mockClear();
+  });
+
+  it('403 при открытии фото — тост, а не тишина', async () => {
+    authFetchMock.mockImplementation(async (url: string) => {
+      if (url.startsWith('/api/media/download-batch')) {
+        return { ok: true, status: 200, json: async () => ({ urls: { m1: 'https://cdn.example/x.jpg' } }) };
+      }
+      return { ok: false, status: 403, json: async () => ({ error: 'Доступ запрещён' }) };
+    });
+    render(<ReportThumbnail reportId="r1" mediaId="m1" />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Открыть фото отчёта' }));
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith(
+      'Нет прав на просмотр фото. Смените роль или обратитесь к администратору.',
     ));
   });
 });

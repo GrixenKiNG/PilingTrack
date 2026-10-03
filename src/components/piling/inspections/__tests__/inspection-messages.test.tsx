@@ -328,6 +328,24 @@ describe('фото пункта осмотра: сбой чтения галер
     );
     expect(toast.error).not.toHaveBeenCalledWith('Failed to fetch');
   });
+
+  // F-R115-9: клик по фото при отказе скачивания молча ничего не делал.
+  it('403 при открытии фото объясняется тостом, а не тишиной (F-R115-9)', async () => {
+    mocks.authFetch.mockImplementation(async (url: string) => {
+      if (url === '/api/media?entityType=inspection&entityId=insp-1__i1') {
+        return json({ data: [{ id: 'm1', fileName: 'a.png', contentType: 'image/png', thumbnailKey: 'k' }] });
+      }
+      if (url.startsWith('/api/media/download-batch')) return json({ urls: { m1: 'https://cdn.example/x.jpg' } });
+      return json({ error: 'Доступ запрещён' }, 403);
+    });
+    render(<InspectionItemPhotos inspectionId="insp-1" itemId="i1" />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Открыть фото' }));
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith(
+      'Нет прав на просмотр фото. Смените роль или обратитесь к администратору.',
+    ));
+  });
 });
 
 describe('сохранение и завершение осмотра (F-R100-6, F-R100-7)', () => {
