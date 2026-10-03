@@ -29,8 +29,23 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { ConfirmActionDialog } from '@/components/piling/confirm-action-dialog';
+import { apiErrorMessage } from '@/lib/api-error-message';
 import type { TelegramConfigDTO } from '@/lib/types';
 import { cn } from '@/lib/utils';
+
+/**
+ * Текст отказа API для тоста.
+ *
+ * Сервер отвечает `{ error, details }` (400 с полем и причиной, 404), а экран
+ * показывал на любой отказ одну строку «Ошибка сохранения»: админ не знал,
+ * какое поле не принято, и правил наугад (F-R120-4). 404 — запись уже удалена,
+ * общий текст тут сбил бы с толку.
+ */
+async function apiFailureText(res: Response, fallback: string): Promise<string> {
+  if (res.status === 404) return 'Запись не найдена — возможно, её уже удалили, обновите список';
+  const body = await res.json().catch(() => null);
+  return apiErrorMessage(body, fallback);
+}
 
 export function AdminTelegram() {
   const [configs, setConfigs] = useState<TelegramConfigDTO[]>([]);
@@ -138,7 +153,10 @@ export function AdminTelegram() {
           chatId: newChatId.trim(),
         }),
       });
-      if (!res.ok) throw new Error('Ошибка сохранения');
+      if (!res.ok) {
+        toast.error(await apiFailureText(res, 'Ошибка сохранения'));
+        return;
+      }
       const data = await res.json();
       if (isEdit) {
         setConfigs((prev) => prev.map((c) => (c.id === editingId ? data.config : c)));
@@ -162,7 +180,10 @@ export function AdminTelegram() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id }),
       });
-      if (!res.ok) throw new Error('Ошибка удаления');
+      if (!res.ok) {
+        toast.error(await apiFailureText(res, 'Ошибка удаления'));
+        return;
+      }
       setConfigs((prev) => prev.filter((c) => c.id !== id));
       toast.success('Конфигурация удалена');
     } catch {
@@ -183,7 +204,10 @@ export function AdminTelegram() {
           enabled: !config.enabled,
         }),
       });
-      if (!res.ok) throw new Error('Ошибка');
+      if (!res.ok) {
+        toast.error(await apiFailureText(res, 'Ошибка переключения'));
+        return;
+      }
       setConfigs((prev) =>
         prev.map((c) =>
           c.id === config.id ? { ...c, enabled: !c.enabled } : c

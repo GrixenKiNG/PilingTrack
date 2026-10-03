@@ -4,9 +4,13 @@
  * включённую запись — админ у второго бота видел результат первого. Спиннер
  * тоже был один на весь экран. Проверяем, что запрос называет канал своей
  * карточки и крутится только на ней.
+ *
+ * F-R120-4 (находка 4): отказ сохранения/удаления объясняется человеку — тело
+ * ответа (400 с полем, 404) больше не выбрасывается ради «Ошибка сохранения».
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
+import { toast } from 'sonner';
 
 const mocks = vi.hoisted(() => ({ authFetch: vi.fn() }));
 
@@ -78,5 +82,63 @@ describe('AdminTelegram: «Тест» проверяет свой канал (R1
     expect(testButtons()[0].querySelector('.animate-spin')).toBeNull();
 
     await act(async () => {});
+  });
+});
+
+/** Открывает диалог создания и заполняет поля (Label не связан с Input). */
+const fillCreateDialog = (values: { label: string; token: string; chatId: string }) => {
+  fireEvent.click(screen.getByRole('button', { name: 'Добавить' }));
+  fireEvent.change(screen.getByPlaceholderText('Например: Основной чат'), { target: { value: values.label } });
+  fireEvent.change(screen.getByPlaceholderText('123456:ABC-DEF...'), { target: { value: values.token } });
+  fireEvent.change(screen.getByPlaceholderText('-1001234567890'), { target: { value: values.chatId } });
+};
+
+/** Кнопка отправки в подвале диалога — вторая из двух «Добавить» на экране. */
+const submitCreateDialog = () => {
+  const buttons = screen.getAllByRole('button', { name: 'Добавить' });
+  fireEvent.click(buttons[buttons.length - 1]);
+};
+
+describe('AdminTelegram: отказ API объясняется (R120 находка 4)', () => {
+  beforeEach(() => {
+    mocks.authFetch.mockReset();
+    vi.mocked(toast.error).mockClear();
+  });
+
+  it('400 с полем показывает причину от сервера, а не «Ошибка сохранения»', async () => {
+    mocks.authFetch.mockImplementation((_url: string, init?: RequestInit) =>
+      init?.method === 'POST'
+        ? Promise.resolve(json({ error: 'Некорректные данные', details: [{ field: 'chatId', message: 'String must contain at least 1 character(s)' }] }, 400))
+        : Promise.resolve(json({ configs: [] })),
+    );
+    render(<AdminTelegram />);
+    await screen.findByText('Нет конфигураций Telegram');
+
+    fillCreateDialog({ label: 'Ночной чат', token: '123:ABC', chatId: '-100123' });
+    submitCreateDialog();
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalled());
+    const message = String(vi.mocked(toast.error).mock.calls[0][0]);
+    expect(message).toContain('Некорректные данные');
+    expect(message).toContain('не заполнено');
+    expect(message).not.toBe('Ошибка сохранения');
+  });
+
+  it('404 при удалении говорит, что запись уже удалена, а не «Ошибка удаления»', async () => {
+    mocks.authFetch.mockImplementation((_url: string, init?: RequestInit) =>
+      init?.method === 'DELETE'
+        ? Promise.resolve(json({ error: 'Config not found' }, 404))
+        : Promise.resolve(json({ configs: [config()] })),
+    );
+    render(<AdminTelegram />);
+    await screen.findAllByRole('button', { name: 'Тест' });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Удалить' }));
+    const confirm = screen.getAllByRole('button', { name: 'Удалить' });
+    fireEvent.click(confirm[confirm.length - 1]);
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalled());
+    expect(String(vi.mocked(toast.error).mock.calls[0][0])).toContain('уже удалили');
+    expect(vi.mocked(toast.error)).not.toHaveBeenCalledWith('Ошибка удаления');
   });
 });
