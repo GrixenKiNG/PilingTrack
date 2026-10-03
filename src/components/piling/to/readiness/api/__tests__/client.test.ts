@@ -73,6 +73,25 @@ describe('fetchReadinessBootstrap', () => {
     })).rejects.toBeInstanceOf(ReadinessRequestCancelledError);
     expect(mockedAuthFetch).not.toHaveBeenCalled();
   });
+
+  /*
+    R112 №16 (важно): на 5xx клиент подставлял серверный текст как есть, и
+    503 «Tenant settings are not configured» показывался человеку по-английски.
+  */
+  it('5xx с английским текстом сервера → русское сообщение (F-R112-3)', async () => {
+    mockedAuthFetch.mockResolvedValue(jsonResponse({ error: 'Tenant settings are not configured' }, 503));
+    await expect(fetchReadinessBootstrap({ requestId: 'request-test' }))
+      .rejects.toMatchObject({
+        code: 'UNAVAILABLE',
+        message: 'Сервис технической готовности временно недоступен.',
+      });
+  });
+
+  it('русский текст сервера на 5xx сохраняется', async () => {
+    mockedAuthFetch.mockResolvedValue(jsonResponse({ error: 'Ведутся плановые работы' }, 503));
+    await expect(fetchReadinessBootstrap({ requestId: 'request-test' }))
+      .rejects.toMatchObject({ code: 'UNAVAILABLE', message: 'Ведутся плановые работы' });
+  });
 });
 
 describe('readinessFilterQuery', () => {

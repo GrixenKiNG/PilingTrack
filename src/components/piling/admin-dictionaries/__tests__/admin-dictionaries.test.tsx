@@ -183,3 +183,56 @@ describe('AdminDictionaries: архивация (решение владельц
     expect(JSON.parse(patches()[1][1].body as string)).toMatchObject({ id: 'g1', isActive: true });
   });
 });
+
+/*
+  R112 №24 (важно): английские строки отказа API доходили до тоста как есть —
+  обрыв сети «Failed to fetch», истёкшая сессия «Unauthorized», CSRF «CSRF
+  validation failed: …». Экран показывает свой русский текст.
+*/
+describe('AdminDictionaries: английские ошибки API (F-R112-3)', () => {
+  const archive = () => fireEvent.click(screen.getByRole('button', { name: 'Архивировать СВ 120-35' }));
+
+  beforeEach(() => vi.clearAllMocks());
+
+  const patchResponds = (body: unknown, status: number) => {
+    authFetch.mockImplementation(async (_url: string, init?: RequestInit) =>
+      init?.method === 'PATCH' ? jsonResponse(body, status) : jsonResponse(registry));
+  };
+
+  it('401 при архивации → «Сессия истекла», а не «Unauthorized»', async () => {
+    const { toast } = await import('sonner');
+    patchResponds({ error: 'Unauthorized' }, 401);
+    render(<AdminDictionaries />);
+    await screen.findByText('СВ 120-35');
+
+    archive();
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Сессия истекла — войдите снова.'));
+  });
+
+  it('CSRF-403 → русский текст про проверку безопасности, а не «CSRF validation failed»', async () => {
+    const { toast } = await import('sonner');
+    patchResponds({ error: 'CSRF validation failed: origin mismatch' }, 403);
+    render(<AdminDictionaries />);
+    await screen.findByText('СВ 120-35');
+
+    archive();
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith(
+      'Запрос отклонён проверкой безопасности. Обновите страницу и повторите.',
+    ));
+  });
+
+  it('обрыв сети → «Нет соединения», а не «Failed to fetch»', async () => {
+    const { toast } = await import('sonner');
+    authFetch.mockImplementation(async (_url: string, init?: RequestInit) => {
+      if (init?.method === 'PATCH') throw new TypeError('Failed to fetch');
+      return jsonResponse(registry);
+    });
+    render(<AdminDictionaries />);
+    await screen.findByText('СВ 120-35');
+
+    archive();
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith(
+      'Нет соединения с сервером. Проверьте связь и повторите.',
+    ));
+  });
+});
