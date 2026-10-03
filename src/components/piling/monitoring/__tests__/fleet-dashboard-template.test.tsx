@@ -94,6 +94,19 @@ describe('FleetDashboard shared equipment template', () => {
     });
   };
 
+  it('shows the fresh fleet when reopening after an equipment photo upload', async () => {
+    const base = mocks.authFetch.getMockImplementation();
+    if (!base) throw new Error('authFetch mock is not configured');
+    mocks.authFetch.mockImplementation(async (url: string, init?: RequestInit) => {
+      if (!url.startsWith('/api/monitoring/fleet')) return base(url, init);
+      const name = url.includes('_ts=') ? 'После загрузки' : 'До загрузки';
+      return { ok: true, json: async () => ({ ...snapshot, equipment: snapshot.equipment.map(card => ({ ...card, name })) }) };
+    });
+    render(<FleetDashboard />);
+    expect(await screen.findAllByText('После загрузки')).toHaveLength(2);
+    expect(screen.queryByText('До загрузки')).not.toBeInTheDocument();
+  });
+
   it('applies one saved template to all visible equipment cards', async () => {
     // Шаблон приходит с сервера уже сохранённым: редактор переехал в
     // «Настройки → Шаблоны плиток», и на мониторинге его больше нет. Проверяем

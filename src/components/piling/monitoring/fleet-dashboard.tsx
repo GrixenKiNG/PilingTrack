@@ -109,10 +109,10 @@ export function FleetDashboard() {
   }, [fetchSnapshot]);
   const tile = useEquipmentTileTemplate(undefined, onPhotoUploaded);
 
-  // Initial load
+  // Reopening after an upload must read a fresh fleet snapshot.
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- loads data on mount / dependency change; the async loader sets state
-    void fetchSnapshot();
+    void fetchSnapshot({ bust: true });
   }, [fetchSnapshot]);
 
   // Живое обновление — опрос раз в 30 с, при возврате связи и на вкладку.

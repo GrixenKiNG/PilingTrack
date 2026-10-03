@@ -5,7 +5,7 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import { createFixture } from './helpers/disposable-db';
 
 const enabled = Boolean(process.env.INTEGRATION_DATABASE_URL_OWNER && process.env.CODEX_STAND_URL);
-const cases: Array<{ method: string; path: string; body?: Record<string, unknown> }> = [
+const cases: Array<{ method: string; path: string; body?: Record<string, unknown>; safeEmpty?: boolean }> = [
   {method:'GET',path:'/auth/me?userId=U'}, {method:'GET',path:'/crews/my?operatorId=U'},
   {method:'GET',path:'/reports/edit?userId=U&siteId=S&date=2026-10-02'},
   {method:'GET',path:'/reports/single-pdf?reportId=R&sync=1'},
@@ -16,12 +16,12 @@ const cases: Array<{ method: string; path: string; body?: Record<string, unknown
   {method:'POST',path:'/media',body:{entityType:'equipment',entityId:'E',fileName:'codex.png',contentType:'image/png',fileSize:100}},
   {method:'POST',path:'/inspections',body:{equipmentId:'E',templateId:'T',inspectionDate:'2026-10-02'}},
   {method:'POST',path:'/readiness/shifts',body:{equipmentId:'E',type:'DAY'}},
-  {method:'POST',path:'/briefings/foreign/sign',body:{}},
+  {method:'POST',path:'/briefings/B1/sign',body:{}},
   {method:'GET',path:'/equipment/E'}, {method:'PUT',path:'/equipment/E',body:{name:'IDOR overwrite'}}, {method:'DELETE',path:'/equipment/E'},
   {method:'GET',path:'/equipment/E/details'}, {method:'GET',path:'/equipment/E/meter-readings'}, {method:'POST',path:'/equipment/E/meter-readings',body:{engineHours:10}},
   {method:'GET',path:'/equipment/E/fuel'}, {method:'POST',path:'/equipment/E/fuel',body:{litersAdded:10}},
   {method:'POST',path:'/equipment/E/documents',body:{type:'OTHER',title:'IDOR'}},
-  {method:'PUT',path:'/equipment/E/documents/child',body:{title:'IDOR'}}, {method:'DELETE',path:'/equipment/E/documents/child'},
+  {method:'PUT',path:'/equipment/E/documents/D1',body:{title:'IDOR'}}, {method:'DELETE',path:'/equipment/E/documents/D1'},
   {method:'GET',path:'/equipment/E/device-keys'}, {method:'POST',path:'/equipment/E/device-keys',body:{}},
   {method:'GET',path:'/equipment/E/maintenance'}, {method:'POST',path:'/equipment/E/maintenance',body:{type:'REPAIR',title:'IDOR'}},
   {method:'PUT',path:'/equipment/E/maintenance/M',body:{title:'IDOR'}}, {method:'DELETE',path:'/equipment/E/maintenance/M'},
@@ -32,14 +32,33 @@ const cases: Array<{ method: string; path: string; body?: Record<string, unknown
   {method:'GET',path:'/inspections/I'}, {method:'PUT',path:'/inspections/I',body:{answers:[]}}, {method:'POST',path:'/inspections/I/complete',body:{signedByName:'Codex test'}},
   {method:'GET',path:'/checklist-templates/T'}, {method:'DELETE',path:'/checklist-templates/T'},
   {method:'GET',path:'/maintenance/M'}, {method:'POST',path:'/maintenance/M/accept',body:{}},
-  {method:'GET',path:'/users/U/documents'}, {method:'POST',path:'/users/U/documents',body:{typeId:'type'}},
-  {method:'PUT',path:'/users/U/documents/child',body:{notes:'IDOR'}}, {method:'DELETE',path:'/users/U/documents/child'},
+  {method:'GET',path:'/users/U/documents'}, {method:'POST',path:'/users/U/documents',body:{typeId:'DT'}},
+  {method:'PUT',path:'/users/U/documents/U1',body:{notes:'IDOR'}}, {method:'DELETE',path:'/users/U/documents/U1'},
   {method:'GET',path:'/reports/R/history'}, {method:'DELETE',path:'/reports/delete',body:{reportId:'REPORT'}},
   {method:'GET',path:'/media/F/download'}, {method:'POST',path:'/media/F/confirm',body:{}}, {method:'DELETE',path:'/media/F'},
   {method:'GET',path:'/readiness/shifts/H'}, {method:'PATCH',path:'/readiness/shifts/H',body:{expectedVersion:1,type:'NIGHT'}},
   {method:'POST',path:'/readiness/shifts/H/start',body:{expectedVersion:1}},
   {method:'POST',path:'/readiness/shifts/H/request-acceptance',body:{expectedVersion:1}},
   {method:'POST',path:'/readiness/shifts/H/cancel',body:{expectedVersion:1,reason:'IDOR attempt'}},
+
+  {method:'DELETE',path:'/equipment/E/fuel/F1'}, {method:'DELETE',path:'/equipment/E/meter-readings/N1'},
+  {method:'PATCH',path:'/maintenance-plans/PM',body:{title:'IDOR'}}, {method:'DELETE',path:'/maintenance-plans/PM'},
+  {method:'GET',path:'/readiness/current?equipmentId=E',safeEmpty:true},
+  {method:'GET',path:'/readiness/defects?equipmentId=E',safeEmpty:true},
+  {method:'POST',path:'/readiness/defects',body:{equipmentId:'E',severity:'NORMAL',title:'IDOR defect'}},
+  {method:'POST',path:'/readiness/defects/DF/triage',body:{expectedVersion:1,comment:'IDOR'}},
+  {method:'POST',path:'/readiness/defects/DF/resolve',body:{expectedVersion:1,resolution:'IDOR'}},
+  {method:'POST',path:'/readiness/defects/DF/reject',body:{expectedVersion:1,reason:'IDOR'}},
+  {method:'GET',path:'/readiness/handovers/HO'},
+  {method:'POST',path:'/readiness/handovers/HO/accept',body:{expectedVersion:1}},
+  {method:'POST',path:'/readiness/handovers/HO/rework',body:{expectedVersion:1,reason:'IDOR'}},
+  {method:'GET',path:'/readiness/work-permits/WP'},
+  {method:'PATCH',path:'/readiness/work-permits/WP',body:{expectedVersion:1,title:'IDOR'}},
+  {method:'POST',path:'/readiness/work-permits/WP/submit',body:{expectedVersion:1}},
+  {method:'POST',path:'/readiness/work-permits/WP/approve',body:{expectedVersion:1}},
+  {method:'POST',path:'/readiness/work-permits/WP/revoke',body:{expectedVersion:1,reason:'IDOR'}},
+  {method:'POST',path:'/readiness/shifts/H/decline',body:{expectedVersion:1,reason:'IDOR'}},
+  {method:'POST',path:'/readiness/shifts/H/handover',body:{expectedVersion:1,summary:'IDOR'}},
 ];
 
 describe.skipIf(!enabled)('E2 HTTP IDOR on disposable production app', () => {
@@ -58,6 +77,21 @@ describe.skipIf(!enabled)('E2 HTTP IDOR on disposable production app', () => {
     fixture=await createFixture(); [a,b]=fixture.tenants;
     const equip=fixture.id(a,'Equipment'); const user=fixture.id(a,'User');
     ids={E:equip,S:fixture.id(a,'Site'),I:fixture.id(a,'Inspection'),T:fixture.id(a,'ChecklistTemplate'),R:fixture.id(a,'Report'),U:user,H:fixture.id(a,'Shift'),C:a+'-crew',M:a+'-maintenance',F:a+'-media',G:a+'-grade'};
+    Object.assign(ids,{D1:a+'-eqdoc',DT:a+'-doctype',U1:a+'-userdoc',B1:a+'-briefing',F1:a+'-fuel',N1:a+'-meter',PM:a+'-pm',DF:a+'-defect',HO:a+'-handover',WP:a+'-permit'});
+    const insert=async(table:string,values:Record<string,unknown>)=>{const keys=Object.keys(values);await fixture.owner.query(`INSERT INTO "${table}" (${keys.map(k=>'"'+k+'"').join(',')}) VALUES (${keys.map((_,i)=>'$'+(i+1)).join(',')})`,Object.values(values));};
+    const common={tenantId:a,updatedAt:new Date()};
+    await insert('ReadinessScoreSnapshot',{id:a+'-snapshot',tenantId:a,equipmentId:equip,ruleSetId:'codex-rule',ruleSetVersion:'1',triggerType:'codex-fixture',triggerId:a,status:'READY',score:100,blockers:'[]',warnings:'[]',evidence:'[]',facts:'{}',factsHash:Buffer.alloc(32)});
+    await insert('CurrentReadiness',{tenantId:a,equipmentId:equip,snapshotId:a+'-snapshot',status:'READY',score:100,calculatedAt:new Date()});
+    await insert('EquipmentDocument',{...common,id:ids.D1,equipmentId:equip,type:'OTHER',title:'Codex document'});
+    await insert('UserDocumentType',{...common,id:ids.DT,name:'Codex document',normalizedName:'codex document'});
+    await insert('UserDocument',{...common,id:ids.U1,userId:user,typeId:ids.DT,notes:'Codex'});
+    await insert('BriefingRecord',{id:ids.B1,tenantId:a,userId:user,kind:'INSTRUCTION',userName:'Codex',userRole:'OPERATOR',documentCode:'codex',documentTitle:'Codex',documentVersion:'1',recordedAt:new Date()});
+    await insert('FuelLog',{id:ids.F1,tenantId:a,equipmentId:equip,recordedAt:new Date(),litersAdded:10});
+    await insert('MeterReading',{id:ids.N1,tenantId:a,equipmentId:equip,recordedAt:new Date(),engineHours:10});
+    await insert('MaintenancePlan',{...common,id:ids.PM,equipmentId:equip,title:'Codex PM',triggerType:'HOURS',intervalHours:100});
+    await insert('EquipmentDefect',{...common,id:ids.DF,equipmentId:equip,title:'Codex defect',reportedById:user});
+    await insert('ShiftHandover',{...common,id:ids.HO,shiftId:ids.H,summary:'Codex handover',submittedById:user});
+    await insert('WorkPermit',{...common,id:ids.WP,equipmentId:equip,risk:'NORMAL',title:'Codex permit',scope:'Codex scope',validFrom:new Date(),validTo:new Date(Date.now()+3600000),timezone:'Europe/Moscow',authorId:user,lastEditedById:user});
     await fixture.owner.query('INSERT INTO "PileGrade" (id,"tenantId",name,"normalizedName","lengthMm","updatedAt") VALUES ($1,$2,$1,$1,6000,now())',[ids.G,a]);
     await fixture.owner.query('INSERT INTO "Crew" (id,name,"operatorId","equipmentId","siteId","updatedAt") VALUES ($1,$1,$2,$3,$4,now())',[ids.C,user,equip,ids.S]);
     await fixture.owner.query('INSERT INTO "MaintenanceRecord" (id,"tenantId","equipmentId",type,title,"updatedAt") VALUES ($1,$2,$3,$4,$1,now())',[ids.M,a,equip,'REPAIR']);
@@ -77,6 +111,8 @@ describe.skipIf(!enabled)('E2 HTTP IDOR on disposable production app', () => {
   });
   afterAll(async () => {
     if(!fixture)return;
+    // Immutable history is retained until the owned database container is removed.
+    for(const table of ['CurrentReadiness','ShiftHandover','WorkPermit','EquipmentDefect','MaintenancePlan','FuelLog','MeterReading','BriefingRecord','UserDocument','UserDocumentType','EquipmentDocument'])await fixture.owner.query(`DELETE FROM "${table}" WHERE "tenantId"=$1`,[a]);
     await fixture.owner.query('DELETE FROM "Media" WHERE id=$1',[ids.F]);
     await fixture.owner.query('DELETE FROM "MaintenanceRecord" WHERE id=$1',[ids.M]);
     await fixture.owner.query('DELETE FROM "PileGrade" WHERE id=$1',[ids.G]);
@@ -87,16 +123,20 @@ describe.skipIf(!enabled)('E2 HTTP IDOR on disposable production app', () => {
     await fixture.close();
   });
   for(const role of ['OPERATOR','ASSISTANT'])for(const c of cases) it(`${role}: ${c.method} ${c.path}`,async()=>{
-    const path=c.path.replace(/\b(E|S|I|T|R|U|H|C|M|F)\b/g,p=>ids[p]);
+    const path=c.path.replace(/\b([A-Z][A-Z0-9]*)\b/g,p=>ids[p]||p);
     const response=await request(role,c.method,path,c.body);
     if(c.path.startsWith('/crews/my')) {
       expect(response.status).toBe(200);
       expect((await response.json()).crew.id).toBe(b+'-crew');
       return;
     }
+    if(c.safeEmpty&&role==='OPERATOR'){expect(response.status).toBe(200);expect((await response.json()).data).toEqual([]);return;}
     expect([403,404],`${role} ${c.method} ${c.path}: ${response.status} ${await response.text()}`).toContain(response.status);
   });
   it('foreign records remain intact after all denied mutations',async()=>{
+    expect((await fixture.owner.query('SELECT title FROM "WorkPermit" WHERE id=$1',[ids.WP])).rows[0].title).toBe('Codex permit');
+    expect((await fixture.owner.query('SELECT "employeeSignedAt" FROM "BriefingRecord" WHERE id=$1',[ids.B1])).rows[0].employeeSignedAt).toBe(null);
+    expect((await fixture.owner.query('SELECT notes FROM "UserDocument" WHERE id=$1',[ids.U1])).rows[0].notes).toBe('Codex');
     expect((await fixture.owner.query('SELECT name FROM "Equipment" WHERE id=$1',[ids.E])).rows[0].name).toBe('Disposable equipment');
     expect((await fixture.owner.query('SELECT version FROM "Report" WHERE id=$1',[ids.R])).rows[0].version).toBe(1);
     expect((await fixture.owner.query('SELECT "isDeleted" FROM "Media" WHERE id=$1',[ids.F])).rows[0].isDeleted).toBe(false);
