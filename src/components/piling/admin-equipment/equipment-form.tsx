@@ -12,6 +12,7 @@
  * the previous string.
  */
 
+import { cloneElement, isValidElement, useId } from 'react';
 import type { EquipmentKindDTO } from '@/lib/types';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -109,6 +110,7 @@ interface Props {
 
 export function EquipmentForm({ state, onChange, compact = false, equipmentId }: Props) {
   const showTo = !compact && !!equipmentId;
+  const uid = useId();
   return (
     <Tabs defaultValue="basic" className="w-full">
       <TabsList className={cn('grid w-full', showTo ? 'grid-cols-4' : 'grid-cols-3')}>
@@ -138,9 +140,9 @@ export function EquipmentForm({ state, onChange, compact = false, equipmentId }:
           <Field label="Модель">
             <Input value={state.model} onChange={(e) => onChange({ model: e.target.value })} className="h-11" />
           </Field>
-          <Field label="Тип машины">
+          <Field label="Тип машины" id={`${uid}-kind`}>
             <Select value={state.kind} onValueChange={(v) => onChange({ kind: v as EquipmentKindDTO })}>
-              <SelectTrigger className="h-11"><SelectValue /></SelectTrigger>
+              <SelectTrigger id={`${uid}-kind`} className="h-11"><SelectValue /></SelectTrigger>
               <SelectContent>
                 {(Object.keys(KIND_LABELS) as EquipmentKindDTO[]).map((k) => (
                   <SelectItem key={k} value={k}>{KIND_LABELS[k]}</SelectItem>
@@ -209,9 +211,9 @@ export function EquipmentForm({ state, onChange, compact = false, equipmentId }:
           <NumberField label="Макс. длина сваи (м)" value={state.maxPileLength} onChange={(v) => onChange({ maxPileLength: v })} step="0.1" />
           <NumberField label="Макс. глубина бурения (м)" value={state.maxDrillingDepth} onChange={(v) => onChange({ maxDrillingDepth: v })} step="0.1" />
           <SectionTitle>Молот</SectionTitle>
-          <Field label="Вид молота (для чек-листа)">
+          <Field label="Вид молота (для чек-листа)" id={`${uid}-hammer-kind`}>
             <Select value={state.hammerKind} onValueChange={(v) => onChange({ hammerKind: v as HammerKindDTO })}>
-              <SelectTrigger className="h-11"><SelectValue /></SelectTrigger>
+              <SelectTrigger id={`${uid}-hammer-kind`} className="h-11"><SelectValue /></SelectTrigger>
               <SelectContent>
                 {(Object.keys(HAMMER_KIND_LABELS) as HammerKindDTO[]).map((k) => (
                   <SelectItem key={k} value={k}>{HAMMER_KIND_LABELS[k]}</SelectItem>
@@ -264,11 +266,15 @@ export function EquipmentForm({ state, onChange, compact = false, equipmentId }:
 
 // --------------------------------------------------------------------------
 
-function Field({ label, full = false, children }: { label: string; full?: boolean; children: React.ReactNode }) {
+function Field({ label, full = false, id: idProp, children }: {
+  label: string; full?: boolean; id?: string; children: React.ReactNode;
+}) {
+  const generatedId = useId();
+  const id = idProp ?? generatedId;
   return (
     <div className={cn('space-y-1.5', full && 'sm:col-span-2')}>
-      <Label className="text-xs">{label}</Label>
-      {children}
+      <Label htmlFor={id} className="text-xs">{label}</Label>
+      {isValidElement(children) ? cloneElement(children as React.ReactElement<{ id?: string }>, { id }) : children}
     </div>
   );
 }
