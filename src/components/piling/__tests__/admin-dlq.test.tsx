@@ -69,12 +69,30 @@ describe('AdminDlq: понятные тексты', () => {
     vi.mocked(toast.error).mockReset();
   });
 
-  it('тип события показывается по-русски, машинный код остаётся рядом', async () => {
+  it('тип события показывается по-русски, машинный код и id — в данных события', async () => {
     mockLoad(makeEntry({ eventType: 'ReportPdfDeliveryRequested' }));
     render(<AdminDlq />);
 
     expect(await screen.findByText('Доставка PDF отчёта')).toBeInTheDocument();
+    // Машинный код, технические id и payload скрыты за кнопкой, а не в списке.
+    expect(screen.queryByText('ReportPdfDeliveryRequested')).not.toBeInTheDocument();
+    expect(screen.queryByText(/aggregateId/)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Показать данные события' }));
+
     expect(screen.getByText('ReportPdfDeliveryRequested')).toBeInTheDocument();
+    expect(screen.getByText('rep_1')).toBeInTheDocument();
+    expect(screen.getByText('out_1')).toBeInTheDocument();
+  });
+
+  it('сбой загрузки объясняется без аббревиатуры DLQ', async () => {
+    mocks.authFetch.mockResolvedValue(json({}, 500));
+    render(<AdminDlq />);
+
+    expect(
+      await screen.findByText('Сервер не смог отдать очередь недоставленных событий. Попробуйте обновить.'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/список DLQ/)).not.toBeInTheDocument();
   });
 
   it('статус «Повтор поставлен в очередь» вместо «Отправлены повторно»', async () => {
