@@ -129,10 +129,12 @@ export async function POST(request: NextRequest) {
     const summary = alert.annotations.summary || alert.annotations.description || alert.labels.alertname || 'Alert';
     const description = alert.annotations.description;
     const message = description && description !== summary ? summary + '\n' + description : summary;
-    // Labels + start identify the same firing episode independent of batch order.
+    // Match Alertmanager reminders (critical1h, others4h); retries within a window dedupe.
+    const repeatMs = alert.labels.severity === 'critical' ? 3600_000 : 4 * 3600_000;
+    const repeatWindow = Math.floor(Date.now() / repeatMs);
     // Missing/invalid start is ambiguous: a new id favors retry over silent loss.
     const identity = typeof alert.startsAt === 'string' && Number.isFinite(Date.parse(alert.startsAt))
-      ? createHash('sha256').update(JSON.stringify([Object.keys(alert.labels).sort().map(key => [key, alert.labels[key]]), alert.startsAt])).digest('hex')
+      ? createHash('sha256').update(JSON.stringify([Object.keys(alert.labels).sort().map(key => [key, alert.labels[key]]), alert.startsAt, repeatWindow])).digest('hex')
       : randomUUID();
     try {
       const delivered = await runWithTenantContext(async () => {

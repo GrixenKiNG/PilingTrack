@@ -253,6 +253,21 @@ describe('POST /api/alerts/webhook — delivery failure', () => {
     expect(mocks.sendAlert.mock.calls[0][0].ruleId).toBe('rule-1');
   });
 
+  it.each([['critical', 1], ['warning', 4]])('F6 review3: %s reminders deliver again after %sh', async (severity, hours) => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      vi.setSystemTime(new Date('2026-10-03T00:00:00Z'));
+      const alerts = [{ status: 'firing', startsAt: '2026-10-02T00:00:00Z', labels: { severity, alertname: 'disk' }, annotations: {} }];
+      expect((await POST(reqWithBody({ alerts }))).status).toBe(200);
+      mocks.sendAlert.mockClear();
+      expect((await POST(reqWithBody({ alerts }))).status).toBe(200);
+      expect(mocks.sendAlert).not.toHaveBeenCalled();
+      vi.setSystemTime(new Date(Date.now() + hours * 3600_000));
+      expect((await POST(reqWithBody({ alerts }))).status).toBe(200);
+      expect(mocks.sendAlert).toHaveBeenCalledTimes(1);
+      expect(mocks.rows.size).toBe(2);
+    } finally { vi.useRealTimers(); }
+  });
   it('F2: a repeat after DLQ gets a new durable attempt and can deliver', async () => {
     const alerts = [{ status: 'firing', startsAt: '2026-10-03T00:00:00Z', labels: { alertname: 'disk' }, annotations: { summary: 'Disk full' } }];
     mocks.sendAlert.mockResolvedValue(false);
