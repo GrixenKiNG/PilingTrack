@@ -279,3 +279,41 @@ describe('AdminReports — имя файла выгрузки (F-R115-14)', () =
     }
   });
 });
+
+/**
+ * F-R115-5: пустой период сервер отдавал как 200 (CSV из одной шапки), а экран
+ * показывал зелёное «Выгружено за период…». Теперь пустая выгрузка объясняется,
+ * а пустой файл не сохраняется.
+ */
+describe('AdminReports — пустая выгрузка (F-R115-5)', () => {
+  beforeEach(() => {
+    authFetchMock.mockReset();
+    vi.mocked(toast.error).mockClear();
+    vi.mocked(toast.success).mockClear();
+    reportsState.current = baseState();
+  });
+
+  it('пустой период → сообщение вместо «Выгружено», файл не сохраняется', async () => {
+    authFetchMock.mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: new Headers({ 'content-disposition': 'attachment; filename="pilingtrack-reports-2026-10-03.csv"' }),
+      blob: async () => new Blob(['\uFEFFID отчёта;Дата;Смена\n']),
+    });
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+    try {
+      render(<AdminReports />);
+      // Фильтр «Сегодня» задаёт период, который нужен выгрузке.
+      fireEvent.click(screen.getByRole('button', { name: 'Сегодня' }));
+      fireEvent.click(screen.getByRole('button', { name: 'CSV' }));
+
+      await waitFor(() => expect(toast.error).toHaveBeenCalledWith(
+        'За выбранный период отчётов нет — выгружать нечего. Измените период или фильтры.',
+      ));
+      expect(toast.success).not.toHaveBeenCalled();
+      expect(click).not.toHaveBeenCalled();
+    } finally {
+      click.mockRestore();
+    }
+  });
+});
