@@ -13,9 +13,9 @@ it('I11: production cleanup stays disabled without the exact opt-in flag', async
 it('I11: opt-in defaults to dry-run, runs daily and stops its timers', async () => {
   vi.stubEnv('PDF_TEMP_CLEANUP_ENABLED', 'true');
   const stop = startPdfCleanupScheduler(); await vi.advanceTimersByTimeAsync(60000);
-  expect(mocks.cleanup).toHaveBeenLastCalledWith({ dryRun: true });
+  expect(mocks.cleanup).toHaveBeenLastCalledWith({ dryRun: true, signal: expect.any(AbortSignal) });
   vi.stubEnv('PDF_TEMP_CLEANUP_DRY_RUN', 'false'); await vi.advanceTimersByTimeAsync(86400000);
-  expect(mocks.cleanup).toHaveBeenLastCalledWith({ dryRun: false });
+  expect(mocks.cleanup).toHaveBeenLastCalledWith({ dryRun: false, signal: expect.any(AbortSignal) });
   await stop(); const calls = mocks.cleanup.mock.calls.length; await vi.advanceTimersByTimeAsync(86400000);
   expect(mocks.cleanup).toHaveBeenCalledTimes(calls);
 });
@@ -24,4 +24,25 @@ it('I11: failure is logged and the next daily pass can retry', async () => {
   const stop = startPdfCleanupScheduler(); await vi.advanceTimersByTimeAsync(60000);
   expect(mocks.error).toHaveBeenCalled(); await vi.advanceTimersByTimeAsync(86400000); await stop();
   expect(mocks.cleanup).toHaveBeenCalledTimes(2);
+});
+
+it('shutdown aborts an in-flight cleanup and waits for it to settle', async () => {
+  vi.stubEnv('PDF_TEMP_CLEANUP_ENABLED', 'true');
+  let finish!: () => void;
+  let signal: AbortSignal | undefined;
+  mocks.cleanup.mockImplementation((options: { signal?: AbortSignal }) => {
+    signal = options.signal;
+    return new Promise<void>(resolve => {
+      finish = resolve;
+      signal?.addEventListener('abort', resolve as EventListener, { once: true });
+    });
+  });
+  const stop = startPdfCleanupScheduler();
+  await vi.advanceTimersByTimeAsync(60000);
+  const stopped = stop();
+  try { expect(signal?.aborted).toBe(true); }
+  finally { finish(); await stopped; }
+  const calls = mocks.cleanup.mock.calls.length;
+  await vi.advanceTimersByTimeAsync(86400000);
+  expect(mocks.cleanup).toHaveBeenCalledTimes(calls);
 });

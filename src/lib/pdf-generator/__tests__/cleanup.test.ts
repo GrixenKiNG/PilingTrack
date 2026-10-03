@@ -106,3 +106,25 @@ describe('I11 temporary PDF cleanup', () => {
     expect((await cleanupTemporaryPdfs({ now, dryRun: false })).deleted).toBe(0);
   });
 });
+
+it('cancellation interrupts an in-flight S3 listing without deleting and destroys the client', async () => {
+  vi.stubEnv('S3_ENDPOINT', 'http://mock-s3'); vi.stubEnv('S3_ACCESS_KEY_ID', 'mock'); vi.stubEnv('S3_SECRET_ACCESS_KEY', 'mock');
+  const controller = new AbortController();
+  let options: { abortSignal?: AbortSignal } | undefined;
+  let finish!: () => void;
+  mocks.send.mockImplementation((_command, requestOptions) => {
+    options = requestOptions;
+    return new Promise((resolve, reject) => {
+      finish = () => resolve({});
+      options?.abortSignal?.addEventListener('abort', () => reject(controller.signal.reason), { once: true });
+    });
+  });
+  const pending = cleanupTemporaryPdfs({ now, dryRun: false, signal: controller.signal });
+  const caught = pending.catch(error => error);
+  controller.abort(new Error('worker stopping'));
+  try { expect(options?.abortSignal).toBe(controller.signal); }
+  finally { finish(); }
+  expect(await caught).toBe(controller.signal.reason);
+  expect(mocks.send).toHaveBeenCalledTimes(1);
+  expect(mocks.destroy).toHaveBeenCalledOnce();
+});
