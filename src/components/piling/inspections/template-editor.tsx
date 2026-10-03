@@ -67,6 +67,9 @@ export function TemplateEditor({ templateId }: TemplateEditorProps) {
   const [sections, setSections] = useState<SectionDraft[]>([emptySection()]);
   const [loading, setLoading] = useState(!isNew);
   const [busy, setBusy] = useState(false);
+  // Снятая (заменённая) версия неотличима от действующей, поэтому по прямой
+  // ссылке её правят как живую и «Сохранить» выпускает её заново (R123 №4).
+  const [archived, setArchived] = useState(false);
   // Почему шаблон не показан: пустая форма под заголовком «Редактировать
   // шаблон» выглядела как «шаблон пуст», а сохранение затирало живой (R100 №4).
   const [loadError, setLoadError] = useState<InspectionLoadError | null>(null);
@@ -88,6 +91,7 @@ export function TemplateEditor({ templateId }: TemplateEditorProps) {
       }
       const { template } = await res.json();
       setLoadError(null);
+      setArchived(template.isActive === false);
       setName(template.name ?? '');
       setLevel(template.level as InspectionLevel);
       setBlockType((template.blockType ?? 'BASE') as BlockType);
@@ -291,6 +295,15 @@ export function TemplateEditor({ templateId }: TemplateEditorProps) {
           {saveProblem === 'stale'
             ? 'Шаблон уже изменён другим администратором — сохранение не отправлено. Откройте список шаблонов и выберите действующую версию.'
             : 'Сохранение не завершилось: прежняя версия шаблона могла быть снята, а новая не выпущена. Проверьте список шаблонов — возможно, чек-лист больше не действует.'}
+        </p>
+      )}
+
+      {/* Строка снята: по прямой ссылке её раньше правили как живую, и
+          «Сохранить» выпускало снятый чек-лист заново — без пометки
+          «архив» человек не понимал, что открыл старую версию (R123 №4). */}
+      {archived && (
+        <p role="status" className="rounded-md border border-border bg-muted px-3 py-2 text-xs text-muted-foreground">
+          Это снятая версия шаблона (архив) — она больше не действует. Чтобы изменить чек-лист, откройте действующую версию в списке шаблонов; сохранение этой формы будет отклонено как устаревшее.
         </p>
       )}
 

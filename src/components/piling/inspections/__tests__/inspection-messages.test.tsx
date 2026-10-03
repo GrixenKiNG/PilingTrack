@@ -482,6 +482,91 @@ describe('сохранение и завершение осмотра (F-R100-6,
   });
 });
 
+describe('список шаблонов: деактивация с объяснением последствий (F-R123-7)', () => {
+  const row = {
+    id: 'tpl-1', name: 'ЕО — экскаватор', level: 'EO',
+    blockType: 'BASE', appliesToModel: 'Banut 655', isActive: true,
+  };
+  const listWith = (templates: unknown[]) =>
+    json({ templates });
+
+  it('голый confirm заменён диалогом: последствия видны до нажатия, DELETE не уходит', async () => {
+    mocks.authFetch.mockImplementation(async (_url: string, init?: RequestInit) => (
+      init?.method === 'DELETE' ? json({ ok: true }) : listWith([row])
+    ));
+    render(<TemplateList />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Деактивировать' }));
+
+    // Снятие последнего блока «База» для модели ломает заводку новых осмотров
+    // этих машин — админ узнаёт об этом до подтверждения (R123 №7).
+    expect(screen.getByText('Деактивировать шаблон?')).toBeInTheDocument();
+    expect(screen.getByText(/последний действующий блок «База» для модели «Banut 655»/)).toBeInTheDocument();
+    expect(mocks.authFetch.mock.calls.some(([, init]) => (init as RequestInit | undefined)?.method === 'DELETE')).toBe(false);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Деактивировать шаблон' }));
+
+    await waitFor(() => expect(mocks.authFetch.mock.calls.some(([u, init]) =>
+      (init as RequestInit | undefined)?.method === 'DELETE' && u === '/api/checklist-templates/tpl-1',
+    )).toBe(true));
+  });
+
+  it('есть другая «База» для той же модели → о поломке не предупреждаем', async () => {
+    mocks.authFetch.mockResolvedValue(listWith([row, { ...row, id: 'tpl-2', name: 'ТО1 — экскаватор' }]));
+    render(<TemplateList />);
+
+    fireEvent.click(await screen.findAllByRole('button', { name: 'Деактивировать' })
+      .then((buttons) => buttons[0]));
+
+    expect(screen.getByText('Деактивировать шаблон?')).toBeInTheDocument();
+    expect(screen.queryByText(/последний действующий блок/)).toBeNull();
+  });
+});
+
+describe('список шаблонов: отказ деактивации различается по статусу (F-R123-9)', () => {
+  const row = { id: 'tpl-1', name: 'ЕО — экскаватор', level: 'EO', blockType: 'HAMMER', appliesToModel: null, isActive: true };
+
+  const deactivate = async (status: number) => {
+    mocks.authFetch.mockImplementation(async (_url: string, init?: RequestInit) => (
+      init?.method === 'DELETE' ? json({ error: 'Template not found' }, status) : json({ templates: [row] })
+    ));
+    render(<TemplateList />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Деактивировать' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Деактивировать шаблон' }));
+  };
+
+  it('404 → «уже деактивирован», а не общее «Не удалось»', async () => {
+    await deactivate(404);
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Шаблон уже деактивирован или не найден — обновите список.'));
+    expect(toast.error).not.toHaveBeenCalledWith('Не удалось деактивировать шаблон');
+  });
+
+  it('403 → про права, а не «Не удалось»', async () => {
+    await deactivate(403);
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Нет прав на деактивацию шаблона. Обратитесь к администратору.'));
+    expect(toast.error).not.toHaveBeenCalledWith('Не удалось деактивировать шаблон');
+  });
+});
+
+describe('редактор шаблона: снятая версия помечена (F-R123-4)', () => {
+  it('открытая по прямой ссылке снятая версия названа архивом, а не выдаётся за действующую', async () => {
+    mocks.authFetch.mockResolvedValue(json({ template: { ...templatePayload.template, isActive: false } }));
+    render(<TemplateEditor templateId="tpl-1" />);
+
+    const notice = await screen.findByRole('status');
+    expect(notice).toHaveTextContent('снятая версия шаблона (архив)');
+    expect(notice).toHaveTextContent('откройте действующую версию');
+  });
+
+  it('действующая версия пометки «архив» не получает', async () => {
+    mocks.authFetch.mockResolvedValue(json({ template: { ...templatePayload.template, isActive: true } }));
+    render(<TemplateEditor templateId="tpl-1" />);
+
+    await screen.findByLabelText('Название *');
+    expect(screen.queryByRole('status')).toBeNull();
+  });
+});
+
 describe('inspection-api-error: выбор текста по причине', () => {
   const texts = { forbidden: 'нет прав', notFound: 'не найден', server: 'сбой сервера' };
 
