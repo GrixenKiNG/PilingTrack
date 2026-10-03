@@ -59,4 +59,26 @@ describe('UserAssignmentDialog — назначение оператора', () 
     expect(screen.queryByText('Нет активных операторов')).toBeNull();
     expect(screen.getByRole('button', { name: 'Повторить' })).toBeTruthy();
   });
+
+  it('блокирует повторное снятие назначения, пока запрос выполняется (F-R113-13)', async () => {
+    const assigned = { id: 'assignment-1', userId: 'u1', user: { name: 'Оператор 1', email: 'op@example.com' } };
+    let releaseDelete: (response: Response) => void = () => {};
+    authFetchMock.mockImplementation((_url: string, init?: RequestInit) =>
+      init?.method === 'DELETE'
+        ? new Promise<Response>((resolve) => { releaseDelete = resolve; })
+        : Promise.resolve(jsonResponse(200, { site: { users: [assigned] } })),
+    );
+
+    renderDialog();
+    const removeButton = await screen.findByTitle('Снять назначение');
+
+    fireEvent.click(removeButton);
+
+    expect(removeButton).toBeDisabled();
+    fireEvent.click(removeButton);
+    expect(authFetchMock.mock.calls.filter(([, init]) => (init as RequestInit | undefined)?.method === 'DELETE')).toHaveLength(1);
+
+    releaseDelete(jsonResponse(200, {}));
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Назначение снято'));
+  });
 });

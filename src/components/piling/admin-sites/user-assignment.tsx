@@ -28,6 +28,7 @@ interface UserAssignmentDialogProps {
 export function UserAssignmentDialog({ siteId, loadingUsers, users }: UserAssignmentDialogProps) {
   const [assignedUsers, setAssignedUsers] = useState<AssignedUser[]>([]);
   const [loadingAssign, setLoadingAssign] = useState(false);
+  const [unassigningUserId, setUnassigningUserId] = useState<string | null>(null);
   // Сбой чтения показывает «назначений нет», хотя данных нет: пустой список
   // неотличим от отказа (находка 7).
   const [loadError, setLoadError] = useState(false);
@@ -79,6 +80,8 @@ export function UserAssignmentDialog({ siteId, loadingUsers, users }: UserAssign
   };
 
   const handleUnassignUser = async (userId: string) => {
+    if (unassigningUserId === userId) return;
+    setUnassigningUserId(userId);
     try {
       const res = await authFetch(`/api/sites/${siteId}/assign?userId=${userId}`, {
         method: 'DELETE',
@@ -91,6 +94,8 @@ export function UserAssignmentDialog({ siteId, loadingUsers, users }: UserAssign
       }
     } catch {
       toast.error('Нет соединения с сервером. Проверьте связь и повторите.');
+    } finally {
+      setUnassigningUserId(null);
     }
   };
 
@@ -136,6 +141,7 @@ export function UserAssignmentDialog({ siteId, loadingUsers, users }: UserAssign
                     </div>
                     <button
                       onClick={() => handleUnassignUser(a.userId)}
+                      disabled={unassigningUserId === a.userId}
                       className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-destructive/10 text-muted-foreground hover:text-destructive-strong transition-colors"
                       title="Снять назначение"
                     >

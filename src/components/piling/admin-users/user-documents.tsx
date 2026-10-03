@@ -328,7 +328,9 @@ export function UserDocuments({ userId }: { userId: string }) {
         open={pendingDelete !== null}
         onOpenChange={(open) => !open && setPendingDelete(null)}
         title="Удалить документ?"
-        description={pendingDelete ? `${pendingDelete.type.name}${pendingDelete.number ? ` № ${pendingDelete.number}` : ''}` : ''}
+        description={pendingDelete
+          ? `Документ «${pendingDelete.type.name}${pendingDelete.number ? ` № ${pendingDelete.number}` : ''}» будет удалён без возможности восстановления.`
+          : ''}
         confirmLabel="Удалить"
         onConfirm={async () => {
           if (pendingDelete) await remove(pendingDelete);

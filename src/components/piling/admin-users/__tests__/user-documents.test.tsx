@@ -103,4 +103,14 @@ describe('UserDocuments — обрыв сети (F-R112-1)', () => {
       'Нет соединения с сервером. Проверьте связь и повторите.',
     ));
   });
+
+  it('подтверждение сообщает, что удаление документа необратимо (F-R113-15)', async () => {
+    documentsResponse = () => Promise.resolve(ok({ documents: [docRow('doc-10', 'Удостоверение')] }));
+    render(<UserDocuments userId="ivanov" />);
+    await screen.findByText('Удостоверение');
+
+    fireEvent.click(screen.getByLabelText('Удалить документ'));
+
+    expect(await screen.findByText(/Удостоверение.*будет удалён без возможности восстановления/)).toBeInTheDocument();
+  });
 });

@@ -23,6 +23,7 @@ import type {
   SiteDrillingPlanDTO,
 } from '@/lib/types';
 import { cn } from '@/lib/utils';
+import { ConfirmActionDialog } from '@/components/piling/confirm-action-dialog';
 import type { DrillingPlanRow, PilePlanRow, SiteListItem } from '../types';
 import { PilePlanSection } from './pile-plan-section';
 import { DrillingPlanSection } from './drilling-plan-section';
@@ -63,6 +64,7 @@ export function EditSiteDialog({
   const [pilePlans, setPilePlans] = useState<PilePlanRow[]>([]);
   const [drillingPlans, setDrillingPlans] = useState<DrillingPlanRow[]>([]);
   const [saving, setSaving] = useState(false);
+  const [planWipeConfirmOpen, setPlanWipeConfirmOpen] = useState(false);
   const [detailState, setDetailState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
   const [retryKey, setRetryKey] = useState(0);
   // Сколько строк плана реально лежало в БД на момент открытия — чтобы поймать
@@ -144,6 +146,19 @@ export function EditSiteDialog({
         ? 'Укажите обе координаты или оставьте оба поля пустыми'
         : null;
 
+  const save = async () => {
+    if (!site) return;
+    setSaving(true);
+    try {
+      await onSave(site.id, name.trim(), active, pilePlans, drillingPlans, {
+        latitude: parsedLatitude ?? null,
+        longitude: parsedLongitude ?? null,
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const submit = async () => {
     if (!site || !name.trim()) {
       toast.error('Введите название');
@@ -154,20 +169,10 @@ export function EditSiteDialog({
       return;
     }
     if (planWipeRequiresConfirm(initialPileRows, initialDrillingRows, pilePlans, drillingPlans)) {
-      const ok = window.confirm(
-        `Вы сохраняете объект БЕЗ плана: все текущие строки плана (сваи: ${initialPileRows}, бурение: ${initialDrillingRows}) будут удалены, а плановые цифры обнулены.\n\nПродолжить?`,
-      );
-      if (!ok) return;
+      setPlanWipeConfirmOpen(true);
+      return;
     }
-    setSaving(true);
-    try {
-      await onSave(site.id, name.trim(), active, pilePlans, drillingPlans, {
-        latitude: parsedLatitude ?? null,
-        longitude: parsedLongitude ?? null,
-      });
-    } finally {
-      setSaving(false);
-    }
+    await save();
   };
 
   return (
@@ -285,6 +290,15 @@ export function EditSiteDialog({
           </Button>
         </DialogFooter>
       </DialogContent>
+      <ConfirmActionDialog
+        open={planWipeConfirmOpen}
+        onOpenChange={setPlanWipeConfirmOpen}
+        title="Сохранить объект без плана?"
+        description={`Все текущие строки плана (сваи: ${initialPileRows}, бурение: ${initialDrillingRows}) будут удалены, а плановые цифры обнулены. Это действие нельзя отменить.`}
+        confirmLabel="Сохранить без плана"
+        busy={saving}
+        onConfirm={save}
+      />
     </Dialog>
   );
 }
