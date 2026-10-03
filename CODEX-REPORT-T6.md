@@ -33,3 +33,9 @@
 GitNexus impact replace-worker-generation exit1: CLI unavailable. Разрешённый заданием fallback rg+git diff; graph risk UNKNOWN, не LOW. Вызывающие: deploy-prod.sh:114/143 (deploy/rollback), test-worker-generation.sh и ранбуки008/016. Production deploy script не запускался. Перед commit — detect-changes с фактическим exit и diff --check.
 
 Итог F1: bash scripts/test-worker-generation.sh exit0, 6 PASS/0 FAIL (app143, workers143+возврат, live one-off доSTOP, preflight безмутаций, partial START+image/policy/replica возврат, failed drain+возврат). f1-complete.log; свои контейнеры/сеть/tag удалены EXIT trap. bash -n exit0; git diff --check exit0; detect-changes exit1 CLI unavailable. Коммит F1 содержит только барьер, его тест и этот отчёт.
+
+## F2 — новая попытка после DLQ (ревью №2)
+
+Подтверждено на текущей ветке: published + Moved to DLQ отвечал503 без попытки отправки. Теперь повтор создаёт отдельное durable OutboxEvent с новым retry UUID, пустыми receipts и attempts по умолчанию, доставляет через существующий serializing deliverQueuedAlert. Прежние outbox/DLQ записи сохраняются. Если Telegram всё ещё недоступен —503 и новая попытка остаётся для воркера; после восстановления —200, сообщение доставлено. Дубли допускаются решением владельца «дубль лучше потери»; плановые повторы уже успешно опубликованного исходного алерта отдельно относятся к находке №3/F6.
+
+Red f2-red.log exit1:16passed/1failed (реальный ответ503 вместо200). Green f2-green.log exit0:2files/29passed/0skip, маршрут+durable delivery; asserts сохраняют прежнюю DLQ, новую опубликованную строку и реальный вызов notifier mock. Live PG/Telegram stub proof будет в F8. GitNexus impact POST/detect exit1 unavailable, risk UNKNOWN; fallback подтвердил Alertmanager/disk-guard callers и durable-alert-delivery/outbox routing. git diff --check exit0. F1 commit:28898142.

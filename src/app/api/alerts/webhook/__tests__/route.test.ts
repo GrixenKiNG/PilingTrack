@@ -13,7 +13,7 @@ import { NextRequest } from 'next/server';
 const mocks = vi.hoisted(() => ({
   sendAlert: vi.fn().mockResolvedValue(true),
   enabled: vi.fn().mockResolvedValue(true),
-  upsert: vi.fn(), find: vi.fn(), update: vi.fn(),
+  create: vi.fn(), upsert: vi.fn(), find: vi.fn(), update: vi.fn(),
   rows: new Map<string, { id: string; tenantId: string; published: boolean; payload: Record<string, unknown>; lastError: string | null }>(),
 }));
 
@@ -21,7 +21,7 @@ vi.mock('@/core/notifications/telegram', () => ({
   telegramNotifier: { sendAlert: mocks.sendAlert },
 }));
 vi.mock('@/lib/db', () => {
-  const outboxEvent = { upsert: mocks.upsert, findFirst: mocks.find, update: mocks.update };
+  const outboxEvent = { create: mocks.create, upsert: mocks.upsert, findFirst: mocks.find, update: mocks.update };
   return { db: { outboxEvent, $transaction: async (fn: (tx: unknown) => Promise<unknown>) => fn({ outboxEvent, $queryRaw: vi.fn() }) } };
 });
 vi.mock('@/modules/settings', () => ({ isNotificationEnabled: mocks.enabled }));
@@ -38,6 +38,11 @@ beforeEach(() => {
     const key = create.tenantId + ':' + create.dedupeKey;
     if (!mocks.rows.has(key)) mocks.rows.set(key, { ...create, id: key, published: false, lastError: null });
     return mocks.rows.get(key);
+  });
+  mocks.create.mockReset().mockImplementation(async ({ data }) => {
+    const key = data.tenantId + ':' + data.dedupeKey;
+    const row = { ...data, id: key, published: false, lastError: null };
+    mocks.rows.set(key, row); return row;
   });
   mocks.find.mockReset().mockImplementation(async ({ where }) => [...mocks.rows.values()].find(row => row.id === where.id && row.tenantId === where.tenantId));
   mocks.update.mockReset().mockImplementation(async ({ where, data }) => {
@@ -248,6 +253,19 @@ describe('POST /api/alerts/webhook — delivery failure', () => {
     expect(mocks.sendAlert.mock.calls[0][0].ruleId).toBe('rule-1');
   });
 
+  it('F2: a repeat after DLQ gets a new durable attempt and can deliver', async () => {
+    const alerts = [{ status: 'firing', startsAt: '2026-10-03T00:00:00Z', labels: { alertname: 'disk' }, annotations: { summary: 'Disk full' } }];
+    mocks.sendAlert.mockResolvedValue(false);
+    expect((await POST(reqWithBody({ alerts }))).status).toBe(503);
+    const dead = [...mocks.rows.values()][0];
+    dead.published = true; dead.lastError = 'Moved to DLQ: retries exhausted';
+    mocks.sendAlert.mockClear().mockResolvedValue(true);
+    expect((await POST(reqWithBody({ alerts }))).status).toBe(200);
+    expect(mocks.sendAlert).toHaveBeenCalledTimes(1);
+    expect(mocks.rows.size).toBe(2);
+    expect(dead.lastError).toBe('Moved to DLQ: retries exhausted');
+    expect([...mocks.rows.values()][1]).toMatchObject({ published: true, lastError: null });
+  });
   it('answers 200 when the batch has only resolved alerts (no firing to deliver)', async () => {
     const res = await POST(reqWithBody({
       alerts: [{ status: 'resolved', labels: { severity: 'critical', alertname: 'rule-1' }, annotations: {} }],
