@@ -73,13 +73,21 @@ export function useEquipmentList() {
     setEquipment((prev) => [...prev, data.equipment]);
   };
 
+  const reloadCard = async (id: string) => {
+    const res = await authFetch(`/api/equipment/${id}`);
+    if (!res.ok) throw new Error('Не удалось перечитать карточку');
+    const data = await res.json();
+    setEquipment((prev) => prev.map((e) => e.id === id ? data.equipment : e));
+  };
+
   const update = async (id: string, payload: Record<string, unknown>) => {
     const res = await authFetch(`/api/equipment/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
+      body: JSON.stringify({ ...payload, expectedUpdatedAt: equipment.find((e) => e.id === id)?.updatedAt }),
     });
     if (!res.ok) {
+      if (res.status === 409) await reloadCard(id);
       const err = await res.json().catch(() => ({}));
       throw new Error(err.error || 'Ошибка сохранения');
     }
@@ -102,8 +110,13 @@ export function useEquipmentList() {
       const res = await authFetch(`/api/equipment/${item.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ isActive: !item.isActive }),
+        body: JSON.stringify({ isActive: !item.isActive, expectedUpdatedAt: item.updatedAt }),
       });
+      if (res.status === 409) {
+        await reloadCard(item.id);
+        toast.error('Карточка изменена другим пользователем. Данные обновлены; повторите правку.');
+        return;
+      }
       if (!res.ok) throw new Error();
       const data = await res.json();
       setEquipment((prev) => prev.map((e) => (e.id === item.id ? data.equipment : e)));

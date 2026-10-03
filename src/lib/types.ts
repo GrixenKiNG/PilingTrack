@@ -445,6 +445,7 @@ export interface EquipmentMetadata {
 }
 
 export interface EquipmentDTO extends EquipmentMetadata {
+  updatedAt?: string;
   id: string;
   name: string;
   model: string;

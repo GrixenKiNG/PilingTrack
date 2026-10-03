@@ -56,7 +56,7 @@ function putReq(body: Record<string, unknown>): NextRequest {
   return new NextRequest('http://localhost/api/equipment/eq-1', {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
+    body: JSON.stringify({ expectedUpdatedAt: '2026-10-03T00:00:00.000Z', ...body }),
   });
 }
 
@@ -173,4 +173,29 @@ describe('DELETE /api/equipment/[id] — снимок и след (F-R34-14)', (
     expect(res.status).toBe(200);
     expect(loggerErrorMock).toHaveBeenCalled();
   });
+});
+
+
+it('PUT требует версию карточки до изменения', async () => {
+  vi.resetAllMocks();
+  recordAuditEventMock.mockResolvedValue(undefined);
+  updateEquipmentMock.mockResolvedValue(undefined);
+  requireAuthMock.mockResolvedValue({ user: ADMIN, error: null });
+  findFirstEquipmentMock.mockResolvedValue(BEFORE);
+  getEquipmentByIdOrThrowMock.mockResolvedValue(BEFORE);
+  const res = await PUT(putReq({ name: 'Без версии', expectedUpdatedAt: undefined }), params());
+  expect(res.status).toBe(400);
+});
+
+
+it('PUT передаёт предусловие и возвращает 409 без успеха', async () => {
+  vi.resetAllMocks();
+  requireAuthMock.mockResolvedValue({user:ADMIN,error:null});
+  findFirstEquipmentMock.mockResolvedValue(BEFORE);
+  const { ServiceError } = await import('@/lib/service-error');
+  updateEquipmentMock.mockRejectedValue(new ServiceError('Карточка изменена',409));
+  const res = await PUT(putReq({name:'Правка'}),params());
+  expect(res.status).toBe(409);
+  expect(updateEquipmentMock).toHaveBeenCalledWith(expect.objectContaining({tenantId:'tenant-a',expectedUpdatedAt:'2026-10-03T00:00:00.000Z'}));
+  expect(recordAuditEventMock).not.toHaveBeenCalled();
 });

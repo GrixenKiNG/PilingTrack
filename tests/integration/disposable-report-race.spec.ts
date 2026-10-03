@@ -8,7 +8,7 @@ describe.skipIf(!process.env.CODEX_STAND_URL || !process.env.INTEGRATION_DATABAS
   let fixture: Awaited<ReturnType<typeof createFixture>>;
   let tenant: string; let base: string; let cookie: string; let grade: string;
   beforeAll(async () => {
-    const url = new URL(process.env.CODEX_STAND_URL!);
+    const url = new URL(process.env.CODEX_STAND_URL || 'http://invalid');
     if (!['127.0.0.1','localhost'].includes(url.hostname)) throw new Error('Disposable localhost only');
     base = url.origin;
     fixture = await createFixture(); tenant = fixture.tenants[0]; grade = tenant + '-grade';

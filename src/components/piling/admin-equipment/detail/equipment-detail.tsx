@@ -127,10 +127,11 @@ export function EquipmentDetail({ equipmentId, embedded = false }: Props) {
     const res = await authFetch(`/api/equipment/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
+      body: JSON.stringify({ ...payload, expectedUpdatedAt: details?.equipment.updatedAt }),
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
+      if (res.status === 409) await refresh();
       throw new Error(err.error || 'Ошибка сохранения');
     }
     await refresh();
