@@ -8,8 +8,9 @@
  * <button>, видимая дорожка остаётся 40×24 (образец — workspace-settings.tsx).
  * На десктопе (sm и шире) вид не меняется.
  */
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { toast } from 'sonner';
 
 const mocks = vi.hoisted(() => ({ authFetch: vi.fn() }));
 
@@ -237,5 +238,45 @@ describe('форма установки: лимиты полей как в zod-�
     expect(hours).toHaveAttribute('min', '0');
     expect(hours).toHaveAttribute('max', '1000000');
     expect(hours).toHaveAttribute('step', '1');
+  });
+});
+
+/**
+ * F-R115-8: «Скачать PDF» переходил по адресу маршрута и на отказе (403/429/5xx)
+ * открывал страницу с сырым JSON вместо файла. Теперь PDF тянется через
+ * authFetch, а отказ объясняется русским тостом.
+ */
+describe('отчёт по установке: отказ выгрузки PDF объясняется по-русски (F-R115-8)', () => {
+  beforeEach(() => {
+    vi.mocked(toast.error).mockClear();
+  });
+
+  it('403 на «Скачать PDF» → русский текст, без перехода на страницу с ответом', async () => {
+    mocks.authFetch.mockImplementation(async (u: string) => {
+      if (u === '/api/settings') return json({ timezone: 'Europe/Moscow' });
+      return json({ error: 'Доступ запрещён' }, 403);
+    });
+    render(<EquipmentReportExport equipmentId="eq-1" />);
+
+    fireEvent.click(screen.getByRole('button', { name: /Скачать PDF/ }));
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith(
+      'Нет прав на выгрузку отчёта. Обратитесь к администратору.',
+    ));
+  });
+
+  it('обрыв сети при выгрузке → русский текст, а не «Failed to fetch»', async () => {
+    mocks.authFetch.mockImplementation(async (u: string) => {
+      if (u === '/api/settings') return json({ timezone: 'Europe/Moscow' });
+      throw new TypeError('Failed to fetch');
+    });
+    render(<EquipmentReportExport equipmentId="eq-1" />);
+
+    fireEvent.click(screen.getByRole('button', { name: /Скачать PDF/ }));
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith(
+      'Нет связи с сервером. Файл не сформирован — повторите при появлении сети.',
+    ));
+    expect(toast.error).not.toHaveBeenCalledWith('Failed to fetch');
   });
 });
