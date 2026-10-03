@@ -12,7 +12,7 @@
  * Дочерние диалоги/селекты и данные подменены заглушками: тест про поведение
  * экрана, а не про вёрстку Radix.
  */
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { toast } from 'sonner';
@@ -154,6 +154,65 @@ describe('CrewFormDialog — удалённый помощник виден и �
 
     expect(screen.getByText('Помощник удалён')).toBeInTheDocument();
     expect(screen.queryByText('u-gone')).toBeNull();
+  });
+});
+
+/**
+ * R124-1: в диалоге «Выбрать помощников» выбор применялся к составу сразу,
+ * а обе кнопки лишь закрывали диалог — «Отмена» врала, и лишний помощник
+ * сохранялся молча. Теперь выбор копится в черновике внутри модалки.
+ */
+describe('CrewFormDialog — «Отмена» в диалоге помощников отменяет выбор (F-R124-1)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  const users = [
+    { id: 'u1', name: 'Первый', email: 'u1@example.com' },
+    { id: 'u2', name: 'Второй', email: 'u2@example.com' },
+  ] as unknown as UserDTO[];
+
+  const editItemOneAssistant = {
+    id: 'c1', name: 'Бригада 1', isActive: true,
+    operatorId: 'o1', equipmentId: 'e1', siteId: 's1',
+    assistants: [{ id: 'a1', crewId: 'c1', userId: 'u1', name: 'Первый' }],
+  } as unknown as CrewDTO;
+
+  const renderDialog = (onSubmit: (data: { assistantUserIds: string[] }) => Promise<void>) => render(
+    <CrewFormDialog
+      open onClose={vi.fn()} mode="edit" editItem={editItemOneAssistant}
+      operators={[{ id: 'o1', name: 'Оператор' }] as unknown as UserDTO[]}
+      equipment={[{ id: 'e1', name: 'Техника' }] as unknown as EquipmentDTO[]}
+      sites={[{ id: 's1', name: 'Объект' }] as unknown as SiteDTO[]}
+      assistants={users} loadingReferenceData={false} referenceError={null}
+      onSubmit={onSubmit} submitting={false}
+    />,
+  );
+
+  // В форме правки есть ещё чекбокс «Активна» — ищем по строке помощника.
+  const assistantCheckbox = (name: string) =>
+    within(screen.getByText(name).closest('label') as HTMLElement).getByRole('checkbox');
+
+  it('«Отмена» не переносит выбор в состав, «Применить» — переносит', async () => {
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+    renderDialog(onSubmit);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Изменить состав помощников' }));
+    fireEvent.click(assistantCheckbox('Второй'));
+    // «Отмена» модалки — вторая на экране (после «Отмены» самой формы).
+    fireEvent.click(screen.getAllByRole('button', { name: 'Отмена' })[1]);
+
+    fireEvent.click(screen.getByRole('button', { name: /Сохранить/ }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+    expect(onSubmit.mock.calls[0][0].assistantUserIds).toEqual(['u1']);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Изменить состав помощников' }));
+    fireEvent.click(assistantCheckbox('Второй'));
+    fireEvent.click(screen.getByRole('button', { name: 'Применить' }));
+
+    fireEvent.click(screen.getByRole('button', { name: /Сохранить/ }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(2));
+    expect(onSubmit.mock.calls[1][0].assistantUserIds).toEqual(['u1', 'u2']);
   });
 });
 

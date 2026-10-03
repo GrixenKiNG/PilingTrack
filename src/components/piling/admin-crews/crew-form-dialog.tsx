@@ -364,15 +364,10 @@ export function CrewFormDialog({
         assistantUsers={assistants}
         assistantNameById={assistantNameById}
         selectedIds={assistantUserIds}
-        onToggleId={(selectedId) => setAssistantUserIds(prev => (
-          prev.includes(selectedId)
-            ? prev.filter(idItem => idItem !== selectedId)
-            : [...prev, selectedId]
-        ))}
-        onRemoveId={(removedId) => setAssistantUserIds(prev => (
-          prev.filter(idItem => idItem !== removedId)
-        ))}
-        onConfirm={() => setShowAssistantDialog(false)}
+        onApply={(ids) => {
+          setAssistantUserIds(ids);
+          setShowAssistantDialog(false);
+        }}
       />
     </>
   );
@@ -384,20 +379,31 @@ function AssistantSelectorModal({
   assistantUsers,
   assistantNameById,
   selectedIds,
-  onToggleId,
-  onRemoveId,
-  onConfirm,
+  onApply,
 }: {
   open: boolean;
   onClose: () => void;
   assistantUsers: UserDTO[];
   assistantNameById: Record<string, string>;
   selectedIds: string[];
-  onToggleId: (id: string) => void;
-  onRemoveId: (id: string) => void;
-  onConfirm: () => void;
+  onApply: (ids: string[]) => void;
 }) {
   const [search, setSearch] = useState('');
+  /*
+    Выбор копится в черновике: «Отмена» отбрасывает правки, «Применить»
+    переносит их в состав бригады. Раньше клик по чекбоксу менял состав сразу,
+    и обе кнопки лишь закрывали диалог — «Отмена» врала (R124 №1).
+  */
+  const [draftIds, setDraftIds] = useState<string[]>(selectedIds);
+
+  useEffect(() => {
+    if (open) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- syncs the draft to the source list when the dialog opens
+      setDraftIds(selectedIds);
+      setSearch('');
+    }
+  }, [open, selectedIds]);
+
   const query = search.trim().toLowerCase();
   const filteredUsers = query
     ? assistantUsers.filter(user => (
@@ -412,6 +418,16 @@ function AssistantSelectorModal({
     }
 
     onClose();
+  };
+
+  const toggleDraftId = (id: string) => {
+    setDraftIds(prev => (
+      prev.includes(id) ? prev.filter(idItem => idItem !== id) : [...prev, id]
+    ));
+  };
+
+  const removeDraftId = (id: string) => {
+    setDraftIds(prev => prev.filter(idItem => idItem !== id));
   };
 
   return (
@@ -439,8 +455,8 @@ function AssistantSelectorModal({
                 className="flex cursor-pointer items-center gap-3 rounded-lg border p-3 transition-colors hover:bg-muted"
               >
                 <Checkbox
-                  checked={selectedIds.includes(user.id)}
-                  onCheckedChange={() => onToggleId(user.id)}
+                  checked={draftIds.includes(user.id)}
+                  onCheckedChange={() => toggleDraftId(user.id)}
                 />
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-medium">{user.name}</p>
@@ -456,9 +472,9 @@ function AssistantSelectorModal({
             )}
           </div>
 
-          {selectedIds.length > 0 && (
+          {draftIds.length > 0 && (
             <div className="flex flex-wrap gap-1.5 rounded-lg border border-border bg-muted p-2.5">
-              {selectedIds.map(id => (
+              {draftIds.map(id => (
                 <span
                   key={id}
                   className="inline-flex items-center gap-1 rounded-md border border-warning/30 bg-warning/10 px-2 py-1 text-xs font-medium text-warning-strong"
@@ -466,7 +482,7 @@ function AssistantSelectorModal({
                   {assistantNameById[id] ?? DELETED_ASSISTANT_NAME}
                   <button
                     type="button"
-                    onClick={() => onRemoveId(id)}
+                    onClick={() => removeDraftId(id)}
                     aria-label={`Удалить ассистента ${assistantNameById[id] ?? DELETED_ASSISTANT_NAME}`}
                     title="Удалить ассистента"
                     className="flex min-h-11 min-w-11 items-center justify-center rounded text-warning-strong transition-colors hover:bg-warning/10 hover:text-warning-strong"
@@ -491,7 +507,7 @@ function AssistantSelectorModal({
           )}
 
           <p className="text-xs text-muted-foreground">
-            {selectedIds.length} помощник(ов) выбрано
+            {draftIds.length} помощник(ов) выбрано
           </p>
         </div>
 
@@ -499,7 +515,7 @@ function AssistantSelectorModal({
           <Button variant="outline" onClick={onClose}>
             Отмена
           </Button>
-          <Button onClick={onConfirm} className="bg-signal text-white hover:bg-signal-strong">
+          <Button onClick={() => onApply(draftIds)} className="bg-signal text-white hover:bg-signal-strong">
             Применить
           </Button>
         </DialogFooter>
