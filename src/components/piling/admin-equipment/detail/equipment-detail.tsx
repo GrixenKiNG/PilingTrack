@@ -53,9 +53,12 @@ interface Props {
   /** When rendered inside the fleet-center right column (not the full page):
    *  hides the "back" link and trims outer padding. */
   embedded?: boolean;
+  /** Вызывается после успешного сохранения карточки: центр парка перечитывает
+   *  снимок, иначе в списке слева остаётся старое имя (R119 №5). */
+  onSaved?: () => void;
 }
 
-export function EquipmentDetail({ equipmentId, embedded = false }: Props) {
+export function EquipmentDetail({ equipmentId, embedded = false, onSaved }: Props) {
   const canManage = usePilingStore((state) => state.currentUser?.role === 'ADMIN');
   const [details, setDetails] = useState<DetailsResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -137,6 +140,9 @@ export function EquipmentDetail({ equipmentId, embedded = false }: Props) {
       throw new Error(err.error || 'Ошибка сохранения');
     }
     await refresh();
+    // Список парка слева кормится снимком /monitoring/fleet — без этого
+    // переименованная установка остаётся в плитке со старым именем (R119 №5).
+    onSaved?.();
   };
 
   if (loading) {

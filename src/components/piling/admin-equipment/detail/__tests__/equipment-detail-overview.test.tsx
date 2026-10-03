@@ -7,7 +7,7 @@
  * в поясе западнее UTC.
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 
 const mocks = vi.hoisted(() => ({ authFetch: vi.fn() }));
 
@@ -65,6 +65,18 @@ function row(date: string): TimelineRow {
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
 
+/** Ответ GET /api/equipment/:id/details — минимум, нужный карточке. */
+function detailsResponse(id: string, name: string) {
+  return {
+    equipment: { id, name, kind: 'PILE_DRIVER', isActive: true, model: null, inventoryNumber: null },
+    crew: null,
+    telematicsDevices: [],
+    documents: [],
+    stats30d: { reportCount: 0, piles: 0, pileMeters: 0, drillingCount: 0, drillingMeters: 0, downtimeHours: 0 },
+    timeline: [],
+  };
+}
+
 describe('OverviewTiles — даты обзора (F-R114-1)', () => {
   it('«Ближайшее ТО» и «Последний отчёт» печатаются как ДД.ММ.ГГГГ', () => {
     render(
@@ -114,15 +126,6 @@ describe('OverviewTiles — даты обзора (F-R114-1)', () => {
   только при монтировании, а смена `equipmentId` его не поднимала.
 */
 describe('EquipmentDetail — смена установки (F-R119-13)', () => {
-  const details = (id: string, name: string) => ({
-    equipment: { id, name, kind: 'PILE_DRIVER', isActive: true, model: null, inventoryNumber: null },
-    crew: null,
-    telematicsDevices: [],
-    documents: [],
-    stats30d: { reportCount: 0, piles: 0, pileMeters: 0, drillingCount: 0, drillingMeters: 0, downtimeHours: 0 },
-    timeline: [],
-  });
-
   beforeEach(() => {
     mocks.authFetch.mockReset();
     usePilingStore.setState({ currentUser: { role: 'ADMIN' } as never });
@@ -130,7 +133,7 @@ describe('EquipmentDetail — смена установки (F-R119-13)', () => 
 
   it('пока грузится новая установка, данные прежней не показываются', async () => {
     mocks.authFetch.mockImplementation(async (url: string) => {
-      if (url === '/api/equipment/eq-1/details') return json(details('eq-1', 'СГ-1'));
+      if (url === '/api/equipment/eq-1/details') return json(detailsResponse('eq-1', 'СГ-1'));
       return new Promise(() => {}); // eq-2 ещё грузится
     });
 
@@ -140,5 +143,33 @@ describe('EquipmentDetail — смена установки (F-R119-13)', () => 
     rerender(<EquipmentDetail equipmentId="eq-2" embedded />);
 
     expect(screen.queryAllByText('СГ-1')).toHaveLength(0);
+  });
+});
+
+/*
+  R119 №5: после успешной правки обновлялась только правая карточка, а список
+  парка кормится снимком GET /api/monitoring/fleet — переименованная установка
+  оставалась в плитке слева со старым именем до перезагрузки страницы.
+*/
+describe('EquipmentDetail — обновление списка парка после правки (F-R119-5)', () => {
+  beforeEach(() => {
+    mocks.authFetch.mockReset();
+    usePilingStore.setState({ currentUser: { role: 'ADMIN' } as never });
+  });
+
+  it('после успешного сохранения зовёт onSaved (перечитать снимок)', async () => {
+    const onSaved = vi.fn();
+    mocks.authFetch.mockImplementation(async (_url: string, init?: RequestInit) => {
+      if (init?.method === 'PUT') return json({ equipment: { id: 'eq-1' } });
+      return json(detailsResponse('eq-1', 'СГ-1'));
+    });
+
+    render(<EquipmentDetail equipmentId="eq-1" embedded onSaved={onSaved} />);
+    await screen.findAllByText('СГ-1');
+
+    fireEvent.click(screen.getByRole('button', { name: /Редактировать/ }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Сохранить' }));
+
+    await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1));
   });
 });
