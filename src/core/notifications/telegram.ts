@@ -41,12 +41,12 @@ async function getDbClient() {
   return db;
 }
 
-async function getConfigs(): Promise<TelegramBotConfig[]> {
+async function getConfigs(configId?: string, expectedTenantId?: string): Promise<TelegramBotConfig[]> {
   try {
     // Callers (webhook, DLQ, alert engine, report event handlers) run without
     // a user session, so there's no per-request tenant — fall back to the
     // deployment's default tenant, same as every other background path.
-    const tenantId = getRequestTenantId() ?? process.env.DEFAULT_TENANT_ID;
+    const tenantId = expectedTenantId ?? getRequestTenantId() ?? process.env.DEFAULT_TENANT_ID;
     if (!tenantId) return [];
 
     // Контекст открывается здесь, а не у вызывающего: половина вызовов идёт
@@ -60,7 +60,7 @@ async function getConfigs(): Promise<TelegramBotConfig[]> {
     // расширение не прикладывало тенанта, и RLS отдавал ноль настроек.
     return await runWithTenantContext(() => runOutsideGucScope(async () => {
       setRequestTenantId(tenantId);
-      return loadConfigsForTenant(tenantId);
+      return loadConfigsForTenant(tenantId, configId);
     }));
   } catch (err) {
     logger.error('Failed to load Telegram config', err);
@@ -68,12 +68,12 @@ async function getConfigs(): Promise<TelegramBotConfig[]> {
   }
 }
 
-async function loadConfigsForTenant(tenantId: string): Promise<TelegramBotConfig[]> {
+async function loadConfigsForTenant(tenantId: string, configId?: string): Promise<TelegramBotConfig[]> {
   try {
     const db = await getDbClient();
     const { decrypt, isEncrypted } = await import('@/core/security/encryption');
     const configs = await db.telegramConfig.findMany({
-      where: { enabled: true, tenantId },
+      where: { tenantId, ...(configId ? { id: configId } : { enabled: true }) },
       orderBy: { createdAt: 'asc' },
     });
 
@@ -384,8 +384,8 @@ export class TelegramNotifier {
   /**
    * Test connectivity with Telegram API.
    */
-  async testConnection(): Promise<{ ok: boolean; chatTitle?: string; error?: string }> {
-    const config = (await getConfigs())[0];
+  async testConnection(configId?: string, tenantId?: string): Promise<{ ok: boolean; chatTitle?: string; error?: string }> {
+    const config = (await getConfigs(configId, tenantId))[0];
     if (!config) return { ok: false, error: 'Telegram не настроен — добавьте канал в настройках' };
 
     try {

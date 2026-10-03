@@ -75,6 +75,18 @@ describe('telegramNotifier — botToken decryption', () => {
     expect(url).not.toContain('enc:CIPHERTEXT');
   });
 
+  it('F4: selection filters before chat dedupe and uses the explicit session tenant', async () => {
+    const configs = [
+      { id: 'first', botToken: 'token-first', chatId: 'same-chat', enabled: true },
+      { id: 'second', botToken: 'token-second', chatId: 'same-chat', enabled: true },
+    ];
+    findManyMock.mockImplementation(async ({ where }) => configs.filter(config => !where.id || config.id === where.id));
+    isEncryptedMock.mockReturnValue(false);
+    expect((await telegramNotifier.testConnection('second', 'tenant-b')).ok).toBe(true);
+    expect(findManyMock).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 'second', tenantId: 'tenant-b' } }));
+    expect(fetchMock.mock.calls[0][0]).toContain('token-second');
+    expect(fetchMock.mock.calls[0][0]).not.toContain('token-first');
+  });
   it('passes plain-text botToken through without decrypting', async () => {
     findManyMock.mockResolvedValue([
       { botToken: '999:plain-token', chatId: '-100123', enabled: true },
