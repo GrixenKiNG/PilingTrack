@@ -335,3 +335,83 @@ DATABASE_URL="$DATABASE_URL_POSTGRES" npx tsx scripts/<имя>.ts
 ```bash
 docker compose logs --since=24h workers | grep -i "readiness scheduler"
 ```
+
+## G1 — оставшиеся таблицы, проверка 03.10.2026
+
+На новой одноразовой базе после 107 исходных миграций фактически 76
+политик, все строгие с FORCE; audit-mode — ноль. Число «46 + около19»
+из задания устарело. Полный разбор оставшихся таблиц и путей записи —
+docs/audits/codex-t7-rls.md.
+
+**Решение владельца перед выкладкой:** две новые недеструктивные миграции
+20261004000000_briefing_record_rls и 20261004001000_feedback_event_read_rls.
+Они включают ENABLE/FORCE RLS и создают политики; строки и типы не меняются.
+
+### Порядок и SQL до применения
+
+1. Восстановить свежий дамп в отдельный стенд.
+2. Убедиться, что app/workers работают как pilingtrack_app (не владелец,
+   rolsuper=false, rolbypassrls=false), identity grants установлены.
+3. Выполнить SQL ниже ролью владельца на копии. Все четыре счётчика —
+   ноль. Перед применением повторить на целевой базе.
+4. Проверить tenant-контекст обоих путей записи инструктажа, отметок
+   ленты, вход/acting-as; пройти интеграционные и браузерные сценарии
+   под ролью приложения на копии.
+5. Только после этого применять обычным миграционным сервисом.
+   Пересобрать migrate: старый образ не содержит новые SQL.
+6. Проверить политики, вход, инструктаж/подпись, журнал/печать и
+   ленту/прочитано; отдельно outbox/projection. Глобальные очереди
+   этими миграциями не меняются.
+
+    SELECT count(*) AS briefing_missing_tenant
+    FROM "BriefingRecord" WHERE "tenantId" IS NULL OR "tenantId" = '';
+    SELECT count(*) AS briefing_wrong_user_tenant
+    FROM "BriefingRecord" b LEFT JOIN "User" u
+      ON u.id = b."userId" AND u."tenantId" = b."tenantId"
+    WHERE u.id IS NULL;
+    SELECT count(*) AS feedback_read_missing_user
+    FROM "FeedbackEventRead" r LEFT JOIN "User" u ON u.id = r."userId"
+    WHERE u.id IS NULL;
+    SELECT count(*) AS reader_missing_tenant
+    FROM "FeedbackEventRead" r JOIN "User" u ON u.id = r."userId"
+    WHERE u."tenantId" IS NULL OR u."tenantId" = '';
+    SELECT rolname, rolsuper, rolbypassrls FROM pg_roles
+    WHERE rolname = 'pilingtrack_app';
+
+### SQL после применения
+
+    SELECT tablename, policyname, qual, with_check
+    FROM pg_policies WHERE schemaname = 'public'
+      AND tablename IN ('BriefingRecord', 'FeedbackEventRead');
+    SELECT relname, relrowsecurity, relforcerowsecurity
+    FROM pg_class WHERE oid IN ('"BriefingRecord"'::regclass,
+                               '"FeedbackEventRead"'::regclass);
+    SELECT count(*) AS policies,
+      count(*) FILTER (WHERE qual LIKE '%IS NULL%') AS audit_mode
+    FROM pg_policies WHERE schemaname = 'public';
+
+На чистой базе этой версии: 78 / 0. При следующих миграциях сверять список.
+Под pilingtrack_app без GUC обе таблицы возвращают ноль строк, INSERT
+отказывается с 42501; под организацией A строки B не видны и UPDATE/DELETE
+затрагивают ноль строк. Свой INSERT и оба прикладных пути инструктажа работают.
+Чтение глобальной ленты FeedbackEvent сохраняется: изолируются отметки
+конкретных читателей через User.
+
+### Узкий откат G1
+
+Только по решению владельца после оценки причины. Возвращает прежнюю
+защиту прикладными фильтрами у двух таблиц, поэтому ослабляет защиту перед
+организацией №2. Не использовать старый массовый rollback выше для G1:
+он относится к августовскому переходу, поздние FK-политики не имеют tenantId.
+
+    BEGIN;
+    ALTER TABLE "BriefingRecord" DISABLE ROW LEVEL SECURITY;
+    ALTER TABLE "FeedbackEventRead" DISABLE ROW LEVEL SECURITY;
+    COMMIT;
+
+Данные и журнал миграций остаются на месте. Для повторного включения
+выполнить ENABLE и FORCE на этих двух таблицах: политики после DISABLE
+сохранены. Не повторять CREATE POLICY и не менять _prisma_migrations.
+После отката и повторного включения повторить прикладные сценарии и тесты
+двух организаций. OutboxEvent/DLQ/IdempotencyKey/Tenant/FeedbackEvent/
+_prisma_migrations этим откатом не затрагиваются.
