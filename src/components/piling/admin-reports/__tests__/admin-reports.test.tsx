@@ -34,8 +34,13 @@ vi.mock('../report-form-dialog', () => ({ ReportFormDialog: () => null }));
 vi.mock('../report-evidence-preview', () => ({ ReportEvidencePreview: () => null }));
 vi.mock('@/components/piling/pdf-preview-dialog', () => ({ PdfPreviewDialog: () => null }));
 vi.mock('@/components/piling/confirm-action-dialog', () => ({
-  ConfirmActionDialog: ({ open, onConfirm }: { open: boolean; onConfirm: () => void }) =>
-    open ? <button type="button" onClick={() => void onConfirm()}>Удалить отчёт</button> : null,
+  ConfirmActionDialog: ({ open, onConfirm, description }: { open: boolean; onConfirm: () => void; description?: string }) =>
+    open ? (
+      <div>
+        <p>{description}</p>
+        <button type="button" onClick={() => void onConfirm()}>Удалить отчёт</button>
+      </div>
+    ) : null,
 }));
 vi.mock('../report-evidence-row', () => ({
   ReportsHeader: ({ onExport, onExportXlsx }: { onExport?: () => void; onExportXlsx?: () => void }) => (
@@ -131,6 +136,22 @@ describe('AdminReports — удаление отчёта (F-R93-7)', () => {
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith(
       'Нет соединения с сервером. Проверьте связь и повторите.',
     ));
+  });
+});
+
+describe('AdminReports — единый формат даты отчёта (F-R114-5)', () => {
+  beforeEach(() => {
+    authFetchMock.mockReset();
+    vi.mocked(toast.error).mockClear();
+    reportsState.current = baseState();
+  });
+
+  it('в подтверждении удаления дата — «ДД.ММ.ГГГГ», а не «1 сент. 2026 г.»', () => {
+    render(<AdminReports />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Удалить' }));
+
+    expect(screen.getByText(/Отчёт от 01\.09\.2026 \(Иван\) будет удалён/)).toBeInTheDocument();
   });
 });
 

@@ -11,7 +11,7 @@ import { can } from '@/services/auth/authorization-service';
 import { authFetch } from '@/lib/api';
 import { catchText } from '@/components/piling/admin-crews/crew-messages';
 import { cn } from '@/lib/utils';
-import { pluralizeRu } from '@/lib/format';
+import { pluralizeRu, formatRuDate } from '@/lib/format';
 import type { ReportDTO } from '@/lib/types';
 import { getReportTotals, addTotals } from './report-totals';
 import { useReportsData } from './use-reports-data';
@@ -212,7 +212,7 @@ export function AdminReports() {
     window.addEventListener('mouseup', onUp);
   };
 
-  const formatDate = (d: string) => new Date(d).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' });
+  const formatDate = (d: string) => formatRuDate(d);
 
   const formatLastEditor = (report: ReportDTO) => {
     if (!report.lastEditedByName) return report.user?.name ? `Автор: ${report.user.name}` : 'Нет данных';
