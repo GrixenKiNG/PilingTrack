@@ -406,7 +406,11 @@ export function MaintenanceBoard() {
           )}
         </section>
 
-        <div className="flex items-center justify-between px-1 pb-2 text-xs text-muted-foreground">
+        {/* F-R126-1: на 375 px строка пагинации (блок «Показать по:» + номера
+            страниц по 44 px) не влезала и растягивала страницу до 503 px —
+            единственный экран админки с горизонтальной прокруткой. flex-wrap
+            переносит блоки, gap-2 даёт отступ при переносе. */}
+        <div className="flex flex-wrap items-center justify-between gap-2 px-1 pb-2 text-xs text-muted-foreground">
           <div className="flex items-center gap-2">
             <span>Показать по:</span>
             <Select value={String(pageSize)} onValueChange={(value) => setPageSize(Number(value))}>

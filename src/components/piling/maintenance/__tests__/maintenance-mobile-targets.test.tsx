@@ -95,6 +95,24 @@ describe('журнал ТО: цель нажатия на телефоне (R73)
   });
 });
 
+describe('журнал ТО: строка пагинации переносится на телефоне (F-R126-1)', () => {
+  beforeEach(() => {
+    mocks.loadJson.mockResolvedValue({});
+    mocks.authFetch.mockResolvedValue(json({ records: [] }));
+  });
+
+  it('блок «Показать по:» и номера страниц переносятся (flex-wrap) — страница не расширяется', async () => {
+    render(<MaintenanceBoard />);
+    await screen.findByText(/Нарядов по выбранным фильтрам не найдено/);
+
+    // Ряд пагинации — родитель блока «Показать по:». До правки он был
+    // `flex … justify-between` без переноса: 375 px экрана против 503 px
+    // содержимого, вся страница уезжала вбок.
+    const pagination = screen.getByText('Показать по:').parentElement?.parentElement;
+    expect(pagination).toHaveClass('flex-wrap', 'gap-2');
+  });
+});
+
 describe('журнал ТО: назначение фильтров озвучивается (R116 #10)', () => {
   beforeEach(() => {
     mocks.loadJson.mockResolvedValue({});
