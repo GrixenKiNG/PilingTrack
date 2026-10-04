@@ -198,6 +198,11 @@ function RulesSettings(props: ReferenceUiProps) {
   // утверждение, что фактов нет, и сообщать о нём надо словами ошибки.
   const previewFacts = authoritativeFactsForEquipment(props.currentReadiness, props.selectedId);
   const preview = previewFacts ? computeReadinessScore(previewFacts, draft) : null;
+  // База сравнения — авторитетный снимок выбранной установки: его собственный
+  // балл, версия правил и время оценки. Это отдельная, уже принятая система
+  // координат, и балл чернового предпросмотра с ней не отождествляем. Нет
+  // пригодного снимка — сравнивать не с чем, поэтому базу не показываем.
+  const previewSnapshot = props.currentReadiness.find((item) => item.equipmentId === props.selectedId) ?? null;
   const previewEmptyLabel = props.authoritativeReadinessError
     ?? (props.selectedId
       ? 'По выбранной установке нет авторитетных фактов — предпросмотр недоступен.'
@@ -543,7 +548,21 @@ function RulesSettings(props: ReferenceUiProps) {
         </aside>
       </div>
       <section className={cn(card, 'mt-2 p-3')}>
-        <h2 className="flex items-center gap-2 font-bold"><ShieldCheck className="h-4 w-4 text-muted-foreground" />Предпросмотр расчёта готовности</h2>
+        <h2 className="flex flex-wrap items-center gap-2 font-bold"><ShieldCheck className="h-4 w-4 text-muted-foreground" />Предпросмотр расчёта готовности <span className="rounded bg-signal/15 px-2 py-0.5 text-3xs font-semibold text-signal-strong">по черновым весам</span></h2>
+        <p className="mt-1 text-2xs leading-relaxed text-muted-foreground">
+          Пересчёт фактов авторитетного снимка по несохранённым весам формы — это предпросмотр, а не авторитетная оценка.
+          {preview && previewSnapshot ? (
+            <> База сравнения — авторитетный снимок этой установки: балл <b className="font-semibold text-foreground">{previewSnapshot.score} из 100</b>
+              {previewSnapshot.ruleSetVersion === 'unpublished'
+                ? <>, правила не опубликованы</>
+                : previewSnapshot.ruleSetVersion
+                  ? <>, правила <b className="font-semibold text-foreground">{previewSnapshot.ruleSetVersion}</b></>
+                  : null}
+              {previewSnapshot.calculatedAt
+                ? <>, оценка от {formatDateTimeInTimezone(previewSnapshot.calculatedAt, props.bootstrap?.tenant.timezone)}</>
+                : null}.</>
+          ) : null}
+        </p>
         <div className="mt-3 grid grid-cols-1 items-start gap-4 xl:grid-cols-[270px_minmax(0,1.5fr)_minmax(0,1fr)_200px]">
           <div className="flex items-center gap-3">
             <EquipmentPhoto cardData={previewFleet} name={previewEquipment?.name ?? ''} className="h-[74px] w-[68px] shrink-0" />
