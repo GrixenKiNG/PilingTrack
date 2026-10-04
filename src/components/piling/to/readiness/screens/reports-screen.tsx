@@ -298,6 +298,19 @@ export function ReportsScreen(props: ReferenceUiProps) {
         Период: {formatTenantDay(period.fromDay)} — {formatTenantDay(period.toDay)}
         {' · '}{period.days} {pluralizeRu(period.days, ['сутки', 'суток', 'суток'])}
       </p>
+      {/*
+        История готовности — отдельный источник от текущего снимка. Раньше её
+        отказ выдавался за отказ текущей оценки и гасил весь парк; теперь он
+        виден здесь, где история и читается, и не трогает готовность центра/парка.
+      */}
+      {props.readinessHistoryError && (
+        <p
+          role="alert"
+          className="mb-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive-strong"
+        >
+          История готовности не загружена: {props.readinessHistoryError}. Динамика и снимки в журнале за период могут быть неполными.
+        </p>
+      )}
       <section className={COMPACT_KPI_GRID} style={kpiGridStyle(5)}>
         <RefKpi
           icon="technical-readiness"

@@ -4,6 +4,7 @@ import { bootstrapEnvelope } from '../readiness/api/__tests__/fixtures';
 import type { ReadinessShiftDto } from '../readiness/api/contracts';
 import type { ReferenceUiProps } from '../readiness/screens/types';
 import { ShiftsScreen } from '../readiness/screens/shifts-screen';
+import { ReportsScreen } from '../readiness/screens/reports-screen';
 import { getTodayInTimezone } from '@/lib/timezone';
 import {
   afterEach,
@@ -27,6 +28,7 @@ vi.mock('sonner', () => ({
 }));
 vi.mock('@/modules/readiness', () => ({
   DEFAULT_READINESS_RULES: {},
+  READINESS_READY_THRESHOLD: 80,
   buildReadinessFacts: vi.fn(() => ({})),
   computeReadinessScore: vi.fn(() => ({ score: 0 })),
 }));
@@ -43,12 +45,16 @@ vi.mock('@/components/piling/to/readiness-reference-ui', () => ({
     onViewChange: (view: string) => void;
     onSettingsSectionChange: (section: string) => void;
     onSelect: (id: string) => void;
+    authoritativeReadinessError: string | null;
+    readinessHistoryError: string | null;
   }) => (
     <section
       data-testid="reference-ui"
       data-view={props.view}
       data-section={props.settingsSection}
       data-equipment={props.selectedId}
+      data-authoritative-error={props.authoritativeReadinessError ?? ''}
+      data-history-error={props.readinessHistoryError ?? ''}
     >
       <button type="button" onClick={() => props.onViewChange('reports')}>
         Open reports
@@ -289,6 +295,50 @@ describe('ToModule production shell integration', () => {
 
     expect(document.title).toBe('Техническая готовность — PilingTrack');
   }, 30_000);
+
+  /**
+   * F-N1004-HISTORY-ERROR (R151 №1): ошибка ИСТОРИИ готовности раньше
+   * сливалась с ошибкой ТЕКУЩЕГО снимка в один флаг
+   * (`currentResult.error ?? historyResult.error`), и падение только истории
+   * (её читают лишь отчёты) гасило готовность всего парка и центра. Проверяем,
+   * что два источника разведены: отказ истории не трогает текущий снимок, а
+   * отказ текущего не подменяется успешной историей.
+   */
+  it('отказ истории не гасит текущий снимок (F-N1004-HISTORY-ERROR)', async () => {
+    mocks.authFetch.mockImplementation(async (url: string, options?: RequestInit) => {
+      if (url.startsWith('/api/readiness/current')) return jsonResponse({ data: [] });
+      if (url.startsWith('/api/readiness/history')) {
+        return jsonResponse({ error: 'История недоступна' }, 500);
+      }
+      return responseFor(url, options);
+    });
+
+    await renderToModule('/admin/to');
+
+    const referenceUi = screen.getByTestId('reference-ui');
+    // Текущий снимок получен — парк и центр авторитетны.
+    expect(referenceUi).toHaveAttribute('data-authoritative-error', '');
+    // Отказ истории сохранён отдельно и не потерян.
+    expect(referenceUi.getAttribute('data-history-error')).toBeTruthy();
+  }, 30_000);
+
+  it('отказ текущего снимка при успешной истории оставляет готовность неподтверждённой', async () => {
+    mocks.authFetch.mockImplementation(async (url: string, options?: RequestInit) => {
+      if (url.startsWith('/api/readiness/current')) {
+        return jsonResponse({ error: 'Снимок недоступен' }, 500);
+      }
+      if (url.startsWith('/api/readiness/history')) {
+        return jsonResponse({ data: [], page: { limit: 500, total: 0 }, filters: {} });
+      }
+      return responseFor(url, options);
+    });
+
+    await renderToModule('/admin/to');
+
+    const referenceUi = screen.getByTestId('reference-ui');
+    expect(referenceUi.getAttribute('data-authoritative-error')).toBeTruthy();
+    expect(referenceUi).toHaveAttribute('data-history-error', '');
+  }, 30_000);
 });
 
 const DAY_MS = 86_400_000;
@@ -362,6 +412,7 @@ describe('ShiftsScreen — неделя по производственным д
       defects: [],
       currentReadiness: [],
       authoritativeReadinessError: null,
+      readinessHistoryError: null,
       readinessHistory: [],
       audit: null,
       filters: {},
@@ -393,5 +444,67 @@ describe('ShiftsScreen — неделя по производственным д
     ]);
 
     expect(kpiValue('Смен сегодня')).toBe('1');
+  });
+});
+
+/**
+ * F-N1004-HISTORY-ERROR (R151 №1): отказ истории готовности должен быть виден
+ * именно там, где история читается — на экране отчётов, — а не подменять собой
+ * текущую оценку парка/центра. Проверяем, что причина отказа показана, а при
+ * успешной истории предупреждения нет.
+ */
+describe('ReportsScreen — отказ истории виден у отчётов (F-N1004-HISTORY-ERROR)', () => {
+  function renderReports(overrides: Partial<ReferenceUiProps> = {}) {
+    const props = {
+      view: 'reports',
+      onViewChange: () => {},
+      settingsSection: 'rules',
+      onSettingsSectionChange: () => {},
+      equipment: [],
+      selectedId: '',
+      onSelect: () => {},
+      readinessByEquipment: {},
+      factsByEquipment: {},
+      scoresByEquipment: {},
+      rulesState: {} as ReferenceUiProps['rulesState'],
+      onRulesStateChange: () => {},
+      journals: {},
+      crews: [],
+      maintenance: [],
+      fleetCards: [],
+      details: {},
+      loading: false,
+      workspaceError: null,
+      workspaceIssues: [],
+      outOfRoleSources: [],
+      rulesAvailable: true,
+      bootstrap: bootstrapEnvelope('reports').data,
+      shifts: [],
+      permits: [],
+      defects: [],
+      currentReadiness: [],
+      authoritativeReadinessError: null,
+      readinessHistoryError: null,
+      readinessHistory: [],
+      audit: null,
+      filters: {},
+      onFiltersChange: () => {},
+      showInternalNavigation: false,
+      onRetry: () => {},
+      ...overrides,
+    } satisfies ReferenceUiProps;
+    render(<ReportsScreen {...props} />);
+  }
+
+  it('показывает причину отказа истории готовности', () => {
+    renderReports({ readinessHistoryError: 'Сервис истории недоступен' });
+
+    expect(screen.getByRole('alert')).toHaveTextContent('Сервис истории недоступен');
+  });
+
+  it('не показывает предупреждение, когда история загружена', () => {
+    renderReports();
+
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 });

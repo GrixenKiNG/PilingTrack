@@ -313,6 +313,12 @@ export function ToModule({ surface = 'readiness' }: { surface?: ModuleSurface } 
   const [currentReadiness, setCurrentReadiness] = useState<CurrentReadinessDto[]>([]);
   const [readinessHistory, setReadinessHistory] = useState<ReadinessSnapshotDto[]>([]);
   const [authoritativeReadinessError, setAuthoritativeReadinessError] = useState<string | null>(null);
+  // Ошибка истории — отдельный источник. Раньше она сливалась с ошибкой
+  // текущего снимка, и падение только истории (её читают лишь отчёты) гасило
+  // готовность всего парка и центра: снимки были на месте, а экран показывал
+  // «оценка недоступна». Держим их порознь: история видна у отчётов, парк и
+  // центр судят только по текущему снимку.
+  const [readinessHistoryError, setReadinessHistoryError] = useState<string | null>(null);
   const [audit, setAudit] = useState<ReadinessAuditEnvelope | null>(null);
   const [readinessFilters, setReadinessFilters] = useState<ReadinessUrlFilters>({});
 
@@ -379,6 +385,7 @@ export function ToModule({ surface = 'readiness' }: { surface?: ModuleSurface } 
     setWorkspaceIssues([]);
     setOutOfRoleSources([]);
     setAuthoritativeReadinessError(null);
+    setReadinessHistoryError(null);
     setRulesAvailable(false);
     try {
       let readinessBootstrap = await fetchReadinessBootstrap({ signal: controller.signal });
@@ -489,7 +496,8 @@ export function ToModule({ surface = 'readiness' }: { surface?: ModuleSurface } 
       setDefects(defectsResult.data);
       setCurrentReadiness(currentResult.data);
       setReadinessHistory(historyResult.data);
-      setAuthoritativeReadinessError(currentResult.error ?? historyResult.error);
+      setAuthoritativeReadinessError(currentResult.error);
+      setReadinessHistoryError(historyResult.error);
       setAudit(auditResult.data);
       const readinessPartialFailure =
         shiftsResult.failed || permitsResult.failed || defectsResult.failed || auditResult.failed;
@@ -762,6 +770,7 @@ export function ToModule({ surface = 'readiness' }: { surface?: ModuleSurface } 
       defects={defects}
       currentReadiness={currentReadiness}
       authoritativeReadinessError={authoritativeReadinessError}
+      readinessHistoryError={readinessHistoryError}
       readinessHistory={readinessHistory}
       audit={audit}
       filters={readinessFilters}

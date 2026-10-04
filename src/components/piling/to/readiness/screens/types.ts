@@ -101,7 +101,13 @@ export interface ReferenceUiProps {
   permits: WorkPermitDto[];
   defects: DefectDto[];
   currentReadiness: CurrentReadinessDto[];
+  /**
+   * Ошибка авторитетного ТЕКУЩЕГО снимка. При ней готовность «не подтверждена» —
+   * в парке и центре. История сюда не входит: у неё свой источник и своё место.
+   */
   authoritativeReadinessError: string | null;
+  /** Ошибка истории готовности — отдельного источника. Видна только там, где читается история (отчёты), и не гасит парк/центр. */
+  readinessHistoryError: string | null;
   readinessHistory: ReadinessSnapshotDto[];
   audit: ReadinessAuditEnvelope | null;
   filters: ReadinessUrlFilters;
