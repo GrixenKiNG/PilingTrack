@@ -247,7 +247,7 @@ export function ReportsScreen(props: ReferenceUiProps) {
   const facts = props.currentReadiness.flatMap((item) => item.facts ? [item.facts] : []);
   const blockerRows: Array<readonly [string, number]> = [
     ['Критический дефект', facts.filter((item) => item.criticalDefect).length],
-    ['Осмотр не завершён', facts.filter((item) => !item.inspectionCompleted).length],
+    ['Нет осмотра за сегодня', facts.filter((item) => !item.inspectionCompleted).length],
     ['Наряд-допуск', facts.filter((item) => item.permitValid === false || item.permitExpired).length],
     ['Просрочено ТО', facts.filter((item) => item.maintenanceOverdueHours > 0 || item.maintenanceOverdueDays > 0).length],
     ['Приёмка не подтверждена', facts.filter((item) => !item.accepted).length],
