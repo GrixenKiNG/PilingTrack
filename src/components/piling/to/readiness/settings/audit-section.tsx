@@ -8,7 +8,7 @@ import { formatDateTimeInTimezone } from '@/lib/timezone';
 import { cn } from '@/lib/utils';
 import type { ReadinessAuditEnvelope, ReadinessAuditEventDto, ReadinessBootstrap } from '../api/contracts';
 import { handoverRoleLabel } from '../handover-journal';
-import { auditActionLabel, auditActionMark, auditEmptyMessage, auditEntityLabel, auditImportanceLabel, isCriticalAuditAction } from './audit-labels';
+import { auditActionLabel, auditActionMark, auditChainReasonLabel, auditEmptyMessage, auditEntityLabel, auditImportanceLabel, auditShownMessage, isCriticalAuditAction } from './audit-labels';
 import { InfoRow, ScreenTitle, SettingsKpis, StatusPill, card } from './shared-ui';
 import { normalizeSearch } from '../shared/text-search';
 
@@ -155,7 +155,7 @@ export function AuditSettings({ audit, bootstrap, canExport, activeFilterCount, 
           </div>
           {visible.length === 0 && <div className="py-10 text-center text-sm text-muted-foreground">{auditEmptyMessage(audit !== null, activeFilterCount, events.length)}</div>}
           <div className="border-t border-border p-3 text-xs text-muted-foreground">
-            Показано {visible.length} из {verification?.eventCount ?? events.length} событий
+            {auditShownMessage(visible.length, events.length)}
           </div>
         </section>
 
@@ -179,7 +179,7 @@ export function AuditSettings({ audit, bootstrap, canExport, activeFilterCount, 
             <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
               {verification?.valid
                 ? `Цепочка проверена: ${verification.eventCount} событий, разрывов не обнаружено.`
-                : `Проверка не пройдена${verification?.reason ? `: ${verification.reason}` : '.'}`}
+                : `Проверка не пройдена${verification?.reason ? `: ${auditChainReasonLabel(verification.reason)}` : '.'}`}
             </p>
             <p className="mt-2 text-2xs text-muted-foreground">Каждая запись подписана хешем предыдущей — задним числом журнал не переписать.</p>
           </section>

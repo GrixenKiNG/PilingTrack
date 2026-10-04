@@ -1,5 +1,5 @@
 import {describe, expect, it} from 'vitest';
-import {auditActionLabel, auditEmptyMessage, auditImportanceLabel} from '../audit-labels';
+import {auditActionLabel, auditActionMark, auditChainReasonLabel, auditEmptyMessage, auditImportanceLabel, auditShownMessage} from '../audit-labels';
 
 /**
  * Коды действий, которые контур техготовности пишет в доказательную цепочку
@@ -107,5 +107,61 @@ describe('auditEmptyMessage', () => {
 
   it('blames the search query when events were loaded but the query hid them', () => {
     expect(auditEmptyMessage(true, 0, 5)).toBe('По запросу ничего не найдено.');
+  });
+});
+
+/*
+  R125 №3: `work-permit.expired` и `shift.auto-closed` писал только планировщик,
+  значков для них в ACTION_MARK не было — срабатывала запасная ветка, и главные
+  «ночные» инциденты (истечение наряда, автозакрытие смены) рисовались зелёной
+  галочкой «успешно».
+*/
+describe('auditActionMark', () => {
+  it('marks the scheduler incidents as trouble, not as a green success check', () => {
+    expect(auditActionMark('work-permit.expired').tone).toBe('danger');
+    expect(auditActionMark('shift.auto-closed').tone).toBe('warning');
+  });
+
+  it('keeps the tone of the actions that were already marked', () => {
+    expect(auditActionMark('shift.cancelled').tone).toBe('danger');
+    expect(auditActionMark('defect.reject').tone).toBe('warning');
+  });
+
+  it('keeps the fallback: a critical unknown code is danger, an ordinary one is success', () => {
+    expect(auditActionMark('shift.start-blocked').tone).toBe('danger');
+    expect(auditActionMark('shift.unknown-action').tone).toBe('success');
+  });
+});
+
+/*
+  R125 №5: подпись «Показано N из M событий» брала знаменателем
+  `verification.eventCount` — длину ВСЕЙ цепочки. С фильтром строка читалась как
+  «показано 3 из 5342», хотя под фильтр подходило 3.
+*/
+describe('auditShownMessage', () => {
+  it('counts against the loaded slice, not the whole chain', () => {
+    expect(auditShownMessage(3, 3)).toBe('Показано 3 из 3 загруженных событий');
+    expect(auditShownMessage(3, 500)).toBe('Показано 3 из 500 загруженных событий');
+  });
+
+  it('agrees with the noun for a single event', () => {
+    expect(auditShownMessage(1, 1)).toBe('Показано 1 из 1 загруженного события');
+  });
+});
+
+/*
+  R125 №9: узел «Целостность журнала» печатал английский код причины разрыва
+  как есть — «Проверка не пройдена: PREV_HASH_MISMATCH».
+*/
+describe('auditChainReasonLabel', () => {
+  it('names every chain-break reason in Russian', () => {
+    expect(auditChainReasonLabel('SEQUENCE_GAP')).toBe('разрыв нумерации');
+    expect(auditChainReasonLabel('PREV_HASH_MISMATCH')).toBe('не совпал хеш предыдущей записи');
+    expect(auditChainReasonLabel('HASH_MISMATCH')).toBe('не совпал собственный хеш');
+    expect(auditChainReasonLabel('HEAD_MISMATCH')).toBe('не совпал конец цепочки');
+  });
+
+  it('shows an unknown reason as is, so a new check never disappears silently', () => {
+    expect(auditChainReasonLabel('SOMETHING_NEW')).toBe('SOMETHING_NEW');
   });
 });
