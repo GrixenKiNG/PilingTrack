@@ -373,3 +373,30 @@ describe('AdminReports — текстовый поиск (R130 №4)', () => {
     expect(screen.queryByText('r1')).not.toBeInTheDocument();
   });
 });
+
+/**
+ * R134, находка 1: «Печать» печатала страницу целиком — на лист попадали шапка
+ * и меню администраторской оболочки, а таблица обрезалась по краю области
+ * прокрутки, и правые графы пропадали. Экран теперь помечен областью печати
+ * `print-area`, а рядом подключены правила печати, оставляющие на листе только
+ * её. Тест держит обе части: без класса или без правил находка вернётся.
+ */
+describe('AdminReports — область печати (R134 №1)', () => {
+  beforeEach(() => {
+    authFetchMock.mockReset();
+    vi.mocked(toast.error).mockClear();
+    reportsState.current = baseState();
+  });
+
+  it('экран помечен print-area и подключает правила печати', () => {
+    const { container } = render(<AdminReports />);
+
+    expect(container.querySelector('.print-area')).not.toBeNull();
+
+    // Правила печати живут в <style> рядом с экраном: импорт .css из компонента
+    // роняет vitest этого проекта (см. print-screen.tsx).
+    const css = container.querySelector('style')?.textContent ?? '';
+    expect(css).toContain('@media print');
+    expect(css).toContain('print-area');
+  });
+});

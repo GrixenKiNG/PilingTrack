@@ -25,6 +25,7 @@ import { EvidenceReportRow, EvidenceSummary, ReportsHeader } from './report-evid
 import { ReportEvidencePreview } from './report-evidence-preview';
 import { ConfirmActionDialog } from '@/components/piling/confirm-action-dialog';
 import { toast } from 'sonner';
+import { PrintScreenStyles } from './print-screen';
 
 type QuickFilter = 'all' | 'today' | 'yesterday' | 'week' | 'downtime' | 'withPhotos' | 'edited';
 
@@ -265,7 +266,10 @@ export function AdminReports() {
   }
 
   return (
-    <div className="min-h-full bg-muted/60 p-4 lg:p-6">
+    // print-area: при печати на лист попадает только этот блок — без шапки,
+    // меню и обрезки по краю прокрутки (R134, находка 1; см. print-screen.tsx).
+    <div className="print-area min-h-full bg-muted/60 p-4 lg:p-6">
+      <PrintScreenStyles />
       {error ? (
         <div className="space-y-4">
           <ReportsHeader

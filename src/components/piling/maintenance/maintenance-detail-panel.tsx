@@ -22,6 +22,7 @@ import { TYPE_LABEL } from './maintenance-labels';
 import { statusView, type MaintenanceCrewView, type WorkOrderRow } from './maintenance-board-model';
 import { ActionIcon } from './maintenance-board-bits';
 import { WorkOrderPhotos } from './work-order-photos';
+import { PrintScreenStyles } from '../admin-reports/print-screen';
 
 export function MaintenanceDetailPanel({
   record,
@@ -54,7 +55,10 @@ export function MaintenanceDetailPanel({
   const closeBusy = busyAction === `${record.id}:DONE`;
 
   return (
-    <aside className="min-h-screen border-l border-border bg-card">
+    // print-area: при печати на лист попадает только карточка наряда — без
+    // шапки, меню и обрезки по краю прокрутки (R134, находка 1).
+    <aside className="print-area min-h-screen border-l border-border bg-card">
+      <PrintScreenStyles />
       <div className="flex h-full flex-col">
         <header className="flex items-center justify-between border-b border-border px-5 py-4">
           <div className="min-w-0">
