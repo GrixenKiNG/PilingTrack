@@ -592,3 +592,30 @@ describe('inspection-api-error: выбор текста по причине', ()
     expect(await extractApiError(json({ error: 'Осмотр уже завершён' }, 409), 'Ошибка')).toBe('Осмотр уже завершён');
   });
 });
+
+/**
+ * F-R131 №9 и №17. В списке осмотров вид «ЕО» печатался двухбуквенным кодом без
+ * расшифровки, а оценка — «голым» числом «87» без единицы, хотя в контуре
+ * готовности та же величина читается «87/100». До правки оба текста на экране
+ * отсутствовали — тесты падали.
+ */
+describe('список осмотров: расшифровка ЕО и оценка с единицей (F-R131 №9, №17)', () => {
+  const row = {
+    id: 'insp-1',
+    level: 'EO',
+    inspectionDate: '2026-09-30',
+    healthScore: 87,
+    status: 'COMPLETED',
+    equipment: { id: 'eq-1', name: 'СП-49', model: 'PVE 50PR' },
+  };
+
+  it('вид «ЕО» расшифрован, оценка показана как «87/100»', async () => {
+    mocks.authFetch.mockResolvedValue(json({ inspections: [row] }));
+    render(<InspectionsList />);
+
+    expect(await screen.findByText('СП-49')).toBeInTheDocument();
+    expect(screen.getAllByText('ЕО — ежедневный осмотр').length).toBeGreaterThan(0);
+    expect(screen.getByText('87/100')).toBeInTheDocument();
+    expect(screen.queryByText('87')).toBeNull();
+  });
+});

@@ -23,7 +23,8 @@ interface JournalRecord {
 }
 
 const TYPE_LABEL: Record<string, string> = {
-  EO: 'ЕО', TO1: 'ТО-1', TO2: 'ТО-2', TO3: 'ТО-3', SEASONAL: 'Сезонное',
+  // F-R131 №9: «ЕО» без расшифровки.
+  EO: 'ЕО — ежедневный осмотр', TO1: 'ТО-1', TO2: 'ТО-2', TO3: 'ТО-3', SEASONAL: 'Сезонное',
   REPAIR: 'Ремонт', FAULT: 'Неисправность', SCHEDULED: 'ТО', INSPECTION: 'Осмотр',
 };
 const STATUS_LABEL: Record<string, string> = {
@@ -70,8 +71,13 @@ export function EquipmentToTab({ equipmentId }: { equipmentId: string }) {
             const score = r.inspection?.healthScore;
             return (
               <div key={r.id} className="flex items-center gap-3 px-3 py-2.5">
-                <div className={cn('grid h-9 w-9 shrink-0 place-items-center rounded-full bg-muted text-xs font-bold',
-                  typeof score === 'number' ? scoreColor(score) : 'text-muted-foreground')}>
+                <div
+                  className={cn('grid h-9 w-9 shrink-0 place-items-center rounded-full bg-muted text-xs font-bold',
+                    typeof score === 'number' ? scoreColor(score) : 'text-muted-foreground')}
+                  // F-R131 №17: «голое» число без единицы. В контуре готовности та же
+                  // величина читается «87/100»; здесь места нет — расшифровка в подсказке.
+                  title={typeof score === 'number' ? `Оценка осмотра: ${score}/100` : undefined}
+                >
                   {typeof score === 'number' ? score : (INSPECTION_TYPES.has(r.type) ? '—' : <PilingIcon name="repair" size={18} tone="warning" decorative />)}
                 </div>
                 <div className="min-w-0 flex-1">

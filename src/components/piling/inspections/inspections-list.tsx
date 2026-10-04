@@ -132,7 +132,8 @@ export function InspectionsList() {
                     <span>{formatRuDate(r.inspectionDate)}</span>
                     {r.equipment?.model && <span>{r.equipment.model}</span>}
                     <span className={cn('font-mono font-medium', healthScoreColor(r.healthScore))}>
-                      {r.healthScore != null ? `${r.healthScore}` : '—'}
+                      {/* F-R131 №17: «голое» число не читалось. В готовности — «87/100». */}
+                      {r.healthScore != null ? `${r.healthScore}/100` : '—'}
                     </span>
                   </div>
                 </div>

@@ -410,6 +410,7 @@ export function AdminDashboard() {
             onClick={refreshAll}
             className="flex h-9 w-9 items-center justify-center rounded-md border border-border bg-card text-muted-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-info/30"
             aria-label="Обновить дашборд"
+            title="Обновить дашборд"
           >
             <RefreshCw className="h-4 w-4" />
           </button>

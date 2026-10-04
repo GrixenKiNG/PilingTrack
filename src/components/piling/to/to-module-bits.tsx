@@ -48,7 +48,8 @@ export const HAMMER_LABEL: Record<HammerKind, string> = {
 };
 
 export const TYPE_LABEL: Record<string, string> = {
-  EO: 'ЕО',
+  // F-R131 №9: «ЕО» без расшифровки в журнале ТО.
+  EO: 'ЕО — ежедневный осмотр',
   TO1: 'ТО-1',
   TO2: 'ТО-2',
   TO3: 'ТО-3',

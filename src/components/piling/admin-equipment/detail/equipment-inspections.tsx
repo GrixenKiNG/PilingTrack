@@ -81,7 +81,8 @@ export function EquipmentInspections({ equipmentId }: { equipmentId: string }) {
                   {STATUS_LABEL[r.status]}
                 </span>
                 <span className={cn('ml-auto font-mono text-xs font-semibold', healthScoreColor(r.healthScore))}>
-                  {r.healthScore != null ? `${r.healthScore}` : '—'}
+                  {/* F-R131 №17: оценка с единицей, как в контуре готовности («87/100»). */}
+                  {r.healthScore != null ? `${r.healthScore}/100` : '—'}
                 </span>
               </Link>
             </li>

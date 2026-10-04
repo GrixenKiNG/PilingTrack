@@ -269,3 +269,46 @@ describe('AdminDashboard: пустая система — первый шаг и
     expect(screen.queryByText('По выбранным фильтрам установок нет')).not.toBeInTheDocument();
   });
 });
+
+/**
+ * F-R131 №15 и №24. Плитка объекта писала «5 отч.» — сокращение, которое вне
+ * контекста не читается; кнопка обновления имела aria-label, но не имела
+ * всплывающей подсказки (стандарт проекта — и aria-label, и title). До правки
+ * оба теста падали.
+ */
+describe('AdminDashboard: счётчик отчётов и подсказка обновления (F-R131 №15, №24)', () => {
+  const site = {
+    siteId: 's1', siteName: 'Объект №1',
+    plannedPiles: 10, actualPiles: 4, plannedPileMeters: 200, actualPileMeters: 80,
+    plannedDrillingCount: 5, actualDrillingCount: 2, plannedDrilling: 100, actualDrilling: 40,
+    actualPilesAllTime: 4, actualPileMetersAllTime: 80, actualDrillingAllTime: 40,
+    pileProgress: 40, drillingProgress: 40, totalReports: 5, totalDowntime: 0,
+  };
+
+  beforeEach(() => {
+    mocks.authFetch.mockReset();
+    mocks.layoutWidgets = [];
+    mocks.authFetch.mockImplementation((url: string) => {
+      if (url.startsWith('/api/analytics/sites')) return Promise.resolve(json({ analytics: [site] }));
+      if (url.startsWith('/api/monitoring/fleet')) return Promise.resolve(json(fleet));
+      if (url.startsWith('/api/maintenance')) return Promise.resolve(json({ records: [] }));
+      if (url.startsWith('/api/reports/recent')) return Promise.resolve(json({ reports: [] }));
+      if (url.startsWith('/api/sites/all')) return Promise.resolve(json({ sites: [] }));
+      return Promise.resolve(json({}));
+    });
+  });
+
+  it('плитка объекта пишет «5 отчётов», а не «5 отч.»', async () => {
+    render(<AdminDashboard />);
+
+    expect(await screen.findByText('5 отчётов')).toBeInTheDocument();
+    expect(screen.queryByText('5 отч.')).not.toBeInTheDocument();
+  });
+
+  it('кнопка обновления несёт и aria-label, и title', async () => {
+    render(<AdminDashboard />);
+
+    const button = await screen.findByRole('button', { name: 'Обновить дашборд' });
+    expect(button).toHaveAttribute('title', 'Обновить дашборд');
+  });
+});
