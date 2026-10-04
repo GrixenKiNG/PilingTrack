@@ -5,6 +5,7 @@ import { DEFAULT_READINESS_RULES } from '@/modules/readiness';
 import { ReadinessCentre } from '../readiness-centre';
 import { PermitsScreen } from '../permits-screen';
 import { ReportsScreen } from '../reports-screen';
+import type { CurrentReadinessDto } from '../../api/contracts';
 import { SettingsWorkspace } from '../settings-workspace';
 import { bootstrapEnvelope } from '../../api/__tests__/fixtures';
 
@@ -177,5 +178,40 @@ describe('Экспорт справочника и журнала аудита �
 
     await act(async () => { finish(); });
     expect(await screen.findByRole('button', { name: 'Экспорт журнала' })).toBeEnabled();
+  });
+});
+
+/** Снимок готовности установки — минимум полей, которые читает экран отчётов. */
+const readinessRow = (equipmentId: string, score: number): CurrentReadinessDto => ({
+  snapshotId: `snap-${equipmentId}`,
+  equipmentId,
+  status: 'READY',
+  verdict: 'ALLOWED',
+  score,
+  calculatedAt: '2026-10-01T06:00:00.000Z',
+  blockers: [],
+  warnings: null,
+  evidence: null,
+  facts: null,
+  triggerType: null,
+  ruleSetVersion: null,
+});
+
+/**
+ * R129 #6: «Готовность парка» печаталась сырым числом — «87.5%» точкой, тогда
+ * как в отчёте техготовности десятичная часть показана запятой.
+ */
+describe('Отчёты: готовность парка с запятой (R129 #6)', () => {
+  it('десятичная часть процента печатается по-русски', () => {
+    render(<ReportsScreen {...propsFor({
+      equipment: [
+        { id: 'eq-1', name: 'Свая-1', model: 'X', hammerKind: 'HYDRAULIC', isCombined: false, isActive: true, crewCount: 0 },
+        { id: 'eq-2', name: 'Свая-2', model: 'X', hammerKind: 'HYDRAULIC', isCombined: false, isActive: true, crewCount: 0 },
+      ],
+      currentReadiness: [readinessRow('eq-1', 85), readinessRow('eq-2', 90)],
+    })} />);
+
+    expect(screen.getAllByText('87,5%').length).toBeGreaterThan(0);
+    expect(screen.queryByText('87.5%')).not.toBeInTheDocument();
   });
 });

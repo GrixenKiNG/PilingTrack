@@ -293,3 +293,22 @@ describe('журнал забивки: пустая выгрузка (F-R115-10)
       .some(([url]) => String(url).startsWith('/api/pile-passports/export'))).toBe(false);
   });
 });
+
+/**
+ * R129 #5: карточка сваи печатала замеры сырым числом — «11.5 м», «1.8 мм/уд»
+ * точкой и без разрядов; единственный экран, где числа шли «как в базе».
+ */
+describe('карточка сваи: замеры с запятой (R129 #5)', () => {
+  beforeEach(() => {
+    mocks.authFetch.mockReset();
+  });
+
+  it('глубина погружения и отказ печатаются по-русски', async () => {
+    await renderJournal();
+    fireEvent.click(screen.getByText('С-130'));
+
+    expect(await screen.findByText('11,5 м')).toBeInTheDocument();
+    expect(screen.getByText('1,8 мм/уд')).toBeInTheDocument();
+    expect(screen.queryByText('11.5 м')).toBeNull();
+  });
+});

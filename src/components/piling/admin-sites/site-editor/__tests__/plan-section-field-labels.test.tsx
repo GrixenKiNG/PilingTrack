@@ -93,3 +93,25 @@ describe('план свай: метры строки и итога с запят
     expect(screen.getByText('420,5')).toBeInstanceOf(HTMLSpanElement);
   });
 });
+
+/**
+ * R129 #3: строка плана бурения и «Итого бурение» печатали метры через
+ * .toFixed(1) — точкой («120.0 м»), тогда как на соседних экранах запятая.
+ */
+describe('план бурения: метры строки и итога с запятой (R129 #3)', () => {
+  it('строка и «Итого бурение» печатаются по-русски', () => {
+    render(
+      <DrillingPlanSection
+        plans={[
+          { tempId: 'd1', diameter: 400, count: 2, metersPerUnit: 60.25 },
+          { tempId: 'd2', diameter: 300, count: 1, metersPerUnit: 9.5 },
+        ]}
+        setPlans={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText('120,5 м')).toBeInstanceOf(HTMLSpanElement);
+    expect(screen.getByText('9,5 м')).toBeInstanceOf(HTMLSpanElement);
+    expect(screen.getByText('130,0')).toBeInstanceOf(HTMLSpanElement);
+  });
+});

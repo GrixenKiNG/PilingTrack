@@ -164,3 +164,33 @@ describe('AdminSites — «Выполнен» блокируется на вре
     await waitFor(() => expect(button).not.toBeDisabled());
   });
 });
+
+/**
+ * R129 #4: дерево иерархии печатало сумму метров плана свай и бурения через
+ * .toFixed(1) — точкой и без пробела в разрядах («1200.0 м»), тогда как на
+ * соседних экранах та же величина — «1 200,0».
+ */
+describe('PlansSummary — метры плана с запятой (R129 #4)', () => {
+  it('строки и итоги свай/бурения печатаются по-русски', async () => {
+    const { PlansSummary } = await vi.importActual<typeof import('../hierarchy-tree')>('../hierarchy-tree');
+    const tree: SiteFullData = {
+      id: 's1', name: 'Объект 1', isActive: true, plannedPiles: 0, plannedDrilling: 0, fields: [],
+      pilePlans: [
+        { id: 'pp1', siteId: 's1', pileGradeId: 'pg-1', count: 3, metersPerUnit: 10.5, pileGrade: { id: 'pg-1', name: 'С 100.30', isActive: true } },
+        { id: 'pp2', siteId: 's1', pileGradeId: 'pg-2', count: 2, metersPerUnit: 4.25, pileGrade: { id: 'pg-2', name: 'С 90.30', isActive: true } },
+      ],
+      drillingPlans: [
+        { id: 'dp1', siteId: 's1', diameter: 400, count: 2, metersPerUnit: 60.25 },
+        { id: 'dp2', siteId: 's1', diameter: 300, count: 1, metersPerUnit: 9.5 },
+      ],
+    };
+    render(<PlansSummary tree={tree} />);
+
+    expect(screen.getByText('31,5 м')).toBeInTheDocument();
+    expect(screen.getByText('8,5 м')).toBeInTheDocument();
+    expect(screen.getByText('40,0 м')).toBeInTheDocument();
+    expect(screen.getByText('120,5 м')).toBeInTheDocument();
+    expect(screen.getByText('9,5 м')).toBeInTheDocument();
+    expect(screen.getByText('130,0 м')).toBeInTheDocument();
+  });
+});

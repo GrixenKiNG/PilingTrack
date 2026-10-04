@@ -4,6 +4,7 @@ import { Drill, Plus, X } from '@/components/piling/icons/unified-icons';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { formatFixed } from '@/lib/format';
 import type { DrillingPlanRow } from '../types';
 import { emptyDrillingPlanRow, totalDrillingMeters } from './plan-helpers';
 
@@ -76,7 +77,7 @@ export function DrillingPlanSection({ plans, setPlans }: DrillingPlanSectionProp
               />
               <span className="text-3xs font-mono text-muted-foreground w-14 text-right flex-shrink-0">
                 {row.count * row.metersPerUnit > 0
-                  ? `${(row.count * row.metersPerUnit).toFixed(1)} м`
+                  ? `${formatFixed(row.count * row.metersPerUnit, 1)} м`
                   : '—'}
               </span>
               <button
@@ -97,7 +98,7 @@ export function DrillingPlanSection({ plans, setPlans }: DrillingPlanSectionProp
         <div className="flex items-center justify-between px-2 py-1.5 bg-info/10 rounded-lg text-xs">
           <span className="font-medium text-muted-foreground">Итого бурение</span>
           <span className="text-foreground">
-            <span className="font-mono font-semibold">{totalDrillingMeters(plans).toFixed(1)}</span> м
+            <span className="font-mono font-semibold">{formatFixed(totalDrillingMeters(plans), 1)}</span> м
           </span>
         </div>
       )}

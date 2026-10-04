@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 import { AlertTriangle, Search } from '@/components/piling/icons/unified-icons';
 import { COMPACT_KPI_GRID, ScreenTitle, card } from '../settings/shared-ui';
-import { pluralizeRu } from '@/lib/format';
+import { formatPercent, pluralizeRu } from '@/lib/format';
 import { auditActionLabel, isCriticalAuditAction } from '../settings/audit-labels';
 import { kpiGridStyle } from '@/components/piling/kpi-tile';
 import { Button } from '@/components/ui/button';
@@ -303,7 +303,7 @@ export function ReportsScreen(props: ReferenceUiProps) {
           icon="technical-readiness"
           label="Готовность парка"
           tone="success"
-          value={`${readinessPercent}%`}
+          value={formatPercent(readinessPercent)}
           detail={deltaDetail(readinessPercent, previousScore, 'п.п.') ?? 'сравнить не с чем'}
         />
         {/*
@@ -375,7 +375,7 @@ export function ReportsScreen(props: ReferenceUiProps) {
                   За выбранный период снимков готовности нет.
                 </div>
               )}
-              <div className="absolute right-3 top-3 rounded border border-border bg-card px-3 py-2 text-xs"><b>{readinessPercent}%</b><br /><span className="text-muted-foreground">сегодня</span></div>
+              <div className="absolute right-3 top-3 rounded border border-border bg-card px-3 py-2 text-xs"><b>{formatPercent(readinessPercent)}</b><br /><span className="text-muted-foreground">сегодня</span></div>
             </div>
           </div>
           {dailyTrend.length > 0 && (
