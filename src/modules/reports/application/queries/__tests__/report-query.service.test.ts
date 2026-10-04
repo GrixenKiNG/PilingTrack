@@ -9,13 +9,26 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 type Sheet = { name: string; rows: (string | number | null)[][] };
 
-const { findMany, sheets, getSettings } = vi.hoisted(() => ({
+const { findMany, reportCount, mediaFindMany, pileWorkGroupBy, leaderDrillingAggregate, downtimeAggregate, sheets, getSettings } = vi.hoisted(() => ({
   findMany: vi.fn(),
+  reportCount: vi.fn(),
+  mediaFindMany: vi.fn(),
+  pileWorkGroupBy: vi.fn(),
+  leaderDrillingAggregate: vi.fn(),
+  downtimeAggregate: vi.fn(),
   sheets: { current: [] as Sheet[] },
   getSettings: vi.fn(),
 }));
 
-vi.mock('@/lib/db', () => ({ db: { report: { findMany } } }));
+vi.mock('@/lib/db', () => ({
+  db: {
+    report: { findMany, count: reportCount },
+    media: { findMany: mediaFindMany },
+    pileWork: { groupBy: pileWorkGroupBy },
+    leaderDrilling: { aggregate: leaderDrillingAggregate },
+    reportDowntime: { aggregate: downtimeAggregate },
+  },
+}));
 vi.mock('@/modules/settings', () => ({ getSettings }));
 // Листы перехватываем до упаковки в ZIP: «Статус» и подпись итогов — текст
 // листа, а не бинарник.
@@ -146,5 +159,105 @@ describe('exportReportsXlsx — статус смены', () => {
     await exportReportsXlsx({ tenantId: 'tenant-a' });
 
     expect(sheet('Итоги').rows.some((row) => String(row[0]).startsWith('Включены'))).toBe(false);
+  });
+});
+
+/**
+ * F-R140-PAGING: у отчётов с одинаковой датой порядок внутри даты был
+ * недетерминирован (`orderBy: { date: 'desc' }`), а курсор листает по id
+ * (`src/lib/pagination.ts:44-53`) — «Загрузить ещё» могло повторить или
+ * пропустить строку. Живой базы в тестовом окружении нет, поэтому Prisma
+ * моделируется: сортировка по фактически переданному orderBy, затем позиция
+ * курсора + skip, затем take — ровно как у курсора Prisma. Ничьи на одной
+ * дате БД отдаёт в произвольном порядке, поэтому модель переставляет их от
+ * вызова к вызову (сдвиг по номеру вызова); без этого старая сортировка без
+ * тай-брейкера выглядела бы стабильной и дефект не воспроизвёлся бы.
+ */
+describe('listReportsForReview — устойчивые страницы (F-R140-PAGING)', () => {
+  // Семь отчётов, из них пять — за одну дату (страница по два: >1 страницы).
+  const rows = [
+    { id: 'id-f', date: '2026-09-26', reportId: 'R-f', journalPhotoMediaId: null },
+    { id: 'id-b', date: '2026-09-26', reportId: 'R-b', journalPhotoMediaId: null },
+    { id: 'id-d', date: '2026-09-26', reportId: 'R-d', journalPhotoMediaId: null },
+    { id: 'id-a', date: '2026-09-26', reportId: 'R-a', journalPhotoMediaId: null },
+    { id: 'id-c', date: '2026-09-26', reportId: 'R-c', journalPhotoMediaId: null },
+    { id: 'id-g', date: '2026-09-20', reportId: 'R-g', journalPhotoMediaId: null },
+    { id: 'id-e', date: '2026-09-10', reportId: 'R-e', journalPhotoMediaId: null },
+  ];
+
+  const hash = (value: string) => [...value].reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
+
+  // Эмулятор курсора Prisma: применяет orderBy (единственное, что зависит от
+  // правки), затем отбрасывает строки до курсора и берёт take.
+  function fakeFindMany(source: typeof rows) {
+    let call = 0;
+    return (args: {
+      orderBy?: Record<string, 'asc' | 'desc'> | Array<Record<string, 'asc' | 'desc'>>;
+      take?: number;
+      cursor?: { id: string };
+      skip?: number;
+    }) => {
+      const myCall = call++;
+      const orderBy = Array.isArray(args.orderBy) ? args.orderBy : [args.orderBy ?? {}];
+      const sorted = [...source].sort((a, b) => {
+        for (const clause of orderBy) {
+          for (const [field, dir] of Object.entries(clause)) {
+            const av = String((a as Record<string, unknown>)[field]);
+            const bv = String((b as Record<string, unknown>)[field]);
+            if (av !== bv) return (dir === 'desc' ? -1 : 1) * av.localeCompare(bv);
+          }
+        }
+        return ((hash(a.id) + myCall) % 7) - ((hash(b.id) + myCall) % 7);
+      });
+      const start = args.cursor
+        ? sorted.findIndex((r) => r.id === args.cursor?.id) + (args.skip ?? 0)
+        : 0;
+      return Promise.resolve(sorted.slice(start, start + (args.take ?? sorted.length)));
+    };
+  }
+
+  beforeEach(() => {
+    findMany.mockReset();
+    reportCount.mockReset();
+    mediaFindMany.mockReset();
+    pileWorkGroupBy.mockReset();
+    leaderDrillingAggregate.mockReset();
+    downtimeAggregate.mockReset();
+    reportCount.mockResolvedValue(0);
+    mediaFindMany.mockResolvedValue([]);
+    pileWorkGroupBy.mockResolvedValue([]);
+    leaderDrillingAggregate.mockResolvedValue({ _sum: { count: 0, meters: 0 } });
+    downtimeAggregate.mockResolvedValue({ _sum: { duration: 0 } });
+  });
+
+  it('листает весь набор без дублей и пропусков, ставя уникальный тай-брейкер id', async () => {
+    const spy = fakeFindMany(rows);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary: fake Prisma findMany
+    findMany.mockImplementation((args: any) => spy(args));
+
+    const seen: string[] = [];
+    let cursor: string | undefined;
+    for (let page = 0; page < 10; page++) {
+      const result = await listReportsForReview(
+        { id: 'u1', role: 'ADMIN' },
+        null,
+        { cursor, limit: 2 },
+        null,
+      );
+      seen.push(...result.data.map((r) => (r as { id: string }).id));
+      if (!result.hasMore) break;
+      cursor = result.nextCursor ?? undefined;
+    }
+
+    // Все id ровно один раз — при ничьей на одной дате старая сортировка
+    // (только по date) давала повторы/пропуски на стыке страниц.
+    expect(seen).toHaveLength(rows.length);
+    expect(new Set(seen).size).toBe(rows.length);
+    expect([...seen].sort()).toEqual(rows.map((r) => r.id).sort());
+
+    // Тай-брейкер id обязателен: без него порядок ничьих не полон.
+    expect(findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ orderBy: [{ date: 'desc' }, { id: 'desc' }] }),
+    );
   });
 });
