@@ -35,6 +35,9 @@ import type { CrewDTO, EquipmentDTO, SiteDTO, UserDTO } from '@/lib/types';
 /** Подпись помощника, чей пользователь удалён: вместо сырого id (R124 №5). */
 const DELETED_ASSISTANT_NAME = 'Помощник удалён';
 
+/** Предупреждение о закрытии окна с несохранёнными правками (R132 №6). */
+const CONFIRM_LEAVE = 'Закрыть без сохранения? Введённые данные будут потеряны.';
+
 interface CrewFormDialogProps {
   open: boolean;
   onClose: () => void;
@@ -197,7 +200,22 @@ export function CrewFormDialog({
     });
   };
 
+  // Несохранённые правки: сравнение с составом на момент открытия. Помощники —
+  // массив, поэтому сравниваем по идентификаторам.
+  const baselineAssistantIds = editItem?.assistants
+    ?.map(a => a.userId)
+    .filter((id): id is string => !!id) || [];
+  const dirty =
+    operatorId !== (editItem?.operatorId || '')
+    || equipmentId !== (editItem?.equipmentId || '')
+    || siteId !== (editItem?.siteId || '')
+    || name !== (editItem?.name || '')
+    || active !== (editItem?.isActive ?? true)
+    || assistantUserIds.join(',') !== baselineAssistantIds.join(',');
+
+  /** Закрытие по Esc/клику вне окна/«Отмена» — с вопросом, если есть правки. */
   const handleClose = () => {
+    if (dirty && !window.confirm(CONFIRM_LEAVE)) return;
     onClose();
   };
 

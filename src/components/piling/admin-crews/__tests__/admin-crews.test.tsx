@@ -311,3 +311,50 @@ describe('AdminCrews — кнопка активации блокируется 
     expect(document.title).toBe('Бригады — PilingTrack');
   });
 });
+
+/**
+ * F-R132-6: форма бригады закрывалась по Esc, клику вне окна и «Отмена» без
+ * вопроса — набранный состав (оператор, установка, объект, название) терялся
+ * молча. Пока форма «грязная», закрытие спрашивает подтверждение.
+ */
+describe('CrewFormDialog — защита несохранённых правок (F-R132-6)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  function renderCreate(onClose = vi.fn()) {
+    render(
+      <CrewFormDialog
+        open onClose={onClose} mode="create" editItem={null}
+        operators={[]} equipment={[]} sites={[]} assistants={[]}
+        loadingReferenceData={false} referenceError={null} onSubmit={vi.fn()} submitting={false}
+      />,
+    );
+    return onClose;
+  }
+
+  it('введённое название — «Отмена» спрашивает и при отказе не закрывает', () => {
+    const confirmMock = vi.fn(() => false);
+    vi.stubGlobal('confirm', confirmMock);
+    const onClose = renderCreate();
+
+    fireEvent.change(screen.getByPlaceholderText('Бригада №1'), { target: { value: 'Бригада №2' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Отмена' }));
+
+    expect(confirmMock).toHaveBeenCalledTimes(1);
+    expect(onClose).not.toHaveBeenCalled();
+    vi.unstubAllGlobals();
+  });
+
+  it('без правок «Отмена» закрывает без вопроса', () => {
+    const confirmMock = vi.fn(() => false);
+    vi.stubGlobal('confirm', confirmMock);
+    const onClose = renderCreate();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Отмена' }));
+
+    expect(confirmMock).not.toHaveBeenCalled();
+    expect(onClose).toHaveBeenCalledTimes(1);
+    vi.unstubAllGlobals();
+  });
+});

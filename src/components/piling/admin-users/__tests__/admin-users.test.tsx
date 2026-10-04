@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { OperationalUserDTO } from '@/lib/types';
 
 const useUsersListMock = vi.fn();
@@ -412,5 +412,64 @@ describe('UserDetail — кнопки карточки блокируются н
     render(<AdminUsers />);
 
     expect(document.title).toBe('Пользователи — PilingTrack');
+  });
+});
+
+/**
+ * F-R132-7: диалоги «Новый/Редактировать пользователя» закрывались по Esc,
+ * клику вне окна и «Отмена» без вопроса — введённые поля (в т.ч. новый пароль)
+ * терялись молча. Пока форма «грязная», закрытие спрашивает подтверждение.
+ */
+describe('диалоги пользователя: защита несохранённых правок (F-R132-7)', () => {
+  let confirmMock: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    confirmMock = vi.fn(() => false);
+    vi.stubGlobal('confirm', confirmMock);
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('создание: введённое имя — «Отмена» спрашивает и при отказе не закрывает', () => {
+    const onOpenChange = vi.fn();
+    render(<CreateUserDialog open onOpenChange={onOpenChange} onSubmit={vi.fn()} />);
+
+    fireEvent.change(screen.getByPlaceholderText('Иванов Иван'), { target: { value: 'Иван' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Отмена' }));
+
+    expect(confirmMock).toHaveBeenCalledTimes(1);
+    expect(onOpenChange).not.toHaveBeenCalled();
+  });
+
+  it('создание: пустая форма закрывается без вопроса', () => {
+    const onOpenChange = vi.fn();
+    render(<CreateUserDialog open onOpenChange={onOpenChange} onSubmit={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Отмена' }));
+
+    expect(confirmMock).not.toHaveBeenCalled();
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+
+  it('правка: изменённое поле спрашивает, неизменённая форма — нет', () => {
+    const onOpenChange = vi.fn();
+    render(
+      <EditUserDialog
+        open
+        user={operationalUser()}
+        onOpenChange={onOpenChange}
+        onSubmit={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Отмена' }));
+    expect(confirmMock).not.toHaveBeenCalled();
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+
+    fireEvent.change(screen.getByDisplayValue('Анна Сидорова'), { target: { value: 'Анна П.' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Отмена' }));
+
+    expect(confirmMock).toHaveBeenCalledTimes(1);
   });
 });

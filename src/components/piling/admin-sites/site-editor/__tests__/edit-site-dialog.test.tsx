@@ -115,3 +115,51 @@ describe('planWipeRequiresConfirm', () => {
     expect(planWipeRequiresConfirm(0, 0, [], [])).toBe(false);
   });
 });
+
+/**
+ * F-R132-3: «Редактировать объект» закрывался по Esc, клику вне окна и «Отмена»
+ * без вопроса — правки названия, координат и планов терялись молча. Пока форма
+ * «грязная» (снимок загруженного состояния против текущего), закрытие спрашивает
+ * подтверждение.
+ */
+describe('EditSiteDialog — защита несохранённых правок (F-R132-3)', () => {
+  function renderDialog(onOpenChange = vi.fn()) {
+    authFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ site: {} }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      }),
+    );
+    render(<EditSiteDialog
+      site={{ id: 's1', name: 'Объект 1', isActive: true, plannedPiles: 1, plannedDrilling: 1 }}
+      open onOpenChange={onOpenChange} loadingPileGrades={false} pileGrades={[]} onSave={vi.fn()}
+    />);
+    return onOpenChange;
+  }
+
+  it('изменённое название — «Отмена» спрашивает и при отказе не закрывает', async () => {
+    const confirmMock = vi.fn(() => false);
+    vi.stubGlobal('confirm', confirmMock);
+    const onOpenChange = renderDialog();
+
+    fireEvent.change(await screen.findByLabelText('Название объекта'), { target: { value: 'Объект 2' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Отмена' }));
+
+    expect(confirmMock).toHaveBeenCalledTimes(1);
+    expect(onOpenChange).not.toHaveBeenCalled();
+    vi.unstubAllGlobals();
+  });
+
+  it('без правок «Отмена» закрывает без вопроса', async () => {
+    const confirmMock = vi.fn(() => false);
+    vi.stubGlobal('confirm', confirmMock);
+    const onOpenChange = renderDialog();
+
+    await screen.findByLabelText('Название объекта');
+    fireEvent.click(screen.getByRole('button', { name: 'Отмена' }));
+
+    expect(confirmMock).not.toHaveBeenCalled();
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+    vi.unstubAllGlobals();
+  });
+});

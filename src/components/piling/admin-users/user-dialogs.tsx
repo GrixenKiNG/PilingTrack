@@ -60,6 +60,9 @@ const USER_FIELD_MAX = {
   password: 100,
 } as const;
 
+/** Предупреждение о закрытии окна с несохранёнными правками (R132 №7). */
+const CONFIRM_LEAVE = 'Закрыть без сохранения? Введённые данные будут потеряны.';
+
 interface CreateProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -87,6 +90,14 @@ export function CreateUserDialog({ open, onOpenChange, onSubmit }: CreateProps) 
       setErrors({});
     }
   }, [open]);
+
+  const dirty = name !== '' || email !== '' || phone !== '' || password !== '' || role !== 'OPERATOR';
+
+  /** Закрытие по Esc/клику вне окна/«Отмена» — с вопросом, если есть правки. */
+  const handleOpenChange = (next: boolean) => {
+    if (!next && dirty && !window.confirm(CONFIRM_LEAVE)) return;
+    onOpenChange(next);
+  };
 
   const submit = async () => {
     const next: Record<string, string> = {};
@@ -121,7 +132,7 @@ export function CreateUserDialog({ open, onOpenChange, onSubmit }: CreateProps) 
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -185,7 +196,7 @@ export function CreateUserDialog({ open, onOpenChange, onSubmit }: CreateProps) 
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+          <Button variant="outline" onClick={() => handleOpenChange(false)}>
             Отмена
           </Button>
           <Button
@@ -230,6 +241,19 @@ export function EditUserDialog({ open, user, onOpenChange, onSubmit }: EditProps
     }
   }, [open, user]);
 
+  const dirty =
+    name !== (user?.name ?? '')
+    || email !== (user?.email ?? '')
+    || phone !== (user?.phone ?? '')
+    || role !== (user?.role ?? 'OPERATOR')
+    || password !== '';
+
+  /** Закрытие по Esc/клику вне окна/«Отмена» — с вопросом, если есть правки. */
+  const handleOpenChange = (next: boolean) => {
+    if (!next && dirty && !window.confirm(CONFIRM_LEAVE)) return;
+    onOpenChange(next);
+  };
+
   const submit = async () => {
     if (!user) return;
     const next: Record<string, string> = {};
@@ -264,7 +288,7 @@ export function EditUserDialog({ open, user, onOpenChange, onSubmit }: EditProps
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -325,7 +349,7 @@ export function EditUserDialog({ open, user, onOpenChange, onSubmit }: EditProps
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+          <Button variant="outline" onClick={() => handleOpenChange(false)}>
             Отмена
           </Button>
           <Button
