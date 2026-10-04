@@ -206,6 +206,18 @@ describe('ToModule production shell integration', () => {
     30_000,
   );
 
+  /**
+   * R136 №3: форма «Создать смену» возвращала на `/admin/to?tab=shifts`
+   * (`shifts/new/page.tsx`), а модуль читал только `?view=` — «Назад», «Отмена»
+   * и возврат после сохранения открывали домашнюю «Готовность» вместо «Смен».
+   * `tab` — прежнее имя параметра раздела, читаем его как синоним `view`.
+   */
+  it('открывает названный раздел по прежнему параметру ?tab= (R136 №3)', async () => {
+    await renderToModule('/admin/to?tab=shifts');
+
+    expect(screen.getByTestId('reference-ui')).toHaveAttribute('data-view', 'shifts');
+  }, 30_000);
+
   it('replaces URL state after tab, settings and equipment selection', async () => {
     await renderToModule('/admin/to');
     const replaceState = vi.spyOn(window.history, 'replaceState');

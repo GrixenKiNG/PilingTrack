@@ -143,8 +143,12 @@ export function AdminUsers() {
     now: new Date(),
   }), [users, quick, search]);
 
+  // Сотрудник показывается в карточке справа только когда выбран явно — кликом
+  // или ссылкой (`?userId=`). Раньше сюда молча подставлялся первый из списка,
+  // и панель выглядела как «выбранный человек», хотя человек его не выбирал;
+  // после удаления активного так же молча подставлялся следующий.
   const active = useMemo(
-    () => filtered.find((user) => user.id === activeId) ?? filtered[0] ?? null,
+    () => (activeId ? filtered.find((user) => user.id === activeId) ?? null : null),
     [filtered, activeId]
   );
 

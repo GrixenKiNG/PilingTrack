@@ -318,8 +318,13 @@ export function ToModule({ surface = 'readiness' }: { surface?: ModuleSurface } 
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    viewPinnedByUrl.current = params.get('view') !== null;
-    const requestedView = parseView(params.get('view'), surface);
+    // Прежнее имя параметра раздела — `tab`. Форма «Создать смену» возвращала
+    // на `/admin/to?tab=shifts`, а модуль читал только `?view=` — «Назад»,
+    // «Отмена» и возврат после сохранения открывали домашнюю «Готовность».
+    // Читаем `tab` как синоним, чтобы старые ссылки вели в названный раздел.
+    const requestedViewParam = params.get('view') ?? params.get('tab');
+    viewPinnedByUrl.current = requestedViewParam !== null;
+    const requestedView = parseView(requestedViewParam, surface);
     // Раздел чужого модуля в адресе — не ошибка, а старая ссылка: наряды и
     // журнал инструктажей годами открывались как `/admin/to?view=...`, и такие
     // адреса лежат в закладках, письмах и уведомлениях. Уводим туда, где

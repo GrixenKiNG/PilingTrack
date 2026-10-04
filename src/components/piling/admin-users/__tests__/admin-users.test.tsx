@@ -84,10 +84,32 @@ describe('AdminUsers', () => {
 
     expect(screen.getByText('Объект')).toBeInTheDocument();
     expect(screen.getByText('Бригада / установка')).toBeInTheDocument();
+    // Карточка справа появляется только после явного выбора сотрудника
+    // (R136 №18) — до клика панель пуста.
+    fireEvent.click(screen.getByText('Анна Сидорова'));
     expect(screen.getAllByText('Активность').length).toBeGreaterThanOrEqual(2);
     for (const tab of ['Обзор', 'Закрепление', 'Активность', 'Доступ', 'История']) {
       expect(screen.getByRole('tab', { name: tab })).toBeInTheDocument();
     }
+  });
+
+  /**
+   * R136 №18: при открытии «Пользователей» карточка справа сразу показывала
+   * первого сотрудника списка, хотя человек его не выбирал; после удаления
+   * активного так же молча подставлялся следующий. Теперь до явного клика
+   * панель пуста.
+   */
+  it('не выбирает сотрудника молча — карточка пуста до клика (R136 №18)', () => {
+    render(<AdminUsers />);
+
+    expect(screen.queryByRole('tab', { name: 'Обзор' })).not.toBeInTheDocument();
+    expect(
+      screen.getByText('Выберите пользователя, чтобы увидеть доступы и историю.'),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText('Анна Сидорова'));
+
+    expect(screen.getByRole('tab', { name: 'Обзор' })).toBeInTheDocument();
   });
 
   it('searches by phone', () => {
@@ -123,6 +145,8 @@ describe('AdminUsers', () => {
     expect(screen.getByRole('button', { name: /Виды документов/ })).toHaveClass('h-11', 'sm:h-10');
     expect(screen.getByRole('button', { name: /Новый пользователь/ })).toHaveClass('h-11', 'sm:h-10');
 
+    // Карточка справа появляется после выбора сотрудника (R136 №18).
+    fireEvent.click(screen.getByText('Анна Сидорова'));
     // Radix Tabs переключает вкладку по mousedown, не по click.
     fireEvent.mouseDown(screen.getByRole('tab', { name: 'Доступ' }));
     for (const name of [/Редактировать/, /Заблокировать/, /Удалить/]) {
@@ -181,6 +205,8 @@ describe('AdminUsers', () => {
     });
     render(<AdminUsers />);
 
+    // Карточка справа появляется после выбора сотрудника (R136 №18).
+    fireEvent.click(screen.getByText('Анна Сидорова'));
     // Radix Tabs переключает вкладку по mousedown, не по click.
     fireEvent.mouseDown(screen.getByRole('tab', { name: 'Доступ' }));
     fireEvent.click(screen.getByRole('button', { name: 'Заблокировать' }));
@@ -396,6 +422,8 @@ describe('UserDetail — кнопки карточки блокируются н
     });
     render(<AdminUsers />);
 
+    // Карточка справа появляется после выбора сотрудника (R136 №18).
+    fireEvent.click(screen.getByText('Анна Сидорова'));
     // Radix Tabs переключает вкладку по mousedown, не по click.
     fireEvent.mouseDown(screen.getByRole('tab', { name: 'Доступ' }));
     fireEvent.click(screen.getByRole('button', { name: 'Заблокировать' }));
