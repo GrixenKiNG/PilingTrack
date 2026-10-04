@@ -28,6 +28,18 @@ import type { ReferenceUiProps } from './types';
  */
 const MAINTENANCE_SOON_HOURS = 250;
 
+/**
+ * Календарный день момента в поясе тенанта, «ГГГГ-ММ-ДД».
+ *
+ * `scheduledAt`/`startedAt` — моменты времени (UTC): работа, назначенная на
+ * 00:30 МСК 26.09, в UTC ещё 25.09, поэтому `.slice(0, 10)` даёт не тот день и
+ * ночью счётчик «Работы сегодня» считал вчерашнее (F-R141-TODAY). День считаем
+ * поясом тенанта — тот же приём, что и в отчётах (`reports-screen.tsx:tenantDay`)
+ * и в паспорте сваи (`pile-passport.service.ts:dayInTimezone`).
+ */
+const tenantDay = (value: string, timezone: string = 'Europe/Moscow'): string =>
+  new Date(value).toLocaleDateString('en-CA', { timeZone: timezone });
+
 export function MaintenanceScreen(props: ReferenceUiProps) {
   /**
    * Раздел обслуживания целиком закрыт правом `maintenance.manage`
@@ -55,9 +67,14 @@ export function MaintenanceScreen(props: ReferenceUiProps) {
   const timezone = props.bootstrap?.tenant.timezone;
   const todayIso = getTodayInTimezone(timezone);
   // «Работы сегодня» считали ВСЕ открытые заявки — счётчик не имел отношения к
-  // сегодняшнему дню. Берём назначенные или начатые на сегодня.
-  const todayWork = open.filter((record) =>
-    (record.scheduledAt ?? record.startedAt ?? '').slice(0, 10) === todayIso);
+  // сегодняшнему дню. Берём назначенные или начатые на сегодня. День заявки —
+  // день пояса тенанта, а не UTC-день момента: иначе ночью 00:00–03:00 МСК
+  // работа на сегодня попадала во вчера, а вчерашняя считалась (F-R141-TODAY).
+  // Запись без обеих дат не считаем — как и раньше.
+  const todayWork = open.filter((record) => {
+    const day = record.scheduledAt ?? record.startedAt;
+    return day != null && tenantDay(day, timezone) === todayIso;
+  });
   /**
    * Загрузка механиков по фактическому исполнителю.
    *
