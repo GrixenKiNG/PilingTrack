@@ -401,19 +401,19 @@ export function WorkOrderDetail({ recordId }: { recordId: string }) {
           </div>
           <div>
             <Label htmlFor="q-started">Начато</Label>
-            <Input id="q-started" type="date" value={quick.startedAt} onChange={(e) => setQ('startedAt', e.target.value)} />
+            <Input id="q-started" type="date" value={quick.startedAt} onChange={(e) => setQ('startedAt', e.target.value)} className="min-h-11 sm:min-h-0" />
           </div>
           <div>
             <Label htmlFor="q-hours">Моточасы</Label>
-            <Input id="q-hours" type="number" min={0} value={quick.engineHoursAtService} onChange={(e) => setQ('engineHoursAtService', e.target.value)} />
+            <Input id="q-hours" type="number" min={0} value={quick.engineHoursAtService} onChange={(e) => setQ('engineHoursAtService', e.target.value)} className="min-h-11 sm:min-h-0" />
           </div>
           <div>
             <Label htmlFor="q-labor">Трудочасы</Label>
-            <Input id="q-labor" type="number" min={0} value={quick.laborHours} onChange={(e) => setQ('laborHours', e.target.value)} />
+            <Input id="q-labor" type="number" min={0} value={quick.laborHours} onChange={(e) => setQ('laborHours', e.target.value)} className="min-h-11 sm:min-h-0" />
           </div>
           <div>
             <Label htmlFor="q-cost">Стоимость, ₽</Label>
-            <Input id="q-cost" type="number" min={0} value={quick.cost} onChange={(e) => setQ('cost', e.target.value)} />
+            <Input id="q-cost" type="number" min={0} value={quick.cost} onChange={(e) => setQ('cost', e.target.value)} className="min-h-11 sm:min-h-0" />
           </div>
         </div>
         <div className="mt-3 space-y-3">

@@ -355,24 +355,24 @@ export function WorkOrderFormDialog({
               <Label htmlFor="wo-title">Название *</Label>
               <Input id="wo-title" value={form.title}
                 onChange={(e) => set('title', e.target.value)}
-                placeholder="Напр. Замена масла ГСМ, ТО-2" />
+                placeholder="Напр. Замена масла ГСМ, ТО-2" className="min-h-11 sm:min-h-0" />
             </div>
 
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               <div>
                 <Label htmlFor="wo-scheduled">План</Label>
                 <Input id="wo-scheduled" type="date" value={form.scheduledAt}
-                  onChange={(e) => set('scheduledAt', e.target.value)} />
+                  onChange={(e) => set('scheduledAt', e.target.value)} className="min-h-11 sm:min-h-0" />
               </div>
               <div>
                 <Label htmlFor="wo-started">Начато</Label>
                 <Input id="wo-started" type="date" value={form.startedAt}
-                  onChange={(e) => set('startedAt', e.target.value)} />
+                  onChange={(e) => set('startedAt', e.target.value)} className="min-h-11 sm:min-h-0" />
               </div>
               <div>
                 <Label htmlFor="wo-completed">Выполнено</Label>
                 <Input id="wo-completed" type="date" value={form.completedAt}
-                  onChange={(e) => set('completedAt', e.target.value)} />
+                  onChange={(e) => set('completedAt', e.target.value)} className="min-h-11 sm:min-h-0" />
               </div>
             </div>
 
@@ -380,18 +380,18 @@ export function WorkOrderFormDialog({
               <div>
                 <Label htmlFor="wo-hours">Моточасы</Label>
                 <Input id="wo-hours" type="number" min={0} step={1} value={form.engineHoursAtService}
-                  onChange={(e) => set('engineHoursAtService', e.target.value)} />
+                  onChange={(e) => set('engineHoursAtService', e.target.value)} className="min-h-11 sm:min-h-0" />
                 <p className="mt-1 text-xs text-muted-foreground">Целое число, не меньше 0</p>
               </div>
               <div>
                 <Label htmlFor="wo-labor">Трудоч.</Label>
                 <Input id="wo-labor" type="number" min={0} value={form.laborHours}
-                  onChange={(e) => set('laborHours', e.target.value)} />
+                  onChange={(e) => set('laborHours', e.target.value)} className="min-h-11 sm:min-h-0" />
               </div>
               <div>
                 <Label htmlFor="wo-cost">Стоим., ₽</Label>
                 <Input id="wo-cost" type="number" min={0} value={form.cost}
-                  onChange={(e) => set('cost', e.target.value)} />
+                  onChange={(e) => set('cost', e.target.value)} className="min-h-11 sm:min-h-0" />
               </div>
             </div>
 

@@ -20,6 +20,7 @@ vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 import { MaintenanceBoard } from '../maintenance-board';
 import { MaintenanceDetailPanel } from '../maintenance-detail-panel';
 import { WorkOrderDetail } from '../work-order-detail';
+import { WorkOrderFormDialog } from '../work-order-form-dialog';
 import { WorkOrderPhotos } from '../work-order-photos';
 import { WorkOrderTable } from '../work-order-table';
 import { STATUS_LABEL } from '../maintenance-labels';
@@ -255,5 +256,51 @@ describe('галерея фото наряда ТО: цель нажатия н�
 
     const btn = await screen.findByRole('button', { name: 'Добавить фото' });
     expect(btn).toHaveClass('min-h-11', 'items-center', 'sm:min-h-0');
+  });
+});
+
+/*
+  F-R137-NEXT №4: поля быстрой правки наряда ТО (в т.ч. «Моточасы» — счётчик
+  наработки) были 36px (`Input h-9`). Корень `.field-type` карточки наряда
+  лифта 44px не даёт (он только про шрифт), а моточасы — целевое поле экрана.
+*/
+describe('карточка наряда ТО: поля правки на телефоне (F-R137-NEXT, №4)', () => {
+  beforeEach(() => {
+    mocks.authFetch.mockImplementation(async (url: string) => {
+      if (url === '/api/maintenance/assignees') return json({ users: [] });
+      return json({ record: record() });
+    });
+  });
+
+  it('«Начато», «Моточасы», «Трудочасы», «Стоимость» — не ниже 44px, на десктопе прежние 36px', async () => {
+    render(<WorkOrderDetail recordId="wo-1" />);
+
+    for (const label of ['Начато', 'Моточасы', 'Трудочасы', 'Стоимость, ₽']) {
+      expect(await screen.findByLabelText(label)).toHaveClass('min-h-11', 'sm:min-h-0');
+    }
+  });
+});
+
+/*
+  F-R137-NEXT №6: поля диалога создания/правки наряда (в т.ч. «Моточасы») были
+  36px. Radix выносит `DialogContent` в портал вне `.field-type`, поэтому ни CSS
+  модуля ТО, ни корень карточки их не лифтуют — на телефоне в перчатке в поле
+  трудно попасть.
+*/
+describe('диалог наряда ТО: поля формы на телефоне (F-R137-NEXT, №6)', () => {
+  beforeEach(() => {
+    mocks.authFetch.mockImplementation(async (url: string) => {
+      if (url === '/api/maintenance/assignees') return json({ users: [] });
+      return json({});
+    });
+  });
+
+  it('все поля ввода — не ниже 44px на телефоне, на десктопе прежние 36px', async () => {
+    render(<WorkOrderFormDialog open onOpenChange={() => {}} equipmentId="eq-1" onSaved={() => {}} />);
+
+    await screen.findByLabelText('Название *');
+    for (const label of ['Название *', 'План', 'Начато', 'Выполнено', 'Моточасы', 'Трудоч.', 'Стоим., ₽']) {
+      expect(screen.getByLabelText(label)).toHaveClass('min-h-11', 'sm:min-h-0');
+    }
   });
 });

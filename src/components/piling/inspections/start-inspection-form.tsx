@@ -330,7 +330,7 @@ export function StartInspectionForm() {
 
           <div>
             <Label htmlFor="si-hours">Моточасы</Label>
-            <Input id="si-hours" type="number" min={0} placeholder="Необязательно" value={engineHours} onChange={(e) => setEngineHours(e.target.value)} />
+            <Input id="si-hours" type="number" min={0} placeholder="Необязательно" value={engineHours} onChange={(e) => setEngineHours(e.target.value)} className="min-h-11 sm:min-h-0" />
           </div>
 
           <div className="flex gap-2 pt-2">
