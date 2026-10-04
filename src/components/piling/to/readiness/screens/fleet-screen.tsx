@@ -9,6 +9,7 @@ import type { KpiTone } from '@/components/piling/kpi-tile';
 import { kpiGridStyle } from '@/components/piling/kpi-tile';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { formatDateTimeInTimezone } from '@/lib/timezone';
 import { cn } from '@/lib/utils';
 import { COMPACT_KPI_GRID, ScreenTitle, card } from '../settings/shared-ui';
 import { EquipmentPhoto, RefKpi, downloadReadinessExport } from './shared';
@@ -54,6 +55,12 @@ export function FleetScreen(props: ReferenceUiProps) {
   const selected = visible.find((item) => item.equipment.id === props.selectedId);
   const sites = [...new Set(items.map((item) => item.site))].sort((a, b) => a.localeCompare(b, 'ru-RU'));
   const hasFilters = Boolean(view.query || view.site || view.status !== 'all');
+  const timezone = props.bootstrap?.tenant.timezone ?? 'Europe/Moscow';
+  // Время оценки — тем же поясом и форматом, что в панели. Пустое или битое
+  // время показываем словами, а не пустой ячейкой: пропуск читался бы как
+  // «совсем свежая» оценка, хотя снимка нет вовсе.
+  const evaluationTime = (value: string | null) => value && Number.isFinite(Date.parse(value))
+    ? formatDateTimeInTimezone(value, timezone) : 'Время оценки не указано';
 
   useEffect(() => {
     const sync = () => setView(readFleetViewState(window.location.search));
@@ -162,7 +169,7 @@ export function FleetScreen(props: ReferenceUiProps) {
           <table className="w-full text-left text-sm">
             <caption className="sr-only">Готовность установок. Нажмите название, чтобы открыть основания статуса.</caption>
             <thead className="bg-muted/60 text-xs text-muted-foreground"><tr>
-              <th scope="col" className="p-3 font-semibold">Установка / объект</th><th scope="col" className="p-3 font-semibold">Статус и причина</th><th scope="col" className="whitespace-nowrap p-3 text-right font-semibold">Наработка</th>
+              <th scope="col" className="p-3 font-semibold">Установка / объект</th><th scope="col" className="p-3 font-semibold">Статус и причина</th><th scope="col" className="whitespace-nowrap p-3 font-semibold">Оценка</th><th scope="col" className="whitespace-nowrap p-3 text-right font-semibold">Наработка</th>
             </tr></thead>
             <tbody className="divide-y divide-border">{visible.map((item) => <tr key={item.equipment.id}
               className={cn('align-top hover:bg-muted/30', item.equipment.id === props.selectedId && 'bg-signal/5')}>
@@ -183,6 +190,9 @@ export function FleetScreen(props: ReferenceUiProps) {
                 </div>
               </th>
               <td className="p-3"><FleetStatus item={item} /><p className="mt-2 max-w-xs text-xs leading-relaxed text-muted-foreground">{item.reason}</p></td>
+              <td className="whitespace-nowrap p-3 text-xs text-muted-foreground">
+                <span className="inline-flex items-center gap-1.5"><PilingIcon name="history" size={16} decorative />{evaluationTime(item.presentation.calculatedAt)}</span>
+              </td>
               <td className="whitespace-nowrap p-3 text-right">
                 <span className="inline-flex items-center gap-1.5 tabular-nums"><PilingIcon name="engine-hours" size={16} decorative />{item.equipment.engineHoursTotal?.toLocaleString('ru-RU') ?? '—'} ч</span>
               </td>

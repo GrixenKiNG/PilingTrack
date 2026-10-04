@@ -4,6 +4,7 @@ import type { CurrentReadinessDto } from '../api/contracts';
 import type { EquipmentOption } from '../../to-module-bits';
 import type { ReferenceUiProps } from './types';
 import { bootstrapEnvelope } from '../api/__tests__/fixtures';
+import { formatDateTimeInTimezone } from '@/lib/timezone';
 import { FleetScreen } from './fleet-screen';
 import { buildFleetItems, countFleetGroups, DEFAULT_FLEET_VIEW, filterFleetItems, readFleetViewState, writeFleetViewState } from './fleet-workspace-model';
 
@@ -149,5 +150,30 @@ describe('Панель парка: блокеры показаны по дейс
     render(<FleetScreen {...propsFor({ currentReadiness: [withBlocker('DENY_START', 'Критический дефект гидравлики', 'Запретить запуск')] })} />);
 
     expect(panelFor().getByText('Критический дефект гидравлики').closest('li')).toHaveClass('bg-destructive/10');
+  });
+});
+
+/**
+ * R141 №5: в строке парка не было видно, когда сделана оценка — машина с
+ * недельным и свежим снимком выглядели одинаково. Время берём из снимка в
+ * поясе организации, порог устаревания не вводим (владелец 04.10.2026).
+ */
+describe('Время оценки в строке парка (R141 №5)', () => {
+  it('различает две оценки с разным временем без открытия панели', () => {
+    const older = '2026-09-01T06:00:00Z';
+    const fresher = '2026-09-05T20:00:00Z';
+    render(<FleetScreen {...propsFor({ currentReadiness: [
+      snapshot('rig-1', { calculatedAt: older }),
+      snapshot('rig-2', { calculatedAt: fresher }),
+    ] })} />);
+
+    expect(screen.getByText(formatDateTimeInTimezone(fresher, 'Europe/Moscow'))).toBeInTheDocument();
+    expect(screen.getAllByText(formatDateTimeInTimezone(older, 'Europe/Moscow')).length).toBeGreaterThan(0);
+  });
+
+  it('пустое время оценки показывается словами, а не свежей датой', () => {
+    render(<FleetScreen {...propsFor({ currentReadiness: [] })} />);
+
+    expect(screen.getAllByText('Время оценки не указано').length).toBeGreaterThan(0);
   });
 });
