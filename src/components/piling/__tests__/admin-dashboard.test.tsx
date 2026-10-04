@@ -11,13 +11,18 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 
-const mocks = vi.hoisted(() => ({ authFetch: vi.fn() }));
+const mocks = vi.hoisted(() => ({
+  authFetch: vi.fn(),
+  // Плитки KPI рендерит PageLayoutRenderer по раскладке; по умолчанию её нет,
+  // отдельные наборы включаются в тестах (F-R127 №2).
+  layoutWidgets: [] as { id: string; visible: boolean; size: string; order: number }[],
+}));
 
 vi.mock('@/lib/api', () => ({ authFetch: mocks.authFetch }));
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }));
 vi.mock('@/lib/use-ability', () => ({ useAbility: () => true }));
 vi.mock('@/components/piling/main-dashboard/dashboard-layout', () => ({
-  useMainDashboardLayout: () => ({ template: { id: 'main-dashboard', widgets: [] } }),
+  useMainDashboardLayout: () => ({ template: { id: 'main-dashboard', version: 1, widgets: mocks.layoutWidgets } }),
 }));
 
 import { AdminDashboard } from '../admin-dashboard';
@@ -191,5 +196,53 @@ describe('AdminDashboard: отметка свежести аналитики (F-
 
     expect(await screen.findByText('Не удалось загрузить, обновите страницу')).toBeInTheDocument();
     expect(screen.queryByText(/^Обновлено в /)).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * F-R127 №1/№2. Пустая система: админ после входа видел только нули и два
+ * пустых блока, без единого слова о том, с чего начать. Теперь на пустой базе
+ * (аналитика успешна, объектов нет, парк пуст) виден блок «С чего начать» с
+ * порядком заполнения, а нулевые плитки читаются как «нет данных», а не как
+ * измеренный ноль.
+ */
+describe('AdminDashboard: пустая система — первый шаг и «нет данных» (F-R127)', () => {
+  beforeEach(() => {
+    mocks.authFetch.mockReset();
+    mocks.layoutWidgets = [
+      { id: 'dk-reports', visible: true, size: 'md', order: 0 },
+      { id: 'dk-piles', visible: true, size: 'md', order: 1 },
+      { id: 'dk-drilling', visible: true, size: 'md', order: 2 },
+      { id: 'dk-downtime', visible: true, size: 'md', order: 3 },
+      { id: 'dk-rigs', visible: true, size: 'md', order: 4 },
+      { id: 'dk-maintenance', visible: true, size: 'md', order: 5 },
+    ];
+    mocks.authFetch.mockImplementation((url: string) => {
+      if (url.startsWith('/api/analytics/sites')) return Promise.resolve(json({ analytics: [] }));
+      if (url.startsWith('/api/monitoring/fleet')) return Promise.resolve(json(fleet));
+      if (url.startsWith('/api/maintenance')) return Promise.resolve(json({ records: [] }));
+      if (url.startsWith('/api/reports/recent')) return Promise.resolve(json({ reports: [] }));
+      if (url.startsWith('/api/sites/all')) return Promise.resolve(json({ sites: [] }));
+      return Promise.resolve(json({}));
+    });
+  });
+
+  it('показывает «С чего начать» с шагами, ведущими в разделы', async () => {
+    render(<AdminDashboard />);
+
+    expect(await screen.findByText('С чего начать')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Справочники' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Объекты' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Бригады' })).toBeInTheDocument();
+  });
+
+  it('нулевые плитки подписаны «нет установок» / «данных пока нет», а не нулями', async () => {
+    render(<AdminDashboard />);
+
+    expect((await screen.findAllByText('нет установок')).length).toBeGreaterThan(0);
+    expect((await screen.findAllByText('данных пока нет')).length).toBeGreaterThan(0);
+    // «0 / 0» и «из 0» как факт на пустой базе не показываются.
+    expect(screen.queryByText('0 / 0')).not.toBeInTheDocument();
+    expect(screen.queryByText(/из 0/)).not.toBeInTheDocument();
   });
 });
