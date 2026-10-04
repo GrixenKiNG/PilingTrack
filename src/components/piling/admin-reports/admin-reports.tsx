@@ -38,7 +38,7 @@ const QUICK_FILTERS: Array<{ key: QuickFilter; label: string }> = [
   { key: 'submitted', label: 'Сданные' },
   { key: 'downtime', label: 'С простоем' },
   { key: 'withPhotos', label: 'С фото' },
-  { key: 'edited', label: 'Изменены админом' },
+  { key: 'edited', label: 'Изменены вручную' },
 ];
 
 type SortKey = 'date' | 'site' | 'user' | 'piles' | 'drilling' | 'downtime';
@@ -498,6 +498,14 @@ export function AdminReports() {
                   </div>
                   {hasMore && (
                     <div className="border-t border-border bg-muted/80 p-3 text-center">
+                      {/* F-R140-FILTER-SCOPE: быстрые фильтры и сортировка считаются
+                          по загруженной части списка. Пока есть что догружать,
+                          говорим об этом у самой кнопки догрузки; после полной
+                          загрузки (hasMore = false) подсказка исчезает. */}
+                      <p className="mb-2 text-2xs text-muted-foreground">
+                        Быстрые фильтры и сортировка действуют по загруженным отчётам.
+                        {' '}Нажмите «Загрузить ещё отчёты», чтобы учесть остальные.
+                      </p>
                       <Button
                         type="button"
                         variant="outline"

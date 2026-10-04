@@ -453,3 +453,39 @@ describe('AdminReports — сортировка списка (R140 №3)', () =>
     expect(order()).toEqual(['r2', 'r1']);
   });
 });
+
+/**
+ * F-R140-FILTER-SCOPE: список листается страницами, а быстрые фильтры и
+ * сортировка считаются на клиенте по уже загруженным строкам. Пока есть что
+ * догружать, об этом говорит подсказка у кнопки догрузки; после полной загрузки
+ * она исчезает. Заодно фильтр «Изменены админом» переименован в «Изменены
+ * вручную» — он проверяет lastEditedByName, а не роль администратора.
+ */
+describe('AdminReports — область клиентских фильтров и сортировки (F-R140-FILTER-SCOPE)', () => {
+  beforeEach(() => {
+    authFetchMock.mockReset();
+    reportsState.current = baseState();
+  });
+
+  it('фильтр называется «Изменены вручную», прежнего «Изменены админом» нет', () => {
+    render(<AdminReports />);
+
+    expect(screen.getByRole('button', { name: 'Изменены вручную' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Изменены админом' })).not.toBeInTheDocument();
+  });
+
+  it('пока есть что догружать — подсказка о области фильтров стоит у кнопки догрузки', () => {
+    reportsState.current = baseState({ hasMore: true, totalReports: 250 });
+    render(<AdminReports />);
+
+    expect(screen.getByRole('button', { name: 'Загрузить ещё отчёты' })).toBeInTheDocument();
+    expect(screen.getByText(/Быстрые фильтры и сортировка действуют по загруженным отчётам/)).toBeInTheDocument();
+  });
+
+  it('после полной загрузки подсказки об области фильтров нет', () => {
+    reportsState.current = baseState({ hasMore: false });
+    render(<AdminReports />);
+
+    expect(screen.queryByText(/Быстрые фильтры и сортировка действуют по загруженным отчётам/)).not.toBeInTheDocument();
+  });
+});
