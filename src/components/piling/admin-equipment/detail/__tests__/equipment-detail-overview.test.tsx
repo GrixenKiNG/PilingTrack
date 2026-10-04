@@ -20,6 +20,7 @@ vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 import { toast } from 'sonner';
 import { OverviewTiles } from '../equipment-detail-overview';
 import { EquipmentDetail } from '../equipment-detail';
+import { EquipmentDocuments } from '../equipment-documents';
 import { usePilingStore } from '@/lib/store';
 import type { TimelineRow } from '../equipment-detail-parts';
 import type { EquipmentDTO } from '@/lib/types';
@@ -222,5 +223,21 @@ describe('EquipmentDetail — текст отказа сохранения (F-R1
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith(
       expect.stringContaining('Поле name: обязательное поле'),
     ));
+  });
+});
+
+/*
+  F-R126-6: диалог документа установки («Новый документ») не ограничивал высоту
+  — на коротком экране обрезался сверху и снизу, крестик уходил за кадр.
+  Добавлены `max-h-[90vh]` и прокрутка.
+*/
+describe('EquipmentDocuments — диалог ограничен по высоте (F-R126-6)', () => {
+  it('содержимое диалога ограничено 90vh и прокручивается', async () => {
+    render(<EquipmentDocuments equipmentId="eq-1" documents={[]} canManage onChanged={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /Добавить/ }));
+
+    const dialog = (await screen.findByText('Новый документ')).closest('[data-slot="dialog-content"]');
+    expect(dialog).toHaveClass('max-h-[90vh]', 'overflow-y-auto');
   });
 });

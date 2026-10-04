@@ -103,7 +103,7 @@ export function UserAssignmentDialog({ siteId, loadingUsers, users }: UserAssign
   const assignedIds = new Set(assignedUsers.map((a) => a.userId));
 
   return (
-    <DialogContent aria-describedby={undefined}>
+    <DialogContent aria-describedby={undefined} className="max-h-[90vh] overflow-y-auto">
       <DialogHeader>
         <DialogTitle>Операторы на объекте</DialogTitle>
       </DialogHeader>

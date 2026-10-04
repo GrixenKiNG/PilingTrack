@@ -253,3 +253,25 @@ describe('AdminTelegram: русские подписи значений кана
     expect(screen.queryByText(/Chat ID/)).toBeNull();
   });
 });
+
+/**
+ * F-R126-6: диалог создания/правки канала Telegram не ограничивал высоту — на
+ * коротком экране (открытая клавиатура) обрезался сверху и снизу, крестик
+ * уходил за кадр. Добавлены `max-h-[90vh]` и прокрутка.
+ */
+describe('AdminTelegram: диалог ограничен по высоте (F-R126-6)', () => {
+  beforeEach(() => {
+    mocks.authFetch.mockReset();
+  });
+
+  it('содержимое диалога ограничено 90vh и прокручивается', async () => {
+    mocks.authFetch.mockResolvedValue(json({ configs: [] }));
+    render(<AdminTelegram />);
+    await screen.findByText('Нет конфигураций Telegram');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Добавить' }));
+
+    const dialog = (await screen.findByText('Новая конфигурация Telegram')).closest('[data-slot="dialog-content"]');
+    expect(dialog).toHaveClass('max-h-[90vh]', 'overflow-y-auto');
+  });
+});

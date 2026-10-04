@@ -226,7 +226,7 @@ export function EquipmentDocuments({ equipmentId, documents, canManage, onChange
       )}
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent aria-describedby={undefined} className="sm:max-w-md">
+        <DialogContent aria-describedby={undefined} className="sm:max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editing ? 'Редактировать документ' : 'Новый документ'}</DialogTitle>
           </DialogHeader>

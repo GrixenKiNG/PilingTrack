@@ -260,6 +260,33 @@ describe('диалоги пользователя: пределы длины к�
 });
 
 /**
+ * F-R126-4: диалоги пользователя не ограничивали высоту — при открытой
+ * экранной клавиатуре (визуальный вьюпорт ~500 px) диалог 540 px обрезался
+ * сверху, крестик уходил за экран. Добавлены `max-h-[90vh]` и прокрутка.
+ */
+describe('диалоги пользователя: ограничены по высоте на коротком экране (F-R126-4)', () => {
+  const contentOf = (title: string) =>
+    screen.getByText(title).closest('[data-slot="dialog-content"]');
+
+  it('создание: содержимое ограничено 90vh и прокручивается', () => {
+    render(<CreateUserDialog open onOpenChange={vi.fn()} onSubmit={vi.fn()} />);
+    expect(contentOf('Новый пользователь')).toHaveClass('max-h-[90vh]', 'overflow-y-auto');
+  });
+
+  it('правка: содержимое ограничено 90vh и прокручивается', () => {
+    render(
+      <EditUserDialog
+        open
+        user={operationalUser()}
+        onOpenChange={vi.fn()}
+        onSubmit={vi.fn()}
+      />,
+    );
+    expect(contentOf('Редактировать пользователя')).toHaveClass('max-h-[90vh]', 'overflow-y-auto');
+  });
+});
+
+/**
  * R121 №9: в справочнике видов документов «Название» не имело maxLength
  * (схема маршрута — 200), а «Срок, мес.» = «0» уходило на сервер как `0`,
  * хотя zod требует `int ≥ 1` — 400 «Некорректные данные» без имени поля.

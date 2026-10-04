@@ -59,7 +59,7 @@ export function DictionaryForm({ mode, kind, item, saving, onClose, onSubmit }: 
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent aria-describedby={undefined} className="sm:max-w-lg">
+      <DialogContent aria-describedby={undefined} className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{mode === 'create' ? 'Добавить элемент' : 'Переименовать элемент'}</DialogTitle>
         </DialogHeader>

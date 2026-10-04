@@ -619,7 +619,7 @@ export function AdminDictionaries() {
       )}
 
       <Dialog open={lengthState !== null} onOpenChange={(open) => !open && setLengthState(null)}>
-        <DialogContent aria-describedby={undefined}>
+        <DialogContent aria-describedby={undefined} className="max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>Длина сваи — {lengthState?.item.name}</DialogTitle></DialogHeader>
           <label className="grid gap-1.5 text-sm font-medium text-foreground">
             Длина, м
@@ -639,7 +639,7 @@ export function AdminDictionaries() {
       </Dialog>
 
       <Dialog open={lengthConfirm !== null} onOpenChange={(open) => !open && setLengthConfirm(null)}>
-        <DialogContent aria-describedby={undefined}>
+        <DialogContent aria-describedby={undefined} className="max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>Пересчитать прошлые отчёты?</DialogTitle></DialogHeader>
           <div className="space-y-3 text-sm text-muted-foreground">
             <p className="text-foreground">
@@ -670,7 +670,7 @@ export function AdminDictionaries() {
       </Dialog>
 
       <Dialog open={confirmDelete !== null} onOpenChange={(open) => !open && setConfirmDelete(null)}>
-        <DialogContent aria-describedby={undefined}>
+        <DialogContent aria-describedby={undefined} className="max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>Удалить навсегда?</DialogTitle></DialogHeader>
           <p className="text-sm text-muted-foreground">Элемент «{confirmDelete?.item.name}» будет удалён без возможности восстановления.</p>
           <DialogFooter>

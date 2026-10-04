@@ -69,6 +69,26 @@ describe('EditSiteDialog', () => {
     expect(confirm).not.toHaveBeenCalled();
     vi.unstubAllGlobals();
   });
+
+  /**
+   * F-R126-3: диалог «Редактировать объект» выше короткого экрана (при 375×568
+   * высота 578 px, `top = −5`, крестик закрытия уходит за кадр) — у DialogContent
+   * не было ни ограничения высоты, ни прокрутки. Теперь `max-h-[90vh]` +
+   * `overflow-y-auto`: содержимое влезает и скроллится.
+   */
+  it('диалог ограничен по высоте и прокручивается на коротком экране (F-R126-3)', async () => {
+    authFetch.mockResolvedValueOnce(new Response(JSON.stringify({ site: {} }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    }));
+    render(<EditSiteDialog
+      site={{ id: 's1', name: 'Объект 1', isActive: true, plannedPiles: 1, plannedDrilling: 1 }}
+      open onOpenChange={vi.fn()} loadingPileGrades={false} pileGrades={[]} onSave={vi.fn()}
+    />);
+
+    const dialog = (await screen.findByText('Редактировать объект')).closest('[data-slot="dialog-content"]');
+    expect(dialog).toHaveClass('max-h-[90vh]', 'overflow-y-auto');
+  });
 });
 
 // Guard инцидента 2026-07-17: сохранение объекта с опустевшим планом стёрло

@@ -122,7 +122,7 @@ export function CreateUserDialog({ open, onOpenChange, onSubmit }: CreateProps) 
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <UserCog className="h-4 w-4" />
@@ -265,7 +265,7 @@ export function EditUserDialog({ open, user, onOpenChange, onSubmit }: EditProps
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Pencil className="h-4 w-4" />

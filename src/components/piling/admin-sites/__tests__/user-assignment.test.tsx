@@ -81,4 +81,18 @@ describe('UserAssignmentDialog — назначение оператора', () 
     releaseDelete(jsonResponse(200, {}));
     await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Назначение снято'));
   });
+
+  /**
+   * F-R126-6: диалог «Операторы на объекте» растёт с числом операторов и не
+   * ограничивал высоту — на коротком экране обрезался сверху и снизу, крестик
+   * уходил за кадр. Добавлены `max-h-[90vh]` и прокрутка.
+   */
+  it('ограничен по высоте и прокручивается (F-R126-6)', async () => {
+    authFetchMock.mockResolvedValue(jsonResponse(200, { site: { users: [] } }));
+
+    renderDialog();
+
+    const dialog = (await screen.findByText('Операторы на объекте')).closest('[data-slot="dialog-content"]');
+    expect(dialog).toHaveClass('max-h-[90vh]', 'overflow-y-auto');
+  });
 });

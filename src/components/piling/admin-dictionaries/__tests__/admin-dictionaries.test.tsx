@@ -236,3 +236,64 @@ describe('AdminDictionaries: английские ошибки API (F-R112-3)', 
     ));
   });
 });
+
+/**
+ * F-R126-3..6: диалоги справочников не ограничивали высоту — при открытой
+ * экранной клавиатуре (визуальный вьюпорт ~500 px) обрезались сверху и снизу,
+ * крестик закрытия уходил за кадр. Форма элемента и все три диалога экрана
+ * получили `max-h-[90vh]` + `overflow-y-auto`.
+ */
+describe('AdminDictionaries: диалоги ограничены по высоте (F-R126-3..6)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    authFetch.mockResolvedValue(jsonResponse(registry));
+  });
+
+  const contentOf = (title: string | RegExp) =>
+    screen.getByText(title).closest('[data-slot="dialog-content"]');
+
+  it('форма «Добавить элемент» ограничена 90vh и прокручивается', async () => {
+    render(<AdminDictionaries />);
+    await screen.findByText('СВ 120-35');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Добавить марку сваи' }));
+
+    expect(contentOf('Добавить элемент')).toHaveClass('max-h-[90vh]', 'overflow-y-auto');
+  });
+
+  it('диалог «Длина сваи» ограничен 90vh и прокручивается', async () => {
+    render(<AdminDictionaries />);
+    await screen.findByText('СВ 120-35');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Изменить длину СВ 120-35' }));
+
+    expect(contentOf(/^Длина сваи —/)).toHaveClass('max-h-[90vh]', 'overflow-y-auto');
+  });
+
+  it('подтверждение пересчёта ограничено 90vh и прокручивается', async () => {
+    render(<AdminDictionaries />);
+    await screen.findByText('СВ 120-35');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Изменить длину СВ 120-35' }));
+    fireEvent.change(screen.getByLabelText('Длина сваи, м'), { target: { value: '15' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить' }));
+
+    expect(contentOf('Пересчитать прошлые отчёты?')).toHaveClass('max-h-[90vh]', 'overflow-y-auto');
+  });
+
+  it('подтверждение удаления ограничено 90vh и прокручивается', async () => {
+    authFetch.mockResolvedValue(jsonResponse({
+      ...registry,
+      pileGrades: [
+        registry.pileGrades[0],
+        { ...registry.pileGrades[0], id: 'g2', name: 'СВ 90-30', reportCount: 0, planCount: 0, siteCount: 0 },
+      ],
+    }));
+    render(<AdminDictionaries />);
+    await screen.findByText('СВ 90-30');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Удалить СВ 90-30' }));
+
+    expect(contentOf('Удалить навсегда?')).toHaveClass('max-h-[90vh]', 'overflow-y-auto');
+  });
+});
