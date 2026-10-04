@@ -72,6 +72,9 @@ export function useSiteMutations({
   setExpandedSiteId,
 }: Options) {
   const [togglingId, setTogglingId] = useState<string | null>(null);
+  // F-R128-5: отметка «Выполнен» шла PUT'ом без признака занятости — двойной
+  // клик слал два запроса и отметка мигала туда-обратно.
+  const [completingId, setCompletingId] = useState<string | null>(null);
 
   const handleCreateSite = async (
     name: string,
@@ -224,6 +227,7 @@ export function useSiteMutations({
   // Отметка «Выполнен» — без окна, но с «Отменить» в уведомлении (решение
   // владельца 28.09.2026): данные не пропадают, возврат в одно нажатие.
   const handleSetCompleted = async (site: SiteListItem, completed: boolean, undoable = true) => {
+    setCompletingId(site.id);
     try {
       const res = await authFetch(`/api/sites/${site.id}`, {
         method: 'PUT',
@@ -246,6 +250,8 @@ export function useSiteMutations({
       );
     } catch (error) {
       toast.error(catchText(error));
+    } finally {
+      setCompletingId(null);
     }
   };
 
@@ -326,6 +332,7 @@ export function useSiteMutations({
 
   return {
     togglingId,
+    completingId,
     handleCreateSite,
     handleSaveEdit,
     handleConfirmDelete,

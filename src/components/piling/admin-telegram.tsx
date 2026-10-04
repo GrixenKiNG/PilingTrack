@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { motion } from 'framer-motion';
 import {
   Send,
@@ -67,6 +67,11 @@ export function AdminTelegram() {
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [testingId, setTestingId] = useState<string | null>(null);
   const [pendingDelete, setPendingDelete] = useState<TelegramConfigDTO | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  // Radix закрывает диалог по клику на «Удалить» раньше, чем React применит
+  // setDeleting, — закрытие откладываем через ref, иначе кнопка не успевает
+  // заблокироваться и второй клик шлёт второй DELETE (F-R128-4).
+  const deletingRef = useRef(false);
 
   const openCreate = () => {
     setDialogMode('create');
@@ -199,6 +204,8 @@ export function AdminTelegram() {
   };
 
   const handleDelete = async (id: string) => {
+    deletingRef.current = true;
+    setDeleting(true);
     try {
       const res = await authFetch('/api/telegram/configs', {
         method: 'DELETE',
@@ -214,6 +221,8 @@ export function AdminTelegram() {
     } catch {
       toast.error('Ошибка удаления');
     } finally {
+      deletingRef.current = false;
+      setDeleting(false);
       setPendingDelete(null);
     }
   };
@@ -459,12 +468,13 @@ export function AdminTelegram() {
 
       <ConfirmActionDialog
         open={Boolean(pendingDelete)}
-        onOpenChange={(open) => { if (!open) setPendingDelete(null); }}
+        onOpenChange={(open) => { if (!open && !deletingRef.current) setPendingDelete(null); }}
         title="Удалить канал уведомлений?"
         description={pendingDelete
           ? `Канал «${pendingDelete.label}» (ID чата: ${pendingDelete.chatId}) будет удалён без возможности восстановления.`
           : ''}
         confirmLabel="Удалить"
+        busy={deleting}
         onConfirm={() => { if (pendingDelete) void handleDelete(pendingDelete.id); }}
       />
     </div>

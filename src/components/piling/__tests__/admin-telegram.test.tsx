@@ -15,7 +15,7 @@
  * сохраняется как рабочий канал.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act, within } from '@testing-library/react';
 import { toast } from 'sonner';
 
 const mocks = vi.hoisted(() => ({ authFetch: vi.fn() }));
@@ -273,5 +273,39 @@ describe('AdminTelegram: диалог ограничен по высоте (F-R1
 
     const dialog = (await screen.findByText('Новая конфигурация Telegram')).closest('[data-slot="dialog-content"]');
     expect(dialog).toHaveClass('max-h-[90vh]', 'overflow-y-auto');
+  });
+});
+
+/**
+ * F-R128-4: подтверждение удаления канала Telegram не блокировало кнопку —
+ * двойной клик отправлял два DELETE, второй получал 404 и ложный тост об
+ * ошибке. Теперь на время запроса кнопка недоступна, а диалог остаётся открыт
+ * с подписью «Удаление…».
+ */
+describe('AdminTelegram: удаление канала блокирует подтверждение (F-R128-4)', () => {
+  beforeEach(() => {
+    mocks.authFetch.mockReset();
+    vi.mocked(toast.error).mockClear();
+    vi.mocked(toast.success).mockClear();
+  });
+
+  it('кнопка «Удалить» недоступна, пока DELETE не ответил', async () => {
+    let resolveDelete: (r: Response) => void = () => {};
+    mocks.authFetch.mockImplementation((_url: string, init?: RequestInit) =>
+      init?.method === 'DELETE'
+        ? new Promise<Response>((resolve) => { resolveDelete = resolve; })
+        : Promise.resolve(json({ configs: [config()] })),
+    );
+    render(<AdminTelegram />);
+    await screen.findAllByRole('button', { name: 'Тест' });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Удалить' }));
+    const dialog = await screen.findByRole('alertdialog');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Удалить' }));
+
+    expect(await screen.findByRole('button', { name: 'Удаление…' })).toBeDisabled();
+
+    await act(async () => { resolveDelete(json({ ok: true })); });
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Конфигурация удалена'));
   });
 });

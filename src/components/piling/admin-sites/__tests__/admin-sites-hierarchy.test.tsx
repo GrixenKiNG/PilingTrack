@@ -6,7 +6,7 @@
  * Тяжёлые дочерние компоненты и источники данных подменены заглушками: тест
  * про поведение экрана при отказе, а не про вёрстку.
  */
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const { authFetchMock, sitesData, overview } = vi.hoisted(() => ({
@@ -129,4 +129,38 @@ describe('HierarchyTree — удаление узла с подтвержден�
     expect(await screen.findByText('Удалить пикет «ПК-1»?')).toBeInTheDocument();
     expect(screen.getByText(/Выработка, привязанная к пикету, потеряет привязку/)).toBeInTheDocument();
   }, 15_000);
+});
+
+/**
+ * F-R128-5: кнопка «Выполнен» в карточке объекта не блокировалась на время
+ * запроса — двойной клик слал два PUT, отметка мигала туда-обратно.
+ */
+describe('AdminSites — «Выполнен» блокируется на время запроса (F-R128-5)', () => {
+  beforeEach(() => {
+    authFetchMock.mockReset();
+    sitesData.current = {
+      sites: [site], setSites: vi.fn(), users: [], pileGrades: [],
+      loading: false, sitesError: null, reloadSites: vi.fn(),
+      loadingUsers: false, loadingPileGrades: false, loadUsers: vi.fn(), loadPileGrades: vi.fn(),
+    };
+    overview.current = { rows: [], loading: false, error: null, crewsError: false, reload: vi.fn() };
+  });
+
+  it('кнопка недоступна, пока PUT не ответил', async () => {
+    let resolvePut: (r: Response) => void = () => {};
+    authFetchMock.mockImplementation((_url: string, init?: RequestInit) =>
+      init?.method === 'PUT'
+        ? new Promise<Response>((resolve) => { resolvePut = resolve; })
+        : Promise.resolve(jsonResponse(200, { site: { id: 's1', crews: [] } })),
+    );
+    render(<AdminSites />);
+
+    const button = await screen.findByRole('button', { name: 'Выполнен' });
+    fireEvent.click(button);
+
+    expect(button).toBeDisabled();
+
+    await act(async () => { resolvePut(jsonResponse(200, { site: { completionDate: '2026-10-01' } })); });
+    await waitFor(() => expect(button).not.toBeDisabled());
+  });
 });

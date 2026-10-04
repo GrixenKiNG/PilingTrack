@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { OperationalUserDTO } from '@/lib/types';
 
@@ -367,5 +367,44 @@ describe('AdminUsers — повторная загрузка не гасит с�
     render(<AdminUsers />);
 
     expect(screen.queryByPlaceholderText('ФИО, email или телефон')).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * F-R128-3: кнопки карточки пользователя не блокировались на время запроса —
+ * «Заблокировать/Разблокировать» шлёт PUT и ещё ждёт перечитывания списка,
+ * второй клик отправлял второй запрос.
+ */
+describe('UserDetail — кнопки карточки блокируются на время запроса (F-R128-3)', () => {
+  beforeEach(() => {
+    authFetchMock.mockReset();
+    window.history.replaceState(null, '', '/');
+  });
+
+  it('«Заблокировать» недоступна, пока блокировка не завершилась', async () => {
+    let release: () => void = () => {};
+    const toggleActive = vi.fn(() => new Promise<void>((resolve) => { release = resolve; }));
+    useUsersListMock.mockReturnValue({
+      users: [operationalUser()],
+      loading: false,
+      error: null,
+      retry: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+      remove: vi.fn(),
+      toggleActive,
+    });
+    render(<AdminUsers />);
+
+    // Radix Tabs переключает вкладку по mousedown, не по click.
+    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Доступ' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Заблокировать' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Заблокировать доступ' }));
+
+    expect(toggleActive).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('button', { name: 'Заблокировать' })).toBeDisabled();
+
+    await act(async () => { release(); });
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Заблокировать' })).not.toBeDisabled());
   });
 });
