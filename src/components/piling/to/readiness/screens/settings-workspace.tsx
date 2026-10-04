@@ -18,6 +18,7 @@ import { cn } from '@/lib/utils';
 import { BLOCKER_ACTIONS, BLOCKER_ACTION_LABELS, BLOCKER_LABELS, CRITERION_LABELS, SYSTEM_SAFETY_BLOCKERS, computeReadinessScore, describeRuleSetChanges, normalizeWeights, type BlockerAction, type ReadinessCriterionKey, type ReadinessRuleSet, type ReadinessRulesState } from '@/modules/readiness';
 import { resolveReadinessCapabilities, type ReadinessAbility, type ReadinessRole } from '@/modules/readiness/application/capabilities';
 import { type ReadinessUrlFilters } from '../api/client';
+import { authoritativeFactsForEquipment } from '../authoritative-presentation';
 import { EquipmentPhoto, ReadinessFiltersBar, ReadinessRing, downloadReadinessExport } from './shared';
 import type { ReferenceUiProps, SettingsSection } from './types';
 
@@ -189,8 +190,15 @@ function RulesSettings(props: ReferenceUiProps) {
 
   const total = draft.criteria.reduce((sum, criterion) => sum + criterion.weight, 0);
   const rulesUnavailable = !props.rulesAvailable || !props.bootstrap?.capabilities.entities.rules.manage;
-  const previewFacts = props.factsByEquipment[props.selectedId];
+  // Предпросмотр считается по фактам авторитетного снимка выбранной установки:
+  // производные факты строятся без наряда, приёмки и дефектов, и шаг «Приёмка»
+  // в них всегда «ожидает приёмки» — админ подбирал бы веса по заниженному баллу.
+  // Нет снимка или фактов в нём — балл не выдумываем, показываем недостаточность.
+  const previewFacts = authoritativeFactsForEquipment(props.currentReadiness, props.selectedId);
   const preview = previewFacts ? computeReadinessScore(previewFacts, draft) : null;
+  const previewEmptyLabel = props.selectedId
+    ? 'По выбранной установке нет авторитетных фактов — предпросмотр недоступен.'
+    : 'Выберите тестовую установку.';
   const previewEquipment = props.equipment.find((item) => item.id === props.selectedId);
   const previewFleet = props.fleetCards.find((item) => item.id === props.selectedId);
   // Список правок показываем от действующей версии к тому, что сейчас в форме,
@@ -544,21 +552,25 @@ function RulesSettings(props: ReferenceUiProps) {
           </div>
           <div>
             <div className="mb-2 text-xs font-semibold text-muted-foreground">Расчёт по критериям</div>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-              {draft.criteria.map((criterion) => {
-                const result = preview?.criteria.find((item) => item.key === criterion.key);
-                const ratio = result?.ratio ?? 0;
-                return (
-                  <div key={criterion.key}>
-                    <div title={CRITERION_LABELS[criterion.key].title} className="flex min-h-8 min-w-0 items-end break-words text-3xs font-semibold leading-tight text-muted-foreground">{CRITERION_LABELS[criterion.key].short}</div>
-                    <div className="mt-1 font-mono text-sm font-bold">{result?.earned ?? 0} <span className="text-2xs font-semibold text-muted-foreground">/ {criterion.weight}</span></div>
-                    <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-muted">
-                      <span className={cn('block h-full rounded-full', ratio >= 0.999 ? 'bg-success-strong' : ratio > 0 ? 'bg-signal-strong' : 'bg-destructive-strong')} style={{ width: `${Math.max(ratio * 100, ratio > 0 ? 6 : 3)}%` }} />
+            {preview ? (
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+                {draft.criteria.map((criterion) => {
+                  const result = preview.criteria.find((item) => item.key === criterion.key);
+                  const ratio = result?.ratio ?? 0;
+                  return (
+                    <div key={criterion.key}>
+                      <div title={CRITERION_LABELS[criterion.key].title} className="flex min-h-8 min-w-0 items-end break-words text-3xs font-semibold leading-tight text-muted-foreground">{CRITERION_LABELS[criterion.key].short}</div>
+                      <div className="mt-1 font-mono text-sm font-bold">{result?.earned ?? 0} <span className="text-2xs font-semibold text-muted-foreground">/ {criterion.weight}</span></div>
+                      <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-muted">
+                        <span className={cn('block h-full rounded-full', ratio >= 0.999 ? 'bg-success-strong' : ratio > 0 ? 'bg-signal-strong' : 'bg-destructive-strong')} style={{ width: `${Math.max(ratio * 100, ratio > 0 ? 6 : 3)}%` }} />
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="rounded-lg border border-border p-2.5 text-2xs text-muted-foreground">{previewEmptyLabel}</p>
+            )}
           </div>
           <div>
             <div className="mb-2 text-xs font-semibold text-muted-foreground">Блокеры</div>
@@ -578,7 +590,7 @@ function RulesSettings(props: ReferenceUiProps) {
                 })}
               </ul>
             ) : (
-              <p className="rounded-lg border border-border p-2.5 text-2xs text-muted-foreground">{preview ? 'Ни одно правило не сработало.' : 'Выберите тестовую установку.'}</p>
+              <p className="rounded-lg border border-border p-2.5 text-2xs text-muted-foreground">{preview ? 'Ни одно правило не сработало.' : previewEmptyLabel}</p>
             )}
           </div>
           <div>
@@ -601,7 +613,7 @@ function RulesSettings(props: ReferenceUiProps) {
           <span className={cn('rounded-md px-2.5 py-1 text-xs font-bold', preview?.canStart
             ? 'bg-success/10 text-success-strong'
             : preview ? 'bg-destructive/10 text-destructive-strong' : 'bg-muted text-muted-foreground')}>
-            {preview?.verdictLabel ?? 'выберите установку'}
+            {preview?.verdictLabel ?? (props.selectedId ? 'недостаточно данных' : 'выберите установку')}
           </span>
         </div>
       </section>

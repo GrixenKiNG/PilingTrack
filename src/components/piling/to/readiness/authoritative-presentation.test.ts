@@ -1,6 +1,10 @@
 import {describe, expect, it} from 'vitest';
 import type {CurrentReadinessDto} from './api/contracts';
-import {buildAuthoritativeReadinessPresentation} from './authoritative-presentation';
+import {
+  authoritativeFactsForEquipment,
+  buildAuthoritativeReadinessPresentation,
+  readinessFactsFromSnapshot,
+} from './authoritative-presentation';
 
 const facts = {
   inspectionCompleted: true,
@@ -178,5 +182,39 @@ describe('buildAuthoritativeReadinessPresentation', () => {
       mode: 'malformed', status: 'UNCONFIRMED', score: null,
       title: 'Авторитетная оценка недоступна',
     });
+  });
+});
+
+/**
+ * F-R141-PREVIEW: предпросмотр правил обязан считаться по фактам авторитетного
+ * снимка (наряд, приёмка, дефекты), а не по производным фактам из журнала —
+ * иначе шаг «Приёмка» всегда «ожидает приёмки» и балл занижен на её вес.
+ */
+describe('readinessFactsFromSnapshot', () => {
+  it('переносит факты приёмки и дефектов без потерь', () => {
+    // Приёмка и критический дефект — ровно те основания, которых нет в
+    // производных фактах; их потеря вернула бы исходную ошибку. Заодно
+    // проверяем, что преобразование переносит все поля без искажений.
+    expect(readinessFactsFromSnapshot(facts)).toEqual(facts);
+    expect(readinessFactsFromSnapshot({...facts, accepted: true, criticalDefect: true, findings: 3}))
+      .toMatchObject({accepted: true, criticalDefect: true, findings: 3});
+  });
+
+  it('не выдумывает балл: null-факты дают null, а не нули', () => {
+    expect(readinessFactsFromSnapshot(null)).toBeNull();
+    expect(readinessFactsFromSnapshot(undefined)).toBeNull();
+  });
+
+  it('берёт факты выбранной установки, а не «первой попавшейся»', () => {
+    const strict = snapshot({equipmentId: 'a'});
+    const withDefect = snapshot({equipmentId: 'b', facts: {...facts, accepted: false, criticalDefect: true}});
+    expect(authoritativeFactsForEquipment([strict, withDefect], 'a')).toMatchObject({accepted: true, criticalDefect: false});
+    expect(authoritativeFactsForEquipment([strict, withDefect], 'b')).toMatchObject({accepted: false, criticalDefect: true});
+
+    // Снимок есть, но факты не записаны (старый формат) — балла нет.
+    const legacy = snapshot({equipmentId: 'c', facts: null});
+    expect(authoritativeFactsForEquipment([strict, legacy], 'c')).toBeNull();
+    // Снимка для установки нет вовсе — тоже без балла.
+    expect(authoritativeFactsForEquipment([strict], 'missing')).toBeNull();
   });
 });

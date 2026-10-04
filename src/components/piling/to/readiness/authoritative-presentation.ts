@@ -1,9 +1,11 @@
 import {
   OUTCOME_LABELS,
   resolveReadinessOutcome,
+  type ReadinessFacts,
   type ReadinessOutcome,
 } from '@/modules/readiness';
 import type {
+  AuthoritativeReadinessFactsDto,
   CurrentReadinessDto,
   ReadinessSnapshotDto,
 } from './api/contracts';
@@ -333,4 +335,53 @@ export function buildUnavailableReadinessPresentation(
   snapshot: Snapshot | null,
 ): AuthoritativeReadinessPresentation {
   return unconfirmed('malformed', snapshot);
+}
+
+/**
+ * Факты авторитетного снимка — в контракт расчёта балла (`ReadinessFacts`).
+ *
+ * Поля перечислены поимённо, а не приведением типа: сегодня состав обоих
+ * контрактов совпадает, но снимок неизменяем и переживёт любое расширение
+ * `ReadinessFacts`, а молчаливое совпадение формы этот разрыв скроет.
+ *
+ * `null` — фактов в снимке нет (снимки до появления колонки `facts`, либо
+ * её отсутствие). Балл по таким фактам выдумывать нельзя: вызывающий обязан
+ * показать «недостаточно данных», а не подставить нули или производные факты.
+ */
+export function readinessFactsFromSnapshot(
+  facts: AuthoritativeReadinessFactsDto | null | undefined,
+): ReadinessFacts | null {
+  if (!facts) return null;
+  return {
+    inspectionCompleted: facts.inspectionCompleted,
+    inspectionProgress: facts.inspectionProgress,
+    healthScore: facts.healthScore,
+    meterKnown: facts.meterKnown,
+    permitValid: facts.permitValid,
+    permitExpired: facts.permitExpired,
+    maintenanceConfigured: facts.maintenanceConfigured,
+    maintenanceOverdueHours: facts.maintenanceOverdueHours,
+    maintenanceOverdueDays: facts.maintenanceOverdueDays,
+    accepted: facts.accepted,
+    criticalDefect: facts.criticalDefect,
+    findings: facts.findings,
+  };
+}
+
+/**
+ * Авторитетные факты выбранной установки из её снимка готовности.
+ *
+ * Предпросмотр правил обязан считаться по тем же фактам, по которым сервер
+ * вынес вердикт. Производные факты строятся без наряда, приёмки и дефектов,
+ * поэтому шаг «Приёмка» в них всегда «ожидает приёмки», а балл занижен на её
+ * вес — и админ подбирал бы веса по числу, которого в бою не будет.
+ *
+ * `null` — снимка нет или в нём не записаны факты.
+ */
+export function authoritativeFactsForEquipment(
+  snapshots: readonly CurrentReadinessDto[],
+  equipmentId: string,
+): ReadinessFacts | null {
+  const snapshot = snapshots.find((item) => item.equipmentId === equipmentId);
+  return readinessFactsFromSnapshot(snapshot?.facts);
 }
