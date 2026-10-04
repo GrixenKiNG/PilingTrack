@@ -123,8 +123,30 @@ describe('buildAnalyticsKpiWidgets: период против «на сегод�
     render(<>{w['kpi-sites'].render({})}</>);
     render(<>{w['kpi-crews'].render({})}</>);
     render(<>{w['kpi-operators'].render({})}</>);
-    expect(screen.getByText('всего на сегодня')).toBeInTheDocument();
-    expect(screen.getByText('активных на сегодня')).toBeInTheDocument();
+    // R139 №19: значение — только активные установки; №14: объекты включают закрытые.
+    expect(screen.getByText('активных в парке на сегодня')).toBeInTheDocument();
+    expect(screen.getByText('всего на сегодня, включая закрытые')).toBeInTheDocument();
     expect(screen.getAllByText('на смене сегодня, включая несданные смены')).toHaveLength(2);
+  });
+
+  // R139 №21: deltaPct = null (нет прошлого периода с базой) — процент исчезал, и на
+  // его месте стояло «за период»: «нет базы для сравнения» выглядело как «изменений нет».
+  it('нет базы для сравнения — плитка говорит об этом, а не молчит', () => {
+    const noBase: AnalyticsKpiData = {
+      ...PERIOD_DATA,
+      period: {
+        label: 'к пред. неделе',
+        meters: { value: 1200, deltaPct: null },
+        piles: { value: 30, deltaPct: null },
+        drilling: { value: 800, deltaPct: null },
+        drillingCount: { value: 10, deltaPct: null },
+        downtime: { value: 4.2, deltaPp: -1.1 },
+      },
+    };
+    const w = buildAnalyticsKpiWidgets(noBase);
+    render(<>{w['kpi-piles'].render({})}</>);
+    render(<>{w['kpi-drilling'].render({})}</>);
+    expect(screen.getAllByText('нет данных для сравнения')).toHaveLength(2);
+    expect(screen.queryByText('м.п. +5,2% к пред. неделе')).not.toBeInTheDocument();
   });
 });

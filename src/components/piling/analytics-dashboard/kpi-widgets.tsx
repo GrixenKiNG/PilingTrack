@@ -85,11 +85,18 @@ export function buildAnalyticsKpiWidgets(d: AnalyticsKpiData): Record<string, Re
   // рядом с «шт. / м.п.» читается как процент по штукам (R139 №2).
   const pctDelta = (deltaPct: number | null | undefined) =>
     p && deltaPct != null ? { text: `м.п. ${signed(deltaPct, '%')} ${p.label}`, good: deltaPct >= 0 } : null;
+  // Нет прошлого периода с ненулевой базой → deltaPct = null, и дельта не рисуется.
+  // Молчать нельзя: пустое место читается как «изменений нет», хотя сравнить не с
+  // чем (R139 №21).
+  const periodHint = (deltaPct: number | null | undefined) =>
+    p && deltaPct == null ? 'нет данных для сравнения' : 'за период';
   return {
     // Дневные плитки (снимок парка) подписаны «на сегодня», периодные — «за период»:
     // иначе в одной полосе 7-дневный итог и текущий день читаются как один срез (R139 №1).
-    'kpi-equipment': tile('kpi-equipment', 'Установок', String(d.totalEquipment), 'всего на сегодня'),
-    'kpi-sites': tile('kpi-sites', 'Объектов', String(d.sitesCount), 'активных на сегодня'),
+    // «Установок» — только активные машины парка (fleet.totalEquipment), «Объектов» —
+    // все объекты тенанта, включая закрытые (/api/sites/all с includeInactive) (R139 №14, №19).
+    'kpi-equipment': tile('kpi-equipment', 'Установок', String(d.totalEquipment), 'активных в парке на сегодня'),
+    'kpi-sites': tile('kpi-sites', 'Объектов', String(d.sitesCount), 'всего на сегодня, включая закрытые'),
     // Сваи и бурение — одной записью «шт. / м.п.», как на всех экранах
     // (решение владельца 28.09.2026). Отдельная плитка «Погонные метры» убрана:
     // её число теперь во второй половине плитки «Сваи». Динамика — по м.п.
@@ -99,10 +106,10 @@ export function buildAnalyticsKpiWidgets(d: AnalyticsKpiData): Record<string, Re
     // значений — иначе она обещала бы несданные смены там, где их нет.
     'kpi-piles': tile('kpi-piles', 'Сваи',
       p ? formatCountMeters(p.piles.value, p.meters.value) : formatCountMeters(d.pilesToday, d.pileMetersToday),
-      p ? 'за период' : 'за сегодня, включая несданные смены', pctDelta(p?.meters.deltaPct)),
+      p ? periodHint(p.meters.deltaPct) : 'за сегодня, включая несданные смены', pctDelta(p?.meters.deltaPct)),
     'kpi-drilling': tile('kpi-drilling', 'Бурение',
       p ? formatCountMeters(p.drillingCount.value, p.drilling.value) : formatCountMeters(d.drillingCountToday, d.drillingToday),
-      p ? 'за период' : 'за сегодня, включая несданные смены', pctDelta(p?.drilling.deltaPct)),
+      p ? periodHint(p.drilling.deltaPct) : 'за сегодня, включая несданные смены', pctDelta(p?.drilling.deltaPct)),
     'kpi-downtime': tile('kpi-downtime', p ? 'Доля простоя в смене, %' : 'Простой',
       p ? (p.downtime.value != null ? `${p.downtime.value.toLocaleString('ru-RU', { maximumFractionDigits: 1 })} %` : '—') : formatDowntimeHours(d.downtimeHoursToday),
       p ? 'по отчётам с указанным временем смены' : 'за сегодня, включая несданные смены',
