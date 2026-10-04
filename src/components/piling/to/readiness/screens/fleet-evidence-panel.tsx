@@ -38,7 +38,7 @@ export function FleetSourceLink({ href, children }: { href: string; children: Re
 
 export function FleetEvidencePanel({ item, props }: { item: FleetItem; props: ReferenceUiProps }) {
   const [section, setSection] = useState<Section>('basis');
-  const [defectResult, setDefectResult] = useState<{ id: string; data?: DefectDto[]; error?: string } | null>(null);
+  const [defectResult, setDefectResult] = useState<{ key: string; data?: DefectDto[]; error?: string } | null>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const { equipment, presentation, snapshot } = item;
   const detail = props.details[equipment.id];
@@ -57,15 +57,27 @@ export function FleetEvidencePanel({ item, props }: { item: FleetItem; props: Re
   const date = (value: string | null | undefined) => value && Number.isFinite(Date.parse(value))
     ? formatDateTimeInTimezone(value, timezone) : 'Дата не указана';
 
+  /*
+   * Список дефектов привязан не только к установке и вкладке, но и к снимку
+   * оценки: «Обновить данные» перезагружает модуль, не пересоздавая панель
+   * (её ключ — equipmentId), поэтому без снимка открытый журнал оставался
+   * прежним рядом со свежей оценкой (R151 №8). Идентификатор снимка — готовый
+   * признак завершённого пересчёта: новый снимок даёт новый `snapshotId`, а
+   * на время загрузки снимок не сбрасывается, поэтому на каждый тик `loading`
+   * запрос не повторяется. Ключ результата хранит, к какому снимку относится
+   * ответ: пока снимок иной, прежний список не выдаётся за свежий.
+   */
+  const defectKey = `${equipment.id}:${snapshot?.snapshotId ?? ''}`;
   useEffect(() => {
     if (section !== 'defects') return;
     const controller = new AbortController();
+    const key = `${equipment.id}:${snapshot?.snapshotId ?? ''}`;
     void fetchReadinessDefects(controller.signal, { equipmentId: equipment.id }).then(
-      (data) => { if (!controller.signal.aborted) setDefectResult({ id: equipment.id, data: data.filter((record) => record.equipmentId === equipment.id) }); },
-      (error: unknown) => { if (!controller.signal.aborted) setDefectResult({ id: equipment.id, error: error instanceof Error ? error.message : 'Не удалось загрузить дефекты' }); },
+      (data) => { if (!controller.signal.aborted) setDefectResult({ key, data: data.filter((record) => record.equipmentId === equipment.id) }); },
+      (error: unknown) => { if (!controller.signal.aborted) setDefectResult({ key, error: error instanceof Error ? error.message : 'Не удалось загрузить дефекты' }); },
     );
     return () => controller.abort();
-  }, [equipment.id, section]);
+  }, [equipment.id, section, snapshot?.snapshotId]);
 
   const chooseSection = (next: Section) => {
     setSection(next);
@@ -190,7 +202,7 @@ export function FleetEvidencePanel({ item, props }: { item: FleetItem; props: Re
       </div>}
       {section === 'defects' && <div className="mt-3 space-y-3 text-sm">
         <p className="text-muted-foreground">Дефекты {equipment.name}. Блокирующие условия готовности показываются отдельно в основаниях оценки.</p>
-        {defectResult?.id !== equipment.id ? <p role="status">Загружаем журнал дефектов…</p> : defectResult.error
+        {defectResult?.key !== defectKey ? <p role="status">Загружаем журнал дефектов…</p> : defectResult.error
           ? <div role="alert"><p>{defectResult.error}</p><Button variant="outline" className="mt-2" onClick={() => chooseSection('basis')}>Вернуться к основаниям</Button></div>
           : defectResult.data?.length ? defectResult.data.map((defect) => <article key={defect.id} className="rounded-lg border border-border p-3">
             <p className="font-semibold">{defect.title}</p>
