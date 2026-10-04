@@ -7,6 +7,7 @@ import { MapPin, HardHat, Drill, Users, AlertTriangle, Plus, Pencil, Trash2, Use
 import { authFetch } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Dialog } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { QueryErrorBanner } from '@/components/piling/async-ui';
 import { formatCountMeters, formatNumber, pluralizeRu } from '@/lib/format';
@@ -42,6 +43,7 @@ import type { SiteCrew, SiteFullData, SiteListItem } from './types';
 import { formatDowntimeHours } from '@/lib/downtime-hours';
 import { ConfirmActionDialog } from '@/components/piling/confirm-action-dialog';
 import { deactivateDescription } from './site-deactivate';
+import { normalizeSearch } from '@/components/piling/to/readiness/shared/text-search';
 
 type QuickKey = 'all' | 'active' | 'inactive' | 'behind' | 'noCrew' | 'noReports' | 'downtime';
 
@@ -82,6 +84,7 @@ export function AdminSites() {
   const { sites, sitesError, reloadSites, users, pileGrades, loadingUsers, loadingPileGrades, loadUsers, loadPileGrades, setSites } = useSitesData();
 
   const [quick, setQuick] = useState<QuickKey>('all');
+  const [search, setSearch] = useState('');
   const [activeId, setActiveId] = useState<string | null>(null);
 
   // Hierarchy tree of the selected site (loaded on demand).
@@ -128,7 +131,9 @@ export function AdminSites() {
   }, [rows, sites, crewsError]);
 
   const filtered = useMemo(() => {
+    const query = normalizeSearch(search);
     return allRows.filter((r) => {
+      if (query && !normalizeSearch([r.siteName, ...r.rigNames].join(' ')).includes(query)) return false;
       if (quick === 'active') return r.isActive;
       if (quick === 'inactive') return !r.isActive;
       if (quick === 'behind') return r.plannedPiles > 0 && r.pileProgress < 60;
@@ -137,7 +142,7 @@ export function AdminSites() {
       if (quick === 'downtime') return r.totalDowntime > 0;
       return true;
     });
-  }, [allRows, quick]);
+  }, [allRows, quick, search]);
 
   const active = useMemo(
     () => filtered.find((r) => r.siteId === activeId) ?? filtered[0] ?? null,
@@ -313,7 +318,21 @@ export function AdminSites() {
             Бригады не загрузились — число бригад не показано
           </p>
         )}
-        <OpsFilterBar quickFilters={QUICK_FILTERS} active={quick} onSelect={setQuick} footer={`Показано ${filtered.length} из ${allRows.length}`} />
+        <OpsFilterBar
+          quickFilters={QUICK_FILTERS}
+          active={quick}
+          onSelect={setQuick}
+          extra={
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Поиск по объекту"
+              aria-label="Поиск по названию объекта или установки"
+              className="min-h-11 w-full min-w-[200px] rounded-lg border border-border bg-card px-3 py-2 text-xs text-foreground focus:border-info focus:outline-none sm:min-h-0 sm:w-auto"
+            />
+          }
+          footer={`Показано ${filtered.length} из ${allRows.length}`}
+        />
         <OpsTable
           columns={columns}
           rows={filtered}

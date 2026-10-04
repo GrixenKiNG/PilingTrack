@@ -194,3 +194,37 @@ describe('PlansSummary — метры плана с запятой (R129 #4)', (
     expect(screen.getByText('130,0 м')).toBeInTheDocument();
   });
 });
+
+/**
+ * R130 №3: в списке объектов не было текстового поиска — найти объект по
+ * названию можно было только листанием. Поиск нормализует «ё/е»: «черемушки»
+ * находит «Черёмушки».
+ */
+describe('AdminSites — текстовый поиск по объекту (R130 №3)', () => {
+  beforeEach(() => {
+    authFetchMock.mockReset();
+    authFetchMock.mockResolvedValue(jsonResponse(200, { site: { id: 's1', crews: [] } }));
+    sitesData.current = {
+      sites: [
+        { id: 's1', name: 'Объект 1', isActive: true, plannedPiles: 10, plannedDrilling: 0, completionDate: null },
+        { id: 's2', name: 'ЖК Черёмушки', isActive: true, plannedPiles: 5, plannedDrilling: 0, completionDate: null },
+      ],
+      setSites: vi.fn(), users: [], pileGrades: [],
+      loading: false, sitesError: null, reloadSites: vi.fn(),
+      loadingUsers: false, loadingPileGrades: false, loadUsers: vi.fn(), loadPileGrades: vi.fn(),
+    };
+    overview.current = { rows: [], loading: false, error: null, crewsError: false, reload: vi.fn() };
+  });
+
+  it('оставляет только совпавший объект, «ё» находится набором «е»', () => {
+    render(<AdminSites />);
+
+    fireEvent.change(
+      screen.getByLabelText('Поиск по названию объекта или установки'),
+      { target: { value: 'черемушки' } },
+    );
+
+    expect(screen.getAllByText('ЖК Черёмушки').length).toBeGreaterThan(0);
+    expect(screen.queryByText('Объект 1')).not.toBeInTheDocument();
+  });
+});

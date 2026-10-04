@@ -345,3 +345,31 @@ describe('AdminReports — повторная загрузка не гасит �
     expect(screen.queryByRole('button', { name: 'Все' })).not.toBeInTheDocument();
   });
 });
+
+/**
+ * R130 №4: в списке отчётов не было текстового поиска — отчёт по фамилии
+ * оператора, объекту или установке искали только выпадающими списками. Поиск
+ * нормализует «ё/е»: «петр» находит «Пётр».
+ */
+describe('AdminReports — текстовый поиск (R130 №4)', () => {
+  beforeEach(() => {
+    authFetchMock.mockReset();
+    const sidorov = { ...report, id: 'r1', reportId: 'r1', user: { name: 'Иван Сидоров' } } as unknown as ReportDTO;
+    const novikov = { ...report, id: 'r2', reportId: 'r2', user: { name: 'Пётр Новиков' } } as unknown as ReportDTO;
+    reportsState.current = baseState({ reports: [sidorov, novikov] });
+  });
+
+  it('отбирает по фамилии, «ё» находится набором «е»', () => {
+    render(<AdminReports />);
+    expect(screen.getByText('r1')).toBeInTheDocument();
+    expect(screen.getByText('r2')).toBeInTheDocument();
+
+    fireEvent.change(
+      screen.getByLabelText('Поиск по оператору, объекту или установке'),
+      { target: { value: 'петр' } },
+    );
+
+    expect(screen.getByText('r2')).toBeInTheDocument();
+    expect(screen.queryByText('r1')).not.toBeInTheDocument();
+  });
+});

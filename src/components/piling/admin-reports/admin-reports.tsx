@@ -20,6 +20,7 @@ import { ReportDetailDialog } from './report-detail-dialog';
 import { ReportFormDialog } from './report-form-dialog';
 import { useReportHistory } from './use-report-history';
 import { todayYmd, shiftYmd } from './report-list-format';
+import { normalizeSearch } from '@/components/piling/to/readiness/shared/text-search';
 import { EvidenceReportRow, EvidenceSummary, ReportsHeader } from './report-evidence-row';
 import { ReportEvidencePreview } from './report-evidence-preview';
 import { ConfirmActionDialog } from '@/components/piling/confirm-action-dialog';
@@ -68,6 +69,7 @@ export function AdminReports() {
   const [pendingDeleteReport, setPendingDeleteReport] = useState<ReportDTO | null>(null);
   const [quickFilter, setQuickFilter] = useState<QuickFilter>('all');
   const [filterEquipmentId, setFilterEquipmentId] = useState('all');
+  const [search, setSearch] = useState('');
   const [exporting, setExporting] = useState<'csv' | 'xlsx' | null>(null);
 
   // Export the same filters as the visible list. An unbounded history needs
@@ -191,8 +193,10 @@ export function AdminReports() {
     const today = todayYmd();
     const yesterday = shiftYmd(-1);
     const weekStart = shiftYmd(-6);
+    const query = normalizeSearch(search);
     return reports.filter((report) => {
       const totals = getReportTotals(report);
+      if (query && !normalizeSearch([report.user?.name ?? '', report.site?.name ?? '', report.equipment?.name ?? ''].join(' ')).includes(query)) return false;
       if (quickFilter === 'today' && report.date !== today) return false;
       if (quickFilter === 'yesterday' && report.date !== yesterday) return false;
       if (quickFilter === 'week' && (report.date < weekStart || report.date > today)) return false;
@@ -202,7 +206,7 @@ export function AdminReports() {
       if (filterEquipmentId !== 'all' && report.equipment?.id !== filterEquipmentId) return false;
       return true;
     });
-  }, [filterEquipmentId, quickFilter, reports]);
+  }, [filterEquipmentId, quickFilter, reports, search]);
 
   // Итоги — только сданные отчёты, как на всех экранах; черновик виден в
   // списке с пометкой, но в суммы не входит.
@@ -212,7 +216,7 @@ export function AdminReports() {
   );
   // Быстрые фильтры и отбор по установке работают на экране — серверные
   // итоги их не учитывают, поэтому при них считаем по загруженным строкам.
-  const clientFilterActive = quickFilter !== 'all' || filterEquipmentId !== 'all';
+  const clientFilterActive = quickFilter !== 'all' || filterEquipmentId !== 'all' || search.trim() !== '';
   const photoCount = useMemo(
     () => filteredReports.filter((r) => r.hasPhotos === true).length,
     [filteredReports],
@@ -313,6 +317,14 @@ export function AdminReports() {
             <div className="space-y-3 rounded-lg border border-border bg-card p-3 shadow-sm">
               <div className="flex flex-wrap items-center gap-2">
                 <Filter className="hidden h-4 w-4 text-muted-foreground sm:block" />
+                <input
+                  type="text"
+                  aria-label="Поиск по оператору, объекту или установке"
+                  placeholder="Поиск по оператору, объекту, установке"
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  className="h-9 min-w-[200px] flex-1 rounded-md border border-border bg-card px-2 text-xs text-foreground outline-none focus:border-slate-400"
+                />
                 {QUICK_FILTERS.map((filter) => (
                   <button
                     key={filter.key}
@@ -387,7 +399,7 @@ export function AdminReports() {
                   <FileText className="mb-3 h-12 w-12 text-muted-foreground" />
                   <p className="text-sm font-medium text-muted-foreground">Отчёты не найдены</p>
                   <p className="mt-1 max-w-sm text-xs text-muted-foreground">
-                    Попробуйте изменить быстрые фильтры, период, объект, установку или оператора.
+                    Попробуйте изменить быстрые фильтры, период, объект, установку, оператора или строку поиска.
                   </p>
                 </div>
               ) : (
