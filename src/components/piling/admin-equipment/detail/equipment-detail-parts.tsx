@@ -270,8 +270,12 @@ export function MaintenanceBlock({ eq }: { eq: EquipmentDTO & Record<string, unk
   // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null invariant established earlier in this function
   const daysLeft = hasDate ? Math.round((new Date(nextDateStr!).getTime() - Date.now()) / 86_400_000) : null;
 
+  // Пороги «скоро ТО» — те же, что в общем правиле @/lib/maintenance-due
+  // (SOON_HOURS = 50, SOON_DAYS = 7): карточка и бейдж «Скоро ТО» в списке
+  // должны предупреждать одновременно. Раньше здесь стояло 14 дней, и за
+  // 10 дней карточка желтела, а бейджа в списке не было (F-R138 №4).
   const hoursStatus = remainingHours == null ? 'ok' : remainingHours <= 0 ? 'alarm' : remainingHours <= 50 ? 'warn' : 'ok';
-  const dateStatus = daysLeft == null ? 'ok' : daysLeft < 0 ? 'alarm' : daysLeft <= 14 ? 'warn' : 'ok';
+  const dateStatus = daysLeft == null ? 'ok' : daysLeft < 0 ? 'alarm' : daysLeft <= 7 ? 'warn' : 'ok';
 
   const barColor = (st: string) => (st === 'alarm' ? 'bg-destructive-strong' : st === 'warn' ? 'bg-warning-strong' : 'bg-success-strong');
   const txtColor = (st: string) => (st === 'alarm' ? 'text-destructive-strong' : st === 'warn' ? 'text-warning-strong' : 'text-foreground');

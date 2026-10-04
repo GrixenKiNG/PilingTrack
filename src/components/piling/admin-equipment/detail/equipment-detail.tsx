@@ -35,7 +35,7 @@ import {
   HistoryTable, OperatorRotationCard, MaintenanceBlock, PassportGrid,
   formatRelative,
 } from './equipment-detail-parts';
-import { formatCountMeters, formatFixed } from '@/lib/format';
+import { formatCountMeters } from '@/lib/format';
 import { usePilingStore } from '@/lib/store';
 import type { EquipmentDTO, EquipmentKindDTO } from '@/lib/types';
 import {
@@ -387,8 +387,8 @@ export function EquipmentDetail({ equipmentId, embedded = false, onSaved }: Prop
       <Section icon={Activity} title="30 дней активности">
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <Metric label="Отчётов" value={details.stats30d.reportCount} />
-          <Metric label="Свай" value={details.stats30d.piles} />
-          <Metric label="Бурение, м" value={formatFixed(details.stats30d.drillingMeters, 1)} />
+          <Metric label="Свай" value={formatCountMeters(details.stats30d.piles, details.stats30d.pileMeters)} />
+          <Metric label="Бурение" value={formatCountMeters(details.stats30d.drillingCount, details.stats30d.drillingMeters)} />
           <Metric label="Простой" value={formatDowntimeHours(details.stats30d.downtimeHours)} />
         </div>
       </Section>

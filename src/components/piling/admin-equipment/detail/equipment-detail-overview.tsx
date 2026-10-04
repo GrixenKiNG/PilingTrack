@@ -172,7 +172,7 @@ export function OverviewTiles({
         rows={[
           ['Ближайшее ТО', formatRuDate(eq.nextMaintenanceDate)],
           ['Моточасы ТО', eq.nextMaintenanceAtHours != null ? `${formatFixed(Number(eq.nextMaintenanceAtHours), 0)} ч` : '—'],
-          ['Замечания', timeline.some((row) => row.downtimeHours && row.downtimeHours > 0) ? 'есть простой' : 'нет'],
+          ['Простои за 30 дней', stats.downtimeHours > 0 ? 'есть простой' : 'нет'],
         ]}
       />
     </div>

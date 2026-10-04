@@ -22,7 +22,7 @@ import { OverviewTiles } from '../equipment-detail-overview';
 import { EquipmentDetail } from '../equipment-detail';
 import { EquipmentDocuments } from '../equipment-documents';
 import { usePilingStore } from '@/lib/store';
-import type { TimelineRow } from '../equipment-detail-parts';
+import { MaintenanceBlock, type TimelineRow } from '../equipment-detail-parts';
 import { KIND_LABEL } from '../../equipment-status';
 import type { EquipmentDTO } from '@/lib/types';
 
@@ -324,5 +324,98 @@ describe('EquipmentDetail — статус списанной установки
 
     expect(screen.getAllByText('Списана').length).toBeGreaterThan(0);
     expect(screen.queryByText('Неактивна')).toBeNull();
+  });
+});
+
+/*
+  F-R138 №4: карточка подсвечивала «Следующее ТО по дате» жёлтым уже при 14
+  днях до срока, а бейдж «Скоро ТО» в списке появлялся только при ≤7 (SOON_DAYS
+  в @/lib/maintenance-due). Один факт — два порога. Теперь оба порога совпадают.
+*/
+describe('MaintenanceBlock — порог «скоро ТО» по дате (F-R138, №4)', () => {
+  const daysFromNow = (days: number) => new Date(Date.now() + days * 86_400_000).toISOString();
+
+  /** Значение строки «Следующее ТО по дате» — второй span в строке. */
+  function dateValue(): HTMLElement {
+    const row = screen.getByText('Следующее ТО по дате').parentElement;
+    return row?.lastElementChild as HTMLElement;
+  }
+
+  it('за 10 дней до срока дата не подсвечена (порог 7 дней, как в списке)', () => {
+    render(<MaintenanceBlock eq={equipment({ nextMaintenanceDate: daysFromNow(10) })} />);
+
+    expect(dateValue()).not.toHaveClass('text-warning-strong');
+  });
+
+  it('за 5 дней до срока дата подсвечена', () => {
+    render(<MaintenanceBlock eq={equipment({ nextMaintenanceDate: daysFromNow(5) })} />);
+
+    expect(dateValue()).toHaveClass('text-warning-strong');
+  });
+});
+
+/*
+  F-R138 №6: плитка «Замечания» показывала «есть простой», если простой был
+  хоть раз за всю историю отчётов (timeline до 1000 записей без границы даты),
+  хотя подпись обещала замечания. Теперь строка названа «Простои за 30 дней» и
+  считается по stats30d.
+*/
+describe('OverviewTiles — «Простои за 30 дней» (F-R138, №6)', () => {
+  it('считает простой по stats30d, а не по всей истории отчётов', () => {
+    const withDowntime = { ...row('2026-09-25'), downtimeHours: 5 };
+    render(
+      <OverviewTiles
+        eq={equipment()}
+        crew={null}
+        stats={{ ...stats, downtimeHours: 0 }}
+        timeline={[withDowntime]}
+        devicesCount={0}
+      />,
+    );
+
+    expect(screen.getByText('Простои за 30 дней')).toBeInTheDocument();
+    // Давний простой в истории не превращает плитку в «есть простой».
+    expect(screen.queryByText('Замечания')).toBeNull();
+    expect(screen.getByText('нет')).toBeInTheDocument();
+  });
+
+  it('показывает простой, когда он есть за 30 дней', () => {
+    render(
+      <OverviewTiles
+        eq={equipment()}
+        crew={null}
+        stats={{ ...stats, downtimeHours: 12 }}
+        timeline={[]}
+        devicesCount={0}
+      />,
+    );
+
+    expect(screen.getByText('есть простой')).toBeInTheDocument();
+  });
+});
+
+/*
+  F-R138 №9: на полной странице «Свай: 42» и «Бурение, м: 128,5» печатались без
+  единиц, а во встроенной карточке — «42 шт. / 336 м.п.» (решение владельца
+  28.09.2026: сваи и бурение везде пишутся «шт. / м.п.»). Одна статистика в двух
+  видах. Теперь полная страница тоже через formatCountMeters.
+*/
+describe('EquipmentDetail — единицы статистики на полной странице (F-R138, №9)', () => {
+  beforeEach(() => {
+    mocks.authFetch.mockReset();
+    usePilingStore.setState({ currentUser: { role: 'ADMIN' } as never });
+  });
+
+  it('«Свай» и «Бурение» показаны как «шт. / м.п.», как во встроенной карточке', async () => {
+    mocks.authFetch.mockImplementation(async () => json({
+      ...detailsResponse('eq-1', 'СГ-1'),
+      stats30d: { reportCount: 3, piles: 10, pileMeters: 100, drillingCount: 2, drillingMeters: 12.5, downtimeHours: 0 },
+    }));
+
+    render(<EquipmentDetail equipmentId="eq-1" />);
+    await screen.findAllByText('СГ-1');
+
+    expect(screen.getByText('10 шт. / 100 м.п.')).toBeInTheDocument();
+    expect(screen.getByText('2 шт. / 12,5 м.п.')).toBeInTheDocument();
   });
 });
