@@ -22,6 +22,7 @@ import {
 import { databaseCircuitBreaker, CircuitOpenError } from '@/core/infrastructure/circuit-breakers';
 import { withApi, readJsonBody } from '@/core/api-wrapper';
 import { z } from 'zod';
+import { resolveEffectiveRole } from '@/lib/types';
 
 const telemetryRecordSchema = z.object({
   type: z.string().max(50),
@@ -363,8 +364,8 @@ export const GET = withApi(async (request: NextRequest) => {
     return NextResponse.json({ records });
 }, { domain: 'telemetry' });
 
-function assertAnyRole(user: { role: string }, roles: string[]) {
-  if (!roles.includes(user.role)) {
+function assertAnyRole(user: { role: string; actingAs?: string | null }, roles: string[]) {
+  if (!roles.includes(resolveEffectiveRole(user.role, user.actingAs))) {
     return NextResponse.json({ error: 'Недостаточно прав' }, { status: 403 });
   }
 

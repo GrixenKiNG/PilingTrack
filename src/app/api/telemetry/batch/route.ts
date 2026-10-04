@@ -8,6 +8,7 @@ import { databaseCircuitBreaker, CircuitOpenError } from '@/core/infrastructure/
 import { logger } from '@/lib/logger';
 import { withApi, readJsonBody } from '@/core/api-wrapper';
 import { z } from 'zod';
+import { resolveEffectiveRole } from '@/lib/types';
 
 const telemetryRecordSchema = z.object({
   type: z.string().max(50),
@@ -83,7 +84,7 @@ export const POST = withApi(async (request: NextRequest) => {
   try {
     // Only ADMIN, DISPATCHER, and OPERATOR can submit telemetry
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
-    if (!['ADMIN', 'DISPATCHER', 'OPERATOR'].includes(user!.role)) {
+    if (!['ADMIN', 'DISPATCHER', 'OPERATOR'].includes(resolveEffectiveRole(user!.role, user!.actingAs))) {
       return NextResponse.json({ error: 'Недостаточно прав' }, { status: 403 });
     }
 

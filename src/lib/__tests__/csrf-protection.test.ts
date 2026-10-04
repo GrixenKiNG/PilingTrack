@@ -13,7 +13,7 @@
  * here would silently disable CSRF for the whole API surface.
  */
 
-import { describe, it, expect } from 'vitest';
+import { afterEach, describe, it, expect, vi } from 'vitest';
 import { withCsrf } from '../csrf-protection';
 
 // Why a plain mock object instead of new Request(): the WHATWG fetch spec
@@ -29,6 +29,8 @@ function makeRequest({
   origin,
   referer,
   secFetchSite,
+  protocol = 'https',
+  forwardedProto,
 }: {
   method?: string;
   path?: string;
@@ -36,14 +38,17 @@ function makeRequest({
   origin?: string;
   referer?: string;
   secFetchSite?: string;
+  protocol?: string;
+  forwardedProto?: string;
 } = {}): Request {
   const h = new Map<string, string>();
   h.set('host', host);
   if (origin !== undefined) h.set('origin', origin);
   if (referer !== undefined) h.set('referer', referer);
   if (secFetchSite !== undefined) h.set('sec-fetch-site', secFetchSite);
+  if (forwardedProto !== undefined) h.set('x-forwarded-proto', forwardedProto);
   return {
-    url: `https://${host}${path}`,
+    url: `${protocol}://${host}${path}`,
     method,
     headers: { get: (name: string) => h.get(name.toLowerCase()) ?? null },
   } as unknown as Request;
@@ -183,7 +188,7 @@ describe('withCsrf — Origin', () => {
 
   it('passes when ports match within Origin and Host', () => {
     const res = withCsrf(
-      makeRequest({ origin: 'http://localhost:3000', host: 'localhost:3000' }),
+      makeRequest({ origin: 'http://localhost:3000', host: 'localhost:3000', protocol: 'http' }),
     );
     expect(res).toBeNull();
   });
@@ -204,6 +209,32 @@ describe('withCsrf — Origin', () => {
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- test: value is established by the setup/fixture above
     const body = await res!.json();
     expect(body.error).toMatch(/invalid origin/i);
+  });
+});
+
+describe('withCsrf — scheme and trusted TLS proxy', () => {
+  afterEach(() => vi.unstubAllEnvs());
+
+  it.each(['origin', 'referer'] as const)('rejects a different scheme in %s on the same host', (header) => {
+    vi.stubEnv('TRUST_PROXY', 'false');
+    expect(withCsrf(makeRequest({ [header]: 'http://app.orionpiling.ru' }))?.status).toBe(403);
+  });
+  it('accepts HTTPS behind the explicitly trusted TLS proxy', () => {
+    vi.stubEnv('TRUST_PROXY', 'true');
+    expect(withCsrf(makeRequest({ protocol: 'http', forwardedProto: 'https', origin: 'https://app.orionpiling.ru' }))).toBeNull();
+  });
+  it('rejects HTTP Origin when a trusted TLS proxy says HTTPS', () => {
+    vi.stubEnv('TRUST_PROXY', 'true');
+    expect(withCsrf(makeRequest({ protocol: 'http', forwardedProto: 'https', origin: 'http://app.orionpiling.ru' }))?.status).toBe(403);
+  });
+  it('ignores spoofed forwarded protocol without explicit proxy trust', () => {
+    vi.stubEnv('TRUST_PROXY', 'false');
+    expect(withCsrf(makeRequest({ forwardedProto: 'http', origin: 'http://app.orionpiling.ru' }))?.status).toBe(403);
+    expect(withCsrf(makeRequest({ forwardedProto: 'http', origin: 'https://app.orionpiling.ru' }))).toBeNull();
+  });
+  it.each(['https,http', 'https, http', 'ftp', 'HTTPS', ''])('rejects ambiguous or invalid trusted protocol %j', (forwardedProto) => {
+    vi.stubEnv('TRUST_PROXY', 'true');
+    expect(withCsrf(makeRequest({ forwardedProto, origin: 'https://app.orionpiling.ru' }))?.status).toBe(403);
   });
 });
 
