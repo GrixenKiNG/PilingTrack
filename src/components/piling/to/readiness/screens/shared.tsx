@@ -18,6 +18,38 @@ import { type PresentationStage } from '../authoritative-presentation';
 
 export const muted = 'text-muted-foreground';
 
+export type BlockerTone = 'critical' | 'attention' | 'info';
+
+/**
+ * Тон блокера по его действию, а не «все красные».
+ *
+ * Правило «нет осмотра за сегодня» возвращает оператора на доработку
+ * (`RETURN_TO_OPERATOR`) — это незакрытый шаг, а не критический дефект;
+ * «нужно подтверждение» (`REQUIRE_CONFIRMATION`) — решение ответственного.
+ * Домен эти исходы специально различает (`readiness-score.ts`). Неизвестное
+ * действие (в т.ч. пропущенное у старых снимков) считаем строгим запретом:
+ * недооценить блокировку пуска хуже, чем перестраховаться.
+ */
+export function blockerTone(action: string | null | undefined): BlockerTone {
+  if (action === 'RETURN_TO_OPERATOR') return 'attention';
+  if (action === 'REQUIRE_CONFIRMATION') return 'info';
+  return 'critical';
+}
+
+/** Цвета тона блокера: рамка/фон, значок и рамка плашки. */
+export const BLOCKER_TONE_CLASS: Record<BlockerTone, { box: string; icon: string; badge: string }> = {
+  critical: { box: 'border-destructive/25 bg-destructive/10', icon: 'text-destructive-strong', badge: 'border-destructive text-destructive-strong' },
+  attention: { box: 'border-warning/25 bg-warning/10', icon: 'text-warning-strong', badge: 'border-warning text-warning-strong' },
+  info: { box: 'border-info/25 bg-info/10', icon: 'text-info-strong', badge: 'border-info text-info-strong' },
+};
+
+/** Слово-итог по тону блокера — вместо «критическое» для любого исхода. */
+export const BLOCKER_TONE_LABEL: Record<BlockerTone, string> = {
+  critical: 'Критическое',
+  attention: 'Требует решения',
+  info: 'Требует подтверждения',
+};
+
 /**
  * Подготовка файла выгрузки.
  *

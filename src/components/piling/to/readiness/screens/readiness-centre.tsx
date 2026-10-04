@@ -10,7 +10,7 @@ import { buildHandoverJournal, handoverRoleLabel, type HandoverEventKind, type H
 import { isOpenRecord } from '../../to-stats';
 import type { AuthoritativeReadinessFactsDto, ReadinessShiftDto } from '../api/contracts';
 import { buildAuthoritativeReadinessPresentation, buildUnavailableReadinessPresentation, type AuthoritativeReadinessPresentation, type PresentationEvidence, type PresentationStage } from '../authoritative-presentation';
-import { EquipmentPhoto, ReadinessRing, STAGE_CTA, muted } from './shared';
+import { EquipmentPhoto, ReadinessRing, STAGE_CTA, muted, blockerTone, BLOCKER_TONE_CLASS, BLOCKER_TONE_LABEL } from './shared';
 import type { EquipmentDetailSnapshot, ReferenceUiProps, ReferenceView } from './types';
 
 const ROLE_FLOW = [
@@ -479,8 +479,20 @@ export function ReadinessCentre(props: ReferenceUiProps) {
   */
   const pendingStages = presentation.stages.filter((stage) => stage.state !== 'pass');
   const pendingSummary = pendingStages.map((stage) => `${stage.label} — ${stage.value.toLowerCase()}`).join('; ');
+  const topBlocker = presentation.blockers[0] ?? null;
+  /*
+    Блокер блокеру не равен: запрет пуска (`DENY_START`), возврат оператору
+    (`RETURN_TO_OPERATOR`) и «нужно подтверждение» (`REQUIRE_CONFIRMATION`) —
+    разные исходы. Раньше любой из них звался «критическим замечанием» и
+    красился красным, и подпись правила «нет осмотра за сегодня» читалась как
+    критический дефект. Тон берём из действия блокера.
+  */
+  const topTone = topBlocker ? BLOCKER_TONE_CLASS[blockerTone(topBlocker.action)] : null;
+  const hasBlockingDeny = presentation.blockers.some((notice) => blockerTone(notice.action) === 'critical');
   const recommendation = blockers > 0
-    ? 'Рекомендация: устранить критические замечания для допуска к работе.'
+    ? hasBlockingDeny
+      ? 'Рекомендация: устранить блокирующие условия для допуска к работе.'
+      : 'Рекомендация: закрыть условие допуска — требуется действие ответственного.'
     : warnings > 0
       ? 'Рекомендация: закрыть замечания до начала смены.'
       : presentation.status === 'READY'
@@ -817,14 +829,14 @@ export function ReadinessCentre(props: ReferenceUiProps) {
             )}
           </div>
           <div className="border-t border-border p-4">
-            <h3 className="flex items-center gap-2 font-bold"><AlertTriangle className="h-4 w-4 text-destructive-strong" />Критическое замечание</h3>
-            <div className="mt-3 flex items-center gap-3 rounded-lg border border-destructive/25 bg-destructive/10 p-3">
-              <AlertTriangle className="h-7 w-7 text-destructive-strong" />
+            <h3 className="flex items-center gap-2 font-bold"><AlertTriangle className={cn('h-4 w-4', topTone?.icon ?? 'text-muted-foreground')} />Что держит допуск</h3>
+            <div className={cn('mt-3 flex items-center gap-3 rounded-lg border p-3', topTone?.box ?? 'border-border bg-muted')}>
+              <AlertTriangle className={cn('h-7 w-7', topTone?.icon ?? 'text-muted-foreground')} />
               <div className="flex-1">
-                <div className="font-semibold">{presentation.blockers[0]?.label ?? (presentation.status === 'UNCONFIRMED' ? presentation.title : 'Критических замечаний не обнаружено')}</div>
-                <div className="mt-1 text-xs text-muted-foreground">{presentation.blockers[0]?.actionLabel ?? presentation.description}</div>
+                <div className="font-semibold">{topBlocker?.label ?? (presentation.status === 'UNCONFIRMED' ? presentation.title : 'Ничего не держит допуск')}</div>
+                <div className="mt-1 text-xs text-muted-foreground">{topBlocker?.actionLabel ?? presentation.description}</div>
               </div>
-              <span className="rounded border border-destructive px-2 py-1 text-xs text-destructive-strong">{blockers ? 'Критическое' : 'Нет блокеров'}</span>
+              <span className={cn('rounded border px-2 py-1 text-xs', topTone?.badge ?? 'border-border text-muted-foreground')}>{topBlocker ? BLOCKER_TONE_LABEL[blockerTone(topBlocker.action)] : 'Нет блокеров'}</span>
             </div>
           </div>
           <div className="flex flex-1 flex-col border-t border-border p-4">

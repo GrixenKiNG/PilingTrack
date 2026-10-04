@@ -8,7 +8,7 @@ import { formatDateTimeInTimezone } from '@/lib/timezone';
 import { cn } from '@/lib/utils';
 import { fetchReadinessDefects } from '../api/client';
 import type { DefectDto } from '../api/contracts';
-import { EquipmentPhoto } from './shared';
+import { EquipmentPhoto, blockerTone, BLOCKER_TONE_CLASS } from './shared';
 import type { ReferenceUiProps } from './types';
 import type { FleetGroup, FleetItem } from './fleet-workspace-model';
 
@@ -111,7 +111,12 @@ export function FleetEvidencePanel({ item, props }: { item: FleetItem; props: Re
       {section === 'basis' && <>
         <p className="mt-2 text-sm leading-relaxed">{presentation.description}</p>
         {(presentation.blockers.length > 0 || presentation.warnings.length > 0) && <ul className="mt-3 space-y-2 text-sm">
-          {presentation.blockers.map((notice, index) => <li key={`block-${index}`} className="flex gap-2 rounded-lg bg-destructive/10 p-3"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive-strong" /><span>{notice.label}</span></li>)}
+          {presentation.blockers.map((notice, index) => {
+            // Цвет по действию блокера: возврат оператору — не то же самое, что
+            // запрет пуска (см. блокер «нет осмотра за сегодня»).
+            const tone = BLOCKER_TONE_CLASS[blockerTone(notice.action)];
+            return <li key={`block-${index}`} className={cn('flex gap-2 rounded-lg p-3', tone.box)}><AlertTriangle className={cn('mt-0.5 h-4 w-4 shrink-0', tone.icon)} /><span>{notice.label}{notice.actionLabel && <span className="mt-0.5 block text-xs text-muted-foreground">{notice.actionLabel}</span>}</span></li>;
+          })}
           {presentation.warnings.map((notice, index) => <li key={`warning-${index}`} className="flex gap-2 rounded-lg bg-signal/10 p-3"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-signal-strong" /><span>{notice.label}</span></li>)}
         </ul>}
         <p className="mb-2 mt-4 text-xs font-semibold text-muted-foreground">Факты на момент оценки</p><p className="mb-3 text-xs leading-relaxed text-muted-foreground">Незавершённый пункт не всегда блокирует работу: это зависит от действующих правил оценки.</p>

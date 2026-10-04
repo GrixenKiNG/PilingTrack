@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CurrentReadinessDto } from '../api/contracts';
 import type { EquipmentOption } from '../../to-module-bits';
@@ -123,5 +123,31 @@ describe('Fleet evidence interactions', () => {
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Недостаточно прав'));
     expect(screen.queryByText(/В ответе журнала нет дефектов/)).not.toBeInTheDocument();
     expect(fetchDefects).toHaveBeenCalledWith(expect.any(AbortSignal), { equipmentId: 'rig-1' });
+  });
+});
+
+/**
+ * R141 №2: в панели все блокеры рисовались красным, хотя домен различает
+ * запрет пуска (`DENY_START`) и возврат оператору (`RETURN_TO_OPERATOR`) —
+ * второй это незакрытый шаг, а не критический дефект.
+ */
+describe('Панель парка: блокеры показаны по действию (R141 №2)', () => {
+  const withBlocker = (action: string, label: string, actionLabel: string) =>
+    snapshot('rig-1', { blockers: [{ condition: 'INSPECTION_BELOW_80', action, label, actionLabel }] });
+  const panelFor = () => within(screen.getByRole('complementary', { name: 'Подробности Установка 1' }));
+
+  it('возврат оператору не красится как запрет пуска', () => {
+    render(<FleetScreen {...propsFor({ currentReadiness: [withBlocker('RETURN_TO_OPERATOR', 'Нет осмотра за сегодня', 'Вернуть оператору')] })} />);
+
+    const item = panelFor().getByText('Нет осмотра за сегодня').closest('li');
+    expect(item).toHaveClass('bg-warning/10');
+    expect(item).not.toHaveClass('bg-destructive/10');
+    expect(panelFor().getByText('Вернуть оператору')).toBeInTheDocument();
+  });
+
+  it('запрет пуска остаётся красным', () => {
+    render(<FleetScreen {...propsFor({ currentReadiness: [withBlocker('DENY_START', 'Критический дефект гидравлики', 'Запретить запуск')] })} />);
+
+    expect(panelFor().getByText('Критический дефект гидравлики').closest('li')).toHaveClass('bg-destructive/10');
   });
 });

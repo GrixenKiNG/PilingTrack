@@ -9,8 +9,9 @@ import { kpiGridStyle } from '@/components/piling/kpi-tile';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAbility } from '@/lib/use-ability';
-import { formatDateTimeInTimezone, getTodayInTimezone } from '@/lib/timezone';
+import { formatDateInTimezone, formatDateTimeInTimezone, getTodayInTimezone } from '@/lib/timezone';
 import { cn } from '@/lib/utils';
+import { checkMaintenanceDue } from '@/lib/maintenance-due';
 import { PRIORITY_LABEL, STATUS_LABEL, type MaintenancePriority, type MaintenanceStatus } from '@/components/piling/maintenance/maintenance-labels';
 import type { MaintenanceSummary } from '../../readiness-design-views';
 import { DefectsPanel } from './defects-panel';
@@ -149,29 +150,50 @@ export function MaintenanceScreen(props: ReferenceUiProps) {
             */}
             <div className="mt-2 divide-y divide-border">
               {props.equipment
-                .map((item) => ({
-                  item,
-                  left: item.nextMaintenanceAtHours != null
+                .map((item) => {
+                  /*
+                    Срок считаем тем же помощником, что и факт готовности
+                    (`checkMaintenanceDue`), а не только по моточасам. Раньше
+                    машина, просроченная по дате, стояла здесь зелёной с
+                    подписью «ТО через N м/ч», а на доске была «Просрочено на
+                    N дн.» — два экрана говорили о сроке разное.
+                  */
+                  const due = checkMaintenanceDue({
+                    nextMaintenanceDate: item.nextMaintenanceDate,
+                    nextMaintenanceAtHours: item.nextMaintenanceAtHours,
+                    engineHoursTotal: item.engineHoursTotal,
+                  });
+                  const left = item.nextMaintenanceAtHours != null
                     ? item.nextMaintenanceAtHours - (item.engineHoursTotal ?? 0)
-                    : null,
-                }))
-                .sort((left, right) => (left.left ?? Number.POSITIVE_INFINITY) - (right.left ?? Number.POSITIVE_INFINITY))
+                    : null;
+                  // Просроченные — вверх, затем «на подходе», затем остальные.
+                  const rank = due.overdue ? 0 : due.soon ? 1 : 2;
+                  return { item, due, left, rank };
+                })
+                .sort((left, right) => left.rank - right.rank
+                  || (left.left ?? Number.POSITIVE_INFINITY) - (right.left ?? Number.POSITIVE_INFINITY))
                 .slice(0, 5)
-                .map(({ item, left }) => {
-                  const overdue = left != null && left <= 0;
-                  const soon = left != null && left > 0 && left <= MAINTENANCE_SOON_HOURS;
+                .map(({ item, due, left }) => {
+                  const overdue = due.overdue;
+                  const soon = due.soon || (left != null && left > 0 && left <= MAINTENANCE_SOON_HOURS);
                   const progress = left != null && item.nextMaintenanceAtHours
                     ? Math.min(100, Math.max(0, (item.engineHoursTotal ?? 0) / item.nextMaintenanceAtHours * 100))
                     : 0;
+                  const label = due.overdueDays != null || due.overdueHours != null
+                    ? [
+                        due.overdueDays != null ? `просрочено по дате ${due.overdueDays} дн.` : null,
+                        due.overdueHours != null ? `перепробег ${due.overdueHours.toLocaleString('ru-RU')} м/ч` : null,
+                      ].filter(Boolean).join(' · ')
+                    : left != null
+                      ? left > 0 ? `ТО через ${left.toLocaleString('ru-RU')} м/ч` : `Перепробег ${Math.abs(left).toLocaleString('ru-RU')} м/ч`
+                      : item.nextMaintenanceDate ? `ТО до ${formatDateInTimezone(item.nextMaintenanceDate, timezone)}` : 'Регламент не задан';
                   return (
                     <div key={item.id} className="flex items-center gap-2 py-2">
                       <EquipmentPhoto cardData={props.fleetCards.find((entry) => entry.id === item.id)} name={item.name} className="h-8 w-8 shrink-0" />
                       <div className="min-w-0 flex-1">
                         <div className="truncate text-2xs font-semibold">{item.name}</div>
                         <div className={cn('text-3xs', overdue ? 'font-semibold text-destructive-strong' : soon ? 'font-semibold text-signal-strong' : 'text-muted-foreground')}>
-                          {left == null
-                            ? 'Регламент не задан'
-                            : overdue ? `Перепробег ${Math.abs(left).toLocaleString('ru-RU')} м/ч` : `ТО через ${left.toLocaleString('ru-RU')} м/ч`}
+                          {label}
                         </div>
                         <div className="mt-1 h-1 overflow-hidden rounded-full bg-border">
                           <div className={cn('h-full rounded-full', overdue ? 'bg-destructive-strong' : soon ? 'bg-signal' : 'bg-success-strong')} style={{ width: `${progress}%` }} />

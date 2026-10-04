@@ -11,6 +11,14 @@ import type {
 export interface PresentationNotice {
   code: string;
   label: string;
+  /**
+   * Действие блокера: `DENY_START` (запрет), `RETURN_TO_OPERATOR` (возврат
+   * оператору), `REQUIRE_CONFIRMATION` (нужно подтверждение). Экраны красят
+   * блокер по нему: «нет осмотра за сегодня» — незакрытый шаг, а не
+   * критический дефект, и красным, как запрет, его показывать нельзя.
+   * `null` — у снимков без поля; тогда блокер считаем строгим.
+   */
+  action: string | null;
   actionLabel: string | null;
 }
 
@@ -145,6 +153,7 @@ function notices(value: unknown, warning = false): PresentationNotice[] | null {
     result.push({
       code,
       label,
+      action: typeof item.action === 'string' ? item.action : null,
       actionLabel: typeof item.actionLabel === 'string' ? item.actionLabel : null,
     });
   }

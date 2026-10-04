@@ -215,3 +215,41 @@ describe('Отчёты: готовность парка с запятой (R129 
     expect(screen.queryByText('87.5%')).not.toBeInTheDocument();
   });
 });
+
+/**
+ * R141 №2: любой активный блокер звался «критическим замечанием» и красился
+ * красным. Для блокера «нет осмотра за сегодня» (действие `RETURN_TO_OPERATOR`)
+ * это незакрытый шаг, а не критический дефект. Панель нейтральна, тон — по
+ * действию блокера, и запрет пуска (`DENY_START`) отличается от возврата.
+ */
+describe('Центр готовности: блокер показан по действию, а не всё «критическим» (R141 №2)', () => {
+  const snapshotWithBlocker = (action: string, label: string, actionLabel: string): CurrentReadinessDto => ({
+    snapshotId: 'snap-eq-1', equipmentId: 'eq-1', status: 'BLOCKED', verdict: 'RETURN_TO_OPERATOR', score: 60,
+    calculatedAt: '2026-10-01T06:00:00.000Z', ruleSetVersion: 'v1', triggerType: null,
+    blockers: [{ condition: 'INSPECTION_BELOW_80', action, label, actionLabel }],
+    warnings: [],
+    facts: { inspectionCompleted: false, inspectionProgress: 0, healthScore: 50, meterKnown: true,
+      permitValid: null, permitExpired: false, maintenanceConfigured: true,
+      maintenanceOverdueHours: 0, maintenanceOverdueDays: 0, accepted: true, criticalDefect: false, findings: 0 },
+    evidence: { equipmentId: 'eq-1', inspectionId: null, permitId: null, maintenanceRecordIds: [], evaluatedAt: '2026-10-01T06:00:00.000Z' },
+  });
+
+  it('возврат оператору — не «критическое»: нейтральный заголовок и рекомендация без «критических замечаний»', () => {
+    render(<ReadinessCentre {...propsFor({ currentReadiness: [snapshotWithBlocker('RETURN_TO_OPERATOR', 'Нет осмотра за сегодня', 'Вернуть оператору')] })} />);
+
+    expect(screen.getByText('Что держит допуск')).toBeInTheDocument();
+    expect(screen.getByText('Нет осмотра за сегодня')).toBeInTheDocument();
+    expect(screen.getAllByText('Вернуть оператору').length).toBeGreaterThan(0);
+    expect(screen.queryByText('Критическое замечание')).not.toBeInTheDocument();
+    expect(screen.queryByText('Критическое')).not.toBeInTheDocument();
+    expect(screen.getByText('Рекомендация: закрыть условие допуска — требуется действие ответственного.')).toBeInTheDocument();
+  });
+
+  it('запрет пуска (DENY_START) остаётся критическим и в тексте, и в плашке', () => {
+    render(<ReadinessCentre {...propsFor({ currentReadiness: [snapshotWithBlocker('DENY_START', 'Критический дефект', 'Запретить запуск')] })} />);
+
+    expect(screen.getByText('Критический дефект')).toBeInTheDocument();
+    expect(screen.getByText('Критическое')).toBeInTheDocument();
+    expect(screen.getByText('Рекомендация: устранить блокирующие условия для допуска к работе.')).toBeInTheDocument();
+  });
+});
