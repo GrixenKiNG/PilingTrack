@@ -170,16 +170,6 @@ const parseView = (value: string | null, surface: ModuleSurface): ReferenceView 
 const parseSettingsSection = (value: string | null): SettingsSection =>
   value && SETTINGS_IDS.has(value as SettingsSection) ? value as SettingsSection : 'rules';
 
-async function readOptionalJson<T>(url: string): Promise<T | null> {
-  try {
-    const response = await authFetch(url);
-    if (!response.ok) return null;
-    return await response.json() as T;
-  } catch {
-    return null;
-  }
-}
-
 interface WorkspaceIssue {
   source: string;
   message: string;
@@ -288,6 +278,12 @@ export function ToModule({ surface = 'readiness' }: { surface?: ModuleSurface } 
   const [equipmentId, setEquipmentId] = useState('');
   const [journals, setJournals] = useState<Record<string, JournalRecord[]>>({});
   const [journalLoaded, setJournalLoaded] = useState<Record<string, boolean>>({});
+  // Какие источники выбранной установки уже спрашивали (журнал/карточка).
+  // Отдельно от «загружено»: отказ — это тоже попытка, и без такой отметки
+  // эффект догрузки зациклился бы на повторных запросах к упавшему источнику.
+  const [loadAttempts, setLoadAttempts] = useState<
+    Record<string, { journal: boolean; card: boolean }>
+  >({});
   const [crews, setCrews] = useState<CrewSummary[]>([]);
   const [maintenance, setMaintenance] = useState<MaintenanceSummary[]>([]);
   const [fleetCards, setFleetCards] = useState<FleetCard[]>([]);
@@ -554,6 +550,10 @@ export function ToModule({ surface = 'readiness' }: { surface?: ModuleSurface } 
       setDetails(primaryDetail.data ? { [primaryEquipment.id]: primaryDetail.data } : {});
       setJournals({ [primaryEquipment.id]: primaryJournal.data?.records ?? [] });
       setJournalLoaded({ [primaryEquipment.id]: primaryJournal.data != null });
+      // Первичный путь уже спросил (или осознанно не стал спрашивать) оба
+      // источника выбранной установки — отмечаем, чтобы эффект догрузки не
+      // повторил упавший запрос и не задвоил сообщение об ошибке.
+      setLoadAttempts({ [primaryEquipment.id]: { journal: true, card: true } });
       setLoading(false);
 
     } catch (error) {
@@ -592,29 +592,59 @@ export function ToModule({ surface = 'readiness' }: { surface?: ModuleSurface } 
   // Догрузка журнала и карточки при выборе установки. Права те же, что и при
   // первой загрузке: без них экран снова спрашивал бы у мастера то, что ему
   // не положено, и получал 403 — а пустой журнал читался бы как «записей нет».
+  //
+  // Источники считаем порознь (R151 №2/№5): раньше «удалась любая половина»
+  // закрывала обе, и упавшая карточка при живом журнале больше не
+  // перезапрашивалась. Удачу и отказ тоже разводим: `journalLoaded` ставится
+  // по полученным данным, а не по факту запроса, — иначе 500/403 на журнале
+  // читался бы как «журнал пуст». Отметка «спрашивали» не даёт эффекту
+  // зациклиться на отказе: новый запрос — только после действия пользователя,
+  // а полная перезагрузка сбрасывает отметки.
   useEffect(() => {
     const actor = bootstrap?.actor;
-    if (!equipmentId || !actor || journalLoaded[equipmentId] || details[equipmentId]) return;
+    if (!equipmentId || !actor) return;
     if (resolveEffectiveRole(actor.role, actor.actingAs) === 'OPERATOR') return;
     const mayReadJournal = can(actor, 'maintenance.manage');
     const mayReadCard = can(actor, 'equipment.read');
-    if (!mayReadJournal && !mayReadCard) return;
+    const attempted = loadAttempts[equipmentId] ?? { journal: false, card: false };
+    const needJournal = mayReadJournal && journalLoaded[equipmentId] !== true && !attempted.journal;
+    const needCard = mayReadCard && details[equipmentId] === undefined && !attempted.card;
+    if (!needJournal && !needCard) return;
+    const name = equipment.find((item) => item.id === equipmentId)?.name ?? equipmentId;
     let active = true;
     void Promise.all([
-      mayReadJournal
-        ? readOptionalJson<{ records?: JournalRecord[] }>(`/api/to/journal?equipmentId=${encodeURIComponent(equipmentId)}`)
-        : Promise.resolve(null),
-      mayReadCard
-        ? readOptionalJson<EquipmentDetailSnapshot>(`/api/equipment/${encodeURIComponent(equipmentId)}/details`)
-        : Promise.resolve(null),
+      needJournal
+        ? readOptionalJsonWithIssue<{ records?: JournalRecord[] }>(
+            `/api/to/journal?equipmentId=${encodeURIComponent(equipmentId)}`,
+            `Журнал «${name}»`,
+          )
+        : Promise.resolve({ data: null, issue: null }),
+      needCard
+        ? readOptionalJsonWithIssue<EquipmentDetailSnapshot>(
+            `/api/equipment/${encodeURIComponent(equipmentId)}/details`,
+            `Карточка «${name}»`,
+          )
+        : Promise.resolve({ data: null, issue: null }),
     ]).then(([journal, detail]) => {
       if (!active) return;
-      setJournals((previous) => ({ ...previous, [equipmentId]: journal?.records ?? [] }));
-      setJournalLoaded((previous) => ({ ...previous, [equipmentId]: true }));
-      if (detail) setDetails((previous) => ({ ...previous, [equipmentId]: detail }));
+      setLoadAttempts((previous) => ({
+        ...previous,
+        [equipmentId]: { journal: true, card: true },
+      }));
+      if (needJournal) {
+        setJournals((previous) => ({ ...previous, [equipmentId]: journal.data?.records ?? [] }));
+        setJournalLoaded((previous) => ({ ...previous, [equipmentId]: journal.data != null }));
+      }
+      const nextDetail = detail.data;
+      if (needCard && nextDetail) {
+        setDetails((previous) => ({ ...previous, [equipmentId]: nextDetail }));
+      }
+      const issues = [journal.issue, detail.issue]
+        .filter((issue): issue is WorkspaceIssue => issue !== null);
+      if (issues.length > 0) setWorkspaceIssues((previous) => [...previous, ...issues]);
     });
     return () => { active = false; };
-  }, [bootstrap?.actor, details, equipmentId, journalLoaded]);
+  }, [bootstrap?.actor, details, equipment, equipmentId, journalLoaded, loadAttempts]);
 
   const readinessByEquipment = useMemo(() => {
     // Карточка парка собирается из авторитетного снимка целиком.

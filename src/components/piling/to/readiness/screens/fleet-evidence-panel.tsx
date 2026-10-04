@@ -47,6 +47,10 @@ export function FleetEvidencePanel({ item, props }: { item: FleetItem; props: Re
   const maintenanceUnavailable = props.outOfRoleSources.includes('Обслуживание и журнал ТО');
   const detailError = props.workspaceIssues.find((issue) => issue.source === `Карточка «${equipment.name}»`);
   const maintenanceError = props.workspaceIssues.find((issue) => issue.source === 'Обслуживание');
+  // Отказ догрузки журнала выбранной установки — отдельный от отказа карточки
+  // источник. Раньше он нигде не показывался, и пустой журнал читался как
+  // «записей нет» (R151 №3).
+  const journalError = props.workspaceIssues.find((issue) => issue.source === `Журнал «${equipment.name}»`);
   const records = props.maintenance.filter((record) => record.equipment?.id === equipment.id);
   const inspectionEvidence = presentation.evidence.find((evidence) => evidence.key === 'inspection');
   const inspection = detail?.latestInspection;
@@ -178,7 +182,7 @@ export function FleetEvidencePanel({ item, props }: { item: FleetItem; props: Re
           <p className="mt-2">Следующее ТО: {detail.equipment?.nextMaintenanceAtHours?.toLocaleString('ru-RU') ?? 'не задано'} ч</p>
           <p className="mt-2">По дате: {date(detail.equipment?.nextMaintenanceDate)}</p>
         </div>}
-        {maintenanceUnavailable ? <p>Журнал ТО недоступен текущей роли.</p> : maintenanceError ? <p role="alert">{maintenanceError.message}</p> : records.length ? records.map((record) => <article key={record.id} className="rounded-lg border border-border p-3">
+        {maintenanceUnavailable ? <p>Журнал ТО недоступен текущей роли.</p> : maintenanceError ? <p role="alert">{maintenanceError.message}</p> : journalError ? <p role="alert">{journalError.message}</p> : records.length ? records.map((record) => <article key={record.id} className="rounded-lg border border-border p-3">
           <p className="font-semibold">{record.title}</p><p className="mt-1">{RECORD_STATUS[record.status] ?? record.status}</p>
           <p className="mt-1 text-xs text-muted-foreground">Создано: {date(record.createdAt)}</p>
           <FleetSourceLink href={`/admin/maintenance/${record.id}`}>Открыть эту запись</FleetSourceLink>

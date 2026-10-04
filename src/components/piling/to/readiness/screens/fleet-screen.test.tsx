@@ -125,6 +125,31 @@ describe('Fleet evidence interactions', () => {
     expect(screen.queryByText(/В ответе журнала нет дефектов/)).not.toBeInTheDocument();
     expect(fetchDefects).toHaveBeenCalledWith(expect.any(AbortSignal), { equipmentId: 'rig-1' });
   });
+  /**
+   * F-N1004-SELECTED-SOURCES (R151 №3): отказ догрузки журнала выбранной
+   * установки должен быть виден в панели, а не выдаваться за пустой журнал.
+   */
+  it('shows the journal load failure for the selected machine instead of an empty journal', () => {
+    render(<FleetScreen {...propsFor({ workspaceIssues: [
+      { source: 'Журнал «Установка 1»', message: 'Источник временно недоступен (код 500).' },
+    ] })} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Обслуживание' }));
+    expect(screen.getByRole('alert')).toHaveTextContent('Источник временно недоступен (код 500).');
+    expect(screen.queryByText(/В загруженном журнале нет записей/)).not.toBeInTheDocument();
+  });
+  /**
+   * F-N1004-SELECTED-SOURCES: отказ загрузки карточки выбранной установки
+   * показывается её причиной, а не общей подсказкой «подробности ещё не
+   * получены».
+   */
+  it('shows the card load failure reason for the selected machine', () => {
+    render(<FleetScreen {...propsFor({ details: {}, workspaceIssues: [
+      { source: 'Карточка «Установка 1»', message: 'Недостаточно прав для загрузки данных.' },
+    ] })} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Документы' }));
+    expect(screen.getByText('Недостаточно прав для загрузки данных.')).toBeInTheDocument();
+    expect(screen.queryByText(/Подробности установки ещё не получены/)).not.toBeInTheDocument();
+  });
 });
 
 /**

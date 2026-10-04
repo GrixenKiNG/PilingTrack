@@ -17,6 +17,7 @@ import {
 
 const mocks = vi.hoisted(() => ({
   authFetch: vi.fn(),
+  deriveEquipmentReadiness: vi.fn(),
 }));
 
 vi.mock('@/lib/api', () => ({ authFetch: mocks.authFetch }));
@@ -33,9 +34,7 @@ vi.mock('@/modules/readiness', () => ({
   computeReadinessScore: vi.fn(() => ({ score: 0 })),
 }));
 vi.mock('@/components/piling/to/readiness-model', () => ({
-  deriveEquipmentReadiness: vi.fn((equipment: { id: string }) => ({
-    equipmentId: equipment.id,
-  })),
+  deriveEquipmentReadiness: mocks.deriveEquipmentReadiness,
 }));
 vi.mock('@/components/piling/to/readiness-reference-ui', () => ({
   ReadinessReferenceUi: (props: {
@@ -45,8 +44,12 @@ vi.mock('@/components/piling/to/readiness-reference-ui', () => ({
     onViewChange: (view: string) => void;
     onSettingsSectionChange: (section: string) => void;
     onSelect: (id: string) => void;
+    onRetry: () => void;
     authoritativeReadinessError: string | null;
     readinessHistoryError: string | null;
+    workspaceIssues: Array<{ source: string; message: string }>;
+    journals: Record<string, unknown>;
+    details: Record<string, unknown>;
   }) => (
     <section
       data-testid="reference-ui"
@@ -55,6 +58,9 @@ vi.mock('@/components/piling/to/readiness-reference-ui', () => ({
       data-equipment={props.selectedId}
       data-authoritative-error={props.authoritativeReadinessError ?? ''}
       data-history-error={props.readinessHistoryError ?? ''}
+      data-issues={props.workspaceIssues.map((issue) => issue.source).join('|')}
+      data-journals={Object.keys(props.journals).join(',')}
+      data-details={Object.keys(props.details).join(',')}
     >
       <button type="button" onClick={() => props.onViewChange('reports')}>
         Open reports
@@ -67,6 +73,9 @@ vi.mock('@/components/piling/to/readiness-reference-ui', () => ({
       </button>
       <button type="button" onClick={() => props.onSelect('equipment-2')}>
         Select second equipment
+      </button>
+      <button type="button" onClick={() => props.onRetry()}>
+        Retry
       </button>
     </section>
   ),
@@ -170,6 +179,10 @@ describe('ToModule production shell integration', () => {
     mocks.authFetch.mockImplementation(
       async (url: string, options?: RequestInit) => responseFor(url, options),
     );
+    mocks.deriveEquipmentReadiness.mockReset();
+    mocks.deriveEquipmentReadiness.mockImplementation((equipment: { id: string }) => ({
+      equipmentId: equipment.id,
+    }));
   });
 
   afterEach(() => {
@@ -338,6 +351,103 @@ describe('ToModule production shell integration', () => {
     const referenceUi = screen.getByTestId('reference-ui');
     expect(referenceUi.getAttribute('data-authoritative-error')).toBeTruthy();
     expect(referenceUi).toHaveAttribute('data-history-error', '');
+  }, 30_000);
+
+  /**
+   * F-N1004-SELECTED-SOURCES (R151 №2/№3): догрузка журнала и карточки
+   * выбранной после первой загрузки установки глушила отказ источника —
+   * `journalLoaded` ставился безусловно, а сообщения об ошибке не писались.
+   * Проверяем, что при отказе журнала удавшаяся карточка сохраняется, отказ
+   * виден как WorkspaceIssue, а журнал не выдаётся за загруженный.
+   */
+  it('частичный отказ догрузки виден и не стирает удавшуюся половину (F-N1004-SELECTED-SOURCES)', async () => {
+    mocks.authFetch.mockImplementation(async (url: string, options?: RequestInit) => {
+      if (url.startsWith('/api/to/journal?equipmentId=equipment-2')) {
+        return jsonResponse({ error: 'Журнал недоступен' }, 500);
+      }
+      if (url.startsWith('/api/equipment/equipment-2/details')) {
+        return jsonResponse({ equipment: { id: 'equipment-2', name: 'Rig 2' } });
+      }
+      return responseFor(url, options);
+    });
+
+    await renderToModule('/admin/to');
+    fireEvent.click(screen.getByRole('button', { name: 'Select second equipment' }));
+
+    const referenceUi = await waitFor(() => {
+      const element = screen.getByTestId('reference-ui');
+      expect(element).toHaveAttribute('data-equipment', 'equipment-2');
+      expect(element.getAttribute('data-issues')).toContain('Журнал «Rig 2»');
+      return element;
+    });
+    // Удавшаяся карточка сохранена — отказ журнала её не стёр.
+    expect(referenceUi.getAttribute('data-details')).toContain('equipment-2');
+    // Успешный источник ошибкой не помечен.
+    expect(referenceUi.getAttribute('data-issues')).not.toContain('Карточка «Rig 2»');
+    // Отказ журнала не выдан за пустой журнал: производная оценка видит «не загружен».
+    const journalCalls = mocks.deriveEquipmentReadiness.mock.calls
+      .filter(([item]) => (item as { id: string }).id === 'equipment-2');
+    expect(journalCalls.at(-1)?.[2]).toBe(false);
+  }, 30_000);
+
+  /**
+   * F-N1004-SELECTED-SOURCES: полная перезагрузка («Повторить») должна
+   * восстановить отказавший источник выбранной установки — она сбрасывает
+   * отметки попыток и снова читает журнал.
+   */
+  it('повтор загрузки восстанавливает отказавший источник (F-N1004-SELECTED-SOURCES)', async () => {
+    let journalFails = true;
+    mocks.authFetch.mockImplementation(async (url: string, options?: RequestInit) => {
+      if (url.startsWith('/api/to/journal?equipmentId=equipment-2')) {
+        return journalFails
+          ? jsonResponse({ error: 'Журнал недоступен' }, 500)
+          : jsonResponse({ records: [] });
+      }
+      return responseFor(url, options);
+    });
+
+    await renderToModule('/admin/to');
+    fireEvent.click(screen.getByRole('button', { name: 'Select second equipment' }));
+    await waitFor(() => {
+      expect(screen.getByTestId('reference-ui').getAttribute('data-issues')).toContain('Журнал «Rig 2»');
+    });
+
+    journalFails = false;
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    await waitFor(() => {
+      expect(screen.getByTestId('reference-ui').getAttribute('data-issues') ?? '').not.toContain('Журнал «Rig 2»');
+    });
+  }, 30_000);
+
+  /**
+   * F-N1004-SELECTED-SOURCES: источник, закрытый ролью, при догрузке не
+   * запрашивается вовсе — как и при первой загрузке. Иначе мастер получал бы
+   * 403 на ровном месте, а отказ читался бы как «данных нет».
+   */
+  it('источник, недоступный роли, при догрузке не запрашивается (F-N1004-SELECTED-SOURCES)', async () => {
+    mocks.authFetch.mockImplementation(async (url: string, options?: RequestInit) => {
+      if (url === '/api/readiness/bootstrap') {
+        const requestId = new Headers(options?.headers).get('x-request-id') ?? 'request-test';
+        const envelope = bootstrapEnvelope(requestId);
+        // Мастеру не положены ни журнал ТО, ни карточка установки.
+        envelope.data.actor.role = 'FOREMAN';
+        envelope.data.selectors.equipment = equipment
+          .filter((item) => item.id !== 'equipment-foreign')
+          .map(({ id, name, model }) => ({ id, name, model }));
+        envelope.data.counts.equipment = envelope.data.selectors.equipment.length;
+        return jsonResponse(envelope, 200, requestId);
+      }
+      return responseFor(url, options);
+    });
+
+    await renderToModule('/admin/to');
+    fireEvent.click(screen.getByRole('button', { name: 'Select second equipment' }));
+    await waitFor(() => {
+      expect(screen.getByTestId('reference-ui')).toHaveAttribute('data-equipment', 'equipment-2');
+    });
+
+    const requested = mocks.authFetch.mock.calls.map(([url]) => String(url));
+    expect(requested.some((url) => url.includes('equipment-2'))).toBe(false);
   }, 30_000);
 });
 
