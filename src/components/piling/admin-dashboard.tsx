@@ -450,7 +450,13 @@ export function AdminDashboard() {
                 ? <Empty text="Не удалось загрузить парк установок. Обновите сводку." tone="warning" />
                 : <Empty text="По выбранным фильтрам установок нет" />
             ) : canReadEquipment ? (
-              <div className="grid gap-2 p-3 sm:grid-cols-2">
+              /* F-R126-2: у плитки установки прямые потомки — `div.truncate`
+                 (white-space: nowrap) без min-w-0, поэтому её min-content
+                 ширина = ширина текста. Плитка становилась шире колонки, а
+                 Section с overflow-hidden срезал правый край вместе с бейджем
+                 статуса («Требует ТО», «Ждём отчёт»). [&>*]:min-w-0 — как на
+                 соседней сетке план-факта выше. */
+              <div className="grid gap-2 p-3 sm:grid-cols-2 [&>*]:min-w-0">
                 {fleetRows.map((r) => (
                   <RigTile key={r.id} r={r} status={rigStatus(r)} onOpen={() => router.push(`/admin/equipment/${r.id}`)} />
                 ))}

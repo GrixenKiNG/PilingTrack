@@ -79,6 +79,48 @@ describe('AdminDashboard: сбой аналитики не уносит весь
 });
 
 /**
+ * F-R126-2: в секции «Парк установок» плитка шире колонки — прямые потомки
+ * кнопки `div.truncate` (white-space: nowrap) задавали её min-content ширину
+ * по длине текста, а `Section` с `overflow-hidden` срезал правый край вместе с
+ * бейджем статуса («Требует ТО», «Ждём отчёт»). На 375 px диспетчер не видел,
+ * какую установку отправлять на ТО. Правка — `[&>*]:min-w-0` на сетке плиток,
+ * как на соседней сетке план-факта.
+ */
+describe('AdminDashboard: плитки парка не шире колонки (F-R126-2)', () => {
+  const fleetWithRig = {
+    totals: { ...fleet.totals, totalEquipment: 1, expected: 1 },
+    equipment: [{
+      id: 'eq-1', name: 'СП-49', model: 'Liebherr LRH 100', status: 'expected' as const,
+      assignedSiteName: 'Объект №1', assignedOperatorName: 'Иванов И.', assignedCrewName: 'Бригада №1',
+      engineHoursTotal: 1200, nextMaintenanceAtHours: 1250,
+      todayTotals: null, latestReport: null,
+    }],
+  };
+
+  beforeEach(() => {
+    mocks.authFetch.mockReset();
+    mocks.authFetch.mockImplementation((url: string) => {
+      if (url.startsWith('/api/analytics/sites')) return Promise.resolve(json({ analytics: [] }));
+      if (url.startsWith('/api/monitoring/fleet')) return Promise.resolve(json(fleetWithRig));
+      if (url.startsWith('/api/maintenance')) return Promise.resolve(json({ records: [] }));
+      if (url.startsWith('/api/reports/recent')) return Promise.resolve(json({ reports: [] }));
+      if (url.startsWith('/api/sites/all')) return Promise.resolve(json({ sites: [] }));
+      return Promise.resolve(json({}));
+    });
+  });
+
+  it('сетка плиток установок даёт плиткам min-w-0 — бейдж статуса не уходит за край', async () => {
+    render(<AdminDashboard />);
+
+    // Плитка установки с бейджем статуса отрисовалась.
+    expect(await screen.findByText('Ждём отчёт')).toBeInTheDocument();
+
+    const grid = screen.getByText('Ждём отчёт').closest('div.grid');
+    expect(grid).toHaveClass('[&>*]:min-w-0');
+  });
+});
+
+/**
  * F-R109-2: справочник объектов читался один раз при монтировании, и при сбое
  * `/api/sites/all` блок оставался пустым навсегда — фильтр «Объект» выглядел
  * как «объектов в системе нет». Теперь в блоке видно «Объекты не загрузились»
