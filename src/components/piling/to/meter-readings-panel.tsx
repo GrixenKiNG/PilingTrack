@@ -62,7 +62,6 @@ export function MeterReadingsPanel({
       if (!res.ok && res.status !== 404) {
         setReadings([]);
         setLoadError(loadFailureText(res.status));
-        toast.error('Не удалось загрузить показания');
         return [];
       }
       const body = res.ok
@@ -75,7 +74,6 @@ export function MeterReadingsPanel({
     } catch {
       setReadings([]);
       setLoadError(loadFailureText(null));
-      toast.error('Не удалось загрузить показания');
       return [];
     } finally {
       setLoading(false);

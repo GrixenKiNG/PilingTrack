@@ -249,7 +249,6 @@ export function useReportsData(): UseReportsDataReturn {
           setHasMore(false);
           setServerSums(null);
           setNextCursor(null);
-          toast.error('Ошибка загрузки отчётов');
         }
       } catch (error) {
         if (isMounted && !(error instanceof Error && error.name === 'AbortError')) {
@@ -258,7 +257,6 @@ export function useReportsData(): UseReportsDataReturn {
           setHasMore(false);
           setServerSums(null);
           setNextCursor(null);
-          toast.error('Ошибка загрузки отчётов');
         }
       } finally {
         if (isMounted) {

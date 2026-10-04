@@ -263,3 +263,27 @@ describe('AdminDlq: истёкшая сессия (F-R133 №11)', () => {
     ).not.toBeInTheDocument();
   });
 });
+
+/**
+ * R135 №14: при сбое загрузки экран рисовал красный баннер ошибки и
+ * одновременно зелёное «Недоставленных событий нет» с галочкой — человек
+ * читал «всё в порядке» рядом с ошибкой. Ветки должны быть взаимоисключающими.
+ */
+describe('AdminDlq: сбой загрузки не выдаёт себя за «событий нет» (R135 №14)', () => {
+  beforeEach(() => {
+    mocks.authFetch.mockReset();
+  });
+
+  it('при 500 нет зелёного «Недоставленных событий нет»', async () => {
+    mocks.authFetch.mockResolvedValue(json({}, 500));
+    render(<AdminDlq />);
+
+    expect(
+      await screen.findByText('Сервер не смог отдать очередь недоставленных событий. Попробуйте обновить.'),
+    ).toBeInTheDocument();
+    // Скелет держится минимум 250 мс (`useMinSkeletonDuration`), а зелёная
+    // ветка рисуется только после него — без паузы проверка прошла бы вслепую.
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 300)); });
+    expect(screen.queryByText('Недоставленных событий нет')).not.toBeInTheDocument();
+  });
+});

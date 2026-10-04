@@ -223,13 +223,13 @@ export function AdminDlq() {
             <Skeleton key={i} className="h-20 w-full" />
           ))}
         </div>
-      ) : entries.length === 0 ? (
+      ) : entries.length === 0 && !loadError ? (
         <div className="text-center py-16">
           <CheckCircle2 className="w-12 h-12 text-success/40 mx-auto mb-3" />
           <p className="text-sm text-muted-foreground">Недоставленных событий нет</p>
           <p className="text-xs text-muted-foreground mt-1">Нет событий со статусом «{STATUS_FILTERS.find(f=>f.key===status)?.label}»</p>
         </div>
-      ) : (
+      ) : entries.length === 0 ? null : (
         <div className="space-y-2">
           {entries.map((entry, index) => (
             <motion.div

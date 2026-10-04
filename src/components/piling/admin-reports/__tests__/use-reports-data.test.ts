@@ -218,3 +218,30 @@ describe('useReportsData — 401 против 5xx (F-R133 №8)', () => {
     expect(result.current.errorForbidden).toBe(false);
   });
 });
+
+/**
+ * R135 №5: сбой чтения списка показывался дважды — тостом «Ошибка загрузки
+ * отчётов» и красным баннером с «Повторить». Тост убран: причина и повтор
+ * остаются в баннере.
+ */
+describe('useReportsData — сбой чтения не дублируется тостом (R135 №5)', () => {
+  beforeEach(() => {
+    authFetchMock.mockReset();
+    vi.mocked(toast.error).mockClear();
+  });
+
+  it('500 на списке → error есть, тоста «Ошибка загрузки отчётов» нет', async () => {
+    authFetchMock.mockImplementation((url: string) => {
+      if (url.startsWith('/api/reports')) {
+        return Promise.resolve({ ok: false, status: 500, json: async () => ({}) });
+      }
+      return Promise.resolve(okJson({ sites: [], users: [] }));
+    });
+
+    const { result } = renderHook(() => useReportsData());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    expect(result.current.error).toBe('Не удалось загрузить отчёты. Сервер вернул ошибку.');
+    expect(toast.error).not.toHaveBeenCalledWith('Ошибка загрузки отчётов');
+  });
+});
