@@ -217,4 +217,25 @@ describe('readinessFactsFromSnapshot', () => {
     // Снимка для установки нет вовсе — тоже без балла.
     expect(authoritativeFactsForEquipment([strict], 'missing')).toBeNull();
   });
+
+  /*
+    F-N1004-PREVIEW-STATE: предпросмотр читал факты из любого снимка, не
+    проверяя, признаёт ли его авторитетный экран. Снимок с валидными фактами,
+    но испорченным доказательством «Центр готовности» отвергает
+    («Авторитетная оценка недоступна»), а настройки показывали балл по тем же
+    фактам — два экрана по одному снимку давали противоположный ответ.
+  */
+  it('не даёт балл по снимку, который авторитетный экран отвергает как непригодный', () => {
+    const broken = snapshot({equipmentId: 'broken', evidence: []});
+    expect(buildAuthoritativeReadinessPresentation(broken).mode).toBe('malformed');
+    // Факты в снимке валидны — если бы мы смотрели только на них, балл бы вышел.
+    expect(broken.facts).toMatchObject({accepted: true, criticalDefect: false});
+    expect(authoritativeFactsForEquipment([broken], 'broken')).toBeNull();
+  });
+
+  it('считает по пригодному авторитетному снимку, когда его принимает авторитетный экран', () => {
+    const accepted = snapshot({equipmentId: 'ok'});
+    expect(buildAuthoritativeReadinessPresentation(accepted).mode).toBe('authoritative');
+    expect(authoritativeFactsForEquipment([accepted], 'ok')).toMatchObject({accepted: true});
+  });
 });

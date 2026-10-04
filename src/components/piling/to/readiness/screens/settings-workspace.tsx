@@ -193,12 +193,15 @@ function RulesSettings(props: ReferenceUiProps) {
   // Предпросмотр считается по фактам авторитетного снимка выбранной установки:
   // производные факты строятся без наряда, приёмки и дефектов, и шаг «Приёмка»
   // в них всегда «ожидает приёмки» — админ подбирал бы веса по заниженному баллу.
-  // Нет снимка или фактов в нём — балл не выдумываем, показываем недостаточность.
+  // Нет пригодного снимка или фактов в нём — балл не выдумываем, показываем
+  // недостаточность. Сбой загрузки — отдельный случай: это отказ чтения, а не
+  // утверждение, что фактов нет, и сообщать о нём надо словами ошибки.
   const previewFacts = authoritativeFactsForEquipment(props.currentReadiness, props.selectedId);
   const preview = previewFacts ? computeReadinessScore(previewFacts, draft) : null;
-  const previewEmptyLabel = props.selectedId
-    ? 'По выбранной установке нет авторитетных фактов — предпросмотр недоступен.'
-    : 'Выберите тестовую установку.';
+  const previewEmptyLabel = props.authoritativeReadinessError
+    ?? (props.selectedId
+      ? 'По выбранной установке нет авторитетных фактов — предпросмотр недоступен.'
+      : 'Выберите тестовую установку.');
   const previewEquipment = props.equipment.find((item) => item.id === props.selectedId);
   const previewFleet = props.fleetCards.find((item) => item.id === props.selectedId);
   // Список правок показываем от действующей версии к тому, что сейчас в форме,

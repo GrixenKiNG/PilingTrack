@@ -377,11 +377,21 @@ export function readinessFactsFromSnapshot(
  * вес — и админ подбирал бы веса по числу, которого в бою не будет.
  *
  * `null` — снимка нет или в нём не записаны факты.
+ *
+ * Факты берём не из любого снимка, а только из того, который признаёт
+ * авторитетный контур: `buildAuthoritativeReadinessPresentation` отвергает
+ * снимок с испорченными `evidence`/`blockers` (`malformed`) или без фактов
+ * (`historical-incomplete`), и «Центр готовности» честно пишет «Авторитетная
+ * оценка недоступна». Снимок с валидными фактами, но повреждённым
+ * доказательством не должен давать балл в предпросмотре — иначе два экрана по
+ * одному снимку отвечают противоположно, и админ подбирает веса по числу,
+ * которому авторитетный экран не верит.
  */
 export function authoritativeFactsForEquipment(
   snapshots: readonly CurrentReadinessDto[],
   equipmentId: string,
 ): ReadinessFacts | null {
-  const snapshot = snapshots.find((item) => item.equipmentId === equipmentId);
+  const snapshot = snapshots.find((item) => item.equipmentId === equipmentId) ?? null;
+  if (buildAuthoritativeReadinessPresentation(snapshot).mode !== 'authoritative') return null;
   return readinessFactsFromSnapshot(snapshot?.facts);
 }
