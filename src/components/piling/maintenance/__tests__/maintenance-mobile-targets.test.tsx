@@ -9,7 +9,7 @@
  * `data-[size=default]:h-9` самого SelectTrigger (у него выше специфичность).
  * На десктопе (sm и шире) вид не меняется.
  */
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({ authFetch: vi.fn(), loadJson: vi.fn() }));
@@ -215,5 +215,26 @@ describe('журнал ТО: заголовок вкладки браузера 
     await screen.findByText(/Нарядов по выбранным фильтрам не найдено/);
 
     expect(document.title).toBe('Наряды ТО — PilingTrack');
+  });
+});
+
+/*
+  F-R136-TOP №2: карточка наряда ТО показывала одну ссылку «← К списку
+  нарядов» — пути «Наряды ТО → наряд» не было видно.
+*/
+describe('наряд ТО: хлебные крошки (F-R136-TOP, №2)', () => {
+  beforeEach(() => {
+    mocks.authFetch.mockImplementation(async (url: string) => {
+      if (url === '/api/maintenance/assignees') return json({ users: [] });
+      return json({ record: record() });
+    });
+  });
+
+  it('карточка наряда показывает путь «Наряды ТО → ТО-1 СП-49»', async () => {
+    render(<WorkOrderDetail recordId="wo-1" />);
+
+    const crumb = await screen.findByRole('navigation', { name: 'Путь к экрану' });
+    expect(within(crumb).getByRole('link', { name: 'Наряды ТО' })).toHaveAttribute('href', '/admin/maintenance');
+    expect(within(crumb).getByText('ТО-1 СП-49')).toBeInTheDocument();
   });
 });

@@ -118,3 +118,17 @@ describe('экран осмотра: цель нажатия на телефон
     expect(screen.getByRole('button', { name: 'Подтвердить' })).toHaveClass('min-h-11', 'flex-1', 'sm:min-h-0');
   });
 });
+
+/*
+  F-R136-TOP №2: экран осмотра показывал одну ссылку «← Осмотры» — пути
+  «Осмотры → установка» не было видно.
+*/
+describe('экран осмотра: хлебные крошки (F-R136-TOP, №2)', () => {
+  it('осмотр показывает путь «Осмотры → СП-49»', async () => {
+    await renderInspection([item('i1', 'Двигатель', 'YES_NO')]);
+
+    const crumb = screen.getByRole('navigation', { name: 'Путь к экрану' });
+    expect(within(crumb).getByRole('link', { name: 'Осмотры' })).toHaveAttribute('href', '/inspections');
+    expect(within(crumb).getByText('СП-49')).toBeInTheDocument();
+  });
+});

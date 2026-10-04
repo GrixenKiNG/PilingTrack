@@ -7,7 +7,7 @@
  * в поясе западнее UTC.
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 
 const mocks = vi.hoisted(() => ({ authFetch: vi.fn() }));
 
@@ -239,5 +239,26 @@ describe('EquipmentDocuments — диалог ограничен по высот
 
     const dialog = (await screen.findByText('Новый документ')).closest('[data-slot="dialog-content"]');
     expect(dialog).toHaveClass('max-h-[90vh]', 'overflow-y-auto');
+  });
+});
+
+/*
+  F-R136-TOP №2: карточка установки показывала одну ссылку «← К списку
+  установок» — пути «Установки → СГ-1» не было видно.
+*/
+describe('EquipmentDetail — хлебные крошки (F-R136-TOP, №2)', () => {
+  beforeEach(() => {
+    mocks.authFetch.mockReset();
+    usePilingStore.setState({ currentUser: { role: 'ADMIN' } as never });
+  });
+
+  it('карточка показывает путь «Установки → СГ-1»', async () => {
+    mocks.authFetch.mockImplementation(async () => json(detailsResponse('eq-1', 'СГ-1')));
+
+    render(<EquipmentDetail equipmentId="eq-1" />);
+
+    const crumb = await screen.findByRole('navigation', { name: 'Путь к экрану' });
+    expect(within(crumb).getByRole('link', { name: 'Установки' })).toHaveAttribute('href', '/admin/equipment');
+    expect(within(crumb).getByText('СГ-1')).toBeInTheDocument();
   });
 });

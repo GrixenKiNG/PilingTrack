@@ -14,6 +14,7 @@
  *   OpsRiskBadge / resolveRisk → risk statuses (not decorative)
  */
 export { OpsPage, OpsHeader } from './ops-page';
+export { OpsBreadcrumb, type OpsCrumb } from './breadcrumb';
 export { OpsKpiBar } from './ops-kpi-bar';
 export { OpsFilterBar } from './ops-filter-bar';
 export { OpsTable, OpsTableEmpty } from './ops-table';

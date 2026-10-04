@@ -11,7 +11,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Camera, ClipboardCheck, Loader2, UserCog, Wrench } from '@/components/piling/icons/unified-icons';
+import { Camera, ClipboardCheck, Loader2, UserCog, Wrench } from '@/components/piling/icons/unified-icons';
+import { OpsBreadcrumb } from '@/components/piling/ops-shell';
 import { toast } from 'sonner';
 import { authFetch } from '@/lib/api';
 import { formatRuDate } from '@/lib/format';
@@ -283,7 +284,7 @@ export function WorkOrderDetail({ recordId }: { recordId: string }) {
 
   return (
     <div className="mx-auto w-full max-w-3xl px-4 py-6 field-type">
-      <BackLink />
+      <BackLink current={record.title} />
 
       <div className="mt-4 rounded-xl border bg-card p-4">
         <div className="flex flex-wrap items-center gap-2">
@@ -497,10 +498,13 @@ function PersonRow({ label, name, at, fallback }: {
   );
 }
 
-function BackLink() {
+function BackLink({ current }: { current?: string } = {}) {
   return (
-    <Link href="/admin/maintenance" className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-signal-strong">
-      <ArrowLeft className="w-3 h-3" /> К списку нарядов
-    </Link>
+    <OpsBreadcrumb
+      items={[
+        { label: 'Наряды ТО', href: '/admin/maintenance' },
+        ...(current ? [{ label: current }] : []),
+      ]}
+    />
   );
 }

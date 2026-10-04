@@ -7,8 +7,8 @@
  */
 
 import { useState } from 'react';
-import Link from 'next/link';
-import { ArrowLeft, ChevronRight, ChevronDown, type LucideIcon } from '@/components/piling/icons/unified-icons';
+import { ChevronRight, ChevronDown, type LucideIcon } from '@/components/piling/icons/unified-icons';
+import { OpsBreadcrumb } from '@/components/piling/ops-shell';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { formatFixed, formatHours, formatRelative, formatRuDate } from '@/lib/format';
@@ -80,14 +80,14 @@ export function EmptyState({ message }: { message: string }) {
   return <p className="rounded-lg bg-muted px-3 py-2 text-sm text-muted-foreground">{message}</p>;
 }
 
-export function BackLink() {
+export function BackLink({ current }: { current?: string } = {}) {
   return (
-    <Link
-      href="/admin/equipment"
-      className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
-    >
-      <ArrowLeft className="w-3 h-3" /> К списку установок
-    </Link>
+    <OpsBreadcrumb
+      items={[
+        { label: 'Установки', href: '/admin/equipment' },
+        ...(current ? [{ label: current }] : []),
+      ]}
+    />
   );
 }
 

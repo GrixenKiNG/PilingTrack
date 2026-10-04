@@ -11,6 +11,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { OpsBreadcrumb } from '@/components/piling/ops-shell';
 import { ArrowLeft, Loader2 } from '@/components/piling/icons/unified-icons';
 import { toast } from 'sonner';
 import { authFetch } from '@/lib/api';
@@ -351,12 +352,12 @@ export function RunInspection({ inspectionId, onExit }: { inspectionId: string; 
             <ArrowLeft className="w-3.5 h-3.5" /> К смене
           </button>
         ) : (
-          <Link
-            href="/inspections"
-            className="inline-flex min-h-11 items-center gap-1 text-sm text-muted-foreground hover:text-foreground sm:min-h-0"
-          >
-            <ArrowLeft className="w-3.5 h-3.5" /> Осмотры
-          </Link>
+          <OpsBreadcrumb
+            items={[
+              { label: 'Осмотры', href: '/inspections' },
+              { label: inspection.equipment?.name ?? 'Осмотр' },
+            ]}
+          />
         )}
       </div>
 
