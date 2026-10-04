@@ -474,65 +474,70 @@ export function AdminReports() {
                 <div className="grid place-items-center px-4 py-16 text-center">
                   <FileText className="mb-3 h-12 w-12 text-muted-foreground" />
                   <p className="text-sm font-medium text-muted-foreground">Отчёты не найдены</p>
+                  {/* F-N1004-EMPTY-PAGE: пустой клиентский отбор при незагруженном
+                      хвосте — это не «отчётов нет», а «нет среди загруженных».
+                      Говорим об этом честно; догрузка остаётся ниже. */}
                   <p className="mt-1 max-w-sm text-xs text-muted-foreground">
-                    Попробуйте изменить быстрые фильтры, период, объект, установку, оператора или строку поиска.
+                    {hasMore
+                      ? 'Среди загруженных отчётов совпадений нет. Загрузите остальные — искомый отчёт может быть среди них.'
+                      : 'Попробуйте изменить быстрые фильтры, период, объект, установку, оператора или строку поиска.'}
                   </p>
                 </div>
               ) : (
-                <>
-                  <div className="divide-y divide-border">
-                    {sortedReports.map((report) => (
-                      <EvidenceReportRow
-                        key={report.id}
-                        report={report}
-                        active={effectivePreview?.reportId === report.reportId}
-                        deleting={deletingId === report.reportId}
-                        formatLastEditor={formatLastEditor}
-                        onSelect={setPreviewReport}
-                        onOpenDetails={setDetailReport}
-                        onEdit={mayManage ? (r) => { setEditReport(r); setShowCreateDialog(true); } : undefined}
-                        onPreviewPdf={handlePreviewPdf}
-                        onDelete={mayManage ? setPendingDeleteReport : undefined}
-                      />
-                    ))}
-                  </div>
-                  {hasMore && (
-                    <div className="border-t border-border bg-muted/80 p-3 text-center">
-                      {/* F-R140-FILTER-SCOPE: быстрые фильтры и сортировка считаются
-                          по загруженной части списка. Пока есть что догружать,
-                          говорим об этом у самой кнопки догрузки; после полной
-                          загрузки (hasMore = false) подсказка исчезает. */}
-                      <p className="mb-2 text-2xs text-muted-foreground">
-                        Быстрые фильтры и сортировка действуют по загруженным отчётам.
-                        {' '}Нажмите «Загрузить ещё отчёты», чтобы учесть остальные.
-                      </p>
+                <div className="divide-y divide-border">
+                  {sortedReports.map((report) => (
+                    <EvidenceReportRow
+                      key={report.id}
+                      report={report}
+                      active={effectivePreview?.reportId === report.reportId}
+                      deleting={deletingId === report.reportId}
+                      formatLastEditor={formatLastEditor}
+                      onSelect={setPreviewReport}
+                      onOpenDetails={setDetailReport}
+                      onEdit={mayManage ? (r) => { setEditReport(r); setShowCreateDialog(true); } : undefined}
+                      onPreviewPdf={handlePreviewPdf}
+                      onDelete={mayManage ? setPendingDeleteReport : undefined}
+                    />
+                  ))}
+                </div>
+              )}
+              {/* F-N1004-EMPTY-PAGE: догрузка нужна и при пустом клиентском
+                  отборе — иначе оставшиеся страницы недостижимы. При полном
+                  отборе (hasMore = false) блока нет, как и раньше.
+                  F-R140-FILTER-SCOPE: быстрые фильтры и сортировка считаются
+                  по загруженной части списка. Пока есть что догружать,
+                  говорим об этом у самой кнопки догрузки. */}
+              {hasMore && (
+                <div className="border-t border-border bg-muted/80 p-3 text-center">
+                  <p className="mb-2 text-2xs text-muted-foreground">
+                    Быстрые фильтры и сортировка действуют по загруженным отчётам.
+                    {' '}Нажмите «Загрузить ещё отчёты», чтобы учесть остальные.
+                  </p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => void loadMoreReports()}
+                    disabled={loadingMore}
+                    className="border-border bg-card"
+                  >
+                    {loadingMore ? 'Загрузка...' : 'Загрузить ещё отчёты'}
+                  </Button>
+                  {loadMoreError ? (
+                    <div className="mt-2 flex flex-col items-center gap-1">
+                      <span className="text-xs text-destructive-strong">{loadMoreError}</span>
                       <Button
                         type="button"
+                        size="sm"
                         variant="outline"
                         onClick={() => void loadMoreReports()}
                         disabled={loadingMore}
                         className="border-border bg-card"
                       >
-                        {loadingMore ? 'Загрузка...' : 'Загрузить ещё отчёты'}
+                        Повторить
                       </Button>
-                      {loadMoreError ? (
-                        <div className="mt-2 flex flex-col items-center gap-1">
-                          <span className="text-xs text-destructive-strong">{loadMoreError}</span>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            onClick={() => void loadMoreReports()}
-                            disabled={loadingMore}
-                            className="border-border bg-card"
-                          >
-                            Повторить
-                          </Button>
-                        </div>
-                      ) : null}
                     </div>
-                  )}
-                </>
+                  ) : null}
+                </div>
               )}
             </section>
           </div>

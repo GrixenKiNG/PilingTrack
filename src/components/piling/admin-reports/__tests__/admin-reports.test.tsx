@@ -489,3 +489,61 @@ describe('AdminReports — область клиентских фильтров 
     expect(screen.queryByText(/Быстрые фильтры и сортировка действуют по загруженным отчётам/)).not.toBeInTheDocument();
   });
 });
+
+/**
+ * F-N1004-EMPTY-PAGE: кнопка «Загрузить ещё отчёты» и пояснение о неполноте
+ * стояли только в ветке непустого клиентского отбора. Если первая сотня не
+ * содержала совпадений, оставшиеся страницы были недостижимы — экран говорил
+ * «отчётов нет», хотя отбор просто ещё не догружен. Теперь догрузка и честная
+ * подпись показываются и при пустом результате; действительно пустой полный
+ * отбор (hasMore = false) по-прежнему даёт обычное «отчётов нет».
+ */
+describe('AdminReports — пустой клиентский отбор сохраняет догрузку (F-N1004-EMPTY-PAGE)', () => {
+  beforeEach(() => {
+    authFetchMock.mockReset();
+    reportsState.current = baseState();
+  });
+
+  const search = (value: string) => fireEvent.change(
+    screen.getByLabelText('Поиск по оператору, объекту или установке'),
+    { target: { value } },
+  );
+
+  it('пусто при hasMore=true — есть кнопка догрузки и честная подпись вместо «измените фильтры»', () => {
+    const loadMoreReports = vi.fn();
+    const foreign = { ...report, id: 'r9', reportId: 'r9', user: { name: 'Пётр Новиков' } } as unknown as ReportDTO;
+    reportsState.current = baseState({ reports: [foreign], hasMore: true, totalReports: 250, loadMoreReports });
+    render(<AdminReports />);
+
+    search('сидоров');
+
+    expect(screen.getByText('Отчёты не найдены')).toBeInTheDocument();
+    expect(screen.getByText(/Среди загруженных отчётов совпадений нет/)).toBeInTheDocument();
+    expect(screen.queryByText(/Попробуйте изменить быстрые фильтры/)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Загрузить ещё отчёты' }));
+    expect(loadMoreReports).toHaveBeenCalledTimes(1);
+  });
+
+  it('догруженная страница с совпадением показывается', () => {
+    const match = { ...report, id: 'r2', reportId: 'r2', user: { name: 'Иван Сидоров' } } as unknown as ReportDTO;
+    reportsState.current = baseState({ reports: [match], hasMore: false, totalReports: 250 });
+    render(<AdminReports />);
+
+    search('сидоров');
+
+    expect(screen.getByText('r2')).toBeInTheDocument();
+    expect(screen.queryByText('Отчёты не найдены')).not.toBeInTheDocument();
+  });
+
+  it('пусто при hasMore=false — обычное отсутствие результатов, кнопки догрузки нет', () => {
+    const foreign = { ...report, id: 'r9', reportId: 'r9', user: { name: 'Пётр Новиков' } } as unknown as ReportDTO;
+    reportsState.current = baseState({ reports: [foreign], hasMore: false });
+    render(<AdminReports />);
+
+    search('сидоров');
+
+    expect(screen.getByText(/Попробуйте изменить быстрые фильтры/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Загрузить ещё отчёты' })).not.toBeInTheDocument();
+  });
+});
