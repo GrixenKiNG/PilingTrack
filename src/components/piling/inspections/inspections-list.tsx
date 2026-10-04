@@ -13,6 +13,7 @@ import { authFetch } from '@/lib/api';
 import { formatRuDate } from '@/lib/format';
 import { Button } from '@/components/ui/button';
 import { QueryErrorBanner } from '@/components/piling/async-ui';
+import { useDocumentTitle } from '@/components/piling/ops-shell';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
@@ -36,6 +37,7 @@ interface InspectionRow {
 const ALL = '__all__';
 
 export function InspectionsList() {
+  useDocumentTitle('Осмотры');
   const [records, setRecords] = useState<InspectionRow[]>([]);
   const [levelFilter, setLevelFilter] = useState<string>(ALL);
   const [loading, setLoading] = useState(true);

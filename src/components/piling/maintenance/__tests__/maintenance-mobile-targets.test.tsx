@@ -203,3 +203,17 @@ describe('карточка наряда ТО: цель нажатия на те�
     expect(screen.getByRole('button', { name: /Сохранить/ })).toHaveClass('min-h-11', 'sm:min-h-0');
   });
 });
+
+describe('журнал ТО: заголовок вкладки браузера (F-R136-TOP, №1)', () => {
+  beforeEach(() => {
+    mocks.loadJson.mockResolvedValue({});
+    mocks.authFetch.mockResolvedValue(json({ records: [] }));
+  });
+
+  it('заголовок вкладки браузера назван по экрану', async () => {
+    render(<MaintenanceBoard />);
+    await screen.findByText(/Нарядов по выбранным фильтрам не найдено/);
+
+    expect(document.title).toBe('Наряды ТО — PilingTrack');
+  });
+});

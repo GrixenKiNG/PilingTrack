@@ -26,4 +26,5 @@ export {
 } from './ops-detail-panel';
 export { OpsRiskBadge, resolveRisk } from './ops-risk-badge';
 export { useEntityHistory, type EntityHistoryState } from './use-entity-history';
+export { useDocumentTitle } from './use-document-title';
 export type { OpsTone, RiskLevel, OpsKpiItem, OpsQuickFilter, OpsColumn } from './types';

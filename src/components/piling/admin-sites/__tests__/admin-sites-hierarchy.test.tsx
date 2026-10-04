@@ -227,4 +227,10 @@ describe('AdminSites — текстовый поиск по объекту (R130
     expect(screen.getAllByText('ЖК Черёмушки').length).toBeGreaterThan(0);
     expect(screen.queryByText('Объект 1')).not.toBeInTheDocument();
   });
+
+  it('заголовок вкладки браузера назван по экрану', () => {
+    render(<AdminSites />);
+
+    expect(document.title).toBe('Объекты — PilingTrack');
+  });
 });

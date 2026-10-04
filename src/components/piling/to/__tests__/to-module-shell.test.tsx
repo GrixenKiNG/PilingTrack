@@ -267,4 +267,10 @@ describe('ToModule production shell integration', () => {
     );
     expect(document.body.textContent).not.toContain('equipment-foreign');
   }, 30_000);
+
+  it('заголовок вкладки браузера назван по модулю', async () => {
+    await renderToModule('/admin/to');
+
+    expect(document.title).toBe('Техническая готовность — PilingTrack');
+  }, 30_000);
 });

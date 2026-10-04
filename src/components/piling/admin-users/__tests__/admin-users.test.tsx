@@ -407,4 +407,10 @@ describe('UserDetail — кнопки карточки блокируются н
     await act(async () => { release(); });
     await waitFor(() => expect(screen.getByRole('button', { name: 'Заблокировать' })).not.toBeDisabled());
   });
+
+  it('заголовок вкладки браузера назван по экрану', () => {
+    render(<AdminUsers />);
+
+    expect(document.title).toBe('Пользователи — PilingTrack');
+  });
 });

@@ -16,6 +16,7 @@ import { toast } from 'sonner';
 import { authFetch } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { QueryErrorBanner } from '@/components/piling/async-ui';
+import { useDocumentTitle } from '@/components/piling/ops-shell';
 import { ConfirmActionDialog } from '@/components/piling/confirm-action-dialog';
 import { cn } from '@/lib/utils';
 import { LEVEL_LABEL, LEVEL_STYLE, type InspectionLevel } from './inspection-labels';
@@ -51,6 +52,7 @@ function deactivateDescription(target: TemplateRow, all: TemplateRow[]): string 
 }
 
 export function TemplateList() {
+  useDocumentTitle('Шаблоны чек-листов');
   const [templates, setTemplates] = useState<TemplateRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);

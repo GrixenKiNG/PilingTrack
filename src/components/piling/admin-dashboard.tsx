@@ -25,6 +25,7 @@
 import { useAbility } from '@/lib/use-ability';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useDocumentTitle } from '@/components/piling/ops-shell';
 import {
   AlertTriangle, CameraOff, Clock, FileWarning, LayoutGrid,
   PauseCircle, TrendingDown, Truck, Building2, Wrench,
@@ -93,6 +94,7 @@ function rangeFor(mode: PeriodMode, from: string, to: string): { from: string; t
 }
 
 export function AdminDashboard() {
+  useDocumentTitle('Дашборд');
   const canReadMaintenance = useAbility('maintenance.manage');
   // Роль без `equipment.read` (мастер) на этом дашборде — не редкость: `/admin` —
   // её домашний экран, но карточка установки ей закрыта (`admin/equipment/layout.tsx`).

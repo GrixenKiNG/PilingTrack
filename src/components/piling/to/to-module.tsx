@@ -3,6 +3,7 @@
 import { usePilingStore } from '@/lib/store';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
+import { useDocumentTitle } from '@/components/piling/ops-shell';
 import type { FleetCard, FleetSnapshot } from '@/components/piling/admin-equipment/fleet-types';
 import { authFetch } from '@/lib/api';
 import {
@@ -269,6 +270,7 @@ async function readReadinessPartial<T>(
 }
 
 export function ToModule({ surface = 'readiness' }: { surface?: ModuleSurface } = {}) {
+  useDocumentTitle(SURFACE_LABEL[surface]);
   const workspaceRequest = useRef<AbortController | null>(null);
   // Раздел назван в адресе — значит выбран человеком, и подменять его нельзя.
   const viewPinnedByUrl = useRef(false);

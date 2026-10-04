@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import Link from 'next/link';
+import { useDocumentTitle } from '@/components/piling/ops-shell';
 import { motion } from 'framer-motion';
 import {
   BarChart3,
@@ -39,6 +40,7 @@ const shiftDay = (day: string, delta: number): string =>
   new Date(new Date(`${day}T12:00:00.000Z`).getTime() + delta * 86_400_000).toISOString().slice(0, 10);
 
 export function AdminAnalytics() {
+  useDocumentTitle('Аналитика');
   const layout = useAnalyticsDashboardLayout();
   const [tab, setTab] = useState<'operators' | 'trends' | 'kpi'>('operators');
   // Выбор объекта живёт во вкладке «Тренды» — глобального фильтра больше нет.

@@ -11,6 +11,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { useDocumentTitle } from '@/components/piling/ops-shell';
 import {
   AlertTriangle,
   CalendarDays,
@@ -60,6 +61,7 @@ const ALL = '__all__';
 const PAGE_SIZE_OPTIONS = [10, 25, 50] as const;
 
 export function MaintenanceBoard() {
+  useDocumentTitle('Наряды ТО');
   const [records, setRecords] = useState<WorkOrderRow[]>([]);
   const [equipment, setEquipment] = useState<EquipmentDTO[]>([]);
   const [sites, setSites] = useState<SiteOption[]>([]);

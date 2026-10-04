@@ -296,4 +296,10 @@ describe('AdminDictionaries: диалоги ограничены по высот
 
     expect(contentOf('Удалить навсегда?')).toHaveClass('max-h-[90vh]', 'overflow-y-auto');
   });
+
+  it('заголовок вкладки браузера назван по экрану', () => {
+    render(<AdminDictionaries />);
+
+    expect(document.title).toBe('Справочники — PilingTrack');
+  });
 });

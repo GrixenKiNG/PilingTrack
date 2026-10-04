@@ -325,4 +325,10 @@ describe('FleetDashboard shared equipment template', () => {
       expect(screen.getByText(/Данные обновлены 2 мин назад/)).toBeInTheDocument();
     });
   });
+
+  it('заголовок вкладки браузера назван по экрану', () => {
+    render(<FleetDashboard />);
+
+    expect(document.title).toBe('Мониторинг — PilingTrack');
+  });
 });

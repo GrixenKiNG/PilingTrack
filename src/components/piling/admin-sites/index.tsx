@@ -23,6 +23,7 @@ import {
   OpsFact,
   OpsRiskBadge,
   resolveRisk,
+  useDocumentTitle,
   type OpsColumn,
   type OpsQuickFilter,
   type OpsKpiItem,
@@ -79,6 +80,7 @@ function toListItem(row: SiteOverviewRow): SiteListItem {
 }
 
 export function AdminSites() {
+  useDocumentTitle('Объекты');
   const canManage = useAbility('sites.manage');
   const { rows, loading, error, crewsError, reload } = useSitesOverview();
   const { sites, sitesError, reloadSites, users, pileGrades, loadingUsers, loadingPileGrades, loadUsers, loadPileGrades, setSites } = useSitesData();

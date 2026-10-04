@@ -30,6 +30,7 @@ import {
   OpsDetailEmpty,
   OpsRiskBadge,
   resolveRisk,
+  useDocumentTitle,
   type OpsColumn,
   type OpsQuickFilter,
 } from '@/components/piling/ops-shell';
@@ -121,6 +122,7 @@ function writeUrlState(state: { quick: UserQuickFilter; search: string; userId: 
 }
 
 export function AdminUsers() {
+  useDocumentTitle('Пользователи');
   const currentUser = usePilingStore((state) => state.currentUser);
   const { users, loading, error, retry, create, update, remove, toggleActive } = useUsersList();
   const initial = useMemo(

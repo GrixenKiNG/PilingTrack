@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useDocumentTitle } from '@/components/piling/ops-shell';
 import { AlertCircle, AlertTriangle, Archive, Clock, Drill, Filter, HardHat, Plus, Ruler, Save, Search, X } from '@/components/piling/icons/unified-icons';
 import { toast } from 'sonner';
 import { authFetch } from '@/lib/api';
@@ -76,6 +77,7 @@ const KINDS: Array<{ kind: DictionaryKind; title: string; summaryTitle: string; 
 ];
 
 export function AdminDictionaries() {
+  useDocumentTitle('Справочники');
   const [data, setData] = useState<Record<DictionaryKind, RegistryItem[]>>({
     pileGrade: [], drillingType: [], downtimeReason: [],
   });

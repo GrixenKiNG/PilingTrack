@@ -304,4 +304,10 @@ describe('AdminCrews — кнопка активации блокируется 
 
     expect(mocks.toggleActive).toHaveBeenCalledTimes(1);
   });
+
+  it('заголовок вкладки браузера назван по экрану', () => {
+    render(<AdminCrews />);
+
+    expect(document.title).toBe('Бригады — PilingTrack');
+  });
 });

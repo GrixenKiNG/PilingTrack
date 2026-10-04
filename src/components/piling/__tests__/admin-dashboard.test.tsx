@@ -311,4 +311,10 @@ describe('AdminDashboard: счётчик отчётов и подсказка о
     const button = await screen.findByRole('button', { name: 'Обновить дашборд' });
     expect(button).toHaveAttribute('title', 'Обновить дашборд');
   });
+
+  it('заголовок вкладки браузера назван по экрану', () => {
+    render(<AdminDashboard />);
+
+    expect(document.title).toBe('Дашборд — PilingTrack');
+  });
 });

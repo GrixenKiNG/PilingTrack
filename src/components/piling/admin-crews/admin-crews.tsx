@@ -21,6 +21,7 @@ import {
   OpsFact,
   OpsRiskBadge,
   resolveRisk,
+  useDocumentTitle,
   type OpsColumn,
   type OpsQuickFilter,
   type OpsKpiItem,
@@ -51,6 +52,7 @@ function crewRisk(crew: Crew) {
 }
 
 export function AdminCrews() {
+  useDocumentTitle('Бригады');
   const canManage = useAbility('crews.manage');
   const {
     crews, setCrews, equipmentList, sites,
