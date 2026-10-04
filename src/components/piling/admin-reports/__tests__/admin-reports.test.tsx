@@ -53,7 +53,7 @@ vi.mock('../report-evidence-row', () => ({
   EvidenceSummary: () => null,
   EvidenceReportRow: ({ report, onDelete }: { report: ReportDTO; onDelete?: (r: ReportDTO) => void }) => (
     <div>
-      <span>{report.reportId}</span>
+      <span data-testid="report-id">{report.reportId}</span>
       {onDelete ? <button type="button" onClick={() => onDelete(report)}>Удалить</button> : null}
     </div>
   ),
@@ -398,5 +398,58 @@ describe('AdminReports — область печати (R134 №1)', () => {
     const css = container.querySelector('style')?.textContent ?? '';
     expect(css).toContain('@media print');
     expect(css).toContain('print-area');
+  });
+});
+
+/**
+ * R140 №2: черновики и сданные лежали вперемешку по дате — отбор по статусу был
+ * только глазами. Кнопки «Черновики»/«Сданные» отбирают список по статусу.
+ */
+describe('AdminReports — отбор по статусу (R140 №2)', () => {
+  beforeEach(() => {
+    authFetchMock.mockReset();
+    const draft = { ...report, id: 'd1', reportId: 'd1', status: 'draft', user: { name: 'Иван' } } as unknown as ReportDTO;
+    const sent = { ...report, id: 's1', reportId: 's1', status: 'submitted', user: { name: 'Пётр' } } as unknown as ReportDTO;
+    reportsState.current = baseState({ reports: [draft, sent] });
+  });
+
+  it('«Черновики» показывают только черновики, «Сданные» — только сданные', () => {
+    render(<AdminReports />);
+    expect(screen.getByText('d1')).toBeInTheDocument();
+    expect(screen.getByText('s1')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Черновики' }));
+    expect(screen.getByText('d1')).toBeInTheDocument();
+    expect(screen.queryByText('s1')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Сданные' }));
+    expect(screen.queryByText('d1')).not.toBeInTheDocument();
+    expect(screen.getByText('s1')).toBeInTheDocument();
+  });
+});
+
+/**
+ * R140 №3: порядок был жёстко по дате вниз, заголовки — статичные подписи.
+ * Клик по заголовку сортирует по колонке, повторный — меняет направление.
+ */
+describe('AdminReports — сортировка списка (R140 №3)', () => {
+  beforeEach(() => {
+    authFetchMock.mockReset();
+    const first = { ...report, id: 'r1', reportId: 'r1', date: '2026-09-01', user: { name: 'Иван' } } as unknown as ReportDTO;
+    const second = { ...report, id: 'r2', reportId: 'r2', date: '2026-09-02', user: { name: 'Пётр' } } as unknown as ReportDTO;
+    reportsState.current = baseState({ reports: [first, second] });
+  });
+
+  const order = () => screen.getAllByTestId('report-id').map((el) => el.textContent);
+
+  it('по умолчанию — по дате вниз, «Оператор» меняет порядок вверх и обратно', () => {
+    render(<AdminReports />);
+    expect(order()).toEqual(['r2', 'r1']);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Сортировать по: Оператор' }));
+    expect(order()).toEqual(['r1', 'r2']);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Сортировать по: Оператор' }));
+    expect(order()).toEqual(['r2', 'r1']);
   });
 });

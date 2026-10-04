@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { FileText, Filter, Loader2 } from '@/components/piling/icons/unified-icons';
+import { ArrowUpDown, FileText, Filter, Loader2 } from '@/components/piling/icons/unified-icons';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { PdfPreviewDialog } from '@/components/piling/pdf-preview-dialog';
@@ -27,17 +27,57 @@ import { ConfirmActionDialog } from '@/components/piling/confirm-action-dialog';
 import { toast } from 'sonner';
 import { PrintScreenStyles } from './print-screen';
 
-type QuickFilter = 'all' | 'today' | 'yesterday' | 'week' | 'downtime' | 'withPhotos' | 'edited';
+type QuickFilter = 'all' | 'today' | 'yesterday' | 'week' | 'drafts' | 'submitted' | 'downtime' | 'withPhotos' | 'edited';
 
 const QUICK_FILTERS: Array<{ key: QuickFilter; label: string }> = [
   { key: 'all', label: 'Все' },
   { key: 'today', label: 'Сегодня' },
   { key: 'yesterday', label: 'Вчера' },
   { key: 'week', label: '7 дней' },
+  { key: 'drafts', label: 'Черновики' },
+  { key: 'submitted', label: 'Сданные' },
   { key: 'downtime', label: 'С простоем' },
   { key: 'withPhotos', label: 'С фото' },
   { key: 'edited', label: 'Изменены админом' },
 ];
+
+type SortKey = 'date' | 'site' | 'user' | 'piles' | 'drilling' | 'downtime';
+
+/**
+ * R140 №3: колонки были статичными подписями — список всегда шёл по дате вниз,
+ * и диспетчер не мог разложить его по оператору, объекту или сваям. Заголовок
+ * теперь кнопка: клик сортирует по своей колонке, повторный — меняет
+ * направление (↑/↓). Сортировка загруженных строк, как и прочие фильтры экрана.
+ */
+function SortHeader({
+  label, column, sortKey, sortDir, onSort, right,
+}: {
+  label: string;
+  column: SortKey;
+  sortKey: SortKey;
+  sortDir: 'asc' | 'desc';
+  onSort: (k: SortKey) => void;
+  right?: boolean;
+}) {
+  const active = column === sortKey;
+  return (
+    <div className={cn(right && 'flex justify-end')}>
+      <button
+        type="button"
+        onClick={() => onSort(column)}
+        aria-label={`Сортировать по: ${label}`}
+        className={cn(
+          'inline-flex items-center gap-1 uppercase tracking-wide transition-colors hover:text-foreground',
+          active && 'text-foreground',
+        )}
+      >
+        {label}
+        <ArrowUpDown className="h-3 w-3 opacity-50" />
+        {active ? <span className="text-3xs">{sortDir === 'asc' ? '↑' : '↓'}</span> : null}
+      </button>
+    </div>
+  );
+}
 
 /** Строк данных в CSV: первая строка — шапка, пустые строки не считаем. */
 function countCsvDataRows(text: string): number {
@@ -69,6 +109,8 @@ export function AdminReports() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [pendingDeleteReport, setPendingDeleteReport] = useState<ReportDTO | null>(null);
   const [quickFilter, setQuickFilter] = useState<QuickFilter>('all');
+  const [sortKey, setSortKey] = useState<SortKey>('date');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const [filterEquipmentId, setFilterEquipmentId] = useState('all');
   const [search, setSearch] = useState('');
   const [exporting, setExporting] = useState<'csv' | 'xlsx' | null>(null);
@@ -201,6 +243,8 @@ export function AdminReports() {
       if (quickFilter === 'today' && report.date !== today) return false;
       if (quickFilter === 'yesterday' && report.date !== yesterday) return false;
       if (quickFilter === 'week' && (report.date < weekStart || report.date > today)) return false;
+      if (quickFilter === 'drafts' && report.status !== 'draft') return false;
+      if (quickFilter === 'submitted' && report.status !== 'submitted') return false;
       if (quickFilter === 'downtime' && totals.downtimeHours <= 0) return false;
       if (quickFilter === 'withPhotos' && report.hasPhotos !== true) return false;
       if (quickFilter === 'edited' && !report.lastEditedByName) return false;
@@ -208,6 +252,34 @@ export function AdminReports() {
       return true;
     });
   }, [filterEquipmentId, quickFilter, reports, search]);
+
+  // R140 №3: экран сортирует уже отфильтрованные строки; порядок по умолчанию —
+  // по дате вниз, как отдаёт сервер.
+  const sortedReports = useMemo(() => {
+    const rows = [...filteredReports];
+    const dir = sortDir === 'asc' ? 1 : -1;
+    const sortValue = (report: ReportDTO): string | number => {
+      if (sortKey === 'date') return report.date;
+      if (sortKey === 'site') return report.site?.name ?? '';
+      if (sortKey === 'user') return report.user?.name ?? '';
+      const rowTotals = getReportTotals(report);
+      if (sortKey === 'piles') return rowTotals.piles;
+      if (sortKey === 'drilling') return rowTotals.drillingCount;
+      return rowTotals.downtimeHours;
+    };
+    rows.sort((a, b) => {
+      const av = sortValue(a);
+      const bv = sortValue(b);
+      const cmp = typeof av === 'string' && typeof bv === 'string' ? av.localeCompare(bv) : (av as number) - (bv as number);
+      return dir * cmp;
+    });
+    return rows;
+  }, [filteredReports, sortKey, sortDir]);
+
+  const toggleSort = (key: SortKey) => {
+    if (key === sortKey) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    else { setSortKey(key); setSortDir(key === 'site' || key === 'user' ? 'asc' : 'desc'); }
+  };
 
   // Итоги — только сданные отчёты, как на всех экранах; черновик виден в
   // списке с пометкой, но в суммы не входит.
@@ -389,12 +461,12 @@ export function AdminReports() {
                 </div>
               ) : null}
               <div className="hidden border-b border-border bg-muted/80 px-3 py-2 text-2xs font-semibold uppercase tracking-wide text-muted-foreground lg:grid lg:grid-cols-[116px_minmax(170px,1.2fr)_minmax(150px,1fr)_86px_92px_86px_152px]">
-                <span>Дата</span>
-                <span>Объект / установка</span>
-                <span>Оператор</span>
-                <span className="text-right">Сваи</span>
-                <span className="text-right">Бурение</span>
-                <span className="text-right">Простой</span>
+                <SortHeader label="Дата" column="date" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+                <SortHeader label="Объект / установка" column="site" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+                <SortHeader label="Оператор" column="user" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+                <SortHeader label="Сваи" column="piles" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} right />
+                <SortHeader label="Бурение" column="drilling" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} right />
+                <SortHeader label="Простой" column="downtime" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} right />
                 <span className="text-right">Действия</span>
               </div>
 
@@ -409,7 +481,7 @@ export function AdminReports() {
               ) : (
                 <>
                   <div className="divide-y divide-border">
-                    {filteredReports.map((report) => (
+                    {sortedReports.map((report) => (
                       <EvidenceReportRow
                         key={report.id}
                         report={report}
