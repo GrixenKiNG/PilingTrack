@@ -9,8 +9,8 @@ import { cn } from '@/lib/utils';
 import { buildHandoverJournal, handoverRoleLabel, type HandoverEventKind, type HandoverJournalEvent } from '../handover-journal';
 import { isOpenRecord } from '../../to-stats';
 import type { AuthoritativeReadinessFactsDto, ReadinessShiftDto } from '../api/contracts';
-import { buildAuthoritativeReadinessPresentation, buildUnavailableReadinessPresentation, type AuthoritativeReadinessPresentation, type PresentationEvidence, type PresentationStage } from '../authoritative-presentation';
-import { EquipmentPhoto, ReadinessRing, STAGE_CTA, muted, blockerTone, BLOCKER_TONE_CLASS, BLOCKER_TONE_LABEL } from './shared';
+import { buildAuthoritativeReadinessPresentation, buildUnavailableReadinessPresentation, type AuthoritativeReadinessPresentation, type PresentationEvidence, type PresentationNotice, type PresentationStage } from '../authoritative-presentation';
+import { EquipmentPhoto, ReadinessRing, STAGE_CTA, muted, blockerTone, type BlockerTone, BLOCKER_TONE_CLASS, BLOCKER_TONE_LABEL } from './shared';
 import { blockerGuidance } from './blocker-guidance';
 import type { EquipmentDetailSnapshot, ReferenceUiProps, ReferenceView } from './types';
 
@@ -210,6 +210,37 @@ const HANDOVER_PILL: Record<HandoverEventKind, { label: string; cls: string }> =
   ACCEPTED: { label: 'Принято', cls: 'border-border text-muted-foreground' },
 };
 
+/**
+ * Счёт блокеров по тону действия — тому же, которым блокер красится.
+ *
+ * Правило «нет осмотра за сегодня» (`RETURN_TO_OPERATOR`) — незакрытый шаг, а
+ * не критический дефект; «нужно подтверждение» (`REQUIRE_CONFIRMATION`) —
+ * решение ответственного. Раньше плитка и блок называли ЛЮБОЙ блокер
+ * критическим. Неизвестное действие `blockerTone` относит к строгому запрету,
+ * поэтому в «Критические» попадает и оно: недооценить блокировку пуска хуже,
+ * чем перестраховаться. Сами условия допуска остаются блокерами — меняется
+ * лишь подпись и цвет счётчика.
+ */
+function countBlockersByTone(blockers: readonly PresentationNotice[]): Record<BlockerTone, number> {
+  const counts: Record<BlockerTone, number> = { critical: 0, attention: 0, info: 0 };
+  for (const notice of blockers) counts[blockerTone(notice.action)] += 1;
+  return counts;
+}
+
+/** Слово-итог счётчика по тону блокера: «Критическое» — только строгий запрет. */
+const BLOCKER_COUNT_LABEL: Record<BlockerTone, string> = {
+  critical: 'Критические',
+  attention: BLOCKER_TONE_LABEL.attention,
+  info: BLOCKER_TONE_LABEL.info,
+};
+
+/** Заливка счётчика по тону блокера: красная — только у запрета пуска. */
+const BLOCKER_COUNT_CLASS: Record<BlockerTone, string> = {
+  critical: 'bg-destructive/10 text-destructive-strong',
+  attention: 'bg-warning/10 text-warning-strong',
+  info: 'bg-info/10 text-info-strong',
+};
+
 interface ReadinessMetricTile {
   key: string;
   label: string;
@@ -258,6 +289,8 @@ function buildReadinessMetricTiles(
   const daysLeft = nextDate
     ? Math.ceil((new Date(nextDate).getTime() - Date.now()) / 86_400_000)
     : null;
+  // Блокеры одного вердикта разных исходов — «критический» только запрет пуска.
+  const blockerTones = countBlockersByTone(presentation.blockers);
 
   return [
     {
@@ -290,13 +323,19 @@ function buildReadinessMetricTiles(
       key: 'findings',
       label: 'Замечания и дефекты',
       icon: AlertTriangle,
-      pill: presentation.blockers.length > 0
-        ? { label: 'Есть', cls: 'bg-destructive/10 text-destructive-strong' }
-        : presentation.warnings.length > 0
-          ? { label: 'Есть замечания', cls: 'bg-warning/10 text-warning-strong' }
-          : { label: 'Нет', cls: 'bg-success/10 text-success-strong' },
+      pill: blockerTones.critical > 0
+        ? { label: 'Есть', cls: BLOCKER_COUNT_CLASS.critical }
+        : blockerTones.attention > 0
+          ? { label: 'Есть', cls: BLOCKER_COUNT_CLASS.attention }
+          : blockerTones.info > 0
+            ? { label: 'Есть', cls: BLOCKER_COUNT_CLASS.info }
+            : presentation.warnings.length > 0
+              ? { label: 'Есть замечания', cls: 'bg-warning/10 text-warning-strong' }
+              : { label: 'Нет', cls: 'bg-success/10 text-success-strong' },
       rows: [
-        { caption: 'Критические', value: String(presentation.blockers.length) },
+        { caption: BLOCKER_COUNT_LABEL.critical, value: String(blockerTones.critical) },
+        ...(blockerTones.attention > 0 ? [{ caption: BLOCKER_COUNT_LABEL.attention, value: String(blockerTones.attention) }] : []),
+        ...(blockerTones.info > 0 ? [{ caption: BLOCKER_COUNT_LABEL.info, value: String(blockerTones.info) }] : []),
         { caption: 'Обычные', value: String(facts?.findings ?? presentation.warnings.length) },
       ],
       view: 'maintenance',
@@ -430,6 +469,9 @@ export function ReadinessCentre(props: ReferenceUiProps) {
   };
   const blockers = presentation.blockers.length;
   const warnings = presentation.warnings.length;
+  // Счёт по исходу, а не «все блокеры критические»: возврат оператору и
+  // подтверждение — не критический дефект, красным красится только запрет пуска.
+  const blockerTones = countBlockersByTone(presentation.blockers);
   const facts = authoritativeCurrent?.facts ?? null;
   const doneStages = presentation.stages.filter((stage) => stage.state === 'pass').length;
   const stageProgress = Math.round((doneStages / presentation.stages.length) * 100);
@@ -740,8 +782,10 @@ export function ReadinessCentre(props: ReferenceUiProps) {
                   <p className="mt-1 text-sm sm:text-2xs leading-relaxed text-muted-foreground">
                     Взвешенная оценка состояния узлов. Пуск разрешают не баллы, а блокирующие правила.
                   </p>
-                  <div className="mt-3 flex gap-4 text-xs">
-                    <span>Критические блокеры <b className="ml-1 rounded bg-destructive/10 px-1.5 py-0.5 text-destructive-strong">{blockers}</b></span>
+                  <div className="mt-3 flex flex-wrap gap-4 text-xs">
+                    <span>Критические блокеры <b className={cn('ml-1 rounded px-1.5 py-0.5', BLOCKER_COUNT_CLASS.critical)}>{blockerTones.critical}</b></span>
+                    {blockerTones.attention > 0 && <span>{BLOCKER_COUNT_LABEL.attention} <b className={cn('ml-1 rounded px-1.5 py-0.5', BLOCKER_COUNT_CLASS.attention)}>{blockerTones.attention}</b></span>}
+                    {blockerTones.info > 0 && <span>{BLOCKER_COUNT_LABEL.info} <b className={cn('ml-1 rounded px-1.5 py-0.5', BLOCKER_COUNT_CLASS.info)}>{blockerTones.info}</b></span>}
                     <span>Замечания <b className="ml-1 rounded bg-signal/10 px-1.5 py-0.5 text-signal-strong">{warnings}</b></span>
                   </div>
                 </div>

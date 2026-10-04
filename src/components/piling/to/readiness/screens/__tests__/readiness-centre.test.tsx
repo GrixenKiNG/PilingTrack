@@ -255,6 +255,83 @@ describe('Центр готовности: блокер показан по де
 });
 
 /**
+ * F-N1004-BLOCKER-LABELS (остаток MR-CHECK-1004 №3): плитка «Замечания и
+ * дефекты» считала ЛЮБОЙ блокер «Критическими», а блок называл их
+ * «Критические блокеры». Возврат оператору (`RETURN_TO_OPERATOR`) и
+ * «нужно подтверждение» (`REQUIRE_CONFIRMATION`) — не критический дефект;
+ * счётчики и цвет теперь идут по действию блокера, как плашка «Что держит
+ * допуск». Все условия допуска остаются блокерами, обычные замечания —
+ * отдельным числом.
+ */
+describe('Центр готовности: счётчики блокеров по действию, а не все «критические» (F-N1004-BLOCKER-LABELS)', () => {
+  const snapshotWithActions = (
+    blockers: Array<{ condition: string; action: string; label: string; actionLabel: string }>,
+  ): CurrentReadinessDto => ({
+    snapshotId: 'snap-eq-1', equipmentId: 'eq-1', status: 'BLOCKED', verdict: 'RETURN_TO_OPERATOR', score: 60,
+    calculatedAt: '2026-10-01T06:00:00.000Z', ruleSetVersion: 'v1', triggerType: null,
+    blockers,
+    warnings: [],
+    facts: { inspectionCompleted: false, inspectionProgress: 0, healthScore: 50, meterKnown: true,
+      permitValid: null, permitExpired: false, maintenanceConfigured: true,
+      maintenanceOverdueHours: 0, maintenanceOverdueDays: 0, accepted: true, criticalDefect: false, findings: 3 },
+    evidence: { equipmentId: 'eq-1', inspectionId: null, permitId: null, maintenanceRecordIds: [], evaluatedAt: '2026-10-01T06:00:00.000Z' },
+  });
+
+  /** Значение строки плитки по её подписи-термину (столбец «caption»). */
+  const tileValue = (caption: string) => screen.getByText(caption, { selector: 'dt' }).nextElementSibling;
+
+  it('один возврат оператору — не критический счётчик, а «Требует решения»', () => {
+    render(<ReadinessCentre {...propsFor({ currentReadiness: [snapshotWithActions([
+      { condition: 'INSPECTION_BELOW_80', action: 'RETURN_TO_OPERATOR', label: 'Нет осмотра за сегодня', actionLabel: 'Вернуть оператору' },
+    ])] })} />);
+
+    expect(tileValue('Критические')).toHaveTextContent('0');
+    expect(tileValue('Требует решения')).toHaveTextContent('1');
+    expect(tileValue('Обычные')).toHaveTextContent('3');
+    expect(screen.getByText('Критические блокеры').querySelector('b')).toHaveTextContent('0');
+
+    // Плитка больше не красная: возврат — не запрет пуска.
+    const pill = screen.getByText('Есть');
+    expect(pill.className).toContain('text-warning-strong');
+    expect(pill.className).not.toContain('text-destructive-strong');
+  });
+
+  it('одно подтверждение — «Требует подтверждения», критических нет', () => {
+    render(<ReadinessCentre {...propsFor({ currentReadiness: [snapshotWithActions([
+      { condition: 'ACCEPTANCE_UNCONFIRMED', action: 'REQUIRE_CONFIRMATION', label: 'Приёмка не подтверждена', actionLabel: 'Подтвердить' },
+    ])] })} />);
+
+    expect(tileValue('Критические')).toHaveTextContent('0');
+    expect(tileValue('Требует подтверждения')).toHaveTextContent('1');
+    expect(screen.queryByText('Требует решения', { selector: 'dt' })).not.toBeInTheDocument();
+  });
+
+  it('смешанные действия показаны верными количествами и названиями', () => {
+    render(<ReadinessCentre {...propsFor({ currentReadiness: [snapshotWithActions([
+      { condition: 'CRITICAL_DEFECT', action: 'DENY_START', label: 'Критический дефект', actionLabel: 'Запретить запуск' },
+      { condition: 'INSPECTION_BELOW_80', action: 'RETURN_TO_OPERATOR', label: 'Нет осмотра за сегодня', actionLabel: 'Вернуть оператору' },
+    ])] })} />);
+
+    expect(tileValue('Критические')).toHaveTextContent('1');
+    expect(tileValue('Требует решения')).toHaveTextContent('1');
+    expect(screen.getByText('Критические блокеры').querySelector('b')).toHaveTextContent('1');
+
+    const pill = screen.getByText('Есть');
+    expect(pill.className).toContain('text-destructive-strong');
+  });
+
+  it('неизвестное действие считается строгим запретом (критическим)', () => {
+    render(<ReadinessCentre {...propsFor({ currentReadiness: [snapshotWithActions([
+      { condition: 'NEW_RULE', action: 'SOMETHING_NEW', label: 'Новое условие из правил', actionLabel: 'Разобраться' },
+    ])] })} />);
+
+    expect(tileValue('Критические')).toHaveTextContent('1');
+    expect(screen.queryByText('Требует решения', { selector: 'dt' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Требует подтверждения', { selector: 'dt' })).not.toBeInTheDocument();
+  });
+});
+
+/**
  * R141 №4: у причины блокировки на доске не было адреса — кто снимает и куда
  * идти; `actionLabel` («Вернуть оператору») описывает реакцию системы, а не
  * действие человека. Рядом с причиной показываем маршрутизацию из
