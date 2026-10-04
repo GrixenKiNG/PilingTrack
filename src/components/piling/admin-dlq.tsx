@@ -112,6 +112,9 @@ export function AdminDlq() {
         const data = await res.json();
         setEntries(data.entries || []);
         setStats(data.stats || null);
+      } else if (res.status === 401) {
+        // Сессия истекла — «Попробуйте обновить» тут не поможет.
+        setLoadError('Сессия истекла — войдите снова.');
       } else {
         setLoadError('Сервер не смог отдать очередь недоставленных событий. Попробуйте обновить.');
       }

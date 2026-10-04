@@ -242,3 +242,24 @@ describe('AdminDlq: обрыв сети объясняется по-русски
     expect(vi.mocked(toast.error).mock.calls[0][0]).not.toContain('Failed to fetch');
   });
 });
+
+/**
+ * F-R133 №11: на истёкшей сессии экран показывал «Сервер не смог отдать
+ * очередь недоставленных событий. Попробуйте обновить.» — причина неверная,
+ * совет не работает. Теперь 401 назван прямо.
+ */
+describe('AdminDlq: истёкшая сессия (F-R133 №11)', () => {
+  beforeEach(() => {
+    mocks.authFetch.mockReset();
+  });
+
+  it('401 при загрузке → «Сессия истекла — войдите снова.»', async () => {
+    mocks.authFetch.mockResolvedValue(json({ error: 'Unauthorized' }, 401));
+    render(<AdminDlq />);
+
+    expect(await screen.findByText('Сессия истекла — войдите снова.')).toBeInTheDocument();
+    expect(
+      screen.queryByText('Сервер не смог отдать очередь недоставленных событий. Попробуйте обновить.'),
+    ).not.toBeInTheDocument();
+  });
+});

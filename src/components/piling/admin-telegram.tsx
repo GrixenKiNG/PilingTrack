@@ -45,6 +45,7 @@ const CHAT_ID_PATTERN = /^-?\d+$|^@[A-Za-z0-9_]{5,}$/;
  * общий текст тут сбил бы с толку.
  */
 async function apiFailureText(res: Response, fallback: string): Promise<string> {
+  if (res.status === 401) return 'Сессия истекла — войдите снова.';
   if (res.status === 404) return 'Запись не найдена — возможно, её уже удалили, обновите список';
   const body = await res.json().catch(() => null);
   return apiErrorMessage(body, fallback);
@@ -131,9 +132,11 @@ export function AdminTelegram() {
       if (!res.ok) {
         // Раньше отказ молча оставлял пустой список — админ видел «Нет
         // конфигураций Telegram», думал, что ботов нет, и заводил дубли.
-        const message = res.status === 403
-          ? 'Нет доступа к настройкам Telegram'
-          : 'Не удалось загрузить конфигурации Telegram';
+        const message = res.status === 401
+          ? 'Сессия истекла — войдите снова.'
+          : res.status === 403
+            ? 'Нет доступа к настройкам Telegram'
+            : 'Не удалось загрузить конфигурации Telegram';
         setLoadError(message);
         toast.error(message);
         return;

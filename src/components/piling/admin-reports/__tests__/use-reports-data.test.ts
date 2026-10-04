@@ -192,3 +192,29 @@ describe('useReportsData — справочники формы', () => {
     expect(result.current.pileGrades).toHaveLength(1);
   });
 });
+
+/**
+ * F-R133 №8: чтение списка отчётов на истёкшей сессии показывало
+ * «Не удалось загрузить отчёты. Сервер вернул ошибку.» — причина названа
+ * неверно, сбой не на сервере. Теперь 401 отличается от 5xx.
+ */
+describe('useReportsData — 401 против 5xx (F-R133 №8)', () => {
+  beforeEach(() => {
+    authFetchMock.mockReset();
+  });
+
+  it('401 → текст про истёкшую сессию, а не «Сервер вернул ошибку»', async () => {
+    authFetchMock.mockImplementation((url: string) => {
+      if (url.startsWith('/api/reports')) {
+        return Promise.resolve({ ok: false, status: 401, json: async () => ({ error: 'Unauthorized' }) });
+      }
+      return Promise.resolve(okJson({ sites: [], users: [] }));
+    });
+
+    const { result } = renderHook(() => useReportsData());
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.error).toBe('Сессия истекла — войдите снова.');
+    expect(result.current.errorForbidden).toBe(false);
+  });
+});

@@ -237,7 +237,10 @@ export function useReportsData(): UseReportsDataReturn {
           // NOT throw, so without this branch the list would render empty as
           // if there were simply no reports. Surface it as a real error.
           // 403 — это не сбой: дело в правах, «Повторить» не поможет.
-          if (res.status === 403) {
+          if (res.status === 401) {
+            // Сессия истекла — причина не на сервере, повтор не поможет.
+            setError('Сессия истекла — войдите снова.');
+          } else if (res.status === 403) {
             setError('Нет прав на просмотр отчётов. Смените роль или обратитесь к администратору.');
             setErrorForbidden(true);
           } else {

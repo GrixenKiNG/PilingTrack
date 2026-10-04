@@ -309,3 +309,38 @@ describe('AdminTelegram: удаление канала блокирует под
     await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Конфигурация удалена'));
   });
 });
+
+/**
+ * F-R133 №12: истёкшая сессия на экране Telegram выдавалась за сбой чтения, а
+ * при сохранении/удалении — за серверное «Unauthorized». Теперь 401 назван
+ * прямо и одинаково в обоих путях.
+ */
+describe('AdminTelegram: истёкшая сессия (F-R133 №12)', () => {
+  beforeEach(() => {
+    mocks.authFetch.mockReset();
+    vi.mocked(toast.error).mockClear();
+  });
+
+  it('401 при чтении списка → «Сессия истекла — войдите снова.»', async () => {
+    mocks.authFetch.mockResolvedValue(json({ error: 'Unauthorized' }, 401));
+    render(<AdminTelegram />);
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Сессия истекла — войдите снова.');
+    expect(screen.queryByText('Не удалось загрузить конфигурации Telegram')).toBeNull();
+  });
+
+  it('401 при сохранении → русский текст, а не серверное «Unauthorized»', async () => {
+    mocks.authFetch.mockImplementation((_url: string, init?: RequestInit) =>
+      init?.method === 'POST'
+        ? Promise.resolve(json({ error: 'Unauthorized' }, 401))
+        : Promise.resolve(json({ configs: [] })),
+    );
+    render(<AdminTelegram />);
+    await screen.findByText('Нет конфигураций Telegram');
+
+    fillCreateDialog({ label: 'Ночной чат', token: '123:ABC', chatId: '-100123' });
+    submitCreateDialog();
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Сессия истекла — войдите снова.'));
+  });
+});
