@@ -482,7 +482,14 @@ export function AdminDashboard() {
               /* Сбой аналитики объясняется на месте, только в своём блоке:
                  парк, ТО и риски приходят другими выборками и остаются. */
               <Empty text={loadError} tone="danger" />
-            ) : planRows.length === 0 ? <Empty text="Для выбранного периода нет объектов с планом" /> : (
+            ) : planRows.length === 0 ? (
+              /* F-R127 №3: на пустой базе отбор не при чём — объектов нет вовсе.
+                 Текст винил фильтр и не звал завести объект. */
+              noData && siteFilter === 'all' && rigFilter === 'all'
+                ? <Empty text="В системе пока нет объектов с планом. Заведите первый объект"
+                    action={{ label: 'Новый объект', onClick: () => router.push('/admin/sites') }} />
+                : <Empty text="Для выбранного периода нет объектов с планом" />
+            ) : (
               <div className="grid gap-2 p-3 sm:grid-cols-2">
                 {planRows.map((a) => <PlanTile key={a.siteId} a={a} />)}
               </div>
@@ -495,7 +502,12 @@ export function AdminDashboard() {
             {fleetRows.length === 0 ? (
               (stale.fleet || stale.maint)
                 ? <Empty text="Не удалось загрузить парк установок. Обновите сводку." tone="warning" />
-                : <Empty text="По выбранным фильтрам установок нет" />
+                /* F-R127 №4: пустой парк — «ещё не заводили», а не «отбор не дал».
+                   Ссылка ведёт в раздел, только если он доступен роли. */
+                : noFleet
+                  ? <Empty text="В парке пока нет установок. Добавьте первую"
+                      action={canReadEquipment ? { label: 'Добавить установку', onClick: () => router.push('/admin/equipment') } : undefined} />
+                  : <Empty text="По выбранным фильтрам установок нет" />
             ) : canReadEquipment ? (
               /* F-R126-2: у плитки установки прямые потомки — `div.truncate`
                  (white-space: nowrap) без min-w-0, поэтому её min-content
@@ -527,7 +539,13 @@ export function AdminDashboard() {
 
         <Section icon={AlertTriangle} title="Риски дня" count={visibleRisks.length} dominant>
           {visibleRisks.length === 0 ? (
-            (stale.fleet || stale.maint || stale.recent) ? <Empty text="Часть данных не загрузилась" tone="warning" /> : <Empty text={canReadMaintenance ? "Рисков нет" : "Рисков в доступных данных нет"} tone="success" />
+            (stale.fleet || stale.maint || stale.recent)
+              ? <Empty text="Часть данных не загрузилась" tone="warning" />
+              /* F-R127 №5: пустая база — не «всё в порядке», а «нечего оценивать»:
+                 зелёное «Рисков нет» на нулях читалось как измеренный факт. */
+              : emptySystem
+                ? <Empty text="Данных пока нет — нечего оценивать" />
+                : <Empty text={canReadMaintenance ? "Рисков нет" : "Рисков в доступных данных нет"} tone="success" />
           ) : (
             <div className="divide-y divide-border">
               <RiskGroup title="Критично" risks={groupedRisks.critical} onOpen={(href) => router.push(href)} />

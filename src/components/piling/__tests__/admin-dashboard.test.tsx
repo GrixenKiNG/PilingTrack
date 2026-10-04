@@ -77,7 +77,7 @@ describe('AdminDashboard: сбой аналитики не уносит весь
     mockFetch(json({ analytics: [] }));
     render(<AdminDashboard />);
 
-    expect(await screen.findByText('Для выбранного периода нет объектов с планом')).toBeInTheDocument();
+    expect(await screen.findByText('В системе пока нет объектов с планом. Заведите первый объект')).toBeInTheDocument();
     expect(screen.queryByText('Нет прав на аналитику')).not.toBeInTheDocument();
     expect(screen.queryByText('Не удалось загрузить, обновите страницу')).not.toBeInTheDocument();
   });
@@ -244,5 +244,28 @@ describe('AdminDashboard: пустая система — первый шаг и
     // «0 / 0» и «из 0» как факт на пустой базе не показываются.
     expect(screen.queryByText('0 / 0')).not.toBeInTheDocument();
     expect(screen.queryByText(/из 0/)).not.toBeInTheDocument();
+  });
+
+  /**
+   * F-R127 №3–№5. Пустые блоки на свежей базе винили отбор («нет объектов с
+   * планом за период», «по выбранным фильтрам установок нет») и рисовали
+   * зелёное «Рисков нет» на нулях. Теперь они зовут к первому действию, а
+   * риски читаются как «нечего оценивать».
+   */
+  it('пустые блоки зовут завести объект/установку, риски — не зелёные (№3–№5)', async () => {
+    render(<AdminDashboard />);
+
+    // №3: план-факт ведёт в объекты.
+    expect(await screen.findByText('В системе пока нет объектов с планом. Заведите первый объект')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Новый объект' })).toBeInTheDocument();
+    // №4: парк ведёт в установки.
+    expect(screen.getByText('В парке пока нет установок. Добавьте первую')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Добавить установку' })).toBeInTheDocument();
+    // №5: риски — нейтральный текст, а не зелёное «Рисков нет».
+    expect(screen.getByText('Данных пока нет — нечего оценивать')).toBeInTheDocument();
+    expect(screen.queryByText('Рисков нет')).not.toBeInTheDocument();
+    // Старые тексты «дело в отборе» на пустой базе не показываются.
+    expect(screen.queryByText('Для выбранного периода нет объектов с планом')).not.toBeInTheDocument();
+    expect(screen.queryByText('По выбранным фильтрам установок нет')).not.toBeInTheDocument();
   });
 });
