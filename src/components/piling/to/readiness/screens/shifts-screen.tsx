@@ -47,10 +47,15 @@ export function ShiftsScreen(props: ReferenceUiProps) {
   const activeCrews = props.crews.filter((crew) => crew.isActive);
   const timezone = props.bootstrap?.tenant.timezone ?? 'Europe/Moscow';
   const today = getTodayInTimezone(timezone);
-  const weekStart = Date.now() - 6 * 86_400_000;
+  // Производственный день `productionDate` — UTC-полночь календарного дня
+  // (`@db.Date`). Сравнивать его с живым `Date.now() - 6 суток` нельзя: крайняя
+  // (шестая) смена недели пропадала или прилипала в зависимости от часа. Окно
+  // «Неделя» считаем теми же производственными днями в поясе тенанта, что и
+  // ветка «День»: арифметика по календарю от сегодняшнего дня тенанта.
+  const weekStartDay = new Date(Date.parse(`${today}T00:00:00.000Z`) - 6 * 86_400_000).toISOString().slice(0, 10);
   const todayShifts = props.shifts.filter((shift) => period === 'day'
     ? shift.productionDate.slice(0, 10) === today
-    : new Date(shift.productionDate).getTime() >= weekStart);
+    : shift.productionDate.slice(0, 10) >= weekStartDay);
   const ready = todayShifts.filter((shift) => shift.state === 'STARTED');
   const waiting = todayShifts.filter((shift) => shift.state === 'HANDOVER_PENDING');
   const blocked = todayShifts.filter((shift) => shift.state === 'CANCELLED');

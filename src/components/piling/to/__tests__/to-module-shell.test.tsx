@@ -1,6 +1,10 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { bootstrapEnvelope } from '../readiness/api/__tests__/fixtures';
+import type { ReadinessShiftDto } from '../readiness/api/contracts';
+import type { ReferenceUiProps } from '../readiness/screens/types';
+import { ShiftsScreen } from '../readiness/screens/shifts-screen';
+import { getTodayInTimezone } from '@/lib/timezone';
 import {
   afterEach,
   beforeEach,
@@ -285,4 +289,109 @@ describe('ToModule production shell integration', () => {
 
     expect(document.title).toBe('Техническая готовность — PilingTrack');
   }, 30_000);
+});
+
+const DAY_MS = 86_400_000;
+
+/** Календарный день как UTC-полночь, сдвинутый на `delta` суток. */
+const shiftDay = (day: string, delta: number): string =>
+  new Date(Date.parse(`${day}T00:00:00.000Z`) + delta * DAY_MS).toISOString().slice(0, 10);
+
+function shift(id: string, productionDate: string, timezone: string, state: ReadinessShiftDto['state'] = 'STARTED'): ReadinessShiftDto {
+  return {
+    id, equipmentId: `eq-${id}`, type: 'DAY', state, productionDate, timezone,
+    plannedStartAt: null, plannedEndAt: null, requestedAt: null, declinedAt: null,
+    declineReason: null, startedAt: null, closedAt: null, version: 1, handovers: [],
+  };
+}
+
+/** Значение KPI-плитки по её подписи (плитка парка). */
+function kpiValue(label: string): string {
+  const value = screen.getByText(label).closest('div')?.querySelector('.text-2xl');
+  return value?.textContent ?? '';
+}
+
+/**
+ * F-R141-SHIFT-WEEK (R141 №17): фильтр «Неделя» сравнивал UTC-полночь
+ * `productionDate` с живым `Date.now() − 6 суток`, из-за чего крайняя шестая
+ * смена недели пропадала в зависимости от часа. Теперь окно считается
+ * производственными днями в поясе тенанта. Плитка «Смен сегодня» показывает
+ * число смен после фильтра — по ней и проверяем границы.
+ */
+describe('ShiftsScreen — неделя по производственным дням тенанта (F-R141-SHIFT-WEEK)', () => {
+  // Мгновение, выбранное так, чтобы старое сравнение «UTC-полночь против
+  // Date.now() − 6 суток» теряло крайний (шестой) день недели: now = 02:00 UTC,
+  // а полуночь шестого дня (00:00 UTC) лежит раньше него.
+  const NOW = new Date('2026-10-05T02:00:00.000Z');
+  const timezone = 'Asia/Vladivostok';
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  function renderShifts(shifts: ReadinessShiftDto[]) {
+    vi.useFakeTimers({ now: NOW });
+    const bootstrap = bootstrapEnvelope('shifts-week').data;
+    bootstrap.tenant.timezone = timezone;
+    const props = {
+      view: 'shifts',
+      onViewChange: () => {},
+      settingsSection: 'rules',
+      onSettingsSectionChange: () => {},
+      equipment: [],
+      selectedId: 'eq-a',
+      onSelect: () => {},
+      readinessByEquipment: {},
+      factsByEquipment: {},
+      scoresByEquipment: {},
+      rulesState: {} as ReferenceUiProps['rulesState'],
+      onRulesStateChange: () => {},
+      journals: {},
+      crews: [],
+      maintenance: [],
+      fleetCards: [],
+      details: {},
+      loading: false,
+      workspaceError: null,
+      workspaceIssues: [],
+      outOfRoleSources: [],
+      rulesAvailable: true,
+      bootstrap,
+      shifts,
+      permits: [],
+      defects: [],
+      currentReadiness: [],
+      authoritativeReadinessError: null,
+      readinessHistory: [],
+      audit: null,
+      filters: {},
+      onFiltersChange: () => {},
+      showInternalNavigation: false,
+      onRetry: () => {},
+    } satisfies ReferenceUiProps;
+    render(<ShiftsScreen {...props} />);
+  }
+
+  it('шестой производственный день в окне недели, седьмой — вне', () => {
+    const today = getTodayInTimezone(timezone);
+    renderShifts([
+      shift('in', shiftDay(today, -5), timezone),
+      shift('boundary', shiftDay(today, -6), timezone),
+      shift('out', shiftDay(today, -7), timezone),
+    ]);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Неделя' }));
+
+    expect(kpiValue('Смен сегодня')).toBe('2');
+  });
+
+  it('«День» фильтрует по сегодняшнему производственному дню', () => {
+    const today = getTodayInTimezone(timezone);
+    renderShifts([
+      shift('today', today, timezone),
+      shift('yesterday', shiftDay(today, -1), timezone),
+    ]);
+
+    expect(kpiValue('Смен сегодня')).toBe('1');
+  });
 });
