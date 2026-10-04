@@ -93,6 +93,18 @@ export function useReportsData(): UseReportsDataReturn {
 
   const referenceDataLoadedRef = useRef(false);
   const referenceDataPromiseRef = useRef<Promise<void> | null>(null);
+  // Поколение текущего отбора: растёт при каждой (пере)загрузке основного
+  // списка. Поздний ответ «Загрузить ещё», запущенный при прежнем отборе,
+  // распознаётся по нему и отбрасывается — иначе он подмешивает строки и
+  // курсор чужого отбора к уже заменённому списку.
+  const reportsGenRef = useRef(0);
+  // Защёлка на ref, а не на состоянии `loadingMore`: два вызова в одном тике
+  // видят `loadingMore === false` (состояние обновляется на следующем рендере)
+  // и оба ушли бы в сеть с одним курсором.
+  const loadMoreInFlightRef = useRef(false);
+  const loadMoreAbortRef = useRef<AbortController | null>(null);
+  // Монтирование: гасит устаревшую догрузку, дожившую до ухода с экрана.
+  const isMountedRef = useRef(true);
   // Bumped to force a reports refetch (retry after error, refresh after
   // create/delete). The load itself lives in the effect below.
   const [reloadKey, setReloadKey] = useState(0);
@@ -195,8 +207,24 @@ export function useReportsData(): UseReportsDataReturn {
   }, []);
 
   useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+      loadMoreAbortRef.current?.abort();
+    };
+  }, []);
+
+  useEffect(() => {
     const abortController = new AbortController();
     let isMounted = true;
+
+    // Новый отбор: поднимаем поколение, гасим догрузку прежнего отбора и
+    // снимаем защёлку, чтобы новая догрузка не ждала завершения устаревшей.
+    // Состояние `loadingMore` снимет `finally` самой догрузки (по владению
+    // AbortController) — здесь setState в теле эффекта недопустим.
+    reportsGenRef.current += 1;
+    loadMoreAbortRef.current?.abort();
+    loadMoreInFlightRef.current = false;
 
     const loadReports = async () => {
       setLoading(true);
@@ -280,14 +308,28 @@ export function useReportsData(): UseReportsDataReturn {
   }, []);
 
   const loadMoreReports = useCallback(async () => {
-    if (periodActive || loadingMore || !hasMore || !nextCursor) return;
+    if (periodActive || !hasMore || !nextCursor) return;
+    // Защёлка на ref, а не на `loadingMore`: синхронно гасит повторный вызов в
+    // одном тике (состояние обновится лишь на следующем рендере).
+    if (loadMoreInFlightRef.current) return;
+    loadMoreInFlightRef.current = true;
+
+    const gen = reportsGenRef.current;
+    const abortController = new AbortController();
+    loadMoreAbortRef.current = abortController;
+    // Ответ принадлежит текущему отбору и компонент ещё на экране.
+    const isCurrent = () => isMountedRef.current && gen === reportsGenRef.current;
+
     setLoadingMore(true);
     setLoadMoreError(null);
     try {
       const params = new URLSearchParams({ cursor: nextCursor, limit: String(REPORTS_PAGE_LIMIT) });
       if (filterSiteId !== 'all') params.set('siteId', filterSiteId);
       if (filterUserId !== 'all') params.set('userId', filterUserId);
-      const res = await authFetch(`/api/reports/all?${params.toString()}`);
+      const res = await authFetch(`/api/reports/all?${params.toString()}`, { signal: abortController.signal });
+      // Отбор сменился, пока ответ был в пути: страница чужого отбора не
+      // дописывается к новому списку и не перетирает его курсор.
+      if (!isCurrent()) return;
       if (!res.ok) {
         // Отказ догрузки не должен заменять уже загруженный список баннером
         // ошибки: данные никуда не делись, показать надо только хвост.
@@ -300,17 +342,27 @@ export function useReportsData(): UseReportsDataReturn {
         return;
       }
       const data = await res.json();
+      if (!isCurrent()) return;
       const reportsArray = Array.isArray(data.reports) ? data.reports : [];
       setReports((prev) => [...prev, ...reportsArray]);
       setHasMore(Boolean(data.hasMore));
       setNextCursor(data.nextCursor ?? null);
     } catch {
+      if (!isCurrent()) return;
       setLoadMoreError('Не удалось догрузить отчёты. Проверьте соединение.');
       toast.error('Ошибка догрузки отчётов');
     } finally {
-      setLoadingMore(false);
+      // Освобождаем защёлку и снимаем `loadingMore` только если этот запрос
+      // всё ещё владеет AbortController (новая догрузка его перезапишет) и
+      // компонент на экране. Проверка по владению, а не по поколению: устарев-
+      // шая догрузка тоже обязана снять с себя `loadingMore`, иначе он залипнет.
+      if (isMountedRef.current && loadMoreAbortRef.current === abortController) {
+        loadMoreAbortRef.current = null;
+        loadMoreInFlightRef.current = false;
+        setLoadingMore(false);
+      }
     }
-  }, [filterSiteId, filterUserId, hasMore, loadingMore, nextCursor, periodActive]);
+  }, [filterSiteId, filterUserId, hasMore, nextCursor, periodActive]);
 
   const handleApplyPeriod = () => {
     if (!periodFrom || !periodTo) {
