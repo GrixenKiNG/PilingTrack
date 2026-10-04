@@ -80,11 +80,16 @@ export function buildAnalyticsKpiWidgets(d: AnalyticsKpiData): Record<string, Re
     render: () => <KpiTile id={id} label={title} value={value} hint={hint} delta={delta} />,
   });
   const p = d.period;
+  // Дельта «Свай» и «Бурения» считается по погонным метрам (overview.kpi.meters /
+  // drilling), а плитка печатает и штуки, и метры: без единицы «+X % к пред. неделе»
+  // рядом с «шт. / м.п.» читается как процент по штукам (R139 №2).
   const pctDelta = (deltaPct: number | null | undefined) =>
-    p && deltaPct != null ? { text: `${signed(deltaPct, '%')} ${p.label}`, good: deltaPct >= 0 } : null;
+    p && deltaPct != null ? { text: `м.п. ${signed(deltaPct, '%')} ${p.label}`, good: deltaPct >= 0 } : null;
   return {
-    'kpi-equipment': tile('kpi-equipment', 'Установок', String(d.totalEquipment), 'всего'),
-    'kpi-sites': tile('kpi-sites', 'Объектов', String(d.sitesCount), 'активных'),
+    // Дневные плитки (снимок парка) подписаны «на сегодня», периодные — «за период»:
+    // иначе в одной полосе 7-дневный итог и текущий день читаются как один срез (R139 №1).
+    'kpi-equipment': tile('kpi-equipment', 'Установок', String(d.totalEquipment), 'всего на сегодня'),
+    'kpi-sites': tile('kpi-sites', 'Объектов', String(d.sitesCount), 'активных на сегодня'),
     // Сваи и бурение — одной записью «шт. / м.п.», как на всех экранах
     // (решение владельца 28.09.2026). Отдельная плитка «Погонные метры» убрана:
     // её число теперь во второй половине плитки «Сваи». Динамика — по м.п.
@@ -103,8 +108,8 @@ export function buildAnalyticsKpiWidgets(d: AnalyticsKpiData): Record<string, Re
       p ? 'по отчётам с указанным временем смены' : 'за сегодня, включая несданные смены',
       // For downtime a NEGATIVE delta (less idle time) is the good direction.
       p && p.downtime.deltaPp != null ? { text: `${signed(p.downtime.deltaPp, ' п.п.')} ${p.label}`, good: p.downtime.deltaPp <= 0 } : null),
-    'kpi-crews': tile('kpi-crews', 'Бригады', String(d.crewsOnShiftToday), 'на смене, включая несданные смены'),
-    'kpi-operators': tile('kpi-operators', 'Операторы', String(d.operatorsOnShiftToday), 'на смене, включая несданные смены'),
+    'kpi-crews': tile('kpi-crews', 'Бригады', String(d.crewsOnShiftToday), 'на смене сегодня, включая несданные смены'),
+    'kpi-operators': tile('kpi-operators', 'Операторы', String(d.operatorsOnShiftToday), 'на смене сегодня, включая несданные смены'),
   };
 }
 
