@@ -21,6 +21,7 @@ vi.mock('@/lib/store', () => ({
 }));
 
 import { Status4Control, YesNoControl } from '../inspection-controls';
+import { InspectionItemPhotos } from '../inspection-item-photos';
 import { RunInspection } from '../run-inspection';
 
 const json = (body: unknown, status = 200) =>
@@ -130,5 +131,21 @@ describe('экран осмотра: хлебные крошки (F-R136-TOP, �
     const crumb = screen.getByRole('navigation', { name: 'Путь к экрану' });
     expect(within(crumb).getByRole('link', { name: 'Осмотры' })).toHaveAttribute('href', '/inspections');
     expect(within(crumb).getByText('СП-49')).toBeInTheDocument();
+  });
+});
+
+/*
+  F-R137-TOP №1: «Добавить фото» у пункта осмотра было ≈20px — фото это
+  обязательное доказательство (пункт с photoRequired без фото не закрыть), а
+  на телефоне в перчатке в кнопку было почти не попасть. Галерея установки
+  уже получила 44px в R73.
+*/
+describe('фото пункта осмотра: цель нажатия на телефоне (F-R137-TOP, №1)', () => {
+  it('«Добавить фото» — не ниже 44px на телефоне, прежняя высота на десктопе', async () => {
+    mocks.authFetch.mockResolvedValue(json({ data: [] }));
+    render(<InspectionItemPhotos inspectionId="insp-1" itemId="i1" />);
+
+    const btn = await screen.findByRole('button', { name: 'Добавить фото' });
+    expect(btn).toHaveClass('min-h-11', 'items-center', 'sm:min-h-0');
   });
 });

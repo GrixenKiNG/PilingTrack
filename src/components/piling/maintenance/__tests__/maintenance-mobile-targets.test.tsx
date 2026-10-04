@@ -20,6 +20,7 @@ vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 import { MaintenanceBoard } from '../maintenance-board';
 import { MaintenanceDetailPanel } from '../maintenance-detail-panel';
 import { WorkOrderDetail } from '../work-order-detail';
+import { WorkOrderPhotos } from '../work-order-photos';
 import { WorkOrderTable } from '../work-order-table';
 import { STATUS_LABEL } from '../maintenance-labels';
 import type { WorkOrderRow } from '../maintenance-board-model';
@@ -236,5 +237,23 @@ describe('наряд ТО: хлебные крошки (F-R136-TOP, №2)', () =
     const crumb = await screen.findByRole('navigation', { name: 'Путь к экрану' });
     expect(within(crumb).getByRole('link', { name: 'Наряды ТО' })).toHaveAttribute('href', '/admin/maintenance');
     expect(within(crumb).getByText('ТО-1 СП-49')).toBeInTheDocument();
+  });
+});
+
+/*
+  F-R137-TOP №2: «Добавить фото» в галерее наряда ТО было 28px — фото это
+  обязательное доказательство работ, а на телефоне в перчатке в кнопку было
+  почти не попасть. Соседняя галерея установки уже получила 44px в R73.
+*/
+describe('галерея фото наряда ТО: цель нажатия на телефоне (F-R137-TOP, №2)', () => {
+  beforeEach(() => {
+    mocks.authFetch.mockResolvedValue(json({ data: [] }));
+  });
+
+  it('«Добавить фото» — не ниже 44px на телефоне, прежняя высота на десктопе', async () => {
+    render(<WorkOrderPhotos recordId="wo-1" />);
+
+    const btn = await screen.findByRole('button', { name: 'Добавить фото' });
+    expect(btn).toHaveClass('min-h-11', 'items-center', 'sm:min-h-0');
   });
 });
