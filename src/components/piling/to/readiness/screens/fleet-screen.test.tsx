@@ -177,3 +177,48 @@ describe('Время оценки в строке парка (R141 №5)', () =>
     expect(screen.getAllByText('Время оценки не указано').length).toBeGreaterThan(0);
   });
 });
+
+/**
+ * R141 №3: в строке парка была видна только первая причина из нескольких
+ * (`blockers[0] ?? warnings[0]`), остальные — лишь после выбора машины.
+ * Первую краткую причину оставляем, а число остальных ведёт в ту же панель
+ * «Основания оценки» выбранной установки.
+ */
+describe('Несколько причин блокировки видны в списке (R141 №3)', () => {
+  const blocker = (label: string, action = 'DENY_START') => ({ condition: 'CRITICAL_DEFECT', label, action, actionLabel: 'Запретить запуск' });
+  const warning = (message: string) => ({ message, action: 'REQUIRE_CONFIRMATION', actionLabel: 'Требуется подтверждение' });
+
+  it('0 и 1 причина не показывают счётчик «ещё»', () => {
+    expect(buildFleetItems(propsFor())[0].extraReasonCount).toBe(0);
+    const one = buildFleetItems(propsFor({ currentReadiness: [snapshot('rig-1', {
+      status: 'BLOCKED', verdict: 'DENIED', blockers: [blocker('Критический дефект')],
+    })] }))[0];
+    expect(one.reason).toBe('Критический дефект');
+    expect(one.extraReasonCount).toBe(0);
+  });
+
+  it('три причины дают «ещё 2 причины», первая остаётся краткой', () => {
+    const props = propsFor({ currentReadiness: [snapshot('rig-1', {
+      status: 'BLOCKED', verdict: 'DENIED',
+      blockers: [blocker('Критический дефект гидравлики'), blocker('Нет осмотра за сегодня', 'RETURN_TO_OPERATOR')],
+      warnings: [warning('Просрочено ТО по дате')],
+    })] });
+    const item = buildFleetItems(props)[0];
+    expect(item.reason).toBe('Критический дефект гидравлики');
+    expect(item.extraReasonCount).toBe(2);
+
+    const onSelect = vi.fn();
+    render(<FleetScreen {...props} selectedId="rig-2" onSelect={onSelect} />);
+    const more = screen.getByRole('button', { name: /Открыть основания оценки Установка 1: ещё 2 причины/ });
+    more.focus();
+    expect(more).toHaveFocus();
+    fireEvent.click(more);
+    expect(onSelect).toHaveBeenCalledWith('rig-1');
+  });
+
+  it('неизвестный снимок не показывает счётчик причин', () => {
+    render(<FleetScreen {...propsFor({ currentReadiness: [] })} />);
+
+    expect(screen.queryByRole('button', { name: /Открыть основания оценки/ })).not.toBeInTheDocument();
+  });
+});

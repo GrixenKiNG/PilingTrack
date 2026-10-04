@@ -67,10 +67,21 @@ export function buildFleetItems(props: Pick<ReferenceUiProps, 'equipment' | 'fle
       : presentation.outcome === 'BLOCKED' ? 'blocked'
         : presentation.outcome === 'READY' ? 'ready' : 'attention';
     const fleet = cards.get(equipment.id);
-    const reason = presentation.blockers[0]?.label ?? presentation.warnings[0]?.label
+    /*
+      Причины — это все замечания авторитетной оценки в том порядке, в каком
+      их показывает панель: сначала блокеры, затем предупреждения (см.
+      fleet-evidence-panel, раздел «Основания оценки»). Список оставляем
+      полным, но в строке показываем одну краткую причину — первую, как и
+      прежде: приоритет допуска не меняем. Число остальных строку не
+      расширяет, а ведёт в ту же панель, где причины уже перечислены целиком.
+      Порядок «блокер важнее предупреждения» повторяет `nextAction` и панель.
+    */
+    const reasons = [...presentation.blockers, ...presentation.warnings];
+    const reason = reasons[0]?.label
       ?? (group === 'unknown' ? 'Нет подтверждённой оценки'
         : group === 'ready' ? 'Блокирующих условий в оценке нет' : presentation.description);
     return { equipment, fleet, snapshot, presentation, group, reason,
+      extraReasonCount: Math.max(0, reasons.length - 1),
       site: fleet?.assignedSiteName || 'Без объекта' };
   });
 }

@@ -10,6 +10,7 @@ import { kpiGridStyle } from '@/components/piling/kpi-tile';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { formatDateTimeInTimezone } from '@/lib/timezone';
+import { pluralizeRu } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { COMPACT_KPI_GRID, ScreenTitle, card } from '../settings/shared-ui';
 import { EquipmentPhoto, RefKpi, downloadReadinessExport } from './shared';
@@ -189,7 +190,22 @@ export function FleetScreen(props: ReferenceUiProps) {
                   </div>
                 </div>
               </th>
-              <td className="p-3"><FleetStatus item={item} /><p className="mt-2 max-w-xs text-xs leading-relaxed text-muted-foreground">{item.reason}</p></td>
+              <td className="p-3"><FleetStatus item={item} /><p className="mt-2 max-w-xs text-xs leading-relaxed text-muted-foreground">{item.reason}</p>
+                {/*
+                  В строке — одна краткая причина; остальные уже перечислены в
+                  панели «Основания оценки». Ссылка ведёт именно в неё: она
+                  выбирает эту установку, а не открывает отдельную страницу.
+                  Кнопка, а не <a>: это действие внутри экрана (выбор машины
+                  уже открывает панель), и нативный <button> доступен с
+                  клавиатуры так же, как ссылка.
+                */}
+                {item.extraReasonCount > 0 && <button type="button"
+                  aria-label={`Открыть основания оценки ${item.equipment.name}: ещё ${item.extraReasonCount} ${pluralizeRu(item.extraReasonCount, ['причина', 'причины', 'причин'])}`}
+                  onClick={() => select(item.equipment.id)}
+                  className="mt-1 rounded text-xs font-semibold text-signal-strong underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-signal">
+                  Ещё {item.extraReasonCount} {pluralizeRu(item.extraReasonCount, ['причина', 'причины', 'причин'])} — открыть основания оценки
+                </button>}
+              </td>
               <td className="whitespace-nowrap p-3 text-xs text-muted-foreground">
                 <span className="inline-flex items-center gap-1.5"><PilingIcon name="history" size={16} decorative />{evaluationTime(item.presentation.calculatedAt)}</span>
               </td>
