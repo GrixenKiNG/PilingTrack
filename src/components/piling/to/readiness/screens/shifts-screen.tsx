@@ -262,8 +262,10 @@ export function ShiftsScreen(props: ReferenceUiProps) {
           {activeCrews.length > 0 ? activeCrews.slice(0, 5).map((crew) => {
             const state = crew.equipment ? props.readinessByEquipment[crew.equipment.id] : null;
             // `load` — историческое имя: это балл готовности установки экипажа,
-            // а не загрузка бригады.
-            const load = state?.score ?? 0;
+            // а не загрузка бригады. Неизвестный балл (оценка не подтверждена)
+            // не показываем нулём: ноль — это утверждение «готовность 0»,
+            // которого у нас нет (F-N1004-UNKNOWN-READINESS).
+            const load = state?.score ?? null;
             return (
               <article key={crew.id} className="rounded-lg border border-border p-2">
                 <div className="flex items-start justify-between gap-3">
@@ -272,7 +274,7 @@ export function ShiftsScreen(props: ReferenceUiProps) {
                 </div>
                 <div className="mt-2 truncate text-2xs text-muted-foreground">{crew.equipment?.name || 'Техника не назначена'}</div>
                 <div className="mt-1 text-3xs text-muted-foreground">{crew.site?.name || 'Объект не назначен'}</div>
-                <div className="mt-2 flex items-center gap-2"><div className="h-1.5 flex-1 overflow-hidden rounded-full bg-border"><div className={cn('h-full rounded-full', load >= READINESS_READY_THRESHOLD ? 'bg-success-strong' : 'bg-signal-strong')} style={{ width: `${load}%` }} /></div><b className="text-3xs">{load}%</b></div>
+                <div className="mt-2 flex items-center gap-2"><div className="h-1.5 flex-1 overflow-hidden rounded-full bg-border"><div className={cn('h-full rounded-full', load != null && load >= READINESS_READY_THRESHOLD ? 'bg-success-strong' : 'bg-signal-strong')} style={{ width: `${load ?? 0}%` }} /></div><b className="text-3xs">{load == null ? '—' : `${load}%`}</b></div>
               </article>
             );
           }) : <div className="col-span-5 py-8 text-center text-sm text-muted-foreground">Активные экипажи не назначены.</div>}

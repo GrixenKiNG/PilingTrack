@@ -50,6 +50,7 @@ vi.mock('@/components/piling/to/readiness-reference-ui', () => ({
     workspaceIssues: Array<{ source: string; message: string }>;
     journals: Record<string, unknown>;
     details: Record<string, unknown>;
+    readinessByEquipment: Record<string, { status: string; canOperate: boolean }>;
   }) => (
     <section
       data-testid="reference-ui"
@@ -61,6 +62,9 @@ vi.mock('@/components/piling/to/readiness-reference-ui', () => ({
       data-issues={props.workspaceIssues.map((issue) => issue.source).join('|')}
       data-journals={Object.keys(props.journals).join(',')}
       data-details={Object.keys(props.details).join(',')}
+      data-readiness={Object.entries(props.readinessByEquipment)
+        .map(([id, state]) => `${id}:${state.status}:${state.canOperate}`)
+        .join('|')}
     >
       <button type="button" onClick={() => props.onViewChange('reports')}>
         Open reports
@@ -182,6 +186,11 @@ describe('ToModule production shell integration', () => {
     mocks.deriveEquipmentReadiness.mockReset();
     mocks.deriveEquipmentReadiness.mockImplementation((equipment: { id: string }) => ({
       equipmentId: equipment.id,
+      // Полностью зелёная производная оценка: она не должна подменять собой
+      // авторитетный отказ (F-N1004-UNKNOWN-READINESS).
+      status: 'READY',
+      canOperate: true,
+      score: 100,
     }));
   });
 
@@ -354,6 +363,51 @@ describe('ToModule production shell integration', () => {
   }, 30_000);
 
   /**
+   * F-N1004-UNKNOWN-READINESS (R151 №4): производная модель
+   * `readinessByEquipment` не знала об отказе авторитетного чтения — при
+   * упавшем `/api/readiness/current` и полном журнале она давала зелёный READY,
+   * а «Отчёты» и экипажи смен читают именно её. Проверяем, что при отказе
+   * текущего снимка производная оценка не проходит как готовность.
+   */
+  it('отказ текущего снимка не даёт производную зелёную готовность (F-N1004-UNKNOWN-READINESS)', async () => {
+    mocks.authFetch.mockImplementation(async (url: string, options?: RequestInit) => {
+      if (url.startsWith('/api/readiness/current')) {
+        return jsonResponse({ error: 'Снимок недоступен' }, 500);
+      }
+      if (url.startsWith('/api/readiness/history')) {
+        return jsonResponse({ data: [], page: { limit: 500, total: 0 }, filters: {} });
+      }
+      return responseFor(url, options);
+    });
+
+    await renderToModule('/admin/to');
+
+    const readiness = screen.getByTestId('reference-ui').getAttribute('data-readiness') ?? '';
+    expect(readiness).toContain('equipment-1:NO_DATA:false');
+    expect(readiness).not.toContain(':READY:true');
+  }, 30_000);
+
+  /**
+   * F-N1004-UNKNOWN-READINESS: правка не должна гасить успешный авторитетный
+   * путь. Пока текущий снимок читается (без ошибки), производная оценка для
+   * установок без снимка работает как прежде.
+   */
+  it('успешный текущий снимок сохраняет производную оценку парка (F-N1004-UNKNOWN-READINESS)', async () => {
+    mocks.authFetch.mockImplementation(async (url: string, options?: RequestInit) => {
+      if (url.startsWith('/api/readiness/current')) return jsonResponse({ data: [] });
+      if (url.startsWith('/api/readiness/history')) {
+        return jsonResponse({ data: [], page: { limit: 500, total: 0 }, filters: {} });
+      }
+      return responseFor(url, options);
+    });
+
+    await renderToModule('/admin/to');
+
+    const readiness = screen.getByTestId('reference-ui').getAttribute('data-readiness') ?? '';
+    expect(readiness).toContain('equipment-1:READY:true');
+  }, 30_000);
+
+  /**
    * F-N1004-SELECTED-SOURCES (R151 №2/№3): догрузка журнала и карточки
    * выбранной после первой загрузки установки глушила отказ источника —
    * `journalLoaded` ставился безусловно, а сообщения об ошибке не писались.
@@ -489,7 +543,7 @@ describe('ShiftsScreen — неделя по производственным д
     vi.useRealTimers();
   });
 
-  function renderShifts(shifts: ReadinessShiftDto[]) {
+  function renderShifts(shifts: ReadinessShiftDto[], overrides: Partial<ReferenceUiProps> = {}) {
     vi.useFakeTimers({ now: NOW });
     const bootstrap = bootstrapEnvelope('shifts-week').data;
     bootstrap.tenant.timezone = timezone;
@@ -529,6 +583,7 @@ describe('ShiftsScreen — неделя по производственным д
       onFiltersChange: () => {},
       showInternalNavigation: false,
       onRetry: () => {},
+      ...overrides,
     } satisfies ReferenceUiProps;
     render(<ShiftsScreen {...props} />);
   }
@@ -554,6 +609,43 @@ describe('ShiftsScreen — неделя по производственным д
     ]);
 
     expect(kpiValue('Смен сегодня')).toBe('1');
+  });
+
+  /**
+   * F-N1004-UNKNOWN-READINESS (R151 №4): плитка экипажа брала балл готовности
+   * через `state?.score ?? 0` и печатала «0%», когда авторитетная оценка не
+   * подтверждена (балл `null`). Ноль — это утверждение о готовности, которого
+   * у нас нет; показываем прочерк.
+   */
+  it('неизвестный балл готовности экипажа не показывается нулём (F-N1004-UNKNOWN-READINESS)', () => {
+    renderShifts([], {
+      crews: [{
+        id: 'crew-1',
+        name: 'Бригада 1',
+        isActive: true,
+        operator: { id: 'op-1', name: 'Иван', role: 'OPERATOR' },
+        equipment: { id: 'eq-a', name: 'Rig A' },
+        site: null,
+        assistants: [],
+      }],
+      readinessByEquipment: {
+        'eq-a': {
+          equipmentId: 'eq-a',
+          status: 'NO_DATA',
+          canOperate: false,
+          score: null,
+          reason: 'Авторитетная оценка недоступна.',
+          nextAction: '',
+          nextActionHref: '',
+          evidence: [],
+          latestInspection: null,
+          activeRecord: null,
+        },
+      },
+    });
+
+    expect(screen.queryByText('0%')).not.toBeInTheDocument();
+    expect(screen.getByText('—')).toBeInTheDocument();
   });
 });
 
@@ -616,5 +708,41 @@ describe('ReportsScreen — отказ истории виден у отчёто
     renderReports();
 
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  /**
+   * F-N1004-UNKNOWN-READINESS (R151 №4): при отказе авторитетного чтения
+   * «Готовность парка» считалась по производной модели и печатала процент,
+   * которого сервер не подтверждал. Показываем «—», а не выдуманное число.
+   */
+  it('при отказе авторитетного чтения не печатает производную готовность парка (F-N1004-UNKNOWN-READINESS)', () => {
+    renderReports({
+      equipment: [{
+        id: 'eq-1',
+        name: 'Rig 1',
+        model: null,
+        hammerKind: 'NONE',
+        isCombined: false,
+        isActive: true,
+        crewCount: 0,
+      }],
+      readinessByEquipment: {
+        'eq-1': {
+          equipmentId: 'eq-1',
+          status: 'READY',
+          canOperate: true,
+          score: 100,
+          reason: '',
+          nextAction: '',
+          nextActionHref: '',
+          evidence: [],
+          latestInspection: null,
+          activeRecord: null,
+        },
+      },
+      authoritativeReadinessError: 'Снимок недоступен',
+    });
+
+    expect(kpiValue('Готовность парка')).toBe('—');
   });
 });

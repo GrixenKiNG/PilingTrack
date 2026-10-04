@@ -54,7 +54,10 @@ import {
   type ReadinessEvidence,
   type ReadinessStatus,
 } from './readiness-model';
-import { buildAuthoritativeReadinessPresentation } from './readiness/authoritative-presentation';
+import {
+  buildAuthoritativeReadinessPresentation,
+  buildUnavailableReadinessPresentation,
+} from './readiness/authoritative-presentation';
 import type { EquipmentOption } from './to-module-bits';
 import type { JournalRecord } from './to-stats';
 // Та же матрица прав, по которой откажет сервер. Модуль чистый — ни базы,
@@ -671,9 +674,17 @@ export function ToModule({ surface = 'readiness' }: { surface?: ModuleSurface } 
         journals[item.id] ?? [],
         journalLoaded[item.id] === true,
       );
-      if (!snapshot) return [item.id, derived] as const;
 
-      const presentation = buildAuthoritativeReadinessPresentation(snapshot);
+      // Отказ авторитетного чтения не заменяем производной оценкой: журнал
+      // может быть полон и дать зелёный READY, хотя сервер вердикта не вынес
+      // (R151 №4). Как в парке и центре, показываем «не подтверждено».
+      const presentation = authoritativeReadinessError
+        ? buildUnavailableReadinessPresentation(snapshot ?? null)
+        : snapshot
+          ? buildAuthoritativeReadinessPresentation(snapshot)
+          : null;
+      if (!presentation) return [item.id, derived] as const;
+
       if (presentation.status === 'UNCONFIRMED') {
         return [item.id, {
           ...derived,
@@ -704,7 +715,7 @@ export function ToModule({ surface = 'readiness' }: { surface?: ModuleSurface } 
       } satisfies EquipmentReadiness] as const;
     });
     return Object.fromEntries(entries) as Record<string, EquipmentReadiness>;
-  }, [currentReadiness, equipment, journalLoaded, journals]);
+  }, [authoritativeReadinessError, currentReadiness, equipment, journalLoaded, journals]);
 
   const factsByEquipment = useMemo(() => Object.fromEntries(
     equipment.map((item) => [

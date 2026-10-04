@@ -104,7 +104,13 @@ export function ReportsScreen(props: ReferenceUiProps) {
     : states.filter((item) => item.canOperate).length;
   const readinessPercent = authoritative?.length
     ? Math.round(authoritative.reduce((sum, item) => sum + item.score, 0) / authoritative.length * 10) / 10
-    : states.length ? Math.round(ready / states.length * 1000) / 10 : 0;
+    : props.authoritativeReadinessError
+      // Отказ авторитетного чтения — производный процент по журналу не
+      // показываем: сервер вердикта не вынес, и число было бы выдуманным
+      // (F-N1004-UNKNOWN-READINESS). Неизвестное — прочерк, а не ноль.
+      ? null
+      : states.length ? Math.round(ready / states.length * 1000) / 10 : 0;
+  const readinessPercentLabel = readinessPercent == null ? '—' : formatPercent(readinessPercent);
   const timezone = props.bootstrap?.tenant.timezone ?? 'Europe/Moscow';
   const period = resolveReportPeriod(props.filters, timezone);
   // Сравнение строк «ГГГГ-ММ-ДД» — то же, что сравнение календарных дней.
@@ -316,8 +322,10 @@ export function ReportsScreen(props: ReferenceUiProps) {
           icon="technical-readiness"
           label="Готовность парка"
           tone="success"
-          value={formatPercent(readinessPercent)}
-          detail={deltaDetail(readinessPercent, previousScore, 'п.п.') ?? 'сравнить не с чем'}
+          value={readinessPercentLabel}
+          detail={readinessPercent == null
+            ? 'авторитетная оценка недоступна'
+            : deltaDetail(readinessPercent, previousScore, 'п.п.') ?? 'сравнить не с чем'}
         />
         {/*
           Было «Смен допущено» со значением ready — это количество ГОТОВЫХ
@@ -388,7 +396,7 @@ export function ReportsScreen(props: ReferenceUiProps) {
                   За выбранный период снимков готовности нет.
                 </div>
               )}
-              <div className="absolute right-3 top-3 rounded border border-border bg-card px-3 py-2 text-xs"><b>{formatPercent(readinessPercent)}</b><br /><span className="text-muted-foreground">сегодня</span></div>
+              <div className="absolute right-3 top-3 rounded border border-border bg-card px-3 py-2 text-xs"><b>{readinessPercentLabel}</b><br /><span className="text-muted-foreground">сегодня</span></div>
             </div>
           </div>
           {dailyTrend.length > 0 && (
