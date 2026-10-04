@@ -4,8 +4,12 @@
 import { formatFixed, formatNumber as formatNumberRu } from '@/lib/format';
 
 export function safeText(value: unknown): string {
-  const text = value === null || value === undefined || value === '' ? '—' : String(value);
-  return text.replace(/\s+/g, ' ').trim();
+  // Не-конечные числа (NaN/±Infinity) — не текст: в PDF печаталось «NaN»/«Infinity».
+  if (typeof value === 'number' && !Number.isFinite(value)) return '—';
+  if (value === null || value === undefined || value === '') return '—';
+  // Строка из пробелов после сжатия даёт пустоту — тоже подстановка «—».
+  const text = String(value).replace(/\s+/g, ' ').trim();
+  return text === '' ? '—' : text;
 }
 
 export function formatNumber(value: number | null | undefined): string {
@@ -19,9 +23,20 @@ export function formatMeters(value: number | null | undefined): string {
 
 export function formatRuDate(value: string): string {
   if (!value) return '—';
-  const [year, month, day] = value.split('-').map(Number);
-  if (!year || !month || !day) return value;
-  return new Date(Date.UTC(year, month - 1, day)).toLocaleDateString('ru-RU');
+  // Принимаем только строгую календарную дату ГГГГ-ММ-ДД; битую (abc, 2026-04,
+  // 2026-02-30) не возвращаем «как есть» и не нормализуем в другой месяц.
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return '—';
+  const [, year, month, day] = match;
+  const y = Number(year);
+  const m = Number(month);
+  const d = Number(day);
+  const date = new Date(Date.UTC(y, m - 1, d));
+  if (date.getUTCFullYear() !== y || date.getUTCMonth() !== m - 1 || date.getUTCDate() !== d) {
+    return '—';
+  }
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${pad(d)}.${pad(m)}.${year}`;
 }
 
 export function shortId(value: string): string {

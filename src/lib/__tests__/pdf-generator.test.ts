@@ -355,29 +355,33 @@ describe('pdf-generator — формат строк и итогов период
     expect(sumPiles(toPeriodReportRow(undefined))).toBe(0);
   });
 
-  it.fails('safeText печатает «NaN»/«Infinity» вместо «—» (T-PDF-FORMAT)', async () => {
-    // Дефект: guard ловит null/undefined/пустую строку, но не не-конечное число —
-    // в PDF печатается «NaN»/«Infinity» вместо «—».
+  it('safeText печатает «—» вместо «NaN»/«Infinity», сохраняя конечные числа (T-PDF-FORMAT)', async () => {
     const { safeText } = await import('@/lib/pdf-generator/format');
 
     expect(safeText(NaN)).toBe('—');
     expect(safeText(Infinity)).toBe('—');
+    expect(safeText(-Infinity)).toBe('—');
+    // Конечный 0 — не пустота: печатается как «0», а не «—».
+    expect(safeText(0)).toBe('0');
+    expect(safeText(12.5)).toBe('12.5');
   });
 
-  it.fails('safeText оставляет пробельную строку пустой вместо «—» (T-PDF-FORMAT)', async () => {
-    // Дефект: «   » не равно '' на входе, поэтому после trim выходит пустая
-    // строка, а не подстановка «—»: в документе остаётся пустая ячейка.
+  it('safeText оставляет «—» вместо строки из одних пробелов (T-PDF-FORMAT)', async () => {
     const { safeText } = await import('@/lib/pdf-generator/format');
 
     expect(safeText('   ')).toBe('—');
+    expect(safeText('\n\t  ')).toBe('—');
   });
 
-  it.fails('formatRuDate не печатает битую дату вместо «—» (T-PDF-FORMAT)', async () => {
-    // Дефект: неразобранная дата возвращается «как есть» — в PDF попадает
-    // «abc» или неполный ISO «2026-04» вместо «—» (ср. @/lib/format.formatRuDate).
+  it('formatRuDate печатает «—» вместо битой даты и не сдвигает валидную (T-PDF-FORMAT)', async () => {
     const { formatRuDate } = await import('@/lib/pdf-generator/format');
 
     expect(formatRuDate('abc')).toBe('—');
     expect(formatRuDate('2026-04')).toBe('—');
+    // Невозможная календарная дата не нормализуется молча в другой месяц.
+    expect(formatRuDate('2026-02-30')).toBe('—');
+    expect(formatRuDate('2026-13-01')).toBe('—');
+    // Валидная дата — в правильном дне независимо от системного пояса.
+    expect(formatRuDate('2026-04-24')).toBe('24.04.2026');
   });
 });
