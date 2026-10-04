@@ -11,6 +11,7 @@ import { isOpenRecord } from '../../to-stats';
 import type { AuthoritativeReadinessFactsDto, ReadinessShiftDto } from '../api/contracts';
 import { buildAuthoritativeReadinessPresentation, buildUnavailableReadinessPresentation, type AuthoritativeReadinessPresentation, type PresentationEvidence, type PresentationStage } from '../authoritative-presentation';
 import { EquipmentPhoto, ReadinessRing, STAGE_CTA, muted, blockerTone, BLOCKER_TONE_CLASS, BLOCKER_TONE_LABEL } from './shared';
+import { blockerGuidance } from './blocker-guidance';
 import type { EquipmentDetailSnapshot, ReferenceUiProps, ReferenceView } from './types';
 
 const ROLE_FLOW = [
@@ -488,6 +489,18 @@ export function ReadinessCentre(props: ReferenceUiProps) {
     критический дефект. Тон берём из действия блокера.
   */
   const topTone = topBlocker ? BLOCKER_TONE_CLASS[blockerTone(topBlocker.action)] : null;
+  /*
+    Кто снимает причину и куда идти. Доменный `actionLabel` («Вернуть
+    оператору») — команда системе, а не адрес для человека; маршрутизация
+    «кто/куда» уже описана в blocker-guidance и до сих пор жила только в
+    «Отчётах». Показываем её рядом с причиной; кнопка перехода ведёт на ту же
+    вкладку, но только если вкладка доступна роли (полоса вкладок фильтруется
+    по тем же capabilities.screens — иначе обещали бы переход в никуда).
+  */
+  const topGuidance = topBlocker ? blockerGuidance(topBlocker) : null;
+  const guidanceView = topGuidance?.view ?? null;
+  const guidanceAvailable = guidanceView != null
+    && props.bootstrap?.capabilities.screens[guidanceView] !== false;
   const hasBlockingDeny = presentation.blockers.some((notice) => blockerTone(notice.action) === 'critical');
   const recommendation = blockers > 0
     ? hasBlockingDeny
@@ -835,9 +848,28 @@ export function ReadinessCentre(props: ReferenceUiProps) {
               <div className="flex-1">
                 <div className="font-semibold">{topBlocker?.label ?? (presentation.status === 'UNCONFIRMED' ? presentation.title : 'Ничего не держит допуск')}</div>
                 <div className="mt-1 text-xs text-muted-foreground">{topBlocker?.actionLabel ?? presentation.description}</div>
+                {/* Карта интерфейса: кто отвечает за снятие и на каком экране это делается. */}
+                {topGuidance && (
+                  <div className="mt-1 flex flex-wrap items-center gap-x-1 text-xs text-muted-foreground">
+                    <span>Снимает</span>
+                    <span className="font-semibold text-foreground">{topGuidance.who}</span>
+                    <span aria-hidden>·</span>
+                    <span>{topGuidance.where}</span>
+                  </div>
+                )}
               </div>
               <span className={cn('rounded border px-2 py-1 text-xs', topTone?.badge ?? 'border-border text-muted-foreground')}>{topBlocker ? BLOCKER_TONE_LABEL[blockerTone(topBlocker.action)] : 'Нет блокеров'}</span>
             </div>
+            {guidanceAvailable && (
+              <Button
+                type="button"
+                variant="outline"
+                className="mt-2 h-9 w-full"
+                onClick={() => guidanceView && props.onViewChange(guidanceView)}
+              >
+                Перейти к снятию <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            )}
           </div>
           <div className="flex flex-1 flex-col border-t border-border p-4">
             <h3 className="flex items-center gap-2 font-bold"><FileText className="h-4 w-4 text-muted-foreground" />Доказательства готовности</h3>

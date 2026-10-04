@@ -253,3 +253,59 @@ describe('Центр готовности: блокер показан по де
     expect(screen.getByText('Рекомендация: устранить блокирующие условия для допуска к работе.')).toBeInTheDocument();
   });
 });
+
+/**
+ * R141 №4: у причины блокировки на доске не было адреса — кто снимает и куда
+ * идти; `actionLabel` («Вернуть оператору») описывает реакцию системы, а не
+ * действие человека. Рядом с причиной показываем маршрутизацию из
+ * существующего `blockerGuidance` и кнопку перехода на нужную вкладку; код,
+ * которого нет в карте, остаётся видимым без выдуманной подсказки.
+ */
+describe('Центр готовности: у причины есть адресат и переход (R141 №4)', () => {
+  const blockedSnapshot = (condition: string, label: string): CurrentReadinessDto => ({
+    snapshotId: 'snap-eq-1', equipmentId: 'eq-1', status: 'BLOCKED', verdict: 'RETURN_TO_OPERATOR', score: 60,
+    calculatedAt: '2026-10-01T06:00:00.000Z', ruleSetVersion: 'v1', triggerType: null,
+    blockers: [{ condition, action: 'RETURN_TO_OPERATOR', label, actionLabel: 'Вернуть оператору' }],
+    warnings: [],
+    facts: { inspectionCompleted: false, inspectionProgress: 0, healthScore: 50, meterKnown: true,
+      permitValid: null, permitExpired: false, maintenanceConfigured: true,
+      maintenanceOverdueHours: 0, maintenanceOverdueDays: 0, accepted: true, criticalDefect: false, findings: 0 },
+    evidence: { equipmentId: 'eq-1', inspectionId: null, permitId: null, maintenanceRecordIds: [], evaluatedAt: '2026-10-01T06:00:00.000Z' },
+  });
+
+  it('известный блокер: кто снимает, куда идти, и кнопка ведёт на нужную вкладку', () => {
+    const onViewChange = vi.fn();
+    render(<ReadinessCentre {...propsFor({
+      currentReadiness: [blockedSnapshot('INSPECTION_BELOW_80', 'Нет осмотра за сегодня')],
+      onViewChange,
+    })} />);
+
+    expect(screen.getByText('оператор')).toBeInTheDocument();
+    expect(screen.getByText('вкладка «Смены» → провести осмотр за сегодня')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /Перейти к снятию/ }));
+    expect(onViewChange).toHaveBeenCalledWith('shifts');
+  });
+
+  it('неизвестный блокер остаётся видимым, но без выдуманной подсказки и кнопки', () => {
+    render(<ReadinessCentre {...propsFor({
+      currentReadiness: [blockedSnapshot('UNKNOWN_CODE', 'Новая причина из правил')],
+    })} />);
+
+    expect(screen.getByText('Новая причина из правил')).toBeInTheDocument();
+    expect(screen.queryByText('Снимает')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Перейти к снятию/ })).not.toBeInTheDocument();
+  });
+
+  it('вкладка, закрытая роли, не обещает переход — подсказка остаётся видимой', () => {
+    const base = bootstrapEnvelope().data;
+    const bootstrap = { ...base, capabilities: { ...base.capabilities, screens: { ...base.capabilities.screens, shifts: false } } };
+    render(<ReadinessCentre {...propsFor({
+      currentReadiness: [blockedSnapshot('INSPECTION_BELOW_80', 'Нет осмотра за сегодня')],
+      bootstrap,
+    })} />);
+
+    expect(screen.getByText('вкладка «Смены» → провести осмотр за сегодня')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Перейти к снятию/ })).not.toBeInTheDocument();
+  });
+});
