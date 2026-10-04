@@ -180,7 +180,7 @@ export function EquipmentDetail({ equipmentId, embedded = false, onSaved }: Prop
           </Badge>
           {!eq.isActive && (
             <Badge variant="secondary" className="bg-muted text-muted-foreground border-border">
-              Неактивна
+              Списана
             </Badge>
           )}
         </div>

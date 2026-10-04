@@ -28,6 +28,7 @@ import { Activity, Gauge, Info, Wrench } from '@/components/piling/icons/unified
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 import { EquipmentToTab } from './equipment-to-tab';
+import { KIND_LABEL } from './equipment-status';
 
 export interface EquipmentFormState {
   // core
@@ -84,13 +85,10 @@ export const EMPTY_EQUIPMENT_FORM: EquipmentFormState = {
   homeBaseLocation: '',
 };
 
-const KIND_LABELS: Record<EquipmentKindDTO, string> = {
-  PILE_DRIVER: 'Забивная установка',
-  DRILLING_RIG: 'Буровая установка',
-  VIBRO_HAMMER: 'Вибропогружатель',
-  HYBRID: 'Гибрид (забивка + бурение)',
-  OTHER: 'Другое',
-};
+// Названия типа техники берём из общего словаря карточки и списка
+// (F-R138-TOP №1): свой список в форме разошёлся с ним, и «Копёр» в списке
+// не совпадал с «Забивная установка» в шапке карточки.
+const KIND_LABELS = KIND_LABEL;
 
 type HammerKindDTO = 'HYDRAULIC' | 'DIESEL' | 'NONE';
 const HAMMER_KIND_LABELS: Record<HammerKindDTO, string> = {

@@ -55,7 +55,7 @@ describe('buildFleetFilterOptions', () => {
 
   it('maps kind codes to Russian labels', () => {
     const opts = buildFleetFilterOptions([card({ kind: 'PILE_DRIVER' })]);
-    expect(opts.kinds[0]).toEqual({ value: 'PILE_DRIVER', label: 'Копёр' });
+    expect(opts.kinds[0]).toEqual({ value: 'PILE_DRIVER', label: 'Забивная установка' });
   });
 
   it('returns empty options for an empty fleet', () => {

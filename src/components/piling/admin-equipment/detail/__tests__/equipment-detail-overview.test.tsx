@@ -23,6 +23,7 @@ import { EquipmentDetail } from '../equipment-detail';
 import { EquipmentDocuments } from '../equipment-documents';
 import { usePilingStore } from '@/lib/store';
 import type { TimelineRow } from '../equipment-detail-parts';
+import { KIND_LABEL } from '../../equipment-status';
 import type { EquipmentDTO } from '@/lib/types';
 
 const stats = {
@@ -260,5 +261,68 @@ describe('EquipmentDetail — хлебные крошки (F-R136-TOP, №2)', (
     const crumb = await screen.findByRole('navigation', { name: 'Путь к экрану' });
     expect(within(crumb).getByRole('link', { name: 'Установки' })).toHaveAttribute('href', '/admin/equipment');
     expect(within(crumb).getByText('СГ-1')).toBeInTheDocument();
+  });
+});
+
+/*
+  F-R138-TOP №1: тип техники назывался по-разному — список подписывал
+  «Копёр/Бур/Вибро», шапка карточки — «Забивная установка/…», а тип OTHER в
+  списке печатался голым «—» (неотличимо от незаполненного поля). Теперь
+  список и карточка берут один словарь (equipment-status.ts), и OTHER подписан
+  словом.
+*/
+describe('EquipmentDetail — название типа техники (F-R138-TOP, №1)', () => {
+  beforeEach(() => {
+    mocks.authFetch.mockReset();
+    usePilingStore.setState({ currentUser: { role: 'ADMIN' } as never });
+  });
+
+  function mockDetails(kind: string) {
+    mocks.authFetch.mockImplementation(async () => json({
+      ...detailsResponse('eq-1', 'СГ-1'),
+      equipment: { id: 'eq-1', name: 'СГ-1', kind, isActive: true, model: null, inventoryNumber: null },
+    }));
+  }
+
+  it('карточка подписывает тип тем же словом, что и список', async () => {
+    mockDetails('PILE_DRIVER');
+    render(<EquipmentDetail equipmentId="eq-1" embedded />);
+    await screen.findAllByText('СГ-1');
+
+    expect(screen.getAllByText(KIND_LABEL.PILE_DRIVER).length).toBeGreaterThan(0);
+  });
+
+  it('тип OTHER подписан словом, а не прочерком', async () => {
+    mockDetails('OTHER');
+    render(<EquipmentDetail equipmentId="eq-1" embedded />);
+    await screen.findAllByText('СГ-1');
+
+    expect(KIND_LABEL.OTHER).not.toBe('—');
+    expect(screen.getAllByText(KIND_LABEL.OTHER).length).toBeGreaterThan(0);
+  });
+});
+
+/*
+  F-R138-TOP №2: состояние выведенной из эксплуатации установки называлось
+  «Неактивна» в бейдже у имени, но «Списана» — в герое и плитке «Текущее
+  состояние». Одно слово на оба места.
+*/
+describe('EquipmentDetail — статус списанной установки (F-R138-TOP, №2)', () => {
+  beforeEach(() => {
+    mocks.authFetch.mockReset();
+    usePilingStore.setState({ currentUser: { role: 'ADMIN' } as never });
+  });
+
+  it('списанная установка подписана «Списана», а не «Неактивна»', async () => {
+    mocks.authFetch.mockImplementation(async () => json({
+      ...detailsResponse('eq-1', 'СГ-1'),
+      equipment: { id: 'eq-1', name: 'СГ-1', kind: 'PILE_DRIVER', isActive: false, model: null, inventoryNumber: null },
+    }));
+
+    render(<EquipmentDetail equipmentId="eq-1" embedded />);
+    await screen.findAllByText('СГ-1');
+
+    expect(screen.getAllByText('Списана').length).toBeGreaterThan(0);
+    expect(screen.queryByText('Неактивна')).toBeNull();
   });
 });
