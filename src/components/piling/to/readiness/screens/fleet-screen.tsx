@@ -210,7 +210,7 @@ export function FleetScreen(props: ReferenceUiProps) {
                 <span className="inline-flex items-center gap-1.5"><PilingIcon name="history" size={16} decorative />{evaluationTime(item.presentation.calculatedAt)}</span>
               </td>
               <td className="whitespace-nowrap p-3 text-right">
-                <span className="inline-flex items-center gap-1.5 tabular-nums"><PilingIcon name="engine-hours" size={16} decorative />{item.equipment.engineHoursTotal?.toLocaleString('ru-RU') ?? '—'} ч</span>
+                <span className="inline-flex items-center gap-1.5 tabular-nums"><PilingIcon name="engine-hours" size={16} decorative />{item.equipment.engineHoursTotal?.toLocaleString('ru-RU') ?? '—'} м/ч</span>
               </td>
             </tr>)}</tbody>
           </table>
