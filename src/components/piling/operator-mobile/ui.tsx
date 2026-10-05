@@ -26,7 +26,7 @@ export function Screen({title, subtitle, children, footer, tabs}: {
     <div className="operator-screen flex min-h-dvh flex-col bg-background text-foreground">
       <header className="operator-screen-header border-b px-4 pb-2.5 pt-3">
         <h1 className="text-[1.4rem] font-black leading-tight tracking-[-0.025em] text-balance">{title}</h1>
-        {subtitle ? <p className="mt-0.5 text-2xs text-muted-foreground">{subtitle}</p> : null}
+        {subtitle ? <p className="mt-0.5 text-sm text-muted-foreground">{subtitle}</p> : null}
       </header>
       {/*
         Снизу — только дыхание, а не место под панель.

@@ -50,7 +50,7 @@ export function WarningsPanel({warnings}: {warnings: WorkWarning[]}) {
           <div className="flex gap-3">
             <Sign tone="danger" />
             <div className="min-w-0 flex-1">
-              <p className="text-3xs font-bold uppercase tracking-wider text-muted-foreground">
+              <p className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
                 {CAPTION[warning.level]}
               </p>
               <PanelTitle tone={TONE[warning.level]}>{warning.title}</PanelTitle>
@@ -67,14 +67,14 @@ export function WarningsPanel({warnings}: {warnings: WorkWarning[]}) {
             type="button"
             onClick={() => setOpenNotes((value) => !value)}
             aria-expanded={openNotes}
-            className="flex w-full items-center gap-3 text-left"
+            className="flex min-h-11 w-full items-center gap-3 text-left"
           >
             <Sign tone="warning" />
             <span className="min-w-0 flex-1">
               <span className="block text-sm font-semibold leading-snug">
                 К сведению: {notes.length}
               </span>
-              <span className="mt-0.5 block truncate text-2xs text-muted-foreground">
+              <span className="mt-0.5 block truncate text-sm text-muted-foreground">
                 {notes.map((warning) => warning.title).join(' · ')}
               </span>
             </span>
@@ -88,8 +88,8 @@ export function WarningsPanel({warnings}: {warnings: WorkWarning[]}) {
               {notes.map((warning) => (
                 <li key={warning.code} className="border-t pt-2 first:border-t-0 first:pt-0">
                   <p className="text-sm font-semibold">{warning.title}</p>
-                  <p className="mt-0.5 text-2xs">{warning.detail}</p>
-                  <p className="mt-1 text-2xs font-medium">{warning.resolution}</p>
+                  <p className="mt-0.5 text-sm">{warning.detail}</p>
+                  <p className="mt-1 text-sm font-medium">{warning.resolution}</p>
                 </li>
               ))}
             </ul>
@@ -116,7 +116,7 @@ export function PermitPanel({permit}: {permit: ProductionPermit}) {
       <div className="flex gap-3">
         <Sign tone="danger" />
         <div className="min-w-0 flex-1">
-          <p className="text-3xs font-bold uppercase tracking-wider text-muted-foreground">
+          <p className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
             Запрет · выработку записать нельзя
           </p>
           <PanelTitle tone="danger">Работа запрещена</PanelTitle>
