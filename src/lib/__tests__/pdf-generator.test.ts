@@ -235,6 +235,39 @@ describe('pdf-generator', () => {
     expect(period).toContain('ООО «Орион»');
   }, 30_000);
 
+  it('не печатает пустую ячейку, когда имя в шапке — строка из пробелов (F-N1005-PDF-INFO-EMPTY)', async () => {
+    const { generateSinglePdf } = await import('@/lib/pdf-generator');
+
+    const rendered = await capturePdfText(async () => {
+      await generateSinglePdf({
+        ...singleReportWithPiles([{ pileGrade: { name: 'Свая 300', lengthMm: 12000 }, count: 3 }]),
+        site: { name: '   ' },
+        assistantName: '  \n\t ',
+        equipmentName: '\t ',
+      });
+    });
+
+    // Пробельные значения сетки доводятся до «—», а не печатаются пустой ячейкой.
+    // Три пробельных значения шапки (Объект/Помощник/Оборудование) дают ровно три «—»;
+    // других «—» в документе с этими данными нет.
+    expect(rendered.filter((line) => line === '—')).toHaveLength(3);
+    expect(rendered.some((line) => line === '   ' || line === '  \n\t ' || line === '\t ')).toBe(false);
+  }, 30_000);
+
+  it('сохраняет длинное имя в шапке без обрезки (F-N1005-PDF-INFO-EMPTY)', async () => {
+    const { generateSinglePdf } = await import('@/lib/pdf-generator');
+    const siteName = 'ЖК «Северная долина», корпус 7, очередь 3, участок свайных работ у северного фасада';
+
+    const rendered = await capturePdfText(async () => {
+      await generateSinglePdf({
+        ...singleReportWithPiles([{ pileGrade: { name: 'Свая 300', lengthMm: 12000 }, count: 3 }]),
+        site: { name: siteName },
+      });
+    });
+
+    expect(rendered).toContain(siteName);
+  }, 30_000);
+
   it('печатает установку в шапке сводного отчёта только при отборе по установке (F-R44-5)', async () => {
     const { generatePeriodPdf } = await import('@/lib/pdf-generator');
 

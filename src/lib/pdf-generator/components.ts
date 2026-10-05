@@ -81,8 +81,9 @@ export function addInfoGrid(doc: PdfDoc, rows: string[][]) {
     doc.text(row[2], x2 + 6, y + 7, { width: labelWidth - 10, height: rowHeight - 8 });
 
     doc.font('Regular').fontSize(8.5).fillColor(COLORS.dark);
-    doc.text(row[1], x1 + 6, y + 7, { width: valueWidth - 10, height: rowHeight - 8 });
-    doc.text(row[3], x3 + 6, y + 7, { width: valueWidth - 10, height: rowHeight - 8 });
+    // Значения идут через safeText: строка из пробелов проходит `|| '—'` и печаталась пустой ячейкой.
+    doc.text(safeText(row[1]), x1 + 6, y + 7, { width: valueWidth - 10, height: rowHeight - 8 });
+    doc.text(safeText(row[3]), x3 + 6, y + 7, { width: valueWidth - 10, height: rowHeight - 8 });
 
     doc.y = y + rowHeight;
   });
