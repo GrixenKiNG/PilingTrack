@@ -1,0 +1,10 @@
+Revert-checks r9 (итерация владельца 05.10): тест должен падать без своей правки.
+Дата: 2026-10-05T17:28:44.533Z. Стенд: vitest, модуль src/components/piling/operator-next.
+
+### ПС — дверь к форме простоя при сдаче закрыта — записать забытый простой после «Завершить работу» нельзя
+- Откат: src/components/piling/operator-next/operator-next-app.tsx — вернул строку: "        if (false) { // ОТКАТ"
+- Прогон: `npx vitest run <файл> -t "простой можно записать прямо на экране закрытия"`
+- Результат: EXIT=1; ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯; упали: после «Завершить работу» простой можно записать прямо на экране закрытия 1159ms
+  Первое сообщение: TestingLibraryElementError: Unable to find an element with the text: Причина простоя. This could be because the text is broken up by multiple elements. In this case, you can provid
+
+DONE. Откат возвращён; целевой тест падает без своей правки (проверено).
