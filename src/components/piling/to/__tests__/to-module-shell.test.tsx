@@ -1,11 +1,12 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { bootstrapEnvelope } from '../readiness/api/__tests__/fixtures';
-import type { CurrentReadinessDto, ReadinessShiftDto } from '../readiness/api/contracts';
+import type { CurrentReadinessDto, ReadinessShiftDto, WorkPermitDto } from '../readiness/api/contracts';
 import type { ReferenceUiProps } from '../readiness/screens/types';
 import { ShiftsScreen } from '../readiness/screens/shifts-screen';
 import { ReportsScreen } from '../readiness/screens/reports-screen';
 import { MaintenanceScreen } from '../readiness/screens/maintenance-screen';
+import { PermitsScreen } from '../readiness/screens/permits-screen';
 import { getTodayInTimezone } from '@/lib/timezone';
 import {
   afterEach,
@@ -1013,5 +1014,164 @@ describe('MaintenanceScreen — отказ дефектов не показан 
     expect(kpiValue('Критические дефекты')).toBe('0');
     expect(screen.getByText('Замечаний по этой установке не зафиксировано.')).toBeInTheDocument();
     expect(screen.queryByText(/замечания не загружены/)).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * F-N1005-PERMIT-EVIDENCE (R163 №2): плитки «Доказательства допуска» считали
+ * осмотры и соблюдение ТО из `currentReadiness`. При отказе
+ * `/api/readiness/current` массив пуст, и плитки показывали подтверждённое
+ * «Осмотрено: 0 из N» / «Регламент ТО соблюдён: 0 из N» и зелёный pass —
+ * хотя сервер вердикта не вынес. Проверяем: отказ текущего снимка при
+ * действующем наряде даёт непроверенность и не теряет наряд; отказ только
+ * истории (экран нарядов её не читает) не гасит подсчитанные осмотры/ТО;
+ * успешные пустой и положительный ответы сохраняют прежний вид.
+ */
+describe('PermitsScreen — осмотры и ТО не подтверждаются при отказе снимка (F-N1005-PERMIT-EVIDENCE)', () => {
+  const equipment: ReferenceUiProps['equipment'] = [
+    { id: 'equipment-1', name: 'Rig 1', model: null, hammerKind: 'NONE', isCombined: false, isActive: true, crewCount: 0 },
+    { id: 'equipment-2', name: 'Rig 2', model: null, hammerKind: 'NONE', isCombined: false, isActive: true, crewCount: 0 },
+  ];
+
+  const goodFacts: CurrentReadinessDto['facts'] = {
+    inspectionCompleted: true,
+    inspectionProgress: 1,
+    healthScore: 90,
+    meterKnown: true,
+    permitValid: true,
+    permitExpired: false,
+    maintenanceConfigured: true,
+    maintenanceOverdueHours: 0,
+    maintenanceOverdueDays: 0,
+    accepted: true,
+    criticalDefect: false,
+    findings: 0,
+  };
+
+  const currentRow = (equipmentId: string, facts: CurrentReadinessDto['facts']): CurrentReadinessDto => ({
+    snapshotId: `snap-${equipmentId}`,
+    equipmentId,
+    status: 'READY',
+    verdict: 'ALLOWED',
+    score: 90,
+    calculatedAt: '2026-10-01T06:00:00.000Z',
+    blockers: [],
+    warnings: null,
+    evidence: null,
+    facts,
+    triggerType: null,
+    ruleSetVersion: null,
+  });
+
+  const approvedPermit: WorkPermitDto = {
+    id: 'permit-00000001',
+    equipmentId: 'equipment-1',
+    shiftId: null,
+    risk: 'NORMAL',
+    state: 'APPROVED',
+    workTypeId: null,
+    title: 'Забивка свай',
+    scope: 'Забивка свай',
+    location: 'Площадка 1',
+    objectName: 'Объект 1',
+    hazards: [],
+    producerUserId: null,
+    producerName: 'Иванов',
+    observerUserId: null,
+    observerName: 'Петров',
+    safetyUserId: null,
+    safetyName: 'Сидоров',
+    validFrom: '2026-10-01T00:00:00.000Z',
+    validTo: '2026-10-05T00:00:00.000Z',
+    timezone: 'Europe/Moscow',
+    version: 1,
+    approvals: [],
+  };
+
+  function renderPermits(overrides: Partial<ReferenceUiProps> = {}) {
+    const props = {
+      view: 'permits',
+      onViewChange: () => {},
+      settingsSection: 'rules',
+      onSettingsSectionChange: () => {},
+      equipment,
+      selectedId: 'equipment-1',
+      onSelect: () => {},
+      readinessByEquipment: {},
+      factsByEquipment: {},
+      scoresByEquipment: {},
+      rulesState: {} as ReferenceUiProps['rulesState'],
+      onRulesStateChange: () => {},
+      journals: {},
+      crews: [],
+      maintenance: [],
+      fleetCards: [],
+      details: {},
+      loading: false,
+      workspaceError: null,
+      workspaceIssues: [],
+      outOfRoleSources: [],
+      rulesAvailable: true,
+      bootstrap: bootstrapEnvelope('permits-evidence').data,
+      shifts: [],
+      permits: [],
+      defects: [],
+      defectsError: null,
+      currentReadiness: [],
+      authoritativeReadinessError: null,
+      readinessHistoryError: null,
+      readinessHistory: [],
+      audit: null,
+      filters: {},
+      onFiltersChange: () => {},
+      showInternalNavigation: false,
+      onRetry: () => {},
+      ...overrides,
+    } satisfies ReferenceUiProps;
+    render(<PermitsScreen {...props} />);
+  }
+
+  it('отказ текущего снимка: осмотры и ТО непроверены, а наряд сохранён', () => {
+    renderPermits({
+      authoritativeReadinessError: 'Снимок недоступен',
+      permits: [approvedPermit],
+    });
+
+    expect(screen.getByText(/Осмотрено: не проверено — авторитетный снимок недоступен/)).toBeInTheDocument();
+    expect(screen.getByText(/Регламент ТО соблюдён: не проверено — авторитетный снимок недоступен/)).toBeInTheDocument();
+    expect(screen.queryByText(/Осмотрено: 0 из/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Регламент ТО соблюдён: 0 из/)).not.toBeInTheDocument();
+    // Ни одна плитка не выдаёт зелёный pass.
+    expect(screen.queryByText('Выполнено')).not.toBeInTheDocument();
+    // Независимо загруженный действующий наряд и его ограничения не потеряны.
+    expect(screen.getAllByText('НД-00000001').length).toBeGreaterThan(0);
+    expect(screen.getByText(/Ограничений: 0/)).toBeInTheDocument();
+  });
+
+  it('отказ только истории не гасит подсчитанные осмотры и ТО', () => {
+    renderPermits({
+      readinessHistoryError: 'История недоступна',
+      currentReadiness: [currentRow('equipment-1', goodFacts)],
+    });
+
+    expect(screen.getByText(/Осмотрено: 1 из 2/)).toBeInTheDocument();
+    expect(screen.getByText(/Регламент ТО соблюдён: 1 из 2/)).toBeInTheDocument();
+    expect(screen.getAllByText('Выполнено')).toHaveLength(2);
+  });
+
+  it('успешный пустой снимок по-прежнему даёт ноль, а не непроверенность', () => {
+    renderPermits({ currentReadiness: [] });
+
+    expect(screen.getByText(/Осмотрено: 0 из 2/)).toBeInTheDocument();
+    expect(screen.getByText(/Регламент ТО соблюдён: 0 из 2/)).toBeInTheDocument();
+    expect(screen.getAllByText('Выполнено')).toHaveLength(2);
+  });
+
+  it('успешный положительный снимок показывает подсчитанные осмотры и ТО', () => {
+    renderPermits({ currentReadiness: [currentRow('equipment-1', goodFacts)] });
+
+    expect(screen.getByText(/Осмотрено: 1 из 2/)).toBeInTheDocument();
+    expect(screen.getByText(/Регламент ТО соблюдён: 1 из 2/)).toBeInTheDocument();
+    expect(screen.getAllByText('Выполнено')).toHaveLength(2);
   });
 });
