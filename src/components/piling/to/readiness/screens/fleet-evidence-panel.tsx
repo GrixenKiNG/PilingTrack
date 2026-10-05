@@ -194,11 +194,23 @@ export function FleetEvidencePanel({ item, props }: { item: FleetItem; props: Re
           <p className="mt-2">Следующее ТО: {detail.equipment?.nextMaintenanceAtHours?.toLocaleString('ru-RU') ?? 'не задано'} ч</p>
           <p className="mt-2">По дате: {date(detail.equipment?.nextMaintenanceDate)}</p>
         </div>}
-        {maintenanceUnavailable ? <p>Журнал ТО недоступен текущей роли.</p> : maintenanceError ? <p role="alert">{maintenanceError.message}</p> : journalError ? <p role="alert">{journalError.message}</p> : records.length ? records.map((record) => <article key={record.id} className="rounded-lg border border-border p-3">
-          <p className="font-semibold">{record.title}</p><p className="mt-1">{RECORD_STATUS[record.status] ?? record.status}</p>
-          <p className="mt-1 text-xs text-muted-foreground">Создано: {date(record.createdAt)}</p>
-          <FleetSourceLink href={`/admin/maintenance/${record.id}`}>Открыть эту запись</FleetSourceLink>
-        </article>) : <p className="rounded-lg bg-muted p-3">В загруженном журнале нет записей для этой установки.</p>}
+        {maintenanceUnavailable ? <p>Журнал ТО недоступен текущей роли.</p> : <>
+          {/*
+            Отказ журнала выбранной установки (/api/to/journal) — отдельный
+            источник от «Обслуживания» (props.maintenance). Раньше он стоял в
+            одном тернарном выражении перед записями, поэтому сбой журнала
+            прятал уже полученные записи независимого источника (F-N1005).
+            Ошибки показываются рядом с записями, а пустой ответ не выдаётся
+            за успешно прочитанный.
+          */}
+          {maintenanceError && <p role="alert">{maintenanceError.message}</p>}
+          {journalError && <p role="alert">{journalError.message}</p>}
+          {records.length ? records.map((record) => <article key={record.id} className="rounded-lg border border-border p-3">
+            <p className="font-semibold">{record.title}</p><p className="mt-1">{RECORD_STATUS[record.status] ?? record.status}</p>
+            <p className="mt-1 text-xs text-muted-foreground">Создано: {date(record.createdAt)}</p>
+            <FleetSourceLink href={`/admin/maintenance/${record.id}`}>Открыть эту запись</FleetSourceLink>
+          </article>) : !maintenanceError && !journalError && <p className="rounded-lg bg-muted p-3">В загруженном журнале нет записей для этой установки.</p>}
+        </>}
       </div>}
       {section === 'defects' && <div className="mt-3 space-y-3 text-sm">
         <p className="text-muted-foreground">Дефекты {equipment.name}. Блокирующие условия готовности показываются отдельно в основаниях оценки.</p>

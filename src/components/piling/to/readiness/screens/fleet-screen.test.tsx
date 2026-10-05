@@ -7,6 +7,7 @@ import { bootstrapEnvelope } from '../api/__tests__/fixtures';
 import { formatDateTimeInTimezone } from '@/lib/timezone';
 import { FleetScreen } from './fleet-screen';
 import { buildFleetItems, countFleetGroups, DEFAULT_FLEET_VIEW, filterFleetItems, readFleetViewState, writeFleetViewState } from './fleet-workspace-model';
+import type { MaintenanceSummary } from '../../readiness-design-views';
 
 const fetchDefects = vi.hoisted(() => vi.fn());
 vi.mock('../api/client', async (original) => ({ ...await original<typeof import('../api/client')>(), fetchReadinessDefects: fetchDefects }));
@@ -37,6 +38,11 @@ const defect = (title: string): DefectDto => ({
   title, description: 'Описание дефекта.', node: null, reportedById: 'user-1', reportedAt: '2026-09-05T10:00:00Z',
   inspectionId: null, shiftId: null, triagedById: null, triagedAt: null, maintenanceRecordId: null,
   resolvedById: null, resolvedAt: null, resolution: null, version: 1, createdAt: '2026-09-05T10:00:00Z', updatedAt: '2026-09-05T10:00:00Z',
+});
+const maintenanceRecord = (id: string, title: string): MaintenanceSummary => ({
+  id, type: 'TO', status: 'COMPLETED', priority: 'NORMAL', title,
+  scheduledAt: null, completedAt: null, createdAt: '2026-09-05T10:00:00Z',
+  equipment: { id: 'rig-1', name: 'Установка 1', model: 'Модель' },
 });
 const propsFor = (overrides: Partial<ReferenceUiProps> = {}): ReferenceUiProps => ({
   equipment: [equipment('rig-1', 'Установка 1'), equipment('rig-2', 'Установка 2')],
@@ -209,6 +215,55 @@ describe('Fleet evidence interactions', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Документы' }));
     expect(screen.getByText('Недостаточно прав для загрузки данных.')).toBeInTheDocument();
     expect(screen.queryByText(/Подробности установки ещё не получены/)).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * F-N1005-MAINTENANCE-SOURCE: отказ журнала выбранной установки
+ * (/api/to/journal) — отдельный источник от «Обслуживания»
+ * (props.maintenance). Раньше он стоял в одном тернарном выражении перед
+ * записями, поэтому сбой журнала прятал уже полученные записи независимого
+ * источника и выдавал пустой ответ за успешно прочитанный.
+ */
+describe('Панель парка: сбой журнала не скрывает записи обслуживания (F-N1005)', () => {
+  const openMaintenance = () => fireEvent.click(screen.getByRole('button', { name: 'Обслуживание' }));
+
+  it('показывает и запись обслуживания, и ошибку журнала', () => {
+    render(<FleetScreen {...propsFor({
+      maintenance: [maintenanceRecord('m-1', 'Плановое ТО двигателя')],
+      workspaceIssues: [{ source: 'Журнал «Установка 1»', message: 'Источник временно недоступен (код 500).' }],
+    })} />);
+    openMaintenance();
+
+    expect(screen.getByText('Плановое ТО двигателя')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Открыть эту запись/ })).toHaveAttribute('href', '/admin/maintenance/m-1');
+    expect(screen.getByRole('alert')).toHaveTextContent('Источник временно недоступен (код 500).');
+  });
+
+  it('настоящий отказ обслуживания показывает ошибку, а не пустой журнал', () => {
+    render(<FleetScreen {...propsFor({
+      workspaceIssues: [{ source: 'Обслуживание', message: 'Не удалось загрузить журнал ТО.' }],
+    })} />);
+    openMaintenance();
+
+    expect(screen.getByRole('alert')).toHaveTextContent('Не удалось загрузить журнал ТО.');
+    expect(screen.queryByText(/В загруженном журнале нет записей/)).not.toBeInTheDocument();
+  });
+
+  it('успешный пустой ответ показывает отсутствие записей без ошибки', () => {
+    render(<FleetScreen {...propsFor()} />);
+    openMaintenance();
+
+    expect(screen.getByText(/В загруженном журнале нет записей/)).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('роль без доступа к обслуживанию видит ограничение, а не пустой журнал', () => {
+    render(<FleetScreen {...propsFor({ outOfRoleSources: ['Обслуживание и журнал ТО'] })} />);
+    openMaintenance();
+
+    expect(screen.getByText('Журнал ТО недоступен текущей роли.')).toBeInTheDocument();
+    expect(screen.queryByText(/В загруженном журнале нет записей/)).not.toBeInTheDocument();
   });
 });
 
