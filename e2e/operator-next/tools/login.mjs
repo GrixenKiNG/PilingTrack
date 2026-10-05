@@ -41,6 +41,9 @@ const page = await context.newPage();
 await page.goto('/');
 const emailField = page.locator('#email');
 await emailField.waitFor({state: 'visible', timeout: 30_000});
+// Гидратация формы: до неё кнопка отправки остаётся disabled, и клик
+// промахивается мимо ещё не собранного состояния полей.
+await page.waitForTimeout(2000);
 
 let ok = false;
 for (let attempt = 1; attempt <= 3 && !ok; attempt++) {
@@ -49,6 +52,7 @@ for (let attempt = 1; attempt <= 3 && !ok; attempt++) {
   const respPromise = page
     .waitForResponse((r) => r.url().includes('/api/auth/login'), {timeout: 10_000})
     .catch(() => null);
+  await page.waitForFunction(() => !document.querySelector('button[type="submit"]')?.disabled, {timeout: 15_000}).catch(() => {});
   await page.locator('button[type="submit"]').click();
   const resp = await respPromise;
   if (resp && resp.ok()) {
