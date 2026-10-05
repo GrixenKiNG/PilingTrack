@@ -146,7 +146,7 @@ export function DefectsPanel(props: ReferenceUiProps) {
         <div>
           <h2 className="font-bold">Журнал дефектов</h2>
           <p className="mt-1 text-xs text-muted-foreground">
-            {props.selectedId ? equipmentName(props.selectedId) : 'Все установки'} · открытых {open.length}
+            {props.selectedId ? equipmentName(props.selectedId) : 'Все установки'} · {props.defectsError ? 'замечания не загружены' : `открытых ${open.length}`}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -175,9 +175,11 @@ export function DefectsPanel(props: ReferenceUiProps) {
       <div className="mt-3 space-y-2">
         {shown.length === 0 ? (
           <p className="rounded-lg border border-border p-4 text-center text-xs text-muted-foreground">
-            {forSelected.length === 0
-              ? 'Замечаний по этой установке не зафиксировано.'
-              : 'Открытых замечаний нет — все разобраны.'}
+            {props.defectsError
+              ? 'Не удалось загрузить замечания — список не проверен.'
+              : forSelected.length === 0
+                ? 'Замечаний по этой установке не зафиксировано.'
+                : 'Открытых замечаний нет — все разобраны.'}
           </p>
         ) : shown.map((defect) => {
           const blocking = defect.severity === 'CRITICAL' && (defect.status === 'OPEN' || defect.status === 'IN_WORK');

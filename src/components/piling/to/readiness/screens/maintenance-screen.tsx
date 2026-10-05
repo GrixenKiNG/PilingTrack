@@ -127,7 +127,7 @@ export function MaintenanceScreen(props: ReferenceUiProps) {
         ? <Button asChild className="min-h-11 bg-signal-strong hover:bg-signal-strong"><Link href="/admin/maintenance/new">+ Создать заявку</Link></Button>
         : <Button disabled className="min-h-11 bg-signal-strong hover:bg-signal-strong">+ Создать заявку</Button>}</div>} />
       <section className={COMPACT_KPI_GRID} style={kpiGridStyle(4)}>
-        <RefKpi icon="defect" label="Критические дефекты" tone="danger" value={blockingDefects.length} detail={`открытых замечаний: ${openDefects.length}`} alert={blockingDefects.length > 0} />
+        <RefKpi icon="defect" label="Критические дефекты" tone={props.defectsError ? undefined : 'danger'} value={props.defectsError ? '—' : blockingDefects.length} detail={props.defectsError ? 'не проверено' : `открытых замечаний: ${openDefects.length}`} alert={!props.defectsError && blockingDefects.length > 0} />
         <RefKpi icon="work-order" label="Работы сегодня" tone="warning" value={todayWork.length} />
         <RefKpi icon="maintenance-due" label="Ближайшие ТО" tone="info" value={planned.length} />
         <RefKpi icon="technical-readiness" label="Готовность сервиса" tone="success" value={`${Math.max(0, servicePercent)}%`} />

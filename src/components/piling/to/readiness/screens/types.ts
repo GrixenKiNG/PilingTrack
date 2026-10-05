@@ -100,6 +100,12 @@ export interface ReferenceUiProps {
   shifts: ReadinessShiftDto[];
   permits: WorkPermitDto[];
   defects: DefectDto[];
+  /**
+   * Отказ чтения журнала дефектов — отдельный источник (F-N1005-DEFECTS-UNKNOWN).
+   * Пока он не подтверждён, пустой `defects` значит «не прочитано», а не
+   * «замечаний нет»: счётчик критических дефектов влияет на допуск установки.
+   */
+  defectsError: string | null;
   currentReadiness: CurrentReadinessDto[];
   /**
    * Ошибка авторитетного ТЕКУЩЕГО снимка. При ней готовность «не подтверждена» —

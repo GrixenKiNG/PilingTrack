@@ -5,6 +5,7 @@ import type { ReadinessShiftDto } from '../readiness/api/contracts';
 import type { ReferenceUiProps } from '../readiness/screens/types';
 import { ShiftsScreen } from '../readiness/screens/shifts-screen';
 import { ReportsScreen } from '../readiness/screens/reports-screen';
+import { MaintenanceScreen } from '../readiness/screens/maintenance-screen';
 import { getTodayInTimezone } from '@/lib/timezone';
 import {
   afterEach,
@@ -47,6 +48,7 @@ vi.mock('@/components/piling/to/readiness-reference-ui', () => ({
     onRetry: () => void;
     authoritativeReadinessError: string | null;
     readinessHistoryError: string | null;
+    defectsError: string | null;
     workspaceIssues: Array<{ source: string; message: string }>;
     journals: Record<string, unknown>;
     details: Record<string, unknown>;
@@ -59,6 +61,7 @@ vi.mock('@/components/piling/to/readiness-reference-ui', () => ({
       data-equipment={props.selectedId}
       data-authoritative-error={props.authoritativeReadinessError ?? ''}
       data-history-error={props.readinessHistoryError ?? ''}
+      data-defects-error={props.defectsError ?? ''}
       data-issues={props.workspaceIssues.map((issue) => issue.source).join('|')}
       data-journals={Object.keys(props.journals).join(',')}
       data-details={Object.keys(props.details).join(',')}
@@ -503,6 +506,80 @@ describe('ToModule production shell integration', () => {
     const requested = mocks.authFetch.mock.calls.map(([url]) => String(url));
     expect(requested.some((url) => url.includes('equipment-2'))).toBe(false);
   }, 30_000);
+
+  /**
+   * F-N1005-DEFECTS-UNKNOWN (R163 №3): отказ чтения дефектов сворачивался в
+   * общее «Техготовность», а `props.defects` оставался `[]` — плитка
+   * «Критические дефекты» показывала подтверждённый ноль. Проверяем, что при
+   * успешных соседних источниках отказ дефектов даёт собственное состояние и
+   * собственный источник, а ошибки current/history к нему не подмешиваются.
+   */
+  it('отказ дефектов не выдаётся за ноль и не сливается с соседями (F-N1005-DEFECTS-UNKNOWN)', async () => {
+    mocks.authFetch.mockImplementation(async (url: string, options?: RequestInit) => {
+      if (url.startsWith('/api/readiness/defects')) {
+        return jsonResponse({ error: 'Журнал дефектов недоступен' }, 503);
+      }
+      if (url.startsWith('/api/readiness/shifts')) return jsonResponse({ data: [] });
+      if (url.startsWith('/api/readiness/work-permits')) return jsonResponse({ data: [] });
+      if (url.startsWith('/api/readiness/current')) return jsonResponse({ data: [] });
+      if (url.startsWith('/api/readiness/history')) {
+        return jsonResponse({ data: [], page: { limit: 500, total: 0 }, filters: {} });
+      }
+      if (url.startsWith('/api/readiness/audit')) {
+        return jsonResponse({ data: [], page: { limit: 500, total: 0 }, filters: {} });
+      }
+      return responseFor(url, options);
+    });
+
+    await renderToModule('/admin/to');
+
+    const referenceUi = screen.getByTestId('reference-ui');
+    // Отказ дефектов — своё состояние...
+    expect(referenceUi.getAttribute('data-defects-error')).toBeTruthy();
+    // ...не слитое с ошибками current и history.
+    expect(referenceUi).toHaveAttribute('data-authoritative-error', '');
+    expect(referenceUi).toHaveAttribute('data-history-error', '');
+    // Источник назван по имени, обезличенного «Техготовность» при успешных соседях нет.
+    const issues = referenceUi.getAttribute('data-issues') ?? '';
+    expect(issues).toContain('Дефекты');
+    expect(issues).not.toContain('Техготовность');
+  }, 30_000);
+
+  /**
+   * F-N1005-DEFECTS-UNKNOWN: повтор должен перечитать источник и после успеха
+   * снять именно его ошибку — успешный `[]` значит «замечаний нет», а не
+   * «не проверено».
+   */
+  it('повтор снимает ошибку дефектов при успешном пустом списке (F-N1005-DEFECTS-UNKNOWN)', async () => {
+    let defectsFail = true;
+    mocks.authFetch.mockImplementation(async (url: string, options?: RequestInit) => {
+      if (url.startsWith('/api/readiness/defects')) {
+        return defectsFail
+          ? jsonResponse({ error: 'Журнал дефектов недоступен' }, 503)
+          : jsonResponse({ data: [] });
+      }
+      if (url.startsWith('/api/readiness/shifts')) return jsonResponse({ data: [] });
+      if (url.startsWith('/api/readiness/work-permits')) return jsonResponse({ data: [] });
+      if (url.startsWith('/api/readiness/current')) return jsonResponse({ data: [] });
+      if (url.startsWith('/api/readiness/history')) {
+        return jsonResponse({ data: [], page: { limit: 500, total: 0 }, filters: {} });
+      }
+      if (url.startsWith('/api/readiness/audit')) {
+        return jsonResponse({ data: [], page: { limit: 500, total: 0 }, filters: {} });
+      }
+      return responseFor(url, options);
+    });
+
+    await renderToModule('/admin/to');
+    expect(screen.getByTestId('reference-ui').getAttribute('data-defects-error')).toBeTruthy();
+
+    defectsFail = false;
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    await waitFor(() => {
+      expect(screen.getByTestId('reference-ui')).toHaveAttribute('data-defects-error', '');
+    });
+    expect(screen.getByTestId('reference-ui').getAttribute('data-issues') ?? '').not.toContain('Дефекты');
+  }, 30_000);
 });
 
 const DAY_MS = 86_400_000;
@@ -574,6 +651,7 @@ describe('ShiftsScreen — неделя по производственным д
       shifts,
       permits: [],
       defects: [],
+      defectsError: null,
       currentReadiness: [],
       authoritativeReadinessError: null,
       readinessHistoryError: null,
@@ -684,6 +762,7 @@ describe('ReportsScreen — отказ истории виден у отчёто
       shifts: [],
       permits: [],
       defects: [],
+      defectsError: null,
       currentReadiness: [],
       authoritativeReadinessError: null,
       readinessHistoryError: null,
@@ -744,5 +823,74 @@ describe('ReportsScreen — отказ истории виден у отчёто
     });
 
     expect(kpiValue('Готовность парка')).toBe('—');
+  });
+});
+
+/**
+ * F-N1005-DEFECTS-UNKNOWN (R163 №3): отказ `/api/readiness/defects` экран
+ * «Обслуживание ТО» показывал подтверждённым нулём («Критические дефекты: 0»),
+ * а журнал замечаний — «не зафиксировано». Показываем «не проверено»/прочерк,
+ * а успешный пустой список по-прежнему значит «замечаний нет».
+ */
+describe('MaintenanceScreen — отказ дефектов не показан нулём (F-N1005-DEFECTS-UNKNOWN)', () => {
+  function renderMaintenance(overrides: Partial<ReferenceUiProps> = {}) {
+    const props = {
+      view: 'maintenance',
+      onViewChange: () => {},
+      settingsSection: 'rules',
+      onSettingsSectionChange: () => {},
+      equipment: [],
+      selectedId: 'eq-a',
+      onSelect: () => {},
+      readinessByEquipment: {},
+      factsByEquipment: {},
+      scoresByEquipment: {},
+      rulesState: {} as ReferenceUiProps['rulesState'],
+      onRulesStateChange: () => {},
+      journals: {},
+      crews: [],
+      maintenance: [],
+      fleetCards: [],
+      details: {},
+      loading: false,
+      workspaceError: null,
+      workspaceIssues: [],
+      outOfRoleSources: [],
+      rulesAvailable: true,
+      bootstrap: bootstrapEnvelope('maintenance-defects').data,
+      shifts: [],
+      permits: [],
+      defects: [],
+      defectsError: null,
+      currentReadiness: [],
+      authoritativeReadinessError: null,
+      readinessHistoryError: null,
+      readinessHistory: [],
+      audit: null,
+      filters: {},
+      onFiltersChange: () => {},
+      showInternalNavigation: false,
+      onRetry: () => {},
+      ...overrides,
+    } satisfies ReferenceUiProps;
+    render(<MaintenanceScreen {...props} />);
+  }
+
+  it('отказ дефектов показан прочерком и «не проверено», а не нулём', () => {
+    renderMaintenance({ defectsError: 'Не удалось загрузить журнал дефектов.' });
+
+    expect(kpiValue('Критические дефекты')).toBe('—');
+    expect(screen.getByText('не проверено')).toBeInTheDocument();
+    // Панель замечаний не утверждает, что их нет.
+    expect(screen.getByText('Не удалось загрузить замечания — список не проверен.')).toBeInTheDocument();
+    expect(screen.getByText(/замечания не загружены/)).toBeInTheDocument();
+  });
+
+  it('успешный пустой список по-прежнему означает «замечаний нет»', () => {
+    renderMaintenance({ defectsError: null, defects: [] });
+
+    expect(kpiValue('Критические дефекты')).toBe('0');
+    expect(screen.getByText('Замечаний по этой установке не зафиксировано.')).toBeInTheDocument();
+    expect(screen.queryByText(/замечания не загружены/)).not.toBeInTheDocument();
   });
 });

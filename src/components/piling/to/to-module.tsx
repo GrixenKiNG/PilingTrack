@@ -129,6 +129,13 @@ export const TECH_READINESS_PRODUCTION_SHELL_ENABLED =
   process.env.NEXT_PUBLIC_TECH_READINESS_PRODUCTION_SHELL !== 'false';
 
 /**
+ * Отказ чтения журнала дефектов. Отдельное состояние, а не только строка в
+ * общем баннере: счётчик критических дефектов решает допуск установки, и ноль в
+ * нём при отказе читался бы как «замечаний нет» (F-N1005-DEFECTS-UNKNOWN).
+ */
+const DEFECTS_UNAVAILABLE_MESSAGE = 'Не удалось загрузить журнал дефектов.';
+
+/**
  * Какой модуль показывает оболочка. Данные и экраны у них общие, разные —
  * набор вкладок, адрес и то, куда попадаешь без `?view=`.
  */
@@ -309,6 +316,10 @@ export function ToModule({ surface = 'readiness' }: { surface?: ModuleSurface } 
   const [shifts, setShifts] = useState<ReadinessShiftDto[]>([]);
   const [permits, setPermits] = useState<WorkPermitDto[]>([]);
   const [defects, setDefects] = useState<DefectDto[]>([]);
+  // Отказ чтения дефектов — отдельный источник (F-N1005-DEFECTS-UNKNOWN).
+  // Пустой `defects` при этом значит «не прочитано», а не «замечаний нет»:
+  // счётчик критических дефектов влияет на допуск установки.
+  const [defectsError, setDefectsError] = useState<string | null>(null);
   const [currentReadiness, setCurrentReadiness] = useState<CurrentReadinessDto[]>([]);
   const [readinessHistory, setReadinessHistory] = useState<ReadinessSnapshotDto[]>([]);
   const [authoritativeReadinessError, setAuthoritativeReadinessError] = useState<string | null>(null);
@@ -385,6 +396,7 @@ export function ToModule({ surface = 'readiness' }: { surface?: ModuleSurface } 
     setOutOfRoleSources([]);
     setAuthoritativeReadinessError(null);
     setReadinessHistoryError(null);
+    setDefectsError(null);
     setRulesAvailable(false);
     try {
       let readinessBootstrap = await fetchReadinessBootstrap({ signal: controller.signal });
@@ -493,18 +505,26 @@ export function ToModule({ surface = 'readiness' }: { surface?: ModuleSurface } 
       setShifts(shiftsResult.data);
       setPermits(permitsResult.data);
       setDefects(defectsResult.data);
+      setDefectsError(defectsResult.failed ? DEFECTS_UNAVAILABLE_MESSAGE : null);
       setCurrentReadiness(currentResult.data);
       setReadinessHistory(historyResult.data);
       setAuthoritativeReadinessError(currentResult.error);
       setReadinessHistoryError(historyResult.error);
       setAudit(auditResult.data);
+      // Дефекты выведены из общего ИЛИ (F-N1005-DEFECTS-UNKNOWN): у отказа
+      // журнала замечаний теперь свой источник с именем, а его состояние
+      // (defectsError) экраны показывают прочерком, а не нулём.
       const readinessPartialFailure =
-        shiftsResult.failed || permitsResult.failed || defectsResult.failed || auditResult.failed;
+        shiftsResult.failed || permitsResult.failed || auditResult.failed;
       const initialIssues = [
         crewResult.issue,
         maintenanceResult.issue,
         fleetResult.issue,
         readinessRulesResult.issue,
+        ...(defectsResult.failed ? [{
+          source: 'Дефекты',
+          message: DEFECTS_UNAVAILABLE_MESSAGE,
+        } satisfies WorkspaceIssue] : []),
         ...(readinessPartialFailure ? [{
           source: 'Техготовность',
           message: 'Не удалось загрузить часть данных техготовности. Обновите страницу.',
@@ -809,6 +829,7 @@ export function ToModule({ surface = 'readiness' }: { surface?: ModuleSurface } 
       shifts={shifts}
       permits={permits}
       defects={defects}
+      defectsError={defectsError}
       currentReadiness={currentReadiness}
       authoritativeReadinessError={authoritativeReadinessError}
       readinessHistoryError={readinessHistoryError}
