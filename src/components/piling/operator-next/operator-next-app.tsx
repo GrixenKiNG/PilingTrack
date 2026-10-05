@@ -840,6 +840,42 @@ export function OperatorNextApp() {
             </Screen>
           );
         }
+        // Простой при сдаче (итерация владельца 05.10): механик заполняет
+        // отчёт ПОСЛЕ смены, и последний отрезок простоя часто вносится уже
+        // здесь — сервер это прямо предполагает («последний отрезок простоя
+        // обычно вносится уже при сдаче», production.ts). Пока открыта форма
+        // простоя (черновик в режиме DOWNTIME), показываем её вместо отчёта;
+        // «Назад к смене» и успешная запись возвращают к сдаче.
+        if (workDraft.mode === 'DOWNTIME') {
+          return (
+            <WorkScreenNext
+              state={state}
+              busy={busy}
+              error={actionError}
+              tabs={shiftTabs}
+              storageOk={storageOk}
+              draft={workDraft}
+              onDraftChange={updateWorkDraft}
+              passport={draftsAreCurrent ? drafts.passport ?? emptyPassportDraft() : emptyPassportDraft()}
+              onPassportChange={updatePassportDraft}
+              onOpenTab={setWorkTab}
+              onOpenSafety={(safetyStage) => setDetour({kind: 'CHECKLIST', stage: safetyStage})}
+              onFinish={() => void run(null, () => sendCommand({command: 'finish-work', shiftId: shift.id}))}
+              onSubmitEntry={(entry: ProductionEntryInput) => run('production', () => sendCommand({
+                command: 'log-production',
+                clientCommandId: keys.get('production'),
+                shiftId: shift.id,
+                entry,
+              }), () => clearSubmittedEntry(entry))}
+              onCorrect={(input) => run('correction', () => sendCommand({
+                command: 'correct-production',
+                clientCommandId: keys.get('correction'),
+                shiftId: shift.id,
+                ...input,
+              }))}
+            />
+          );
+        }
         return (
           <ReportSendScreen
             state={state}
@@ -852,6 +888,7 @@ export function OperatorNextApp() {
             noteLocked={closeSending}
             storageOk={storageOk}
             onOpenService={() => setDetour({kind: 'CHECKLIST', stage: 'EO_AFTER'})}
+            onOpenDowntime={() => updateWorkDraft((current) => ({...current, mode: 'DOWNTIME'}))}
             onFlushQueued={() => void flush()}
             onReload={() => void reload()}
             onClose={() => void closeShift()}

@@ -27,7 +27,7 @@ import {WORDS} from './words';
  */
 export function ReportSendScreen({
   state, busy, error, tabs, unsentCount, closeNote, onCloseNoteChange, noteLocked = false, storageOk = true,
-  onOpenService, onFlushQueued, onReload, onClose,
+  onOpenService, onOpenDowntime, onFlushQueued, onReload, onClose,
 }: {
   state: OperatorMobileState;
   busy: boolean;
@@ -46,6 +46,8 @@ export function ReportSendScreen({
   /** Доступно ли хранилище черновиков — от этого зависит честная подсказка. */
   storageOk?: boolean;
   onOpenService: () => void;
+  /** Простой, не записанный вовремя: его вносят и при сдаче (владелец, 05.10). */
+  onOpenDowntime?: () => void;
   onFlushQueued: () => void;
   onReload: () => void;
   onClose: (comment: string) => void;
@@ -177,6 +179,19 @@ export function ReportSendScreen({
           <Fact label="Простой" value={formatDowntimeHours(state.production.downtimeHours)} />
         </div>
       </Panel>
+
+      {onOpenDowntime ? (
+        <Panel>
+          <PanelTitle>Простой машины</PanelTitle>
+          <p className="mt-1 text-sm">
+            Смена сдаётся после работы: если машина стояла, а простой ещё не записан —
+            внесите его сейчас, до отправки отчёта. Он войдёт в итоги смены.
+          </p>
+          <div className="mt-3">
+            <ActionButton label="Записать простой" tone="ghost" onClick={onOpenDowntime} disabled={busy} />
+          </div>
+        </Panel>
+      ) : null}
 
       {serviceDone ? (
         <div className="space-y-1.5">
