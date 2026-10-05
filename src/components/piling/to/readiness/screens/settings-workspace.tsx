@@ -18,7 +18,7 @@ import { cn } from '@/lib/utils';
 import { BLOCKER_ACTIONS, BLOCKER_ACTION_LABELS, BLOCKER_LABELS, CRITERION_LABELS, SYSTEM_SAFETY_BLOCKERS, computeReadinessScore, describeRuleSetChanges, normalizeWeights, type BlockerAction, type ReadinessCriterionKey, type ReadinessRuleSet, type ReadinessRulesState } from '@/modules/readiness';
 import { resolveReadinessCapabilities, type ReadinessAbility, type ReadinessRole } from '@/modules/readiness/application/capabilities';
 import { type ReadinessUrlFilters } from '../api/client';
-import { authoritativeFactsForEquipment } from '../authoritative-presentation';
+import { authoritativeFactsForEquipment, buildAuthoritativeReadinessPresentation } from '../authoritative-presentation';
 import { EquipmentPhoto, ReadinessFiltersBar, ReadinessRing, downloadReadinessExport } from './shared';
 import type { ReferenceUiProps, SettingsSection } from './types';
 
@@ -203,10 +203,15 @@ function RulesSettings(props: ReferenceUiProps) {
   // координат, и балл чернового предпросмотра с ней не отождествляем. Нет
   // пригодного снимка — сравнивать не с чем, поэтому базу не показываем.
   const previewSnapshot = props.currentReadiness.find((item) => item.equipmentId === props.selectedId) ?? null;
+  // Причина недоступности предпросмотра — по режиму авторитетного представления
+  // снимка, тем же, что называет «Центр готовности». Отсутствие снимка, снимок
+  // старого формата и снимок с испорченным доказательством (при годных фактах) —
+  // разные причины, и общее «нет авторитетных фактов» называло их неверно.
+  // Сбой чтения остаётся приоритетным отказом, отсутствие установки — приглашение
+  // выбрать.
+  const previewPresentation = buildAuthoritativeReadinessPresentation(previewSnapshot);
   const previewEmptyLabel = props.authoritativeReadinessError
-    ?? (props.selectedId
-      ? 'По выбранной установке нет авторитетных фактов — предпросмотр недоступен.'
-      : 'Выберите тестовую установку.');
+    ?? (props.selectedId ? previewPresentation.description : 'Выберите тестовую установку.');
   const previewEquipment = props.equipment.find((item) => item.id === props.selectedId);
   const previewFleet = props.fleetCards.find((item) => item.id === props.selectedId);
   // Список правок показываем от действующей версии к тому, что сейчас в форме,

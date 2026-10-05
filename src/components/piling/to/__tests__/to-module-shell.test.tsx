@@ -7,6 +7,7 @@ import { ShiftsScreen } from '../readiness/screens/shifts-screen';
 import { ReportsScreen } from '../readiness/screens/reports-screen';
 import { MaintenanceScreen } from '../readiness/screens/maintenance-screen';
 import { PermitsScreen } from '../readiness/screens/permits-screen';
+import { SettingsWorkspace } from '../readiness/screens/settings-workspace';
 import { getTodayInTimezone } from '@/lib/timezone';
 import {
   afterEach,
@@ -29,11 +30,18 @@ vi.mock('sonner', () => ({
     warning: vi.fn(),
   },
 }));
-vi.mock('@/modules/readiness', () => ({
+vi.mock('@/modules/readiness', async (original) => ({
+  // Реальные помощники правил (BLOCKER_ACTIONS, CRITERION_LABELS,
+  // describeRuleSetChanges…) нужны, чтобы рендерить настоящий SettingsWorkspace.
+  // Подменяются только расчёт балла, сборка фактов и значения по умолчанию.
+  ...await original<typeof import('@/modules/readiness')>(),
   DEFAULT_READINESS_RULES: {},
   READINESS_READY_THRESHOLD: 80,
   buildReadinessFacts: vi.fn(() => ({})),
-  computeReadinessScore: vi.fn(() => ({ score: 0 })),
+  computeReadinessScore: vi.fn(() => ({
+    score: 0, criteria: [], blockers: [], criticalBlockers: 0, findings: 0,
+    verdict: 'ALLOWED', verdictLabel: '', canStart: false, ruleVersion: 'v0',
+  })),
 }));
 vi.mock('@/components/piling/to/readiness-model', () => ({
   deriveEquipmentReadiness: mocks.deriveEquipmentReadiness,
@@ -1173,5 +1181,101 @@ describe('PermitsScreen — осмотры и ТО не подтверждают
     expect(screen.getByText(/Осмотрено: 1 из 2/)).toBeInTheDocument();
     expect(screen.getByText(/Регламент ТО соблюдён: 1 из 2/)).toBeInTheDocument();
     expect(screen.getAllByText('Выполнено')).toHaveLength(2);
+  });
+});
+
+/**
+ * F-N1005-PREVIEW-REASON (остаток F-N1004-PREVIEW-STATE/R164 №2): блок
+ * «Предпросмотр расчёта готовности» печатал «нет авторитетных фактов» всем
+ * случаям одинаково — и отсутствию снимка, и снимку старого формата, и снимку с
+ * испорченным доказательством, у которого факты как раз годны. Причина берётся из
+ * того же авторитетного представления, что рисует «Центр готовности», поэтому
+ * случаи различаются; сбой чтения остаётся приоритетным отказом, а отсутствие
+ * выбранной установки — приглашением выбрать.
+ */
+describe('SettingsWorkspace — предпросмотр называет честную причину (F-N1005-PREVIEW-REASON)', () => {
+  const rules: ReferenceUiProps['rulesState']['published'] = {
+    version: 'v1',
+    status: 'PUBLISHED',
+    criteria: [
+      { key: 'INSPECTION', weight: 40, locked: false },
+      { key: 'ENGINE_HOURS', weight: 20, locked: false },
+      { key: 'PERMIT', weight: 0, locked: false },
+      { key: 'MAINTENANCE', weight: 27, locked: false },
+      { key: 'ACCEPTANCE', weight: 13, locked: false },
+    ],
+    blockers: [
+      { condition: 'CRITICAL_DEFECT', action: 'DENY_START', isActive: true },
+      { condition: 'INSPECTION_BELOW_80', action: 'RETURN_TO_OPERATOR', isActive: true },
+    ],
+  };
+
+  const facts: CurrentReadinessDto['facts'] = {
+    inspectionCompleted: true, inspectionProgress: 1, healthScore: 90,
+    meterKnown: true, permitValid: true, permitExpired: false,
+    maintenanceConfigured: true, maintenanceOverdueHours: 0, maintenanceOverdueDays: 0,
+    accepted: true, criticalDefect: false, findings: 0,
+  };
+
+  const snapshot = (over: Partial<CurrentReadinessDto> = {}): CurrentReadinessDto => ({
+    snapshotId: 'snap-1', equipmentId: 'equipment-1', status: 'READY', verdict: 'ALLOWED',
+    score: 90, calculatedAt: '2026-10-01T06:00:00.000Z', blockers: [], warnings: [],
+    evidence: { equipmentId: 'equipment-1', inspectionId: null, permitId: null, maintenanceRecordIds: [], evaluatedAt: '2026-10-01T06:00:00.000Z' },
+    facts, triggerType: null, ruleSetVersion: 'v1',
+    ...over,
+  });
+
+  function renderSettings(over: Partial<ReferenceUiProps> = {}) {
+    const bootstrap = bootstrapEnvelope('preview-reason').data;
+    bootstrap.capabilities.entities.rules.manage = true;
+    const props = {
+      view: 'settings', onViewChange: () => {}, settingsSection: 'rules', onSettingsSectionChange: () => {},
+      equipment: [{ id: 'equipment-1', name: 'Rig 1', model: null, hammerKind: 'NONE', isCombined: false, isActive: true, crewCount: 0 }],
+      selectedId: 'equipment-1', onSelect: () => {}, readinessByEquipment: {}, factsByEquipment: {},
+      scoresByEquipment: {}, rulesState: { published: rules, draft: null, pendingChanges: 0, publishedInDb: true },
+      onRulesStateChange: () => {}, journals: {}, crews: [], maintenance: [], fleetCards: [], details: {},
+      loading: false, workspaceError: null, workspaceIssues: [], outOfRoleSources: [], rulesAvailable: true,
+      bootstrap, shifts: [], permits: [], defects: [], defectsError: null, currentReadiness: [],
+      authoritativeReadinessError: null, readinessHistoryError: null, readinessHistory: [], audit: null,
+      filters: {}, onFiltersChange: () => {}, showInternalNavigation: false, onRetry: () => {},
+      ...over,
+    } satisfies ReferenceUiProps;
+    render(<SettingsWorkspace {...props} />);
+  }
+
+  it('снимок с испорченным доказательством: провал проверки, а не «нет фактов»', () => {
+    renderSettings({ currentReadiness: [snapshot({ evidence: { equipmentId: 1 } })] });
+
+    expect(screen.getAllByText('Снимок не прошёл проверку контракта доказательств и не может подтверждать готовность.').length).toBeGreaterThan(0);
+    expect(screen.queryByText(/нет авторитетных фактов/)).not.toBeInTheDocument();
+  });
+
+  it('снимок без фактов опознан как исторически неполный', () => {
+    renderSettings({ currentReadiness: [snapshot({ facts: null })] });
+
+    expect(screen.getAllByText(/Снимок создан до сохранения точных фактов/).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/нет авторитетных фактов/)).not.toBeInTheDocument();
+  });
+
+  it('отсутствие снимка названо отсутствием оценки, а не «нет фактов»', () => {
+    renderSettings({ currentReadiness: [] });
+
+    expect(screen.getAllByText(/нет подтверждённого снимка готовности/).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/нет авторитетных фактов/)).not.toBeInTheDocument();
+  });
+
+  it('сбой чтения остаётся приоритетным и не подменяется причиной отсутствия', () => {
+    renderSettings({ currentReadiness: [], authoritativeReadinessError: 'Сервис готовности недоступен' });
+
+    expect(screen.getAllByText('Сервис готовности недоступен').length).toBeGreaterThan(0);
+    expect(screen.queryByText(/нет подтверждённого снимка готовности/)).not.toBeInTheDocument();
+  });
+
+  it('годный снимок показывает предпросмотр и не печатает причин недоступности', () => {
+    renderSettings({ currentReadiness: [snapshot()] });
+
+    expect(document.body.textContent).toContain('База сравнения');
+    expect(screen.queryByText(/нет авторитетных фактов/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/не прошёл проверку контракта доказательств/)).not.toBeInTheDocument();
   });
 });
