@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { bootstrapEnvelope } from '../readiness/api/__tests__/fixtures';
-import type { ReadinessShiftDto } from '../readiness/api/contracts';
+import type { CurrentReadinessDto, ReadinessShiftDto } from '../readiness/api/contracts';
 import type { ReferenceUiProps } from '../readiness/screens/types';
 import { ShiftsScreen } from '../readiness/screens/shifts-screen';
 import { ReportsScreen } from '../readiness/screens/reports-screen';
@@ -823,6 +823,127 @@ describe('ReportsScreen — отказ истории виден у отчёто
     });
 
     expect(kpiValue('Готовность парка')).toBe('—');
+  });
+});
+
+/**
+ * F-N1005-PARETO-UNKNOWN (R163 №1, R174 №2): «Причины блокировки · Парето»
+ * считал `blockerRows` из `currentReadiness`; при отказе `/api/readiness/current`
+ * массив пуст, все причины равны нулю, и блок писал «Ни одна причина сейчас не
+ * срабатывает» — отказ чтения выглядел подтверждённым «блокировок нет».
+ * Проверяем: отказ текущего снимка даёт непроверенность, отказ только истории
+ * не гасит достоверное текущее Парето, а успешный пустой и успешный ненулевой
+ * ответы сохраняют прежнее поведение.
+ */
+describe('ReportsScreen — Парето не выдаёт отказ за отсутствие причин (F-N1005-PARETO-UNKNOWN)', () => {
+  function renderReports(overrides: Partial<ReferenceUiProps> = {}) {
+    const props = {
+      view: 'reports',
+      onViewChange: () => {},
+      settingsSection: 'rules',
+      onSettingsSectionChange: () => {},
+      equipment: [],
+      selectedId: '',
+      onSelect: () => {},
+      readinessByEquipment: {},
+      factsByEquipment: {},
+      scoresByEquipment: {},
+      rulesState: {} as ReferenceUiProps['rulesState'],
+      onRulesStateChange: () => {},
+      journals: {},
+      crews: [],
+      maintenance: [],
+      fleetCards: [],
+      details: {},
+      loading: false,
+      workspaceError: null,
+      workspaceIssues: [],
+      outOfRoleSources: [],
+      rulesAvailable: true,
+      bootstrap: bootstrapEnvelope('reports-pareto').data,
+      shifts: [],
+      permits: [],
+      defects: [],
+      defectsError: null,
+      currentReadiness: [],
+      authoritativeReadinessError: null,
+      readinessHistoryError: null,
+      readinessHistory: [],
+      audit: null,
+      filters: {},
+      onFiltersChange: () => {},
+      showInternalNavigation: false,
+      onRetry: () => {},
+      ...overrides,
+    } satisfies ReferenceUiProps;
+    render(<ReportsScreen {...props} />);
+  }
+
+  /** Факты с единственной сработавшей причиной — «Критический дефект». */
+  const criticalDefectFacts: CurrentReadinessDto['facts'] = {
+    inspectionCompleted: true,
+    inspectionProgress: 1,
+    healthScore: 60,
+    meterKnown: true,
+    permitValid: true,
+    permitExpired: false,
+    maintenanceConfigured: true,
+    maintenanceOverdueHours: 0,
+    maintenanceOverdueDays: 0,
+    accepted: true,
+    criticalDefect: true,
+    findings: 1,
+  };
+
+  const currentRow = (equipmentId: string, facts: CurrentReadinessDto['facts']): CurrentReadinessDto => ({
+    snapshotId: `snap-${equipmentId}`,
+    equipmentId,
+    status: 'BLOCKED',
+    verdict: 'DENIED',
+    score: 60,
+    calculatedAt: '2026-10-01T06:00:00.000Z',
+    blockers: [],
+    warnings: null,
+    evidence: null,
+    facts,
+    triggerType: null,
+    ruleSetVersion: null,
+  });
+
+  it('отказ текущего снимка показан «не проверено», а не «нет причин»', () => {
+    renderReports({ authoritativeReadinessError: 'Снимок недоступен' });
+
+    const alert = screen.getByRole('alert');
+    expect(alert).toHaveTextContent('Причины блокировки не проверены');
+    expect(alert).toHaveTextContent('Снимок недоступен');
+    expect(screen.queryByText('Ни одна причина сейчас не срабатывает.')).not.toBeInTheDocument();
+  });
+
+  it('отказ только истории не гасит достоверное текущее Парето', () => {
+    renderReports({
+      readinessHistoryError: 'История недоступна',
+      currentReadiness: [currentRow('eq-1', criticalDefectFacts)],
+    });
+
+    // Диаграмма построена по реальным текущим фактам...
+    expect(screen.getByText('Критический дефект')).toBeInTheDocument();
+    // ...и Парето не добавил собственного предупреждения: единственный alert — баннер истории.
+    expect(screen.getAllByRole('alert')).toHaveLength(1);
+    expect(screen.getByRole('alert')).toHaveTextContent('История недоступна');
+  });
+
+  it('успешный пустой набор по-прежнему значит «ни одна причина не срабатывает»', () => {
+    renderReports({ currentReadiness: [] });
+
+    expect(screen.getByText('Ни одна причина сейчас не срабатывает.')).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('успешная ненулевая причина показана в диаграмме', () => {
+    renderReports({ currentReadiness: [currentRow('eq-1', criticalDefectFacts)] });
+
+    expect(screen.getByText('Критический дефект')).toBeInTheDocument();
+    expect(screen.queryByText('Ни одна причина сейчас не срабатывает.')).not.toBeInTheDocument();
   });
 });
 

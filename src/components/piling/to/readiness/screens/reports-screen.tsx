@@ -412,7 +412,19 @@ export function ReportsScreen(props: ReferenceUiProps) {
         </section>
         <section className={cn(card, 'p-3')}>
           <h2 className="font-bold">Причины блокировки · Парето</h2>
-          {blockerTotal === 0 ? (
+          {/*
+            Отказ авторитетного текущего снимка оставлял `facts` пустыми (`:253`),
+            и блок писал «Ни одна причина сейчас не срабатывает» — неотличимо от
+            честного успешного пустого ответа. Пока оценок нет, показываем
+            непроверенность, а не подтверждённое отсутствие блокировок
+            (F-N1005-PARETO-UNKNOWN). Ошибка истории сюда не входит: её
+            собственный баннер выше, и она не гасит достоверное текущее Парето.
+          */}
+          {props.authoritativeReadinessError ? (
+            <p role="alert" className="mt-6 text-center text-xs text-destructive-strong">
+              Причины блокировки не проверены: авторитетная оценка недоступна — {props.authoritativeReadinessError}.
+            </p>
+          ) : blockerTotal === 0 ? (
             <p className="mt-6 text-center text-xs text-muted-foreground">Ни одна причина сейчас не срабатывает.</p>
           ) : (
             <>
