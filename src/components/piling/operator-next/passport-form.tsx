@@ -65,7 +65,7 @@ function Check({label, checked, onChange, disabled}: {
         checked={checked}
         disabled={disabled}
         onChange={(event) => onChange(event.target.checked)}
-        className="h-5 w-5"
+        className="h-6 w-6 shrink-0"
       />
       <span className="text-base font-medium">{label}</span>
     </label>
@@ -243,7 +243,7 @@ export function PassportForm({grades, busy, value, onChange, onSubmit}: {
                       type="button"
                       disabled={busy}
                       onClick={() => setSets(value.sets.filter((_, i) => i !== index))}
-                      className="text-2xs font-medium text-muted-foreground underline"
+                      className="inline-flex min-h-11 min-w-11 items-center justify-center px-2 text-sm font-medium text-muted-foreground underline"
                     >
                       убрать
                     </button>
