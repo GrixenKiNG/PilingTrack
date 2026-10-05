@@ -7,4 +7,15 @@ Revert-checks r9 (итерация владельца 05.10): тест долж�
 - Результат: EXIT=1; ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯; упали: после «Завершить работу» простой можно записать прямо на экране закрытия 1159ms
   Первое сообщение: TestingLibraryElementError: Unable to find an element with the text: Причина простоя. This could be because the text is broken up by multiple elements. In this case, you can provid
 
+### СШ1 — подпись шапки снова 11 px — тест читаемости падает
+- Откат: src/components/piling/operator-mobile/ui.tsx — вернул строку: "mt-0.5 text-2xs text-muted-foreground\">{subtitle} // ОТКАТ"
+- Прогон: `npx vitest run <файл> -t "подпись шапки"`
+- Результат: EXIT=1; ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯; упали: подпись шапки — не мельче 14 px; перепрогон чистым откатом (без комментария)
+  Первое сообщение: AssertionError: expected 'mt-0.5 text-2xs text-muted-foreground' to contain 'text-sm'
+
+### СШ2 — строка «К сведению» снова ниже 44 px — тест читаемости падает
+- Откат: src/components/piling/operator-mobile/warnings-panel.tsx — вернул строку: "            className=\"flex w-full items-center gap-3 text-left\""
+- Прогон: `npx vitest run <файл> -t "предупреждения для поля"`
+- Результат: EXIT=1; ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯; упали: предупреждения для поля — значок и строка «К сведению» 69ms
+  Первое сообщение: AssertionError: expected 'flex w-full items-center gap-3 text-l…' to contain 'min-h-11'
 DONE. Откат возвращён; целевой тест падает без своей правки (проверено).
