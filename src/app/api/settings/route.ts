@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireTenantId } from '@/lib/tenant';
 import { requireAuth } from '@/lib/auth';
+import { resolveEffectiveRole } from '@/lib/types';
 import { withApi, withMutation } from '@/core/api-wrapper';
 import { getSettings, saveSettings, type WorkspaceSettings } from '@/modules/settings';
 import { recordAuditEvent } from '@/services/audit/audit-service';
@@ -24,7 +25,7 @@ export const PUT = withMutation(async (request: NextRequest) => {
   const { user, error } = await requireAuth(request);
   if (error) return error;
   // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
-  if (user!.role !== 'ADMIN') return NextResponse.json({ error: 'Недостаточно прав' }, { status: 403 });
+  if (resolveEffectiveRole(user!.role, user!.actingAs) !== 'ADMIN') return NextResponse.json({ error: 'Недостаточно прав' }, { status: 403 });
   // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
   const tenantId = requireTenantId(user!);
   let body: unknown;

@@ -68,6 +68,15 @@ export function withCsrf(request: Request): NextResponse | null {
   const referer = request.headers.get('referer');
   const host = request.headers.get('host');
   const secFetchSite = request.headers.get('sec-fetch-site');
+  // Caddy terminates TLS: its upstream URL can be HTTP while the browser's
+  // origin is HTTPS. Only explicitly trusted proxies may supply that scheme.
+  const forwardedProto = request.headers.get('x-forwarded-proto');
+  if (process.env.TRUST_PROXY === 'true' && forwardedProto !== null && !['http', 'https'].includes(forwardedProto)) {
+    return NextResponse.json({ error: 'CSRF validation failed: invalid forwarded protocol' }, { status: 403 });
+  }
+  const protocol = process.env.TRUST_PROXY === 'true' && forwardedProto !== null
+    ? `${forwardedProto}:`
+    : url.protocol;
 
   // Layer 1: Sec-Fetch-Site validation (modern browsers, most reliable)
   if (secFetchSite) {
@@ -82,8 +91,8 @@ export function withCsrf(request: Request): NextResponse | null {
   // Layer 2: Origin header validation (primary defense)
   if (origin) {
     try {
-      const originHost = new URL(origin).host;
-      if (originHost !== host) {
+      const originUrl = new URL(origin);
+      if (originUrl.host !== host || originUrl.protocol !== protocol) {
         return NextResponse.json(
           { error: 'CSRF validation failed: origin mismatch' },
           { status: 403 }
@@ -100,8 +109,8 @@ export function withCsrf(request: Request): NextResponse | null {
   // Layer 3: Referer header validation (fallback when Origin is absent)
   if (referer && !origin) {
     try {
-      const refererHost = new URL(referer).host;
-      if (refererHost !== host) {
+      const refererUrl = new URL(referer);
+      if (refererUrl.host !== host || refererUrl.protocol !== protocol) {
         return NextResponse.json(
           { error: 'CSRF validation failed: referer mismatch' },
           { status: 403 }

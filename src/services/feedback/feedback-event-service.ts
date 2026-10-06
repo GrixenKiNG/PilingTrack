@@ -6,6 +6,7 @@ import type {
   FeedbackEventPriority,
 } from '@/lib/types';
 import { isPrivilegedRole } from '@/services/auth/authorization-service';
+import { resolveEffectiveRole } from '@/lib/types';
 
 interface FeedbackActor {
   id: string;
@@ -16,6 +17,7 @@ interface FeedbackActor {
 interface FeedbackUser {
   id: string;
   role: string;
+  actingAs?: string | null;
 }
 
 interface FeedbackEventWithReads {
@@ -81,7 +83,7 @@ function mapEvent(event: FeedbackEventWithReads): FeedbackEventDTO {
 }
 
 function getAccessWhere(user: FeedbackUser) {
-  return isPrivilegedRole(user.role)
+  return isPrivilegedRole(resolveEffectiveRole(user.role, user.actingAs))
     ? {}
     : {
         OR: [{ actorId: user.id }, { audience: 'ALL' }],
@@ -160,7 +162,7 @@ export async function listFeedbackEventsForUser(user: FeedbackUser, limit = 25) 
   });
 
   const mapped = events.map(mapEvent);
-  const isPrivileged = isPrivilegedRole(user.role);
+  const isPrivileged = isPrivilegedRole(resolveEffectiveRole(user.role, user.actingAs));
   const summary = {
     total: 0,
     unread: 0,

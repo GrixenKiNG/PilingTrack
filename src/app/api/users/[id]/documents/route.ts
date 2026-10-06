@@ -26,9 +26,9 @@ const createSchema = z.object({
  * поэтому она живёт в одном месте (services/users/user-documents.ts), а не
  * разъезжается по маршрутам через assertCan.
  */
-function actorContext(user: { id: string; role: string; tenantId?: string | null }) {
+function actorContext(user: { id: string; role: string; tenantId?: string | null; actingAs?: string | null }) {
   const tenantId = requireTenantId(user);
-  return { tenantId, actor: { id: user.id, role: user.role } };
+  return { tenantId, actor: { id: user.id, role: user.role, actingAs: user.actingAs } };
 }
 
 export const GET = withApi(

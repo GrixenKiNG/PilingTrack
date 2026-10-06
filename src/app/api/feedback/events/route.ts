@@ -8,6 +8,8 @@ import {
   recordFeedbackEvent,
 } from '@/services/feedback/feedback-event-service';
 import type { FeedbackEventAudience, FeedbackEventLevel, FeedbackEventPriority } from '@/lib/types';
+import { resolveEffectiveRole } from '@/lib/types';
+import { isPrivilegedRole } from '@/services/auth/authorization-service';
 import { z } from 'zod';
 import { getSessionCacheScope, withApi, withMutation } from '@/core/api-wrapper';
 import { getResponseCache } from '@/core/cache';
@@ -84,6 +86,7 @@ export const POST = withMutation(async (request: NextRequest) => {
   if (!sessionUser) {
     return createJsonResponse({ error: 'Войдите в систему', requestId }, { status: 401 }, requestId);
   }
+  const isPrivileged = isPrivilegedRole(resolveEffectiveRole(sessionUser.role, sessionUser.actingAs));
 
   try {
     const body = await request.json();
@@ -113,7 +116,7 @@ export const POST = withMutation(async (request: NextRequest) => {
         );
       }
 
-      if (operation === 'acknowledge' && user?.role !== 'ADMIN' && user?.role !== 'DISPATCHER') {
+      if (operation === 'acknowledge' && !isPrivileged) {
         return createJsonResponse(
           { error: 'Подтверждать события могут только пользователи с особыми правами', requestId },
           { status: 403 },
@@ -151,7 +154,7 @@ export const POST = withMutation(async (request: NextRequest) => {
       action: validated.data.action,
       title: validated.data.title,
       message: validated.data.message,
-      audience: sessionUser.role === 'ADMIN' || sessionUser.role === 'DISPATCHER' ? validated.data.audience : 'USER',
+      audience: isPrivileged ? validated.data.audience : 'USER',
       actor: { id: sessionUser.id, name: sessionUser.name, role: sessionUser.role },
       requestId,
       targetId: validated.data.targetId || null,

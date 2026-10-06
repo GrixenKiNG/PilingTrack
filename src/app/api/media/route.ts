@@ -15,26 +15,26 @@ import { assertCanAccessMediaEntity } from '@/core/media/media-auth';
 import { getRequestId } from '@/lib/request-context';
 import { withApi, withMutation, readJsonBody } from '@/core/api-wrapper';
 import { ServiceError } from '@/services/service-error';
+import { z } from 'zod';
+
+const uploadSchema = z.object({
+  fileName: z.string().min(1),
+  contentType: z.string().min(1),
+  fileSize: z.number().finite().int().positive(),
+  entityType: z.string().nullish().transform(value => value ?? undefined),
+  entityId: z.string().nullish().transform(value => value ?? undefined),
+});
 
 export const POST = withMutation(async (request: NextRequest) => {
   const { user, error } = await requireAuth(request);
   if (error) return error;
 
   const requestId = getRequestId(request);
-  // Тело описано здесь, а не выведено из `any`: имя файла и тип содержимого
-  // проверяются ниже, а ключ в хранилище собирается не из них (см.
-  // buildMediaKey — там же и обеззараживание), поэтому схемы zod тут нет.
-  const body = await readJsonBody<{
-    fileName?: string;
-    contentType?: string;
-    fileSize?: number;
-    entityType?: string;
-    entityId?: string;
-  }>(request);
-
-  if (!body.fileName || !body.contentType) {
-    return NextResponse.json({ error: 'Требуются fileName и contentType' }, { status: 400 });
+  const validated = uploadSchema.safeParse(await readJsonBody<unknown>(request));
+  if (!validated.success) {
+    return NextResponse.json({ error: 'Некорректные параметры загрузки файла' }, { status: 400 });
   }
+  const body = validated.data;
 
   try {
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned

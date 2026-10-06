@@ -82,6 +82,21 @@ describe('POST /api/equipment/[id]/meter-readings — след записи по
     );
   });
 
+  it('не передаёт право ADMIN на снижение счётчика в режиме инженера ОТ', async () => {
+    requireAuthMock.mockResolvedValue({ user: { ...ADMIN, actingAs: 'SAFETY_ENGINEER' }, error: null });
+    canDecreaseMeterMock.mockImplementation(role => role === 'ADMIN' || role === 'MECHANIC');
+
+    const res = await POST(postReq({ engineHours: 199 }), params());
+
+    expect(res.status).toBe(201);
+    expect(canDecreaseMeterMock).toHaveBeenCalledWith('SAFETY_ENGINEER');
+    expect(addMeterReadingMock).toHaveBeenCalledWith(
+      'eq-1',
+      { engineHours: 199 },
+      { tenantId: 'tenant-a', recordedById: 'admin-1', allowDecrease: false },
+    );
+  });
+
   it('пишет meter.reading.added с названием установки и значением после успеха', async () => {
     await POST(postReq({ engineHours: 1234 }), params());
 
