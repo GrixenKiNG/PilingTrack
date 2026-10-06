@@ -312,9 +312,9 @@ export function PileJournal() {
 
       {header ? <JournalTitleBlock header={header} /> : null}
 
-      {truncated ? (
+      {truncated && header ? (
         <p className="text-2xs text-warning-strong">
-          Показаны первые 500 свай — сузьте период или объект
+          Показано {rows?.length ?? 0} из {header.rowsTotal} записей — сузьте период или объект
         </p>
       ) : null}
 

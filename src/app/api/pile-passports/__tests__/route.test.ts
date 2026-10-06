@@ -36,7 +36,7 @@ function req(qs = ''): NextRequest {
   return new NextRequest(`http://localhost/api/pile-passports?${qs}`);
 }
 
-/** Only the fields pileJournalHeader reads; the query itself is stubbed. */
+/** Строка выработки: только поля, которые читает pileJournalHeader (запрос заглушён). */
 const row = (drivenAt: string) => ({
   drivenAt,
   siteName: 'Объект А',
@@ -49,18 +49,30 @@ const row = (drivenAt: string) => ({
   suggestion: null,
 });
 
+/** Итоги периода — титул берёт счётчики отсюда, не из показанных строк (W21). */
+const totals = {
+  piles: 1,
+  draftPiles: 0,
+  withoutPassportPiles: 1,
+  accepted: 0,
+  needsRedrive: 0,
+  pending: 1,
+  rows: 1,
+};
+
 describe('GET /api/pile-passports — период в поясе тенанта', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     requireAuthMock.mockResolvedValue({ user: admin, error: null });
     getSettingsMock.mockResolvedValue({ timezone: 'Europe/Moscow' });
-    listPilePassportsMock.mockResolvedValue({ rows: [], truncated: false });
+    listPilePassportsMock.mockResolvedValue({ rows: [], truncated: false, totals });
   });
 
   it('дату забивки 25.09 21:30 UTC печатает как 26.09.2026 по Москве, а не UTC-днём', async () => {
     listPilePassportsMock.mockResolvedValue({
       rows: [row('2026-09-25T21:30:00.000Z')],
       truncated: false,
+      totals,
     });
 
     const response = await GET(req());
@@ -77,6 +89,7 @@ describe('GET /api/pile-passports — период в поясе тенанта'
     listPilePassportsMock.mockResolvedValue({
       rows: [row('2026-09-25T14:30:00.000Z')],
       truncated: false,
+      totals,
     });
 
     const response = await GET(req());

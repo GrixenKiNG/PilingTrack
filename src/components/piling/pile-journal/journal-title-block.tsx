@@ -38,12 +38,17 @@ export function JournalTitleBlock({ header }: { header: PileJournalHeader }) {
       </dl>
 
       <div className="grid grid-cols-2 divide-x divide-border border-t border-border sm:grid-cols-5">
-        <Counter label="Свай в журнале" value={header.pilesTotal} />
-        <Counter label="Не разобрано" value={header.pending} />
-        <Counter label="Отказ выше проектного" value={header.overRefusal} tone="warning" />
-        <Counter label="На добивку" value={header.needsRedrive} tone="warning" />
-        <Counter label="Принято" value={header.accepted} tone="success" />
+        <Counter label="Свай (всего)" value={header.pilesTotal} />
+        <Counter label="Паспортов не разобрано" value={header.pending} />
+        <Counter label="Паспортов на добивку" value={header.needsRedrive} tone="warning" />
+        <Counter label="Паспортов принято" value={header.accepted} tone="success" />
+        <Counter label="Свай без паспорта" value={header.withoutPassportPiles} />
       </div>
+      {/* Черновики — часть «Свай (всего)», не отдельная категория: выносим
+          строкой, чтобы не смешать с плитками-паспортами. */}
+      <p className="border-t border-border px-3 py-2 text-2xs text-muted-foreground">
+        из них в черновиках: {header.draftPiles}
+      </p>
     </section>
   );
 }

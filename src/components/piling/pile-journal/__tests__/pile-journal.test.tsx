@@ -78,10 +78,12 @@ const header = {
   dateFrom: '2026-09-28',
   dateTo: '2026-09-28',
   pilesTotal: 1,
+  draftPiles: 0,
+  withoutPassportPiles: 0,
   accepted: 0,
   needsRedrive: 0,
   pending: 1,
-  overRefusal: 0,
+  rowsTotal: 1,
 };
 
 async function renderJournal() {
@@ -329,5 +331,27 @@ describe('карточка сваи: замеры с запятой (R129 #5)', 
     expect(await screen.findByText('11,5 м')).toBeInTheDocument();
     expect(screen.getByText('1,8 мм/уд')).toBeInTheDocument();
     expect(screen.queryByText('11.5 м')).toBeNull();
+  });
+});
+
+/**
+ * W21: в титуле смешивались единицы — «Свай в журнале» (сваи) рядом с
+ * «Принято» (паспорта), а сваи без паспорта не попадали ни в один счётчик.
+ * Теперь каждая плитка названа своей единицей, а черновики — отдельной строкой.
+ */
+describe('журнал забивки: подписи плиток титула (W21)', () => {
+  beforeEach(() => {
+    mocks.authFetch.mockReset();
+  });
+
+  it('плитки подписаны единицами счёта, черновики — отдельной строкой', async () => {
+    await renderJournal();
+
+    expect(screen.getByText('Свай (всего)')).toBeInTheDocument();
+    expect(screen.getByText('Паспортов принято')).toBeInTheDocument();
+    expect(screen.getByText('Паспортов на добивку')).toBeInTheDocument();
+    expect(screen.getByText('Паспортов не разобрано')).toBeInTheDocument();
+    expect(screen.getByText('Свай без паспорта')).toBeInTheDocument();
+    expect(screen.getByText(/из них в черновиках/)).toBeInTheDocument();
   });
 });

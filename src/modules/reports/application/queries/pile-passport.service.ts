@@ -1,8 +1,9 @@
 import { db } from '@/lib/db';
+import { Prisma } from '@/generated/postgres-client';
 import { ServiceError } from '@/lib/service-error';
 import { zonedDayStartUtc } from '@/lib/timezone';
 import { pileLengthMeters } from '@/lib/pile-length';
-import { isSubmittedReport } from '@/lib/report-status';
+import { SUBMITTED_REPORT_STATUS, isSubmittedReport } from '@/lib/report-status';
 import { getSettings } from '@/modules/settings';
 import {
   actualRefusalMm,
@@ -119,12 +120,20 @@ export interface PileJournalHeader {
   designRefusalMm: number[];
   dateFrom: string | null;
   dateTo: string | null;
+  /** «Свай (всего)» — сваи за период, а не за показанную страницу. */
   pilesTotal: number;
+  /** «из них в черновиках» — сваи из отчётов-черновиков. */
+  draftPiles: number;
+  /** «Свай без паспорта» — сваи, записанные пачкой. */
+  withoutPassportPiles: number;
+  /** «Паспортов принято» — единица счёта паспорт, не свая. */
   accepted: number;
+  /** «Паспортов на добивку». */
   needsRedrive: number;
+  /** «Паспортов не разобрано». */
   pending: number;
-  /** Свай, у которых отказ больше проектного. */
-  overRefusal: number;
+  /** Строк в выборке за период — для «Показано N из M записей». */
+  rowsTotal: number;
 }
 
 export interface PileJournalFilters {
@@ -145,18 +154,48 @@ export interface PileJournalFilters {
 }
 
 /**
- * Предел строк журнала — один на экран и на выгрузку.
+ * Предел строк журнала на экране.
  *
- * ПОЧЕМУ ОДИН. Титул («Свай в журнале», «Принято», «На добивку») считается из
- * загруженных строк. Разные пределы на экране и в .xlsx дали бы подшитый
- * документ, противоречащий экрану, на котором его собирали.
+ * ПОЧЕМУ ЭКРАН И ВЫГРУЗКА РАЗНЫЕ. Экран — рабочее место: 500 строк читаются, а
+ * больше листать нечем. Выгрузка — нормативный документ (СП 45.13330): обрезать
+ * его нельзя, поэтому у неё свой, высокий предел (`PILE_JOURNAL_EXPORT_LIMIT`),
+ * а титул в обоих случаях считается по всему периоду одним агрегатом, не по
+ * показанной странице.
  */
 export const PILE_JOURNAL_LIMIT = 500;
 
+/**
+ * Предел строк журнала в выгрузке .xlsx.
+ *
+ * Настоящий журнал может быть на тысячи строк, и обрезать его — значит отдать
+ * подрядчику неполный исполнительный документ. Потолок всё же нужен: файл
+ * держится в памяти целиком. Если и его не хватит, шапка файла честно скажет
+ * об этом (строка-предупреждение), а не промолчит.
+ */
+export const PILE_JOURNAL_EXPORT_LIMIT = 20000;
+
+/** Итоги периода — по всему периоду, а не по показанной странице. */
+export interface PileJournalTotals {
+  /** «Свай (всего)»: Σ count по всем строкам периода. */
+  piles: number;
+  /** «из них в черновиках»: Σ count строк отчётов-черновиков. */
+  draftPiles: number;
+  /** «Свай без паспорта»: Σ count строк, у которых паспорта нет. */
+  withoutPassportPiles: number;
+  /** Паспорта по решению мастера — единица счёта паспорт, не свая. */
+  accepted: number;
+  needsRedrive: number;
+  pending: number;
+  /** Строк в выборке за период (не свай) — для «Показано N из M записей». */
+  rows: number;
+}
+
 export interface PileJournalPage {
   rows: PilePassportRow[];
-  /** Строк в выборке больше лимита: показаны первые `PILE_JOURNAL_LIMIT`. */
+  /** Строк в выборке больше лимита: показаны первые `limit`. */
   truncated: boolean;
+  /** Итоги по всему периоду — титул не зависит от среза страницы. */
+  totals: PileJournalTotals;
 }
 
 /**
@@ -188,10 +227,81 @@ function addDays(date: string, days: number): string {
   return new Date(Date.UTC(year, month - 1, day + days)).toISOString().slice(0, 10);
 }
 
+interface RawPileJournalTotals {
+  piles: number;
+  draftPiles: number;
+  withoutPassportPiles: number;
+  accepted: number;
+  needsRedrive: number;
+  pending: number;
+  rows: number;
+}
+
+/**
+ * Итоги периода одним агрегатным запросом.
+ *
+ * ПОЧЕМУ ОТДЕЛЬНО ОТ СТРАНИЦЫ. Экран показывает первые 500 строк, но титул —
+ * итог всего периода (СП 45.13330): считать его по срезанной странице значит
+ * занижать числа в подшиваемом документе. Фильтры те же, что у списка;
+ * организация — строгим равенством (никакого `tenantId IS NULL OR ...`).
+ *
+ * ПОЧЕМУ ЕДИНИЦЫ РАЗНЫЕ. «Свай (всего)» и «Свай без паспорта» — Σ count (сваи,
+ * сваи записывают пачкой), а «Паспортов принято/на добивку/не разобрано» —
+ * число СТРОК с паспортом (паспорт заводят на одну сваю). Мешать их в одной
+ * плитке нельзя: «Принято 1» рядом с «Свай 3025» читается как 1 из 3025.
+ */
+async function pileJournalTotals(
+  input: PileJournalFilters,
+  acceptance: PileAcceptanceValue | undefined,
+  bounds: { gte?: Date; lt?: Date } | null,
+): Promise<PileJournalTotals> {
+  const conditions: Prisma.Sql[] = [Prisma.sql`pw."tenantId" = ${input.tenantId}`];
+  if (input.siteId) conditions.push(Prisma.sql`r."siteId" = ${input.siteId}`);
+  // Решение и номер сваи — в паспорте; сваи без паспорта под эти фильтры не идут.
+  if (acceptance) conditions.push(Prisma.sql`p."acceptance"::text = ${acceptance}`);
+  if (input.pileNumber) {
+    conditions.push(Prisma.sql`p."pileNumber" ILIKE ${`%${input.pileNumber}%`}`);
+  }
+  // Дата забивки — момент работы; строку без `occurredAt` ставим по `receivedAt`.
+  if (bounds) {
+    const occurred: Prisma.Sql[] = [];
+    const received: Prisma.Sql[] = [];
+    if (bounds.gte) {
+      occurred.push(Prisma.sql`pw."occurredAt" >= ${bounds.gte}`);
+      received.push(Prisma.sql`pw."receivedAt" >= ${bounds.gte}`);
+    }
+    if (bounds.lt) {
+      occurred.push(Prisma.sql`pw."occurredAt" < ${bounds.lt}`);
+      received.push(Prisma.sql`pw."receivedAt" < ${bounds.lt}`);
+    }
+    conditions.push(Prisma.sql`(
+      (pw."occurredAt" IS NOT NULL AND ${Prisma.join(occurred, ' AND ')})
+      OR (pw."occurredAt" IS NULL AND ${Prisma.join(received, ' AND ')})
+    )`);
+  }
+
+  const [totals] = await db.$queryRaw<RawPileJournalTotals[]>`
+    SELECT
+      COALESCE(SUM(pw."count"), 0)::int AS "piles",
+      COALESCE(SUM(pw."count") FILTER (WHERE r."status" IS DISTINCT FROM ${SUBMITTED_REPORT_STATUS}), 0)::int AS "draftPiles",
+      COALESCE(SUM(pw."count") FILTER (WHERE p.id IS NULL), 0)::int AS "withoutPassportPiles",
+      COUNT(*) FILTER (WHERE p."acceptance" = 'ACCEPTED')::int AS "accepted",
+      COUNT(*) FILTER (WHERE p."acceptance" = 'NEEDS_REDRIVE')::int AS "needsRedrive",
+      COUNT(*) FILTER (WHERE p."acceptance" = 'PENDING')::int AS "pending",
+      COUNT(*)::int AS "rows"
+    FROM "PileWork" pw
+    LEFT JOIN "Report" r ON r.id = pw."reportId"
+    LEFT JOIN "PilePassport" p ON p."pileWorkId" = pw.id
+    WHERE ${Prisma.join(conditions, ' AND ')}
+  `;
+  return totals;
+}
+
 export async function listPilePassports(input: PileJournalFilters): Promise<PileJournalPage> {
   if (!input.tenantId) throw new ServiceError('tenantId is required', 400);
 
-  const limit = Math.min(input.limit ?? PILE_JOURNAL_LIMIT, PILE_JOURNAL_LIMIT);
+  // Экран просит 500 строк, выгрузка — свой, высокий предел.
+  const limit = Math.min(input.limit ?? PILE_JOURNAL_LIMIT, PILE_JOURNAL_EXPORT_LIMIT);
   const acceptance = input.acceptance ?? (input.pendingOnly ? 'PENDING' : undefined);
   // Пояс нужен только для периода: день фильтра — день тенанта, а не UTC.
   const bounds = input.dateFrom || input.dateTo
@@ -248,6 +358,10 @@ export async function listPilePassports(input: PileJournalFilters): Promise<Pile
       passport: { include: { sets: { orderBy: { ordinal: 'asc' } } } },
     },
   });
+
+  // Итоги периода — отдельным агрегатом по ВСЕЙ выборке; титул не срезается
+  // вместе со страницей, иначе подшитый документ занижал бы числа.
+  const totals = await pileJournalTotals(input, acceptance, bounds);
 
   const truncated = rows.length > limit;
   const page = truncated ? rows.slice(0, limit) : rows;
@@ -353,7 +467,7 @@ export async function listPilePassports(input: PileJournalFilters): Promise<Pile
     };
   });
 
-  return { rows: items, truncated };
+  return { rows: items, truncated, totals };
 }
 
 /**
@@ -394,18 +508,27 @@ function printYmd(ymd: string): string {
 }
 
 /**
- * Титул журнала по уже загруженным строкам.
+ * Титул журнала: описательные величины — из показанных строк, итоги — из
+ * агрегата периода (`totals`).
  *
- * ПОЧЕМУ ИЗ СТРОК, А НЕ ИЗ ОТДЕЛЬНЫХ ПОЛЕЙ ОБЪЕКТА. Копёр, молот, энергия
- * удара и проектный отказ записаны в каждом паспорте на момент забивки. Второй
- * источник тех же величин (карточка объекта) разошёлся бы с журналом на первой
- * же замене молота — и титул начал бы противоречить строкам под собой.
+ * ПОЧЕМУ ОПИСАТЕЛЬНЫЕ ИЗ СТРОК, А НЕ ИЗ ОТДЕЛЬНЫХ ПОЛЕЙ ОБЪЕКТА. Копёр, молот,
+ * энергия удара и проектный отказ записаны в каждом паспорте на момент забивки.
+ * Второй источник тех же величин (карточка объекта) разошёлся бы с журналом на
+ * первой же замене молота — и титул начал бы противоречить строкам под собой.
+ *
+ * ПОЧЕМУ ИТОГИ ОТДЕЛЬНЫМ ПАРАМЕТРОМ. Экран грузит первые 500 строк, а титул —
+ * итог всего периода (СП 45.13330). Считать его по срезу значило бы занижать
+ * числа в подшиваемом документе; поэтому счётчики берутся из агрегата.
  *
  * ПОЧЕМУ ПОЯС ВХОДИТ ПАРАМЕТРОМ. Его знает только выгрузка .xlsx: там день
  * печатается по поясу тенанта (F-R17-1). Без пояса период остаётся прежним —
  * UTC-днём, каким его получает экран.
  */
-export function pileJournalHeader(rows: PilePassportRow[], timezone?: string): PileJournalHeader {
+export function pileJournalHeader(
+  rows: PilePassportRow[],
+  totals: PileJournalTotals,
+  timezone?: string,
+): PileJournalHeader {
   const uniq = <T,>(values: (T | null | undefined)[]): T[] =>
     [...new Set(values.filter((value): value is T => value !== null && value !== undefined))];
 
@@ -425,13 +548,16 @@ export function pileJournalHeader(rows: PilePassportRow[], timezone?: string): P
     designRefusalMm: uniq(rows.map((row) => row.designRefusalMm)).sort((a, b) => a - b),
     dateFrom: periodEdge(dates[0]),
     dateTo: periodEdge(dates[dates.length - 1]),
-    // «Свай в журнале» — число свай, а не строк: запись пачкой приносит сразу
-    // несколько, а поправка с отрицательным счётом вычитается, как и в учёте.
-    pilesTotal: rows.reduce((sum, row) => sum + row.count, 0),
-    accepted: rows.filter((row) => row.acceptance === 'ACCEPTED').length,
-    needsRedrive: rows.filter((row) => row.acceptance === 'NEEDS_REDRIVE').length,
-    pending: rows.filter((row) => row.acceptance === 'PENDING').length,
-    overRefusal: rows.filter((row) => row.suggestion?.value === 'NEEDS_REDRIVE').length,
+    // Единицы не смешиваем: «Свай (всего)» — сваи (Σ count, пачка приносит
+    // несколько, поправка с отрицательным счётом вычитается), а «Паспортов …» —
+    // число строк с паспортом. Оба числа — по всему периоду, не по странице.
+    pilesTotal: totals.piles,
+    draftPiles: totals.draftPiles,
+    withoutPassportPiles: totals.withoutPassportPiles,
+    accepted: totals.accepted,
+    needsRedrive: totals.needsRedrive,
+    pending: totals.pending,
+    rowsTotal: totals.rows,
   };
 }
 
@@ -506,8 +632,15 @@ export async function exportPileJournalXlsx(filters: PileJournalFilters): Promis
   // День документа — день тенанта, а не UTC (F-R17-1): свая, забитая в 00:30
   // МСК, в UTC ещё вчерашняя, и подшитый журнал датировал бы её соседним днём.
   const { timezone, companyName, inn } = await getSettings(filters.tenantId);
-  const { rows, truncated } = await listPilePassports({ ...filters, limit: PILE_JOURNAL_LIMIT, timezone });
-  const header = pileJournalHeader(rows, timezone);
+  // Выгрузка — нормативный документ: у неё свой, высокий предел строк, а не
+  // экранные 500. Титул при этом считается по всему периоду (агрегат), поэтому
+  // и при срезе счётчики честные.
+  const { rows, truncated, totals } = await listPilePassports({
+    ...filters,
+    limit: PILE_JOURNAL_EXPORT_LIMIT,
+    timezone,
+  });
+  const header = pileJournalHeader(rows, totals, timezone);
 
   const list = (values: (string | number)[]): string => (values.length ? values.join(', ') : '—');
 
@@ -529,18 +662,19 @@ export async function exportPileJournalXlsx(filters: PileJournalFilters): Promis
     ['Проектный отказ, мм/удар', list(header.designRefusalMm)],
     ['Период забивки', `${header.dateFrom ?? '—'} — ${header.dateTo ?? '—'}`],
     [],
-    ['Свай в журнале', header.pilesTotal],
-    ['Принято', header.accepted],
-    ['На добивку', header.needsRedrive],
-    ['Не разобрано', header.pending],
-    ['Отказ больше проектного', header.overRefusal],
+    ['Свай (всего)', header.pilesTotal],
+    ['из них в черновиках', header.draftPiles],
+    ['Свай без паспорта', header.withoutPassportPiles],
+    ['Паспортов принято', header.accepted],
+    ['Паспортов на добивку', header.needsRedrive],
+    ['Паспортов не разобрано', header.pending],
     [],
     ['Отказ считается как среднее по трём последним залогам (СП 45.13330).'],
     // Дата формирования — по поясу тенанта, как и весь остальной документ (F-R37-1):
     // журнал, выгруженный 26.09 в 01:00 МСК, не должен датироваться 25.09 по UTC.
     ['Журнал выгружен', printMoment(new Date(), timezone)],
     // Не молчим о срезе: иначе подшитый документ выглядел бы как полный.
-    ...(truncated ? [[`Показаны первые ${PILE_JOURNAL_LIMIT} свай — сузьте период или объект`]] : []),
+    ...(truncated ? [[`Показаны первые ${PILE_JOURNAL_EXPORT_LIMIT} строк — сузьте период или объект`]] : []),
   ];
 
   const piles: (string | number | null)[][] = [[

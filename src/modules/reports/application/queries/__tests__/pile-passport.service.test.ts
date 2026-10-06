@@ -10,8 +10,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 type Sheet = { name: string; rows: (string | number | null)[][] };
 
-const { pileWorkFindMany, pileUpdateMany, userFindMany, getSettings, sheets } = vi.hoisted(() => ({
+const { pileWorkFindMany, pileTotalsQuery, pileUpdateMany, userFindMany, getSettings, sheets } = vi.hoisted(() => ({
   pileWorkFindMany: vi.fn(),
+  pileTotalsQuery: vi.fn(),
   pileUpdateMany: vi.fn(),
   userFindMany: vi.fn(),
   getSettings: vi.fn(),
@@ -23,6 +24,7 @@ vi.mock('@/lib/db', () => ({
     pileWork: { findMany: pileWorkFindMany },
     pilePassport: { updateMany: pileUpdateMany },
     user: { findMany: userFindMany },
+    $queryRaw: pileTotalsQuery,
   },
 }));
 
@@ -35,7 +37,7 @@ vi.mock('@/lib/xlsx-writer', () => ({
   },
 }));
 
-import { decidePilePassport, exportPileJournalXlsx, listPilePassports } from '../pile-passport.service';
+import { decidePilePassport, exportPileJournalXlsx, listPilePassports, pileJournalHeader, PILE_JOURNAL_LIMIT, PILE_JOURNAL_EXPORT_LIMIT } from '../pile-passport.service';
 
 /** Строка выработки: одна запись = одна строка журнала. */
 function work(overrides: Record<string, unknown> = {}) {
@@ -101,6 +103,8 @@ function defaultMocks() {
   sheets.current = [];
   pileWorkFindMany.mockReset();
   pileWorkFindMany.mockResolvedValue([work()]);
+  pileTotalsQuery.mockReset();
+  pileTotalsQuery.mockResolvedValue([totals()]);
   userFindMany.mockReset();
   userFindMany.mockResolvedValue([]);
   getSettings.mockReset();
@@ -109,6 +113,20 @@ function defaultMocks() {
     companyName: 'ООО «ОРИОН-Строй»',
     inn: '7701234567',
   });
+}
+
+/** Строка агрегата периода — то, что вернёт один запрос итогов. */
+function totals(overrides: Record<string, unknown> = {}) {
+  return {
+    piles: 1,
+    draftPiles: 0,
+    withoutPassportPiles: 1,
+    accepted: 0,
+    needsRedrive: 0,
+    pending: 0,
+    rows: 1,
+    ...overrides,
+  };
 }
 
 // ---------------------------------------------------------------- строки
@@ -188,6 +206,85 @@ describe('listPilePassports — строки из выработки (W14)', () 
 
     const where = pileWorkFindMany.mock.calls[0][0].where as { passport?: { acceptance?: string } };
     expect(where.passport?.acceptance).toBe('PENDING');
+  });
+});
+
+// ---------------------------------------------------------------- итоги периода (W21)
+
+describe('listPilePassports — итоги по всему периоду (W21)', () => {
+  beforeEach(defaultMocks);
+
+  it('при усечении итоги считаются по всему периоду, а не по показанным строкам', async () => {
+    // 501 строка → срез: титул обязан описать весь период, а не первые 500.
+    pileWorkFindMany.mockResolvedValue(
+      Array.from({ length: PILE_JOURNAL_LIMIT + 1 }, (_, i) => work({ id: `w${i}` })),
+    );
+    pileTotalsQuery.mockResolvedValue([totals({
+      piles: 1234,
+      withoutPassportPiles: 1200,
+      accepted: 5,
+      needsRedrive: 2,
+      pending: 3,
+      rows: 900,
+    })]);
+
+    const { rows, truncated, totals: sum } = await listPilePassports({ tenantId: 'orion' });
+    const header = pileJournalHeader(rows, sum);
+
+    expect(truncated).toBe(true);
+    expect(rows).toHaveLength(PILE_JOURNAL_LIMIT);
+    // Итоги — периода (агрегат), а не показанной страницы.
+    expect(header.pilesTotal).toBe(1234);
+    expect(header.accepted).toBe(5);
+    expect(header.needsRedrive).toBe(2);
+    expect(header.pending).toBe(3);
+    expect(header.rowsTotal).toBe(900);
+  });
+
+  it('«Свай без паспорта» — отдельная сумма, не смешана с плитками паспортов', async () => {
+    pileTotalsQuery.mockResolvedValue([totals({
+      piles: 3025,
+      withoutPassportPiles: 3015,
+      accepted: 1,
+      needsRedrive: 1,
+      pending: 8,
+      rows: 280,
+    })]);
+
+    const { rows, totals: sum } = await listPilePassports({ tenantId: 'orion' });
+    const header = pileJournalHeader(rows, sum);
+
+    expect(header.pilesTotal).toBe(3025);
+    expect(header.withoutPassportPiles).toBe(3015);
+    expect(header.accepted).toBe(1);
+  });
+
+  it('в запросе итогов организация — строгим равенством, без всех тенантов', async () => {
+    await listPilePassports({ tenantId: 'tenant-a' });
+
+    // Аргументы тега $queryRaw: строки запроса + вставленные значения (в т.ч.
+    // вложенный Prisma.sql с условиями). Организация — параметр, не литерал.
+    const args = JSON.stringify(pileTotalsQuery.mock.calls[0]);
+    expect(args).toContain('tenant-a');
+    expect(args).not.toContain('IS NULL OR');
+  });
+});
+
+describe('exportPileJournalXlsx — полная выгрузка (W21)', () => {
+  beforeEach(defaultMocks);
+
+  it('в файл попадает больше 500 строк: у выгрузки отдельный предел', async () => {
+    pileWorkFindMany.mockResolvedValue(
+      Array.from({ length: 600 }, (_, i) => work({ id: `w${i}` })),
+    );
+    pileTotalsQuery.mockResolvedValue([totals({ piles: 600, withoutPassportPiles: 600, rows: 600 })]);
+
+    await exportPileJournalXlsx({ tenantId: 'orion' });
+
+    // Все 600 строк свай в листе, а не экранные 500.
+    expect(sheet('Журнал забивки').rows.length).toBeGreaterThan(600);
+    // Выборка идёт до предела выгрузки, а не до 500.
+    expect(pileWorkFindMany.mock.calls[0][0].take).toBe(PILE_JOURNAL_EXPORT_LIMIT + 1);
   });
 });
 
