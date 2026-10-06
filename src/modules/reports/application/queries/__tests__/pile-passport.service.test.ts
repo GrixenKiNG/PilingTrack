@@ -450,3 +450,30 @@ describe('D4: сервис требует основание добивки', ()
     expect(pileUpdateMany).toHaveBeenLastCalledWith(expect.objectContaining({ data: expect.objectContaining({ acceptance: 'ACCEPTED', acceptanceNote: null }) }));
   });
 });
+
+// ---------------------------------------------------------------- поиск по номеру (W30)
+
+describe('listPilePassports — поиск по номеру экранирует метасимволы LIKE (W30)', () => {
+  beforeEach(defaultMocks);
+
+  it('номер «C_1%» не превращается в шаблон — в списке и в итогах одинаково', async () => {
+    await listPilePassports({ tenantId: 'orion', pileNumber: 'C_1%' });
+
+    // Список (Prisma contains) — `%`/`_` экранированы, а не работают как шаблон.
+    const where = pileWorkFindMany.mock.calls[0][0].where as { passport?: { pileNumber?: { contains?: string } } };
+    expect(where.passport?.pileNumber?.contains).toBe('C\\_1\\%');
+
+    // Итоги (raw ILIKE) — то же экранирование и явный ESCAPE, иначе титул
+    // журнала разошёлся бы со строками под ним на одном и том же поиске.
+    const json = JSON.stringify(pileTotalsQuery.mock.calls[0]);
+    expect(json).toContain(JSON.stringify('%C\\_1\\%%'));
+    expect(json).toContain('ESCAPE');
+  });
+
+  it('обычный номер без метасимволов не обрастает экранированием', async () => {
+    await listPilePassports({ tenantId: 'orion', pileNumber: 'СВ-1' });
+
+    const where = pileWorkFindMany.mock.calls[0][0].where as { passport?: { pileNumber?: { contains?: string } } };
+    expect(where.passport?.pileNumber?.contains).toBe('СВ-1');
+  });
+});

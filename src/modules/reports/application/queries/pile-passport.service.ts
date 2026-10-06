@@ -238,6 +238,21 @@ interface RawPileJournalTotals {
 }
 
 /**
+ * Экранировать метасимволы LIKE (`%`, `_`, `\`) — поиск по номеру сваи идёт
+ * буквально, а не шаблоном.
+ *
+ * ПОЧЕМУ ВРУЧНУЮ. Prisma `contains` подставляет строку в ILIKE как есть —
+ * `ILIKE ('%' || $1 || '%')`, метасимволы не экранирует (проверено на Prisma
+ * 7.8: ввод `C_1%` уходит параметром без изменений). Значит `%`/`_` из поля
+ * поиска превратили бы ввод в шаблон, а титул журнала (агрегат `ILIKE`) и
+ * строки (список `contains`) обязаны понимать один и тот же поиск одинаково —
+ * иначе титул разойдётся со строками под ним. Экранируем оба одним способом.
+ */
+function escapeLikePattern(value: string): string {
+  return value.replace(/[\\%_]/g, '\\$&');
+}
+
+/**
  * Итоги периода одним агрегатным запросом.
  *
  * ПОЧЕМУ ОТДЕЛЬНО ОТ СТРАНИЦЫ. Экран показывает первые 500 строк, но титул —
@@ -260,7 +275,7 @@ async function pileJournalTotals(
   // Решение и номер сваи — в паспорте; сваи без паспорта под эти фильтры не идут.
   if (acceptance) conditions.push(Prisma.sql`p."acceptance"::text = ${acceptance}`);
   if (input.pileNumber) {
-    conditions.push(Prisma.sql`p."pileNumber" ILIKE ${`%${input.pileNumber}%`}`);
+    conditions.push(Prisma.sql`p."pileNumber" ILIKE ${`%${escapeLikePattern(input.pileNumber)}%`} ESCAPE '\\'`);
   }
   // Дата забивки — момент работы; строку без `occurredAt` ставим по `receivedAt`.
   if (bounds) {
@@ -328,7 +343,7 @@ export async function listPilePassports(input: PileJournalFilters): Promise<Pile
           passport: {
             ...(acceptance ? { acceptance } : {}),
             ...(input.pileNumber
-              ? { pileNumber: { contains: input.pileNumber, mode: 'insensitive' as const } }
+              ? { pileNumber: { contains: escapeLikePattern(input.pileNumber), mode: 'insensitive' as const } }
               : {}),
           },
         }
