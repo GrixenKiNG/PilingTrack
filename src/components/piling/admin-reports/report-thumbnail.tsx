@@ -95,6 +95,7 @@ export function ReportThumbnail({ reportId, mediaId: knownMediaId }: Props) {
             type="button"
             onClick={() => setOpen(false)}
             aria-label="Закрыть фото"
+            title="Закрыть"
             className="absolute right-4 top-4 flex h-11 w-11 items-center justify-center rounded-full bg-card/10 text-white hover:bg-card/20"
           >
             <X className="w-5 h-5" />

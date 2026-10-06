@@ -236,6 +236,33 @@ describe('миниатюра фото отчёта: отказ открытия 
 });
 
 /**
+ * F-R131-NEXT3 №29: кнопка закрытия лайтбокса фото в ReportThumbnail
+ * имела aria-label, но не имела title.
+ */
+describe('ReportThumbnail — title на кнопке закрытия (F-R131-NEXT3 №29)', () => {
+  beforeEach(() => {
+    authFetchMock.mockReset();
+    vi.mocked(toast.error).mockClear();
+  });
+
+  it('кнопка закрытия фото имеет title', async () => {
+    authFetchMock.mockImplementation(async (url: string) => {
+      if (url.startsWith('/api/media/download-batch')) {
+        return { ok: true, status: 200, json: async () => ({ urls: { m1: 'https://cdn.example/x.jpg' } }) };
+      }
+      return { ok: true, status: 200, json: async () => ({ data: [{ id: 'm1', fileName: 'a.png', contentType: 'image/png', thumbnailKey: 'k' }] }) };
+    });
+    render(<ReportThumbnail reportId="r1" mediaId="m1" />);
+
+    // Открываем лайтбокс
+    fireEvent.click(await screen.findByRole('button', { name: 'Открыть фото отчёта' }));
+    // Ищем кнопку закрытия в лайтбоксе
+    const closeBtn = await screen.findByRole('button', { name: 'Закрыть фото' });
+    expect(closeBtn).toHaveAttribute('title', 'Закрыть');
+  });
+});
+
+/**
  * F-R115-14: клиент задавал своё имя файла через link.download, а сервер отдавал
  * другое в Content-Disposition (с датой выгрузки) — один документ ходил под двумя
  * именами. Теперь имя берётся у сервера, как это делает техготовность.

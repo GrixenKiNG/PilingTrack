@@ -132,3 +132,19 @@ describe('UserDocuments — пределы длины полей докумен�
     expect(screen.getByLabelText('Примечание')).toHaveAttribute('maxLength', '2000');
   });
 });
+
+/**
+ * F-R131-NEXT3 №25: кнопки-иконки «карандаш»/«корзина» в списке документов
+ * имели aria-label, но не имели title (всплывающую подсказку при наведении).
+ * Стандарт проекта — и aria-label, и title.
+ */
+describe('UserDocuments — title на кнопках-иконках (F-R131-NEXT3 №25)', () => {
+  it('кнопки «Изменить документ» и «Удалить документ» имеют title', async () => {
+    documentsResponse = () => Promise.resolve(ok({ documents: [docRow('doc-1', 'Удостоверение')] }));
+    render(<UserDocuments userId="ivanov" />);
+    await screen.findByText('Удостоверение');
+
+    expect(screen.getByLabelText('Изменить документ')).toHaveAttribute('title', 'Изменить документ');
+    expect(screen.getByLabelText('Удалить документ')).toHaveAttribute('title', 'Удалить документ');
+  });
+});
