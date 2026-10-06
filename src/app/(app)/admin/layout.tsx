@@ -1,5 +1,4 @@
 import { redirect } from 'next/navigation';
-import { roleHomeRoute } from '@/lib/routes';
 import { readPageSessionUser } from '@/lib/page-session';
 
 export default async function AdminSectionLayout({ children }: { children: React.ReactNode }) {
@@ -9,8 +8,11 @@ export default async function AdminSectionLayout({ children }: { children: React
   const user = await readPageSessionUser();
   if (!user) redirect('/login');
 
+  // Роли вне раздела (OPERATOR, ASSISTANT) видят объяснение отказа, а не
+  // молчаливый переход на свой экран — как в гварде разделов
+  // (`require-page-ability.ts`): W11-NO-ACCESS-SCREEN, W17.
   if (!['ADMIN', 'DISPATCHER', 'FOREMAN', 'MECHANIC', 'SAFETY_ENGINEER'].includes(user.role)) {
-    redirect(roleHomeRoute(user.role));
+    redirect('/no-access');
   }
 
   return <>{children}</>;

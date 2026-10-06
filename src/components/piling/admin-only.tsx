@@ -10,7 +10,8 @@ import { usePilingStore } from '@/lib/store';
  * These routes are hidden from the dispatcher's nav, but a dispatcher who types
  * the URL used to land on the page and see a generic "Не удалось загрузить"
  * error (the API correctly 403s — no data leaks, but the UX was confusing).
- * This redirects non-admins back to the dashboard instead.
+ * This sends non-admins to the "Нет доступа" page instead of silently dropping
+ * them on the dashboard (W11-NO-ACCESS-SCREEN, W17).
  */
 export function AdminOnly({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -18,7 +19,7 @@ export function AdminOnly({ children }: { children: React.ReactNode }) {
   const allowed = role === 'ADMIN';
 
   useEffect(() => {
-    if (role && !allowed) router.replace('/admin');
+    if (role && !allowed) router.replace('/no-access');
   }, [role, allowed, router]);
 
   if (!allowed) return null;
