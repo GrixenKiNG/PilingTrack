@@ -4,7 +4,9 @@ import { checkSystemStatus } from './aggregate';
 import { POLL_INTERVAL_MS } from './thresholds';
 import type { SystemStatus } from './types';
 
-let cachedStatus: SystemStatus | null = null;
+// Share the producer snapshot across Next instrumentation and route bundles.
+const healthGlobal = globalThis as typeof globalThis & { __pilingtrackHealthSnapshot?: { value: SystemStatus | null } };
+const sharedHealth = healthGlobal.__pilingtrackHealthSnapshot ??= { value: null };
 let trackerStarted = false;
 
 /** Как часто повторять запись о неизменившейся поломке. */
@@ -54,7 +56,7 @@ function startBackgroundTracker(): void {
   async function tick() {
     try {
       const status = await checkSystemStatus();
-      cachedStatus = status;
+      sharedHealth.value = status;
 
       if (status.status === 'healthy') {
         // Сброс обязателен: без него связка «сломалось → починилось → сломалось
@@ -75,6 +77,7 @@ function startBackgroundTracker(): void {
           redis: status.components.redis.status,
           outbox: status.components.outbox.status,
           workers: status.components.workers.status,
+          schedulers: status.components.schedulers.status,
           storage: status.components.storage.status,
           backup: status.components.backup.status,
         };
@@ -106,7 +109,7 @@ function startBackgroundTracker(): void {
  * Returns cached result (updated every 15s) for fast response.
  */
 export function getCurrentStatus(): SystemStatus | null {
-  return cachedStatus;
+  return sharedHealth.value;
 }
 
 /**
@@ -123,6 +126,6 @@ export function startHealthTracker(): void {
  */
 export async function getFreshStatus(): Promise<SystemStatus> {
   const status = await checkSystemStatus();
-  cachedStatus = status;
+  sharedHealth.value = status;
   return status;
 }

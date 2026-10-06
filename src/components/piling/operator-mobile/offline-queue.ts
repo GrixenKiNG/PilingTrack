@@ -39,6 +39,8 @@ export interface QueuedCommand {
    * положенных до появления поля, владельца нет — их считаем своими.
    */
   ownerId?: string | null;
+  /** Имя владельца — чтобы сменщику было кого назвать (аудит R43 №2). */
+  ownerName?: string | null;
   clientCommandId: string;
   /** Подпись для человека: что именно лежит на устройстве. */
   label: string;
@@ -143,6 +145,39 @@ export function classifyFailure(status: number | null | undefined): FailureKind 
 
 export const AUTH_WAIT_MESSAGE = 'Войдите снова — запись отправится после входа';
 
+/**
+ * Отказ проверки безопасности (CSRF) — временный, хотя и 403.
+ *
+ * `csrf-protection.ts` отдаёт 403 с английским текстом «CSRF validation failed…»,
+ * когда `Origin` не сошёлся с `Host`: приложение открыто по IP, через прокси или
+ * вкладка пережила смену адреса. Причина снимается перезагрузкой страницы,
+ * поэтому повтор записи осмыслен — в отличие от прочих 403 (чужая роль, чужая
+ * смена), которые остаются `permanent`. Русское указание машинисту несёт
+ * `ApiError` (аудит R76, находка 12).
+ */
+export const CSRF_REJECT_MESSAGE =
+  'Запрос отклонён проверкой безопасности. Обновите страницу — запись сохранена на телефоне и уйдёт после обновления.';
+
+/**
+ * Тот же отказ проверки безопасности, но у команды, которая в очередь не
+ * попадает: переходы состояния смены (`close-shift`, `finish-work`) и шаг
+ * снимка. Обещать сохранение записи здесь нельзя — её нет ни на телефоне, ни
+ * в очереди, и после обновления страницы действие придётся выполнить заново
+ * (аудит R89, находка 1).
+ */
+export const CSRF_REJECT_NOT_QUEUED_MESSAGE =
+  'Запрос отклонён проверкой безопасности. Обновите страницу и повторите действие.';
+
+/**
+ * Признак CSRF-отказа на ошибке отправки. Читаем структурно (поле `reason`), а не
+ * через `instanceof ApiError`: этот модуль не может импортировать `api.ts` —
+ * тот импортирует его (циклическая зависимость).
+ */
+export function isCsrfFailure(error: unknown): boolean {
+  return typeof error === 'object' && error !== null
+    && (error as {reason?: unknown}).reason === 'csrf';
+}
+
 // --- Хранилище ---
 
 export class QueueStorageError extends Error {
@@ -151,6 +186,24 @@ export class QueueStorageError extends Error {
       ? 'Память браузера недоступна (частный режим?) — без связи запись не сохранится. Не закрывайте форму и отправьте её при связи.'
       : 'Не удалось сохранить запись на устройстве. Не закрывайте форму: освободите место или восстановите связь и повторите.');
     this.name = 'QueueStorageError';
+  }
+}
+
+/**
+ * Ключ команды занят записью другого машиниста.
+ *
+ * Планшет на установке общий: под сессией сменщика может лежать отвергнутая
+ * запись его предшественника с тем же ключом. Заменить её своим составом
+ * нельзя — она ушла бы под чужой сессией (или чужая работа под нашей), — а
+ * положить вторую запись с тем же ключом не даёт само хранилище. Не
+ * `QueueStorageError`: тот в `sendCommand` означает «память недоступна» и
+ * приводит к прямой отправке в обход очереди. Здесь отправлять нечего —
+ * машинист должен увидеть этот текст (F-V1-QUEUE-VERSION).
+ */
+export class QueueOwnershipError extends Error {
+  constructor() {
+    super('Запись с этим ключом принадлежит другому пользователю. Обновите страницу.');
+    this.name = 'QueueOwnershipError';
   }
 }
 
@@ -242,14 +295,57 @@ export function pendingCount(): number {
   return readQueue().length;
 }
 
+/**
+ * Чужие записи на этом устройстве — сколько и чьи.
+ *
+ * Под сессией сменщика они не уходят и уходить не должны: выработка ушла бы
+ * не тому человеку. Но и молчать о них нельзя (аудит R43 №2): если хозяин
+ * больше не войдёт на этом телефоне, сваи потеряются, и никто не узнает.
+ * Сменщику показываем, что они лежат, чтобы он сообщил хозяину или мастеру.
+ */
+export function foreignQueueSummary(): {count: number; owners: string[]} {
+  const foreign = read().filter((item) => !isMine(item));
+  const owners = [...new Set(foreign.map((item) => item.ownerName).filter((name): name is string => !!name))];
+  return {count: foreign.length, owners};
+}
+
 // --- Операции ---
 
-/** Кладём до отправки: обрыв на середине запроса не должен терять запись. */
+/**
+ * Кладём до отправки: обрыв на середине запроса не должен терять запись.
+ *
+ * ЕСЛИ ЗАПИСЬ С ЭТИМ КЛЮЧОМ УЖЕ ЕСТЬ И ОНА `FAILED` — ЗАМЕНЯЕМ её состав.
+ * Новый ключ приложение заводит только после успеха или `QueuedOffline`
+ * (`operator-mobile-app.tsx`, run()), поэтому машинист, исправив форму и нажав
+ * снова, приходит с тем же ключом. Без замены в очереди остался бы старый
+ * неверный состав, а исправленный потерялся бы, оборвись повтор на середине:
+ * `markAttempt` перевёл бы старую запись в `PENDING`, форма закрылась бы как
+ * `QueuedOffline`, а позже слив отправил бы прежний состав и снова получил
+ * отказ (F-V1-INLINE-REJECT-b, регрессия принятой F-V1-INLINE-REJECT; R82).
+ * Ждущую (`PENDING`) запись не трогаем — она уже снаряжена и уйдёт как есть.
+ * ЧУЖУЮ отвергнутую запись тоже не трогаем: ключ занят, а состав принадлежит
+ * прежнему машинисту (см. `QueueOwnershipError`).
+ * `attempts` не обнуляем: счётчик ведётся по записи, а не по составу.
+ * `queuedAt` при замене обновляем: он отличает состав от прежнего, и по нему
+ * поздний ответ на старую отправку узнаёт, что запись уже другая.
+ */
 export function enqueue(command: {clientCommandId: string}): void {
   const queue = read(true);
-  if (queue.some((item) => item.clientCommandId === command.clientCommandId)) return;
+  const existing = queue.find((item) => item.clientCommandId === command.clientCommandId);
+  if (existing) {
+    if (existing.state !== 'FAILED') return;
+    if (!isMine(existing)) throw new QueueOwnershipError();
+    existing.command = command;
+    existing.label = commandLabel(command);
+    existing.state = 'PENDING';
+    existing.lastError = null;
+    existing.queuedAt = new Date().toISOString();
+    write(queue);
+    return;
+  }
   queue.push({
     ownerId: currentOwnerId(),
+    ownerName: usePilingStore.getState().currentUser?.name ?? null,
     clientCommandId: command.clientCommandId,
     label: commandLabel(command),
     command,
@@ -261,8 +357,19 @@ export function enqueue(command: {clientCommandId: string}): void {
   write(queue);
 }
 
-export function resolve(clientCommandId: string): void {
-  mutate((queue) => queue.filter((item) => item.clientCommandId !== clientCommandId));
+/**
+ * Снять отправленную запись с устройства.
+ *
+ * `expectedQueuedAt` — состав, за который пришёл ответ. Пока запрос был в
+ * пути, машинист мог исправить форму и положить тем же ключом НОВЫЙ состав:
+ * `enqueue` тогда обновил `queuedAt`. Поздний успех относится к прежнему
+ * составу, и снимать по нему новую запись нельзя (F-V1-QUEUE-VERSION).
+ * Не передан — поведение прежнее.
+ */
+export function resolve(clientCommandId: string, expectedQueuedAt?: string): void {
+  mutate((queue) => queue.filter((item) =>
+    item.clientCommandId !== clientCommandId
+    || (expectedQueuedAt !== undefined && item.queuedAt !== expectedQueuedAt)));
 }
 
 /**
@@ -293,11 +400,23 @@ export function discard(clientCommandId: string): void {
     item.clientCommandId !== clientCommandId || item.state !== 'FAILED'));
 }
 
-export function markAttempt(clientCommandId: string, error: string | null, permanent: boolean): void {
-  mutate((queue) => queue.map((item) => item.clientCommandId === clientCommandId
-    ? {...item, attempts: item.attempts + 1, lastError: error,
-      state: permanent ? 'FAILED' as const : 'PENDING' as const}
-    : item));
+/**
+ * Отметить попытку отправки: `permanent` — сервер отказал по существу.
+ *
+ * `expectedQueuedAt` — тот же предохранитель, что у `resolve`: если запись уже
+ * заменена новым составом, отказ на прежний состав её не трогает — иначе
+ * исправленное машинистом (F-V1-INLINE-REJECT-b) молча покраснело бы от
+ * старого ответа (F-V1-QUEUE-VERSION).
+ */
+export function markAttempt(
+  clientCommandId: string, error: string | null, permanent: boolean, expectedQueuedAt?: string,
+): void {
+  mutate((queue) => queue.map((item) => {
+    if (item.clientCommandId !== clientCommandId) return item;
+    if (expectedQueuedAt !== undefined && item.queuedAt !== expectedQueuedAt) return item;
+    return {...item, attempts: item.attempts + 1, lastError: error,
+      state: permanent ? 'FAILED' as const : 'PENDING' as const};
+  }));
 }
 
 let inFlight: Promise<{sent: number; left: number}> | null = null;
@@ -326,15 +445,28 @@ async function sendAll(
   let sent = 0;
   for (const item of readQueue()) {
     if (item.state === 'FAILED') continue;
+    // Состав запоминаем ДО отправки: пока ответ в пути, машинист может
+    // заменить его (enqueue обновит queuedAt). Тогда поздний результат
+    // относится к прежнему составу и новую запись трогать нельзя.
+    const queuedAt = item.queuedAt;
     try {
       await send(item.command);
-      resolve(item.clientCommandId);
+      resolve(item.clientCommandId, queuedAt);
       sent += 1;
     } catch (error) {
+      // CSRF-403 — не отказ по существу: причина (расхождение `Origin`/`Host`)
+      // снимается перезагрузкой страницы. Запись остаётся `PENDING`, а слив
+      // останавливаем, как при сетевом сбое, — остальные подождут
+      // (аудит R76, находка 12).
+      if (isCsrfFailure(error)) {
+        markAttempt(item.clientCommandId,
+          error instanceof Error ? error.message : CSRF_REJECT_MESSAGE, false, queuedAt);
+        break;
+      }
       const kind = classifyFailure((error as {status?: number} | null)?.status);
       markAttempt(item.clientCommandId,
         kind === 'auth' ? AUTH_WAIT_MESSAGE : error instanceof Error ? error.message : 'Не отправлено',
-        kind === 'permanent');
+        kind === 'permanent', queuedAt);
       // Сеть лежит, сервер занят или нужен вход — остальные ждут.
       if (kind !== 'permanent') break;
     }

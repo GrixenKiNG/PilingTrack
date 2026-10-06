@@ -26,7 +26,6 @@ export class PrismaCrewRepository implements CrewRepository {
     const state = aggregate.getState();
     const persistenceData = toPrismaData(aggregate);
     const pendingEvents = aggregate.getPendingEvents();
-
     // Transactional outbox: crew data + outbox events + caller hooks in one tx
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Prisma interactive-transaction callback client type isn't cleanly exported
     await db.$transaction(async (tx: any) => {
@@ -43,12 +42,17 @@ export class PrismaCrewRepository implements CrewRepository {
       });
 
       if (pendingEvents.length > 0) {
+        // Platform ADMIN may have another tenant: the crew belongs to its Site.
+        const site = await tx.site.findUnique({ where: { id: state.siteId }, select: { tenantId: true } });
+        if (!site?.tenantId) throw new Error("Crew outbox requires Site.tenantId");
+        const tenantId = site.tenantId;
         const outboxRecords = pendingEvents.map((event) => {
-          const data = toOutboxData(event);
+          const data = toOutboxData(event, tenantId);
           return {
             type: data.type,
             aggregateId: data.aggregateId,
             aggregateType: data.aggregateType,
+            tenantId: data.tenantId,
             // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Prisma JSON column / event payload is an arbitrary serializable shape
             payload: data.payload as any,
           };

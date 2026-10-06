@@ -13,11 +13,13 @@ import { cn } from '@/lib/utils';
 import { HAMMER_LABEL, type EquipmentOption } from '../../to-module-bits';
 import type { ReadinessBootstrap } from '../api/contracts';
 import { ScreenTitle, SettingsKpis, StatusPill, card } from './shared-ui';
+import { normalizeSearch } from '../shared/text-search';
 
 interface DictionariesSettingsProps {
   equipment: EquipmentOption[];
   bootstrap: ReadinessBootstrap | null;
-  onExport: () => void;
+  /** Возвращает промис: пока выгрузка идёт, кнопка блокируется и показывает ход. */
+  onExport: () => Promise<void>;
 }
 
 interface DictionaryEntry { id: string; name: string; isActive?: boolean }
@@ -56,13 +58,22 @@ export function DictionariesSettings({ equipment, bootstrap, onExport }: Diction
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState<'ALL' | 'ACTIVE' | 'ARCHIVED'>('ALL');
   const [dictionaries, setDictionaries] = useState<{ pileGrades: DictionaryEntry[]; drillingTypes: DictionaryEntry[]; downtimeReasons: DictionaryEntry[] } | null>(null);
+  // Выгрузка справочника идёт не мгновенно; пока она идёт, кнопка блокируется,
+  // чтобы повторный клик не отправил вторую полную выгрузку втихую.
+  const [exportPending, setExportPending] = useState(false);
+
+  const handleExport = async () => {
+    setExportPending(true);
+    try { await onExport(); }
+    finally { setExportPending(false); }
+  };
 
   useEffect(() => {
     let active = true;
     void authFetch('/api/dictionary/all')
       .then(async (response) => {
         if (!response.ok) {
-          if (active) toast.error('Не удалось сохранить настройку');
+          if (active) toast.error('Не удалось загрузить справочники');
           return;
         }
         const body = await response.json() as { pileGrades?: DictionaryEntry[]; drillingTypes?: DictionaryEntry[]; downtimeReasons?: DictionaryEntry[] };
@@ -73,14 +84,14 @@ export function DictionariesSettings({ equipment, bootstrap, onExport }: Diction
           downtimeReasons: body.downtimeReasons ?? [],
         });
       })
-      .catch(() => { if (active) toast.error('Не удалось сохранить настройку'); });
+      .catch(() => { if (active) toast.error('Не удалось загрузить справочники'); });
     return () => { active = false; };
   }, []);
 
-  const normalized = query.trim().toLocaleLowerCase('ru-RU');
+  const normalized = normalizeSearch(query);
   const rows = equipment.filter((item) =>
     (status === 'ALL' || (status === 'ACTIVE' ? item.isActive : !item.isActive))
-    && (!normalized || `${item.name} ${item.model ?? ''}`.toLocaleLowerCase('ru-RU').includes(normalized)));
+    && (!normalized || normalizeSearch(`${item.name} ${item.model ?? ''}`).includes(normalized)));
 
   // Записи приезжают вместе с архивными (F-R29-2), поэтому «Записей» считает
   // только действующие — иначе число прыгало бы при архивации. Архивные
@@ -140,7 +151,7 @@ export function DictionariesSettings({ equipment, bootstrap, onExport }: Diction
                 <option value="ACTIVE">Действующие</option>
                 <option value="ARCHIVED">Архив</option>
               </select>
-              <Button variant="outline" onClick={onExport}>Экспорт</Button>
+              <Button variant="outline" disabled={exportPending} onClick={() => void handleExport()}>{exportPending ? 'Готовим файл…' : 'Экспорт'}</Button>
             </div>
             <div className="overflow-x-auto">
               <div className="grid min-w-[760px] grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_110px_110px_80px_90px] gap-2 border-b border-border px-4 py-2 text-3xs font-semibold uppercase text-muted-foreground">

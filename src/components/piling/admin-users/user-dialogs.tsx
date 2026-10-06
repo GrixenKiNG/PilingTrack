@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { Check, Loader2, Pencil, UserCog } from '@/components/piling/icons/unified-icons';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -32,6 +32,7 @@ import {
 } from '@/components/ui/select';
 import type { OperationalUserDTO, UserRole } from '@/lib/types';
 import { cn } from '@/lib/utils';
+import { catchText } from '@/components/piling/admin-crews/crew-messages';
 import type { CreateUserInput, UpdateUserInput } from './use-users-list';
 
 const RoleOptions = () => (
@@ -46,6 +47,22 @@ const RoleOptions = () => (
   </>
 );
 
+/**
+ * Пределы длины полей пользователя — как в zod-схеме маршрута
+ * (`src/lib/validation-schemas.ts`: `userBaseSchema`). Схему не меняем: если
+ * серверный предел правят, правим и здесь — иначе форма отправляет заведомо
+ * отклоняемый запрос, а человек видит только «Некорректные данные».
+ */
+const USER_FIELD_MAX = {
+  name: 200,
+  email: 255,
+  phone: 30,
+  password: 100,
+} as const;
+
+/** Предупреждение о закрытии окна с несохранёнными правками (R132 №7). */
+const CONFIRM_LEAVE = 'Закрыть без сохранения? Введённые данные будут потеряны.';
+
 interface CreateProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -53,11 +70,11 @@ interface CreateProps {
 }
 
 export function CreateUserDialog({ open, onOpenChange, onSubmit }: CreateProps) {
+  const uid = useId();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
-  const [pin, setPin] = useState('');
   const [role, setRole] = useState<UserRole>('OPERATOR');
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
@@ -69,20 +86,26 @@ export function CreateUserDialog({ open, onOpenChange, onSubmit }: CreateProps) 
       setEmail('');
       setPhone('');
       setPassword('');
-      setPin('');
       setRole('OPERATOR');
       setErrors({});
     }
   }, [open]);
+
+  const dirty = name !== '' || email !== '' || phone !== '' || password !== '' || role !== 'OPERATOR';
+
+  /** Закрытие по Esc/клику вне окна/«Отмена» — с вопросом, если есть правки. */
+  const handleOpenChange = (next: boolean) => {
+    if (!next && dirty && !window.confirm(CONFIRM_LEAVE)) return;
+    onOpenChange(next);
+  };
 
   const submit = async () => {
     const next: Record<string, string> = {};
     if (!name.trim()) next.name = 'Имя обязательно';
     if (!email.trim()) next.email = 'Email обязателен';
     else if (!/\S+@\S+\.\S+/.test(email)) next.email = 'Некорректный email';
-    if (!password && !pin) next.password = 'Укажите пароль или PIN';
+    if (!password) next.password = 'Укажите пароль';
     else if (password && password.trim().length < 8) next.password = 'Минимум 8 символов';
-    if (pin && !/^\d{4,10}$/.test(pin)) next.pin = 'PIN должен содержать 4–10 цифр';
     if (Object.keys(next).length > 0) {
       setErrors(next);
       return;
@@ -96,21 +119,21 @@ export function CreateUserDialog({ open, onOpenChange, onSubmit }: CreateProps) 
         email: email.trim(),
         phone: phone.trim(),
         password: password || undefined,
-        pin: pin || undefined,
         role,
       });
       onOpenChange(false);
       toast.success('Пользователь создан');
     } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : 'Ошибка создания');
+      // Обрыв сети fetch бросает TypeError с английским «Failed to fetch» (F-R112-1).
+      toast.error(catchText(err, 'Ошибка создания'));
     } finally {
       setSubmitting(false);
     }
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogContent className="max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <UserCog className="h-4 w-4" />
@@ -127,6 +150,7 @@ export function CreateUserDialog({ open, onOpenChange, onSubmit }: CreateProps) 
               setErrors((prev) => ({ ...prev, name: '' }));
             }}
             placeholder="Иванов Иван"
+            maxLength={USER_FIELD_MAX.name}
           />
           <FormField
             label="Email"
@@ -138,12 +162,14 @@ export function CreateUserDialog({ open, onOpenChange, onSubmit }: CreateProps) 
               setErrors((prev) => ({ ...prev, email: '' }));
             }}
             placeholder="ivan@piling.ru"
+            maxLength={USER_FIELD_MAX.email}
           />
           <FormField
             label="Телефон"
             value={phone}
             onChange={setPhone}
             placeholder="+7 999 000-00-00"
+            maxLength={USER_FIELD_MAX.phone}
           />
           <FormField
             label="Пароль"
@@ -155,23 +181,12 @@ export function CreateUserDialog({ open, onOpenChange, onSubmit }: CreateProps) 
               setErrors((prev) => ({ ...prev, password: '' }));
             }}
             placeholder="Минимум 8 символов"
-          />
-          <FormField
-            label="PIN"
-            type="password"
-            inputMode="numeric"
-            value={pin}
-            error={errors.pin}
-            onChange={(value) => {
-              setPin(value);
-              setErrors((prev) => ({ ...prev, pin: '' }));
-            }}
-            placeholder="4–10 цифр"
+            maxLength={USER_FIELD_MAX.password}
           />
           <div className="space-y-1.5">
-            <Label>Роль</Label>
+            <Label htmlFor={`${uid}-role`}>Роль</Label>
             <Select value={role} onValueChange={(value) => setRole(value as UserRole)}>
-              <SelectTrigger className="h-11 w-full">
+              <SelectTrigger id={`${uid}-role`} className="h-11 w-full">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -181,7 +196,7 @@ export function CreateUserDialog({ open, onOpenChange, onSubmit }: CreateProps) 
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+          <Button variant="outline" onClick={() => handleOpenChange(false)}>
             Отмена
           </Button>
           <Button
@@ -205,12 +220,12 @@ interface EditProps {
 }
 
 export function EditUserDialog({ open, user, onOpenChange, onSubmit }: EditProps) {
+  const uid = useId();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [role, setRole] = useState<UserRole>('OPERATOR');
   const [password, setPassword] = useState('');
-  const [pin, setPin] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
 
@@ -222,10 +237,22 @@ export function EditUserDialog({ open, user, onOpenChange, onSubmit }: EditProps
       setPhone(user.phone);
       setRole(user.role);
       setPassword('');
-      setPin('');
       setErrors({});
     }
   }, [open, user]);
+
+  const dirty =
+    name !== (user?.name ?? '')
+    || email !== (user?.email ?? '')
+    || phone !== (user?.phone ?? '')
+    || role !== (user?.role ?? 'OPERATOR')
+    || password !== '';
+
+  /** Закрытие по Esc/клику вне окна/«Отмена» — с вопросом, если есть правки. */
+  const handleOpenChange = (next: boolean) => {
+    if (!next && dirty && !window.confirm(CONFIRM_LEAVE)) return;
+    onOpenChange(next);
+  };
 
   const submit = async () => {
     if (!user) return;
@@ -234,7 +261,6 @@ export function EditUserDialog({ open, user, onOpenChange, onSubmit }: EditProps
     if (!email.trim()) next.email = 'Email обязателен';
     else if (!/\S+@\S+\.\S+/.test(email)) next.email = 'Некорректный email';
     if (password && password.trim().length < 8) next.password = 'Минимум 8 символов';
-    if (pin && !/^\d{4,10}$/.test(pin)) next.pin = 'PIN должен содержать 4–10 цифр';
     if (Object.keys(next).length > 0) {
       setErrors(next);
       return;
@@ -250,20 +276,20 @@ export function EditUserDialog({ open, user, onOpenChange, onSubmit }: EditProps
         phone: phone.trim(),
         role,
         password: password || undefined,
-        pin: pin || undefined,
       });
       onOpenChange(false);
       toast.success('Пользователь обновлён');
     } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : 'Ошибка сохранения');
+      // Обрыв сети fetch бросает TypeError с английским «Failed to fetch» (F-R112-1).
+      toast.error(catchText(err, 'Ошибка сохранения'));
     } finally {
       setSubmitting(false);
     }
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogContent className="max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Pencil className="h-4 w-4" />
@@ -279,6 +305,7 @@ export function EditUserDialog({ open, user, onOpenChange, onSubmit }: EditProps
               setName(v);
               setErrors((prev) => ({ ...prev, name: '' }));
             }}
+            maxLength={USER_FIELD_MAX.name}
           />
           <FormField
             label="Email"
@@ -289,11 +316,13 @@ export function EditUserDialog({ open, user, onOpenChange, onSubmit }: EditProps
               setEmail(v);
               setErrors((prev) => ({ ...prev, email: '' }));
             }}
+            maxLength={USER_FIELD_MAX.email}
           />
           <FormField
             label="Телефон"
             value={phone}
             onChange={setPhone}
+            maxLength={USER_FIELD_MAX.phone}
           />
           <FormField
             label="Новый пароль (оставьте пустым, чтобы не менять)"
@@ -305,23 +334,12 @@ export function EditUserDialog({ open, user, onOpenChange, onSubmit }: EditProps
               setErrors((prev) => ({ ...prev, password: '' }));
             }}
             placeholder="••••••••"
-          />
-          <FormField
-            label="Новый PIN (оставьте пустым, чтобы не менять)"
-            type="password"
-            inputMode="numeric"
-            value={pin}
-            error={errors.pin}
-            onChange={(value) => {
-              setPin(value);
-              setErrors((prev) => ({ ...prev, pin: '' }));
-            }}
-            placeholder="4–10 цифр"
+            maxLength={USER_FIELD_MAX.password}
           />
           <div className="space-y-1.5">
-            <Label>Роль</Label>
+            <Label htmlFor={`${uid}-role`}>Роль</Label>
             <Select value={role} onValueChange={(value) => setRole(value as UserRole)}>
-              <SelectTrigger className="h-11 w-full">
+              <SelectTrigger id={`${uid}-role`} className="h-11 w-full">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -331,7 +349,7 @@ export function EditUserDialog({ open, user, onOpenChange, onSubmit }: EditProps
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+          <Button variant="outline" onClick={() => handleOpenChange(false)}>
             Отмена
           </Button>
           <Button
@@ -372,7 +390,8 @@ export function DeleteUserDialog({ open, user, onOpenChange, onConfirm }: Delete
       onOpenChange(false);
       toast.success('Пользователь удалён');
     } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : 'Ошибка удаления');
+      // Обрыв сети fetch бросает TypeError с английским «Failed to fetch» (F-R112-1).
+      toast.error(catchText(err, 'Ошибка удаления'));
     } finally {
       setSubmitting(false);
     }
@@ -408,18 +427,20 @@ interface FormFieldProps {
   value: string;
   type?: 'text' | 'email' | 'password';
   inputMode?: 'text' | 'numeric' | 'email';
+  maxLength?: number;
   error?: string;
   placeholder?: string;
   onChange: (value: string) => void;
 }
 
-function FormField({ label, value, type = 'text', inputMode, error, placeholder, onChange }: FormFieldProps) {
+function FormField({ label, value, type = 'text', inputMode, maxLength, error, placeholder, onChange }: FormFieldProps) {
   return (
     <div className="space-y-1.5">
       <Label>{label}</Label>
       <Input
         type={type}
         inputMode={inputMode}
+        maxLength={maxLength}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}

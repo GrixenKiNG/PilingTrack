@@ -9,7 +9,7 @@
 import { type ReactNode } from 'react';
 import { type LucideIcon } from '@/components/piling/icons/unified-icons';
 import { cn } from '@/lib/utils';
-import { formatNumber } from '@/lib/format';
+import { formatCountMeters, formatNumber, pluralizeRu } from '@/lib/format';
 import { PilingIcon, type PilingIconName } from '@/components/piling/icons';
 import type { SiteAnalyticsDTO } from '@/lib/types';
 
@@ -25,7 +25,7 @@ export interface FleetCard {
   engineHoursTotal: number | null;
   nextMaintenanceAtHours: number | null;
   todaysReports?: number;
-  todayTotals: { piles: number; drillingMeters: number; downtimeHours: number } | null;
+  todayTotals: { piles: number; pileMeters: number; drillingCount: number; drillingMeters: number; downtimeHours: number } | null;
   latestReport: { date: string; siteName: string | null; operatorName: string | null; updatedAt?: string } | null;
 }
 export interface FleetSnapshot {
@@ -109,15 +109,15 @@ export function PlanTile({ a }: { a: SiteAnalyticsDTO }) {
     <div className="space-y-2 rounded-lg border border-border bg-card p-3">
       <div className="flex items-baseline justify-between gap-2">
         <span className="truncate text-sm font-semibold text-foreground">{a.siteName}</span>
-        <span className="shrink-0 text-xs text-muted-foreground">{formatNumber(a.totalReports)} отч.</span>
+        <span className="shrink-0 text-xs text-muted-foreground">{formatNumber(a.totalReports)} {pluralizeRu(a.totalReports, ['отчёт', 'отчёта', 'отчётов'])}</span>
       </div>
       <div>
-        <div className="mb-0.5 text-xs text-muted-foreground">Сваи · план {formatNumber(a.plannedPiles)} шт</div>
-        <MiniProgress value={`${formatNumber(a.actualPiles)} шт / ${formatNumber(a.actualPileMeters)} м.п.`} pct={a.pileProgress} tone="emerald" />
+        <div className="mb-0.5 text-xs text-muted-foreground">Сваи · план {formatCountMeters(a.plannedPiles, a.plannedPileMeters)}</div>
+        <MiniProgress value={formatCountMeters(a.actualPiles, a.actualPileMeters)} pct={a.pileProgress} tone="emerald" />
       </div>
       <div>
-        <div className="mb-0.5 text-xs text-muted-foreground">Бурение · план {formatNumber(a.plannedDrilling)} м</div>
-        <MiniProgress value={`${formatNumber(a.actualDrilling)} м / ${formatNumber(a.actualDrillingCount)} шт`} pct={a.drillingProgress} tone="blue" />
+        <div className="mb-0.5 text-xs text-muted-foreground">Бурение · план {formatCountMeters(a.plannedDrillingCount, a.plannedDrilling)}</div>
+        <MiniProgress value={formatCountMeters(a.actualDrillingCount, a.actualDrilling)} pct={a.drillingProgress} tone="blue" />
       </div>
     </div>
   );
@@ -138,8 +138,15 @@ export function RigTile({ r, status, onOpen }: { r: FleetCard; status: { tone: T
         <span className={cn('shrink-0 rounded px-2 py-0.5 text-xs font-medium', TONE_TAG[status.tone])}>{status.label}</span>
       </div>
       <div className="truncate text-xs text-muted-foreground">{r.assignedSiteName ?? 'объект не привязан'}</div>
+      {/* Раньше здесь стояло «сваи шт / бурение м» одной парой — читалось как
+          одна величина. Сваи и бурение — отдельными строками, шт. / м.п. */}
       <div className="font-mono text-xs text-muted-foreground">
-        {r.todayTotals ? `${formatNumber(r.todayTotals.piles)} шт / ${formatNumber(r.todayTotals.drillingMeters)} м` : 'нет данных за сегодня'}
+        {r.todayTotals ? (
+          <>
+            <div>Сваи {formatCountMeters(r.todayTotals.piles, r.todayTotals.pileMeters)}</div>
+            <div>Бурение {formatCountMeters(r.todayTotals.drillingCount, r.todayTotals.drillingMeters)}</div>
+          </>
+        ) : 'нет данных за сегодня'}
       </div>
       <div className="truncate text-xs text-muted-foreground">
         {r.assignedOperatorName ?? r.latestReport?.operatorName ?? '—'}{r.assignedCrewName ? ` · ${r.assignedCrewName}` : ''}
@@ -224,6 +231,23 @@ export function Section({ icon: Icon, title, count, dominant, footerLabel, onFoo
   );
 }
 
-export function Empty({ text, tone = 'muted' }: { text: string; tone?: Tone }) {
-  return <div className={cn('px-3 py-8 text-center text-sm', TONE_TEXT[tone])}>{text}</div>;
+export function Empty({ text, tone = 'muted', action }: {
+  text: string; tone?: Tone; action?: { label: string; onClick: () => void };
+}) {
+  return (
+    <div className={cn('px-3 py-8 text-center text-sm', TONE_TEXT[tone])}>
+      <div>{text}</div>
+      {/* F-R127 №3/№4: пустое состояние на свежей базе зовёт к первому действию
+          («Заведите первый объект», «Добавьте первую»), а не винит отбор. */}
+      {action && (
+        <button
+          type="button"
+          onClick={action.onClick}
+          className="mt-2 text-sm font-medium text-info-strong hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-info/30"
+        >
+          {action.label}
+        </button>
+      )}
+    </div>
+  );
 }

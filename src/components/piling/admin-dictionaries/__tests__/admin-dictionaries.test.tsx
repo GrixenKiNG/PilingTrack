@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { authFetch } = vi.hoisted(() => ({ authFetch: vi.fn() }));
@@ -91,6 +91,27 @@ describe('AdminDictionaries', () => {
     expect(screen.getByRole('button', { name: 'Сохранить' })).toBeEnabled();
   });
 
+  /*
+    R103 №6 (важно): форма отправляла заведомо отклоняемый сервером запрос
+    (название > 100 символов, длина > 1 000 000 мм) и получала без объяснений
+    «Некорректные данные». Лимиты формы приведены к серверной схеме.
+  */
+  it('не даёт отправить название длиннее 100 символов и длину больше 1000 м', async () => {
+    render(<AdminDictionaries />);
+    await screen.findByText('СВ 120-35');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Добавить марку сваи' }));
+    expect(screen.getByLabelText('Название')).toHaveAttribute('maxlength', '100');
+    expect(screen.getByText('Длина, м (до 1000)')).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('Название'), { target: { value: 'СВ 150-50' } });
+    fireEvent.change(screen.getByLabelText('Длина, м'), { target: { value: '1500' } });
+    expect(screen.getByRole('button', { name: 'Сохранить' })).toBeDisabled();
+
+    fireEvent.change(screen.getByLabelText('Длина, м'), { target: { value: '1000' } });
+    expect(screen.getByRole('button', { name: 'Сохранить' })).toBeEnabled();
+  });
+
   it('renders an actionable retry state when loading fails', async () => {
     authFetch.mockResolvedValue(jsonResponse({ error: 'boom' }, 500));
     render(<AdminDictionaries />);
@@ -118,5 +139,167 @@ describe('AdminDictionaries', () => {
     expect(JSON.parse(patch?.[1]?.body as string)).toMatchObject({
       type: 'pileGrade', id: 'g1', lengthMm: 15000, confirmRecalculate: true,
     });
+  });
+});
+
+describe('AdminDictionaries: архивация (решение владельца 28.09.2026)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    authFetch.mockImplementation(async (_url: string, init?: RequestInit) =>
+      init?.method === 'PATCH' ? jsonResponse({ ok: true }) : jsonResponse(registry));
+  });
+
+  const patches = () => authFetch.mock.calls.filter(([, init]) => (init as RequestInit | undefined)?.method === 'PATCH');
+
+  it('«Выбрать все» → «Архивировать» сначала спрашивает, с числом записей', async () => {
+    render(<AdminDictionaries />);
+    await screen.findByText('СВ 120-35');
+
+    fireEvent.click(screen.getAllByRole('checkbox', { name: 'Выбрать все' })[0]);
+    fireEvent.click(screen.getByRole('button', { name: 'Архивировать' }));
+
+    const dialog = await screen.findByRole('alertdialog');
+    expect(dialog).toHaveTextContent('Архивировать 1 запись?');
+    expect(patches()).toHaveLength(0);
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Архивировать' }));
+    await waitFor(() => expect(patches()).toHaveLength(1));
+    expect(JSON.parse(patches()[0][1].body as string)).toMatchObject({ id: 'g1', isActive: false });
+  });
+
+  it('одна запись архивируется сразу, а в уведомлении есть «Отменить»', async () => {
+    const { toast } = await import('sonner');
+    render(<AdminDictionaries />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Архивировать СВ 120-35' }));
+
+    await waitFor(() => expect(patches()).toHaveLength(1));
+    await waitFor(() => expect(toast.success).toHaveBeenCalled());
+    const [, opts] = vi.mocked(toast.success).mock.calls.at(-1) ?? [];
+    const action = (opts as { action?: { label: string; onClick: () => void } } | undefined)?.action;
+    expect(action?.label).toBe('Отменить');
+
+    action?.onClick();
+    await waitFor(() => expect(patches()).toHaveLength(2));
+    expect(JSON.parse(patches()[1][1].body as string)).toMatchObject({ id: 'g1', isActive: true });
+  });
+});
+
+/*
+  R112 №24 (важно): английские строки отказа API доходили до тоста как есть —
+  обрыв сети «Failed to fetch», истёкшая сессия «Unauthorized», CSRF «CSRF
+  validation failed: …». Экран показывает свой русский текст.
+*/
+describe('AdminDictionaries: английские ошибки API (F-R112-3)', () => {
+  const archive = () => fireEvent.click(screen.getByRole('button', { name: 'Архивировать СВ 120-35' }));
+
+  beforeEach(() => vi.clearAllMocks());
+
+  const patchResponds = (body: unknown, status: number) => {
+    authFetch.mockImplementation(async (_url: string, init?: RequestInit) =>
+      init?.method === 'PATCH' ? jsonResponse(body, status) : jsonResponse(registry));
+  };
+
+  it('401 при архивации → «Сессия истекла», а не «Unauthorized»', async () => {
+    const { toast } = await import('sonner');
+    patchResponds({ error: 'Unauthorized' }, 401);
+    render(<AdminDictionaries />);
+    await screen.findByText('СВ 120-35');
+
+    archive();
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Сессия истекла — войдите снова.'));
+  });
+
+  it('CSRF-403 → русский текст про проверку безопасности, а не «CSRF validation failed»', async () => {
+    const { toast } = await import('sonner');
+    patchResponds({ error: 'CSRF validation failed: origin mismatch' }, 403);
+    render(<AdminDictionaries />);
+    await screen.findByText('СВ 120-35');
+
+    archive();
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith(
+      'Запрос отклонён проверкой безопасности. Обновите страницу и повторите.',
+    ));
+  });
+
+  it('обрыв сети → «Нет соединения», а не «Failed to fetch»', async () => {
+    const { toast } = await import('sonner');
+    authFetch.mockImplementation(async (_url: string, init?: RequestInit) => {
+      if (init?.method === 'PATCH') throw new TypeError('Failed to fetch');
+      return jsonResponse(registry);
+    });
+    render(<AdminDictionaries />);
+    await screen.findByText('СВ 120-35');
+
+    archive();
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith(
+      'Нет соединения с сервером. Проверьте связь и повторите.',
+    ));
+  });
+});
+
+/**
+ * F-R126-3..6: диалоги справочников не ограничивали высоту — при открытой
+ * экранной клавиатуре (визуальный вьюпорт ~500 px) обрезались сверху и снизу,
+ * крестик закрытия уходил за кадр. Форма элемента и все три диалога экрана
+ * получили `max-h-[90vh]` + `overflow-y-auto`.
+ */
+describe('AdminDictionaries: диалоги ограничены по высоте (F-R126-3..6)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    authFetch.mockResolvedValue(jsonResponse(registry));
+  });
+
+  const contentOf = (title: string | RegExp) =>
+    screen.getByText(title).closest('[data-slot="dialog-content"]');
+
+  it('форма «Добавить элемент» ограничена 90vh и прокручивается', async () => {
+    render(<AdminDictionaries />);
+    await screen.findByText('СВ 120-35');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Добавить марку сваи' }));
+
+    expect(contentOf('Добавить элемент')).toHaveClass('max-h-[90vh]', 'overflow-y-auto');
+  });
+
+  it('диалог «Длина сваи» ограничен 90vh и прокручивается', async () => {
+    render(<AdminDictionaries />);
+    await screen.findByText('СВ 120-35');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Изменить длину СВ 120-35' }));
+
+    expect(contentOf(/^Длина сваи —/)).toHaveClass('max-h-[90vh]', 'overflow-y-auto');
+  });
+
+  it('подтверждение пересчёта ограничено 90vh и прокручивается', async () => {
+    render(<AdminDictionaries />);
+    await screen.findByText('СВ 120-35');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Изменить длину СВ 120-35' }));
+    fireEvent.change(screen.getByLabelText('Длина сваи, м'), { target: { value: '15' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить' }));
+
+    expect(contentOf('Пересчитать прошлые отчёты?')).toHaveClass('max-h-[90vh]', 'overflow-y-auto');
+  });
+
+  it('подтверждение удаления ограничено 90vh и прокручивается', async () => {
+    authFetch.mockResolvedValue(jsonResponse({
+      ...registry,
+      pileGrades: [
+        registry.pileGrades[0],
+        { ...registry.pileGrades[0], id: 'g2', name: 'СВ 90-30', reportCount: 0, planCount: 0, siteCount: 0 },
+      ],
+    }));
+    render(<AdminDictionaries />);
+    await screen.findByText('СВ 90-30');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Удалить СВ 90-30' }));
+
+    expect(contentOf('Удалить навсегда?')).toHaveClass('max-h-[90vh]', 'overflow-y-auto');
+  });
+
+  it('заголовок вкладки браузера назван по экрану', () => {
+    render(<AdminDictionaries />);
+
+    expect(document.title).toBe('Справочники — PilingTrack');
   });
 });

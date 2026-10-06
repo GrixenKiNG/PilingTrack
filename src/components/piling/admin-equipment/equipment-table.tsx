@@ -34,7 +34,12 @@ export function EquipmentTable({
   const toggle = (key: SortKey) =>
     setSort((s) => ({ key, asc: s.key === key ? !s.asc : true }));
 
-  const th = 'cursor-pointer select-none break-words px-1.5 py-2 text-left text-xs font-semibold uppercase leading-tight text-muted-foreground';
+  // Сортировке нужен `h-11`, а не `min-h-11`: у `display: table-cell` браузер
+  // min-height игнорирует (замер в Chrome: одиночная ячейка с min-height:44px
+  // осталась 32px, с height:44px стала 44px). `height` у ячейки работает как
+  // минимум, поэтому телефон получает 44px, а `sm:h-auto` возвращает десктоп
+  // к прежней высоте от содержимого.
+  const th = 'h-11 cursor-pointer select-none break-words px-1.5 py-2 text-left text-xs font-semibold uppercase leading-tight text-muted-foreground sm:h-auto';
   const staticTh = 'break-words px-1.5 py-2 text-left text-xs font-semibold uppercase leading-tight text-muted-foreground';
 
   return (
@@ -61,12 +66,24 @@ export function EquipmentTable({
             const reportStatus = REPORT_STATUS_META[c.reportStatus];
             const flag = getMaintenanceFlag(c);
             const t = c.todayTotals;
+            // Строка открывала карточку только мышью (R116 #12): повторяем
+            // паттерн словарной таблицы — фокус, Enter/Space и aria-selected.
+            const onRowKeyDown = (event: React.KeyboardEvent<HTMLTableRowElement>) => {
+              if (event.target !== event.currentTarget) return;
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                onSelect(c.id);
+              }
+            };
             return (
               <tr
                 key={c.id}
+                tabIndex={0}
+                aria-selected={selectedId === c.id}
                 onClick={() => onSelect(c.id)}
+                onKeyDown={onRowKeyDown}
                 className={cn(
-                  'cursor-pointer transition-colors hover:bg-muted',
+                  'cursor-pointer transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-inset focus-visible:ring-ring/50',
                   selectedId === c.id && 'bg-info/10/60',
                 )}
               >
@@ -93,7 +110,7 @@ export function EquipmentTable({
                   {t ? <CompactMetric first={`${formatNum(t.piles)} шт.`} second={`${formatNum(t.pileMeters, 1)} м.п.`} /> : '—'}
                 </td>
                 <td className="text-right font-mono leading-tight text-foreground">
-                  {t ? <CompactMetric first={`${formatNum(t.drillingCount)} шт.`} second={`${formatNum(t.drillingMeters, 1)} м`} /> : '—'}
+                  {t ? <CompactMetric first={`${formatNum(t.drillingCount)} шт.`} second={`${formatNum(t.drillingMeters, 1)} м.п.`} /> : '—'}
                 </td>
                 <td>
                   <div className="font-mono text-foreground">{t ? `${formatNum(t.downtimeHours, 1)} ч` : '—'}</div>

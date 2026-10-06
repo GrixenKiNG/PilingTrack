@@ -34,8 +34,10 @@ vi.mock('@/lib/logger', () => ({
 
 import {
   getReportsByPeriodRaw,
+  getCrewsWithDetailsRaw,
   upsertReportRaw,
   PERIOD_REPORTS_LIMIT,
+  getSiteDailySummaryRaw,
 } from '../raw-queries';
 
 describe('getReportsByPeriodRaw', () => {
@@ -106,6 +108,49 @@ describe('getReportsByPeriodRaw', () => {
   });
 });
 
+// R65 #2: getCrewsWithDetailsRaw раньше шёл без арендного условия и отдавал
+// e-mail машинистов всех активных бригад системы. У «Crew» нет своей колонки
+// tenantId — организация наследуется от объекта, поэтому фильтр идёт по Site.
+describe('getCrewsWithDetailsRaw', () => {
+  beforeEach(() => {
+    queryRawMock.mockReset();
+    queryRawMock.mockResolvedValue([]);
+  });
+
+  it('refuses an empty or non-string tenantId instead of querying (fail closed)', async () => {
+    await expect(getCrewsWithDetailsRaw('')).rejects.toThrow();
+    await expect(getCrewsWithDetailsRaw('   ')).rejects.toThrow();
+    await expect(
+      getCrewsWithDetailsRaw(undefined as unknown as string)
+    ).rejects.toThrow();
+    expect(queryRawMock).not.toHaveBeenCalled();
+  });
+
+  it('scopes the query to the tenant with a strict condition on Site', async () => {
+    await getCrewsWithDetailsRaw('tenant-1');
+
+    expect(queryRawMock).toHaveBeenCalledTimes(1);
+    const strings = queryRawMock.mock.calls[0][0] as TemplateStringsArray;
+    const sql = strings.join('');
+    // strict equality on the owning site, never a fail-open IS NULL
+    expect(sql).toContain('s."tenantId" =');
+    expect(sql).not.toContain('IS NULL');
+    const values = queryRawMock.mock.calls[0].slice(1);
+    expect(values).toContain('tenant-1');
+  });
+
+  it('still applies the optional siteId filter', async () => {
+    await getCrewsWithDetailsRaw('tenant-1', 'site-1');
+
+    const values = queryRawMock.mock.calls[0].slice(1);
+    const fragment = values.find(
+      (value): value is { strings: string[]; values: unknown[] } =>
+        !!value && typeof value === 'object' && 'values' in value
+    );
+    expect(fragment?.values).toContain('site-1');
+  });
+});
+
 describe('upsertReportRaw', () => {
   beforeEach(() => {
     queryRawMock.mockReset();
@@ -159,4 +204,12 @@ describe('upsertReportRaw', () => {
 
     expect(result).toEqual({ id: 'row-a', reportId: 'r1' });
   });
+});
+
+it('I05: raw daily summary requires the submitted status bound into SQL', async () => {
+  queryRawMock.mockReset().mockResolvedValue([]);
+  await getSiteDailySummaryRaw('site-1', '2026-10-01', '2026-10-02');
+  const [strings, ...values] = queryRawMock.mock.calls[0];
+  expect(strings.join('?')).toContain('r.status = ?');
+  expect(values).toContain('submitted');
 });

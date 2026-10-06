@@ -11,14 +11,21 @@
  * готовности дедуплицируется по дате.
  */
 
+import * as Sentry from '@sentry/node';
 import { logger } from '@/lib/logger';
 import { forEachTenant } from '@/lib/tenant-iteration';
 import { runReadinessScheduler } from '@/modules/readiness/application/scheduler';
+import { recordSchedulerHeartbeat } from './scheduler-heartbeat';
+import { positiveIntEnv } from './env-int';
 
-const INTERVAL = parseInt(process.env.READINESS_SCHEDULER_INTERVAL_MS || String(60 * 60 * 1000), 10);
-const STARTUP_DELAY = parseInt(process.env.READINESS_SCHEDULER_STARTUP_DELAY_MS || '90000', 10);
+const INTERVAL = positiveIntEnv('READINESS_SCHEDULER_INTERVAL_MS', 60 * 60 * 1000);
+const STARTUP_DELAY = positiveIntEnv('READINESS_SCHEDULER_STARTUP_DELAY_MS', 90000);
+
+let passRunning = false;
 
 async function runOnce(): Promise<void> {
+  if (passRunning) return;
+  passRunning = true;
   try {
     // Перечень организаций берётся из таблицы Tenant, а не из Shift.
     // Politики RLS на Shift строгие: запрос без объявленной организации
@@ -34,10 +41,14 @@ async function runOnce(): Promise<void> {
         });
       }
     });
+    await recordSchedulerHeartbeat('readiness-scheduler', INTERVAL);
   } catch (error) {
     logger.error('Readiness scheduler pass failed', {
       error: error instanceof Error ? error.message : String(error),
     });
+    Sentry.captureException(error, { tags: { task: 'readiness-scheduler' } });
+  } finally {
+    passRunning = false;
   }
 }
 

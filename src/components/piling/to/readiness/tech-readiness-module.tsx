@@ -54,7 +54,7 @@ export function TechReadinessModule({
   bootstrap,
   tabStripTrailing,
   tabs = MODULE_TABS,
-  moduleLabel = 'Центр технической готовности',
+  moduleLabel = 'Техническая готовность',
 }: TechReadinessModuleProps) {
   const activeTabRef = useRef<HTMLButtonElement>(null);
   const resolvedQueryState = activeViewState(activeView, queryState, bootstrap);

@@ -305,7 +305,17 @@ export async function saveAnswers(
   });
 }
 
-export async function completeInspection(
+/**
+ * Завершение осмотра вместе с признаком повтора.
+ *
+ * Команда идемпотентна: `updateMany` с условием «ещё не COMPLETED» пропускает
+ * повтор (обрыв связи, двойное нажатие, ретрай телефона) и возвращает осмотр
+ * как есть. `replayed: true` означает, что перехода не было и побочные
+ * действия записи повторять нельзя — иначе повтор даёт второе «Осмотр
+ * завершён» в ленте, а при дефектах — второй warn и вторую задачу
+ * подтверждения (F-R84-INSPECTION-DUP-EVENT).
+ */
+export async function completeInspectionWithOutcome(
   id: string,
   ctx: { tenantId: string; signedByName: string; performerId?: string | null },
 ) {
@@ -354,6 +364,28 @@ export async function completeInspection(
   });
   const now = new Date();
   return db.$transaction(async (tx) => {
+    // Дедупликация дефектов — «прочитал открытые по ключу → создал
+    // недостающие» — сама по себе на одновременности не работает:
+    // `EquipmentDefect.sourceKey` обычная колонка, уникального ограничения у
+    // неё нет (F-R38-5). Два осмотра одной машины в один момент (ежесменный у
+    // оператора и ТО-1 у механика, либо повтор завершения с телефона) успевают
+    // оба прочитать «открытых по этому пункту нет» и оба создать запись.
+    //
+    // Транзакционный advisory-замок на ключ дедупликации («организация +
+    // установка + пункт») разводит такие осмотры: второй ждёт коммита первого и
+    // видит его дефект. Замок берётся ПЕРВЫМ оператором транзакции — до чтения
+    // и до захвата строки осмотра, — и снимается сам при коммите или откате.
+    // Ключи в фиксированном порядке: два осмотра с пересекающимся набором
+    // пунктов не блокируют друг друга навстречу.
+    //
+    // Именно `$executeRaw`: `pg_advisory_xact_lock` возвращает void, и адаптер
+    // PrismaPg не десериализует эту колонку через `$queryRaw`
+    // («Failed to deserialize column of type void»).
+    const defectSourceKeys = [...new Set(plannedDefects.map((item) => inspectionDefectKey(ins.equipmentId, item.itemId)))].sort();
+    for (const sourceKey of defectSourceKeys) {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`defect:${ctx.tenantId}:${ins.equipmentId}:${sourceKey}`}))`;
+    }
+
     // Переход делаем условным, а не безусловной правкой по `id`.
     //
     // ПОЧЕМУ. Состояние осмотра читается ДО транзакции. Два запроса —
@@ -372,7 +404,12 @@ export async function completeInspection(
     if (claimed.count === 0) {
       // Осмотр уже завершён — это не ошибка, а повтор. Возвращаем то, что
       // есть: телефон получит тот же ответ, что и с первой попытки.
-      return tx.inspection.findUnique({ where: { id }, include: { answers: true } });
+      // `replayed: true` — перехода не было, вызывающий не должен повторять
+      // побочные действия (запись события в ленту).
+      return {
+        inspection: await tx.inspection.findUnique({ where: { id }, include: { answers: true } }),
+        replayed: true,
+      };
     }
     const inspection = await tx.inspection.findUniqueOrThrow({ where: { id } });
     // Запись ТО заводится вместе с осмотром и закрывается вместе с ним. Без
@@ -464,6 +501,6 @@ export async function completeInspection(
         } as Prisma.InputJsonValue,
       }],
     });
-    return inspection;
+    return { inspection, replayed: false };
   });
 }

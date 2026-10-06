@@ -9,8 +9,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 type Sheet = { name: string; rows: (string | number | null)[][] };
 
-const { pileFindMany, userFindMany, getSettings, sheets } = vi.hoisted(() => ({
+const { pileFindMany, pileUpdateMany, userFindMany, getSettings, sheets } = vi.hoisted(() => ({
   pileFindMany: vi.fn(),
+  pileUpdateMany: vi.fn(),
   userFindMany: vi.fn(),
   getSettings: vi.fn(),
   sheets: { current: [] as Sheet[] },
@@ -18,7 +19,7 @@ const { pileFindMany, userFindMany, getSettings, sheets } = vi.hoisted(() => ({
 
 vi.mock('@/lib/db', () => ({
   db: {
-    pilePassport: { findMany: pileFindMany },
+    pilePassport: { findMany: pileFindMany, updateMany: pileUpdateMany },
     user: { findMany: userFindMany },
   },
 }));
@@ -32,7 +33,7 @@ vi.mock('@/lib/xlsx-writer', () => ({
   },
 }));
 
-import { exportPileJournalXlsx } from '../pile-passport.service';
+import { decidePilePassport, exportPileJournalXlsx } from '../pile-passport.service';
 
 /** Паспорт, забитый 26.09 в 00:30 МСК (в UTC это ещё 25.09). */
 const atMoscowMidnight = {
@@ -233,5 +234,20 @@ describe('exportPileJournalXlsx — графа «Смена» (F-R44-1)', () => 
     await exportPileJournalXlsx({ tenantId: 'orion' });
 
     expect(sheet('Журнал забивки').rows[1][2]).toBe('');
+  });
+});
+
+describe('D4: сервис требует основание добивки', () => {
+  it.each([undefined, '', ' \t\n '])('отклоняет %j и не пишет решение', async (note) => {
+    pileUpdateMany.mockClear();
+    await expect(decidePilePassport({ tenantId: 'tenant-a', passportId: 'p1', actorId: 'u1', acceptance: 'NEEDS_REDRIVE', note })).rejects.toMatchObject({ status: 400, message: 'Укажите, почему свая идёт на добивку' });
+    expect(pileUpdateMany).not.toHaveBeenCalled();
+  });
+  it('сохраняет обрезанное основание, а принятие допускает без основания', async () => {
+    pileUpdateMany.mockResolvedValue({ count: 1 });
+    await decidePilePassport({ tenantId: 'tenant-a', passportId: 'p1', actorId: 'u1', acceptance: 'NEEDS_REDRIVE', note: '  Достичь проектного отказа  ' });
+    expect(pileUpdateMany).toHaveBeenLastCalledWith(expect.objectContaining({ data: expect.objectContaining({ acceptanceNote: 'Достичь проектного отказа' }) }));
+    await decidePilePassport({ tenantId: 'tenant-a', passportId: 'p1', actorId: 'u1', acceptance: 'ACCEPTED' });
+    expect(pileUpdateMany).toHaveBeenLastCalledWith(expect.objectContaining({ data: expect.objectContaining({ acceptance: 'ACCEPTED', acceptanceNote: null }) }));
   });
 });

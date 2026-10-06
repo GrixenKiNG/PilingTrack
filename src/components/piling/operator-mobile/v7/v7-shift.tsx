@@ -130,7 +130,12 @@ export function ProductionFlow({state, busy, kind, onSubmit, onBack}: {
   state: OperatorMobileState;
   busy: boolean;
   kind: EntryKind;
-  onSubmit: (entry: ProductionEntryInput) => void;
+  /**
+   * `true` — сервер принял запись (или она легла в очередь на устройстве),
+   * `false` — отказ по существу. Форма паспорта чистит поля по этому признаку
+   * (F-R43-3c): иначе отказ 400/409 стирал набранный журнал забивки.
+   */
+  onSubmit: (entry: ProductionEntryInput) => Promise<boolean>;
   onBack: () => void;
 }) {
   const {pileGrades, drillingTypes, downtimeReasons} = state.dictionaries;
@@ -211,10 +216,9 @@ export function ProductionFlow({state, busy, kind, onSubmit, onBack}: {
           <PilePassportForm
             grades={pileGrades}
             busy={busy}
-            onSubmit={async (pileGradeId, passport) => {
-              onSubmit({kind: 'PILE_PASSPORT', pileGradeId, passport});
-              return true;
-            }}
+            onSubmit={async (pileGradeId, passport) => onSubmit({
+              kind: 'PILE_PASSPORT', pileGradeId, passport,
+            })}
           />
           <Button tone="ghost" onClick={onBack}>Назад</Button>
         </div>

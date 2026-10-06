@@ -7,12 +7,25 @@
  * defensively.
  */
 
+import { ErrorBoundary } from 'react-error-boundary';
 import type { PageLayoutTemplate, WidgetSize } from './page-layout-template';
 
 export interface RenderablePageWidget {
   id: string;
   title: string;
   render: (settings: Record<string, unknown>) => React.ReactNode;
+}
+
+/**
+ * Локальная заглушка упавшей плитки: одна ошибка рендера не должна уносить
+ * весь экран — остальные плитки обязаны остаться видимыми.
+ */
+function TileFallback() {
+  return (
+    <div className="flex h-full min-h-20 items-center justify-center rounded-lg border border-dashed border-border bg-muted/50 p-3 text-center text-xs text-muted-foreground">
+      Блок не загрузился
+    </div>
+  );
 }
 
 // 12-column grid: size = how many tiles share a row (sm 4/row, md 3/row,
@@ -42,7 +55,7 @@ export function PageLayoutRenderer({
     <div className={className ?? 'grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-12'}>
       {visible.map((w) => (
         <div key={w.id} className={`col-span-1 ${SIZE_SPAN[w.size]} min-w-0 [&>*]:h-full`}>
-          {widgets[w.id].render(w.settings ?? {})}
+          <ErrorBoundary FallbackComponent={TileFallback}>{widgets[w.id].render(w.settings ?? {})}</ErrorBoundary>
         </div>
       ))}
     </div>

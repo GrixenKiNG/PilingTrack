@@ -92,3 +92,25 @@ describe('site analytics cache', () => {
     expect(mocks.recordDeletion).toHaveBeenCalled();
   });
 });
+
+describe('журнал отчётов после записи', () => {
+  it('invalidateReports снимает закэшированные /api/reports/all и /api/reports/my', async () => {
+    const { getResponseCache } = await import('@/core/cache/response-cache');
+    const { NextResponse } = await import('next/server');
+    const { invalidateReports } = await import('../cached-queries');
+    const cache = getResponseCache('reports');
+    const fetchAll = vi.fn(async () => NextResponse.json({ reports: [] }));
+    const fetchMy = vi.fn(async () => NextResponse.json({ reports: [] }));
+
+    await cache.getOrFetch({ endpoint: 'GET:/api/reports/all', userId: 'u1' }, fetchAll);
+    await cache.getOrFetch({ endpoint: 'GET:/api/reports/my', userId: 'u1' }, fetchMy);
+    await cache.getOrFetch({ endpoint: 'GET:/api/reports/all', userId: 'u1' }, fetchAll);
+    expect(fetchAll).toHaveBeenCalledTimes(1); // второй раз — из кэша
+
+    invalidateReports();
+    await cache.getOrFetch({ endpoint: 'GET:/api/reports/all', userId: 'u1' }, fetchAll);
+    await cache.getOrFetch({ endpoint: 'GET:/api/reports/my', userId: 'u1' }, fetchMy);
+    expect(fetchAll).toHaveBeenCalledTimes(2);
+    expect(fetchMy).toHaveBeenCalledTimes(2);
+  });
+});

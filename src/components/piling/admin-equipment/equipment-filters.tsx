@@ -2,6 +2,7 @@
 
 import type { EquipmentOperationalStatus, ReportStatus } from './fleet-types';
 import { EQUIPMENT_STATUS_META, REPORT_STATUS_META } from './equipment-status';
+import { Input } from '@/components/ui/input';
 
 export interface FleetFilterState {
   site: string;
@@ -11,6 +12,8 @@ export interface FleetFilterState {
   equipmentStatus: string;
   reportStatus: string;
   crew: string;
+  /** Текстовый поиск по названию, модели и инвентарному номеру установки. */
+  search: string;
 }
 
 export const EMPTY_FILTERS: FleetFilterState = {
@@ -20,6 +23,7 @@ export const EMPTY_FILTERS: FleetFilterState = {
   equipmentStatus: '',
   reportStatus: '',
   crew: '',
+  search: '',
 };
 
 const EQUIPMENT_STATUS_OPTIONS: { value: EquipmentOperationalStatus; label: string }[] = [
@@ -35,7 +39,7 @@ const REPORT_STATUS_OPTIONS: { value: ReportStatus; label: string }[] = [
 ];
 
 const selectCls =
-  'rounded-lg border border-border bg-muted px-3 py-2 text-xs text-foreground focus:border-info focus:outline-none focus:ring-2 focus:ring-info/30/15';
+  'min-h-11 rounded-lg border border-border bg-muted px-3 py-2 text-xs text-foreground focus:border-info focus:outline-none focus:ring-2 focus:ring-info/30/15 sm:min-h-0';
 
 export function EquipmentFilters({
   sites,
@@ -56,14 +60,22 @@ export function EquipmentFilters({
     <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-card p-3">
       <span className="text-xs font-medium text-muted-foreground">Фильтры:</span>
 
-      <select className={selectCls} value={value.site} onChange={(e) => set({ site: e.target.value })}>
+      <Input
+        value={value.search}
+        onChange={(e) => set({ search: e.target.value })}
+        placeholder="Поиск по названию, модели, инв. номеру"
+        aria-label="Поиск по названию, модели или инвентарному номеру"
+        className={`${selectCls} min-w-[200px] flex-1`}
+      />
+
+      <select className={selectCls} value={value.site} onChange={(e) => set({ site: e.target.value })} aria-label="Фильтр по объекту">
         <option value="">Все объекты</option>
         {sites.map((s) => (
           <option key={s} value={s}>{s}</option>
         ))}
       </select>
 
-      <select className={selectCls} value={value.kind} onChange={(e) => set({ kind: e.target.value })}>
+      <select className={selectCls} value={value.kind} onChange={(e) => set({ kind: e.target.value })} aria-label="Фильтр по типу машины">
         <option value="">Все типы</option>
         {kinds.map((k) => (
           <option key={k.value} value={k.value}>{k.label}</option>
@@ -74,6 +86,7 @@ export function EquipmentFilters({
         className={selectCls}
         value={value.equipmentStatus}
         onChange={(e) => set({ equipmentStatus: e.target.value, status: e.target.value })}
+        aria-label="Фильтр по статусу техники"
       >
         <option value="">Статус техники</option>
         {EQUIPMENT_STATUS_OPTIONS.map((s) => (
@@ -81,14 +94,14 @@ export function EquipmentFilters({
         ))}
       </select>
 
-      <select className={selectCls} value={value.reportStatus} onChange={(e) => set({ reportStatus: e.target.value })}>
+      <select className={selectCls} value={value.reportStatus} onChange={(e) => set({ reportStatus: e.target.value })} aria-label="Фильтр по статусу отчёта">
         <option value="">Статус отчёта</option>
         {REPORT_STATUS_OPTIONS.map((s) => (
           <option key={s.value} value={s.value}>{s.label}</option>
         ))}
       </select>
 
-      <select className={selectCls} value={value.crew} onChange={(e) => set({ crew: e.target.value })}>
+      <select className={selectCls} value={value.crew} onChange={(e) => set({ crew: e.target.value })} aria-label="Фильтр по бригаде">
         <option value="">Все бригады</option>
         {crews.map((c) => (
           <option key={c} value={c}>{c}</option>

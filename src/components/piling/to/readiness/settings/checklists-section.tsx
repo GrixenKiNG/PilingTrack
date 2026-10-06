@@ -23,6 +23,7 @@ import { pluralizeRu } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { TYPE_LABEL } from '../../to-module-bits';
 import { ScreenTitle, SettingsKpis, StatusPill, card } from './shared-ui';
+import { normalizeSearch } from '../shared/text-search';
 
 export interface ChecklistTemplateSummary {
   id: string;
@@ -179,9 +180,9 @@ export function ChecklistsSettings() {
   const detail = loaded?.id === selectedId ? loaded.detail : null;
   const detailError = loaded?.id === selectedId ? loaded.error : null;
 
-  const normalized = query.trim().toLocaleLowerCase('ru-RU');
+  const normalized = normalizeSearch(query);
   const filtered = templates.filter((template) => !normalized
-    || `${template.name} ${template.level} ${template.blockType ?? ''}`.toLocaleLowerCase('ru-RU').includes(normalized));
+    || normalizeSearch(`${template.name} ${template.level} ${template.blockType ?? ''}`).includes(normalized));
   const itemTotal = templates.reduce((sum, template) => sum + (template.itemCount ?? 0), 0);
   const photoItems = detail?.sections.reduce((sum, section) => sum + section.items.filter((item) => item.photoRequired).length, 0) ?? 0;
 

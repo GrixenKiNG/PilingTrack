@@ -1,3 +1,4 @@
+import { isSubmittedReport } from '@/lib/report-status';
 /**
  * Report Export Service — выгрузки отчётов (CSV и Excel).
  *
@@ -12,6 +13,7 @@ import { db } from '@/lib/db';
 import { ServiceError } from '@/lib/service-error';
 import { pileLengthMeters } from '@/lib/pile-length';
 import { formatRuDate } from '@/lib/format';
+import { getSettings } from '@/modules/settings';
 
 /**
  * Ячейка CSV: экранирование кавычек плюс защита от подстановки формул.
@@ -46,6 +48,43 @@ function csvCell(value: string): string {
 const PILE_LENGTH_UNKNOWN_LABEL = 'длина марки не задана';
 /** Пометка к итогу м.п., когда хотя бы у одной марки не задана длина. */
 const PILE_METERS_INCOMPLETE_NOTE = '(неполный: у марки не задана длина)';
+
+/**
+ * Смена в печатном виде. Одно правило на CSV и XLSX (находка 19): раньше
+ * `=== 'NIGHT' ? … : 'Дневная'` печатало любое чужое значение как «Дневная»,
+ * то есть выгрузка молча подменяла смену, если в базе окажется что-то кроме
+ * DAY/NIGHT. Пустое значение — пустая ячейка, чужое — как есть.
+ */
+const SHIFT_TEXT: Record<string, string> = {
+  DAY: 'Дневная',
+  NIGHT: 'Ночная',
+};
+
+function shiftLabel(shiftType: string | null | undefined): string {
+  if (!shiftType) return '';
+  return SHIFT_TEXT[shiftType] ?? shiftType;
+}
+
+/**
+ * Погонные метры в CSV: доли — через запятую (находка 13). Русский Excel с
+ * разделителем «;» читает «37.5» как текст и колонку не суммирует.
+ * `formatFixed` из @/lib/format сюда не подходит: он добавляет ещё и разряды
+ * неразрывным пробелом («1 200,0»), а это для Excel снова текст.
+ */
+function csvMeters(meters: number): string {
+  return meters.toFixed(1).replace('.', ',');
+}
+
+/**
+ * Дробное значение в CSV — через запятую, разделитель полей «;» (D-20260930-007).
+ * Метры бурения и часы простоя уходили точкой («16.7»), и русский Excel читал
+ * их как текст: колонка не суммировалась. Целые оставляем как есть — «2», а не
+ * «2,0». `formatFixed` из @/lib/format сюда не подходит по той же причине, что и
+ * в csvMeters: он добавляет разряды неразрывным пробелом («1 234,5»).
+ */
+function csvDecimal(value: number): string {
+  return String(value).replace('.', ',');
+}
 
 /** Метраж по строке свай: count × длина сваи из единственного источника (lib/pile-length). */
 function pileRowMeters(pile: { count?: number | null; pileGrade?: { lengthMm?: number | null } | null }): number {
@@ -132,7 +171,7 @@ export async function exportReportsCsv(filters: ReportExportFilters) {
       reportId: report.reportId,
       // Выгрузку открывает человек: дата — ДД.ММ.ГГГГ, а не ISO-строка из БД.
       date: formatRuDate(report.date),
-      shift: report.shiftType === 'NIGHT' ? 'Ночная' : 'Дневная',
+      shift: shiftLabel(report.shiftType),
       status: reportStatusExportLabel(report.status),
       site: report.site.name,
       operator: report.user.name,
@@ -149,7 +188,7 @@ export async function exportReportsCsv(filters: ReportExportFilters) {
         pileCount: String(pile.count),
         // Без длины марки метраж не считается: печатаем пояснение, а не «0.0» —
         // иначе пустая длина выглядит как реальный ноль погонных метров.
-        pileMeters: meters > 0 ? meters.toFixed(1) : PILE_LENGTH_UNKNOWN_LABEL,
+        pileMeters: meters > 0 ? csvMeters(meters) : PILE_LENGTH_UNKNOWN_LABEL,
         drillType: '',
         drillMeters: '',
         dtReason: '',
@@ -165,7 +204,7 @@ export async function exportReportsCsv(filters: ReportExportFilters) {
       pileCount: '',
       pileMeters: '',
       drillType: drilling.type?.name ?? '',
-      drillMeters: String(drilling.meters),
+      drillMeters: csvDecimal(drilling.meters),
       dtReason: '',
       dtHours: '',
       dtComment: '',
@@ -180,7 +219,7 @@ export async function exportReportsCsv(filters: ReportExportFilters) {
       drillType: '',
       drillMeters: '',
       dtReason: downtime.reason?.name ?? '',
-      dtHours: String(downtime.duration),
+      dtHours: csvDecimal(downtime.duration),
       dtComment: downtime.comment || '',
     }));
 
@@ -210,6 +249,32 @@ export async function exportReportsCsv(filters: ReportExportFilters) {
   return BOM + header + '\n' + csvLines.join('\n');
 }
 
+/** ГГГГ-ММ-ДД → ДД.ММ.ГГГГ. */
+function printYmd(ymd: string): string {
+  const [year, month, day] = ymd.split('-');
+  return `${day}.${month}.${year}`;
+}
+
+/** День журнала в печатном виде — ДД.ММ.ГГГГ по поясу тенанта. */
+function printDay(iso: string, timezone: string): string {
+  return new Date(iso).toLocaleDateString('ru-RU', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    timeZone: timezone,
+  });
+}
+
+/** Момент времени в печатном виде — ДД.ММ.ГГГГ ЧЧ:ММ в поясе тенанта. */
+function printMoment(date: Date, timezone: string): string {
+  const time = date.toLocaleTimeString('ru-RU', {
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZone: timezone,
+  });
+  return `${printDay(date.toISOString(), timezone)} ${time}`;
+}
+
 /**
  * Та же выгрузка отчётов, но настоящим .xlsx. В отличие от CSV числа лежат
  * числами (Excel их суммирует без «преобразования текста»), а итоги вынесены
@@ -219,17 +284,41 @@ export async function exportReportsCsv(filters: ReportExportFilters) {
 export async function exportReportsXlsx(filters: ReportExportFilters): Promise<Buffer> {
   const { buildXlsx } = await import('@/lib/xlsx-writer');
   const reports = await fetchReportsForExport(filters);
+  // Пояс и реквизиты тенанта — те же, что печатает журнал забивки (F-R17-1):
+  // отметка «Выгружено» обязана стоять по поясу организации, а не сервера.
+  const { timezone, companyName, inn } = await getSettings(filters.tenantId);
 
-  const shift = (t: string) => (t === 'NIGHT' ? 'Ночная' : 'Дневная');
+  // Смена — единым правилом (находка 19), см. shiftLabel. Незнакомое значение
+  // печатаем как есть, а не выдаём за дневную.
+
+  // Реквизиты выгрузки — над таблицей (F-R44-9). Файл уходит в переписку или
+  // подшивается, и по нему должно быть видно, чья это организация, за какой
+  // период и когда выгружен: иначе проверить его вне интерфейса нечем. Те же
+  // три факта журнал забивки печатает на титуле. Пустые части организации не
+  // печатаем — строка «Организация: , ИНН» хуже её отсутствия.
+  const organisation = [
+    companyName ? `Организация: ${companyName}` : null,
+    inn ? `ИНН ${inn}` : null,
+  ].filter((part): part is string => part !== null).join(', ');
+  const requisites: (string | number | null)[][] = [
+    ...(organisation ? [[organisation]] : []),
+    [`Период: ${filters.dateFrom ? printYmd(filters.dateFrom) : '—'} — ${filters.dateTo ? printYmd(filters.dateTo) : '—'}`],
+    [`Выгружено: ${printMoment(new Date(), timezone)}`],
+    [],
+  ];
 
   // --- Лист 1: детализация (числа — числами). ---
-  const detail: (string | number | null)[][] = [[
-    'ID отчёта', 'Дата', 'Смена', 'Статус', 'Объект', 'Оператор', 'Экипаж', 'Установка',
-    'Марка сваи', 'Кол-во свай', 'Свай, м.п.', 'Тип бурения', 'Метры бурения', 'Причина простоя', 'Часы простоя', 'Комментарий',
-  ]];
+  const detail: (string | number | null)[][] = [
+    ...requisites,
+    [
+      'ID отчёта', 'Дата', 'Смена', 'Статус', 'Объект', 'Оператор', 'Экипаж', 'Установка',
+      'Марка сваи', 'Кол-во свай', 'Свай, м.п.', 'Тип бурения', 'Метры бурения', 'Причина простоя', 'Часы простоя', 'Комментарий',
+      'Примечание',
+    ],
+  ];
   for (const r of reports) {
     const base = [
-      r.reportId, formatRuDate(r.date), shift(r.shiftType), reportStatusExportLabel(r.status), r.site.name, r.user.name,
+      r.reportId, formatRuDate(r.date), shiftLabel(r.shiftType), reportStatusExportLabel(r.status), r.site.name, r.user.name,
       r.crew?.name || '', r.equipment?.name || r.crew?.equipment?.name || '',
     ];
     // Справочники (марка/тип/причина) — через `?.`: у старых строк ссылка на
@@ -238,22 +327,26 @@ export async function exportReportsXlsx(filters: ReportExportFilters): Promise<B
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
     for (const p of r.piles as any[]) {
       const meters = pileRowMeters(p);
-      detail.push([...base, p.pileGrade?.name ?? '', p.count, meters > 0 ? meters : PILE_LENGTH_UNKNOWN_LABEL, '', null, '', null, '']);
+      // Колонка «Свай, м.п.» — числовая: без длины марки её оставляем пустой,
+      // а пояснение печатаем в «Примечании» (находка 14) — иначе текст в
+      // числовой колонке делает её текстовой и лист не суммируется.
+      detail.push([...base, p.pileGrade?.name ?? '', p.count, meters > 0 ? meters : null, '', null, '', null, '', meters > 0 ? '' : PILE_LENGTH_UNKNOWN_LABEL]);
     }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
-    for (const d of r.drillings as any[]) detail.push([...base, '', null, '', d.type?.name ?? '', d.meters, '', null, '']);
+    for (const d of r.drillings as any[]) detail.push([...base, '', null, '', d.type?.name ?? '', d.meters, '', null, '', '']);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
-    for (const d of r.downtimes as any[]) detail.push([...base, '', null, '', '', null, d.reason?.name ?? '', d.duration, d.comment || '']);
+    for (const d of r.downtimes as any[]) detail.push([...base, '', null, '', '', null, d.reason?.name ?? '', d.duration, d.comment || '', '']);
     if (!r.piles.length && !r.drillings.length && !r.downtimes.length) {
-      detail.push([...base, '', null, '', '', null, '', null, '']);
+      detail.push([...base, '', null, '', '', null, '', null, '', '']);
     }
   }
 
   // --- Лист 2: итоги по отчёту. ---
   const totals: (string | number | null)[][] = [[
     'ID отчёта', 'Дата', 'Смена', 'Объект', 'Оператор', 'Установка',
-    'Свай, всего', 'Свай, м.п.', 'Бурение, скв.', 'Бурение, м', 'Простой, ч', 'Остаток топлива, %', 'Примечание',
+    'Свай, всего', 'Свай, м.п.', 'Бурение, скв.', 'Бурение, м', 'Простой, ч', 'Остаток топлива, %', 'Примечание', 'Статус',
   ]];
+  const drafts: (string | number | null)[][] = [totals[0]];
   for (const r of reports) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
     const piles = (r.piles as any[]).reduce((s, p) => s + p.count, 0);
@@ -268,23 +361,16 @@ export async function exportReportsXlsx(filters: ReportExportFilters): Promise<B
     const meters = (r.drillings as any[]).reduce((s, d) => s + d.meters, 0);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
     const downtime = (r.downtimes as any[]).reduce((s, d) => s + d.duration, 0);
-    totals.push([
-      r.reportId, formatRuDate(r.date), shift(r.shiftType), r.site.name, r.user.name, r.equipment?.name || r.crew?.equipment?.name || '',
+    (isSubmittedReport(r) ? totals : drafts).push([
+      r.reportId, formatRuDate(r.date), shiftLabel(r.shiftType), r.site.name, r.user.name, r.equipment?.name || r.crew?.equipment?.name || '',
       piles, pileMeters, wells, meters, downtime, r.endingFuelPercent ?? null,
-      pilesWithoutLength ? PILE_METERS_INCOMPLETE_NOTE : '',
+      pilesWithoutLength ? PILE_METERS_INCOMPLETE_NOTE : '', reportStatusExportLabel(r.status),
     ]);
-  }
-
-  // Итоги периода подписаны, если в него попали несданные смены: иначе по
-  // листу «Итоги» не понять, почему сумма больше аналитики (решение владельца
-  // 26.09.2026 — черновики остаются в выгрузке, но помечены).
-  const draftCount = reports.filter((r) => r.status === 'draft').length;
-  if (draftCount > 0) {
-    totals.push([`Включены несданные смены: ${draftCount}`]);
   }
 
   return buildXlsx([
     { name: 'Детализация', rows: detail },
     { name: 'Итоги', rows: totals },
+    ...(drafts.length > 1 ? [{ name: 'Черновики', rows: drafts }] : []),
   ]);
 }

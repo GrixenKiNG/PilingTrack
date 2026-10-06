@@ -54,6 +54,7 @@ export async function requireOpenShift(tx: Tx, tenantId: string, shiftId: string
     where: {tenantId, id: shiftId},
     select: {
       id: true, state: true, equipmentId: true, productionDate: true, type: true,
+      startedAt: true, createdAt: true,
       starter: {select: {id: true, role: true}},
     },
   });
@@ -111,14 +112,25 @@ async function requireDictionaryRow<T>(
   return row;
 }
 
-export function requirePileGrade(tx: Tx, tenantId: string, id: string) {
-  return requireDictionaryRow(
+/**
+ * Марка сваи своей организации. Архивная принимается, если её убрали в архив
+ * уже после начала смены (решение владельца 26.09.2026): машинист выбрал её,
+ * пока она была действующей, а телефон отправил запись позже, без связи. Иначе
+ * реальные сваи не попали бы ни в отчёт, ни в журнал забивки, а вручную
+ * архивную марку в отчёте не выбрать.
+ */
+export async function requirePileGrade(tx: Tx, tenantId: string, id: string, shiftStartedAt: Date) {
+  const grade = await requireDictionaryRow(
     () => tx.pileGrade.findFirst({
-      where: {tenantId, id, isActive: true},
-      select: {id: true, lengthMm: true},
+      where: {tenantId, id},
+      select: {id: true, lengthMm: true, isActive: true, archivedAt: true, name: true},
     }),
-    'Марка сваи не найдена в справочнике вашей организации',
+    'Марка сваи не найдена в справочнике вашей организации — обновите экран и выберите марку заново',
   );
+  if (!grade.isActive && !(grade.archivedAt && grade.archivedAt > shiftStartedAt)) {
+    throw new OperatorCommandError(400, 'Марка сваи убрана в архив — обновите экран и выберите действующую марку');
+  }
+  return {id: grade.id, lengthMm: grade.lengthMm, name: grade.name};
 }
 
 export function requireDrillingType(tx: Tx, tenantId: string, id: string) {
@@ -127,7 +139,7 @@ export function requireDrillingType(tx: Tx, tenantId: string, id: string) {
       where: {tenantId, id, isActive: true},
       select: {id: true},
     }),
-    'Тип бурения не найден в справочнике вашей организации',
+    'Тип бурения не найден в справочнике вашей организации — обновите экран и выберите тип заново',
   );
 }
 
@@ -135,9 +147,9 @@ export function requireDowntimeReason(tx: Tx, tenantId: string, id: string) {
   return requireDictionaryRow(
     () => tx.downtimeReason.findFirst({
       where: {tenantId, id, isActive: true},
-      select: {id: true},
+      select: {id: true, name: true},
     }),
-    'Причина простоя не найдена в справочнике вашей организации',
+    'Причина простоя не найдена в справочнике вашей организации — обновите экран и выберите причину заново',
   );
 }
 
@@ -397,5 +409,22 @@ export async function ensureReport(tx: Tx, input: {
   });
 
   return report.id;
+}
+
+/**
+ * Деловой номер отчёта (`RM-…`) по первичному ключу.
+ *
+ * ЗАЧЕМ ОТДЕЛЬНОЕ ЧТЕНИЕ. `ensureReport` возвращает первичный ключ `report.id`,
+ * и менять его контракт нельзя — на него завязаны клиенты и тесты. А в след
+ * (`ReportAudit`) идёт деловой номер: история отчёта ищет строки именно по нему
+ * (`report-history-service.ts`). Чтение — в той же транзакции, что и запись,
+ * чтобы след ссылался на уже существующий отчёт.
+ */
+export async function businessReportId(tx: Tx, id: string): Promise<string> {
+  const {reportId} = await tx.report.findUniqueOrThrow({
+    where: {id},
+    select: {reportId: true},
+  });
+  return reportId;
 }
 

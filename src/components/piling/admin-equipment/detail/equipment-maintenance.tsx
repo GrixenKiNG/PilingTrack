@@ -14,6 +14,7 @@ import Link from 'next/link';
 import { Pencil, Trash2, Plus, Wrench, Loader2, CheckCircle2, PlayCircle } from '@/components/piling/icons/unified-icons';
 import { toast } from 'sonner';
 import { authFetch } from '@/lib/api';
+import { catchText } from '@/components/piling/admin-crews/crew-messages';
 import { formatRuDate } from '@/lib/format';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -25,7 +26,7 @@ import { resolveAssigneeName } from '@/components/piling/maintenance/maintenance
 import { WorkOrderFormDialog } from '@/components/piling/maintenance/work-order-form-dialog';
 import { ConfirmActionDialog } from '@/components/piling/confirm-action-dialog';
 
-interface MaintenanceRow {
+export interface MaintenanceRow {
   id: string;
   type: string;
   status: string;
@@ -42,6 +43,21 @@ interface MaintenanceRow {
 
 interface AssigneeOption { id: string; name: string }
 
+/**
+ * Порядок журнала на экране: по дате записи — фактической, а при её отсутствии
+ * плановой — от новых к старым. Записи без даты уходят в конец. Сервер отдаёт
+ * строки, сгруппированные по статусу (алфавит), поэтому внутри одной карточки
+ * даты шли вразнобой.
+ */
+export function sortMaintenanceRecords(records: MaintenanceRow[]): MaintenanceRow[] {
+  const time = (r: MaintenanceRow) => {
+    const raw = r.completedAt ?? r.scheduledAt;
+    const t = raw ? Date.parse(raw) : NaN;
+    return Number.isNaN(t) ? -Infinity : t;
+  };
+  return [...records].sort((a, b) => time(b) - time(a));
+}
+
 export function EquipmentMaintenance({ equipmentId }: { equipmentId: string }) {
   const [records, setRecords] = useState<MaintenanceRow[]>([]);
   const [names, setNames] = useState<Map<string, string>>(new Map());
@@ -50,6 +66,7 @@ export function EquipmentMaintenance({ equipmentId }: { equipmentId: string }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [pendingDelete, setPendingDelete] = useState<MaintenanceRow | null>(null);
+  const [pendingDone, setPendingDone] = useState<MaintenanceRow | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -57,7 +74,7 @@ export function EquipmentMaintenance({ equipmentId }: { equipmentId: string }) {
       const res = await authFetch(`/api/equipment/${equipmentId}/maintenance`);
       if (!res.ok) throw new Error();
       const data = await res.json();
-      setRecords(data.records ?? []);
+      setRecords(sortMaintenanceRecords(data.records ?? []));
     } catch {
       toast.error('Не удалось загрузить журнал ТО');
     } finally {
@@ -102,7 +119,8 @@ export function EquipmentMaintenance({ equipmentId }: { equipmentId: string }) {
       }
       await load();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Ошибка');
+      // Обрыв сети fetch бросает TypeError с английским «Failed to fetch» (F-R112-1).
+      toast.error(catchText(err, 'Ошибка'));
     } finally {
       setPendingId(null);
     }
@@ -116,7 +134,8 @@ export function EquipmentMaintenance({ equipmentId }: { equipmentId: string }) {
       toast.success('Запись удалена');
       await load();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Ошибка');
+      // Обрыв сети fetch бросает TypeError с английским «Failed to fetch» (F-R112-1).
+      toast.error(catchText(err, 'Ошибка'));
     } finally {
       setPendingId(null);
       setPendingDelete(null);
@@ -127,7 +146,7 @@ export function EquipmentMaintenance({ equipmentId }: { equipmentId: string }) {
     <div className="mt-4 border-t border-border pt-4">
       <div className="mb-3 flex items-center justify-between gap-2">
         <p className="text-xs text-muted-foreground">Журнал ТО, ремонтов и неисправностей.</p>
-        <Button onClick={openCreate} size="sm" className="bg-signal hover:bg-signal-strong text-white">
+        <Button onClick={openCreate} size="sm" className="min-h-11 bg-signal hover:bg-signal-strong text-white sm:min-h-0">
           <Plus className="w-3.5 h-3.5 mr-1" /> Добавить
         </Button>
       </div>
@@ -173,7 +192,7 @@ export function EquipmentMaintenance({ equipmentId }: { equipmentId: string }) {
                     </button>
                   )}
                   {st !== 'DONE' && st !== 'CANCELLED' && (
-                    <button onClick={() => patchStatus(r, 'DONE')} disabled={pendingId === r.id}
+                    <button onClick={() => setPendingDone(r)} disabled={pendingId === r.id}
                     aria-label={`Отметить «${r.title}» выполненным`}
                     className="flex h-11 w-11 items-center justify-center rounded-md text-success-strong transition-colors hover:bg-success/10 hover:text-success-strong disabled:opacity-50" title="Выполнено">
                       <CheckCircle2 className="w-3.5 h-3.5" />
@@ -202,6 +221,16 @@ export function EquipmentMaintenance({ equipmentId }: { equipmentId: string }) {
         equipmentId={equipmentId}
         editingId={editingId}
         onSaved={load}
+      />
+      <ConfirmActionDialog
+        open={Boolean(pendingDone)}
+        onOpenChange={(open) => { if (!open) setPendingDone(null); }}
+        title="Отметить наряд выполненным?"
+        description={pendingDone
+          ? `Наряд «${pendingDone.title}» будет закрыт: сдвинется срок следующего ТО и запишется показание счётчика моточасов на момент выполнения.`
+          : ''}
+        confirmLabel="Выполнено"
+        onConfirm={() => { const row = pendingDone; setPendingDone(null); if (row) void patchStatus(row, 'DONE'); }}
       />
       <ConfirmActionDialog
         open={Boolean(pendingDelete)}

@@ -26,6 +26,7 @@ import {
   type BriefingJournalEntry, type BriefingKind,
 } from '@/modules/operator-mobile/contracts';
 import { formatRuDate } from '@/lib/format';
+import { formatDateInTimezone } from '@/lib/timezone';
 import { ROLE_LABELS, type UserRole } from '@/lib/types';
 
 interface PrintParams {
@@ -48,10 +49,36 @@ function readParams(): PrintParams {
   };
 }
 
+/**
+ * Мгновение записи на листе — по поясу тенанта из настроек, а не по часам
+ * браузера: инструктаж проходят до начала смены, и сдвиг часов менял бы дату
+ * записи в подшиваемом журнале. Пока пояс не загружен (или настройки
+ * недоступны), остаётся прежний формат по часам браузера.
+ */
+function sheetMoment(iso: string, timezone: string): string {
+  const moment = new Date(iso);
+  if (Number.isNaN(moment.getTime())) return '—';
+  if (!timezone) return formatJournalMoment(iso);
+  const day = formatDateInTimezone(moment, timezone, { day: '2-digit', month: '2-digit', year: 'numeric' });
+  const time = formatDateInTimezone(moment, timezone, { hour: '2-digit', minute: '2-digit' });
+  return `${day}, ${time}`;
+}
+
+/** День мгновения на листе — по поясу тенанта. */
+function sheetDay(iso: string | null, timezone: string): string {
+  if (!iso) return '—';
+  if (!timezone) return formatJournalDay(iso);
+  const moment = new Date(iso);
+  if (Number.isNaN(moment.getTime())) return '—';
+  return formatDateInTimezone(moment, timezone, { day: '2-digit', month: '2-digit', year: 'numeric' });
+}
+
 export function BriefingJournalPrint() {
   const [params, setParams] = useState<PrintParams | null>(null);
   const [rows, setRows] = useState<BriefingJournalEntry[] | null>(null);
   const [company, setCompany] = useState('');
+  const [inn, setInn] = useState('');
+  const [timezone, setTimezone] = useState('');
   const [truncated, setTruncated] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
   const printed = useRef(false);
@@ -73,10 +100,20 @@ export function BriefingJournalPrint() {
       const [journal, settings] = await Promise.all([
         fetch(`/api/briefings/journal?${search.toString()}`, { credentials: 'same-origin' }),
         fetch('/api/settings', { credentials: 'same-origin' }),
-      ]);
+      ]).catch(() => {
+        // Обрыв сети fetch отдаёт браузерной строкой «Failed to fetch» — на
+        // листе журнала по охране труда такая строка попадать не должна.
+        throw new Error('Нет связи с сервером. Журнал не загружен.');
+      });
       if (!journal.ok) {
+        // 401 приходит английским «Unauthorized» — заменяем на понятное человеку
+        // у принтера действие. Остальные отказы сервера уже на русском, их берём
+        // как есть, без технического «Сервер вернул N».
+        if (journal.status === 401) {
+          throw new Error('Сессия истекла — откройте журнал заново из приложения.');
+        }
         const body = await journal.json().catch(() => ({}));
-        throw new Error(body.error || `Сервер вернул ${journal.status}`);
+        throw new Error(body.error || 'Сервер временно недоступен. Повторите позже.');
       }
       const body = await journal.json();
       // Хронология: журнал читают и подписывают сверху вниз по возрастанию даты.
@@ -86,7 +123,12 @@ export function BriefingJournalPrint() {
       setRows(entries);
       setTruncated(Boolean(body.truncated));
       if (settings.ok) {
-        setCompany(((await settings.json()) as { companyName?: string }).companyName ?? '');
+        const config = (await settings.json()) as {
+          companyName?: string; inn?: string; timezone?: string;
+        };
+        setCompany(config.companyName ?? '');
+        setInn(config.inn ?? '');
+        setTimezone(config.timezone ?? '');
       }
       setFailed(null);
     } catch (error) {
@@ -138,6 +180,7 @@ export function BriefingJournalPrint() {
         <h1>Журнал регистрации инструктажей по охране труда</h1>
         <dl className="journal-meta">
           <div><dt>Организация</dt><dd>{company || '—'}</dd></div>
+          <div><dt>ИНН</dt><dd>{inn || '—'}</dd></div>
           <div><dt>Период</dt><dd>{period}</dd></div>
           <div>
             <dt>Вид записей</dt>
@@ -174,7 +217,7 @@ export function BriefingJournalPrint() {
             {rows.map((row, index) => (
               <tr key={row.id}>
                 <td>{index + 1}</td>
-                <td>{formatJournalMoment(row.recordedAt)}</td>
+                <td>{sheetMoment(row.recordedAt, timezone)}</td>
                 <td>{row.userName}</td>
                 <td>{ROLE_LABELS[row.userRole as UserRole] ?? row.userRole}</td>
                 <td>{BRIEFING_KIND_LABELS[row.kind]}</td>
@@ -183,7 +226,7 @@ export function BriefingJournalPrint() {
                   <span className="journal-code"> ({row.documentCode}, в. {row.documentVersion})</span>
                 </td>
                 <td>{row.result ?? '—'}</td>
-                <td>{row.validUntil ? formatJournalDay(row.validUntil) : 'бессрочно'}</td>
+                <td>{row.validUntil ? sheetDay(row.validUntil, timezone) : 'бессрочно'}</td>
                 <td className="journal-sign" />
               </tr>
             ))}
@@ -199,8 +242,11 @@ export function BriefingJournalPrint() {
         </p>
         <div className="journal-signatures">
           <span>Ответственный за охрану труда ____________________ / ____________________</span>
-          <span>Дата составления: {formatJournalDay(new Date().toISOString())}</span>
+          <span>Дата составления: {sheetDay(new Date().toISOString(), timezone)}</span>
         </div>
+        {/* Нумерацию листов ставит рукой человек у принтера: браузер не знает,
+            сколько страниц займёт журнал, а @page-счётчики живут в CSS листа. */}
+        <p>Лист ___ из ___</p>
       </footer>
     </main>
   );

@@ -13,9 +13,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 import { Camera, Loader2, Trash2 } from '@/components/piling/icons/unified-icons';
+import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { authFetch } from '@/lib/api';
 import { getThumbnailUrl } from '@/lib/media-thumbnails';
+import { maintenanceCatchText } from './maintenance-helpers';
 
 interface MediaRecord {
   id: string;
@@ -47,6 +49,10 @@ export function WorkOrderPhotos({ recordId, entityId }: Props) {
   const [photos, setPhotos] = useState<PhotoTile[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  // Отказ чтения галереи раньше отдавал пустой список: панель показывала
+  // «Загрузить первое фото», хотя снимки есть (F-R122-10). Теперь это отдельное
+  // состояние с повтором.
+  const [loadError, setLoadError] = useState(false);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -55,6 +61,7 @@ export function WorkOrderPhotos({ recordId, entityId }: Props) {
         `/api/media?entityType=maintenance&entityId=${encodeURIComponent(eid)}`
       );
       if (!res.ok) {
+        setLoadError(true);
         setPhotos([]);
         return;
       }
@@ -70,7 +77,10 @@ export function WorkOrderPhotos({ recordId, entityId }: Props) {
         })
       );
       setPhotos(tiles);
+      setLoadError(false);
     } catch {
+      // Обрыв сети — тот же «не прочитано», а не «фото нет».
+      setLoadError(true);
       toast.error('Не удалось загрузить фото');
     } finally {
       setLoading(false);
@@ -117,7 +127,8 @@ export function WorkOrderPhotos({ recordId, entityId }: Props) {
       toast.success('Фото загружено');
       await refresh();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Ошибка загрузки');
+      // Обрыв сети fetch бросает TypeError с английским «Failed to fetch» (F-R112-2).
+      toast.error(maintenanceCatchText(err, 'Ошибка загрузки'));
     } finally {
       setBusy(false);
       if (inputRef.current) inputRef.current.value = '';
@@ -133,7 +144,8 @@ export function WorkOrderPhotos({ recordId, entityId }: Props) {
       toast.success('Фото удалено');
       setPhotos((prev) => prev.filter((p) => p.id !== id));
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Ошибка удаления');
+      // Обрыв сети fetch бросает TypeError с английским «Failed to fetch» (F-R112-2).
+      toast.error(maintenanceCatchText(err, 'Ошибка удаления'));
     } finally {
       setBusy(false);
     }
@@ -146,11 +158,22 @@ export function WorkOrderPhotos({ recordId, entityId }: Props) {
       window.open(tile.fullUrl, '_blank', 'noreferrer');
       return;
     }
-    const dl = await authFetch(`/api/media/${tile.id}/download`);
-    if (!dl.ok) return;
-    const url = (await dl.json()).url as string;
-    setPhotos((prev) => prev.map((p) => (p.id === tile.id ? { ...p, fullUrl: url } : p)));
-    window.open(url, '_blank', 'noreferrer');
+    try {
+      const dl = await authFetch(`/api/media/${tile.id}/download`);
+      // Тихий `return` на отказе давал клик без окна и без объяснения (F-R115-9).
+      if (!dl.ok) {
+        toast.error(dl.status === 403
+          ? 'Нет прав на просмотр фото. Смените роль или обратитесь к администратору.'
+          : 'Не удалось открыть фото. Повторите попытку.');
+        return;
+      }
+      const url = (await dl.json()).url as string;
+      setPhotos((prev) => prev.map((p) => (p.id === tile.id ? { ...p, fullUrl: url } : p)));
+      window.open(url, '_blank', 'noreferrer');
+    } catch (err) {
+      // Обрыв сети fetch бросает TypeError с английским «Failed to fetch» (F-R112-2).
+      toast.error(maintenanceCatchText(err, 'Не удалось открыть фото. Повторите попытку.'));
+    }
   };
 
   return (
@@ -163,7 +186,7 @@ export function WorkOrderPhotos({ recordId, entityId }: Props) {
           type="button"
           onClick={() => inputRef.current?.click()}
           disabled={busy}
-          className="inline-flex items-center gap-1.5 rounded-md bg-signal px-3 py-1.5 text-xs font-medium text-white hover:bg-signal-strong disabled:opacity-50"
+          className="inline-flex min-h-11 items-center gap-1.5 rounded-md bg-signal px-3 py-1.5 text-xs font-medium text-white hover:bg-signal-strong disabled:opacity-50 sm:min-h-0"
         >
           {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Camera className="w-3.5 h-3.5" />}
           Добавить фото
@@ -173,6 +196,15 @@ export function WorkOrderPhotos({ recordId, entityId }: Props) {
       {loading ? (
         <div className="h-24 flex items-center justify-center text-muted-foreground">
           <Loader2 className="w-5 h-5 animate-spin" />
+        </div>
+      ) : loadError ? (
+        // Сбой чтения — не «фото пока нет»: раньше показывалась плитка «Загрузить
+        // первое фото», хотя снимки существуют (F-R122-10).
+        <div className="flex h-28 flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-destructive/40 text-sm text-muted-foreground">
+          <p>Не удалось загрузить фото</p>
+          <Button size="sm" variant="outline" className="min-h-11 sm:min-h-0" onClick={() => void refresh()}>
+            Повторить
+          </Button>
         </div>
       ) : photos.length === 0 ? (
         <button

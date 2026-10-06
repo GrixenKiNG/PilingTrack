@@ -16,6 +16,7 @@ import { exportPrometheusMetrics, getLagMetrics } from '@/core/observability/lag
 import { getCurrentStatus } from '@/core/observability/health-tracker';
 import { getEventLoopLagSeconds, resetEventLoopLag } from '@/core/observability/event-loop-lag';
 import { exportHttpMetricsPrometheus } from '@/core/observability/http-metrics';
+import { exportAuditFeedbackMetricsPrometheus } from '@/core/observability/audit-feedback-metrics';
 import { withApi } from '@/core/api-wrapper';
 import { logger } from '@/lib/logger';
 
@@ -96,19 +97,34 @@ export const GET = withApi(
     // Worker lag metrics
     try {
       const lagMetrics = getLagMetrics();
-      if (lagMetrics) {
-        output += exportPrometheusMetrics(lagMetrics);
-      }
+      output += exportPrometheusMetrics(lagMetrics);
     } catch (err) {
       logger.error('metrics: lag metrics failed', err);
     }
 
-    // Backup health metrics
+    // Снимок фонового health-трекера и состояние резервных копий
     try {
       const status = getCurrentStatus();
+      const timestamp = status ? Date.parse(status.timestamp) : NaN;
+      const snapshotAge = Number.isFinite(timestamp) ? Math.max(0, (Date.now() - timestamp) / 1000) : -1;
+      const healthStatus = !status ? -1 : status.status === 'healthy' ? 0 : status.status === 'degraded' ? 1 : 2;
+
+      output += `# HELP health_status Cached system status (-1=unavailable, 0=healthy, 1=degraded, 2=unhealthy)\n`;
+      output += `# TYPE health_status gauge\n`;
+      output += `health_status ${healthStatus}\n\n`;
+      output += `# HELP health_snapshot_age_seconds Age of cached health snapshot (-1=unavailable)\n`;
+      output += `# TYPE health_snapshot_age_seconds gauge\n`;
+      output += `health_snapshot_age_seconds ${snapshotAge}\n\n`;
       if (status?.components.backup) {
         const { backup } = status.components;
-        const ageHours = backup.lastBackupAgeHours || 0;
+        const available = Number.isFinite(backup.lastBackupAgeHours) && (backup.lastBackupAgeHours ?? -1) >= 0;
+        const ageHours = available ? (backup.lastBackupAgeHours ?? 0) : 0;
+        output += `# HELP backup_monitoring_enabled Whether backup monitoring is enabled\n`;
+        output += `# TYPE backup_monitoring_enabled gauge\n`;
+        output += `backup_monitoring_enabled ${backup.source === 'disabled' ? 0 : 1}\n\n`;
+        output += `# HELP backup_last_success_available Whether a valid last successful backup age is available\n`;
+        output += `# TYPE backup_last_success_available gauge\n`;
+        output += `backup_last_success_available ${available ? 1 : 0}\n\n`;
         const s3Synced = backup.s3Synced ? 1 : 0;
 
         output += `# HELP backup_age_hours Hours since last successful backup\n`;
@@ -120,7 +136,7 @@ export const GET = withApi(
         output += `backup_s3_synced ${s3Synced}\n\n`;
       }
     } catch (err) {
-      logger.error('metrics: backup metrics failed', err);
+      logger.error('metrics: health and backup metrics failed', err);
     }
 
     // HTTP request metrics (recorded centrally in withApi/withMutation —
@@ -130,6 +146,8 @@ export const GET = withApi(
     } catch (err) {
       logger.error('metrics: http metrics failed', err);
     }
+
+    output += exportAuditFeedbackMetricsPrometheus();
 
     return new NextResponse(output, {
       headers: {

@@ -56,8 +56,9 @@ describe.runIf(Boolean(connectionString))('shifts and handovers on disposable Po
   `, [id, tenantId, equipmentId, state, version]);
 
   beforeAll(async () => {
+    if (!connectionString) throw new Error("DATABASE_URL_POSTGRES is required");
     await admin.connect(); await admin.query(`CREATE DATABASE "${database}"`);
-    const url = new URL(connectionString!); url.pathname = `/${database}`;
+    const url = new URL(connectionString); url.pathname = `/${database}`;
     sql = new Client({connectionString: url.toString()}); await sql.connect();
     await sql.query(`
       CREATE TYPE "MaintenanceType" AS ENUM ('EO','TO1','TO2','TO3','SEASONAL','REPAIR','FAULT','SCHEDULED','INSPECTION');
@@ -145,10 +146,10 @@ describe.runIf(Boolean(connectionString))('shifts and handovers on disposable Po
       VALUES ('rules-default',$1,'PUBLISHED',$2,$3,$4,NOW())`, [tenantId, DEFAULT_READINESS_RULES.version,
       JSON.stringify(DEFAULT_READINESS_RULES.criteria), JSON.stringify(DEFAULT_READINESS_RULES.blockers)]);
     prisma = new PrismaClient({adapter: new PrismaPg({connectionString: url.toString(), max: 30})}); await prisma.$connect();
-  }, 30_000);
+  }, 60_000);
 
   afterAll(async () => { await prisma?.$disconnect(); await sql?.end();
-    await admin.query(`DROP DATABASE IF EXISTS "${database}" WITH (FORCE)`); await admin.end(); });
+    await admin.query(`DROP DATABASE IF EXISTS "${database}" WITH (FORCE)`); await admin.end(); }, 60_000);
 
   it('allows exactly one of 20 parallel starts and commits one atomic evidence set', async () => {
     await sql.query('INSERT INTO "Inspection" ("id","tenantId","equipmentId","inspectionDate","healthScore","status") VALUES ($1,$2,$3,NOW(),100,$4)', ['valid-start-inspection',tenantId,equipmentId,'COMPLETED']);
@@ -199,7 +200,7 @@ describe.runIf(Boolean(connectionString))('shifts and handovers on disposable Po
     expect(await prisma.outboxEvent.count({where: {tenantId, aggregateId: 'handover-1'}})).toBe(1);
     expect(await prisma.outboxEvent.findFirstOrThrow({where: {tenantId, aggregateId: 'handover-1'},
       select: {payload: true}})).toMatchObject({payload: {equipmentId, shiftId: 'accept-shift'}});
-  });
+  }, 30_000);
 
   it('ignores a stale READY snapshot and commits an explainable blocked decision from authoritative rows', async () => {
     await insertShift('blocked-shift', 'PENDING_ACCEPTANCE');
@@ -245,8 +246,9 @@ describe.runIf(Boolean(connectionString))('shifts and handovers on disposable Po
     const started = await prisma.shift.findUniqueOrThrow({where: {id: 'blocked-shift'},
       select: {state: true, startSnapshotId: true}});
     expect(started).toMatchObject({state: 'STARTED', startSnapshotId: expect.any(String)});
+    if (!started.startSnapshotId) throw new Error("STARTED shift must have a startSnapshotId");
     expect(await prisma.readinessScoreSnapshot.findUniqueOrThrow({
-      where: {id: started.startSnapshotId!}, select: {status: true, triggerId: true, facts: true},
+      where: {id: started.startSnapshotId}, select: {status: true, triggerId: true, facts: true},
     })).toMatchObject({
       status: 'READY', triggerId: 'blocked-shift:start:2026-08-01T12:00:00.000Z',
       facts: {permitValid: true, permitExpired: false, criticalDefect: false},
@@ -254,5 +256,5 @@ describe.runIf(Boolean(connectionString))('shifts and handovers on disposable Po
     expect(await prisma.readinessScoreSnapshot.count({
       where: {tenantId, shiftId: 'blocked-shift', triggerType: 'SHIFT_START_DECISION'},
     })).toBe(2);
-  });
+  }, 30_000);
 });

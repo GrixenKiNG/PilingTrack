@@ -5,92 +5,68 @@ description: Generate a ready-to-paste deploy command block for orionpiling.ru, 
 
 # Deploy to orionpiling.ru
 
-**Default path since 2026-09-23: `bash scripts/deploy-prod.sh [services...]`** (default `app workers`; add `ws` when ws-server changed). It builds images on the developer machine and ships them via `docker save | ssh docker load`, so the 30 GB VPS never hosts a build (a server-side workers build filled the disk to 100% on 2026-09-23). The script does the pre-flight (main, clean tree, HEAD in origin), auto-adds `migrate` for new migrations, keeps ONE rollback tag set, verifies health and prints the rollback command. A transient `Segmentation fault` in `prisma generate` inside the local Docker build is flaky — just re-run.
+Выкладку выполняет оператор только по явной команде владельца, по одному шагу с чтением результата. Этот навык готовит команды, не разрешает автономную выкладку.
 
-The server-side block below is the fallback (e.g. no local Docker). Before using it, check `df -h /` — need ≥ 8 GB free.
+Основной путь с локальной сборкой, передачей готовых образов и барьером:
 
-Generate a copy-paste deploy block for the production VPS.
-
-## Steps
-
-1. Run this command to detect new migrations since the last deployed commit:
 ```bash
-git log --oneline -1 origin/main 2>/dev/null || git log --oneline -1
-git diff --name-only HEAD~1..HEAD -- "prisma/migrations/**" 2>/dev/null
+WORKER_GENERATION_EXTERNAL_STOPPED=1 bash scripts/deploy-prod.sh --replace-worker-generation app workers
 ```
 
-2. Check disk and recent changes:
+`--replace-worker-generation` обязателен и только первым аргументом. `ws` сервиса нет. Скрипт требует main=origin/main и чистое дерево; app-only/workers-only заменяет оба сервиса (app содержит embedded workers), новые миграции добавляют migrate автоматически. Smoke workers выполняется до первого SSH. VPS 30GB не используется для сборки по основному пути; подробности — ранбуки008/016.
+
+## Перед подготовкой команд
+
+1. Сравнить фактический OLD_SHA на сервере с RELEASE_SHA, не HEAD~1. Найти новые prisma/migrations/**. Если OLD_SHA неизвестен, не утверждать отсутствие миграций.
+2. Проверить отчёт, финальные checks и репетицию миграций на копии данных; каждый integrity precheck выполнять отдельно. Проверить диск и оба сохранённых rollback tags/imageIDs. Не удалять тома/откатные образы ради места.
+3. Оператор останавливает все внешние standalone/systemd/pm2/другие хосты и их автозапуск, проверяет завершение операций. Лишь после этого допустимо WORKER_GENERATION_EXTERNAL_STOPPED=1. Живые one-off и неоднородные/не RUNNING старые реплики helper отклоняет до STOP: разобраться вручную.
+4. Согласовать окно недоступности: STOP → VERIFY → START, без rolling-up.
+
+## Основной блок (на машине сборки)
+
+Отвечать по-русски. Если диапазон содержит миграции, отметить необходимость migrate; deploy-prod.sh добавляет его сам.
+
 ```bash
-git log --oneline -5
+git status --short
+git branch --show-current
+git fetch origin main
+git rev-parse HEAD
+git rev-parse origin/main
+# После ручного подтверждения внешней остановки и всех предпроверок:
+WORKER_GENERATION_EXTERNAL_STOPPED=1 bash scripts/deploy-prod.sh --replace-worker-generation app workers
 ```
 
-3. Based on whether there are new migration files, output ONE of the two blocks below. Be explicit about which case applies.
+После выкладки сверить SHA, app/workers healthy, deep-health и зависимости, один лидер каждого ресурса, outbox/Telegram. При миграциях проверить именно ожидаемую запись _prisma_migrations (finished_at, без rolled_back_at), не доверять одному exit0.
 
----
+## Ручной запасной путь (сервер, только по команде владельца)
 
-## Output format
+Сначала убедиться в достаточном свободном месте (≥8GB), сохранить прежние imageIDs/теги ДО build. Собирать последовательно; при новых миграциях сначала migrate. Пример ниже выполняется по одной команде, не unattended block.
 
-Always output in Russian. Start with a one-line status, then the copy-paste block.
-
-### Case A — нет новых миграций
-
-```
-Новых миграций нет — собираем app и workers.
-
+```bash
 cd /opt/pilingtrack
 df -h /
-# Пометить текущую версию перед пересборкой (мгновенный откат без пересборки):
-OLD_COMMIT=$(git rev-parse --short HEAD)
-DATE=$(date +%Y%m%d)
-for svc in app workers; do docker tag pilingtrack-$svc:latest pilingtrack-$svc:$OLD_COMMIT-$DATE 2>/dev/null || true; done
+# Сохранить оба app/workers rollback tags; при миграциях также migrate.
 git pull origin main
-docker compose build app workers
-docker compose up -d app workers
+# Только при новых миграциях:
+docker compose build migrate
+docker compose build app
+docker compose build workers
+bash scripts/smoke-workers-image.sh pilingtrack-workers:latest
+# После ручного подтверждения внешней остановки:
+WORKER_GENERATION_EXTERNAL_STOPPED=1 bash scripts/replace-worker-generation.sh app workers
 ```
 
-### Case B — есть новая миграция (новая папка в prisma/migrations/)
+## Откат
 
-```
-⚠️ Есть новая миграция — нужно пересобрать migrate тоже.
+После проверки наличия двух сохранённых тегов и совместимости схемы/compose, внешние новые исполнители остановлены:
 
+```bash
 cd /opt/pilingtrack
-df -h /
-# Пометить текущую версию перед пересборкой (мгновенный откат без пересборки):
-OLD_COMMIT=$(git rev-parse --short HEAD)
-DATE=$(date +%Y%m%d)
-for svc in app workers migrate; do docker tag pilingtrack-$svc:latest pilingtrack-$svc:$OLD_COMMIT-$DATE 2>/dev/null || true; done
-git pull origin main
-docker compose build migrate app workers
-docker compose up -d app workers
-# Проверь, что миграция применилась (не верь exit 0):
-docker compose exec postgres psql -U piling -d pilingtrack \
-  -c "SELECT migration_name, finished_at FROM _prisma_migrations ORDER BY finished_at DESC NULLS LAST LIMIT 3;"
+docker tag "pilingtrack-app:$ROLLBACK" pilingtrack-app:latest
+docker tag "pilingtrack-workers:$ROLLBACK" pilingtrack-workers:latest
+WORKER_GENERATION_EXTERNAL_STOPPED=1 bash scripts/replace-worker-generation.sh app workers
 ```
 
-### Откат на предыдущую версию (если что-то пошло не так)
+Барьер сохраняет imageIDs/restart policies/число реплик, принимает app0/143, workers только0, проверяет OOM/drain/RUNNING. При отказе после STOP автоматически возвращает старое поколение (при удалённых IDs — прежние образы с текущим compose); exit остаётся1 и печатается RECOVERED. При невозможности возврата — OUTAGE: не запускать параллельных лидеров. Только после ручной проверки безопасен аварийный `cd /opt/pilingtrack && docker compose up -d app workers`.
 
-```
-OLD_COMMIT=<commit, который был тегирован перед деплоем>
-DATE=<дата деплоя>
-for svc in app workers; do docker tag pilingtrack-$svc:$OLD_COMMIT-$DATE pilingtrack-$svc:latest; done
-docker compose up -d app workers
-```
-Это откатывает только **код** (контейнеры). Если деплой включал новую миграцию (Case B) — откат схемы БД отдельный и сложнее (`prisma migrate resolve`/восстановление из бэкапа), сначала смотри, действительно ли проблема в миграции.
-
-### Case C — disk > 85%
-
-Append this warning before the block:
-```
-⚠️ Диск заполнен >85% — сначала очисти builder cache:
-docker builder prune -af
-```
-
----
-
-## Notes
-
-- Never suggest `build app workers` in parallel if disk is near-full — sequential build required (see memory: prod deploy disk).
-- The `migrate` service bakes prisma/migrations into its image at build time — if omitted, it silently says "No pending migrations" and exits 0 without applying.
-- `ws` service changes are rare; only add it if websocket files were modified.
-- **Always tag the old `:latest` image before building** (see commands above). `docker compose build` overwrites `:latest` immediately — without a pre-deploy tag, the old image is unrecoverable once pruned (`docker builder prune`/`docker image prune`), and rollback means a full rebuild from the old commit instead of an instant retag. Tagging is free disk-wise (shares layers, no copy). Hit this gap for real on 2026-06-30 — see [[project_prod_deploy_2026_06_30]].
-- Before a deploy with new migrations, also run each pre-flight data-integrity check (duplicate rows, NULL columns the migration will reject, etc.) as a SEPARATE statement — a single combined query can silently no-op if one referenced column doesn't exist yet pre-migration, masking a real blocker (this is exactly how the 2026-06-30 deploy missed a duplicate-active-crew row until the migration failed live).
+Автовозврат образов не откатывает миграции или env/volumes/topology. Проблема схемы требует отдельного решения владельца. Полная процедура и evidence — ранбуки008/016 и CODEX-REPORT-T6.md.

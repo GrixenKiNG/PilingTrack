@@ -7,9 +7,11 @@
  * the caller; server also enforces ADMIN on save.
  */
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { ArrowUp, ArrowDown, RotateCcw, Save } from '@/components/piling/icons/unified-icons';
+import { ConfirmActionDialog } from '@/components/piling/confirm-action-dialog';
 import type { PageLayoutController } from './use-page-layout-template';
+import { LAYOUT_LOAD_FAILED_MESSAGE } from './use-layout-template';
 import { PageLayoutRenderer, type RenderablePageWidget } from './page-layout-renderer';
 import { WIDGET_SIZES, type WidgetSize } from './page-layout-template';
 
@@ -28,7 +30,21 @@ export function PageLayoutEditor({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Пока есть несохранённые правки, предупреждаем при закрытии/перезагрузке
+  // вкладки: смена дашборда/вкладки в Настройках иначе молча теряет черновик
+  // (F-R108-2).
+  useEffect(() => {
+    if (!controller.editing || !controller.dirty) return;
+    const warnBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', warnBeforeUnload);
+    return () => window.removeEventListener('beforeunload', warnBeforeUnload);
+  }, [controller.editing, controller.dirty]);
+
   const rows = [...controller.draft.widgets].sort((a, b) => a.order - b.order);
+  const [confirmReset, setConfirmReset] = useState(false);
 
   return (
     <section aria-label={`Редактор: ${title}`} className="space-y-4">
@@ -40,7 +56,7 @@ export function PageLayoutEditor({
         <div className="flex gap-2">
           <button
             type="button"
-            onClick={() => void controller.reset()}
+            onClick={() => setConfirmReset(true)}
             className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-border bg-card px-3 text-xs font-semibold text-foreground hover:bg-muted"
           >
             <RotateCcw className="h-3.5 w-3.5" /> Сбросить
@@ -48,13 +64,19 @@ export function PageLayoutEditor({
           <button
             type="button"
             onClick={() => void controller.saveDraft()}
-            disabled={!controller.dirty}
+            disabled={!controller.dirty || controller.loadFailed}
             className="inline-flex min-h-9 items-center gap-1.5 rounded-lg bg-info-strong px-3 text-xs font-semibold text-white hover:bg-info-strong disabled:opacity-40"
           >
             <Save className="h-3.5 w-3.5" /> Сохранить
           </button>
         </div>
       </div>
+
+      {controller.loadFailed && (
+        <p role="alert" className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs font-medium text-destructive-strong">
+          {LAYOUT_LOAD_FAILED_MESSAGE}
+        </p>
+      )}
 
       <ul className="divide-y divide-border rounded-xl border border-border">
         {rows.map((w, index) => {
@@ -89,6 +111,15 @@ export function PageLayoutEditor({
           <PageLayoutRenderer template={controller.draft} widgets={widgets} />
         </div>
       </div>
+
+      <ConfirmActionDialog
+        open={confirmReset}
+        onOpenChange={setConfirmReset}
+        title="Сбросить раскладку?"
+        description="Сохранённая раскладка будет удалена, вернуть её не получится. Показана будет стандартная раскладка."
+        confirmLabel="Сбросить раскладку"
+        onConfirm={() => { setConfirmReset(false); void controller.reset(); }}
+      />
     </section>
   );
 }

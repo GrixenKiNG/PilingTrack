@@ -43,7 +43,7 @@ function weatherAge(at: string): string {
   return `${Math.round(minutes / 60)} ч назад`;
 }
 
-export function WorkScreen({state, onLog, onFinish, onOpenSafety, busy, error, tabs, onCorrect}: {
+export function WorkScreen({state, onLog, onFinish, onOpenSafety, busy, error, errorDetails, tabs, onCorrect}: {
   state: OperatorMobileState;
   /** Возвращает признак удачи: по нему экран решает, чистить ли форму. */
   onLog: (entry: ProductionEntryInput) => Promise<boolean>;
@@ -51,6 +51,8 @@ export function WorkScreen({state, onLog, onFinish, onOpenSafety, busy, error, t
   onOpenSafety: (stage: 'TB_PILING' | 'TB_DRILLING') => void;
   busy: boolean;
   error: string | null;
+  /** Подробности отказа: какие поля не заполнены (аудит R76, находка 10). */
+  errorDetails?: string[];
   /** Нижние вкладки. Рисует оболочка — экран лишь отдаёт их в Screen. */
   tabs?: ReactNode;
   /** Поправка к ошибочной записи. Возвращает признак удачи. */
@@ -83,8 +85,25 @@ export function WorkScreen({state, onLog, onFinish, onOpenSafety, busy, error, t
   // Смена вкладки очищает форму: марка сваи не имеет смысла в простое, а «5»
   // из поля свай, оставшееся в поле часов, — это ошибочный отчёт. Сброс живёт
   // в обработчике, а не в эффекте: эффект дал бы лишний цикл отрисовки.
+  //
+  // НЕРАЗОБРАННЫЙ ОТКАЗ — ЧЕРНОВИК НЕ ТРОГАЕМ (аудит R82, находки 3 и 8).
+  // Повторный вход в ту же форму из обзора смены идёт через этот же
+  // обработчик, и безусловная чистка стирала введённое: машинисту, получившему
+  // отказ («Паспорт заполнен не полностью», «Смена уже закрыта»), приходилось
+  // набирать 5–10 минут заново по памяти, а копии на устройстве уже нет —
+  // запись снял тот же отказ. Отказ считается разобранным, когда родитель его
+  // снял, то есть `error` пуст; новый ключ команды родитель выдаёт только
+  // после успеха, и тогда поля чистит сам `submit`. Смена на ДРУГУЮ вкладку
+  // чистит по-прежнему: «5» из поля свай в поле часов — это ошибочный отчёт.
+  //
+  // ПОКА ЗАПРОС В ПОЛЁТЕ, ВКЛАДКУ НЕ МЕНЯЕМ (аудит R82, находка 13). Смена
+  // вкладки чистит поля, и нажатие «Записать» → «Бурение» стирало введённое
+  // число раньше, чем машинист увидел отказ. Кнопки при `busy` заблокированы,
+  // а этот ранний выход закрывает тот же путь для программного вызова.
   const switchTab = (next: Tab) => {
+    if (busy) return;
     setTab(next);
+    if (error && next === tab) return;
     setReference('');
     setCount('');
     setMetersPerUnit('');
@@ -162,16 +181,23 @@ export function WorkScreen({state, onLog, onFinish, onOpenSafety, busy, error, t
     setComment('');
   };
 
-  if (!formOpen) return <Screen title="Моя смена" tabs={tabs}>
-    <WarningsPanel warnings={state.warnings} />
-    <OperatorWorkOverview state={state} variant="base" busy={busy}
-      onAction={(kind)=>{switchTab(kind==='PASSPORT'?'PILES':kind);setPileMode(kind==='PASSPORT'?'PASSPORT':'BATCH');setFormOpen(true);}}
-      onFinish={()=>setFinishing(true)} />
-    {finishing&&<Panel tone="warning"><PanelTitle>Завершить работу?</PanelTitle><p className="my-3 text-sm">Дальше — ЕО после работы. Новую выработку записывать будет нельзя.</p><BigButton tone="danger" disabled={busy} onClick={onFinish}>Да, работа завершена</BigButton><BigButton tone="ghost" onClick={()=>setFinishing(false)}>Продолжить работу</BigButton></Panel>}
-    <ErrorNote message={error} />
-  </Screen>;
+  const overviewScreen = (
+    <Screen title="Моя смена" tabs={tabs}>
+      {/*
+        Строка отказа — вверху обзора и только у ВИДИМОЙ ветки. Обе ветки
+        смонтированы (см. комментарий над `return`), и без этого условия один
+        и тот же текст лежал бы в разметке дважды (аудит F-V1-ERROR-DETAILS-b).
+      */}
+      {formOpen ? null : <ErrorNote message={error} details={errorDetails} />}
+      <WarningsPanel warnings={state.warnings} />
+      <OperatorWorkOverview state={state} variant="base" busy={busy}
+        onAction={(kind)=>{switchTab(kind==='PASSPORT'?'PILES':kind);setPileMode(kind==='PASSPORT'?'PASSPORT':'BATCH');setFormOpen(true);}}
+        onFinish={()=>setFinishing(true)} />
+      {finishing&&<Panel tone="warning"><PanelTitle>Завершить работу?</PanelTitle><p className="my-3 text-sm">Дальше — ЕО после работы. Новую выработку записывать будет нельзя.</p><BigButton tone="danger" disabled={busy} onClick={onFinish}>Да, работа завершена</BigButton><BigButton tone="ghost" onClick={()=>setFinishing(false)}>Продолжить работу</BigButton></Panel>}
+    </Screen>
+  );
 
-  return (
+  const workScreen = (
     <Screen
       tabs={tabs}
       title="Работа"
@@ -189,12 +215,22 @@ export function WorkScreen({state, onLog, onFinish, onOpenSafety, busy, error, t
             обязательным действием, которое оператор выполняет прямо здесь.
           */}
           {!passportMode ? (
-            <BigButton
-              onClick={() => void submit()}
-              disabled={!ready || busy || needsSafety}
-            >
-              {busy ? 'Записываем…' : 'Записать'}
-            </BigButton>
+            <>
+              {/*
+                Отказ — в липком футере, вплотную над кнопкой: пока он стоял
+                последним в `main`, то есть ниже списка записей, чем длиннее
+                смена, тем дальше уезжала причина от кнопки (аудит R82,
+                находки 6 и 7). Строка показывается только у видимой ветки,
+                чтобы не дублировать обзор смены.
+              */}
+              {formOpen ? <ErrorNote message={error} details={errorDetails} /> : null}
+              <BigButton
+                onClick={() => void submit()}
+                disabled={!ready || busy || needsSafety}
+              >
+                {busy ? 'Записываем…' : 'Записать'}
+              </BigButton>
+            </>
           ) : null}
           {finishing ? (
             <div className="space-y-2 rounded-lg border border-warning bg-warning/10 p-3">
@@ -260,8 +296,10 @@ export function WorkScreen({state, onLog, onFinish, onOpenSafety, busy, error, t
             key={option.value}
             type="button"
             onClick={() => switchTab(option.value)}
+            disabled={busy}
             className={cn(
               'min-h-11 flex-1 rounded-md text-sm font-medium transition-colors',
+              'disabled:cursor-not-allowed disabled:opacity-50',
               tab === option.value ? 'border bg-card font-semibold shadow-xs' : 'text-muted-foreground',
             )}
           >
@@ -301,13 +339,16 @@ export function WorkScreen({state, onLog, onFinish, onOpenSafety, busy, error, t
           <PilePassportForm
             grades={state.dictionaries.pileGrades}
             busy={busy}
+            error={formOpen ? error : null}
+            errorDetails={formOpen ? errorDetails : undefined}
             onSubmit={(pileGradeId, passport) => onLog({kind: 'PILE_PASSPORT', pileGradeId, passport})}
           />
           {/*
-            Список записанного и строка ошибки стоят ОДИН раз — ниже, общими
-            для всех режимов. Здесь они дублировались: в режиме паспорта
-            машинист видел свои две сваи и поправку к ним дважды и не мог
-            понять, записалось ли вдвое больше.
+            Список записанного стоит ОДИН раз — ниже, общим для всех режимов.
+            Здесь он дублировался: в режиме паспорта машинист видел свои две
+            сваи и поправку к ним дважды и не мог понять, записалось ли вдвое
+            больше. Строку отказа форма паспорта теперь рисует сама — над своей
+            кнопкой (аудит R82, находки 6 и 7).
           */}
         </div>
       ) : (
@@ -403,9 +444,29 @@ export function WorkScreen({state, onLog, onFinish, onOpenSafety, busy, error, t
       )}
 
       <EntriesList entries={state.entries} busy={busy} onCorrect={onCorrect} />
-
-      <ErrorNote message={error} />
     </Screen>
+  );
+
+  /*
+    ОБЕ ВЕТКИ ОСТАЮТСЯ В ДЕРЕВЕ (аудит R82, находка 8).
+
+    Раньше обзор смены возвращался отдельно (`if (!formOpen) return …`), и по
+    «← К смене» дерево подменялось целиком: `PilePassportForm` размонтировался
+    вместе со всеми пятнадцатью полями черновика. Паспорт заполняют 5–10 минут
+    в перчатке, и одного нажатия (или промаха) хватало, чтобы потерять его —
+    при том что копии на устройстве нет: запись снял отказ.
+
+    Теперь смонтированы обе ветки, а лишняя выключена атрибутом `hidden`: она
+    не видна и не читается экранным диктором, но состояние формы под ней цело.
+    Обёртка — обычный `div` без классов: утилита Tailwind (`flex` у `Screen`)
+    перебила бы `[hidden]` из preflight своим `display`, поэтому гасим уровнем
+    выше самой `Screen`.
+  */
+  return (
+    <>
+      <div hidden={formOpen}>{overviewScreen}</div>
+      <div hidden={!formOpen}>{workScreen}</div>
+    </>
   );
 }
 

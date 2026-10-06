@@ -6,7 +6,7 @@
  * Выделено из admin-reports.tsx (аудит A-8).
  */
 
-import { type ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import {
   CheckCircle2,
   Clock,
@@ -22,6 +22,8 @@ import {
 } from '@/components/piling/icons/unified-icons';
 import { Button } from '@/components/ui/button';
 import { PhotoSection } from '@/components/piling/report-form/photo-section';
+import { authFetch } from '@/lib/api';
+import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { formatNumber, formatHours, formatRuDate } from '@/lib/format';
 import type { ReportDTO } from '@/lib/types';
@@ -38,7 +40,6 @@ import { formatDowntimeHours } from '@/lib/downtime-hours';
 export function ReportEvidencePreview({
   report,
   history,
-  formatDate,
   onClose,
   onEdit,
   onPreviewPdf,
@@ -46,12 +47,16 @@ export function ReportEvidencePreview({
 }: {
   report: ReportDTO | null;
   history: { data: ReportHistory | null; loading: boolean; error: boolean };
-  formatDate: (d: string) => string;
   onClose: () => void;
   onEdit?: (r: ReportDTO) => void;
   onPreviewPdf: (r: ReportDTO) => void;
   onPrint: () => void;
 }) {
+  // Идёт выгрузка одного PDF: маршрут single-pdf сам ограничивает частоту (429),
+  // поэтому до ответа кнопка «Скачать» заблокирована — повторный клик не должен
+  // запускать вторую пересборку PDF и получать «Слишком много выгрузок подряд».
+  const [downloading, setDownloading] = useState(false);
+
   if (!report) {
     return (
       <aside className="min-h-56 rounded-lg border border-border bg-card p-3 text-sm text-muted-foreground shadow-sm xl:sticky xl:top-4">
@@ -65,13 +70,45 @@ export function ReportEvidencePreview({
   const efficiency = duration ? ((duration - totals.downtimeHours) / duration) * 100 : null;
   const downtimeMax = Math.max(...report.downtimes.map((item) => item.duration), 1);
   const workTotal = Math.max(totals.pileMeters + totals.drillingMeters, 1);
+
+  // Скачивание PDF через authFetch, а не прямой ссылкой: при 403/404/429/500
+  // ссылка уводила браузер на JSON-тело ошибки, и человек не понимал, где файл.
+  const downloadPdf = async () => {
+    if (downloading) return;
+    setDownloading(true);
+    try {
+      const res = await authFetch(`/api/reports/single-pdf?reportId=${encodeURIComponent(report.reportId)}`);
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { error?: unknown };
+        throw new Error(
+          typeof body.error === 'string' && body.error
+            ? body.error
+            : `Не удалось скачать PDF (код ${res.status}).`,
+        );
+      }
+      const url = URL.createObjectURL(await res.blob());
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `отчёт-${report.date}.pdf`;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      toast.error(
+        err instanceof TypeError
+          ? 'Нет связи с сервером. PDF не скачан — повторите при появлении сети.'
+          : err instanceof Error ? err.message : 'Не удалось скачать PDF',
+      );
+    } finally {
+      setDownloading(false);
+    }
+  };
   return (
     <aside className="self-start rounded-lg border border-border bg-card shadow-sm xl:sticky xl:top-4">
       <div className="border-b border-border bg-card p-3">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <h2 className="truncate text-base font-semibold text-foreground">Отчёт #{report.reportId}</h2>
-            <p className="mt-0.5 text-2xs text-muted-foreground">Доказательства смены · {formatDate(report.date)}</p>
+            <p className="mt-0.5 text-2xs text-muted-foreground">Доказательства смены · {formatRuDate(report.date)}</p>
             <span className={cn(
               'mt-1 inline-block rounded px-2 py-0.5 text-3xs font-medium',
               report.status === 'submitted' ? 'bg-success/10 text-success-strong' : 'bg-muted text-muted-foreground',
@@ -153,7 +190,7 @@ export function ReportEvidencePreview({
         */}
         <div className="grid grid-cols-2 divide-x sm:grid-cols-4 rounded-md border border-border">
           <PreviewMetric icon={HardHat} label="Сваи" value={`${formatNumber(totals.piles)} шт.`} sub={`${formatNumber(totals.pileMeters)} м.п.`} />
-          <PreviewMetric icon={Drill} label="Бурение" value={`${formatNumber(totals.drillingCount)} шт.`} sub={`${formatNumber(totals.drillingMeters)} м`} />
+          <PreviewMetric icon={Drill} label="Бурение" value={`${formatNumber(totals.drillingCount)} шт.`} sub={`${formatNumber(totals.drillingMeters)} м.п.`} />
           <PreviewMetric icon={Clock} label="Простой" value={formatDowntimeHours(totals.downtimeHours)} sub={totals.downtimeHours > 0 ? 'есть' : 'нет'} />
           <PreviewMetric icon={CheckCircle2} label="Эффективность" value={efficiency == null ? '-' : formatPercentValue(efficiency)} sub="без простоев" />
         </div>
@@ -187,7 +224,7 @@ export function ReportEvidencePreview({
             <h3 className="mb-1.5 flex items-center gap-2 text-xs font-semibold text-foreground"><Drill className="h-4 w-4 text-muted-foreground" />Типы работ</h3>
             <div className="space-y-1">
               <ProgressLine label="Сваи" value={`${formatNumber(totals.pileMeters)} м.п.`} pct={(totals.pileMeters / workTotal) * 100} tone="orange" />
-              <ProgressLine label="Бурение" value={`${formatNumber(totals.drillingMeters)} м`} pct={(totals.drillingMeters / workTotal) * 100} tone="blue" />
+              <ProgressLine label="Бурение" value={`${formatNumber(totals.drillingMeters)} м.п.`} pct={(totals.drillingMeters / workTotal) * 100} tone="blue" />
             </div>
           </div>
         </div>
@@ -197,11 +234,9 @@ export function ReportEvidencePreview({
             <FileDown className="mr-1 h-3.5 w-3.5 shrink-0" />
             <span className="min-w-0 truncate">Открыть PDF</span>
           </Button>
-          <Button asChild variant="outline" className="h-9 min-w-0 px-2 text-xs">
-            <a href={`/api/reports/single-pdf?reportId=${encodeURIComponent(report.reportId)}`} download>
+          <Button onClick={downloadPdf} disabled={downloading} variant="outline" className="h-9 min-w-0 px-2 text-xs">
             <Download className="mr-1 h-3.5 w-3.5 shrink-0" />
-            <span className="min-w-0 truncate">Скачать</span>
-            </a>
+            <span className="min-w-0 truncate">{downloading ? 'Скачивание…' : 'Скачать'}</span>
           </Button>
           <Button onClick={onPrint} variant="outline" className="h-9 min-w-0 px-2 text-xs">
             <Printer className="mr-1 h-3.5 w-3.5 shrink-0" />

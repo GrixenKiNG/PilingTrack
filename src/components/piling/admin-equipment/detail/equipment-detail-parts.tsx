@@ -7,8 +7,8 @@
  */
 
 import { useState } from 'react';
-import Link from 'next/link';
-import { ArrowLeft, ChevronRight, ChevronDown, type LucideIcon } from '@/components/piling/icons/unified-icons';
+import { ChevronRight, ChevronDown, type LucideIcon } from '@/components/piling/icons/unified-icons';
+import { OpsBreadcrumb } from '@/components/piling/ops-shell';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { formatFixed, formatHours, formatRelative, formatRuDate } from '@/lib/format';
@@ -42,7 +42,7 @@ export function Section({
             type="button"
             onClick={() => setOpen((o) => !o)}
             aria-expanded={open}
-            className="mb-3 flex w-full items-center gap-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground hover:text-foreground"
+            className="mb-3 flex min-h-11 w-full items-center gap-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground hover:text-foreground sm:min-h-0"
           >
             {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
             <Icon className="w-4 h-4" /> {title}
@@ -80,14 +80,14 @@ export function EmptyState({ message }: { message: string }) {
   return <p className="rounded-lg bg-muted px-3 py-2 text-sm text-muted-foreground">{message}</p>;
 }
 
-export function BackLink() {
+export function BackLink({ current }: { current?: string } = {}) {
   return (
-    <Link
-      href="/admin/equipment"
-      className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
-    >
-      <ArrowLeft className="w-3 h-3" /> К списку установок
-    </Link>
+    <OpsBreadcrumb
+      items={[
+        { label: 'Установки', href: '/admin/equipment' },
+        ...(current ? [{ label: current }] : []),
+      ]}
+    />
   );
 }
 
@@ -161,7 +161,7 @@ export function HistoryTable({ rows }: { rows: TimelineRow[] }) {
                       onClick={() => setOpen((o) => !o)}
                       aria-expanded={open}
                       aria-label={open ? 'Свернуть историю' : 'Развернуть историю'}
-                      className="flex items-center justify-center rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+                      className="flex min-h-11 min-w-11 items-center justify-center rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground sm:min-h-0 sm:min-w-0"
                     >
                       {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                     </button>
@@ -189,7 +189,7 @@ export function HistoryTable({ rows }: { rows: TimelineRow[] }) {
         <button
           type="button"
           onClick={() => setOpen((o) => !o)}
-          className="flex w-full items-center justify-center gap-1 border-t bg-muted/50 py-1.5 text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
+          className="flex min-h-11 w-full items-center justify-center gap-1 border-t bg-muted/50 py-1.5 text-xs text-muted-foreground hover:bg-muted hover:text-foreground sm:min-h-0"
         >
           {open ? 'Свернуть' : `Показать всю историю (${rows.length})`}
         </button>
@@ -270,8 +270,12 @@ export function MaintenanceBlock({ eq }: { eq: EquipmentDTO & Record<string, unk
   // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null invariant established earlier in this function
   const daysLeft = hasDate ? Math.round((new Date(nextDateStr!).getTime() - Date.now()) / 86_400_000) : null;
 
+  // Пороги «скоро ТО» — те же, что в общем правиле @/lib/maintenance-due
+  // (SOON_HOURS = 50, SOON_DAYS = 7): карточка и бейдж «Скоро ТО» в списке
+  // должны предупреждать одновременно. Раньше здесь стояло 14 дней, и за
+  // 10 дней карточка желтела, а бейджа в списке не было (F-R138 №4).
   const hoursStatus = remainingHours == null ? 'ok' : remainingHours <= 0 ? 'alarm' : remainingHours <= 50 ? 'warn' : 'ok';
-  const dateStatus = daysLeft == null ? 'ok' : daysLeft < 0 ? 'alarm' : daysLeft <= 14 ? 'warn' : 'ok';
+  const dateStatus = daysLeft == null ? 'ok' : daysLeft < 0 ? 'alarm' : daysLeft <= 7 ? 'warn' : 'ok';
 
   const barColor = (st: string) => (st === 'alarm' ? 'bg-destructive-strong' : st === 'warn' ? 'bg-warning-strong' : 'bg-success-strong');
   const txtColor = (st: string) => (st === 'alarm' ? 'text-destructive-strong' : st === 'warn' ? 'text-warning-strong' : 'text-foreground');

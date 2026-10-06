@@ -1,4 +1,5 @@
-import { test, expect } from '@playwright/test';
+import { TEST_USERS } from './fixtures/auth.fixture';
+import { test, expect } from './fixtures/disposable.fixture';
 import { login } from './page-objects/login.page';
 import { getTodayInTimezone } from '@/lib/timezone';
 
@@ -17,7 +18,7 @@ import { getTodayInTimezone } from '@/lib/timezone';
 test.describe('Real Report Creation Flow', () => {
   test('operator creates a report end-to-end', async ({ page }) => {
     // 1. Login (hydration-safe; helper waits for /api/auth/login + redirect)
-    await login(page, 'operator@piling.ru', 'operator123');
+    await login(page, TEST_USERS.operator.email, TEST_USERS.operator.password);
 
     // 3. Navigate to report creation (if there's a button/link)
     // Look for "New Report" or similar
@@ -91,7 +92,7 @@ test.describe('Real Report Creation Flow', () => {
 
   test('operator submits report via UI form', async ({ page }) => {
     // Login (hydration-safe; helper waits for /api/auth/login + redirect)
-    await login(page, 'operator@piling.ru', 'operator123');
+    await login(page, TEST_USERS.operator.email, TEST_USERS.operator.password);
 
     // Verify dictionaries load
     await page.route('/api/dictionary/all', async (route) => {
@@ -118,7 +119,7 @@ test.describe('Real Report Creation Flow', () => {
 
   test('dispatcher views all reports', async ({ page }) => {
     // Login as dispatcher (hydration-safe helper)
-    await login(page, 'dispatch@piling.ru', 'dispatch123');
+    await login(page, TEST_USERS.dispatcher.email, TEST_USERS.dispatcher.password);
 
     // Dispatcher should have access to all reports
     const allReportsRes = await page.request.get('/api/reports/all');

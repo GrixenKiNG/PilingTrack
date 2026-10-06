@@ -3,6 +3,7 @@
 import { ErrorBoundary } from 'react-error-boundary';
 import type { FallbackProps } from 'react-error-boundary';
 import { useCallback } from 'react';
+import * as Sentry from '@sentry/nextjs';
 import { HardHat, RefreshCw } from '@/components/piling/icons/unified-icons';
 
 function Fallback({ error, resetErrorBoundary }: FallbackProps) {
@@ -12,7 +13,7 @@ function Fallback({ error, resetErrorBoundary }: FallbackProps) {
 
   // Наружу отдаём только идентификатор (digest): сам текст исключения может
   // содержать пути файлов, английские строки библиотек и данные пользователя.
-  // Полный текст остаётся в консоли/Sentry.
+  // Полный текст уходит в Sentry (onError ниже) и в консоль.
   const digest = (error as Error & { digest?: string }).digest;
 
   return (
@@ -55,6 +56,9 @@ export function AppErrorBoundary({ children }: { children: React.ReactNode }) {
     <ErrorBoundary
       FallbackComponent={Fallback}
       onReset={() => window.location.reload()}
+      onError={(error, info) => {
+        Sentry.captureException(error, { extra: { componentStack: info.componentStack } });
+      }}
     >
       {children}
     </ErrorBoundary>

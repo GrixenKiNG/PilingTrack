@@ -119,6 +119,137 @@ describe('ReportFormDialog — дата по умолчанию', () => {
   });
 });
 
+describe('ReportFormDialog — сетевой обрыв (F-R93-3)', () => {
+  beforeEach(() => {
+    authFetchMock.mockReset();
+    vi.mocked(toast.error).mockClear();
+  });
+
+  it('показывает русский текст вместо браузерного «Failed to fetch»', async () => {
+    authFetchMock.mockRejectedValue(new TypeError('Failed to fetch'));
+
+    render(
+      <ReportFormDialog
+        open
+        onClose={vi.fn()}
+        editReport={editReport}
+        loadingReferenceData={false}
+        dictionaryError={null}
+        operators={[]}
+        sites={[]}
+        pileGrades={[{ id: 'g1', name: 'С90.30', isActive: true, lengthMm: 9000 }]}
+        drillingTypes={[]}
+        downtimeReasons={[]}
+        equipment={[]}
+        onSuccess={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /Сохранить/ }));
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith(
+      'Нет связи с сервером. Проверьте интернет и нажмите «Сохранить» ещё раз.',
+    ));
+  });
+});
+
+describe('ReportFormDialog — CSRF-403 (F-R93-4)', () => {
+  beforeEach(() => {
+    authFetchMock.mockReset();
+    vi.mocked(toast.error).mockClear();
+  });
+
+  it('английский текст CSRF заменяется русским про проверку безопасности', async () => {
+    authFetchMock.mockResolvedValue({
+      ok: false,
+      status: 403,
+      json: async () => ({ error: 'CSRF validation failed: origin mismatch' }),
+    });
+
+    render(
+      <ReportFormDialog
+        open
+        onClose={vi.fn()}
+        editReport={editReport}
+        loadingReferenceData={false}
+        dictionaryError={null}
+        operators={[]}
+        sites={[]}
+        pileGrades={[{ id: 'g1', name: 'С90.30', isActive: true, lengthMm: 9000 }]}
+        drillingTypes={[]}
+        downtimeReasons={[]}
+        equipment={[]}
+        onSuccess={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /Сохранить/ }));
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith(
+      'Запрос отклонён проверкой безопасности. Обновите страницу и повторите сохранение.',
+    ));
+  });
+});
+
+describe('ReportFormDialog — конфликт 409 (F-R93-2)', () => {
+  beforeEach(() => {
+    authFetchMock.mockReset();
+    vi.mocked(toast.error).mockClear();
+    vi.mocked(toast.success).mockClear();
+  });
+
+  it('не подменяет версию старых данных после 409 и не закрывает форму', async () => {
+    authFetchMock.mockImplementation((url: string, init?: RequestInit) => {
+      void init;
+      if (url.startsWith('/api/reports/admin-upsert')) {
+        return Promise.resolve({
+          ok: false,
+          status: 409,
+          json: async () => ({ error: 'Отчёт был изменён другим пользователем. Обновите страницу и сохраните заново.' }),
+        });
+      }
+      if (url.startsWith('/api/reports/all')) {
+        // Свежая версия того же отчёта: id из editReport = 'r1'.
+        return Promise.resolve({ ok: true, status: 200, json: async () => ({ reports: [{ reportId: 'r1', version: 7 }] }) });
+      }
+      return Promise.resolve({ ok: true, status: 200, json: async () => ({}) });
+    });
+    const onClose = vi.fn();
+
+    render(
+      <ReportFormDialog
+        open
+        onClose={onClose}
+        editReport={{ ...editReport, version: 3 }}
+        loadingReferenceData={false}
+        dictionaryError={null}
+        operators={[]}
+        sites={[]}
+        pileGrades={[{ id: 'g1', name: 'С90.30', isActive: true, lengthMm: 9000 }]}
+        drillingTypes={[]}
+        downtimeReasons={[]}
+        equipment={[]}
+        onSuccess={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /Сохранить/ }));
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith(
+      expect.stringContaining('Отчёт изменён другим пользователем.'),
+    ));
+    // Форма не закрыта — введённые сваи не потеряны.
+    expect(onClose).not.toHaveBeenCalled();
+
+    // Чужая версия 7 не даёт разрешения перезаписать её данными версии 3.
+    fireEvent.click(screen.getByRole('button', { name: /Сохранить/ }));
+    await waitFor(() => expect(authFetchMock.mock.calls.filter(([u]) => String(u).startsWith('/api/reports/admin-upsert'))).toHaveLength(2));
+    const posts = authFetchMock.mock.calls.filter(([u]) => String(u).startsWith('/api/reports/admin-upsert'));
+    const body = JSON.parse(String((posts[1][1] as RequestInit).body));
+    expect(body.version).toBe(3);
+  });
+});
+
 describe('ReportFormDialog — построчные ошибки сервера', () => {
   beforeEach(() => {
     vi.mocked(toast.error).mockClear();
@@ -207,5 +338,94 @@ describe('ReportFormDialog — архивная марка (F-R29-2)', () => {
     // Название встречается ровно один раз — в строке отчёта. Второе вхождение
     // означало бы, что архивная марка попала в список выбора новой строки.
     expect(screen.queryAllByText('СВ 300-80')).toHaveLength(1);
+  });
+});
+
+describe('ReportFormDialog — доступные имена кнопок «+» (F-R116-1)', () => {
+  it('у каждой кнопки добавления своё имя, а не три одинаковых «кнопка»', () => {
+    render(
+      <ReportFormDialog
+        open
+        onClose={vi.fn()}
+        editReport={editReport}
+        loadingReferenceData={false}
+        dictionaryError={null}
+        operators={[]}
+        sites={[]}
+        pileGrades={[{ id: 'g1', name: 'С90.30', isActive: true, lengthMm: 9000 }]}
+        drillingTypes={[]}
+        downtimeReasons={[]}
+        equipment={[]}
+        onSuccess={vi.fn()}
+      />,
+    );
+
+    // Секция простоя скрыта, пока её не раскрыли ссылкой «+ Добавить».
+    expect(screen.queryByRole('button', { name: 'Добавить простой' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: '+ Добавить' }));
+
+    expect(screen.getByRole('button', { name: 'Добавить сваю' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Добавить бурение' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Добавить простой' })).toBeTruthy();
+  });
+});
+
+describe('ReportFormDialog — доступные имена полей смены (F-R116-3)', () => {
+  it('подписи «Дата», «Начало», «Конец» связаны с полями, а не висят рядом', () => {
+    render(
+      <ReportFormDialog
+        open
+        onClose={vi.fn()}
+        editReport={editReport}
+        loadingReferenceData={false}
+        dictionaryError={null}
+        operators={[]}
+        sites={[]}
+        pileGrades={[{ id: 'g1', name: 'С90.30', isActive: true, lengthMm: 9000 }]}
+        drillingTypes={[]}
+        downtimeReasons={[]}
+        equipment={[]}
+        onSuccess={vi.fn()}
+      />,
+    );
+
+    // Прежде подписи рисовались без htmlFor/id — скринридер читал поля «без имени».
+    expect(screen.getByLabelText('Дата')).toBeInstanceOf(HTMLInputElement);
+    expect(screen.getByLabelText('Начало')).toBeInstanceOf(HTMLInputElement);
+    expect(screen.getByLabelText('Конец')).toBeInstanceOf(HTMLInputElement);
+  });
+});
+
+/**
+ * R121 №4: «Часы» простоя принимали больше суток, а комментарий — длиннее 1000
+ * знаков, хотя zod-схема admin-upsert ограничивает простой `DOWNTIME_MAX_HOURS`
+ * (= 24, lib/downtime-hours.ts), комментарий — 1000. Форма отправляла заведомо
+ * отклоняемый запрос, и в ответ приходило общее «Некорректные данные».
+ * Полям проставлены пределы, а простой длиннее суток отклоняется до отправки.
+ */
+describe('ReportFormDialog — пределы формы простоя (R121 №4)', () => {
+  it('часы ограничены сверху 24, комментарий — 1000 знаками', () => {
+    render(
+      <ReportFormDialog
+        open
+        onClose={vi.fn()}
+        editReport={editReport}
+        loadingReferenceData={false}
+        dictionaryError={null}
+        operators={[]}
+        sites={[]}
+        pileGrades={[{ id: 'g1', name: 'С90.30', isActive: true, lengthMm: 9000 }]}
+        drillingTypes={[]}
+        downtimeReasons={[]}
+        equipment={[]}
+        onSuccess={vi.fn()}
+      />,
+    );
+
+    // Секция простоя скрыта, пока её не раскрыли ссылкой «+ Добавить».
+    fireEvent.click(screen.getByRole('button', { name: '+ Добавить' }));
+
+    expect(screen.getByPlaceholderText('Часы')).toHaveAttribute('max', '24');
+    expect(screen.getByPlaceholderText('Комментарий (необязательно)')).toHaveAttribute('maxLength', '1000');
   });
 });

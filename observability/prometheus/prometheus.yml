@@ -61,7 +61,7 @@ scrape_configs:
   - job_name: 'nodejs-processes'
     scrape_interval: 15s
     static_configs:
-      - targets: ['app:3000', 'ws:3001']
+      - targets: ['app:3000']
         labels:
           service: 'nodejs'
 

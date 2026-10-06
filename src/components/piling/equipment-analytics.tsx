@@ -25,6 +25,7 @@ import { KIND_LABELS } from '@/components/piling/admin-equipment/equipment-form'
 import type { EquipmentKindDTO } from '@/lib/types';
 import { appPageRoute } from '@/lib/routes';
 import { cn } from '@/lib/utils';
+import { formatCountMeters } from '@/lib/format';
 
 interface EquipmentRow {
   equipmentId: string;
@@ -42,6 +43,8 @@ interface EquipmentRow {
   engineHoursTotal: number | null;
   nextMaintenanceAtHours: number | null;
   nextMaintenanceDate: string | null;
+  maintenanceOverdue: boolean;
+  maintenanceSoon: boolean;
   maintenanceDue: boolean;
 }
 
@@ -131,8 +134,8 @@ export function EquipmentAnalytics() {
     else { setSortKey(key); setSortDir(key === 'name' ? 'asc' : 'desc'); }
   };
 
-  // Тач-таргеты ≥40px на мобильном, компактно на десктопе.
-  const chip = 'min-h-10 rounded-md border border-border px-3 py-2 text-sm text-muted-foreground hover:bg-muted sm:min-h-0 sm:py-1 sm:text-xs';
+  // Тач-таргеты ≥44px у кнопок периода на мобильном, компактно на десктопе.
+  const chip = 'min-h-11 rounded-md border border-border px-3 py-2 text-sm text-muted-foreground hover:bg-muted sm:min-h-0 sm:py-1 sm:text-xs';
   const dateInput = 'min-h-10 rounded-md border border-border bg-card px-2 py-2 text-sm sm:min-h-0 sm:py-1';
 
   return (
@@ -144,7 +147,7 @@ export function EquipmentAnalytics() {
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">Выработка, утилизация, простои и обслуживание парка за период</p>
         </div>
-        <Button variant="outline" onClick={() => window.print()}>
+        <Button variant="outline" className="h-11 sm:h-9" onClick={() => window.print()}>
           <Printer className="mr-1.5 h-4 w-4" /> Печать
         </Button>
       </div>
@@ -186,8 +189,8 @@ export function EquipmentAnalytics() {
 function KpiTiles({ fleet }: { fleet: AnalyticsResult['fleet'] }) {
   const tiles = [
     { label: 'Установки', icon: Gauge, value: `${fleet.activeCount} / ${fleet.totalEquipment}`, detail: 'с отчётами за период / всего' },
-    { label: 'Сваи', icon: HardHat, value: `${fmt(fleet.piles)} шт`, detail: `${fmt(fleet.pileMeters)} м.п.` },
-    { label: 'Бурение', icon: Drill, value: `${fmt(fleet.drillingCount)} шт`, detail: `${fmt(fleet.drillingMeters)} м.п.` },
+    { label: 'Сваи', icon: HardHat, value: formatCountMeters(fleet.piles, fleet.pileMeters), detail: 'за период' },
+    { label: 'Бурение', icon: Drill, value: formatCountMeters(fleet.drillingCount, fleet.drillingMeters), detail: 'за период' },
     { label: 'Простой', icon: Clock, value: fmtHours(fleet.downtimeHours), detail: 'суммарно' },
     { label: 'Топливо', icon: Fuel, value: fleet.fuelLiters > 0 ? `${fmt(fleet.fuelLiters)} л` : '—', detail: fleet.fuelLiters > 0 ? 'расход за период' : 'нужна телеметрия' },
     { label: 'ТО', icon: Wrench, value: String(fleet.maintenanceDueCount), detail: 'скоро / просрочено', alert: fleet.maintenanceDueCount > 0 },
@@ -205,8 +208,8 @@ type FleetColumn = { k: SortKey; label: string; right?: boolean };
 
 const FLEET_COLUMNS: FleetColumn[] = [
   { k: 'name', label: 'Установка' },
-  { k: 'piles', label: 'Сваи', right: true },
-  { k: 'drillingMeters', label: 'Бурение', right: true },
+  { k: 'piles', label: 'Сваи, шт. / м.п.', right: true },
+  { k: 'drillingMeters', label: 'Бурение, шт. / м.п.', right: true },
   { k: 'reportCount', label: 'Отчётов', right: true },
   { k: 'activeDays', label: 'Утилизация', right: true },
   { k: 'downtimeHours', label: 'Простой', right: true },
@@ -277,13 +280,15 @@ function FleetTable({
                   <div className="font-medium text-foreground">{r.name}</div>
                   <div className="text-2xs text-muted-foreground">{KIND_LABELS[r.kind as EquipmentKindDTO] ?? r.kind}</div>
                 </div>
-                {r.maintenanceDue && (
+                {r.maintenanceOverdue ? (
+                  <span className="shrink-0 rounded bg-destructive/10 px-1.5 py-0.5 text-2xs font-medium text-destructive-strong">ТО просрочено</span>
+                ) : r.maintenanceSoon ? (
                   <span className="shrink-0 rounded bg-warning/10 px-1.5 py-0.5 text-2xs font-medium text-warning-strong">ТО скоро</span>
-                )}
+                ) : null}
               </div>
               <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1.5 text-sm">
-                <Stat label="Сваи" value={`${fmt(r.piles)} шт`} sub={`${fmt(r.pileMeters)} м`} />
-                <Stat label="Бурение" value={`${fmt(r.drillingCount)} шт`} sub={`${fmt(r.drillingMeters)} м`} />
+                <Stat label="Сваи" value={formatCountMeters(r.piles, r.pileMeters)} />
+                <Stat label="Бурение" value={formatCountMeters(r.drillingCount, r.drillingMeters)} />
                 <Stat label="Отчётов" value={String(r.reportCount)} />
                 <Stat label="Утилизация" value={`${Math.round((r.activeDays / Math.max(periodDays, 1)) * 100)}%`} sub={`${r.activeDays}/${periodDays} дн`} />
                 <Stat label="Простой" value={fmtHours(r.downtimeHours)} />
@@ -324,8 +329,8 @@ function FleetTable({
                 <div className="font-medium text-foreground">{r.name}</div>
                 <div className="text-2xs text-muted-foreground">{KIND_LABELS[r.kind as EquipmentKindDTO] ?? r.kind}</div>
               </td>
-              <td className="px-3 py-2 text-right font-mono">{fmt(r.piles)}<span className="text-2xs text-muted-foreground"> / {fmt(r.pileMeters)} м</span></td>
-              <td className="px-3 py-2 text-right font-mono">{fmt(r.drillingCount)}<span className="text-2xs text-muted-foreground"> / {fmt(r.drillingMeters)} м</span></td>
+              <td className="px-3 py-2 text-right font-mono whitespace-nowrap">{formatCountMeters(r.piles, r.pileMeters)}</td>
+              <td className="px-3 py-2 text-right font-mono whitespace-nowrap">{formatCountMeters(r.drillingCount, r.drillingMeters)}</td>
               <td className="px-3 py-2 text-right font-mono">{r.reportCount}</td>
               <td className="px-3 py-2 text-right font-mono">
                 {Math.round((r.activeDays / Math.max(periodDays, 1)) * 100)}%
@@ -334,9 +339,11 @@ function FleetTable({
               <td className="px-3 py-2 text-right font-mono">{fmtHours(r.downtimeHours)}</td>
               <td className="px-3 py-2 text-right font-mono">{r.fuelLiters > 0 ? `${fmt(r.fuelLiters)} л` : '—'}</td>
               <td className="px-3 py-2 text-right">
-                {r.maintenanceDue
-                  ? <span className="rounded bg-warning/10 px-1.5 py-0.5 text-2xs font-medium text-warning-strong">скоро</span>
-                  : <span className="text-2xs text-muted-foreground">—</span>}
+                {r.maintenanceOverdue
+                  ? <span className="rounded bg-destructive/10 px-1.5 py-0.5 text-2xs font-medium text-destructive-strong">просрочено</span>
+                  : r.maintenanceSoon
+                    ? <span className="rounded bg-warning/10 px-1.5 py-0.5 text-2xs font-medium text-warning-strong">скоро</span>
+                    : <span className="text-2xs text-muted-foreground">—</span>}
               </td>
             </tr>
           ))}

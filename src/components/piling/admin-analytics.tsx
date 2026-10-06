@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import Link from 'next/link';
+import { useDocumentTitle } from '@/components/piling/ops-shell';
 import { motion } from 'framer-motion';
 import {
   BarChart3,
@@ -19,6 +20,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { QueryErrorBanner } from '@/components/piling/async-ui';
 import { cn } from '@/lib/utils';
+import { formatCountMeters } from '@/lib/format';
 import { useAnalyticsDashboardLayout, buildAnalyticsKpiWidgets } from '@/components/piling/analytics-dashboard/kpi-widgets';
 import { PageLayoutRenderer } from '@/components/piling/layout-editor/page-layout-renderer';
 import { getTodayInTimezone } from '@/lib/timezone';
@@ -38,6 +40,7 @@ const shiftDay = (day: string, delta: number): string =>
   new Date(new Date(`${day}T12:00:00.000Z`).getTime() + delta * 86_400_000).toISOString().slice(0, 10);
 
 export function AdminAnalytics() {
+  useDocumentTitle('Аналитика');
   const layout = useAnalyticsDashboardLayout();
   const [tab, setTab] = useState<'operators' | 'trends' | 'kpi'>('operators');
   // Выбор объекта живёт во вкладке «Тренды» — глобального фильтра больше нет.
@@ -239,6 +242,7 @@ export function AdminAnalytics() {
         pilesToday: fleet.totals.pilesToday,
         pileMetersToday: fleet.totals.pileMetersToday,
         drillingToday: fleet.totals.drillingToday,
+        drillingCountToday: fleet.totals.drillingCountToday,
         downtimeHoursToday: fleet.totals.downtimeHoursToday,
         crewsOnShiftToday: fleet.totals.crewsOnShiftToday,
         operatorsOnShiftToday: fleet.totals.operatorsOnShiftToday,
@@ -247,6 +251,7 @@ export function AdminAnalytics() {
           meters: overview.kpi.meters,
           piles: overview.kpi.piles,
           drilling: overview.kpi.drilling,
+          drillingCount: overview.kpi.drillingCount,
           downtime: { value: overview.kpi.downtimePct.value, deltaPp: overview.kpi.downtimePct.deltaPp },
         } : undefined,
       })} />}
@@ -317,7 +322,7 @@ export function AdminAnalytics() {
             key={t.key}
             onClick={() => setTab(t.key)}
             className={cn(
-              'px-3 py-1.5 text-xs font-medium rounded-full border transition-colors flex items-center gap-1.5',
+              'px-3 py-1.5 text-xs font-medium rounded-full border transition-colors flex items-center gap-1.5 min-h-11 sm:min-h-0',
               tab === t.key
                 ? 'bg-info/10 text-info-strong border-info/30'
                 : 'bg-card text-muted-foreground border-border hover:bg-muted'
@@ -349,8 +354,8 @@ export function AdminAnalytics() {
                       <tr className="border-b text-left text-xs text-muted-foreground">
                         <th className="py-2 pr-3">Оператор</th>
                         <th className="py-2 px-3 text-right">Отработано, ч</th>
-                        <th className="py-2 px-3 text-right">Погонные метры, м</th>
-                        <th className="py-2 px-3 text-right">Сваи, шт</th>
+                        <th className="py-2 px-3 text-right">Сваи, шт. / м.п.</th>
+                        <th className="py-2 px-3 text-right">Бурение, шт. / м.п.</th>
                         <th className="py-2 px-3 text-right" title="по отчётам с указанным временем смены">Доля простоя в смене, %</th>
                         <th className="py-2 pl-3 text-right">Отчётов</th>
                       </tr>
@@ -366,8 +371,8 @@ export function AdminAnalytics() {
                         >
                           <td className="py-2 pr-3 font-medium">{o.userName}</td>
                           <td className="py-2 px-3 text-right font-mono">{o.workedHours != null ? o.workedHours.toLocaleString('ru-RU', { maximumFractionDigits: 1 }) : '—'}</td>
-                          <td className="py-2 px-3 text-right font-mono">{Math.round(o.meters).toLocaleString('ru-RU')}</td>
-                          <td className="py-2 px-3 text-right font-mono">{o.piles}</td>
+                          <td className="py-2 px-3 text-right font-mono whitespace-nowrap">{formatCountMeters(o.piles, o.meters)}</td>
+                          <td className="py-2 px-3 text-right font-mono whitespace-nowrap">{formatCountMeters(o.drillingCount, o.drilling)}</td>
                           <td className="py-2 px-3 text-right font-mono">{o.downtimePct != null ? `${o.downtimePct.toLocaleString('ru-RU', { maximumFractionDigits: 1 })}` : '—'}</td>
                           <td className="py-2 pl-3 text-right font-mono text-muted-foreground">{o.reports}</td>
                         </motion.tr>
@@ -377,7 +382,7 @@ export function AdminAnalytics() {
                   {operators.length > 5 && (
                     <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground">
                       <span>Показано {showAllOperators ? operators.length : 5} из {operators.length} операторов</span>
-                      <button type="button" onClick={() => setShowAllOperators((v) => !v)} className="font-medium text-info-strong hover:underline">
+                      <button type="button" onClick={() => setShowAllOperators((v) => !v)} className="min-h-11 font-medium text-info-strong hover:underline sm:min-h-0">
                         {showAllOperators ? 'Свернуть' : 'Смотреть всех'}
                       </button>
                     </div>
@@ -413,7 +418,7 @@ export function AdminAnalytics() {
                       type="button"
                       onClick={() => setTrendSiteId(site.id)}
                       className={cn(
-                        'rounded-md border px-2 py-0.5 text-2xs transition-colors',
+                        'min-h-11 rounded-md border px-2 py-0.5 text-2xs transition-colors sm:min-h-0',
                         trendSiteId === site.id
                           ? 'border-info/30 bg-info/10 font-semibold text-info-strong'
                           : 'border-border bg-card text-muted-foreground hover:bg-muted',
@@ -506,7 +511,7 @@ export function AdminAnalytics() {
               <div className="space-y-4">
                 <div className="flex justify-between text-xs text-muted-foreground">
                   <span>Объект</span>
-                  <span>Погонные метры, м · Сваи, шт</span>
+                  <span>Сваи, шт. / м.п.</span>
                 </div>
                 {overview.siteRating.map((s) => {
                   const max = overview.siteRating[0]?.meters || 1;
@@ -514,7 +519,7 @@ export function AdminAnalytics() {
                     <div key={s.id}>
                       <div className="flex items-baseline justify-between gap-2 text-sm">
                         <span className="truncate font-medium text-foreground">{s.name}</span>
-                        <span className="shrink-0 font-mono text-foreground">{Math.round(s.meters).toLocaleString('ru-RU')} <span className="text-xs text-muted-foreground">· {s.piles}</span></span>
+                        <span className="shrink-0 font-mono text-foreground">{formatCountMeters(s.piles, s.meters)}</span>
                       </div>
                       <div className="mt-1 h-2 overflow-hidden rounded-full bg-muted">
                         <div className="h-full rounded-full bg-info-strong" style={{ width: `${Math.max(4, Math.round((s.meters / max) * 100))}%` }} />

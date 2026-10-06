@@ -5,6 +5,8 @@ import Image from 'next/image';
 import { Image as ImageIcon, X } from '@/components/piling/icons/unified-icons';
 import { authFetch } from '@/lib/api';
 import { getThumbnailUrl } from '@/lib/media-thumbnails';
+import { toast } from 'sonner';
+import { catchText } from '@/components/piling/admin-crews/crew-messages';
 
 interface Props {
   reportId: string;
@@ -51,8 +53,21 @@ export function ReportThumbnail({ reportId, mediaId: knownMediaId }: Props) {
     e.stopPropagation();
     if (!mediaId) return;
     if (!fullUrl) {
-      const dl = await authFetch(`/api/media/${mediaId}/download`);
-      if (dl.ok) setFullUrl((await dl.json()).url);
+      try {
+        const dl = await authFetch(`/api/media/${mediaId}/download`);
+        // Тихий пропуск на отказе давал клик без окна и без объяснения (F-R115-9).
+        if (!dl.ok) {
+          toast.error(dl.status === 403
+            ? 'Нет прав на просмотр фото. Смените роль или обратитесь к администратору.'
+            : 'Не удалось открыть фото. Повторите попытку.');
+          return;
+        }
+        setFullUrl((await dl.json()).url);
+      } catch (err) {
+        // Обрыв сети fetch бросает TypeError с английским «Failed to fetch» (F-R112-1).
+        toast.error(catchText(err, 'Не удалось открыть фото. Повторите попытку.'));
+        return;
+      }
     }
     setOpen(true);
   };

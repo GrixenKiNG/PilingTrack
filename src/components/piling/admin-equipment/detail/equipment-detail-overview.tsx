@@ -8,7 +8,7 @@
 import { type ReactNode } from 'react';
 import { KIND_LABELS } from '../equipment-form';
 import { type TimelineRow } from './equipment-detail-parts';
-import { formatFixed } from '@/lib/format';
+import { formatCountMeters, formatFixed, formatRuDate } from '@/lib/format';
 import type { EquipmentDTO, EquipmentKindDTO } from '@/lib/types';
 import { formatDowntimeHours } from '@/lib/downtime-hours';
 
@@ -155,14 +155,14 @@ export function OverviewTiles({
           ['Статус', eq.isActive ? 'В эксплуатации' : 'Списана'],
           ['Моточасы', eq.engineHoursTotal != null ? `${formatFixed(Number(eq.engineHoursTotal), 0)} ч` : '—'],
           ['Телематика', devicesCount > 0 ? `${devicesCount} устройств` : 'не подключена'],
-          ['Последний отчёт', timeline[0]?.date || '—'],
+          ['Последний отчёт', formatRuDate(timeline[0]?.date)],
         ]}
       />
       <OverviewTile
         title="Производительность за 30 дней"
         rows={[
-          ['Сваи', `${formatFixed(stats.piles, 0)} шт. / ${formatFixed(stats.pileMeters, 1)} м.п.`],
-          ['Бурение', `${formatFixed(stats.drillingCount, 0)} шт. / ${formatFixed(stats.drillingMeters, 1)} м`],
+          ['Сваи', formatCountMeters(stats.piles, stats.pileMeters)],
+          ['Бурение', formatCountMeters(stats.drillingCount, stats.drillingMeters)],
           ['Простой', formatDowntimeHours(stats.downtimeHours)],
           ['Отчёты', `${stats.reportCount}`],
         ]}
@@ -170,9 +170,9 @@ export function OverviewTiles({
       <OverviewTile
         title="ТО и обслуживание"
         rows={[
-          ['Ближайшее ТО', eq.nextMaintenanceDate ? String(eq.nextMaintenanceDate).slice(0, 10) : '—'],
+          ['Ближайшее ТО', formatRuDate(eq.nextMaintenanceDate)],
           ['Моточасы ТО', eq.nextMaintenanceAtHours != null ? `${formatFixed(Number(eq.nextMaintenanceAtHours), 0)} ч` : '—'],
-          ['Замечания', timeline.some((row) => row.downtimeHours && row.downtimeHours > 0) ? 'есть простой' : 'нет'],
+          ['Простои за 30 дней', stats.downtimeHours > 0 ? 'есть простой' : 'нет'],
         ]}
       />
     </div>

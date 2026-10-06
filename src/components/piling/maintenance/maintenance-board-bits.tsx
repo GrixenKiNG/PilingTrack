@@ -16,7 +16,9 @@ export function QuickChip({ active, onClick, children }: { active: boolean; onCl
       type="button"
       onClick={onClick}
       className={cn(
-        'h-8 rounded-md border px-3 text-xs font-medium transition-colors',
+        // R73 (F-MOB-MAINT): чип быстрого фильтра был h-8 (32px) — на телефоне
+        // ниже 44px. Видимая высота на десктопе прежняя (32px) за счёт sm:min-h-8.
+        'min-h-11 rounded-md border px-3 text-xs font-medium transition-colors sm:min-h-8',
         active
           ? 'border-info/30 bg-info/10 text-info-strong'
           : 'border-border bg-card text-foreground hover:bg-muted',

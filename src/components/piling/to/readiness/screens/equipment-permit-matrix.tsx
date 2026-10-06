@@ -22,6 +22,7 @@ import { Input } from '@/components/ui/input';
 import { ConfirmActionDialog } from '@/components/piling/confirm-action-dialog';
 import { cn } from '@/lib/utils';
 import { card } from '../settings/shared-ui';
+import { loadFailureMessage } from './shared';
 import {
   EQUIPMENT_KIND_LABELS, EQUIPMENT_KIND_ORDER, PERMIT_STATUS_LABELS,
   WORK_SCOPE_LABELS, WORK_SCOPE_ORDER, permitStatusClass,
@@ -50,7 +51,7 @@ export function EquipmentPermitMatrix({
   /** Чей это раздел. Пусто — свой (маршрут подставит себя из сессии). */
   userId?: string;
   userName?: string;
-  /** Может ли текущий пользователь выдавать допуски (`users.manage`). */
+  /** Может ли текущий пользователь выдавать допуски (`safety.permits.manage`). */
   editable: boolean;
 }) {
   const [rows, setRows] = useState<PermitRow[] | null>(null);
@@ -70,16 +71,13 @@ export function EquipmentPermitMatrix({
     try {
       const search = userId ? `?userId=${encodeURIComponent(userId)}` : '';
       const response = await authFetch(`/api/safety/equipment-permits${search}`);
-      if (!response.ok) {
-        const body = await response.json().catch(() => ({}));
-        throw new Error(body.error || `Сервер вернул ${response.status}`);
-      }
+      if (!response.ok) throw response;
       setRows(((await response.json()).rows ?? []) as PermitRow[]);
       setFailed(null);
     } catch (error) {
       // Пустая матрица читается как «допусков нет» — а это другое утверждение,
       // чем «не удалось спросить». Разница решает, выпустят ли человека.
-      setFailed(error instanceof Error ? error.message : 'Не удалось загрузить допуски');
+      setFailed(await loadFailureMessage(error, 'Не удалось загрузить допуски'));
       setRows(null);
     }
   }, [userId]);
@@ -107,17 +105,14 @@ export function EquipmentPermitMatrix({
           validUntil: validUntil ? new Date(`${validUntil}T23:59:59`).toISOString() : null,
         }),
       });
-      if (!response.ok) {
-        const body = await response.json().catch(() => ({}));
-        throw new Error(body.error || `Сервер вернул ${response.status}`);
-      }
+      if (!response.ok) throw response;
       setAdding(false);
       setModel('');
       setRestriction('');
       setValidUntil('');
       await load();
     } catch (error) {
-      setFailed(error instanceof Error ? error.message : 'Не удалось сохранить допуск');
+      setFailed(await loadFailureMessage(error, 'Не удалось сохранить допуск'));
     } finally {
       setBusy(false);
     }
@@ -127,13 +122,10 @@ export function EquipmentPermitMatrix({
     setBusy(true);
     try {
       const response = await authFetch(`/api/safety/equipment-permits/${id}`, { method: 'DELETE' });
-      if (!response.ok) {
-        const body = await response.json().catch(() => ({}));
-        throw new Error(body.error || `Сервер вернул ${response.status}`);
-      }
+      if (!response.ok) throw response;
       await load();
     } catch (error) {
-      setFailed(error instanceof Error ? error.message : 'Не удалось удалить допуск');
+      setFailed(await loadFailureMessage(error, 'Не удалось удалить допуск'));
     } finally {
       setBusy(false);
       setPendingDelete(null);

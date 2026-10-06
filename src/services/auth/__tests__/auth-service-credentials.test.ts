@@ -10,7 +10,7 @@
  * стандартный лимит теста.
  */
 
-import { describe, it, expect, vi, beforeEach, beforeAll, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, beforeAll } from 'vitest';
 import { hash as bcryptHash } from 'bcryptjs';
 import { createHash } from 'node:crypto';
 
@@ -35,8 +35,6 @@ vi.mock('@/lib/db', () => ({
 
 import {
   authenticateUserByEmailPassword,
-  authenticateUserByPin,
-  computePinLookup,
 } from '../auth-service';
 
 const ALLOWED = { allowed: true, remaining: 4 };
@@ -112,13 +110,15 @@ describe('authenticateUserByEmailPassword — кого пускать', () => {
     expect(resetMock).not.toHaveBeenCalled();
   });
 
-  it('на успехе сбрасывает только счётчик аккаунта, не общий по адресу', async () => {
+  it('на успехе сбрасывает счётчики аккаунта (с адреса и общий), но не общий по адресу', async () => {
     findUniqueMock.mockResolvedValue(userRow());
 
     await authenticateUserByEmailPassword('operator@piling.ru', PASSWORD, '10.0.0.1');
 
-    expect(resetMock).toHaveBeenCalledTimes(1);
+    expect(resetMock).toHaveBeenCalledTimes(2);
     expect(resetMock).toHaveBeenCalledWith('login:operator@piling.ru:10.0.0.1');
+    expect(resetMock).toHaveBeenCalledWith('login-acct:operator@piling.ru');
+    expect(resetMock).not.toHaveBeenCalledWith('login-ip:10.0.0.1');
   });
 
   it('на неизвестном адресе тратит время на bcrypt, как на известном', async () => {
@@ -145,15 +145,25 @@ describe('authenticateUserByEmailPassword — кого пускать', () => {
 });
 
 describe('authenticateUserByEmailPassword — форматы хранимого пароля', () => {
-  it('пускает по устаревшему SHA-256 и тут же пересохраняет пароль в bcrypt', async () => {
+  // Поддержка SHA-256 без соли снята 01.10.2026: на бою все пароли в bcrypt,
+  // а ветка SHA-256 отвечала быстрее bcrypt — по времени ответа было видно,
+  // какие учётки ещё на старом хеше (аудит Codex out55, F01).
+  it('НЕ пускает по устаревшему SHA-256 и не переписывает хеш', async () => {
     findUniqueMock.mockResolvedValue(userRow({ password: sha256OfPassword }));
 
     const result = await authenticateUserByEmailPassword('operator@piling.ru', PASSWORD, '10.0.0.1');
 
-    expect(result.user).not.toBeNull();
-    expect(updateMock).toHaveBeenCalledTimes(1);
-    const written = updateMock.mock.calls[0][0].data.password as string;
-    expect(written.startsWith('$2')).toBe(true);
+    expect(result.user).toBeNull();
+    expect(updateMock).not.toHaveBeenCalled();
+  });
+
+  it('на хеше неизвестного формата тратит время на bcrypt, как на настоящем', async () => {
+    findUniqueMock.mockResolvedValue(userRow({ password: sha256OfPassword }));
+
+    const startedAt = performance.now();
+    await authenticateUserByEmailPassword('operator@piling.ru', PASSWORD, '10.0.0.1');
+
+    expect(performance.now() - startedAt).toBeGreaterThan(50);
   });
 
   it('НЕ пускает, когда в базе лежит открытый пароль', async () => {
@@ -174,139 +184,5 @@ describe('authenticateUserByEmailPassword — форматы хранимого 
     const result = await authenticateUserByEmailPassword('operator@piling.ru', '', '10.0.0.1');
 
     expect(result.user).toBeNull();
-  });
-});
-
-describe('authenticateUserByPin — вход оператора', () => {
-  const BLOCKED = { allowed: false, remaining: 0, retryAfter: 120 };
-
-  function pinRow(over: Record<string, unknown> = {}) {
-    return { ...userRow(), pin: '1234', pinLookup: 'lookup-1', ...over };
-  }
-
-  it('считает попытки по адресу обратившегося, а не по значению ПИНа', async () => {
-    // Счётчик по самому ПИНу был бы бесполезен: злоумышленник перебирает
-    // разные ПИНы с одного адреса и не задевает ни один счётчик, зато
-    // честный пользователь блокируется за чужие попытки с тем же ПИНом.
-    findUniqueMock.mockResolvedValue(null);
-
-    await authenticateUserByPin('1234', '198.51.100.9');
-
-    expect(checkMock).toHaveBeenCalledWith('pin-ip-198.51.100.9', expect.anything());
-    const keys = checkMock.mock.calls.map(([key]) => key);
-    expect(keys.some((k: string) => k.includes('1234'))).toBe(false);
-  });
-
-  it('при исчерпанном счётчике не ходит в базу вовсе', async () => {
-    checkMock.mockResolvedValue(BLOCKED);
-
-    const result = await authenticateUserByPin('1234', '198.51.100.9');
-
-    expect(result.rateLimited).toBe(true);
-    expect(result.retryAfter).toBe(120);
-    expect(findUniqueMock).not.toHaveBeenCalled();
-    expect(findManyMock).not.toHaveBeenCalled();
-  });
-
-  it('пускает по быстрому пути и сбрасывает счётчик', async () => {
-    findUniqueMock.mockResolvedValue(pinRow());
-
-    const result = await authenticateUserByPin('1234', '198.51.100.9');
-
-    expect(result.user).toMatchObject({ id: 'u1', role: 'OPERATOR' });
-    expect(resetMock).toHaveBeenCalledWith('pin-ip-198.51.100.9');
-    expect(findManyMock).not.toHaveBeenCalled(); // полный перебор не понадобился
-  });
-
-  it('НЕ отдаёт ни ПИН, ни хеш пароля в сессию', async () => {
-    findUniqueMock.mockResolvedValue(pinRow());
-
-    const result = await authenticateUserByPin('1234', '198.51.100.9');
-
-    expect(result.user).not.toHaveProperty('pin');
-    expect(result.user).not.toHaveProperty('pinLookup');
-    expect(result.user).not.toHaveProperty('password');
-  });
-
-  it('не пускает отключённого пользователя', async () => {
-    findUniqueMock.mockResolvedValue(pinRow({ isActive: false }));
-
-    const result = await authenticateUserByPin('1234', '198.51.100.9');
-
-    expect(result.user).toBeNull();
-  });
-
-  it('не пускает по неверному ПИНу', async () => {
-    findUniqueMock.mockResolvedValue(null);
-
-    const result = await authenticateUserByPin('1234', '198.51.100.9');
-
-    expect(result.user).toBeNull();
-    expect(resetMock).not.toHaveBeenCalled();
-  });
-
-  it('открытый ПИН переводит в bcrypt при первом входе', async () => {
-    findUniqueMock.mockResolvedValue(pinRow());
-
-    const result = await authenticateUserByPin('1234', '198.51.100.9');
-
-    expect(result.user).toMatchObject({ id: 'u1' });
-    // Открытый ПИН не должен остаться в базе как есть.
-    expect(String(updateMock.mock.calls[0][0].data.pin).startsWith('$2')).toBe(true);
-  });
-
-  it('никогда не перебирает пользователей, даже если индекс не нашёл никого', async () => {
-    // Перебор гонял bcrypt по каждому пользователю без ключа поиска на
-    // каждую попытку входа. На проде таких нет (проверено 24.09.2026).
-    findUniqueMock.mockResolvedValue(null);
-
-    await authenticateUserByPin('1234', '198.51.100.9');
-
-    expect(findManyMock).not.toHaveBeenCalled();
-  });
-
-  it('сбой базы не выдаёт за неверный ПИН', async () => {
-    findUniqueMock.mockRejectedValue(new Error('connection refused'));
-
-    await expect(authenticateUserByPin('1234', '198.51.100.9')).rejects.toThrow('connection refused');
-  });
-});
-
-describe('computePinLookup', () => {
-  // vi.stubEnv, а не присваивание в process.env: NODE_ENV объявлен только для
-  // чтения, и прямое присваивание не проходит проверку типов.
-  afterEach(() => { vi.unstubAllEnvs(); });
-
-  it('детерминирован: один и тот же ПИН даёт один и тот же ключ', () => {
-    vi.stubEnv('PIN_LOOKUP_SECRET', 'secret-a');
-    expect(computePinLookup('1234')).toBe(computePinLookup('1234'));
-  });
-
-  it('разные ПИНы дают разные ключи', () => {
-    vi.stubEnv('PIN_LOOKUP_SECRET', 'secret-a');
-    expect(computePinLookup('1234')).not.toBe(computePinLookup('4321'));
-  });
-
-  it('смена секрета меняет ключ — ротация обесценивает старые записи', () => {
-    vi.stubEnv('PIN_LOOKUP_SECRET', 'secret-a');
-    const before = computePinLookup('1234');
-    vi.stubEnv('PIN_LOOKUP_SECRET', 'secret-b');
-    expect(computePinLookup('1234')).not.toBe(before);
-  });
-
-  it('на проде падает без выделенного секрета', () => {
-    vi.stubEnv('NODE_ENV', 'production');
-    vi.stubEnv('PIN_LOOKUP_SECRET', '');
-    vi.stubEnv('SESSION_SECRET', 'session-only');
-    expect(() => computePinLookup('1234')).toThrow(/PIN_LOOKUP_SECRET is required/);
-  });
-
-  it('на проде падает, если секрет совпадает с сессионным', () => {
-    // Иначе ротация одного ключа молча ломает другой, а компрометация
-    // подписи JWT заодно вскрывает поиск по ПИНам.
-    vi.stubEnv('NODE_ENV', 'production');
-    vi.stubEnv('PIN_LOOKUP_SECRET', 'same');
-    vi.stubEnv('SESSION_SECRET', 'same');
-    expect(() => computePinLookup('1234')).toThrow(/must be different/);
   });
 });

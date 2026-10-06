@@ -18,6 +18,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { authFetch } from '@/lib/api';
+import { catchText, extractApiError } from '@/components/piling/admin-crews/crew-messages';
 import { cn } from '@/lib/utils';
 import { KIND_LABELS } from '../equipment-form';
 import { EditEquipmentDialog } from '../equipment-dialogs';
@@ -34,7 +35,7 @@ import {
   HistoryTable, OperatorRotationCard, MaintenanceBlock, PassportGrid,
   formatRelative,
 } from './equipment-detail-parts';
-import { formatFixed } from '@/lib/format';
+import { formatCountMeters } from '@/lib/format';
 import { usePilingStore } from '@/lib/store';
 import type { EquipmentDTO, EquipmentKindDTO } from '@/lib/types';
 import {
@@ -52,9 +53,12 @@ interface Props {
   /** When rendered inside the fleet-center right column (not the full page):
    *  hides the "back" link and trims outer padding. */
   embedded?: boolean;
+  /** Вызывается после успешного сохранения карточки: центр парка перечитывает
+   *  снимок, иначе в списке слева остаётся старое имя (R119 №5). */
+  onSaved?: () => void;
 }
 
-export function EquipmentDetail({ equipmentId, embedded = false }: Props) {
+export function EquipmentDetail({ equipmentId, embedded = false, onSaved }: Props) {
   const canManage = usePilingStore((state) => state.currentUser?.role === 'ADMIN');
   const [details, setDetails] = useState<DetailsResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -72,14 +76,18 @@ export function EquipmentDetail({ equipmentId, embedded = false }: Props) {
       setDetails(await res.json());
       setError(null);
     } catch (err) {
-      setError((err as Error).message);
+      // Обрыв сети fetch бросает TypeError с английским «Failed to fetch» (F-R112-1).
+      setError(catchText(err, 'Не удалось загрузить установку'));
     } finally {
       setLoading(false);
     }
   }, [equipmentId]);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- loads data on mount / dependency change; the async loader sets state
+    // Смена установки: показываем скелетон, а не паспорт предыдущей машины
+    // (R119 №13) — до этого loading выставлялся только при монтировании.
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- сброс состояния на смену зависимости; данные затем загрузит refresh
+    setLoading(true);
     void refresh();
   }, [refresh]);
 
@@ -125,13 +133,17 @@ export function EquipmentDetail({ equipmentId, embedded = false }: Props) {
     const res = await authFetch(`/api/equipment/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
+      body: JSON.stringify({ ...payload, expectedUpdatedAt: details?.equipment.updatedAt }),
     });
     if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.error || 'Ошибка сохранения');
+      if (res.status === 409) await refresh();
+      // Preserve E4 conflict refresh and Hermes validation messages.
+      throw new Error(await extractApiError(res, 'Ошибка сохранения'));
     }
     await refresh();
+    // Список парка слева кормится снимком /monitoring/fleet — без этого
+    // переименованная установка остаётся в плитке со старым именем (R119 №5).
+    onSaved?.();
   };
 
   if (loading) {
@@ -168,7 +180,7 @@ export function EquipmentDetail({ equipmentId, embedded = false }: Props) {
           </Badge>
           {!eq.isActive && (
             <Badge variant="secondary" className="bg-muted text-muted-foreground border-border">
-              Неактивна
+              Списана
             </Badge>
           )}
         </div>
@@ -179,7 +191,7 @@ export function EquipmentDetail({ equipmentId, embedded = false }: Props) {
           {eq.registrationNumber && <span className="font-mono">{eq.registrationNumber}</span>}
         </div>
       </div>
-      {canManage && <Button onClick={() => setEditOpen(true)} className="bg-signal hover:bg-signal-strong text-white">
+      {canManage && <Button onClick={() => setEditOpen(true)} className="min-h-11 bg-signal hover:bg-signal-strong text-white sm:min-h-0">
         <Pencil className="w-4 h-4 mr-1.5" /> Редактировать
       </Button>}
     </div>
@@ -205,7 +217,7 @@ export function EquipmentDetail({ equipmentId, embedded = false }: Props) {
               key={t.key}
               onClick={() => setTab(t.key)}
               className={cn(
-                '-mb-px min-w-0 border-b-2 px-2 py-2 text-xs font-medium transition-colors',
+                '-mb-px min-h-11 min-w-0 border-b-2 px-2 py-2 text-xs font-medium transition-colors sm:min-h-0',
                 tab === t.key
                   ? 'border-info text-info-strong'
                   : 'border-transparent text-muted-foreground hover:text-foreground',
@@ -249,8 +261,8 @@ export function EquipmentDetail({ equipmentId, embedded = false }: Props) {
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 <Metric label="Отчётов (30д)" value={details.stats30d.reportCount} />
-                <Metric label="Сваи шт/м.п." value={`${formatFixed(details.stats30d.piles, 0)} / ${formatFixed(details.stats30d.pileMeters, 1)}`} />
-                <Metric label="Бурение шт/м.п." value={`${formatFixed(details.stats30d.drillingCount, 0)} / ${formatFixed(details.stats30d.drillingMeters, 1)}`} />
+                <Metric label="Сваи (30д)" value={formatCountMeters(details.stats30d.piles, details.stats30d.pileMeters)} />
+                <Metric label="Бурение (30д)" value={formatCountMeters(details.stats30d.drillingCount, details.stats30d.drillingMeters)} />
                 <Metric label="Простой" value={formatDowntimeHours(details.stats30d.downtimeHours)} />
               </div>
             </div>
@@ -271,7 +283,7 @@ export function EquipmentDetail({ equipmentId, embedded = false }: Props) {
                       </div>
                       <div className="flex items-center gap-2 text-xs">
                         <TelematicsStatusBadge status={d.status} />
-                        {d.lastSeenAt && <span className="text-muted-foreground">last seen {formatRelative(d.lastSeenAt)}</span>}
+                        {d.lastSeenAt && <span className="text-muted-foreground">последний раз {formatRelative(d.lastSeenAt)}</span>}
                       </div>
                     </div>
                   ))}
@@ -341,8 +353,8 @@ export function EquipmentDetail({ equipmentId, embedded = false }: Props) {
   }
 
   return (
-    <div className={cn('space-y-5', 'p-4 lg:p-6')}>
-      <BackLink />
+    <div className={cn('space-y-5', 'p-4 lg:p-6', 'field-type')}>
+      <BackLink current={eq.name} />
 
       {header}
 
@@ -375,8 +387,8 @@ export function EquipmentDetail({ equipmentId, embedded = false }: Props) {
       <Section icon={Activity} title="30 дней активности">
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <Metric label="Отчётов" value={details.stats30d.reportCount} />
-          <Metric label="Свай" value={details.stats30d.piles} />
-          <Metric label="Бурение, м" value={formatFixed(details.stats30d.drillingMeters, 1)} />
+          <Metric label="Свай" value={formatCountMeters(details.stats30d.piles, details.stats30d.pileMeters)} />
+          <Metric label="Бурение" value={formatCountMeters(details.stats30d.drillingCount, details.stats30d.drillingMeters)} />
           <Metric label="Простой" value={formatDowntimeHours(details.stats30d.downtimeHours)} />
         </div>
       </Section>
@@ -444,7 +456,7 @@ export function EquipmentDetail({ equipmentId, embedded = false }: Props) {
                 </div>
                 <div className="flex items-center gap-2 text-xs">
                   <TelematicsStatusBadge status={d.status} />
-                  {d.lastSeenAt && <span className="text-muted-foreground">last seen {formatRelative(d.lastSeenAt)}</span>}
+                  {d.lastSeenAt && <span className="text-muted-foreground">последний раз {formatRelative(d.lastSeenAt)}</span>}
                 </div>
               </div>
             ))}

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { FileText, Filter } from '@/components/piling/icons/unified-icons';
+import { ArrowUpDown, FileText, Filter, Loader2 } from '@/components/piling/icons/unified-icons';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { PdfPreviewDialog } from '@/components/piling/pdf-preview-dialog';
@@ -9,8 +9,9 @@ import { QueryErrorBanner } from '@/components/piling/async-ui';
 import { usePilingStore } from '@/lib/store';
 import { can } from '@/services/auth/authorization-service';
 import { authFetch } from '@/lib/api';
+import { catchText } from '@/components/piling/admin-crews/crew-messages';
 import { cn } from '@/lib/utils';
-import { pluralizeRu } from '@/lib/format';
+import { pluralizeRu, formatRuDate } from '@/lib/format';
 import type { ReportDTO } from '@/lib/types';
 import { getReportTotals, addTotals } from './report-totals';
 import { useReportsData } from './use-reports-data';
@@ -19,22 +20,69 @@ import { ReportDetailDialog } from './report-detail-dialog';
 import { ReportFormDialog } from './report-form-dialog';
 import { useReportHistory } from './use-report-history';
 import { todayYmd, shiftYmd } from './report-list-format';
+import { normalizeSearch } from '@/components/piling/to/readiness/shared/text-search';
 import { EvidenceReportRow, EvidenceSummary, ReportsHeader } from './report-evidence-row';
 import { ReportEvidencePreview } from './report-evidence-preview';
 import { ConfirmActionDialog } from '@/components/piling/confirm-action-dialog';
 import { toast } from 'sonner';
+import { PrintScreenStyles } from './print-screen';
 
-type QuickFilter = 'all' | 'today' | 'yesterday' | 'week' | 'downtime' | 'withPhotos' | 'edited';
+type QuickFilter = 'all' | 'today' | 'yesterday' | 'week' | 'drafts' | 'submitted' | 'downtime' | 'withPhotos' | 'edited';
 
 const QUICK_FILTERS: Array<{ key: QuickFilter; label: string }> = [
   { key: 'all', label: 'Все' },
   { key: 'today', label: 'Сегодня' },
   { key: 'yesterday', label: 'Вчера' },
   { key: 'week', label: '7 дней' },
+  { key: 'drafts', label: 'Черновики' },
+  { key: 'submitted', label: 'Сданные' },
   { key: 'downtime', label: 'С простоем' },
   { key: 'withPhotos', label: 'С фото' },
-  { key: 'edited', label: 'Изменены админом' },
+  { key: 'edited', label: 'Изменены вручную' },
 ];
+
+type SortKey = 'date' | 'site' | 'user' | 'piles' | 'drilling' | 'downtime';
+
+/**
+ * R140 №3: колонки были статичными подписями — список всегда шёл по дате вниз,
+ * и диспетчер не мог разложить его по оператору, объекту или сваям. Заголовок
+ * теперь кнопка: клик сортирует по своей колонке, повторный — меняет
+ * направление (↑/↓). Сортировка загруженных строк, как и прочие фильтры экрана.
+ */
+function SortHeader({
+  label, column, sortKey, sortDir, onSort, right,
+}: {
+  label: string;
+  column: SortKey;
+  sortKey: SortKey;
+  sortDir: 'asc' | 'desc';
+  onSort: (k: SortKey) => void;
+  right?: boolean;
+}) {
+  const active = column === sortKey;
+  return (
+    <div className={cn(right && 'flex justify-end')}>
+      <button
+        type="button"
+        onClick={() => onSort(column)}
+        aria-label={`Сортировать по: ${label}`}
+        className={cn(
+          'inline-flex items-center gap-1 uppercase tracking-wide transition-colors hover:text-foreground',
+          active && 'text-foreground',
+        )}
+      >
+        {label}
+        <ArrowUpDown className="h-3 w-3 opacity-50" />
+        {active ? <span className="text-3xs">{sortDir === 'asc' ? '↑' : '↓'}</span> : null}
+      </button>
+    </div>
+  );
+}
+
+/** Строк данных в CSV: первая строка — шапка, пустые строки не считаем. */
+function countCsvDataRows(text: string): number {
+  return text.split('\n').slice(1).filter((line) => line.trim() !== '').length;
+}
 
 export function AdminReports() {
   const currentUser = usePilingStore(s => s.currentUser);
@@ -47,8 +95,8 @@ export function AdminReports() {
     filterSiteId, setFilterSiteId,
     filterUserId, setFilterUserId,
     periodFrom, setPeriodFrom, periodTo, setPeriodTo,
-    periodActive, loading, loadingReferenceData, loadingMore, hasMore, error, filterError, dictionaryError,
-    handleApplyPeriod, handleResetPeriod, loadMoreReports, loadReports, loadReferenceData, totalReports,
+    periodActive, loading, loadingReferenceData, loadingMore, hasMore, error, errorForbidden, loadMoreError, filterError, dictionaryError,
+    handleApplyPeriod, handleResetPeriod, loadMoreReports, loadReports, loadReferenceData, totalReports, serverSums,
   } = useReportsData();
 
   const [detailReport, setDetailReport] = useState<ReportDTO | null>(null);
@@ -61,8 +109,11 @@ export function AdminReports() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [pendingDeleteReport, setPendingDeleteReport] = useState<ReportDTO | null>(null);
   const [quickFilter, setQuickFilter] = useState<QuickFilter>('all');
+  const [sortKey, setSortKey] = useState<SortKey>('date');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const [filterEquipmentId, setFilterEquipmentId] = useState('all');
-  const [exporting, setExporting] = useState(false);
+  const [search, setSearch] = useState('');
+  const [exporting, setExporting] = useState<'csv' | 'xlsx' | null>(null);
 
   // Export the same filters as the visible list. An unbounded history needs
   // an explicit period because the export endpoint is limited to 92 days.
@@ -80,7 +131,9 @@ export function AdminReports() {
     const dateTo = quickFrom && periodActive && periodTo ? [quickTo, periodTo].sort()[0]
       : quickFrom ? quickTo : periodTo;
     if (dateFrom > dateTo) { toast.error('В выбранном пересечении дат нет отчётов.'); return; }
-    setExporting(true);
+    // Какой именно файл готовится: обе кнопки («CSV» и «Excel») раньше писали
+    // «Готовим…» одновременно, и было не понять, какая выгрузка идёт (F-R115-12).
+    setExporting(format);
     let objectUrl: string | null = null;
     try {
       const params = new URLSearchParams({ dateFrom, dateTo });
@@ -96,17 +149,38 @@ export function AdminReports() {
         throw new Error(body.error || `Сервер ответил ${response.status}`);
       }
 
-      objectUrl = URL.createObjectURL(await response.blob());
+      const blob = await response.blob();
+      // Пустой период сервер отдаёт как 200 — CSV из одной шапки. Не выдаём
+      // это за успешную выгрузку: считаем строки данных (F-R115-5). Число
+      // строк XLSX клиенту не видно, для него ждём заголовок сервера.
+      const rowCountHeader = response.headers.get('x-export-row-count');
+      const dataRows = rowCountHeader !== null ? Number(rowCountHeader)
+        : format === 'csv' ? countCsvDataRows(await blob.text()) : null;
+      if (dataRows === 0) {
+        toast.error('За выбранный период отчётов нет — выгружать нечего. Измените период или фильтры.');
+        return;
+      }
+      objectUrl = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = objectUrl;
-      link.download = `pilingtrack-reports-${dateFrom}_${dateTo}.${format}`;
+      // Имя файла берём у сервера (Content-Disposition), как это делает
+      // техготовность: своё имя с датой периода расходилось с заголовком
+      // сервера, и один документ ходил под двумя разными именами (F-R115-14).
+      link.download = response.headers.get('content-disposition')?.match(/filename="([^"]+)"/)?.[1]
+        ?? `pilingtrack-reports-${dateFrom}_${dateTo}.${format}`;
       link.click();
       toast.success(`Выгружено за период ${dateFrom} — ${dateTo}`);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Не удалось выгрузить отчёты');
+      // fetch без сети бросает TypeError с английским «Failed to fetch» —
+      // в русском интерфейсе это не сообщение.
+      toast.error(
+        err instanceof TypeError
+          ? 'Нет связи с сервером. Выгрузка не выполнена — повторите при появлении сети.'
+          : err instanceof Error ? err.message : 'Не удалось выгрузить отчёты',
+      );
     } finally {
       if (objectUrl) URL.revokeObjectURL(objectUrl);
-      setExporting(false);
+      setExporting(null);
     }
   };
   // The preview pane shows the user-selected report, falling back to the first
@@ -131,13 +205,22 @@ export function AdminReports() {
         body: JSON.stringify({ reportId: report.reportId }),
       });
       if (!res.ok) {
-        const msg = await res.text().catch(() => '');
-        throw new Error(`Ошибка удаления (${res.status}): ${msg.slice(0, 200)}`);
+        // Русский разбор отказа: сырое тело JSON с кодом статуса диспетчеру ни
+        // о чём не говорит, а 404 («уже удалён») нужно отличить от 403 и 5xx.
+        if (res.status === 403) {
+          throw new Error('Отчёт не удалён: нет прав на удаление. Обратитесь к администратору.');
+        }
+        if (res.status === 404) {
+          throw new Error('Отчёт уже удалён — обновите список.');
+        }
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || `Не удалось удалить отчёт (код ${res.status}).`);
       }
       if (effectivePreview?.reportId === report.reportId) setPreviewReport(null);
       await loadReports();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Не удалось удалить отчёт');
+      // Обрыв сети fetch бросает TypeError с английским «Failed to fetch» (F-R112-1).
+      toast.error(catchText(err, 'Не удалось удалить отчёт'));
     } finally {
       setDeletingId(null);
       setPendingDeleteReport(null);
@@ -153,20 +236,60 @@ export function AdminReports() {
     const today = todayYmd();
     const yesterday = shiftYmd(-1);
     const weekStart = shiftYmd(-6);
+    const query = normalizeSearch(search);
     return reports.filter((report) => {
       const totals = getReportTotals(report);
+      if (query && !normalizeSearch([report.user?.name ?? '', report.site?.name ?? '', report.equipment?.name ?? ''].join(' ')).includes(query)) return false;
       if (quickFilter === 'today' && report.date !== today) return false;
       if (quickFilter === 'yesterday' && report.date !== yesterday) return false;
       if (quickFilter === 'week' && (report.date < weekStart || report.date > today)) return false;
+      if (quickFilter === 'drafts' && report.status !== 'draft') return false;
+      if (quickFilter === 'submitted' && report.status !== 'submitted') return false;
       if (quickFilter === 'downtime' && totals.downtimeHours <= 0) return false;
       if (quickFilter === 'withPhotos' && report.hasPhotos !== true) return false;
       if (quickFilter === 'edited' && !report.lastEditedByName) return false;
       if (filterEquipmentId !== 'all' && report.equipment?.id !== filterEquipmentId) return false;
       return true;
     });
-  }, [filterEquipmentId, quickFilter, reports]);
+  }, [filterEquipmentId, quickFilter, reports, search]);
 
-  const totals = useMemo(() => addTotals(filteredReports), [filteredReports]);
+  // R140 №3: экран сортирует уже отфильтрованные строки; порядок по умолчанию —
+  // по дате вниз, как отдаёт сервер.
+  const sortedReports = useMemo(() => {
+    const rows = [...filteredReports];
+    const dir = sortDir === 'asc' ? 1 : -1;
+    const sortValue = (report: ReportDTO): string | number => {
+      if (sortKey === 'date') return report.date;
+      if (sortKey === 'site') return report.site?.name ?? '';
+      if (sortKey === 'user') return report.user?.name ?? '';
+      const rowTotals = getReportTotals(report);
+      if (sortKey === 'piles') return rowTotals.piles;
+      if (sortKey === 'drilling') return rowTotals.drillingCount;
+      return rowTotals.downtimeHours;
+    };
+    rows.sort((a, b) => {
+      const av = sortValue(a);
+      const bv = sortValue(b);
+      const cmp = typeof av === 'string' && typeof bv === 'string' ? av.localeCompare(bv) : (av as number) - (bv as number);
+      return dir * cmp;
+    });
+    return rows;
+  }, [filteredReports, sortKey, sortDir]);
+
+  const toggleSort = (key: SortKey) => {
+    if (key === sortKey) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    else { setSortKey(key); setSortDir(key === 'site' || key === 'user' ? 'asc' : 'desc'); }
+  };
+
+  // Итоги — только сданные отчёты, как на всех экранах; черновик виден в
+  // списке с пометкой, но в суммы не входит.
+  const totals = useMemo(
+    () => addTotals(filteredReports.filter((r) => r.status === 'submitted')),
+    [filteredReports],
+  );
+  // Быстрые фильтры и отбор по установке работают на экране — серверные
+  // итоги их не учитывают, поэтому при них считаем по загруженным строкам.
+  const clientFilterActive = quickFilter !== 'all' || filterEquipmentId !== 'all' || search.trim() !== '';
   const photoCount = useMemo(
     () => filteredReports.filter((r) => r.hasPhotos === true).length,
     [filteredReports],
@@ -188,7 +311,7 @@ export function AdminReports() {
     window.addEventListener('mouseup', onUp);
   };
 
-  const formatDate = (d: string) => new Date(d).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' });
+  const formatDate = (d: string) => formatRuDate(d);
 
   const formatLastEditor = (report: ReportDTO) => {
     if (!report.lastEditedByName) return report.user?.name ? `Автор: ${report.user.name}` : 'Нет данных';
@@ -200,7 +323,10 @@ export function AdminReports() {
     return `${roleLabel}: ${report.lastEditedByName}`;
   };
 
-  if (loading) {
+  // F-R128-1: полноэкранный скелетон только при первой загрузке. При смене
+  // фильтра/периода и удалении отчёта список уже есть — гасить экран нельзя,
+  // иначе шапка и панель фильтров пропадают и выглядят сброшенными.
+  if (loading && reports.length === 0) {
     return (
       <div className="space-y-4 p-4 lg:p-6">
         <Skeleton className="h-8 w-48" />
@@ -212,7 +338,10 @@ export function AdminReports() {
   }
 
   return (
-    <div className="min-h-full bg-muted/60 p-4 lg:p-6">
+    // print-area: при печати на лист попадает только этот блок — без шапки,
+    // меню и обрезки по краю прокрутки (R134, находка 1; см. print-screen.tsx).
+    <div className="print-area min-h-full bg-muted/60 p-4 lg:p-6">
+      <PrintScreenStyles />
       {error ? (
         <div className="space-y-4">
           <ReportsHeader
@@ -226,7 +355,7 @@ export function AdminReports() {
           <QueryErrorBanner
             title="Не удалось загрузить отчёты"
             message={error}
-            onRetry={loadReports}
+            onRetry={errorForbidden ? undefined : loadReports}
           />
         </div>
       ) : (
@@ -252,6 +381,7 @@ export function AdminReports() {
             totalReports={totalReports}
             // Суммы описывают весь отбор, только когда догружать больше нечего.
             complete={!hasMore}
+            sums={clientFilterActive ? null : serverSums}
           />
 
           <div
@@ -263,6 +393,14 @@ export function AdminReports() {
             <div className="space-y-3 rounded-lg border border-border bg-card p-3 shadow-sm">
               <div className="flex flex-wrap items-center gap-2">
                 <Filter className="hidden h-4 w-4 text-muted-foreground sm:block" />
+                <input
+                  type="text"
+                  aria-label="Поиск по оператору, объекту или установке"
+                  placeholder="Поиск по оператору, объекту, установке"
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  className="h-9 min-w-[200px] flex-1 rounded-md border border-border bg-card px-2 text-xs text-foreground outline-none focus:border-slate-400"
+                />
                 {QUICK_FILTERS.map((filter) => (
                   <button
                     key={filter.key}
@@ -316,14 +454,19 @@ export function AdminReports() {
               </div>
             </div>
 
-            <section className="min-w-0 overflow-hidden rounded-lg border border-border bg-card shadow-sm">
+            <section className="relative min-w-0 overflow-hidden rounded-lg border border-border bg-card shadow-sm">
+              {loading ? (
+                <div className="absolute inset-0 z-10 grid place-items-center bg-card/70">
+                  <Loader2 aria-label="Обновление списка отчётов" className="h-6 w-6 animate-spin text-muted-foreground" />
+                </div>
+              ) : null}
               <div className="hidden border-b border-border bg-muted/80 px-3 py-2 text-2xs font-semibold uppercase tracking-wide text-muted-foreground lg:grid lg:grid-cols-[116px_minmax(170px,1.2fr)_minmax(150px,1fr)_86px_92px_86px_152px]">
-                <span>Дата</span>
-                <span>Объект / установка</span>
-                <span>Оператор</span>
-                <span className="text-right">Сваи</span>
-                <span className="text-right">Бурение</span>
-                <span className="text-right">Простой</span>
+                <SortHeader label="Дата" column="date" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+                <SortHeader label="Объект / установка" column="site" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+                <SortHeader label="Оператор" column="user" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+                <SortHeader label="Сваи" column="piles" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} right />
+                <SortHeader label="Бурение" column="drilling" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} right />
+                <SortHeader label="Простой" column="downtime" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} right />
                 <span className="text-right">Действия</span>
               </div>
 
@@ -331,42 +474,70 @@ export function AdminReports() {
                 <div className="grid place-items-center px-4 py-16 text-center">
                   <FileText className="mb-3 h-12 w-12 text-muted-foreground" />
                   <p className="text-sm font-medium text-muted-foreground">Отчёты не найдены</p>
+                  {/* F-N1004-EMPTY-PAGE: пустой клиентский отбор при незагруженном
+                      хвосте — это не «отчётов нет», а «нет среди загруженных».
+                      Говорим об этом честно; догрузка остаётся ниже. */}
                   <p className="mt-1 max-w-sm text-xs text-muted-foreground">
-                    Попробуйте изменить быстрые фильтры, период, объект, установку или оператора.
+                    {hasMore
+                      ? 'Среди загруженных отчётов совпадений нет. Загрузите остальные — искомый отчёт может быть среди них.'
+                      : 'Попробуйте изменить быстрые фильтры, период, объект, установку, оператора или строку поиска.'}
                   </p>
                 </div>
               ) : (
-                <>
-                  <div className="divide-y divide-border">
-                    {filteredReports.map((report) => (
-                      <EvidenceReportRow
-                        key={report.id}
-                        report={report}
-                        active={effectivePreview?.reportId === report.reportId}
-                        deleting={deletingId === report.reportId}
-                        formatLastEditor={formatLastEditor}
-                        onSelect={setPreviewReport}
-                        onOpenDetails={setDetailReport}
-                        onEdit={mayManage ? (r) => { setEditReport(r); setShowCreateDialog(true); } : undefined}
-                        onPreviewPdf={handlePreviewPdf}
-                        onDelete={mayManage ? setPendingDeleteReport : undefined}
-                      />
-                    ))}
-                  </div>
-                  {hasMore && (
-                    <div className="border-t border-border bg-muted/80 p-3 text-center">
+                <div className="divide-y divide-border">
+                  {sortedReports.map((report) => (
+                    <EvidenceReportRow
+                      key={report.id}
+                      report={report}
+                      active={effectivePreview?.reportId === report.reportId}
+                      deleting={deletingId === report.reportId}
+                      formatLastEditor={formatLastEditor}
+                      onSelect={setPreviewReport}
+                      onOpenDetails={setDetailReport}
+                      onEdit={mayManage ? (r) => { setEditReport(r); setShowCreateDialog(true); } : undefined}
+                      onPreviewPdf={handlePreviewPdf}
+                      onDelete={mayManage ? setPendingDeleteReport : undefined}
+                    />
+                  ))}
+                </div>
+              )}
+              {/* F-N1004-EMPTY-PAGE: догрузка нужна и при пустом клиентском
+                  отборе — иначе оставшиеся страницы недостижимы. При полном
+                  отборе (hasMore = false) блока нет, как и раньше.
+                  F-R140-FILTER-SCOPE: быстрые фильтры и сортировка считаются
+                  по загруженной части списка. Пока есть что догружать,
+                  говорим об этом у самой кнопки догрузки. */}
+              {hasMore && (
+                <div className="border-t border-border bg-muted/80 p-3 text-center">
+                  <p className="mb-2 text-2xs text-muted-foreground">
+                    Быстрые фильтры и сортировка действуют по загруженным отчётам.
+                    {' '}Нажмите «Загрузить ещё отчёты», чтобы учесть остальные.
+                  </p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => void loadMoreReports()}
+                    disabled={loadingMore}
+                    className="border-border bg-card"
+                  >
+                    {loadingMore ? 'Загрузка...' : 'Загрузить ещё отчёты'}
+                  </Button>
+                  {loadMoreError ? (
+                    <div className="mt-2 flex flex-col items-center gap-1">
+                      <span className="text-xs text-destructive-strong">{loadMoreError}</span>
                       <Button
                         type="button"
+                        size="sm"
                         variant="outline"
                         onClick={() => void loadMoreReports()}
                         disabled={loadingMore}
                         className="border-border bg-card"
                       >
-                        {loadingMore ? 'Загрузка...' : 'Загрузить ещё отчёты'}
+                        Повторить
                       </Button>
                     </div>
-                  )}
-                </>
+                  ) : null}
+                </div>
               )}
             </section>
           </div>
@@ -406,7 +577,6 @@ export function AdminReports() {
             <ReportEvidencePreview
               report={effectivePreview}
               history={reportHistory}
-              formatDate={formatDate}
               onClose={() => setPreviewReport(null)}
               onEdit={mayManage ? (r) => { setEditReport(r); setShowCreateDialog(true); } : undefined}
               onPreviewPdf={handlePreviewPdf}

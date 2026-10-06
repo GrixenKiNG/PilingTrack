@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { useDocumentTitle } from '@/components/piling/ops-shell';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useFleet } from './use-fleet';
@@ -18,6 +19,7 @@ import { PilingIcon } from '@/components/piling/icons';
 import { usePilingStore } from '@/lib/store';
 
 export function AdminEquipment() {
+  useDocumentTitle('Установки');
   const canManage = usePilingStore((state) => state.currentUser?.role === 'ADMIN');
   const { snapshot, loading, error, refetch } = useFleet();
   // Display + KPI come from the single snapshot source; create still posts to
@@ -93,7 +95,7 @@ export function AdminEquipment() {
   }
 
   return (
-    <div className="space-y-4 p-4 lg:p-6">
+    <div className="space-y-4 p-4 lg:p-6 field-type">
       {/* Заголовок и KPI — во всю ширину, над колонками: внутри левой колонки
           плитки в один ряд ужимались до ~128px и текст обрезался. */}
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -105,7 +107,7 @@ export function AdminEquipment() {
           <p className="mt-0.5 text-xs text-muted-foreground">Центр управления парком техники · данные из отчётов</p>
         </div>
         {canManage && <div className="flex gap-2">
-          <Button onClick={() => setShowCreate(true)} className="bg-signal text-white hover:bg-signal-strong">
+          <Button onClick={() => setShowCreate(true)} className="min-h-11 bg-signal text-white hover:bg-signal-strong sm:min-h-9">
             <PilingIcon name="add" size={16} decorative className="mr-1 !text-white" /> Добавить
           </Button>
         </div>}
@@ -137,7 +139,7 @@ export function AdminEquipment() {
                 {cards.length === 0 ? 'Нет установок' : 'Нет установок под выбранные фильтры'}
               </p>
               {cards.length > 0 && (
-                <button onClick={() => setFilters(EMPTY_FILTERS)} className="mt-2 text-xs text-info-strong underline">
+                <button onClick={() => setFilters(EMPTY_FILTERS)} className="mt-2 inline-flex min-h-11 items-center text-xs text-info-strong underline sm:min-h-0">
                   Сбросить фильтры
                 </button>
               )}
@@ -201,7 +203,7 @@ export function AdminEquipment() {
                     <PilingIcon name="close" size={16} decorative />
                   </button>
                 </div>
-                <EquipmentDetail equipmentId={selectedId} embedded />
+                <EquipmentDetail equipmentId={selectedId} embedded onSaved={refetch} />
               </div>
             ) : (
               <div className="flex h-full min-h-[200px] flex-col items-center justify-center rounded-xl border border-dashed border-border bg-muted/50 p-8 text-center">

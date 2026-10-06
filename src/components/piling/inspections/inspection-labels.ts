@@ -2,7 +2,8 @@ export type InspectionLevel = 'EO' | 'TO1' | 'TO2' | 'TO3' | 'SEASONAL';
 export type InspectionStatus = 'DRAFT' | 'COMPLETED';
 
 export const LEVEL_LABEL: Record<InspectionLevel, string> = {
-  EO: 'ЕО',
+  // F-R131 №9: «ЕО» без расшифровки. Ежедневный осмотр — самый частый вид.
+  EO: 'ЕО — ежедневный осмотр',
   TO1: 'ТО-1',
   TO2: 'ТО-2',
   TO3: 'ТО-3',

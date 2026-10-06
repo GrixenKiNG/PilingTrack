@@ -1,0 +1,8 @@
+import cp from 'node:child_process'; import https from 'node:https'; import http from 'node:http';
+(async()=>{const upstream=new URL(process.env.BASE_URL||'http://invalid');if(!['127.0.0.1','localhost'].includes(upstream.hostname))throw Error('Only local disposable upstream allowed');
+const pem=cp.execFileSync('C:/Program Files/Git/usr/bin/openssl.exe',['req','-x509','-newkey','rsa:2048','-nodes','-days','1','-subj','/CN=localhost','-addext','subjectAltName=IP:127.0.0.1,DNS:localhost','-keyout','-','-out','-'],{encoding:'utf8',windowsHide:true,stdio:['ignore','pipe','ignore']});
+const key=pem.match(/-----BEGIN PRIVATE KEY-----[\s\S]*?-----END PRIVATE KEY-----/)[0];const cert=pem.match(/-----BEGIN CERTIFICATE-----[\s\S]*?-----END CERTIFICATE-----/)[0];
+const server=https.createServer({key,cert},(req,res)=>{const target=http.request({hostname:upstream.hostname,port:upstream.port,path:req.url,method:req.method,headers:{...req.headers,'x-forwarded-proto':'https','x-forwarded-host':req.headers.host}},r=>{res.writeHead(r.statusCode,r.headers);r.pipe(res);});target.on('error',()=>{res.writeHead(502);res.end('Disposable upstream unavailable');});res.on('close',()=>target.destroy());req.pipe(target);});
+await new Promise(r=>server.listen(0,'127.0.0.1',r));const baseURL='https://127.0.0.1:'+server.address().port;console.log('Disposable HTTPS ready');
+try{const args=process.argv.slice(2);const child=cp.spawn(process.execPath,args,{env:{...process.env,BASE_URL:baseURL},windowsHide:true,stdio:'inherit'});process.exitCode=await new Promise((resolve,reject)=>{child.on('error',reject);child.on('exit',c=>resolve(c??1));});}finally{server.closeAllConnections();await new Promise(r=>server.close(r));}
+})().catch(e=>{console.error(e.message);process.exitCode=1});

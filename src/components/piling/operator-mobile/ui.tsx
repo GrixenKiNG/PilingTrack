@@ -300,12 +300,29 @@ export function PhaseBar({progress, onOpen}: {
   );
 }
 
-export function ErrorNote({message}: {message: string | null}) {
-  if (!message) return null;
+/**
+ * Отказ для машиниста: общая фраза и, если сервер их назвал, подробности под
+ * ней — какие поля паспорта или пункты осмотра не заполнены (аудит R76,
+ * находка 10; отбор строк — `operatorErrorDetails` в `api.ts`).
+ *
+ * Разметка — `div`, а не `p`: маркированный список внутри абзаца браузер
+ * разбирает по-своему, вынося его наружу. Размер текста прежний `text-sm`,
+ * списку он достаётся по наследству.
+ */
+export function ErrorNote({message, details}: {message: string | null; details?: string[]}) {
+  const lines = details ?? [];
+  if (!message && lines.length === 0) return null;
   return (
-    <p role="alert" className="rounded-lg border border-destructive/45 bg-destructive/8 p-3 text-sm font-medium text-destructive-strong">
-      {message}
-    </p>
+    <div role="alert" className="rounded-lg border border-destructive/45 bg-destructive/8 p-3 text-sm font-medium text-destructive-strong">
+      {message ? <p>{message}</p> : null}
+      {lines.length > 0 ? (
+        <ul className={cn('list-disc space-y-0.5 pl-5', message && 'mt-1')}>
+          {/* Подробности повторяются: «Пункт не заполнен» приходит на каждый
+              незаполненный пункт. Ключом берём место в списке. */}
+          {lines.map((line, index) => <li key={index}>{line}</li>)}
+        </ul>
+      ) : null}
+    </div>
   );
 }
 

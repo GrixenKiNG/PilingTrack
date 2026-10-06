@@ -1,3 +1,5 @@
+import { createTelegramDeliveryProgress } from '@/core/notifications/telegram-delivery-progress';
+import { SUBMITTED_REPORT_STATUS } from '@/lib/report-status';
 /**
  * Event Handlers — Concrete handlers for domain events
  *
@@ -11,7 +13,9 @@
 import { ReportDomainEvent, REPORT_DOMAIN_EVENT_TYPES } from '@/modules/reports/domain';
 import { on } from '@/services/reports/domain-events';
 import { logger } from '@/lib/logger';
+import { formatCountMeters } from '@/lib/format';
 import { formatDowntimeHours } from '@/lib/downtime-hours';
+import { pileLengthMeters } from '@/lib/pile-length';
 import { getRedisClient } from '@/lib/redis-cache';
 // Статически (в отличие от обработчиков ниже): динамический import этого
 // модуля не подменяется моком в юнит-тесте, и путь «тенант из отчёта» иначе
@@ -171,7 +175,7 @@ export async function recomputeSiteDailySummary(siteId: string, date: string) {
   // Только сданные: черновик идущей смены попадал в итог дня лишь тогда, когда
   // кто-то другой сдавал отчёт по тому же объекту, — и цифры дня плавали.
   const reports = await db.report.findMany({
-    where: { siteId, date, status: 'submitted' },
+    where: { siteId, date, status: SUBMITTED_REPORT_STATUS },
     select: {
       piles: { select: { count: true } },
       drillings: { select: { meters: true } },
@@ -482,10 +486,6 @@ function escapeHtml(value: string): string {
   return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
-function fmtNum(n: number): string {
-  return new Intl.NumberFormat('ru-RU').format(n);
-}
-
 /**
  * Тип события доставки PDF отчёта. Отправка идёт через outbox, как тревоги
  * (core/notifications/durable-alert): раньше PDF слался прямо из обработчика,
@@ -579,6 +579,11 @@ export async function deliverReportPdf(event: { id?: string; aggregateId: string
   const operatorName = (ctx.report?.lastEditedByName) || d.user?.name || '—';
 
   const totalPiles = d.piles.reduce((s, p) => s + (p.count || 0), 0);
+  const totalPileMeters = d.piles.reduce(
+    (s, p) => s + (p.count || 0) * pileLengthMeters({ gradeLengthMm: p.pileGrade?.lengthMm }),
+    0
+  );
+  const totalDrillingCount = d.drillings.reduce((s, x) => s + (x.count || 1), 0);
   const totalDrilling = d.drillings.reduce((s, x) => s + (x.meters || 0), 0);
   const totalDowntime = d.downtimes.reduce((s, x) => s + (x.duration || 0), 0);
 
@@ -599,8 +604,8 @@ export async function deliverReportPdf(event: { id?: string; aggregateId: string
     ...(isCorrection ? [`🖊 Изменил: <b>${escapeHtml(operatorName)}</b>`] : []),
     `🛠 Оборудование: ${escapeHtml(d.equipmentName || '—')}`,
     '',
-    `🔩 Свай забито: <b>${fmtNum(totalPiles)}</b> шт`,
-    `🌀 Бурение: <b>${fmtNum(totalDrilling)}</b> м.п.`,
+    `🔩 Свай забито: <b>${formatCountMeters(totalPiles, totalPileMeters)}</b>`,
+    `🌀 Бурение: <b>${formatCountMeters(totalDrillingCount, totalDrilling)}</b>`,
     `⏸ Простои: <b>${formatDowntimeHours(totalDowntime)}</b>`,
   ];
   const caption = lines.join('\n');
@@ -611,14 +616,20 @@ export async function deliverReportPdf(event: { id?: string; aggregateId: string
   // Строку события блокируем на время отправки: outbox-публикатор крутится и в
   // app, и в workers, а Telegram ключей идемпотентности не знает. Кто пришёл
   // вторым, видит published=true и выходит.
-  await db.$transaction(async (tx) => {
+  const complete = await db.$transaction(async (tx) => {
     await tx.$queryRaw`SELECT id FROM "OutboxEvent" WHERE id = ${event.id} FOR UPDATE`;
-    const row = await tx.outboxEvent.findUnique({ where: { id: event.id }, select: { published: true } });
-    if (!row || row.published) return;
-    const sent = await telegramNotifier.sendDocument(filename, pdfBuffer, caption);
-    if (!sent) throw new Error('Telegram не принял PDF отчёта; событие останется на повтор');
+    const row = await tx.outboxEvent.findUnique({ where: { id: event.id }, select: { published: true, payload: true } });
+    if (!row || row.published) return true;
+    const progress = createTelegramDeliveryProgress(row.payload, async (payload) => {
+      await tx.outboxEvent.update({ where: { id: event.id }, data: { payload } });
+    });
+    const sent = await telegramNotifier.sendDocument(filename, pdfBuffer, caption, progress);
+    // A partial batch must commit receipts before the outbox schedules retry.
+    if (!sent) return false;
     await tx.outboxEvent.update({ where: { id: event.id }, data: { published: true, publishedAt: new Date(), lastError: null } });
+    return true;
   }, { timeout: 60_000 });
+  if (!complete) throw new Error('Telegram не принял PDF отчёта; событие останется на повтор');
 }
 
 // ============================================================

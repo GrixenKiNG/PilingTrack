@@ -4,6 +4,7 @@ import {createShiftCommand} from '@/modules/readiness/application/shifts/command
 import {queryShifts} from '@/modules/readiness/application/shifts/queries';
 import {createShiftSchema} from '@/modules/readiness/application/shifts/schemas';
 import {parseReadinessReadFilters} from '@/modules/readiness/application/read-filters';
+import {SHIFT_STATES} from '@/modules/readiness/domain/shifts/types';
 import {withReadinessRequestTransaction, withReadinessSerializableTransaction} from '@/modules/readiness/infrastructure/tenant-transaction';
 import {resolveReadinessRequestContext} from '../_shared/request-context';
 import {readinessErrorResponse, readinessResponse} from '../_shared/response';
@@ -28,7 +29,7 @@ async function handleGet(request: NextRequest) {
       const timezone = (await tx.tenantSettings.findUnique({where: {tenantId: context.tenantId}, select: {timezone: true}}))?.timezone;
       const filters = parseReadinessReadFilters(p, timezone ?? undefined);
       const state = p.get('state') ?? filters.status; const type = p.get('type') ?? filters.shiftType;
-      if (state && !['PLANNED', 'STARTED', 'HANDOVER_PENDING', 'CLOSED', 'CANCELLED'].includes(state))
+      if (state && !(SHIFT_STATES as readonly string[]).includes(state))
         throw new ReadinessCommandError('VALIDATION_ERROR', 400, 'Неизвестное состояние смены');
       if (type && !['DAY', 'NIGHT'].includes(type)) throw new ReadinessCommandError('VALIDATION_ERROR', 400, 'Неизвестный тип смены');
       return queryShifts(tx, {tenantId: context.tenantId,

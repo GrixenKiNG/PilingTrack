@@ -26,9 +26,10 @@ import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { COMPACT_KPI_GRID, ScreenTitle, card } from '../settings/shared-ui';
 import { kpiGridStyle } from '@/components/piling/kpi-tile';
-import { RefKpi } from './shared';
+import { loadFailureMessage, RefKpi } from './shared';
 import { EquipmentPermitMatrix } from './equipment-permit-matrix';
 import { EmployeeCard, type ClearanceRow } from './employee-card';
+import { normalizeSearch } from '../shared/text-search';
 import { usePilingStore } from '@/lib/store';
 import { resolveEffectiveRole } from '@/lib/types';
 import { can } from '@/services/auth/authorization-service';
@@ -85,22 +86,24 @@ export function SafetyScreen(props: ReferenceUiProps) {
   // тому, кто действительно может выдать допуск.
   const mayManage = can(
     { ...(currentUser ?? { id: '', role: '' }), role: resolveEffectiveRole(currentUser?.role ?? '', actingAs) },
+    'safety.permits.manage',
+  );
+  // Ссылка «Карточка» ведёт в /admin/users — туда пускает только users.manage.
+  const mayOpenUsers = can(
+    { ...(currentUser ?? { id: '', role: '' }), role: resolveEffectiveRole(currentUser?.role ?? '', actingAs) },
     'users.manage',
   );
 
   const load = useCallback(async () => {
     try {
       const response = await authFetch('/api/safety/clearance');
-      if (!response.ok) {
-        const body = await response.json().catch(() => ({}));
-        throw new Error(body.error || `Сервер вернул ${response.status}`);
-      }
+      if (!response.ok) throw response;
       setData((await response.json()) as ClearanceOverview);
       setFailed(null);
     } catch (error) {
       // Пустой список вместо ошибки читался бы как «все допущены» — на экране
       // допусков это худшая из возможных подмен.
-      setFailed(error instanceof Error ? error.message : 'Не удалось загрузить допуски');
+      setFailed(await loadFailureMessage(error, 'Не удалось загрузить допуски'));
       setData(null);
     }
   }, []);
@@ -108,13 +111,13 @@ export function SafetyScreen(props: ReferenceUiProps) {
   // eslint-disable-next-line react-hooks/set-state-in-effect -- loads data on mount; the async loader sets state
   useEffect(() => { void load(); }, [load]);
 
-  const needle = query.trim().toLocaleLowerCase('ru-RU');
+  const needle = normalizeSearch(query);
   const visible = useMemo(() => {
     const rows = data?.rows ?? [];
     return rows
       .filter((row) => !needle
-        || row.name.toLocaleLowerCase('ru-RU').includes(needle)
-        || (ROLE_LABELS[row.role as UserRole] ?? row.role).toLocaleLowerCase('ru-RU').includes(needle))
+        || normalizeSearch(row.name).includes(needle)
+        || normalizeSearch(ROLE_LABELS[row.role as UserRole] ?? row.role).includes(needle))
       .slice()
       .sort((left, right) => severity(left) - severity(right) || left.name.localeCompare(right.name, 'ru-RU'));
   }, [data, needle]);
@@ -298,9 +301,16 @@ export function SafetyScreen(props: ReferenceUiProps) {
                     current?.id === row.userId ? null : { id: row.userId, name: row.name })}>
                   {selected?.id === row.userId ? 'Скрыть допуски' : 'Допуски к технике'}
                 </Button>
-                <Button asChild variant="outline" className="h-8 text-2xs">
-                  <Link href="/admin/users">Карточка</Link>
-                </Button>
+                {/* «Карточка» ведёт в /admin/users — раздел, закрытый правом
+                    users.manage (mayOpenUsers выше). Диспетчеру и
+                    инженеру ОТ — рабочим ролям этой вкладки — страница откажет
+                    и вернёт на дашборд, поэтому ссылку показываем только тому,
+                    кто её действительно откроет. */}
+                {mayOpenUsers && (
+                  <Button asChild variant="outline" className="h-8 text-2xs">
+                    <Link href="/admin/users">Карточка</Link>
+                  </Button>
+                )}
                 <Button variant="outline" className="h-8 text-2xs"
                   onClick={() => setCardRow(row)}>
                   Карточка ТБ и допуски

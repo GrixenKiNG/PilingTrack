@@ -9,6 +9,8 @@
  *   - outbox_pending_count: number of unpublished events
  *   - outbox_publish_rate: events published per second (5m avg)
  *   - projection_lag_seconds: age of oldest event not yet projected
+ *   - projection_pending_count: number of events not yet projected
+ *   - lag_snapshot_timestamp_seconds: last successful collection time
  *   - worker_is_leader: 1 if this instance is the leader, 0 otherwise
  *
  * Alerts:
@@ -39,6 +41,7 @@ export interface LagMetrics {
   outboxPendingCount: number;
   outboxPublishRate: number;       // events/sec (5m avg)
   projectionLagSeconds: number;
+  projectionPendingCount: number;
   outboxLeaderNodeId: string | null;
   projectionLeaderNodeId: string | null;
   isOutboxLeader: boolean;
@@ -80,7 +83,9 @@ const DEFAULT_CONFIG: LagMonitorConfig = {
 // ============================================================
 
 let monitorStarted = false;
-let lastKnownMetrics: LagMetrics | null = null;
+// Next instrumentation and route bundles can instantiate this module separately.
+const lagGlobal = globalThis as typeof globalThis & { __pilingtrackLagSnapshot?: { value: LagMetrics | null } };
+const sharedLag = lagGlobal.__pilingtrackLagSnapshot ??= { value: null };
 let config: LagMonitorConfig;
 
 async function getDbClient() {
@@ -95,8 +100,7 @@ async function getDbClient() {
 /**
  * Get current outbox lag: age of oldest unpublished event.
  */
-async function getOutboxLag(): Promise<{ lagSeconds: number; pendingCount: number; oldestPending?: Date }> {
-  const db = await getDbClient();
+async function getOutboxLag(db: Awaited<ReturnType<typeof getDbClient>>): Promise<{ lagSeconds: number; pendingCount: number; oldestPending?: Date }> {
   const result = await db.outboxEvent.findFirst({
     where: { published: false },
     orderBy: { createdAt: 'asc' },
@@ -120,8 +124,7 @@ async function getOutboxLag(): Promise<{ lagSeconds: number; pendingCount: numbe
 /**
  * Get exact pending count.
  */
-async function getPendingCount(): Promise<number> {
-  const db = await getDbClient();
+async function getPendingCount(db: Awaited<ReturnType<typeof getDbClient>>): Promise<number> {
   return db.outboxEvent.count({ where: { published: false } });
 }
 
@@ -141,8 +144,7 @@ async function getDlqPendingCount(): Promise<number> {
 /**
  * Estimate publish rate (events/sec) based on published events in last 5 minutes.
  */
-async function getPublishRate(): Promise<number> {
-  const db = await getDbClient();
+async function getPublishRate(db: Awaited<ReturnType<typeof getDbClient>>): Promise<number> {
   const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
   const count = await db.outboxEvent.count({
     where: {
@@ -155,14 +157,19 @@ async function getPublishRate(): Promise<number> {
 }
 
 /**
- * Get projection lag: for projection worker, it's the same as outbox lag
- * since projections consume outbox events.
+ * Measure projection backlog independently of publication and retry eligibility.
  */
-async function getProjectionLag(outboxLag: number): Promise<number> {
-  // Projection lag ≈ outbox lag + projection processing time
-  // We approximate it as outbox lag since they share the same queue
-  // For more accurate measurement, we'd need a separate projection_state table
-  return outboxLag;
+async function getProjectionLag(db: Awaited<ReturnType<typeof getDbClient>>): Promise<{ lagSeconds: number; pendingCount: number }> {
+  const result = await db.outboxEvent.aggregate({
+    where: { projected: false },
+    _count: { _all: true },
+    _min: { createdAt: true },
+  });
+  const oldest = result._min.createdAt;
+  return {
+    lagSeconds: oldest ? Math.max(0, Math.round((Date.now() - oldest.getTime()) / 1000)) : 0,
+    pendingCount: result._count._all,
+  };
 }
 
 // ============================================================
@@ -223,11 +230,13 @@ function evaluateAlerts(metrics: LagMetrics): LagAlert[] {
 // ============================================================
 
 async function collectLagMetrics(): Promise<LagMetrics> {
-  const [lagInfo, pendingCount, publishRate, dlqCount] = await Promise.all([
-    getOutboxLag(),
-    getPendingCount(),
-    getPublishRate(),
+  const db = await getDbClient();
+  const [lagInfo, pendingCount, publishRate, dlqCount, projectionInfo] = await Promise.all([
+    getOutboxLag(db),
+    getPendingCount(db),
+    getPublishRate(db),
     getDlqPendingCount(),
+    getProjectionLag(db),
   ]);
 
   const outboxElection = getOutboxLeaderElection();
@@ -237,7 +246,8 @@ async function collectLagMetrics(): Promise<LagMetrics> {
     outboxLagSeconds: lagInfo.lagSeconds,
     outboxPendingCount: pendingCount,
     outboxPublishRate: publishRate,
-    projectionLagSeconds: await getProjectionLag(lagInfo.lagSeconds),
+    projectionLagSeconds: projectionInfo.lagSeconds,
+    projectionPendingCount: projectionInfo.pendingCount,
     outboxLeaderNodeId: await outboxElection.getLeader() || null,
     projectionLeaderNodeId: await projectionElection.getLeader() || null,
     isOutboxLeader: outboxElection.isLeader(),
@@ -246,7 +256,7 @@ async function collectLagMetrics(): Promise<LagMetrics> {
     timestamp: new Date().toISOString(),
   };
 
-  lastKnownMetrics = metrics;
+  sharedLag.value = metrics;
   return metrics;
 }
 
@@ -258,7 +268,15 @@ async function collectLagMetrics(): Promise<LagMetrics> {
  * Export metrics в Prometheus text format.
  * Используется в /api/metrics endpoint.
  */
-export function exportPrometheusMetrics(metrics: LagMetrics): string {
+export function exportPrometheusMetrics(metrics: LagMetrics | null): string {
+  const timestamp = metrics ? Date.parse(metrics.timestamp) / 1000 : 0;
+  const freshness = [
+    '# HELP lag_snapshot_timestamp_seconds Unix time of last successful lag collection (0=unavailable)',
+    '# TYPE lag_snapshot_timestamp_seconds gauge',
+    'lag_snapshot_timestamp_seconds ' + (Number.isFinite(timestamp) ? Math.max(0, timestamp) : 0),
+    '',
+  ];
+  if (!metrics) return freshness.join('\n');
   const lines: string[] = [
     '# HELP outbox_lag_seconds Age of oldest unpublished outbox event',
     '# TYPE outbox_lag_seconds gauge',
@@ -272,9 +290,13 @@ export function exportPrometheusMetrics(metrics: LagMetrics): string {
     '# TYPE outbox_publish_rate gauge',
     `outbox_publish_rate ${metrics.outboxPublishRate}`,
     '',
-    '# HELP projection_lag_seconds Approximate projection processing lag',
+    '# HELP projection_lag_seconds Age of oldest outbox event not yet projected',
     '# TYPE projection_lag_seconds gauge',
     `projection_lag_seconds ${metrics.projectionLagSeconds}`,
+    '',
+    '# HELP projection_pending_count Number of outbox events not yet projected',
+    '# TYPE projection_pending_count gauge',
+    `projection_pending_count ${metrics.projectionPendingCount}`,
     '',
     '# HELP dlq_pending_count Number of events in Dead Letter Queue',
     '# TYPE dlq_pending_count gauge',
@@ -289,7 +311,7 @@ export function exportPrometheusMetrics(metrics: LagMetrics): string {
     `projection_leader{node_id="${metrics.projectionLeaderNodeId || 'none'}"} ${metrics.isProjectionLeader ? 1 : 0}`,
   ];
 
-  return lines.join('\n');
+  return [...freshness, ...lines].join('\n') + '\n';
 }
 
 // ============================================================
@@ -343,15 +365,15 @@ export function startLagMonitor(userConfig?: Partial<LagMonitorConfig>): void {
  * Get the most recent lag metrics.
  */
 export function getLagMetrics(): LagMetrics | null {
-  return lastKnownMetrics;
+  return sharedLag.value;
 }
 
 /**
  * Get current lag alerts.
  */
 export function getLagAlerts(): LagAlert[] {
-  if (!lastKnownMetrics) return [];
-  return evaluateAlerts(lastKnownMetrics);
+  if (!sharedLag.value) return [];
+  return evaluateAlerts(sharedLag.value);
 }
 
 /**

@@ -3,6 +3,7 @@
  * (plan management, hierarchy, user assignments)
  */
 
+import type { Prisma } from '@/generated/postgres-client/client';
 import { db } from '@/lib/db';
 import { ServiceError } from '@/lib/service-error';
 // eslint-disable-next-line no-restricted-imports -- legacy cross-layer import pending the parked services<->modules migration (CLAUDE.md); behavior-neutral
@@ -357,7 +358,11 @@ const HIERARCHY_TYPE_LABELS: Record<'field' | 'cluster' | 'picket', string> = {
  * Привязка `PileWork.picketId`/`LeaderDrilling.picketId` — `ON DELETE SET NULL`,
  * поэтому без этой проверки удаление узла молча теряло бы место работ.
  */
-async function countSubtreeProductionRows(type: 'field' | 'cluster' | 'picket', itemId: string) {
+async function countSubtreeProductionRows(
+  client: Prisma.TransactionClient,
+  type: 'field' | 'cluster' | 'picket',
+  itemId: string,
+) {
   const where =
     type === 'picket'
       ? { picketId: itemId }
@@ -366,16 +371,20 @@ async function countSubtreeProductionRows(type: 'field' | 'cluster' | 'picket', 
         : { picket: { cluster: { fieldId: itemId } } };
 
   const [piles, drillings] = await Promise.all([
-    db.pileWork.count({ where }),
-    db.leaderDrilling.count({ where }),
+    client.pileWork.count({ where }),
+    client.leaderDrilling.count({ where }),
   ]);
 
   return piles + drillings;
 }
 
 /** Отказ 409, если на узле или в его поддереве есть выработка. */
-async function assertNoSubtreeProduction(type: 'field' | 'cluster' | 'picket', itemId: string) {
-  const rows = await countSubtreeProductionRows(type, itemId);
+async function assertNoSubtreeProduction(
+  client: Prisma.TransactionClient,
+  type: 'field' | 'cluster' | 'picket',
+  itemId: string,
+) {
+  const rows = await countSubtreeProductionRows(client, type, itemId);
   if (rows > 0) {
     throw new ServiceError(
       `Нельзя удалить ${HIERARCHY_TYPE_LABELS[type]}: на нём ${rows} записей выработки. Сначала перенесите их.`,
@@ -434,27 +443,44 @@ export async function deleteSiteHierarchyItem(siteId: string, type: string, item
 
   await requireTenantSite(siteId, ctx.tenantId);
   if (type === 'field') {
-    const item = await db.pileField.findFirst({ where: { id: itemId, siteId }, select: { id: true } });
-    if (!item) throw new ServiceError('Hierarchy item not found', 404);
-    await assertNoSubtreeProduction('field', itemId);
-    await db.pileField.delete({ where: { id: itemId } });
-    return { success: true };
+    return db.$transaction(async (tx) => {
+      // Блокируем всё поддерево сверху вниз в одном порядке: поле → его кусты →
+      // их пикеты. Одного поля мало: чужой INSERT выработки берёт FOR KEY SHARE
+      // на пикете (FK `picketId`), а не на поле, и блокировка предка ему не
+      // мешает (F-R39-RACE2). Только после блокировок — подсчёт и удаление.
+      await tx.$queryRaw<Array<{ id: string }>>`SELECT id FROM "PileField" WHERE id = ${itemId} FOR UPDATE`;
+      await tx.$queryRaw<Array<{ id: string }>>`SELECT id FROM "Cluster" WHERE "fieldId" = ${itemId} ORDER BY id FOR UPDATE`;
+      await tx.$queryRaw<Array<{ id: string }>>`SELECT id FROM "Picket" WHERE "clusterId" IN (SELECT id FROM "Cluster" WHERE "fieldId" = ${itemId}) ORDER BY id FOR UPDATE`;
+      const item = await tx.pileField.findFirst({ where: { id: itemId, siteId }, select: { id: true } });
+      if (!item) throw new ServiceError('Hierarchy item not found', 404);
+      await assertNoSubtreeProduction(tx, 'field', itemId);
+      await tx.pileField.delete({ where: { id: itemId } });
+      return { success: true };
+    });
   }
 
   if (type === 'cluster') {
-    const item = await db.cluster.findFirst({ where: { id: itemId, field: { siteId } }, select: { id: true } });
-    if (!item) throw new ServiceError('Hierarchy item not found', 404);
-    await assertNoSubtreeProduction('cluster', itemId);
-    await db.cluster.delete({ where: { id: itemId } });
-    return { success: true };
+    return db.$transaction(async (tx) => {
+      // Куст → его пикеты (F-R39-RACE2).
+      await tx.$queryRaw<Array<{ id: string }>>`SELECT id FROM "Cluster" WHERE id = ${itemId} FOR UPDATE`;
+      await tx.$queryRaw<Array<{ id: string }>>`SELECT id FROM "Picket" WHERE "clusterId" = ${itemId} ORDER BY id FOR UPDATE`;
+      const item = await tx.cluster.findFirst({ where: { id: itemId, field: { siteId } }, select: { id: true } });
+      if (!item) throw new ServiceError('Hierarchy item not found', 404);
+      await assertNoSubtreeProduction(tx, 'cluster', itemId);
+      await tx.cluster.delete({ where: { id: itemId } });
+      return { success: true };
+    });
   }
 
   if (type === 'picket') {
-    const item = await db.picket.findFirst({ where: { id: itemId, cluster: { field: { siteId } } }, select: { id: true } });
-    if (!item) throw new ServiceError('Hierarchy item not found', 404);
-    await assertNoSubtreeProduction('picket', itemId);
-    await db.picket.delete({ where: { id: itemId } });
-    return { success: true };
+    return db.$transaction(async (tx) => {
+      await tx.$queryRaw<Array<{ id: string }>>`SELECT id FROM "Picket" WHERE id = ${itemId} FOR UPDATE`;
+      const item = await tx.picket.findFirst({ where: { id: itemId, cluster: { field: { siteId } } }, select: { id: true } });
+      if (!item) throw new ServiceError('Hierarchy item not found', 404);
+      await assertNoSubtreeProduction(tx, 'picket', itemId);
+      await tx.picket.delete({ where: { id: itemId } });
+      return { success: true };
+    });
   }
 
   throw new ServiceError('Invalid type', 400);

@@ -11,6 +11,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { useDocumentTitle } from '@/components/piling/ops-shell';
 import {
   AlertTriangle,
   CalendarDays,
@@ -41,7 +42,7 @@ import {
   type MaintenanceStatus,
   type MaintenancePriority,
 } from './maintenance-labels';
-import { buildMaintenanceQuery, resolveAssigneeName, type MaintenanceFilter } from './maintenance-helpers';
+import { buildMaintenanceQuery, resolveAssigneeName, maintenanceErrorText, maintenanceCatchText, type MaintenanceFilter } from './maintenance-helpers';
 import {
   crewForRecord,
   type AssigneeOption,
@@ -54,17 +55,23 @@ import { QuickChip } from './maintenance-board-bits';
 import { MaintenanceDetailPanel } from './maintenance-detail-panel';
 import { WorkOrderTable } from './work-order-table';
 import { WorkOrderFormDialog } from './work-order-form-dialog';
+import { ConfirmActionDialog } from '@/components/piling/confirm-action-dialog';
 
 const ALL = '__all__';
 const PAGE_SIZE_OPTIONS = [10, 25, 50] as const;
 
 export function MaintenanceBoard() {
+  useDocumentTitle('Наряды ТО');
   const [records, setRecords] = useState<WorkOrderRow[]>([]);
   const [equipment, setEquipment] = useState<EquipmentDTO[]>([]);
   const [sites, setSites] = useState<SiteOption[]>([]);
   const [crews, setCrews] = useState<CrewAssignment[]>([]);
   const [assignees, setAssignees] = useState<AssigneeOption[]>([]);
   const [filterError, setFilterError] = useState<string | null>(null);
+  // Почему журнал не показан: текст отказа чтения. Раньше на сбое рядом с красным
+  // тостом оставался серый «Нарядов … не найдено» — экран утверждал, что нарядов
+  // нет, хотя список просто не прочитался (F-R122-11).
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [filter, setFilter] = useState<MaintenanceFilter>({});
   const [equipmentFilterId, setEquipmentFilterId] = useState('');
   const [siteFilterId, setSiteFilterId] = useState('');
@@ -75,6 +82,9 @@ export function MaintenanceBoard() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingEquipmentId, setEditingEquipmentId] = useState<string | null>(null);
   const [busyAction, setBusyAction] = useState<string | null>(null);
+  // Наряд, ожидающий подтверждения закрытия: закрытие необратимо (сдвиг
+  // регламента и запись показания счётчика), а «галочка» стоит в ряду действий.
+  const [pendingDone, setPendingDone] = useState<WorkOrderRow | null>(null);
   const [pageSize, setPageSize] = useState<number>(10);
   const [page, setPage] = useState(1);
 
@@ -83,14 +93,27 @@ export function MaintenanceBoard() {
     [assignees],
   );
 
-  const load = useCallback(async () => {
+  // Возвращает признак успеха, чтобы вызывающий знал, перечитан ли журнал.
+  // `quiet = true` — перечитывание ради 409: тост об отказе скажет сам
+  // вызывающий, иначе человек получит два противоречащих сообщения.
+  const load = useCallback(async (quiet = false): Promise<boolean> => {
     setLoading(true);
     try {
       const res = await authFetch(`/api/maintenance${buildMaintenanceQuery(filter)}`);
-      if (!res.ok) throw new Error();
+      // 403 (нет права), 5xx и прочие отказы — разные причины: раньше все они
+      // звучали как «не удалось загрузить», и отказ по правам не отличался от сбоя.
+      if (!res.ok) {
+        if (!quiet) toast.error(maintenanceErrorText(res.status));
+        setLoadError(maintenanceErrorText(res.status));
+        return false;
+      }
       setRecords(((await res.json()).records ?? []) as WorkOrderRow[]);
-    } catch {
-      toast.error('Не удалось загрузить наряды ТО');
+      setLoadError(null);
+      return true;
+    } catch (err) {
+      if (!quiet) toast.error(maintenanceCatchText(err, 'Не удалось загрузить наряды ТО'));
+      setLoadError(maintenanceCatchText(err, 'Не удалось загрузить наряды ТО'));
+      return false;
     } finally {
       setLoading(false);
     }
@@ -210,12 +233,23 @@ export function MaintenanceBoard() {
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || 'Ошибка сохранения');
+        if (res.status === 409) {
+          // Наряд изменили или приняли, пока экран был открыт. Перечитываем его,
+          // иначе повтор кнопкой снова упрётся в тот же 409. Обещать «данные
+          // обновлены» можно только после удачного перечитывания: если журнал
+          // не прочитался, строка на экране прежняя и повтор по ней бессмыслен.
+          const reloaded = await load(true);
+          toast.error(reloaded
+            ? 'Запись изменилась — данные обновлены, повторите действие.'
+            : 'Данные изменил другой пользователь, обновите страницу.');
+          return;
+        }
+        throw new Error(maintenanceErrorText(res.status, err.error));
       }
       toast.success(status === 'DONE' ? 'ТО закрыто' : 'Статус обновлён');
       await load();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Ошибка сохранения');
+      toast.error(maintenanceCatchText(err, 'Ошибка сохранения'));
     } finally {
       setBusyAction(null);
     }
@@ -229,12 +263,12 @@ export function MaintenanceBoard() {
       const res = await authFetch(`/api/equipment/${record.equipmentId}/maintenance/${record.id}`, { method: 'DELETE' });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || 'Ошибка удаления');
+        throw new Error(maintenanceErrorText(res.status, err.error));
       }
       toast.success('ТО удалено');
       await load();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Ошибка удаления');
+      toast.error(maintenanceCatchText(err, 'Ошибка удаления'));
     } finally {
       setBusyAction(null);
     }
@@ -278,7 +312,7 @@ export function MaintenanceBoard() {
 
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <Select value={equipmentFilterId || ALL} onValueChange={(value) => setEquipmentFilterId(value === ALL ? '' : value)}>
-              <SelectTrigger className="h-9 w-[138px]"><SelectValue placeholder="Все установки" /></SelectTrigger>
+              <SelectTrigger className="min-h-11 h-9 w-[138px] sm:min-h-0" aria-label="Фильтр по установке"><SelectValue placeholder="Все установки" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value={ALL}>Все установки</SelectItem>
                 {equipmentOptions.map(([id, name]) => (
@@ -288,7 +322,7 @@ export function MaintenanceBoard() {
             </Select>
 
             <Select value={siteFilterId || ALL} onValueChange={(value) => setSiteFilterId(value === ALL ? '' : value)}>
-              <SelectTrigger className="h-9 w-[128px]"><SelectValue placeholder="Все объекты" /></SelectTrigger>
+              <SelectTrigger className="min-h-11 h-9 w-[128px] sm:min-h-0" aria-label="Фильтр по объекту"><SelectValue placeholder="Все объекты" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value={ALL}>Все объекты</SelectItem>
                 {siteOptions.map(([id, name]) => (
@@ -298,7 +332,7 @@ export function MaintenanceBoard() {
             </Select>
 
             <Select value={filter.assigneeId || ALL} onValueChange={(value) => setF('assigneeId', value)}>
-              <SelectTrigger className="h-9 w-[150px]"><SelectValue placeholder="Все исполнители" /></SelectTrigger>
+              <SelectTrigger className="min-h-11 h-9 w-[150px] sm:min-h-0" aria-label="Фильтр по исполнителю"><SelectValue placeholder="Все исполнители" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value={ALL}>Все исполнители</SelectItem>
                 {assignees.map((user) => (
@@ -308,7 +342,7 @@ export function MaintenanceBoard() {
             </Select>
 
             <Select value={filter.type || ALL} onValueChange={(value) => setF('type', value)}>
-              <SelectTrigger className="h-9 w-[118px]"><SelectValue placeholder="Тип ТО" /></SelectTrigger>
+              <SelectTrigger className="min-h-11 h-9 w-[118px] sm:min-h-0" aria-label="Фильтр по типу ТО"><SelectValue placeholder="Тип ТО" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value={ALL}>Все типы</SelectItem>
                 {MAINTENANCE_TYPE_OPTIONS.map((key) => (
@@ -318,7 +352,7 @@ export function MaintenanceBoard() {
             </Select>
 
             <Select value={filter.priority || ALL} onValueChange={(value) => setF('priority', value)}>
-              <SelectTrigger className="h-9 w-[128px]"><SelectValue placeholder="Приоритет" /></SelectTrigger>
+              <SelectTrigger className="min-h-11 h-9 w-[128px] sm:min-h-0" aria-label="Фильтр по приоритету"><SelectValue placeholder="Приоритет" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value={ALL}>Приоритет</SelectItem>
                 {(Object.keys(PRIORITY_LABEL) as MaintenancePriority[]).map((key) => (
@@ -332,20 +366,32 @@ export function MaintenanceBoard() {
               <CalendarDays className="h-4 w-4 text-muted-foreground" />
             </div>
 
-            <Button onClick={() => { setEditingId(null); setEditingEquipmentId(null); setDialogOpen(true); }} size="sm" className="h-9 bg-signal text-white hover:bg-signal-strong">
+            <Button onClick={() => { setEditingId(null); setEditingEquipmentId(null); setDialogOpen(true); }} size="sm" className="h-11 bg-signal text-white hover:bg-signal-strong sm:h-9">
               <Plus className="mr-1.5 h-4 w-4" /> Задача ТО
             </Button>
-            <Button variant="outline" size="sm" className="h-9" asChild>
-              {/* План-график ТО — это регламенты в модуле техготовности, а не
-                  редактор чек-листов осмотра, куда вела кнопка раньше. */}
-              <Link href="/admin/to?view=plans"><CalendarDays className="mr-1.5 h-4 w-4" /> План-график</Link>
-            </Button>
+            {/* Кнопка «План-график» вела на /admin/to?view=plans, а тот режим
+                открывает раздел «Обслуживание» без регламентов ТО: ссылка
+                обещала экран, которого нет. Панель регламентов из интерфейса
+                недостижима, поэтому вместо мёртвой ссылки — честная подпись. */}
+            <span className="flex h-9 items-center gap-1.5 text-xs text-muted-foreground">
+              <CalendarDays className="h-4 w-4" />
+              План-график ТО настраивается в техподдержке
+            </span>
           </div>
         </section>
 
         <section className="overflow-hidden rounded-lg border border-border bg-card">
           {loading ? (
             <div className="px-3 py-10 text-center text-sm text-muted-foreground">Загрузка…</div>
+          ) : loadError && shownRecords.length === 0 ? (
+            // Сбой чтения — не «нарядов нет»: показываем отказ с повтором, иначе
+            // серый текст противоречил красному тосту об ошибке (F-R122-11).
+            <div className="px-3 py-10 text-center text-sm text-muted-foreground">
+              <p>{loadError}</p>
+              <Button size="sm" variant="outline" className="mt-3 min-h-11 sm:min-h-0" onClick={() => void load()}>
+                Повторить
+              </Button>
+            </div>
           ) : shownRecords.length === 0 ? (
             <div className="px-3 py-10 text-center text-sm text-muted-foreground">Нарядов по выбранным фильтрам не найдено.</div>
           ) : (
@@ -356,17 +402,21 @@ export function MaintenanceBoard() {
               busyAction={busyAction}
               onSelect={setSelectedId}
               onEdit={openEdit}
-              onDone={(record) => void updateRecordStatus(record, 'DONE')}
+              onDone={(record) => setPendingDone(record)}
               onDelete={(record) => void deleteRecord(record)}
             />
           )}
         </section>
 
-        <div className="flex items-center justify-between px-1 pb-2 text-xs text-muted-foreground">
+        {/* F-R126-1: на 375 px строка пагинации (блок «Показать по:» + номера
+            страниц по 44 px) не влезала и растягивала страницу до 503 px —
+            единственный экран админки с горизонтальной прокруткой. flex-wrap
+            переносит блоки, gap-2 даёт отступ при переносе. */}
+        <div className="flex flex-wrap items-center justify-between gap-2 px-1 pb-2 text-xs text-muted-foreground">
           <div className="flex items-center gap-2">
             <span>Показать по:</span>
             <Select value={String(pageSize)} onValueChange={(value) => setPageSize(Number(value))}>
-              <SelectTrigger className="h-8 w-[74px] bg-card font-mono">
+              <SelectTrigger className="min-h-11 h-8 w-[74px] bg-card font-mono sm:min-h-0">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -394,7 +444,7 @@ export function MaintenanceBoard() {
                 type="button"
                 onClick={() => setPage(pageNumber)}
                 className={cn(
-                  'h-8 w-8 rounded-md border font-mono',
+                  'h-11 w-11 rounded-md border font-mono sm:h-8 sm:w-8',
                   pageNumber === safePage
                     ? 'border-info/30 bg-info/10 text-info-strong'
                     : 'border-border bg-card text-foreground',
@@ -422,9 +472,20 @@ export function MaintenanceBoard() {
         crew={selected ? crewForRecord(selected, crewByEquipment) : null}
         assigneeName={selected ? resolveAssigneeName(selected.assigneeId, assigneeNames) : '—'}
         busyAction={busyAction}
-        onClose={(record) => updateRecordStatus(record, 'DONE')}
+        onClose={async (record) => { setPendingDone(record); }}
       />
       </div>
+
+      <ConfirmActionDialog
+        open={Boolean(pendingDone)}
+        onOpenChange={(open) => { if (!open) setPendingDone(null); }}
+        title="Закрыть наряд ТО?"
+        description={pendingDone
+          ? `Наряд «${pendingDone.title}» будет отмечен выполненным: регламент ТО сдвинется, а показание счётчика запишется в журнал.`
+          : ''}
+        confirmLabel="Закрыть наряд"
+        onConfirm={() => { const record = pendingDone; if (record) void updateRecordStatus(record, 'DONE'); }}
+      />
 
       <WorkOrderFormDialog
         open={dialogOpen}

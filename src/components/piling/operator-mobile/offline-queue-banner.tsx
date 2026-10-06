@@ -1,7 +1,23 @@
 'use client';
 
-import {useState} from 'react';
-import {AUTH_WAIT_MESSAGE, describeCommand, type QueuedCommand} from './offline-queue';
+import {useEffect, useState} from 'react';
+import {usePilingStore} from '@/lib/store';
+import {isHumanRussianText} from './api';
+import {
+  AUTH_WAIT_MESSAGE, describeCommand, foreignQueueSummary, subscribeQueue, type QueuedCommand,
+} from './offline-queue';
+
+/** Чужие записи на устройстве; перечитываются при смене очереди и вошедшего. */
+function useForeignQueue() {
+  const ownerId = usePilingStore((state) => state.currentUser?.id ?? null);
+  const [summary, setSummary] = useState(() => ({count: 0, owners: [] as string[]}));
+  useEffect(() => {
+    const sync = () => setSummary(foreignQueueSummary());
+    sync();
+    return subscribeQueue(sync);
+  }, [ownerId]);
+  return summary;
+}
 
 /**
  * Что записано на устройстве и ещё не ушло на сервер — одна плашка для всех
@@ -12,36 +28,88 @@ import {AUTH_WAIT_MESSAGE, describeCommand, type QueuedCommand} from './offline-
  * отвергнутые — каждую отдельно, с составом записи (чтобы внести её заново)
  * и тремя выходами: повторить, показать, что введено, убрать с устройства.
  */
-export function OfflineQueueBanner({items, onRetry, onDiscard, className = 'space-y-1 px-3 pt-2'}: {
+export function OfflineQueueBanner({items, onRetry, onDiscard, shownElsewhere = null, className = 'space-y-1 px-3 pt-2'}: {
   items: QueuedCommand[];
   onRetry: (clientCommandId: string) => void;
   onDiscard: (clientCommandId: string) => void;
+  /**
+   * Причина, которую экран уже показывает у кнопки (`actionError`).
+   *
+   * Одна и та же фраза отказа стояла дважды: карточкой очереди и `ErrorNote`
+   * на экране. Если причина карточки совпадает с этой строкой, в карточке её
+   * не печатаем — состав и кнопки остаются (аудит R89, находка 3).
+   */
+  shownElsewhere?: string | null;
   className?: string;
 }) {
-  if (items.length === 0) return null;
+  const foreign = useForeignQueue();
+  if (items.length === 0 && foreign.count === 0) return null;
   const failed = items.filter((item) => item.state === 'FAILED');
   const pending = items.filter((item) => item.state === 'PENDING');
   const waitsForLogin = pending.some((item) => item.lastError === AUTH_WAIT_MESSAGE);
+  /*
+    Отказ сервера от обрыва связи отличаем по языку строки: сетевой сбой
+    браузера и таймаут приходят англоязычным текстом («Failed to fetch»,
+    «Load failed», «signal timed out»), а отказ сервера — русским (`markAttempt`
+    кладёт `error.message`, а он у `ApiError` прочитан из тела ответа).
+    Без этого 500/503/429 выглядели как «ждём связи», хотя связь есть
+    (аудит R76, находка 6). `AUTH_WAIT_MESSAGE` разбирается отдельной ветвью.
+  */
+  /*
+    Один и тот же отказ приходит от каждой ждущей записи: пять записей с 503
+    давали пять одинаковых фраз подряд. Сворачиваем повторы, сохраняя порядок
+    первого появления, и дописываем «(×N)» — сколько записей ждут по этой
+    причине.
+  */
+  const serverReasons = Array.from(
+    pending
+      .map((item) => item.lastError)
+      .filter((text): text is string =>
+        isHumanRussianText(text) && text !== AUTH_WAIT_MESSAGE)
+      .reduce((counts, text) => counts.set(text, (counts.get(text) ?? 0) + 1), new Map<string, number>()),
+    ([text, count]) => (count > 1 ? `${text} (×${count})` : text),
+  );
 
   return (
     <div className={className} data-testid="offline-queue-banner">
+      {foreign.count > 0 && (
+        /*
+          Записи прежнего владельца телефона от имени вошедшего не уходят —
+          выработка досталась бы не тому. Но без этой строки они терялись
+          молча, если хозяин больше не входил на этом телефоне (аудит R43 №2).
+        */
+        <div role="status" className="rounded-xl border border-warning bg-warning/10 px-3 py-2 text-2xs font-medium text-warning-strong">
+          На телефоне лежат неотправленные записи другого сотрудника
+          {foreign.owners.length > 0 ? ` (${foreign.owners.join(', ')})` : ''}: {foreign.count}.
+          {' '}Они уйдут, когда владелец войдёт на этом телефоне. Сообщите ему или мастеру.
+        </div>
+      )}
       {pending.length > 0 && (
         <div role="status" className="rounded-xl border border-warning bg-warning/10 px-3 py-2 text-2xs font-medium text-warning-strong">
           На устройстве: {pending.map((item) => item.label).join(', ')}.{' '}
-          {waitsForLogin ? AUTH_WAIT_MESSAGE : 'Отправим, когда появится связь.'}
+          {waitsForLogin
+            ? AUTH_WAIT_MESSAGE
+            : serverReasons.length > 0
+              ? 'Сервер не принял запись, повторим автоматически.'
+              : 'Отправим, когда появится связь.'}
+          {serverReasons.length > 0 && (
+            <span className="mt-1 block font-normal">{serverReasons.join(' · ')}</span>
+          )}
         </div>
       )}
       {failed.map((item) => (
-        <FailedItem key={item.clientCommandId} item={item} onRetry={onRetry} onDiscard={onDiscard} />
+        <FailedItem key={item.clientCommandId} item={item} onRetry={onRetry} onDiscard={onDiscard}
+          shownElsewhere={shownElsewhere} />
       ))}
     </div>
   );
 }
 
-function FailedItem({item, onRetry, onDiscard}: {
+function FailedItem({item, onRetry, onDiscard, shownElsewhere}: {
   item: QueuedCommand;
   onRetry: (clientCommandId: string) => void;
   onDiscard: (clientCommandId: string) => void;
+  shownElsewhere: string | null;
 }) {
   const [open, setOpen] = useState(false);
   const [confirming, setConfirming] = useState(false);
@@ -49,12 +117,24 @@ function FailedItem({item, onRetry, onDiscard}: {
   const when = Number.isNaN(queuedAt.getTime())
     ? ''
     : queuedAt.toLocaleString('ru-RU', {day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'});
+  /*
+    Ту же причину уже печатает `ErrorNote` у кнопки на экране. Второй раз
+    повторять её в карточке незачем — машинист видит одну фразу дважды
+    (аудит R89, находка 3). Состав записи и кнопки остаются на месте.
+  */
+  const reasonShownElsewhere = !!shownElsewhere && item.lastError === shownElsewhere;
 
   return (
     <div role="alert" className="space-y-2 rounded-xl border border-destructive bg-destructive/10 px-3 py-2 text-2xs font-medium text-destructive-strong">
       <p className="min-w-0 break-words">
-        {item.label} не принята: {item.lastError ?? 'причина неизвестна'}
+        {item.label} не принята
       </p>
+      {/* Причина отказа сервера — главное на карточке: по ней решают, поможет ли повтор. */}
+      {!reasonShownElsewhere && (
+        <p className="min-w-0 break-words text-sm font-semibold">
+          {item.lastError ?? 'причина неизвестна'}
+        </p>
+      )}
       {open && (
         <p className="break-words font-normal text-foreground">
           Введено{when ? ` ${when}` : ''}: {describeCommand(item.command)}
@@ -74,19 +154,26 @@ function FailedItem({item, onRetry, onDiscard}: {
           </button>
         </div>
       ) : (
-        <div className="flex flex-wrap gap-2">
-          <button type="button" onClick={() => onRetry(item.clientCommandId)}
-            className="rounded border border-destructive px-2 py-1 font-semibold">
-            Повторить
-          </button>
-          <button type="button" onClick={() => setOpen((value) => !value)} aria-expanded={open}
-            className="rounded border border-destructive px-2 py-1 font-semibold">
-            {open ? 'Скрыть' : 'Что введено'}
-          </button>
-          <button type="button" onClick={() => { setOpen(true); setConfirming(true); }}
-            className="rounded border border-destructive px-2 py-1 font-semibold">
-            Убрать
-          </button>
+        <div className="space-y-2">
+          <div className="flex flex-wrap gap-2">
+            <button type="button" onClick={() => { setOpen(true); setConfirming(true); }}
+              className="rounded border border-destructive bg-destructive px-2 py-1 font-semibold text-white">
+              Удалить запись
+            </button>
+            <button type="button" onClick={() => setOpen((value) => !value)} aria-expanded={open}
+              className="rounded border border-destructive px-2 py-1 font-semibold">
+              {open ? 'Скрыть' : 'Что введено'}
+            </button>
+          </div>
+          <div className="space-y-1">
+            <button type="button" onClick={() => onRetry(item.clientCommandId)}
+              className="rounded border border-destructive px-2 py-1 font-normal">
+              Повторить
+            </button>
+            <p className="break-words font-normal text-foreground">
+              Повтор отправит то же самое — поможет, только если причина уже устранена (смену переоткрыли, справочник поправили)
+            </p>
+          </div>
         </div>
       )}
     </div>

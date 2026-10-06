@@ -7,6 +7,7 @@
  * Knows about Prisma; domain layer does not.
  */
 
+import type { Prisma } from '@/generated/postgres-client/client';
 import { db, DEFAULT_TX_OPTIONS } from '@/lib/db';
 import { reconcileReportEntries } from './reconcile-report-entries';
 import { ServiceError } from '@/lib/service-error';
@@ -29,6 +30,14 @@ export interface SaveHooks {
    */
   expectedVersion?: number;
 }
+
+/**
+ * Клиент записи: обычная база или уже открытая транзакция. Команда отчёта
+ * берёт на свою транзакцию advisory-замок по естественному ключу и выполняет
+ * в ней и чтение, и запись (F-R38-1) — тогда как методы без клиента работают
+ * как раньше.
+ */
+export type ReportClient = Prisma.TransactionClient;
 
 /**
  * Map domain events to outbox database records.
@@ -63,12 +72,13 @@ function mapEventsToOutboxData(
 }
 
 export interface ReportRepository {
-  save(aggregate: ReportAggregate, hooks?: SaveHooks): Promise<void>;
-  findById(reportId: string): Promise<ReportAggregate | null>;
+  save(aggregate: ReportAggregate, hooks?: SaveHooks, client?: ReportClient): Promise<void>;
+  findById(reportId: string, client?: ReportClient): Promise<ReportAggregate | null>;
   findByUserIdAndDate(
     userId: string,
     siteId: string,
-    date: string
+    date: string,
+    client?: ReportClient
   ): Promise<ReportAggregate | null>;
 }
 
@@ -83,11 +93,19 @@ export class PrismaReportRepository implements ReportRepository {
    * exactly-once consumers to receive them twice. That dual-write has been
    * removed.
    */
-  async save(aggregate: ReportAggregate, hooks?: SaveHooks): Promise<void> {
+  async save(
+    aggregate: ReportAggregate,
+    hooks?: SaveHooks,
+    client?: ReportClient
+  ): Promise<void> {
     const state = aggregate.getState();
 
+    // Тело записи — отдельная функция, потому что его же выполняет команда
+    // отчёта внутри своей транзакции, поднятой под advisory-замком по
+    // естественному ключу (F-R38-1): вложенную транзакцию там открывать
+    // нельзя. Без внешнего клиента поведение прежнее — своя транзакция.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Prisma interactive-transaction callback client type isn't cleanly exported
-    await db.$transaction(async (tx: any) => {
+    const write = async (tx: any) => {
       const existing = await tx.report.findUnique({
         where: { reportId: state.reportId },
         select: { id: true, version: true, tenantId: true, shiftId: true },
@@ -244,7 +262,13 @@ export class PrismaReportRepository implements ReportRepository {
       if (hooks?.onBeforeCommit) {
         await hooks.onBeforeCommit(tx);
       }
-    }, DEFAULT_TX_OPTIONS);
+    };
+
+    if (client) {
+      await write(client);
+    } else {
+      await db.$transaction(write, DEFAULT_TX_OPTIONS);
+    }
 
     // Clear pending events after successful persistence. Downstream
     // consumers pick up events via the outbox table, which was written in
@@ -255,8 +279,8 @@ export class PrismaReportRepository implements ReportRepository {
   /**
    * Find aggregate by reportId and reconstitute it.
    */
-  async findById(reportId: string): Promise<ReportAggregate | null> {
-    const prismaReport = await db.report.findUnique({
+  async findById(reportId: string, client: ReportClient = db): Promise<ReportAggregate | null> {
+    const prismaReport = await client.report.findUnique({
       where: { reportId },
       include: {
         piles: true,
@@ -277,9 +301,10 @@ export class PrismaReportRepository implements ReportRepository {
   async findByUserIdAndDate(
     userId: string,
     siteId: string,
-    date: string
+    date: string,
+    client: ReportClient = db
   ): Promise<ReportAggregate | null> {
-    const prismaReport = await db.report.findFirst({
+    const prismaReport = await client.report.findFirst({
       where: { userId, siteId, date, shiftId: null },
       orderBy: { createdAt: 'desc' },
       include: {

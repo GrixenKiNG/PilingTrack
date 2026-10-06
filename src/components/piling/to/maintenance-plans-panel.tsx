@@ -16,7 +16,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import type { PmDueStatus } from '@/lib/pm-due';
-import { LoadFailure, loadFailureText } from '@/components/piling/to/load-failure';
+import { LoadFailure, loadFailureText, catchText } from '@/components/piling/to/load-failure';
 
 interface PlanDue {
   status: PmDueStatus;
@@ -72,7 +72,6 @@ export function MaintenancePlansPanel({ equipmentId }: { equipmentId: string }) 
       if (!res.ok && res.status !== 404) {
         setPlans([]);
         setLoadError(loadFailureText(res.status));
-        toast.error('Не удалось загрузить регламенты');
         return;
       }
       const body = res.ok ? await res.json() as { plans?: Plan[] } : {};
@@ -81,7 +80,6 @@ export function MaintenancePlansPanel({ equipmentId }: { equipmentId: string }) 
     } catch {
       setPlans([]);
       setLoadError(loadFailureText(null));
-      toast.error('Не удалось загрузить регламенты');
     } finally {
       setLoading(false);
     }
@@ -136,7 +134,8 @@ export function MaintenancePlansPanel({ equipmentId }: { equipmentId: string }) 
       resetForm();
       await load(equipmentId);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Не удалось сохранить регламент');
+      // Обрыв сети fetch бросает TypeError с английским «Failed to fetch» (F-R112-2).
+      toast.error(catchText(err, 'Не удалось сохранить регламент'));
     } finally {
       setSubmitting(false);
     }
@@ -162,7 +161,7 @@ export function MaintenancePlansPanel({ equipmentId }: { equipmentId: string }) 
       </div>
 
       {!formOpen && (
-        <Button variant="outline" size="sm" className="mb-3 h-9 w-full" onClick={() => setFormOpen(true)}>
+        <Button variant="outline" size="sm" className="mb-3 h-11 w-full sm:h-9" onClick={() => setFormOpen(true)}>
           <Plus className="mr-1 h-4 w-4" /> Добавить регламент
         </Button>
       )}
@@ -177,7 +176,7 @@ export function MaintenancePlansPanel({ equipmentId }: { equipmentId: string }) 
               <X className="h-4 w-4" />
             </button>
           </div>
-          <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Напр. ТО-1 по моточасам" className="h-9" />
+          <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Напр. ТО-1 по моточасам" className="h-11 sm:h-9" />
           <div className="flex gap-1 rounded-md border border-border bg-card p-1">
             <button
               type="button"
@@ -200,9 +199,9 @@ export function MaintenancePlansPanel({ equipmentId }: { equipmentId: string }) 
             value={interval}
             onChange={(e) => setIntervalValue(e.target.value)}
             placeholder={trigger === 'HOURS' ? 'интервал, м/ч (напр. 250)' : 'интервал, дней (напр. 90)'}
-            className="h-9"
+            className="h-11 sm:h-9"
           />
-          <Button size="sm" className="h-9 w-full" onClick={submit} disabled={submitting}>
+          <Button size="sm" className="h-11 w-full sm:h-9" onClick={submit} disabled={submitting}>
             {submitting ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : null}
             {editingId ? 'Сохранить изменения' : 'Сохранить'}
           </Button>

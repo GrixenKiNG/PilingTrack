@@ -79,6 +79,73 @@ describe('getEquipmentAnalytics — tenant isolation', () => {
 });
 
 /**
+ * Regression (F-TO-DUE / W-10): the fleet analytics screen used its own
+ * ≤14-day / ≤50h rule that collapsed "overdue" into "soon", so the same rig
+ * read "ТО скоро" here while every other screen (checkMaintenanceDue) showed
+ * "Просрочено". The service must now delegate to the shared helper and expose
+ * overdue and soon separately (maintenanceDue stays as their union for the
+ * counter).
+ */
+describe('getEquipmentAnalytics — maintenance flags delegate to checkMaintenanceDue', () => {
+  const DAY_MS = 86_400_000;
+
+  function equipmentRow(overrides: Partial<Record<string, unknown>> = {}) {
+    return {
+      equipmentId: 'e1',
+      name: 'Kopernik',
+      model: null,
+      kind: 'rig',
+      reportCount: 0,
+      activeDays: 0,
+      piles: 0,
+      pileMeters: 0,
+      drillingCount: 0,
+      drillingMeters: 0,
+      downtimeHours: 0,
+      engineHoursTotal: null,
+      nextMaintenanceAtHours: null,
+      nextMaintenanceDate: null,
+      ...overrides,
+    };
+  }
+
+  beforeEach(() => {
+    queryRaw.mockReset();
+    groupBy.mockReset();
+    groupBy.mockResolvedValue([]);
+  });
+
+  it('marks a past service date as overdue, not soon', async () => {
+    const past = new Date(Date.now() - 5 * DAY_MS);
+    queryRaw
+      .mockResolvedValueOnce([equipmentRow({ nextMaintenanceDate: past })])
+      .mockResolvedValueOnce([]);
+
+    const res = await getEquipmentAnalytics({ dateFrom: '2026-01-01', dateTo: '2026-12-31', tenantId: 'orion' });
+
+    expect(res.equipment[0].maintenanceOverdue).toBe(true);
+    expect(res.equipment[0].maintenanceSoon).toBe(false);
+    expect(res.equipment[0].maintenanceDue).toBe(true);
+    expect(res.fleet.maintenanceDueCount).toBe(1);
+  });
+
+  it('marks a service date inside the soon window as soon, not overdue', async () => {
+    // Проверяем общий порог checkMaintenanceDue (SOON_DAYS = 7), а не старую
+    // 14-дневную эвристику этого экрана.
+    const soon = new Date(Date.now() + 5 * DAY_MS);
+    queryRaw
+      .mockResolvedValueOnce([equipmentRow({ nextMaintenanceDate: soon })])
+      .mockResolvedValueOnce([]);
+
+    const res = await getEquipmentAnalytics({ dateFrom: '2026-01-01', dateTo: '2026-12-31', tenantId: 'orion' });
+
+    expect(res.equipment[0].maintenanceOverdue).toBe(false);
+    expect(res.equipment[0].maintenanceSoon).toBe(true);
+    expect(res.equipment[0].maintenanceDue).toBe(true);
+  });
+});
+
+/**
  * Regression: pile metres (м.п.) per rig must come from PileGrade.lengthMm —
  * the single source of truth (src/lib/pile-length.ts) — not from
  * SitePilePlan.metersPerUnit (a planning figure with known-unreliable values)
@@ -102,5 +169,57 @@ describe('getEquipmentAnalytics — pile meters source', () => {
     expect(sql).toContain('"lengthMm"');
     expect(sql).not.toContain('metersPerUnit');
     expect(sql).not.toContain('SitePilePlan');
+  });
+});
+
+/**
+ * F-ANALYTICS-TENANT-SQL (F-20): тенант проверяется строгим равенством в КАЖДОМ
+ * сыром запросе сервиса (агрегат по установкам + парето простоев), а
+ * отсутствующий tenantId падает ДО $queryRaw. `IS NULL OR` встречается только в
+ * необязательном фильтре объекта и привязан к siteId, не к tenantId.
+ */
+describe('getEquipmentAnalytics — tenant isolation in every raw query (F-ANALYTICS-TENANT-SQL)', () => {
+  beforeEach(() => {
+    queryRaw.mockReset();
+    groupBy.mockReset();
+    queryRaw.mockResolvedValue([]);
+    groupBy.mockResolvedValue([]);
+  });
+
+  it('scopes both raw queries by strict tenant equality, never `tenantId … IS NULL`', async () => {
+    await getEquipmentAnalytics({
+      dateFrom: '2026-01-01',
+      dateTo: '2026-12-31',
+      tenantId: 'orion',
+      siteId: 'site_A',
+    });
+
+    // 0 — агрегат по установкам, 1 — парето простоев.
+    expect(queryRaw).toHaveBeenCalledTimes(2);
+
+    for (const [strings, ...values] of queryRaw.mock.calls) {
+      const sql = (strings as string[]).join('?');
+
+      expect(sql).toContain('r."tenantId" = ?');
+      expect(sql).not.toMatch(/tenantId"?\s*(::text\s*)?IS NULL/i);
+      expect(values).toContain('orion');
+
+      // Единственное IS NULL OR — необязательный фильтр объекта.
+      expect(sql.match(/IS NULL OR/g) ?? []).toHaveLength(1);
+      expect(sql).toMatch(/\?::text IS NULL OR r\."siteId" = \?/);
+    }
+
+    // Внешняя выборка техники (не только CTE отчётов) тоже тенантная.
+    const [outerStrings] = queryRaw.mock.calls[0];
+    expect((outerStrings as string[]).join('?')).toContain('e."tenantId" = ?');
+  });
+
+  it('throws when tenantId is absent and never reaches $queryRaw or telemetry', async () => {
+    await expect(
+      getEquipmentAnalytics({ dateFrom: '2026-01-01', dateTo: '2026-12-31' }),
+    ).rejects.toThrow(/tenantId/i);
+
+    expect(queryRaw).not.toHaveBeenCalled();
+    expect(groupBy).not.toHaveBeenCalled();
   });
 });

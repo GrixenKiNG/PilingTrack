@@ -106,7 +106,7 @@ export async function upsertEquipmentPermit(input: {
   tenantId: string;
   userId: string;
   actor: { id: string; name: string };
-  /** `users.manage` — заводить чужие допуски может только администратор. */
+  /** `safety.permits.manage` — выдавать допуски могут администратор и инженер ОТ. */
   mayManage: boolean;
   payload: EquipmentPermitInput;
 }) {

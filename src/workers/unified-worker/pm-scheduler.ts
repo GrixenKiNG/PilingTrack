@@ -5,13 +5,16 @@
  * it needs no leader election — a double run can't create duplicates.
  */
 
+import * as Sentry from '@sentry/node';
 import { logger } from '@/lib/logger';
 import { forEachTenant } from '@/lib/tenant-iteration';
 import { db } from '@/lib/db';
 import { runPmScheduler } from '@/modules/equipment';
+import { recordSchedulerHeartbeat } from './scheduler-heartbeat';
+import { positiveIntEnv } from './env-int';
 
-const PM_INTERVAL = parseInt(process.env.PM_SCHEDULER_INTERVAL_MS || String(24 * 60 * 60 * 1000), 10);
-const PM_STARTUP_DELAY = parseInt(process.env.PM_SCHEDULER_STARTUP_DELAY_MS || '60000', 10);
+const PM_INTERVAL = positiveIntEnv('PM_SCHEDULER_INTERVAL_MS', 24 * 60 * 60 * 1000);
+const PM_STARTUP_DELAY = positiveIntEnv('PM_SCHEDULER_STARTUP_DELAY_MS', 60000);
 
 /**
  * Оповещение о просроченном ТО.
@@ -57,10 +60,15 @@ async function notifyOverdue(
     logger.error('PM overdue alert failed', {
       tenantId, error: error instanceof Error ? error.message : String(error),
     });
+    Sentry.captureException(error, { tags: { task: 'pm-overdue-alert' } });
   }
 }
 
+let passRunning = false;
+
 async function runOnce(): Promise<void> {
+  if (passRunning) return;
+  passRunning = true;
   try {
     // Перечень организаций — из таблицы Tenant, а не из MaintenancePlan:
     // под строгими политиками RLS запрос без объявленной организации вернул бы
@@ -74,10 +82,14 @@ async function runOnce(): Promise<void> {
       }
       await notifyOverdue(tenantId, result.overdue);
     });
+    await recordSchedulerHeartbeat('pm-scheduler', PM_INTERVAL);
   } catch (error) {
     logger.error('PM scheduler pass failed', {
       error: error instanceof Error ? error.message : String(error),
     });
+    Sentry.captureException(error, { tags: { task: 'pm-scheduler' } });
+  } finally {
+    passRunning = false;
   }
 }
 

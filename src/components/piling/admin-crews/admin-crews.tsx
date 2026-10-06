@@ -3,7 +3,7 @@
 import { PermittedEntityHistory } from '@/components/piling/ops-shell/permitted-entity-history';
 import { useAbility } from '@/lib/use-ability';
 import { useEffect, useMemo, useState } from 'react';
-import { Plus, Users, UserCog, Wrench, MapPin, Pencil, Trash2, Power, PowerOff } from '@/components/piling/icons/unified-icons';
+import { Plus, Users, UserCog, Wrench, MapPin, Pencil, Power, PowerOff } from '@/components/piling/icons/unified-icons';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -21,11 +21,13 @@ import {
   OpsFact,
   OpsRiskBadge,
   resolveRisk,
+  useDocumentTitle,
   type OpsColumn,
   type OpsQuickFilter,
   type OpsKpiItem,
 } from '@/components/piling/ops-shell';
 import { useCrewsData } from './use-crews-data';
+import { catchText } from './crew-messages';
 import { CrewFormDialog } from './crew-form-dialog';
 import { DeleteDialog } from './delete-dialog';
 
@@ -50,6 +52,7 @@ function crewRisk(crew: Crew) {
 }
 
 export function AdminCrews() {
+  useDocumentTitle('Бригады');
   const canManage = useAbility('crews.manage');
   const {
     crews, setCrews, equipmentList, sites,
@@ -150,7 +153,7 @@ export function AdminCrews() {
       setCrews((prev) => [...prev, crew]);
       setShowCreate(false);
       toast.success('Бригада создана');
-    } catch (err) { toast.error(err instanceof Error ? err.message : 'Ошибка создания бригады'); }
+    } catch (err) { toast.error(catchText(err, 'Ошибка создания бригады')); }
     finally { setSubmitting(false); }
   };
 
@@ -162,7 +165,7 @@ export function AdminCrews() {
       setCrews((prev) => prev.map((c) => (c.id === editItem.id ? crew : c)));
       setEditItem(null);
       toast.success('Бригада сохранена');
-    } catch (err) { toast.error(err instanceof Error ? err.message : 'Ошибка сохранения'); }
+    } catch (err) { toast.error(catchText(err, 'Ошибка сохранения')); }
     finally { setSubmitting(false); }
   };
 
@@ -171,12 +174,21 @@ export function AdminCrews() {
     setSubmitting(true);
     try {
       await deleteCrew(deleteItem.id);
-      setCrews((prev) => prev.filter((c) => c.id !== deleteItem.id));
+      // Сервер только деактивирует бригаду: строка остаётся в списке со
+      // статусом «Неактивна» и кнопкой «Активировать», как обещает диалог.
+      setCrews((prev) => prev.map((c) => (c.id === deleteItem.id ? { ...c, isActive: false } : c)));
       setDeleteItem(null);
-      if (activeId === deleteItem.id) setActiveId(null);
-      toast.success('Бригада удалена');
-    } catch (err) { toast.error(err instanceof Error ? err.message : 'Ошибка удаления бригады'); }
+      toast.success('Бригада деактивирована — её можно активировать снова');
+    } catch (err) { toast.error(catchText(err, 'Ошибка деактивации бригады')); }
     finally { setSubmitting(false); }
+  };
+
+  // Кнопка активации блокируется на время запроса: двойной клик слал два PUT
+  // подряд (R124 №14).
+  const handleToggleActive = async () => {
+    if (!active) return;
+    setSubmitting(true);
+    try { await toggleActive(active); } finally { setSubmitting(false); }
   };
 
   if (loading) {
@@ -196,7 +208,7 @@ export function AdminCrews() {
       countLabel={loadError ? '—' : `${filtered.length} ${pluralizeRu(filtered.length, ['бригада', 'бригады', 'бригад'])}`}
       subtitle="Сменные назначения: оператор, помощники, установка, объект"
       actions={canManage &&
-        <Button onClick={() => setShowCreate(true)} className="h-10 bg-signal text-white hover:bg-signal-strong">
+        <Button onClick={() => setShowCreate(true)} className="h-11 bg-signal text-white hover:bg-signal-strong sm:h-10">
           <Plus className="mr-1.5 h-4 w-4" />Добавить
         </Button>
       }
@@ -212,9 +224,10 @@ export function AdminCrews() {
             <CrewDetail
               crew={active}
               canManage={canManage}
+              busy={submitting}
               onEdit={() => setEditItem(active)}
               onDelete={() => setDeleteItem(active)}
-              onToggle={() => toggleActive(active)}
+              onToggle={handleToggleActive}
             />
           )
           : <OpsDetailEmpty message={loadError
@@ -260,17 +273,22 @@ export function AdminCrews() {
   );
 }
 
-function CrewDetail({ crew, canManage, onEdit, onDelete, onToggle }: { crew: Crew; canManage: boolean; onEdit: () => void; onDelete: () => void; onToggle: () => void }) {
+function CrewDetail({ crew, canManage, busy, onEdit, onDelete, onToggle }: { crew: Crew; canManage: boolean; busy: boolean; onEdit: () => void; onDelete: () => void; onToggle: () => void }) {
   const risk = crewRisk(crew);
   return (
     <OpsDetailPanel title={crew.name || 'Без названия'} subtitle={`Бригада · ${crew.site?.name ?? '—'}`} status={<OpsRiskBadge level={risk.level} label={risk.label} />}>
       {canManage && <div className="flex flex-wrap gap-2">
-        <Button size="sm" variant="outline" onClick={onEdit} className="h-8 text-xs"><Pencil className="mr-1 h-3.5 w-3.5" />Редактировать</Button>
-        <Button size="sm" variant="outline" onClick={onToggle} className="h-8 text-xs">
+        <Button size="sm" variant="outline" onClick={onEdit} className="h-11 text-xs sm:h-8"><Pencil className="mr-1 h-3.5 w-3.5" />Редактировать</Button>
+        {/*
+          Одно действие вместо двух: «Удалить» и «Деактивировать» приводили к
+          одному результату (isActive=false), но путали — у «Удалить» было
+          подтверждение, у мгновенной «Деактивировать» нет. Деактивация
+          подтверждается, активация выполняется сразу.
+        */}
+        <Button size="sm" variant="outline" onClick={crew.isActive ? onDelete : onToggle} disabled={busy} className="h-11 text-xs sm:h-8">
           {crew.isActive ? <PowerOff className="mr-1 h-3.5 w-3.5" /> : <Power className="mr-1 h-3.5 w-3.5" />}
           {crew.isActive ? 'Деактивировать' : 'Активировать'}
         </Button>
-        <Button size="sm" variant="outline" onClick={onDelete} className="h-8 text-xs text-destructive-strong hover:bg-destructive/10"><Trash2 className="mr-1 h-3.5 w-3.5" />Удалить</Button>
       </div>}
 
       <div className="grid grid-cols-2 divide-x rounded-md border border-border bg-muted">

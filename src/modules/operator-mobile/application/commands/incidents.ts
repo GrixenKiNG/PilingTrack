@@ -120,7 +120,10 @@ export async function reportIncident(input: {
       severity: classification.severity === 'CRITICAL' ? 'critical' : classification.severity === 'HIGH' ? 'high' : 'medium',
       // Правило алерта: без него у происшествия нет выключателя в настройках
       // (durable-доставка гасит по `ruleId`, см. durable-alert-delivery.ts).
-      ruleId: 'incident',
+      // Решение владельца 26.09.2026: «прекратить работы» (сюда входит и
+      // «есть пострадавший» — classifyObservedHazard) приходит всегда, поэтому
+      // у него своё правило без выключателя; выключается только мелкое.
+      ruleId: classification.stopRequired ? 'incidentStopWork' : 'incident',
       message: (classification.stopRequired ? 'Происшествие: требуется прекратить работы. ' : 'Происшествие: ') + input.description,
     }});
     return {

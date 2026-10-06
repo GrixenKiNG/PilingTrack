@@ -21,13 +21,35 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
+import { QueryErrorBanner } from '@/components/piling/async-ui';
 import { LEVEL_LABEL, type InspectionLevel } from './inspection-labels';
+import { InspectionLoadError, isRetryableLoadError, loadErrorText, catchText } from './inspection-api-error';
 import {
-  BLOCK_LABEL, HAMMER_LABEL, SectionEditor, emptySection, uid,
+  BLOCK_LABEL, HAMMER_LABEL, LIMITS, SectionEditor, emptySection, uid,
   type AnswerType, type BlockType, type HammerKind, type SectionDraft,
 } from './template-editor-parts';
 
 // ─── Main component ───────────────────────────────────────────────────────────
+
+/**
+ * Не заменил ли шаблон другой администратор?
+ *
+ * Правка на сервере выпускает новую версию деактивацией прежней строки без
+ * проверки версии, поэтому двое админов с одним шаблоном получают две
+ * действующие версии (R123 №2). Перед сохранением перечитываем шаблон: снятая
+ * строка означает, что правку уже выпустил кто-то другой. Сбой чтения — «не
+ * знаем», сохранение не блокируем (его исход покажет сам PUT).
+ */
+async function isTemplateReplaced(id: string): Promise<boolean> {
+  try {
+    const res = await authFetch(`/api/checklist-templates/${id}`);
+    if (!res.ok) return false;
+    const { template } = (await res.json()) as { template?: { isActive?: boolean } };
+    return template?.isActive === false;
+  } catch {
+    return false;
+  }
+}
 
 interface TemplateEditorProps {
   templateId: string; // 'new' or uuid
@@ -45,14 +67,31 @@ export function TemplateEditor({ templateId }: TemplateEditorProps) {
   const [sections, setSections] = useState<SectionDraft[]>([emptySection()]);
   const [loading, setLoading] = useState(!isNew);
   const [busy, setBusy] = useState(false);
+  // Снятая (заменённая) версия неотличима от действующей, поэтому по прямой
+  // ссылке её правят как живую и «Сохранить» выпускает её заново (R123 №4).
+  const [archived, setArchived] = useState(false);
+  // Почему шаблон не показан: пустая форма под заголовком «Редактировать
+  // шаблон» выглядела как «шаблон пуст», а сохранение затирало живой (R100 №4).
+  const [loadError, setLoadError] = useState<InspectionLoadError | null>(null);
+  // Правка шаблона на сервере — это деактивация прежней строки и создание
+  // новой, причём не в одной транзакции (template-commands.ts). Сбой между
+  // шагами оставляет чек-лист без действующей версии, а человек видел только
+  // «Ошибка» и считал шаблон целым (R123 №1). Ещё строка нужна, когда правку
+  // уже выпустил другой администратор: сохранять тогда нельзя (R123 №2).
+  const [saveProblem, setSaveProblem] = useState<'failed' | 'stale' | null>(null);
 
   // Load existing template
   const loadTemplate = useCallback(async () => {
     setLoading(true);
     try {
       const res = await authFetch(`/api/checklist-templates/${templateId}`);
-      if (!res.ok) throw new Error();
+      if (!res.ok) {
+        setLoadError(new InspectionLoadError(res.status));
+        return;
+      }
       const { template } = await res.json();
+      setLoadError(null);
+      setArchived(template.isActive === false);
       setName(template.name ?? '');
       setLevel(template.level as InspectionLevel);
       setBlockType((template.blockType ?? 'BASE') as BlockType);
@@ -79,7 +118,7 @@ export function TemplateEditor({ templateId }: TemplateEditorProps) {
         })),
       })));
     } catch {
-      toast.error('Не удалось загрузить шаблон');
+      setLoadError(new InspectionLoadError(null));
     } finally {
       setLoading(false);
     }
@@ -109,10 +148,26 @@ export function TemplateEditor({ templateId }: TemplateEditorProps) {
   // Submit
   const submit = async () => {
     if (!name.trim()) { toast.error('Введите название шаблона'); return; }
-    for (const s of sections) {
+    if (name.trim().length > LIMITS.name) { toast.error(`Название шаблона длиннее ${LIMITS.name} символов`); return; }
+    if (blockType === 'BASE' && appliesToModel.trim().length > LIMITS.appliesToModel) {
+      toast.error(`Применимость длиннее ${LIMITS.appliesToModel} символов`); return;
+    }
+    // Пределы полей — как в схеме маршрута: сообщение называет раздел и пункт,
+    // иначе 400 «Некорректные данные» не подсказывал, что править (F-R121-3).
+    for (let si = 0; si < sections.length; si++) {
+      const s = sections[si];
       if (!s.title.trim()) { toast.error('Заполните заголовок каждого раздела'); return; }
-      for (const it of s.items) {
+      if (s.title.trim().length > LIMITS.sectionTitle) {
+        toast.error(`Раздел ${si + 1}: заголовок длиннее ${LIMITS.sectionTitle} символов`); return;
+      }
+      for (let ii = 0; ii < s.items.length; ii++) {
+        const it = s.items[ii];
         if (!it.text.trim()) { toast.error('Заполните текст каждого пункта'); return; }
+        const where = `Раздел ${si + 1}, пункт ${ii + 1}`;
+        if (it.text.trim().length > LIMITS.itemText) { toast.error(`${where}: текст длиннее ${LIMITS.itemText} символов`); return; }
+        if (it.unit.trim().length > LIMITS.itemUnit) { toast.error(`${where}: единица измерения длиннее ${LIMITS.itemUnit} символов`); return; }
+        if (it.norm.trim().length > LIMITS.itemNorm) { toast.error(`${where}: норма длиннее ${LIMITS.itemNorm} символов`); return; }
+        if (it.provenance.trim().length > LIMITS.itemProvenance) { toast.error(`${where}: источник длиннее ${LIMITS.itemProvenance} символов`); return; }
       }
     }
 
@@ -140,8 +195,15 @@ export function TemplateEditor({ templateId }: TemplateEditorProps) {
       })),
     };
 
+    setSaveProblem(null);
     setBusy(true);
     try {
+      // Правку уже выпустил другой администратор — не плодим вторую
+      // действующую версию одним шаблоном (R123 №2).
+      if (!isNew && await isTemplateReplaced(templateId)) {
+        setSaveProblem('stale');
+        return;
+      }
       const url = isNew ? '/api/checklist-templates' : `/api/checklist-templates/${templateId}`;
       const method = isNew ? 'POST' : 'PUT';
       const res = await authFetch(url, {
@@ -156,16 +218,53 @@ export function TemplateEditor({ templateId }: TemplateEditorProps) {
       toast.success(isNew ? 'Шаблон создан' : 'Шаблон обновлён');
       router.push('/admin/checklists');
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Ошибка');
+      // Обрыв сети fetch бросает TypeError с английским «Failed to fetch» (F-R112-2).
+      toast.error(catchText(err, 'Ошибка'));
+      // Правка упала: прежняя версия на сервере уже снята, а новая не создана —
+      // говорим об этом строкой, а не только общим тостом (R123 №1).
+      if (!isNew) setSaveProblem('failed');
     } finally {
       setBusy(false);
     }
+  };
+
+  // Правка существующего шаблона необратима: на сервере `updateTemplate` —
+  // это деактивация текущей версии и создание новой (template-commands.ts),
+  // поэтому «Сохранить» спрашивает подтверждение (R100, важно №5).
+  const confirmAndSubmit = () => {
+    if (!isNew && !confirm('Сохранить изменения шаблона? Текущая версия будет заменена.')) return;
+    void submit();
   };
 
   if (loading) {
     return (
       <div className="mx-auto w-full max-w-3xl px-4 py-6">
         <p className="rounded-lg bg-muted px-3 py-8 text-center text-sm text-muted-foreground">Загрузка…</p>
+      </div>
+    );
+  }
+
+  // Форму правки показываем только после успешного чтения шаблона: пустая форма
+  // неотличима от «шаблон пуст», а её сохранение затирало живой чек-лист.
+  if (!isNew && loadError) {
+    return (
+      <div className="mx-auto w-full max-w-3xl px-4 py-6 field-type">
+        <QueryErrorBanner
+          title="Не удалось загрузить шаблон"
+          message={loadErrorText(loadError, {
+            forbidden: 'Нет прав на шаблоны чек-листов. Обратитесь к администратору.',
+            notFound: 'Шаблон не найден (возможно, деактивирован).',
+            server: 'Не удалось загрузить шаблон. Сервер вернул ошибку.',
+          })}
+          onRetry={isRetryableLoadError(loadError) ? () => void loadTemplate() : undefined}
+        />
+        <Button
+          variant="outline"
+          className="mt-3"
+          onClick={() => router.push('/admin/checklists')}
+        >
+          К списку шаблонов
+        </Button>
       </div>
     );
   }
@@ -187,6 +286,27 @@ export function TemplateEditor({ templateId }: TemplateEditorProps) {
         </Button>
       </div>
 
+      {/* Сбой правки в форме незаметен: на сервере это деактивация прежней
+          версии и создание новой, поэтому сообщаем, что действующей версии
+          могло не остаться, и отправляем проверять список (R123 №1). Когда
+          версию уже выпустил другой администратор — сохранять нельзя (R123 №2). */}
+      {saveProblem && (
+        <p role="alert" className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive-strong">
+          {saveProblem === 'stale'
+            ? 'Шаблон уже изменён другим администратором — сохранение не отправлено. Откройте список шаблонов и выберите действующую версию.'
+            : 'Сохранение не завершилось: прежняя версия шаблона могла быть снята, а новая не выпущена. Проверьте список шаблонов — возможно, чек-лист больше не действует.'}
+        </p>
+      )}
+
+      {/* Строка снята: по прямой ссылке её раньше правили как живую, и
+          «Сохранить» выпускало снятый чек-лист заново — без пометки
+          «архив» человек не понимал, что открыл старую версию (R123 №4). */}
+      {archived && (
+        <p role="status" className="rounded-md border border-border bg-muted px-3 py-2 text-xs text-muted-foreground">
+          Это снятая версия шаблона (архив) — она больше не действует. Чтобы изменить чек-лист, откройте действующую версию в списке шаблонов; сохранение этой формы будет отклонено как устаревшее.
+        </p>
+      )}
+
       {/* General fields */}
       <div className="rounded-lg border bg-card p-4 space-y-3">
         <h2 className="text-sm font-medium text-foreground">Основные параметры</h2>
@@ -197,6 +317,7 @@ export function TemplateEditor({ templateId }: TemplateEditorProps) {
             id="tpl-name"
             value={name}
             onChange={(e) => setName(e.target.value)}
+            maxLength={LIMITS.name}
             placeholder="Напр. ЕО — экскаватор-сваевдавливатель"
           />
         </div>
@@ -234,6 +355,7 @@ export function TemplateEditor({ templateId }: TemplateEditorProps) {
               id="tpl-model"
               value={appliesToModel}
               onChange={(e) => setAppliesToModel(e.target.value)}
+              maxLength={LIMITS.appliesToModel}
               placeholder="Banut 655 (пусто = общий блок для всех)"
             />
           </div>
@@ -295,7 +417,7 @@ export function TemplateEditor({ templateId }: TemplateEditorProps) {
           Отмена
         </Button>
         <Button
-          onClick={() => void submit()}
+          onClick={confirmAndSubmit}
           disabled={busy}
           className="bg-signal hover:bg-signal-strong text-white"
         >

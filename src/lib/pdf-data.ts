@@ -1,3 +1,4 @@
+import { isSubmittedReport } from '@/lib/report-status';
 import type { PeriodPdfData, SingleReportData } from '@/lib/pdf-generator';
 import { normalizeCrewData } from '@/lib/normalize-crew';
 import { logger } from '@/lib/logger';
@@ -125,7 +126,7 @@ async function buildFallbackCrewMap(reports: Array<{ userId: string; siteId: str
 }
 
 function summarizePeriodReports(reports: PeriodReportRecord[]) {
-  return reports.reduce(
+  return reports.filter(isSubmittedReport).reduce(
     (summary, report) => {
       summary.totalPiles += report.piles?.reduce((sum, pile) => sum + (pile.count || 0), 0) || 0;
       summary.totalDrilling +=

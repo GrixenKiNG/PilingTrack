@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { authFetch, isAbort, loadJson } from '@/lib/api';
 import { toast } from 'sonner';
 import type { ReportDTO, SiteFlatDTO, PileGradeDTO, DrillingTypeDTO, DowntimeReasonDTO } from '@/lib/types';
+import type { JournalSums } from './report-totals';
 
 interface OperatorUser {
   id: string;
@@ -34,6 +35,12 @@ export interface UseReportsDataReturn {
    *  show a real error state instead of a silently-empty list — see the
    *  2026-05-30 incident where a failing query rendered as "no reports". */
   error: string | null;
+  /** Отказ по правам (403) на чтение списка: повтор бесполезен, кнопки
+   *  «Повторить» быть не должно — причина не в сбое сервера. */
+  errorForbidden: boolean;
+  /** Отказ догрузки («Загрузить ещё») — показывается под кнопкой, список на экране
+   *  не пропадает. */
+  loadMoreError: string | null;
   /** Списки для отбора прочитаны не полностью — фильтр показывает не всё. */
   filterError: string | null;
   /** Справочники формы отчёта (марки свай, типы скважин, причины простоя) не
@@ -44,6 +51,8 @@ export interface UseReportsDataReturn {
   hasMore: boolean;
   /** Сколько отчётов под отбором всего — не сколько подгружено. */
   totalReports: number;
+  /** Итоги сданных отчётов по всему отбору — с сервера; null в режиме периода и при ошибке. */
+  serverSums: JournalSums | null;
   handleApplyPeriod: () => void;
   handleResetPeriod: () => void;
   loadMoreReports: () => Promise<void>;
@@ -76,11 +85,26 @@ export function useReportsData(): UseReportsDataReturn {
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(false);
   const [totalReports, setTotalReports] = useState(0);
+  const [serverSums, setServerSums] = useState<JournalSums | null>(null);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [errorForbidden, setErrorForbidden] = useState(false);
+  const [loadMoreError, setLoadMoreError] = useState<string | null>(null);
 
   const referenceDataLoadedRef = useRef(false);
   const referenceDataPromiseRef = useRef<Promise<void> | null>(null);
+  // Поколение текущего отбора: растёт при каждой (пере)загрузке основного
+  // списка. Поздний ответ «Загрузить ещё», запущенный при прежнем отборе,
+  // распознаётся по нему и отбрасывается — иначе он подмешивает строки и
+  // курсор чужого отбора к уже заменённому списку.
+  const reportsGenRef = useRef(0);
+  // Защёлка на ref, а не на состоянии `loadingMore`: два вызова в одном тике
+  // видят `loadingMore === false` (состояние обновляется на следующем рендере)
+  // и оба ушли бы в сеть с одним курсором.
+  const loadMoreInFlightRef = useRef(false);
+  const loadMoreAbortRef = useRef<AbortController | null>(null);
+  // Монтирование: гасит устаревшую догрузку, дожившую до ухода с экрана.
+  const isMountedRef = useRef(true);
   // Bumped to force a reports refetch (retry after error, refresh after
   // create/delete). The load itself lives in the effect below.
   const [reloadKey, setReloadKey] = useState(0);
@@ -183,12 +207,30 @@ export function useReportsData(): UseReportsDataReturn {
   }, []);
 
   useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+      loadMoreAbortRef.current?.abort();
+    };
+  }, []);
+
+  useEffect(() => {
     const abortController = new AbortController();
     let isMounted = true;
+
+    // Новый отбор: поднимаем поколение, гасим догрузку прежнего отбора и
+    // снимаем защёлку, чтобы новая догрузка не ждала завершения устаревшей.
+    // Состояние `loadingMore` снимет `finally` самой догрузки (по владению
+    // AbortController) — здесь setState в теле эффекта недопустим.
+    reportsGenRef.current += 1;
+    loadMoreAbortRef.current?.abort();
+    loadMoreInFlightRef.current = false;
 
     const loadReports = async () => {
       setLoading(true);
       setError(null);
+      setErrorForbidden(false);
+      setLoadMoreError(null);
       try {
         let url: string;
         if (periodActive && periodFrom && periodTo) {
@@ -216,22 +258,33 @@ export function useReportsData(): UseReportsDataReturn {
             typeof data.total === 'number' ? data.total : reportsArray.length,
           );
           setHasMore(!periodActive && Boolean(data.hasMore));
+          setServerSums(!periodActive && data.sums ? data.sums : null);
           setNextCursor(!periodActive ? data.nextCursor ?? null : null);
         } else {
           // HTTP error (e.g. 500): fetch resolves with res.ok=false and does
           // NOT throw, so without this branch the list would render empty as
           // if there were simply no reports. Surface it as a real error.
-          setError('Не удалось загрузить отчёты. Сервер вернул ошибку.');
+          // 403 — это не сбой: дело в правах, «Повторить» не поможет.
+          if (res.status === 401) {
+            // Сессия истекла — причина не на сервере, повтор не поможет.
+            setError('Сессия истекла — войдите снова.');
+          } else if (res.status === 403) {
+            setError('Нет прав на просмотр отчётов. Смените роль или обратитесь к администратору.');
+            setErrorForbidden(true);
+          } else {
+            setError('Не удалось загрузить отчёты. Сервер вернул ошибку.');
+          }
           setHasMore(false);
+          setServerSums(null);
           setNextCursor(null);
-          toast.error('Ошибка загрузки отчётов');
         }
       } catch (error) {
         if (isMounted && !(error instanceof Error && error.name === 'AbortError')) {
           setError('Не удалось загрузить отчёты. Проверьте соединение.');
+          setErrorForbidden(false);
           setHasMore(false);
+          setServerSums(null);
           setNextCursor(null);
-          toast.error('Ошибка загрузки отчётов');
         }
       } finally {
         if (isMounted) {
@@ -255,31 +308,61 @@ export function useReportsData(): UseReportsDataReturn {
   }, []);
 
   const loadMoreReports = useCallback(async () => {
-    if (periodActive || loadingMore || !hasMore || !nextCursor) return;
+    if (periodActive || !hasMore || !nextCursor) return;
+    // Защёлка на ref, а не на `loadingMore`: синхронно гасит повторный вызов в
+    // одном тике (состояние обновится лишь на следующем рендере).
+    if (loadMoreInFlightRef.current) return;
+    loadMoreInFlightRef.current = true;
+
+    const gen = reportsGenRef.current;
+    const abortController = new AbortController();
+    loadMoreAbortRef.current = abortController;
+    // Ответ принадлежит текущему отбору и компонент ещё на экране.
+    const isCurrent = () => isMountedRef.current && gen === reportsGenRef.current;
+
     setLoadingMore(true);
-    setError(null);
+    setLoadMoreError(null);
     try {
       const params = new URLSearchParams({ cursor: nextCursor, limit: String(REPORTS_PAGE_LIMIT) });
       if (filterSiteId !== 'all') params.set('siteId', filterSiteId);
       if (filterUserId !== 'all') params.set('userId', filterUserId);
-      const res = await authFetch(`/api/reports/all?${params.toString()}`);
+      const res = await authFetch(`/api/reports/all?${params.toString()}`, { signal: abortController.signal });
+      // Отбор сменился, пока ответ был в пути: страница чужого отбора не
+      // дописывается к новому списку и не перетирает его курсор.
+      if (!isCurrent()) return;
       if (!res.ok) {
-        setError('Не удалось догрузить отчёты. Сервер вернул ошибку.');
+        // Отказ догрузки не должен заменять уже загруженный список баннером
+        // ошибки: данные никуда не делись, показать надо только хвост.
+        setLoadMoreError(
+          res.status === 403
+            ? 'Нет прав на просмотр отчётов.'
+            : 'Не удалось догрузить отчёты. Сервер вернул ошибку.',
+        );
         toast.error('Ошибка догрузки отчётов');
         return;
       }
       const data = await res.json();
+      if (!isCurrent()) return;
       const reportsArray = Array.isArray(data.reports) ? data.reports : [];
       setReports((prev) => [...prev, ...reportsArray]);
       setHasMore(Boolean(data.hasMore));
       setNextCursor(data.nextCursor ?? null);
     } catch {
-      setError('Не удалось догрузить отчёты. Проверьте соединение.');
+      if (!isCurrent()) return;
+      setLoadMoreError('Не удалось догрузить отчёты. Проверьте соединение.');
       toast.error('Ошибка догрузки отчётов');
     } finally {
-      setLoadingMore(false);
+      // Освобождаем защёлку и снимаем `loadingMore` только если этот запрос
+      // всё ещё владеет AbortController (новая догрузка его перезапишет) и
+      // компонент на экране. Проверка по владению, а не по поколению: устарев-
+      // шая догрузка тоже обязана снять с себя `loadingMore`, иначе он залипнет.
+      if (isMountedRef.current && loadMoreAbortRef.current === abortController) {
+        loadMoreAbortRef.current = null;
+        loadMoreInFlightRef.current = false;
+        setLoadingMore(false);
+      }
     }
-  }, [filterSiteId, filterUserId, hasMore, loadingMore, nextCursor, periodActive]);
+  }, [filterSiteId, filterUserId, hasMore, nextCursor, periodActive]);
 
   const handleApplyPeriod = () => {
     if (!periodFrom || !periodTo) {
@@ -304,7 +387,7 @@ export function useReportsData(): UseReportsDataReturn {
     filterSiteId, setFilterSiteId,
     filterUserId, setFilterUserId,
     periodFrom, setPeriodFrom, periodTo, setPeriodTo,
-    periodActive, loading, loadingReferenceData, loadingMore, hasMore, totalReports, error, filterError, dictionaryError,
+    periodActive, loading, loadingReferenceData, loadingMore, hasMore, totalReports, serverSums, error, errorForbidden, loadMoreError, filterError, dictionaryError,
     handleApplyPeriod, handleResetPeriod, loadMoreReports, loadReports, loadReferenceData,
   };
 }

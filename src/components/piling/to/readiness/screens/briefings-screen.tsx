@@ -28,9 +28,11 @@ import { ROLE_LABELS, type UserRole } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 import { COMPACT_KPI_GRID, ScreenTitle, card } from '../settings/shared-ui';
 import { kpiGridStyle } from '@/components/piling/kpi-tile';
 import { RefKpi } from './shared';
+import { normalizeSearch } from '../shared/text-search';
 import type { ReferenceUiProps } from './types';
 
 type KindFilter = BriefingKind | '';
@@ -51,11 +53,9 @@ function signatureCell(iso: string | null) {
     : <span className="text-muted-foreground">—</span>;
 }
 
-/** Календарный день `ГГГГ-ММ-ДД` по местным часам — сравнение «сегодня/вчера». */
-function dayKey(date: Date): string {
-  const month = `${date.getMonth() + 1}`.padStart(2, '0');
-  const day = `${date.getDate()}`.padStart(2, '0');
-  return `${date.getFullYear()}-${month}-${day}`;
+/** Календарный день `ГГГГ-ММ-ДД` в поясе тенанта — сравнение «сегодня/вчера». */
+function dayKey(date: Date, timezone: string): string {
+  return date.toLocaleDateString('en-CA', { timeZone: timezone });
 }
 
 /** Шаги панели регистрации: путь от выбора человека до подписи. */
@@ -154,7 +154,15 @@ export function BriefingsScreen(props: ReferenceUiProps) {
     const period = dayRangeToInstants(fromDay, toDay);
     const search = new URLSearchParams({ from: period.from, to: period.to, fromDay, toDay });
     if (kind) search.set('kind', kind);
-    window.open(`/print/briefing-journal?${search.toString()}`, '_blank', 'noopener');
+    // Заблокированное браузером всплывающее окно возвращает null: без проверки
+    // кнопка «Печатная форма» молча ничего не делала (F-R115-13).
+    const opened = window.open('', '_blank');
+    if (!opened) {
+      toast.error('Браузер заблокировал окно печати. Разрешите всплывающие окна и повторите.');
+      return;
+    }
+    opened.opener = null;
+    opened.location.href = `/print/briefing-journal?${search.toString()}`;
   };
 
   const instructions = rows?.filter((row) => row.kind === 'INSTRUCTION') ?? [];
@@ -168,11 +176,13 @@ export function BriefingsScreen(props: ReferenceUiProps) {
    */
   const stats = useMemo(() => {
     const list = rows ?? [];
-    const today = new Date();
-    const todayKey = dayKey(today);
-    const yesterdayKey = dayKey(new Date(today.getTime() - 86_400_000));
-    const todayCount = list.filter((row) => dayKey(new Date(row.recordedAt)) === todayKey).length;
-    const yesterdayCount = list.filter((row) => dayKey(new Date(row.recordedAt)) === yesterdayKey).length;
+    const timezone = props.bootstrap?.tenant.timezone ?? 'Europe/Moscow';
+    const todayKey = dayKey(new Date(), timezone);
+    const yesterday = new Date(`${todayKey}T12:00:00.000Z`);
+    yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+    const yesterdayKey = yesterday.toISOString().slice(0, 10);
+    const todayCount = list.filter((row) => dayKey(new Date(row.recordedAt), timezone) === todayKey).length;
+    const yesterdayCount = list.filter((row) => dayKey(new Date(row.recordedAt), timezone) === yesterdayKey).length;
     const delta = todayCount - yesterdayCount;
     const inPeriod = (day: string) => fromDay <= day && day <= toDay;
     return {
@@ -185,7 +195,7 @@ export function BriefingsScreen(props: ReferenceUiProps) {
       targeted: list.filter((row) => row.type === 'TARGETED').length,
       objectBriefings: list.filter((row) => row.kind === 'INSTRUCTION').length,
     };
-  }, [rows, fromDay, toDay]);
+  }, [rows, fromDay, toDay, props.bootstrap?.tenant.timezone]);
 
   /** Опции фильтра «Объект» — уникальные площадки из загруженных строк. */
   const siteOptions = useMemo(() => Array.from(new Set(
@@ -197,17 +207,17 @@ export function BriefingsScreen(props: ReferenceUiProps) {
     (rows ?? []).map((row) => row.instructorName).filter(Boolean),
   )).sort((a, b) => a.localeCompare(b, 'ru')), [rows]);
 
-  const needle = query.trim().toLocaleLowerCase('ru-RU');
+  const needle = normalizeSearch(query);
   const visible = (rows ?? []).filter((row) => {
     if (needle) {
-      const haystack = [
+      const haystack = normalizeSearch([
         row.userName,
         row.userRole,
         ROLE_LABELS[row.userRole as UserRole] ?? '',
         row.siteName ?? '',
         row.documentTitle,
         row.documentCode,
-      ].join(' ').toLocaleLowerCase('ru-RU');
+      ].join(' '));
       if (!haystack.includes(needle)) return false;
     }
     if (site && (row.siteName ?? '') !== site) return false;

@@ -64,7 +64,9 @@ export interface FleetSnapshot {
     expected: number;
     idle: number;
     pilesToday: number;
+    pileMetersToday: number;
     drillingToday: number;
+    drillingCountToday: number;
     downtimeHoursToday: number;
     crewsOnShiftToday: number;
     operatorsOnShiftToday: number;

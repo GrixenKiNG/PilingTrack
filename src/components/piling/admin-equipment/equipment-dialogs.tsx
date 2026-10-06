@@ -13,6 +13,7 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import { pluralizeRu } from '@/lib/format';
+import { catchText } from '@/components/piling/admin-crews/crew-messages';
 import type { EquipmentDTO } from '@/lib/types';
 import {
   EquipmentForm,
@@ -32,14 +33,47 @@ interface CreateProps {
   onSubmit: (payload: Record<string, unknown>) => Promise<void>;
 }
 
+/**
+ * Есть ли в форме несохранённые правки: сравнение с состоянием на момент
+ * открытия. Поля плоские примитивы, поэтому глубокое сравнение не нужно.
+ */
+function isFormDirty(state: EquipmentFormState, baseline: EquipmentFormState): boolean {
+  return (Object.keys(baseline) as (keyof EquipmentFormState)[])
+    .some((key) => state[key] !== baseline[key]);
+}
+
+/** Предупреждение о закрытии окна с несохранёнными правками (R119 №3). */
+const CONFIRM_LEAVE = 'Закрыть без сохранения? Введённые данные будут потеряны.';
+
+/** Пока окно открыто и форма «грязная», уход со страницы спрашивает браузер. */
+function useWarnOnPageLeave(open: boolean, dirty: boolean) {
+  useEffect(() => {
+    if (!open || !dirty) return;
+    const warnBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', warnBeforeUnload);
+    return () => window.removeEventListener('beforeunload', warnBeforeUnload);
+  }, [open, dirty]);
+}
+
 export function CreateEquipmentDialog({ open, onOpenChange, onSubmit }: CreateProps) {
   const [state, setState] = useState<EquipmentFormState>(EMPTY_EQUIPMENT_FORM);
   const [submitting, setSubmitting] = useState(false);
+  const dirty = isFormDirty(state, EMPTY_EQUIPMENT_FORM);
+  useWarnOnPageLeave(open, dirty);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- syncs local state to the source prop/dependency when it changes
     if (open) setState(EMPTY_EQUIPMENT_FORM);
   }, [open]);
+
+  /** Закрытие по Esc/клику вне окна/«Отмена» — с вопросом, если есть правки. */
+  const handleOpenChange = (next: boolean) => {
+    if (!next && dirty && !window.confirm(CONFIRM_LEAVE)) return;
+    onOpenChange(next);
+  };
 
   const submit = async () => {
     if (!state.name.trim()) {
@@ -52,14 +86,15 @@ export function CreateEquipmentDialog({ open, onOpenChange, onSubmit }: CreatePr
       onOpenChange(false);
       toast.success('Установка создана');
     } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : 'Ошибка создания установки');
+      // Обрыв сети fetch бросает TypeError с английским «Failed to fetch» (F-R112-1).
+      toast.error(catchText(err, 'Ошибка создания установки'));
     } finally {
       setSubmitting(false);
     }
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -71,7 +106,7 @@ export function CreateEquipmentDialog({ open, onOpenChange, onSubmit }: CreatePr
         </DialogHeader>
         <EquipmentForm state={state} onChange={(patch) => setState((s) => ({ ...s, ...patch }))} />
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Отмена</Button>
+          <Button variant="outline" onClick={() => handleOpenChange(false)}>Отмена</Button>
           <Button
             onClick={submit}
             disabled={submitting || !state.name.trim()}
@@ -99,11 +134,21 @@ interface EditProps {
 export function EditEquipmentDialog({ open, item, onOpenChange, onSubmit }: EditProps) {
   const [state, setState] = useState<EquipmentFormState>(EMPTY_EQUIPMENT_FORM);
   const [submitting, setSubmitting] = useState(false);
+  // «Эталон» для проверки несохранённых правок — форма, перечитанная из установки.
+  const baseline = equipmentToFormState(item as unknown as Record<string, unknown> | null);
+  const dirty = isFormDirty(state, baseline);
+  useWarnOnPageLeave(open, dirty);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- syncs local state to the source prop/dependency when it changes
     if (open) setState(equipmentToFormState(item as unknown as Record<string, unknown> | null));
   }, [open, item]);
+
+  /** Закрытие по Esc/клику вне окна/«Отмена» — с вопросом, если есть правки. */
+  const handleOpenChange = (next: boolean) => {
+    if (!next && dirty && !window.confirm(CONFIRM_LEAVE)) return;
+    onOpenChange(next);
+  };
 
   const submit = async () => {
     if (!item) return;
@@ -117,14 +162,15 @@ export function EditEquipmentDialog({ open, item, onOpenChange, onSubmit }: Edit
       onOpenChange(false);
       toast.success('Установка сохранена');
     } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : 'Ошибка сохранения');
+      // Обрыв сети fetch бросает TypeError с английским «Failed to fetch» (F-R112-1).
+      toast.error(catchText(err, 'Ошибка сохранения'));
     } finally {
       setSubmitting(false);
     }
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -133,7 +179,7 @@ export function EditEquipmentDialog({ open, item, onOpenChange, onSubmit }: Edit
         </DialogHeader>
         <EquipmentForm state={state} onChange={(patch) => setState((s) => ({ ...s, ...patch }))} equipmentId={item?.id} />
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Отмена</Button>
+          <Button variant="outline" onClick={() => handleOpenChange(false)}>Отмена</Button>
           <Button
             onClick={submit}
             disabled={submitting || !state.name.trim()}
@@ -172,7 +218,8 @@ export function DeleteEquipmentDialog({
       onOpenChange(false);
       toast.success('Установка удалена');
     } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : 'Ошибка удаления установки');
+      // Обрыв сети fetch бросает TypeError с английским «Failed to fetch» (F-R112-1).
+      toast.error(catchText(err, 'Ошибка удаления установки'));
     } finally {
       setSubmitting(false);
     }
@@ -184,7 +231,10 @@ export function DeleteEquipmentDialog({
         <DialogHeader>
           <DialogTitle className="text-destructive-strong">Удалить установку?</DialogTitle>
           <DialogDescription>
-            Установка «{item?.name}» будет удалена. Это действие нельзя отменить.
+            Установка «{item?.name}» будет удалена без возможности восстановления.
+            Удалить можно только установку, за которой нет истории: если у неё есть отчёты,
+            смены, осмотры, ТО, топливо или документы — удаление отклонится, а данные
+            сохранятся, установку нужно вывести из эксплуатации.
           </DialogDescription>
         </DialogHeader>
         {crewCount > 0 && (
@@ -193,12 +243,12 @@ export function DeleteEquipmentDialog({
             <p className="text-xs text-destructive-strong">
               Эта установка используется в <strong>{crewCount}</strong>{' '}
               {pluralizeRu(crewCount, ['бригаде', 'бригадах', 'бригадах'])}.
-              Удаление может повлиять на связанные записи.
+              Удаление будет отклонено — сначала выведите установку из эксплуатации, история сохранится.
             </p>
           </div>
         )}
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Отмена</Button>
+          <Button variant="outline" disabled={submitting} onClick={() => onOpenChange(false)}>Отмена</Button>
           <Button
             onClick={submit}
             disabled={submitting}

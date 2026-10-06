@@ -12,7 +12,9 @@ export function OperatorStatusStrip({online, items}: {online: boolean; items: Qu
     ? {
         icon: CircleAlert,
         title: `Нужно проверить: ${failed}`,
-        detail: 'Сервер отклонил запись — причина показана ниже',
+        detail: pending > 0
+          ? `Отклонено: ${failed} · ещё ждёт отправки: ${pending} — причина отказа ниже`
+          : 'Сервер отклонил запись — причина показана ниже',
         tone: 'danger' as const,
       }
     : !online
@@ -33,8 +35,8 @@ export function OperatorStatusStrip({online, items}: {online: boolean; items: Qu
           }
         : {
             icon: CloudCheck,
-            title: 'Синхронизировано',
-            detail: 'Сервер доступен · на устройстве нет очереди',
+            title: 'Всё отправлено',
+            detail: 'очередь на телефоне пуста',
             tone: 'ok' as const,
           };
 
@@ -44,7 +46,7 @@ export function OperatorStatusStrip({online, items}: {online: boolean; items: Qu
     «Всё хорошо» — одна строка, а не карточка в полсотни точек.
 
     Строка обязана быть всегда: без неё автономная работа неотличима от потери
-    данных. Но сообщение «Синхронизировано · на устройстве нет очереди» — это
+    данных. Но сообщение «Всё отправлено · очередь на телефоне пуста» — это
     сообщение об ОТСУТСТВИИ события, и занимать под него высоту наравне с
     настоящей тревогой неправильно: место нужно тому, что требует действия.
     Как только появляется очередь, отказ или пропадает связь — строка
@@ -58,7 +60,7 @@ export function OperatorStatusStrip({online, items}: {online: boolean; items: Qu
         className="operator-status-strip mx-4 mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-3xs font-semibold text-success-strong"
       >
         {/* Переносится, а не обрезается: с крупной шкалой (operator-type.css)
-            «на устройстве нет очереди» уходило в многоточие — а это и есть
+            «очередь на телефоне пуста» уходило в многоточие — а это и есть
             ответ на вопрос «всё ли отправилось». */}
         <Icon className="size-3.5 shrink-0" aria-hidden />
         <span>{view.title}</span>

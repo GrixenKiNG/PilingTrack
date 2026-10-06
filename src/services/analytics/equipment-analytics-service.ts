@@ -1,4 +1,6 @@
+import { SUBMITTED_REPORT_STATUS } from '@/lib/report-status';
 import { db } from '@/lib/db';
+import { checkMaintenanceDue } from '@/lib/maintenance-due';
 
 /**
  * Fleet analytics aggregated per equipment for a date range. Mirrors the
@@ -49,19 +51,6 @@ function daysInPeriod(dateFrom: string, dateTo: string): number {
   return diff > 0 ? diff : 1;
 }
 
-function maintenanceDue(row: EquipmentRow): boolean {
-  // Due if the service date is within 14 days / past, or engine hours are
-  // within 50h of the next-service threshold.
-  if (row.nextMaintenanceDate) {
-    const days = (new Date(row.nextMaintenanceDate).getTime() - Date.now()) / 86_400_000;
-    if (days <= 14) return true;
-  }
-  if (row.engineHoursTotal != null && row.nextMaintenanceAtHours != null) {
-    if (row.engineHoursTotal >= row.nextMaintenanceAtHours - 50) return true;
-  }
-  return false;
-}
-
 export async function getEquipmentAnalytics(params: EquipmentAnalyticsParams) {
   const { dateFrom, dateTo } = params;
   const siteId = params.siteId || null;
@@ -82,7 +71,7 @@ export async function getEquipmentAnalytics(params: EquipmentAnalyticsParams) {
       WHERE r.date >= ${dateFrom}
         AND r.date <= ${dateTo}
         AND r."equipmentId" IS NOT NULL
-        AND r.status = 'submitted'
+        AND r.status = ${SUBMITTED_REPORT_STATUS}
         AND r."tenantId" = ${tenantId}
         AND (${siteId}::text IS NULL OR r."siteId" = ${siteId})
     )
@@ -138,7 +127,7 @@ export async function getEquipmentAnalytics(params: EquipmentAnalyticsParams) {
       WHERE r.date >= ${dateFrom}
         AND r.date <= ${dateTo}
         AND r."equipmentId" IS NOT NULL
-        AND r.status = 'submitted'
+        AND r.status = ${SUBMITTED_REPORT_STATUS}
         AND r."tenantId" = ${tenantId}
         AND (${siteId}::text IS NULL OR r."siteId" = ${siteId})
     )
@@ -174,7 +163,11 @@ export async function getEquipmentAnalytics(params: EquipmentAnalyticsParams) {
   }
 
   const equipment = rows.map((row) => {
-    const due = maintenanceDue(row);
+    const due = checkMaintenanceDue({
+      nextMaintenanceDate: row.nextMaintenanceDate ? row.nextMaintenanceDate.toISOString() : null,
+      nextMaintenanceAtHours: row.nextMaintenanceAtHours,
+      engineHoursTotal: row.engineHoursTotal,
+    });
     return {
       equipmentId: row.equipmentId,
       name: row.name,
@@ -191,7 +184,9 @@ export async function getEquipmentAnalytics(params: EquipmentAnalyticsParams) {
       engineHoursTotal: row.engineHoursTotal,
       nextMaintenanceAtHours: row.nextMaintenanceAtHours,
       nextMaintenanceDate: row.nextMaintenanceDate ? row.nextMaintenanceDate.toISOString() : null,
-      maintenanceDue: due,
+      maintenanceOverdue: due.overdue,
+      maintenanceSoon: due.soon,
+      maintenanceDue: due.overdue || due.soon,
     };
   });
 

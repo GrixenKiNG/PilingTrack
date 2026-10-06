@@ -64,6 +64,31 @@ function formatEventDate(value: string) {
   });
 }
 
+// Подписи областей (scope) для бейджа ленты. Ключи — реальные значения из
+// recordAuditEvent/recordFeedbackEvent/pushClientFeedback. Незнакомую область
+// показываем как есть: скрывать её нельзя (F-FEED-SCOPE-LABELS).
+const SCOPE_LABELS: Record<string, string> = {
+  equipment: 'Техника',
+  inspections: 'Осмотры',
+  users: 'Пользователи',
+  sites: 'Объекты',
+  crews: 'Бригады',
+  reports: 'Отчёты',
+  pdf: 'PDF',
+  dictionaries: 'Справочники',
+  settings: 'Настройки',
+  projections: 'Аналитика',
+  auth: 'Безопасность',
+  telegram: 'Telegram',
+  network: 'Сеть',
+  api: 'API',
+  ui: 'Интерфейс',
+};
+
+function getScopeLabel(scope: string) {
+  return SCOPE_LABELS[scope] ?? scope;
+}
+
 export function FeedbackCenter() {
   const user = usePilingStore((state) => state.currentUser);
   // Operators/assistants get a plain notifications feed; the platform-health
@@ -197,7 +222,7 @@ export function FeedbackCenter() {
               </p>
             </div>
             <div className="flex items-center gap-2">
-              <Button onClick={() => void loadFeedbackFeed({ includeHealth: true })} size="sm" variant="outline" className="h-8 text-xs">
+              <Button onClick={() => void loadFeedbackFeed({ includeHealth: true })} size="sm" variant="outline" className="h-8 min-h-11 text-xs sm:min-h-8">
                 <RefreshCw className={`mr-1.5 h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
                 Обновить
               </Button>
@@ -237,12 +262,12 @@ export function FeedbackCenter() {
           </div>
 
           <div className="flex flex-wrap gap-2">
-            <Button onClick={() => void markAllRead()} size="sm" variant="outline" className="h-8 text-xs">
+            <Button onClick={() => void markAllRead()} size="sm" variant="outline" className="h-8 min-h-11 text-xs sm:min-h-8">
               <CheckCheck className="mr-1.5 h-3.5 w-3.5" />
               Отметить всё как прочитанное
             </Button>
             {localFeedbackEvents.length > 0 && (
-              <Button onClick={clearLocalFeedbackEvents} size="sm" variant="outline" className="h-8 text-xs">
+              <Button onClick={clearLocalFeedbackEvents} size="sm" variant="outline" className="h-8 min-h-11 text-xs sm:min-h-8">
                 Очистить локальные
               </Button>
             )}
@@ -276,7 +301,7 @@ export function FeedbackCenter() {
                             <p className="text-sm font-semibold text-foreground">{event.title}</p>
                             {getPriorityBadge(event.priority)}
                             <Badge variant="secondary" className="text-3xs">
-                              {event.source === 'client' ? 'локально' : event.scope}
+                              {event.source === 'client' ? 'локально' : getScopeLabel(event.scope)}
                             </Badge>
                             {event.unread && (
                               <Badge className="bg-signal/10 text-signal-strong hover:bg-signal/10">Новое</Badge>
@@ -290,7 +315,12 @@ export function FeedbackCenter() {
                           <p className="mt-1 text-sm text-muted-foreground">{event.message}</p>
                           <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-2xs text-muted-foreground">
                             <span>{formatEventDate(event.createdAt)}</span>
-                            {isPrivileged && event.requestId && <span>requestId: {event.requestId}</span>}
+                            {/* requestId нужен поддержке, но в карточке это
+                                техническая строка: держим его только в
+                                подсказке, а не текстом (F-FEED-LOGIN). */}
+                            {isPrivileged && event.requestId && (
+                              <span title={`requestId: ${event.requestId}`}>ID обращения</span>
+                            )}
                             {event.actorName && <span>Инициатор: {event.actorName}</span>}
                           </div>
                           <div className="mt-3 flex flex-wrap gap-2">
@@ -298,7 +328,7 @@ export function FeedbackCenter() {
                               <Button
                                 size="sm"
                                 variant="outline"
-                                className="h-8 text-xs"
+                                className="h-8 min-h-11 text-xs sm:min-h-8"
                                 onClick={() => void updateEventState(event.id, 'read')}
                               >
                                 Отметить как прочитанное
@@ -307,7 +337,7 @@ export function FeedbackCenter() {
                             {canAcknowledge && (
                               <Button
                                 size="sm"
-                                className="h-8 text-xs bg-slate-900 hover:bg-slate-800"
+                                className="h-8 min-h-11 text-xs bg-slate-900 hover:bg-slate-800 sm:min-h-8"
                                 onClick={() => void updateEventState(event.id, 'acknowledge')}
                               >
                                 <Siren className="mr-1.5 h-3.5 w-3.5" />

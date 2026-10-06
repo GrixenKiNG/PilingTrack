@@ -9,10 +9,11 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { toast } from 'sonner';
 import { authFetch } from '@/lib/api';
 import { formatRuDate } from '@/lib/format';
 import { Button } from '@/components/ui/button';
+import { QueryErrorBanner } from '@/components/piling/async-ui';
+import { useDocumentTitle } from '@/components/piling/ops-shell';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
@@ -22,6 +23,7 @@ import {
   LEVEL_LABEL, LEVEL_STYLE, STATUS_LABEL, STATUS_STYLE, healthScoreColor,
   type InspectionLevel, type InspectionStatus,
 } from './inspection-labels';
+import { InspectionLoadError, isRetryableLoadError, loadErrorText } from './inspection-api-error';
 
 interface InspectionRow {
   id: string;
@@ -35,9 +37,12 @@ interface InspectionRow {
 const ALL = '__all__';
 
 export function InspectionsList() {
+  useDocumentTitle('Осмотры');
   const [records, setRecords] = useState<InspectionRow[]>([]);
   const [levelFilter, setLevelFilter] = useState<string>(ALL);
   const [loading, setLoading] = useState(true);
+  // Почему список не показан: отказ чтения вместо «осмотров нет» (R100 №1).
+  const [loadError, setLoadError] = useState<InspectionLoadError | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -46,10 +51,19 @@ export function InspectionsList() {
       if (levelFilter !== ALL) params.set('level', levelFilter);
       const qs = params.toString() ? `?${params.toString()}` : '';
       const res = await authFetch(`/api/inspections${qs}`);
-      if (!res.ok) throw new Error();
+      // 403 (нет права), 5xx и обрыв — разные причины. Раньше все они звучали
+      // как «Осмотров не найдено.»: роль без `inspection.perform` читала, что
+      // осмотров в организации нет.
+      if (!res.ok) {
+        setLoadError(new InspectionLoadError(res.status));
+        setRecords([]);
+        return;
+      }
       setRecords(((await res.json()).inspections ?? []) as InspectionRow[]);
+      setLoadError(null);
     } catch {
-      toast.error('Не удалось загрузить осмотры');
+      setLoadError(new InspectionLoadError(null));
+      setRecords([]);
     } finally {
       setLoading(false);
     }
@@ -83,6 +97,16 @@ export function InspectionsList() {
 
       {loading ? (
         <p className="rounded-lg bg-muted px-3 py-6 text-center text-sm text-muted-foreground">Загрузка…</p>
+      ) : loadError ? (
+        <QueryErrorBanner
+          title="Не удалось загрузить осмотры"
+          message={loadErrorText(loadError, {
+            forbidden: 'Нет прав на просмотр осмотров. Смените роль или обратитесь к администратору.',
+            notFound: 'Осмотры не найдены.',
+            server: 'Не удалось загрузить осмотры. Сервер вернул ошибку.',
+          })}
+          onRetry={isRetryableLoadError(loadError) ? () => void load() : undefined}
+        />
       ) : records.length === 0 ? (
         <p className="rounded-lg bg-muted px-3 py-6 text-center text-sm text-muted-foreground">Осмотров не найдено.</p>
       ) : (
@@ -110,7 +134,8 @@ export function InspectionsList() {
                     <span>{formatRuDate(r.inspectionDate)}</span>
                     {r.equipment?.model && <span>{r.equipment.model}</span>}
                     <span className={cn('font-mono font-medium', healthScoreColor(r.healthScore))}>
-                      {r.healthScore != null ? `${r.healthScore}` : '—'}
+                      {/* F-R131 №17: «голое» число не читалось. В готовности — «87/100». */}
+                      {r.healthScore != null ? `${r.healthScore}/100` : '—'}
                     </span>
                   </div>
                 </div>

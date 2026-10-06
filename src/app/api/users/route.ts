@@ -65,10 +65,10 @@ export const POST = withMutation(
 
     // isActive is intentionally extracted to exclude it from `rest` (createUser
     // does not accept it; new users default to active).
-    const { pin, password, isActive: _isActive, ...rest } = validation.data;
-    if (!password?.trim() && !pin?.trim()) {
+    const { password, isActive: _isActive, ...rest } = validation.data;
+    if (!password?.trim()) {
       return NextResponse.json(
-        { error: 'Укажите пароль или PIN-код' },
+        { error: 'Укажите пароль' },
         { status: 400 }
       );
     }
@@ -77,7 +77,6 @@ export const POST = withMutation(
     const createdUser = await createUser({
       ...rest,
       password,
-      pin,
       role: rest.role || 'OPERATOR',
       tenantId,
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned

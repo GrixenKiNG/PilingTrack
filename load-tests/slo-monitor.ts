@@ -4,7 +4,6 @@
  * Collects and reports system metrics during load testing:
  * - API latency (p50, p90, p95, p99)
  * - Error rates
- * - WS connection count
  * - Event delivery latency
  * - DB response times
  * - Redis latency
@@ -132,25 +131,6 @@ async function probeDbLatency(baseUrl: string) {
 }
 
 // ============================================================
-// WS stats probe
-// ============================================================
-
-async function probeWsStats(wsBaseUrl: string) {
-  try {
-    const res = await fetch(wsBaseUrl, {
-      signal: AbortSignal.timeout(3000),
-    });
-    const data = await res.json() as Record<string, unknown>;
-    const clientCount = (data.clients as number) || 0;
-    collector.record('ws_connections', clientCount);
-    return clientCount;
-  } catch {
-    collector.record('ws_connections', -1);
-    return -1;
-  }
-}
-
-// ============================================================
 // SLO checker
 // ============================================================
 
@@ -166,7 +146,6 @@ const SLO_TARGETS: Array<{
   { name: 'Error rate', metric: 'error_rate', threshold: 1, unit: '%' },
   { name: 'Health check latency', metric: 'health_latency', percentile: 'p95', threshold: 200, unit: 'ms' },
   { name: 'DB query latency', metric: 'db_query_latency', percentile: 'p95', threshold: 100, unit: 'ms' },
-  { name: 'WS connections', metric: 'ws_connections', threshold: 900, unit: 'count' },
 ];
 
 function checkSLOs(): SLOTarget[] {
@@ -248,9 +227,6 @@ function printReport() {
   console.log(`  Errors (last 60s):      ${collector.getRate('http_errors')}`);
   console.log(`  Error rate:             ${collector.getErrorRate().toFixed(2)}%`);
 
-  const wsConns = collector.getRate('ws_connections');
-  console.log(`  WS connections:         ${wsConns > 0 ? wsConns : 'probe failed'}`);
-
   // Events
   const eventCount = collector.getRate('events_published');
   if (eventCount > 0) {
@@ -279,10 +255,9 @@ function printReport() {
 // Monitor loop
 // ============================================================
 
-async function runMonitor(baseUrl: string, wsBaseUrl: string, intervalMs = 10000) {
+async function runMonitor(baseUrl: string, intervalMs = 10000) {
   console.log('🔍 SLO Monitor started');
   console.log(`   API: ${baseUrl}`);
-  console.log(`   WS:  ${wsBaseUrl}`);
   console.log(`   Report interval: ${intervalMs / 1000}s`);
   console.log('');
 
@@ -294,7 +269,6 @@ async function runMonitor(baseUrl: string, wsBaseUrl: string, intervalMs = 10000
     await Promise.all([
       probeHealth(baseUrl),
       probeDbLatency(baseUrl),
-      probeWsStats(wsBaseUrl),
     ]);
   }, intervalMs);
 
@@ -323,9 +297,8 @@ async function runMonitor(baseUrl: string, wsBaseUrl: string, intervalMs = 10000
 // ============================================================
 
 const baseUrl = process.env.BASE_URL || 'http://localhost:3000';
-const wsBaseUrl = process.env.WS_BASE_URL || 'http://localhost:3001';
 
-runMonitor(baseUrl, wsBaseUrl).catch((err) => {
+runMonitor(baseUrl).catch((err) => {
   console.error('Monitor failed:', err);
   process.exit(1);
 });

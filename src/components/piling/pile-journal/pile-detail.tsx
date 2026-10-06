@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { formatNumber } from '@/lib/format';
 import { PILE_ACCEPTANCE_LABELS } from '@/modules/operator-mobile/domain/pile-passport';
 import type { PilePassportRow } from '@/modules/reports/application/queries/pile-passport.service';
 import { DrivingSets } from './driving-sets';
@@ -132,11 +133,11 @@ export function PileDetail({ row, busy, onDecide }: {
           className="w-full rounded-md border bg-card px-3 py-2 text-sm shadow-xs"
         />
         <div className="flex flex-wrap gap-2">
-          <Button size="sm" className="h-8 text-xs" disabled={busy}
+          <Button size="sm" className="h-11 text-xs sm:h-8" disabled={busy}
             onClick={() => onDecide('ACCEPTED', note)}>
             Принять сваю
           </Button>
-          <Button size="sm" variant="outline" className="h-8 text-xs" disabled={busy}
+          <Button size="sm" variant="outline" className="h-11 text-xs sm:h-8" disabled={busy}
             onClick={() => onDecide('NEEDS_REDRIVE', note)}>
             На добивку
           </Button>
@@ -147,7 +148,7 @@ export function PileDetail({ row, busy, onDecide }: {
 }
 
 function fmt(value: number | null, unit = ''): string {
-  return value === null ? '—' : `${value}${unit}`;
+  return value === null ? '—' : `${formatNumber(value, 1)}${unit}`;
 }
 
 function Fact({ label, value, strong }: { label: string; value: string; strong?: boolean }) {

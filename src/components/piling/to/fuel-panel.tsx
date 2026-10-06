@@ -16,7 +16,7 @@ import { toast } from 'sonner';
 import { authFetch } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { LoadFailure, loadFailureText } from '@/components/piling/to/load-failure';
+import { LoadFailure, loadFailureText, catchText } from '@/components/piling/to/load-failure';
 
 interface FuelEntry {
   id: string;
@@ -70,7 +70,6 @@ export function FuelPanel({ equipmentId }: { equipmentId: string }) {
         setEntries([]);
         setSummary(null);
         setLoadError(loadFailureText(res.status));
-        toast.error('Не удалось загрузить журнал топлива');
         return;
       }
       const data = res.ok
@@ -83,7 +82,6 @@ export function FuelPanel({ equipmentId }: { equipmentId: string }) {
       setEntries([]);
       setSummary(null);
       setLoadError(loadFailureText(null));
-      toast.error('Не удалось загрузить журнал топлива');
     } finally {
       setLoading(false);
     }
@@ -127,7 +125,8 @@ export function FuelPanel({ equipmentId }: { equipmentId: string }) {
       resetForm();
       await load(equipmentId);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Не удалось сохранить запись');
+      // Обрыв сети fetch бросает TypeError с английским «Failed to fetch» (F-R112-2).
+      toast.error(catchText(err, 'Не удалось сохранить запись'));
     } finally {
       setSubmitting(false);
     }
@@ -172,7 +171,7 @@ export function FuelPanel({ equipmentId }: { equipmentId: string }) {
       )}
 
       {!formOpen && (
-        <Button variant="outline" size="sm" className="mb-3 h-9 w-full" onClick={() => setFormOpen(true)}>
+        <Button variant="outline" size="sm" className="mb-3 h-11 w-full sm:h-9" onClick={() => setFormOpen(true)}>
           <Plus className="mr-1 h-4 w-4" /> Добавить запись
         </Button>
       )}
@@ -194,7 +193,7 @@ export function FuelPanel({ equipmentId }: { equipmentId: string }) {
                 value={liters}
                 onChange={(e) => setLiters(e.target.value)}
                 placeholder="напр. 200"
-                className="h-9"
+                className="h-11 sm:h-9"
               />
             </div>
             <div>
@@ -206,20 +205,20 @@ export function FuelPanel({ equipmentId }: { equipmentId: string }) {
                 value={percent}
                 onChange={(e) => setPercent(e.target.value)}
                 placeholder="напр. 40"
-                className="h-9"
+                className="h-11 sm:h-9"
               />
             </div>
           </div>
           <p className="text-2xs text-muted-foreground">Заполните хотя бы одно поле.</p>
           <div>
             <label className="mb-1 block text-2xs text-muted-foreground">Дата</label>
-            <Input type="date" value={recordedAt} onChange={(e) => setRecordedAt(e.target.value)} className="h-9" />
+            <Input type="date" value={recordedAt} onChange={(e) => setRecordedAt(e.target.value)} className="h-11 sm:h-9" />
           </div>
           <div>
             <label className="mb-1 block text-2xs text-muted-foreground">Примечание</label>
-            <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="необязательно" className="h-9" />
+            <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="необязательно" className="h-11 sm:h-9" />
           </div>
-          <Button size="sm" className="h-9 w-full" onClick={submit} disabled={submitting}>
+          <Button size="sm" className="h-11 w-full sm:h-9" onClick={submit} disabled={submitting}>
             {submitting ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : null}
             Сохранить
           </Button>

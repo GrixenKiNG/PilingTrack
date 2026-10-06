@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { Loader2 } from '@/components/piling/icons/unified-icons';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -41,6 +41,7 @@ export function CreateSiteDialog({
   pileGrades,
   onCreate,
 }: CreateSiteDialogProps) {
+  const uid = useId();
   const [name, setName] = useState('');
   const [pilePlans, setPilePlans] = useState<PilePlanRow[]>([]);
   const [drillingPlans, setDrillingPlans] = useState<DrillingPlanRow[]>([]);
@@ -78,11 +79,13 @@ export function CreateSiteDialog({
           ) : (
             <div className="space-y-4 pb-2">
               <div className="space-y-1.5">
-                <Label>Название объекта</Label>
+                <Label htmlFor={`${uid}-name`}>Название объекта</Label>
                 <Input
+                  id={`${uid}-name`}
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="Например: ЖК Солнечный"
+                  maxLength={200}
                   className="h-11"
                   autoFocus
                 />

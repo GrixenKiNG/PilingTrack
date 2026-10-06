@@ -19,6 +19,16 @@ export function loadFailureText(status: number | null): string {
     : 'Не удалось загрузить: нет подключения к сети';
 }
 
+/**
+ * Текст тоста из пойманного исключения: обрыв сети `fetch` бросает `TypeError`
+ * с английским «Failed to fetch» — его заменяет понятная фраза; остальное
+ * (серверные русские тексты 400/409) остаётся как есть.
+ */
+export function catchText(cause: unknown, fallback: string): string {
+  if (cause instanceof TypeError) return 'Нет связи с сервером. Проверьте подключение и повторите.';
+  return cause instanceof Error && cause.message ? cause.message : fallback;
+}
+
 export function LoadFailure({ message, onRetry }: { message: string; onRetry: () => void }) {
   return (
     <div
@@ -30,7 +40,7 @@ export function LoadFailure({ message, onRetry }: { message: string; onRetry: ()
         type="button"
         variant="outline"
         size="sm"
-        className="shrink-0"
+        className="min-h-11 shrink-0 sm:min-h-8"
         onClick={onRetry}
       >
         Повторить

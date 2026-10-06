@@ -1,7 +1,7 @@
 'use client';
 
 import {SAFETY_BRIEFING} from '@/modules/operator-mobile/contracts';
-import {BigButton, Panel, Screen} from '../ui';
+import {BigButton, ErrorNote, Panel, Screen} from '../ui';
 
 /**
  * Инструкция целиком на одном экране.
@@ -23,8 +23,15 @@ export interface BriefingText {
   }[];
 }
 
-export function BriefingScreen({busy, onAcknowledge, onBack, briefing = SAFETY_BRIEFING}: {
+export function BriefingScreen({busy, error, onAcknowledge, onBack, briefing = SAFETY_BRIEFING}: {
   busy: boolean;
+  /**
+   * Текст отказа сервера. Инструктаж — обязательный шаг допуска, и без причины
+   * отказа кнопка «Прочитал и ознакомлен» просто отпускается: машинист жмёт её
+   * подряд и остаётся без допуска, не понимая почему (F-V1-BRIEFING-ERROR).
+   * Показываем текст сервера как есть, своих формулировок не придумываем.
+   */
+  error?: string | null;
   onAcknowledge: () => void;
   onBack: () => void;
   /**
@@ -40,6 +47,9 @@ export function BriefingScreen({busy, onAcknowledge, onBack, briefing = SAFETY_B
       subtitle={`${briefing.code} · версия ${briefing.version} · ${briefing.readingMinutes} мин чтения`}
       footer={(
         <>
+          {/* Отказ — в футере, рядом с кнопкой: разделов девять, и заметка
+              в теле экрана осталась бы за границей прокрутки. */}
+          <ErrorNote message={error ?? null} />
           <BigButton onClick={onAcknowledge} disabled={busy}>
             {busy ? 'Записываем…' : 'Прочитал и ознакомлен'}
           </BigButton>

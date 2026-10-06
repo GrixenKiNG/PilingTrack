@@ -19,6 +19,7 @@ import type { WorkPermitDto } from '../api/contracts';
 import { CommandDialog } from '../shared/command-dialog';
 import { PermitForm } from '../forms/permit-form';
 import { ProcessRoleStrip, RefKpi, commandFailure, downloadReadinessExport } from './shared';
+import { normalizeSearch } from '../shared/text-search';
 import type { ReferenceUiProps } from './types';
 
 function EvidenceState({ state }: { state: string }) {
@@ -57,6 +58,10 @@ export function PermitsScreen(props: ReferenceUiProps) {
   const [commandText, setCommandText] = useState('');
   const [commandError, setCommandError] = useState<string | null>(null);
   const [commandPending, setCommandPending] = useState(false);
+  // Выгрузка идёт не мгновенно (serializable-транзакция на сервере), поэтому
+  // кнопка блокируется и показывает ход: без этого двойной клик отправлял две
+  // полные выгрузки, а человек не видел, что что-то происходит.
+  const [exportPending, setExportPending] = useState(false);
   // Сроки документов экипажей: те же данные, что во вкладке «Документы».
   const canReadDocuments = !!props.bootstrap && can(props.bootstrap.actor, 'users.documents.read_all');
   const documentActorKey = props.bootstrap ? [props.bootstrap.actor.id, props.bootstrap.actor.role, props.bootstrap.actor.actingAs].join(':') : '';
@@ -94,6 +99,15 @@ export function PermitsScreen(props: ReferenceUiProps) {
     (журнал ТО грузится по одной), поэтому плитка «Техника» показывала
     «Осмотрено: 0 из 9» при девяти выполненных осмотрах.
   */
+  /*
+    Отказ авторитетного ТЕКУЩЕГО снимка — это «не прочитано», а не «осмотров
+    нет». При нём `currentReadiness` пуст, по нему выходили «Осмотрено: 0 из N»,
+    «Регламент ТО соблюдён: 0 из N» и зелёный pass на плитках, хотя сервер
+    вердикта не вынес (F-N1005-PERMIT-EVIDENCE). Плитки допуска обязаны
+    показать непроверенность; независимо загруженные наряды и решения
+    (ограничения, ожидающие согласования) остаются как есть.
+  */
+  const authoritativeUnknown = props.authoritativeReadinessError !== null;
   const inspectedCount = props.currentReadiness.filter((item) => item.facts?.inspectionCompleted).length;
   const maintenanceOkCount = props.currentReadiness.filter((item) => item.facts
     && item.facts.maintenanceConfigured
@@ -113,8 +127,8 @@ export function PermitsScreen(props: ReferenceUiProps) {
   const filteredPermits = props.permits.filter((permit) => {
     if (permitFilter !== 'ALL' && permit.state !== permitFilter) return false;
     const equipmentName = props.equipment.find((item) => item.id === permit.equipmentId)?.name ?? '';
-    const query = permitQuery.trim().toLocaleLowerCase('ru-RU');
-    return !query || permit.id.toLocaleLowerCase('ru-RU').includes(query) || equipmentName.toLocaleLowerCase('ru-RU').includes(query) || permit.scope.toLocaleLowerCase('ru-RU').includes(query);
+    const query = normalizeSearch(permitQuery);
+    return !query || normalizeSearch(permit.id).includes(query) || normalizeSearch(equipmentName).includes(query) || normalizeSearch(permit.scope).includes(query);
   });
   const runPermitAction = async (permit: WorkPermitDto, action: 'submit' | 'approve' | 'revoke', confirmed = false) => {
     if (!confirmed) { setCommand({permit, action}); setCommandText(''); setCommandError(null); return; }
@@ -142,6 +156,13 @@ export function PermitsScreen(props: ReferenceUiProps) {
     props.onRetry();
   };
 
+  const exportPermits = async () => {
+    setExportPending(true);
+    try { await downloadReadinessExport('permits', props.filters); }
+    catch (error) { toast.error(error instanceof Error ? error.message : 'Не удалось сформировать экспорт'); }
+    finally { setExportPending(false); }
+  };
+
   if (composing) {
     return (
       <PermitForm
@@ -157,7 +178,7 @@ export function PermitsScreen(props: ReferenceUiProps) {
 
   return (
     <>
-      <ScreenTitle heading="Наряд-допуски" subtitle="Проверка условий и разрешений на выполнение работ" actions={<div className="flex gap-2"><Button variant="outline" onClick={() => void downloadReadinessExport('permits', props.filters).catch((error) => toast.error(error instanceof Error ? error.message : 'Не удалось сформировать экспорт'))}>Экспорт</Button>{/* Установку выбирают в самой форме, поэтому кнопка больше не ждёт
+      <ScreenTitle heading="Наряд-допуски" subtitle="Проверка условий и разрешений на выполнение работ" actions={<div className="flex gap-2"><Button variant="outline" disabled={exportPending} onClick={() => void exportPermits()}>{exportPending ? 'Готовим файл…' : 'Экспорт'}</Button>{/* Установку выбирают в самой форме, поэтому кнопка больше не ждёт
                 выделенной строки в списке — раньше она была недоступна, пока
                 пользователь не догадается кликнуть установку. */}
             <Button type="button" disabled={!props.bootstrap?.capabilities.entities.permit.edit} onClick={() => setComposing(true)} className="min-h-11 bg-signal-strong hover:bg-signal-strong">+ Создать наряд</Button></div>} />
@@ -215,11 +236,11 @@ export function PermitsScreen(props: ReferenceUiProps) {
                       : 'Документы действуют',
               ],
             },
-            { title: 'Техника', icon: 'equipment-rig' as PilingIconName, state: blocked > 0 ? 'warning' : 'pass', lines: [`Ограничений: ${blocked}`, `Осмотрено: ${inspectedCount} из ${props.equipment.length}`] },
+            { title: 'Техника', icon: 'equipment-rig' as PilingIconName, state: blocked > 0 ? 'warning' : authoritativeUnknown ? 'missing' : 'pass', lines: [`Ограничений: ${blocked}`, authoritativeUnknown ? 'Осмотрено: не проверено — авторитетный снимок недоступен' : `Осмотрено: ${inspectedCount} из ${props.equipment.length}`] },
             { title: 'Место работ', icon: 'site' as PilingIconName, state: props.crews.some((crew) => crew.isActive && crew.site) ? 'pass' : 'missing', lines: [`Объектов: ${new Set(props.crews.flatMap((crew) => crew.site?.id ? [crew.site.id] : [])).size}`,
               // Подтверждения схемы площадки в системе нет — не делаем вид, что есть.
               `Экипажей без объекта: ${props.crews.filter((crew) => crew.isActive && !crew.site).length}`] },
-            { title: 'Документы', icon: 'documents' as PilingIconName, state: pending > 0 ? 'warning' : 'pass', lines: [`Регламент ТО соблюдён: ${maintenanceOkCount} из ${props.equipment.length}`, pending > 0 ? `Ожидают: ${pending}` : 'Решения подтверждены'] },
+            { title: 'Документы', icon: 'documents' as PilingIconName, state: pending > 0 ? 'warning' : authoritativeUnknown ? 'missing' : 'pass', lines: [authoritativeUnknown ? 'Регламент ТО соблюдён: не проверено — авторитетный снимок недоступен' : `Регламент ТО соблюдён: ${maintenanceOkCount} из ${props.equipment.length}`, pending > 0 ? `Ожидают: ${pending}` : 'Решения подтверждены'] },
           ].map((item) => (
             <article key={item.title} className="rounded-lg border border-border p-2">
               <div className="flex items-center gap-2"><span className="grid h-8 w-8 place-items-center rounded-lg bg-info/10 text-info-strong"><PilingIcon name={item.icon} size={12} decorative /></span><div className="min-w-0 flex-1"><h3 className="text-xs font-bold">{item.title}</h3><EvidenceState state={item.state} /></div></div>

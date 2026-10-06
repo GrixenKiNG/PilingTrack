@@ -121,14 +121,61 @@ export const DELETE = withMutation(
 
     const { id, recordId } = await params;
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
-    const tenantId = requireTenantId(user!);
+    const actor = user!;
+    const tenantId = requireTenantId(actor);
+
+    // Снимок удаляемого наряда берётся из результата команды: `delete`
+    // возвращает снятую строку (DELETE … RETURNING), поэтому отдельное чтение
+    // ДО удаления не нужно — между ним и удалением наряд могли изменить, и в
+    // ленту ушли бы старые значения (F-R72-FEED-b).
+    let removed;
     try {
-      await deleteMaintenance(id, recordId, { tenantId });
-      return NextResponse.json({ ok: true });
+      removed = await deleteMaintenance(id, recordId, { tenantId });
     } catch (err) {
       if (err instanceof ServiceError) return NextResponse.json({ error: err.message }, { status: err.status });
       throw err;
     }
+
+    // Название установки команда не возвращает и от гонки не зависит — читается
+    // отдельно, строго по тенанту и установке.
+    //
+    // Наряд к этому моменту уже удалён, поэтому сбой дообогащения не должен
+    // превращать успех в 500 (F-R72-FEED-c): событие пишется с тем, что есть,
+    // название установки просто не попадает в него, а повтор даёт не 404.
+    let equipment: { name: string } | null = null;
+    try {
+      equipment = await db.equipment.findFirst({
+        where: { id, tenantId },
+        select: { name: true },
+      });
+    } catch (err) {
+      logger.warn('maintenance.record.deleted.enrichment_failed', {
+        recordId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+
+    // Удаление наряда ТО не оставляло следа нигде, хотя создание, правка и
+    // приёмка того же наряда писались (F-R72-FEED-METER-MAINT). Пишется только
+    // после успешной команды.
+    await recordAuditEvent({
+      action: 'maintenance.record.deleted',
+      scope: 'equipment',
+      actorId: actor.id,
+      targetId: recordId,
+      tenantId,
+      metadata: {
+        name: removed.title,
+        before: {
+          type: removed.type,
+          status: removed.status,
+          scheduledAt: removed.scheduledAt,
+          equipmentName: equipment?.name,
+        },
+      },
+    });
+
+    return NextResponse.json({ ok: true });
   },
   { domain: 'equipment.maintenance' }
 );

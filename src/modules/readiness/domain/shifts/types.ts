@@ -5,13 +5,15 @@ export type ShiftType = 'DAY' | 'NIGHT';
  * а «приёмка» стояла в конце и закрывала смену, то есть человеческого допуска
  * перед работой не существовало вовсе.
  */
-export type ShiftState =
-  | 'PLANNED'
-  | 'PENDING_ACCEPTANCE'
-  | 'STARTED'
-  | 'HANDOVER_PENDING'
-  | 'CLOSED'
-  | 'CANCELLED';
+export const SHIFT_STATES = [
+  'PLANNED',
+  'PENDING_ACCEPTANCE',
+  'STARTED',
+  'HANDOVER_PENDING',
+  'CLOSED',
+  'CANCELLED',
+] as const;
+export type ShiftState = (typeof SHIFT_STATES)[number];
 export type ShiftHandoverState = 'DRAFT' | 'SUBMITTED' | 'REWORK_REQUIRED' | 'ACCEPTED';
 
 export interface ShiftRecord {

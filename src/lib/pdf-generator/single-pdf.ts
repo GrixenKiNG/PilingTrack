@@ -18,6 +18,7 @@ import {
   statusLabel,
 } from './format';
 import { renderPdf } from './render';
+import { formatCountMeters } from '@/lib/format';
 import { formatDowntimeHours } from '@/lib/downtime-hours';
 import { pileLengthMeters } from '@/lib/pile-length';
 import type { SingleReportData } from './types';
@@ -51,8 +52,8 @@ export async function generateSinglePdf(data: SingleReportData): Promise<Buffer>
     }
 
     addMetricStrip(doc, [
-      ['Свай забито', `${formatNumber(totalPiles)} / ${formatMeters(totalPileMeters)}`, 'шт/м.п.', hasPilesWithoutLength ? PILE_METERS_INCOMPLETE_NOTE : undefined],
-      ['Бурение', `${formatNumber(totalDrillingCount)} / ${formatMeters(totalDrilling)}`, 'шт/м.п.'],
+      ['Свай забито', formatCountMeters(totalPiles, totalPileMeters), '', hasPilesWithoutLength ? PILE_METERS_INCOMPLETE_NOTE : undefined],
+      ['Бурение', formatCountMeters(totalDrillingCount, totalDrilling), ''],
       ['Простои', formatDowntimeHours(totalDowntime), ''],
     ]);
 

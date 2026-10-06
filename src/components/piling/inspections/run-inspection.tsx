@@ -11,6 +11,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { OpsBreadcrumb } from '@/components/piling/ops-shell';
 import { ArrowLeft, Loader2 } from '@/components/piling/icons/unified-icons';
 import { toast } from 'sonner';
 import { authFetch } from '@/lib/api';
@@ -24,6 +25,7 @@ import { computeHealthScore } from '@/modules/inspections/domain/inspection-logi
 import { healthScoreColor, LEVEL_LABEL, STATUS_LABEL, STATUS_STYLE, type InspectionLevel, type InspectionStatus } from './inspection-labels';
 import { InspectionItemPhotos } from './inspection-item-photos';
 import { YesNoControl, Status4Control, DoneControl, MeasureControl } from './inspection-controls';
+import { InspectionLoadError, catchText, extractApiError, isRetryableLoadError, loadErrorText } from './inspection-api-error';
 
 // ---------- types ----------
 
@@ -87,6 +89,8 @@ export function RunInspection({ inspectionId, onExit }: { inspectionId: string; 
 
   const [inspection, setInspection] = useState<InspectionDetail | null>(null);
   const [loading, setLoading] = useState(true);
+  // Почему карточка не показана: 403/404/5xx/обрыв — разные исходы (R100 №2).
+  const [loadError, setLoadError] = useState<InspectionLoadError | null>(null);
 
   // answers keyed by itemId
   const [answers, setAnswers] = useState<Record<string, ItemAnswer>>({});
@@ -109,9 +113,17 @@ export function RunInspection({ inspectionId, onExit }: { inspectionId: string; 
     setLoading(true);
     try {
       const res = await authFetch(`/api/inspections/${inspectionId}`);
-      if (!res.ok) throw new Error();
+      // 403 (нет права), 404 (чужой/удалённый осмотр), 5xx и обрыв нельзя
+      // показывать одним «Осмотр не найден.»: транзиентный сбой оставлял
+      // человека на тупиковом экране, хотя осмотр есть.
+      if (!res.ok) {
+        setLoadError(new InspectionLoadError(res.status));
+        setInspection(null);
+        return;
+      }
       const { inspection: data } = await res.json() as { inspection: InspectionDetail };
       setInspection(data);
+      setLoadError(null);
 
       // Initialize answer state from saved answers
       const init: Record<string, ItemAnswer> = {};
@@ -134,7 +146,8 @@ export function RunInspection({ inspectionId, onExit }: { inspectionId: string; 
       setPhotoCounts(initPhotos);
       setSignedByName(currentUser?.name ?? '');
     } catch {
-      toast.error('Не удалось загрузить осмотр');
+      setLoadError(new InspectionLoadError(null));
+      setInspection(null);
     } finally {
       setLoading(false);
     }
@@ -188,10 +201,12 @@ export function RunInspection({ inspectionId, onExit }: { inspectionId: string; 
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ answers: buildAnswerPayload() }),
       });
-      if (!res.ok) throw new Error((await res.json()).error || 'Ошибка сохранения');
+      // Текст отказа разбирается по статусу: 401/CSRF-403 приходят английскими,
+      // не-JSON тело (прокси) давало браузерное «Unexpected end of JSON input».
+      if (!res.ok) throw new Error(await extractApiError(res, 'Не удалось сохранить черновик'));
       if (!options?.silent) toast.success('Черновик сохранён');
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Ошибка');
+      toast.error(catchText(err, 'Ошибка сохранения'));
     } finally {
       setSaving(false);
     }
@@ -210,7 +225,7 @@ export function RunInspection({ inspectionId, onExit }: { inspectionId: string; 
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ answers: buildAnswerPayload() }),
       });
-      if (!putRes.ok) throw new Error((await putRes.json()).error || 'Ошибка сохранения');
+      if (!putRes.ok) throw new Error(await extractApiError(putRes, 'Не удалось сохранить осмотр'));
 
       // Complete
       const res = await authFetch(`/api/inspections/${inspectionId}/complete`, {
@@ -218,17 +233,16 @@ export function RunInspection({ inspectionId, onExit }: { inspectionId: string; 
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ signedByName: signedByName.trim() }),
       });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || 'Ошибка завершения');
-      }
+      if (!res.ok) throw new Error(await extractApiError(res, 'Не удалось завершить осмотр'));
       toast.success('Осмотр завершён');
+      setShowSign(false);
       if (onExit) onExit(); else router.push('/inspections');
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Ошибка');
+      // Подпись оставляем на экране: на отказе панель закрывалась, и введённое
+      // имя терялось — человек жал «Завершить осмотр» заново (R100 №7).
+      toast.error(catchText(err, 'Ошибка завершения'));
     } finally {
       setCompleting(false);
-      setShowSign(false);
     }
   };
 
@@ -294,12 +308,33 @@ export function RunInspection({ inspectionId, onExit }: { inspectionId: string; 
   }
 
   if (!inspection) {
+    // Отказ чтения не выдаём за «осмотр не найден»: 404 — чужой/удалённый,
+    // 403 — права, 5xx и обрыв — временный сбой, повторяемый (R100 №2).
+    const message = loadError
+      ? loadErrorText(loadError, {
+        forbidden: 'Нет прав на просмотр осмотра. Смените роль или обратитесь к администратору.',
+        notFound: 'Осмотр не найден или принадлежит другому оператору.',
+        server: 'Не удалось загрузить осмотр. Сервер вернул ошибку.',
+      })
+      : 'Осмотр не найден.';
     return (
       <div className="mx-auto max-w-xl px-4 py-8 text-center text-sm text-muted-foreground">
-        Осмотр не найден.{' '}
-        {onExit
-          ? <button type="button" onClick={onExit} className="text-signal-strong underline">К смене</button>
-          : <Link href="/inspections" className="text-signal-strong underline">К списку</Link>}
+        <p>{message}</p>
+        {isRetryableLoadError(loadError) && (
+          <Button
+            size="sm"
+            variant="outline"
+            className="mt-3 min-h-11 sm:min-h-0"
+            onClick={() => void load()}
+          >
+            Повторить
+          </Button>
+        )}
+        <p className="mt-3">
+          {onExit
+            ? <button type="button" onClick={onExit} className="text-signal-strong underline">К смене</button>
+            : <Link href="/inspections" className="text-signal-strong underline">К списку</Link>}
+        </p>
       </div>
     );
   }
@@ -312,17 +347,17 @@ export function RunInspection({ inspectionId, onExit }: { inspectionId: string; 
           <button
             type="button"
             onClick={onExit}
-            className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+            className="inline-flex min-h-11 items-center gap-1 text-sm text-muted-foreground hover:text-foreground sm:min-h-0"
           >
             <ArrowLeft className="w-3.5 h-3.5" /> К смене
           </button>
         ) : (
-          <Link
-            href="/inspections"
-            className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-          >
-            <ArrowLeft className="w-3.5 h-3.5" /> Осмотры
-          </Link>
+          <OpsBreadcrumb
+            items={[
+              { label: 'Осмотры', href: '/inspections' },
+              { label: inspection.equipment?.name ?? 'Осмотр' },
+            ]}
+          />
         )}
       </div>
 
@@ -380,7 +415,7 @@ export function RunInspection({ inspectionId, onExit }: { inspectionId: string; 
                 aria-current={index === current ? 'step' : undefined}
                 aria-label={`${section.title || `Раздел ${index + 1}`}: ${
                   section.remaining === 0 ? 'заполнен' : `осталось ${section.remaining}`}`}
-                className={`h-9 min-w-9 rounded-lg border px-2 text-sm font-semibold transition ${
+                className={`h-9 min-h-11 min-w-11 rounded-lg border px-2 text-sm font-semibold transition sm:min-h-0 sm:min-w-9 ${
                   index === current
                     ? 'border-signal bg-signal text-white'
                     : section.remaining === 0
@@ -468,7 +503,7 @@ export function RunInspection({ inspectionId, onExit }: { inspectionId: string; 
                             type="button"
                             disabled={isDone}
                             onClick={() => setExpandedExtras((p) => ({ ...p, [item.id]: true }))}
-                            className="mt-2 text-2xs text-muted-foreground hover:text-muted-foreground disabled:opacity-50"
+                            className="mt-2 inline-flex min-h-11 items-center text-2xs text-muted-foreground hover:text-muted-foreground disabled:opacity-50 sm:min-h-0"
                           >
                             + замечание / фото
                           </button>
@@ -542,7 +577,7 @@ export function RunInspection({ inspectionId, onExit }: { inspectionId: string; 
             variant="outline"
             onClick={() => void saveDraft()}
             disabled={isBusy}
-            className="w-full"
+            className="min-h-11 w-full sm:min-h-0"
           >
             {saving && <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />}
             Сохранить черновик
@@ -554,7 +589,7 @@ export function RunInspection({ inspectionId, onExit }: { inspectionId: string; 
             <Button
               onClick={() => setShowSign(true)}
               disabled={isBusy}
-              className="w-full bg-signal hover:bg-signal-strong text-white"
+              className="min-h-11 w-full bg-signal hover:bg-signal-strong text-white sm:min-h-0"
             >
               Завершить осмотр
             </Button>
@@ -574,14 +609,14 @@ export function RunInspection({ inspectionId, onExit }: { inspectionId: string; 
                   variant="outline"
                   onClick={() => setShowSign(false)}
                   disabled={completing}
-                  className="flex-1"
+                  className="min-h-11 flex-1 sm:min-h-0"
                 >
                   Отмена
                 </Button>
                 <Button
                   onClick={complete}
                   disabled={completing || !signedByName.trim()}
-                  className="flex-1 bg-signal hover:bg-signal-strong text-white"
+                  className="min-h-11 flex-1 bg-signal hover:bg-signal-strong text-white sm:min-h-0"
                 >
                   {completing && <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />}
                   Подтвердить

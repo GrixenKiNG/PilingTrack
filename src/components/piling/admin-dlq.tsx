@@ -13,6 +13,7 @@ import {
 } from '@/components/piling/icons/unified-icons';
 import { toast } from 'sonner';
 import { authFetch } from '@/lib/api';
+import { catchText } from '@/components/piling/admin-crews/crew-messages';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -44,10 +45,51 @@ interface DlqStats {
 
 const STATUS_FILTERS: Array<{ key: DlqStatus; label: string; color: string }> = [
   { key: 'pending', label: 'Ожидают', color: 'bg-warning/10 text-warning-strong border-warning/30' },
-  { key: 'resolved', label: 'Отправлены повторно', color: 'bg-success/10 text-success-strong border-success/30' },
+  { key: 'resolved', label: 'Повтор поставлен в очередь', color: 'bg-success/10 text-success-strong border-success/30' },
   { key: 'discarded', label: 'Отброшены', color: 'bg-muted text-muted-foreground border-border' },
   { key: 'all', label: 'Все', color: 'bg-info/10 text-info-strong border-info/30' },
 ];
+
+/**
+ * Русские подписи для типов событий: админ должен понимать, что за событие
+ * упало, а не читать машинный код (`ReportPdfDeliveryRequested`). Незнакомый
+ * тип показываем как есть — словарь не обязан быть исчерпывающим.
+ */
+const EVENT_TYPE_LABELS: Record<string, string> = {
+  ReportCreated: 'Отчёт создан',
+  ReportUpdated: 'Отчёт изменён',
+  ReportSubmitted: 'Отчёт отправлен',
+  ReportDeleted: 'Отчёт удалён',
+  ReportVersionCreated: 'Новая версия отчёта',
+  PileWorkAdded: 'Добавлены сваи',
+  PileWorkRemoved: 'Удалены сваи',
+  DrillingAdded: 'Добавлено бурение',
+  DrillingRemoved: 'Удалено бурение',
+  DowntimeAdded: 'Добавлен простой',
+  DowntimeRemoved: 'Удалён простой',
+  ReportPdfDeliveryRequested: 'Доставка PDF отчёта',
+  NotificationDeliveryRequested: 'Доставка уведомления',
+  ReadinessSnapshotRequested: 'Пересчёт готовности',
+};
+
+function eventTypeLabel(eventType: string): string {
+  return EVENT_TYPE_LABELS[eventType] ?? eventType;
+}
+
+/**
+ * Повтор у события доставки снова отправляет сообщение или PDF отчёта в
+ * Telegram (dedupeKey намеренно не переносится), поэтому подтверждение должно
+ * предупреждать об этом, а не просто «повторить?».
+ */
+function retryConfirmMessage(eventType: string): string {
+  if (eventType === 'ReportPdfDeliveryRequested') {
+    return 'Повторить событие? PDF отчёта уйдёт в Telegram заново — проверьте, что доставка не задублируется.';
+  }
+  if (eventType === 'NotificationDeliveryRequested' || eventType === 'ReportSubmitted') {
+    return 'Повторить событие? Уведомление снова уйдёт в Telegram.';
+  }
+  return 'Повторить событие? Оно будет обработано заново; при повторном сбое появится новая запись в очереди.';
+}
 
 export function AdminDlq() {
   const [entries, setEntries] = useState<DlqEntry[]>([]);
@@ -57,6 +99,7 @@ export function AdminDlq() {
   const showSkeleton = useMinSkeletonDuration(loading);
   const [actingId, setActingId] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [expandedErrorId, setExpandedErrorId] = useState<string | null>(null);
 
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -69,8 +112,11 @@ export function AdminDlq() {
         const data = await res.json();
         setEntries(data.entries || []);
         setStats(data.stats || null);
+      } else if (res.status === 401) {
+        // Сессия истекла — «Попробуйте обновить» тут не поможет.
+        setLoadError('Сессия истекла — войдите снова.');
       } else {
-        setLoadError('Сервер не смог отдать список DLQ. Попробуйте обновить.');
+        setLoadError('Сервер не смог отдать очередь недоставленных событий. Попробуйте обновить.');
       }
     } catch {
       setLoadError('Не удалось связаться с сервером. Проверьте сеть и повторите.');
@@ -84,34 +130,42 @@ export function AdminDlq() {
     load();
   }, [load]);
 
-  const handleAction = async (id: string, action: 'retry' | 'discard') => {
-    if (action === 'discard' && !window.confirm('Отбросить событие? Оно больше не будет обработано.')) {
+  const handleAction = async (entry: DlqEntry, action: 'retry' | 'discard') => {
+    // Защита от двойного нажатия: пока предыдущее действие не завершилось,
+    // повторный клик (в т.ч. по второй кнопке) ничего не делает.
+    if (actingId) return;
+    if (action === 'retry' && !window.confirm(retryConfirmMessage(entry.eventType))) {
       return;
     }
-    setActingId(id);
+    if (action === 'discard' && !window.confirm('Отбросить событие? Оно будет исключено из обработки без возможности восстановления.')) {
+      return;
+    }
+    setActingId(entry.id);
     try {
       const res = await authFetch('/api/admin/dlq', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, action }),
+        body: JSON.stringify({ id: entry.id, action }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.error || 'Ошибка');
       }
-      toast.success(action === 'retry' ? 'Событие отправлено повторно' : 'Событие отброшено');
+      toast.success(action === 'retry' ? 'Повтор поставлен в очередь' : 'Событие отброшено');
       await load();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Ошибка');
+      toast.error(catchText(e, 'Ошибка'));
     } finally {
       setActingId(null);
     }
   };
 
-  const formatDate = (iso: string) => {
-    const d = new Date(iso);
-    return d.toLocaleString('ru-RU');
-  };
+  const formatDate = (iso: string) =>
+    new Intl.DateTimeFormat('ru-RU', {
+      day: '2-digit', month: '2-digit', year: 'numeric',
+      hour: '2-digit', minute: '2-digit',
+      timeZone: 'Europe/Moscow',
+    }).format(new Date(iso));
 
   return (
     <div className="space-y-4 p-4 lg:p-6">
@@ -134,7 +188,7 @@ export function AdminDlq() {
       {stats && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <StatCard icon={Clock} label="Ожидают" value={stats.pending} color="text-warning-strong" bg="bg-warning/10" />
-          <StatCard icon={CheckCircle2} label="Отправлены повторно" value={stats.resolved} color="text-success-strong" bg="bg-success/10" />
+          <StatCard icon={CheckCircle2} label="Повтор поставлен в очередь" value={stats.resolved} color="text-success-strong" bg="bg-success/10" />
           <StatCard icon={XCircle} label="Отброшены" value={stats.discarded} color="text-muted-foreground" bg="bg-muted" />
           <StatCard icon={AlertTriangle} label="Всего" value={stats.total} color="text-info-strong" bg="bg-info/10" />
         </div>
@@ -169,13 +223,13 @@ export function AdminDlq() {
             <Skeleton key={i} className="h-20 w-full" />
           ))}
         </div>
-      ) : entries.length === 0 ? (
+      ) : entries.length === 0 && !loadError ? (
         <div className="text-center py-16">
           <CheckCircle2 className="w-12 h-12 text-success/40 mx-auto mb-3" />
           <p className="text-sm text-muted-foreground">Недоставленных событий нет</p>
           <p className="text-xs text-muted-foreground mt-1">Нет событий со статусом «{STATUS_FILTERS.find(f=>f.key===status)?.label}»</p>
         </div>
-      ) : (
+      ) : entries.length === 0 ? null : (
         <div className="space-y-2">
           {entries.map((entry, index) => (
             <motion.div
@@ -189,39 +243,56 @@ export function AdminDlq() {
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <code className="text-xs bg-muted px-1.5 py-0.5 rounded font-mono">{entry.eventType}</code>
+                        <span className="text-sm font-medium text-foreground">{eventTypeLabel(entry.eventType)}</span>
                         <Badge variant="secondary" className={STATUS_FILTERS.find(f=>f.key===entry.status)?.color}>
                           {STATUS_FILTERS.find(f=>f.key===entry.status)?.label || entry.status}
                         </Badge>
                         <span className="text-xs text-muted-foreground">попыток: {entry.attempts}</span>
                       </div>
-                      {entry.aggregateId && (
-                        <p className="text-xs text-muted-foreground mt-1 font-mono truncate">
-                          aggregateId: {entry.aggregateId}
-                        </p>
-                      )}
-                      {entry.sourceOutboxId && (
-                        <p className="text-xs text-muted-foreground mt-0.5 font-mono truncate">
-                          outboxId: {entry.sourceOutboxId}
-                        </p>
-                      )}
                       <p className="text-xs text-muted-foreground mt-1">
                         Создано: {formatDate(entry.createdAt)}
                         {entry.updatedAt !== entry.createdAt && (
                           <span className="ml-2">· Обновлено: {formatDate(entry.updatedAt)}</span>
                         )}
                       </p>
-                      <p className="text-sm text-destructive-strong mt-2 line-clamp-2">{entry.errorMessage}</p>
-                      <button
-                        onClick={() => setExpandedId(expandedId === entry.id ? null : entry.id)}
-                        className="text-xs text-info-strong hover:underline mt-1"
-                      >
-                        {expandedId === entry.id ? 'Скрыть payload' : 'Показать payload'}
-                      </button>
+                      <p className={cn('text-sm text-destructive-strong mt-2', expandedErrorId !== entry.id && 'line-clamp-2')}>
+                        {entry.errorMessage}
+                      </p>
+                      <div className="flex items-center gap-3 flex-wrap mt-1">
+                        {entry.errorMessage.length > 80 && (
+                          <button
+                            onClick={() => setExpandedErrorId(expandedErrorId === entry.id ? null : entry.id)}
+                            className="text-xs text-info-strong hover:underline"
+                          >
+                            {expandedErrorId === entry.id ? 'Скрыть текст ошибки' : 'Показать текст ошибки полностью'}
+                          </button>
+                        )}
+                        <button
+                          onClick={() => setExpandedId(expandedId === entry.id ? null : entry.id)}
+                          className="text-xs text-info-strong hover:underline"
+                        >
+                          {expandedId === entry.id ? 'Скрыть данные события' : 'Показать данные события'}
+                        </button>
+                      </div>
                       {expandedId === entry.id && (
-                        <pre className="mt-2 text-3xs bg-muted border border-border rounded p-2 overflow-x-auto max-h-60">
-                          {JSON.stringify(entry.payload, null, 2)}
-                        </pre>
+                        <div className="mt-2 space-y-1">
+                          <p className="text-xs text-muted-foreground">
+                            Код события: <code className="font-mono">{entry.eventType}</code>
+                          </p>
+                          {entry.aggregateId && (
+                            <p className="text-xs text-muted-foreground">
+                              Объект события: <code className="font-mono">{entry.aggregateId}</code>
+                            </p>
+                          )}
+                          {entry.sourceOutboxId && (
+                            <p className="text-xs text-muted-foreground">
+                              Исходное сообщение: <code className="font-mono">{entry.sourceOutboxId}</code>
+                            </p>
+                          )}
+                          <pre className="text-3xs bg-muted border border-border rounded p-2 overflow-x-auto max-h-60">
+                            {JSON.stringify(entry.payload, null, 2)}
+                          </pre>
+                        </div>
                       )}
                     </div>
                     {entry.status === 'pending' && (
@@ -229,7 +300,7 @@ export function AdminDlq() {
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => handleAction(entry.id, 'retry')}
+                          onClick={() => handleAction(entry, 'retry')}
                           disabled={actingId === entry.id}
                           className="h-8 text-xs"
                         >
@@ -239,7 +310,7 @@ export function AdminDlq() {
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => handleAction(entry.id, 'discard')}
+                          onClick={() => handleAction(entry, 'discard')}
                           disabled={actingId === entry.id}
                           className="h-8 text-xs text-destructive-strong hover:text-destructive-strong"
                         >

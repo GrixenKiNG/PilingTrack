@@ -3,7 +3,9 @@ import type { MaintenanceStatus, MaintenancePriority, MaintenanceType } from '@/
 export type { MaintenanceStatus, MaintenancePriority, MaintenanceType };
 
 export const TYPE_LABEL: Record<MaintenanceType, string> = {
-  EO: 'ЕО',
+  // F-R131 №9: «ЕО» без расшифровки не читалось вне модуля. Ежедневный осмотр —
+  // тип, который оператор делает каждую смену, поэтому он назван словами.
+  EO: 'ЕО — ежедневный осмотр',
   TO1: 'ТО-1',
   TO2: 'ТО-2',
   TO3: 'ТО-3',

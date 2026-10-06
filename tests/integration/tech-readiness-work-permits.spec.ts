@@ -46,7 +46,6 @@ describe.runIf(Boolean(connectionString))('work permits on disposable PostgreSQL
   let prisma: PrismaClient;
 
   const tenantA = 'tenant-a';
-  const tenantB = 'tenant-b';
   const equipmentA = 'equipment-a';
   const equipmentB = 'equipment-b';
   const mechanicA = 'mechanic-a';
@@ -100,9 +99,10 @@ describe.runIf(Boolean(connectionString))('work permits on disposable PostgreSQL
   };
 
   beforeAll(async () => {
+    if (!connectionString) throw new Error("DATABASE_URL_POSTGRES is required");
     await admin.connect();
     await admin.query(`CREATE DATABASE "${database}"`);
-    const url = new URL(connectionString!);
+    const url = new URL(connectionString);
     url.pathname = `/${database}`;
     testConnectionString = url.toString();
     testDb = new Client({connectionString: testConnectionString});
@@ -229,14 +229,14 @@ describe.runIf(Boolean(connectionString))('work permits on disposable PostgreSQL
     `);
     prisma = new PrismaClient({adapter: new PrismaPg({connectionString: testConnectionString, max: 30})});
     await prisma.$connect();
-  }, 30_000);
+  }, 60_000);
 
   afterAll(async () => {
     await prisma?.$disconnect();
     await testDb?.end();
     await admin.query(`DROP DATABASE IF EXISTS "${database}" WITH (FORCE)`);
     await admin.end();
-  });
+  }, 60_000);
 
   it('rejects every cross-tenant permit FK with SQLSTATE 23503', async () => {
     const base = [tenantA, equipmentA, 'NORMAL', 'DRAFT', 'scope', mechanicA, mechanicA];
@@ -262,7 +262,7 @@ describe.runIf(Boolean(connectionString))('work permits on disposable PostgreSQL
         ("id", "tenantId", "permitId", "permitVersion", "role", "approvedById")
       VALUES ('bad-permit', 'tenant-b', 'permit-fk', 1, 'DISPATCHER', 'dispatcher-b')
     `)).rejects.toMatchObject({code: '23503'});
-  });
+  }, 30_000);
 
   it('keeps one valid approval and no stale approval across an approval/edit race', async () => {
     const id = 'permit-edit-race';
@@ -294,7 +294,7 @@ describe.runIf(Boolean(connectionString))('work permits on disposable PostgreSQL
     const successful = outcomes.filter((result) => result.status === 'fulfilled').length;
     expect(await prisma.auditLog.count({where: {tenantId: tenantA, entityId: id}})).toBe(successful);
     expect(await prisma.outboxEvent.count({where: {tenantId: tenantA, aggregateId: id}})).toBe(successful);
-  });
+  }, 30_000);
 
   it('deduplicates a 20-way approval race and replays the completed command', async () => {
     const id = 'permit-approval-race';

@@ -7,10 +7,13 @@
 export interface DashboardAnalyticsRow {
   actualPiles: number;
   actualPileMeters: number;
+  /** Накопительный факт за весь объект (без фильтра периода) — база для % выполнения. */
+  actualPileMetersAllTime: number;
   plannedPiles: number;
   plannedPileMeters: number;
   actualDrillingCount: number;
   actualDrilling: number;
+  actualDrillingAllTime: number;
   plannedDrillingCount: number;
   plannedDrilling: number;
   totalDowntime: number | null;
@@ -66,10 +69,13 @@ export interface DashboardKpis {
   reports: number;
   actualPiles: number;
   actualPileMeters: number;
+  /** Накопительный факт за весь объект — числитель для % выполнения на плитках. */
+  actualPileMetersAllTime: number;
   plannedPiles: number;
   plannedPileMeters: number;
   actualDrillingCount: number;
   actualDrilling: number;
+  actualDrillingAllTime: number;
   plannedDrillingCount: number;
   plannedDrilling: number;
   downtime: number;
@@ -115,10 +121,12 @@ export function computeDashboardKpis(
     reports: sumBy(analytics, (a) => a.totalReports),
     actualPiles: sumBy(analytics, (a) => a.actualPiles),
     actualPileMeters: sumBy(analytics, (a) => a.actualPileMeters),
+    actualPileMetersAllTime: sumBy(analytics, (a) => a.actualPileMetersAllTime),
     plannedPiles: sumBy(analytics, (a) => a.plannedPiles),
     plannedPileMeters: sumBy(analytics, (a) => a.plannedPileMeters),
     actualDrillingCount: sumBy(analytics, (a) => a.actualDrillingCount),
     actualDrilling: sumBy(analytics, (a) => a.actualDrilling),
+    actualDrillingAllTime: sumBy(analytics, (a) => a.actualDrillingAllTime),
     plannedDrillingCount: sumBy(analytics, (a) => a.plannedDrillingCount),
     plannedDrilling: sumBy(analytics, (a) => a.plannedDrilling),
     downtime: sumBy(analytics, (a) => a.totalDowntime || 0),

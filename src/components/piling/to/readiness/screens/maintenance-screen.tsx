@@ -9,12 +9,14 @@ import { kpiGridStyle } from '@/components/piling/kpi-tile';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAbility } from '@/lib/use-ability';
-import { formatDateTimeInTimezone, getTodayInTimezone } from '@/lib/timezone';
+import { formatDateInTimezone, formatDateTimeInTimezone, getTodayInTimezone } from '@/lib/timezone';
 import { cn } from '@/lib/utils';
+import { checkMaintenanceDue } from '@/lib/maintenance-due';
 import { PRIORITY_LABEL, STATUS_LABEL, type MaintenancePriority, type MaintenanceStatus } from '@/components/piling/maintenance/maintenance-labels';
 import type { MaintenanceSummary } from '../../readiness-design-views';
 import { DefectsPanel } from './defects-panel';
 import { EquipmentPhoto, RefKpi } from './shared';
+import { normalizeSearch } from '../shared/text-search';
 import type { ReferenceUiProps } from './types';
 
 /**
@@ -25,6 +27,18 @@ import type { ReferenceUiProps } from './types';
  * равно интервалу ТО-1 — предупреждение появляется примерно за один цикл.
  */
 const MAINTENANCE_SOON_HOURS = 250;
+
+/**
+ * Календарный день момента в поясе тенанта, «ГГГГ-ММ-ДД».
+ *
+ * `scheduledAt`/`startedAt` — моменты времени (UTC): работа, назначенная на
+ * 00:30 МСК 26.09, в UTC ещё 25.09, поэтому `.slice(0, 10)` даёт не тот день и
+ * ночью счётчик «Работы сегодня» считал вчерашнее (F-R141-TODAY). День считаем
+ * поясом тенанта — тот же приём, что и в отчётах (`reports-screen.tsx:tenantDay`)
+ * и в паспорте сваи (`pile-passport.service.ts:dayInTimezone`).
+ */
+const tenantDay = (value: string, timezone: string = 'Europe/Moscow'): string =>
+  new Date(value).toLocaleDateString('en-CA', { timeZone: timezone });
 
 export function MaintenanceScreen(props: ReferenceUiProps) {
   /**
@@ -53,9 +67,14 @@ export function MaintenanceScreen(props: ReferenceUiProps) {
   const timezone = props.bootstrap?.tenant.timezone;
   const todayIso = getTodayInTimezone(timezone);
   // «Работы сегодня» считали ВСЕ открытые заявки — счётчик не имел отношения к
-  // сегодняшнему дню. Берём назначенные или начатые на сегодня.
-  const todayWork = open.filter((record) =>
-    (record.scheduledAt ?? record.startedAt ?? '').slice(0, 10) === todayIso);
+  // сегодняшнему дню. Берём назначенные или начатые на сегодня. День заявки —
+  // день пояса тенанта, а не UTC-день момента: иначе ночью 00:00–03:00 МСК
+  // работа на сегодня попадала во вчера, а вчерашняя считалась (F-R141-TODAY).
+  // Запись без обеих дат не считаем — как и раньше.
+  const todayWork = open.filter((record) => {
+    const day = record.scheduledAt ?? record.startedAt;
+    return day != null && tenantDay(day, timezone) === todayIso;
+  });
   /**
    * Загрузка механиков по фактическому исполнителю.
    *
@@ -93,8 +112,8 @@ export function MaintenanceScreen(props: ReferenceUiProps) {
     if (maintenanceFilter === 'CRITICAL' && !['CRITICAL', 'HIGH'].includes(record.priority)) return false;
     if (maintenanceFilter === 'ACTIVE' && !['IN_PROGRESS', 'ASSIGNED'].includes(record.status)) return false;
     if (maintenanceFilter === 'PLANNED' && !['PLANNED', 'ASSIGNED'].includes(record.status)) return false;
-    const query = maintenanceQuery.trim().toLocaleLowerCase('ru-RU');
-    return !query || record.title.toLocaleLowerCase('ru-RU').includes(query) || record.equipment?.name.toLocaleLowerCase('ru-RU').includes(query);
+    const query = normalizeSearch(maintenanceQuery);
+    return !query || normalizeSearch(record.title).includes(query) || normalizeSearch(record.equipment?.name ?? '').includes(query);
   });
 
   return (
@@ -108,7 +127,7 @@ export function MaintenanceScreen(props: ReferenceUiProps) {
         ? <Button asChild className="min-h-11 bg-signal-strong hover:bg-signal-strong"><Link href="/admin/maintenance/new">+ Создать заявку</Link></Button>
         : <Button disabled className="min-h-11 bg-signal-strong hover:bg-signal-strong">+ Создать заявку</Button>}</div>} />
       <section className={COMPACT_KPI_GRID} style={kpiGridStyle(4)}>
-        <RefKpi icon="defect" label="Критические дефекты" tone="danger" value={blockingDefects.length} detail={`открытых замечаний: ${openDefects.length}`} alert={blockingDefects.length > 0} />
+        <RefKpi icon="defect" label="Критические дефекты" tone={props.defectsError ? undefined : 'danger'} value={props.defectsError ? '—' : blockingDefects.length} detail={props.defectsError ? 'не проверено' : `открытых замечаний: ${openDefects.length}`} alert={!props.defectsError && blockingDefects.length > 0} />
         <RefKpi icon="work-order" label="Работы сегодня" tone="warning" value={todayWork.length} />
         <RefKpi icon="maintenance-due" label="Ближайшие ТО" tone="info" value={planned.length} />
         <RefKpi icon="technical-readiness" label="Готовность сервиса" tone="success" value={`${Math.max(0, servicePercent)}%`} />
@@ -148,29 +167,50 @@ export function MaintenanceScreen(props: ReferenceUiProps) {
             */}
             <div className="mt-2 divide-y divide-border">
               {props.equipment
-                .map((item) => ({
-                  item,
-                  left: item.nextMaintenanceAtHours != null
+                .map((item) => {
+                  /*
+                    Срок считаем тем же помощником, что и факт готовности
+                    (`checkMaintenanceDue`), а не только по моточасам. Раньше
+                    машина, просроченная по дате, стояла здесь зелёной с
+                    подписью «ТО через N м/ч», а на доске была «Просрочено на
+                    N дн.» — два экрана говорили о сроке разное.
+                  */
+                  const due = checkMaintenanceDue({
+                    nextMaintenanceDate: item.nextMaintenanceDate,
+                    nextMaintenanceAtHours: item.nextMaintenanceAtHours,
+                    engineHoursTotal: item.engineHoursTotal,
+                  });
+                  const left = item.nextMaintenanceAtHours != null
                     ? item.nextMaintenanceAtHours - (item.engineHoursTotal ?? 0)
-                    : null,
-                }))
-                .sort((left, right) => (left.left ?? Number.POSITIVE_INFINITY) - (right.left ?? Number.POSITIVE_INFINITY))
+                    : null;
+                  // Просроченные — вверх, затем «на подходе», затем остальные.
+                  const rank = due.overdue ? 0 : due.soon ? 1 : 2;
+                  return { item, due, left, rank };
+                })
+                .sort((left, right) => left.rank - right.rank
+                  || (left.left ?? Number.POSITIVE_INFINITY) - (right.left ?? Number.POSITIVE_INFINITY))
                 .slice(0, 5)
-                .map(({ item, left }) => {
-                  const overdue = left != null && left <= 0;
-                  const soon = left != null && left > 0 && left <= MAINTENANCE_SOON_HOURS;
+                .map(({ item, due, left }) => {
+                  const overdue = due.overdue;
+                  const soon = due.soon || (left != null && left > 0 && left <= MAINTENANCE_SOON_HOURS);
                   const progress = left != null && item.nextMaintenanceAtHours
                     ? Math.min(100, Math.max(0, (item.engineHoursTotal ?? 0) / item.nextMaintenanceAtHours * 100))
                     : 0;
+                  const label = due.overdueDays != null || due.overdueHours != null
+                    ? [
+                        due.overdueDays != null ? `просрочено по дате ${due.overdueDays} дн.` : null,
+                        due.overdueHours != null ? `перепробег ${due.overdueHours.toLocaleString('ru-RU')} м/ч` : null,
+                      ].filter(Boolean).join(' · ')
+                    : left != null
+                      ? left > 0 ? `ТО через ${left.toLocaleString('ru-RU')} м/ч` : `Перепробег ${Math.abs(left).toLocaleString('ru-RU')} м/ч`
+                      : item.nextMaintenanceDate ? `ТО до ${formatDateInTimezone(item.nextMaintenanceDate, timezone)}` : 'Регламент не задан';
                   return (
                     <div key={item.id} className="flex items-center gap-2 py-2">
                       <EquipmentPhoto cardData={props.fleetCards.find((entry) => entry.id === item.id)} name={item.name} className="h-8 w-8 shrink-0" />
                       <div className="min-w-0 flex-1">
                         <div className="truncate text-2xs font-semibold">{item.name}</div>
                         <div className={cn('text-3xs', overdue ? 'font-semibold text-destructive-strong' : soon ? 'font-semibold text-signal-strong' : 'text-muted-foreground')}>
-                          {left == null
-                            ? 'Регламент не задан'
-                            : overdue ? `Перепробег ${Math.abs(left).toLocaleString('ru-RU')} м/ч` : `ТО через ${left.toLocaleString('ru-RU')} м/ч`}
+                          {label}
                         </div>
                         <div className="mt-1 h-1 overflow-hidden rounded-full bg-border">
                           <div className={cn('h-full rounded-full', overdue ? 'bg-destructive-strong' : soon ? 'bg-signal' : 'bg-success-strong')} style={{ width: `${progress}%` }} />

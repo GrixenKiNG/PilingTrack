@@ -35,6 +35,7 @@ function makeStatus(overrides: Record<string, unknown> = {}) {
       redis: { status: 'up', latencyMs: 1 },
       outbox: { status: 'ok', pendingCount: 0 },
       workers: { status: 'running' },
+      schedulers: { status: 'ok', stale: [] },
       storage: { status: 'up', provider: 's3' },
       backup: { status: 'up' },
     },
@@ -72,8 +73,10 @@ describe('GET /api/health/deep', () => {
     expect(body.components).toEqual({
       database: 'ok',
       redis: 'ok',
+      schedulers: 'ok',
       storage: 'ok',
     });
+    expect(body.staleSchedulers).toEqual([]);
   });
 
   it('returns 200 when overall status is degraded (still serving)', async () => {
@@ -85,6 +88,7 @@ describe('GET /api/health/deep', () => {
           redis: { status: 'up' },
           outbox: { status: 'ok', pendingCount: 0 },
           workers: { status: 'running' },
+          schedulers: { status: 'ok', stale: [] },
           storage: { status: 'up', provider: 's3' },
           backup: { status: 'up' },
         },
@@ -101,6 +105,53 @@ describe('GET /api/health/deep', () => {
     expect(body.components.database).toBe('down');
   });
 
+  it('отдаёт storage «degraded» и всё равно 200 при медленном хранилище', async () => {
+    getFreshStatusMock.mockResolvedValue(
+      makeStatus({
+        status: 'degraded',
+        components: {
+          database: { status: 'up', latencyMs: 5 },
+          redis: { status: 'up' },
+          outbox: { status: 'ok', pendingCount: 0 },
+          workers: { status: 'running' },
+          schedulers: { status: 'ok', stale: [] },
+          storage: { status: 'degraded', provider: 's3' },
+          backup: { status: 'up' },
+        },
+      }),
+    );
+
+    const res = await GET(req());
+    expect(res.status).toBe(200);
+
+    const body = await res.json();
+    expect(body.status).toBe('degraded');
+    expect(body.components.storage).toBe('degraded');
+  });
+
+  it('отдаёт storage «down» при отказе хранилища', async () => {
+    getFreshStatusMock.mockResolvedValue(
+      makeStatus({
+        status: 'unhealthy',
+        components: {
+          database: { status: 'up', latencyMs: 5 },
+          redis: { status: 'up' },
+          outbox: { status: 'ok', pendingCount: 0 },
+          workers: { status: 'running' },
+          schedulers: { status: 'ok', stale: [] },
+          storage: { status: 'down', provider: 's3' },
+          backup: { status: 'up' },
+        },
+      }),
+    );
+
+    const res = await GET(req());
+    expect(res.status).toBe(503);
+
+    const body = await res.json();
+    expect(body.components.storage).toBe('down');
+  });
+
   it('returns 503 when overall status is unhealthy', async () => {
     getFreshStatusMock.mockResolvedValue(
       makeStatus({
@@ -110,6 +161,7 @@ describe('GET /api/health/deep', () => {
           redis: { status: 'up' },
           outbox: { status: 'ok', pendingCount: 0 },
           workers: { status: 'running' },
+          schedulers: { status: 'ok', stale: [] },
           storage: { status: 'up', provider: 's3' },
           backup: { status: 'up' },
         },
@@ -135,6 +187,33 @@ describe('GET /api/health/deep', () => {
     expect(body).not.toHaveProperty('metrics');
     expect(body.components.database).not.toHaveProperty('latencyMs');
     expect(JSON.stringify(body)).not.toMatch(/error/i);
+  });
+
+  it('отдаёт schedulers «stale» с именем вставшего планировщика, оставаясь 200', async () => {
+    getFreshStatusMock.mockResolvedValue(
+      makeStatus({
+        status: 'degraded',
+        components: {
+          database: { status: 'up', latencyMs: 5 },
+          redis: { status: 'up' },
+          outbox: { status: 'ok', pendingCount: 0 },
+          workers: { status: 'running' },
+          schedulers: { status: 'stale', stale: ['projection-rebuild'] },
+          storage: { status: 'up', provider: 's3' },
+          backup: { status: 'up' },
+        },
+      }),
+    );
+
+    const res = await GET(req());
+
+    // Суточная рутина встала, но приложение работает — 200, не 503.
+    expect(res.status).toBe(200);
+
+    const body = await res.json();
+    expect(body.status).toBe('degraded');
+    expect(body.components.schedulers).toBe('stale');
+    expect(body.staleSchedulers).toEqual(['projection-rebuild']);
   });
 
   it('sets Cache-Control: no-store so monitors always see fresh status', async () => {

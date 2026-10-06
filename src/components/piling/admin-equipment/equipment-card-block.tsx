@@ -41,7 +41,7 @@ function BrandLogoBlock({ card }: { card: FleetCard }) {
 }
 
 function QuickLinksBlock({ card }: { card: FleetCard }) {
-  const linkClass = 'flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-border py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground';
+  const linkClass = 'flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-lg border border-border py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground sm:min-h-0';
   return (
     <div className="flex w-full gap-2" onClick={(event) => event.stopPropagation()}>
       <Link href={`/admin/equipment/${card.id}`} className={linkClass}>

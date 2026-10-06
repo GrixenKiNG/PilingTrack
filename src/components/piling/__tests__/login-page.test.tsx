@@ -144,6 +144,39 @@ describe('LoginPage', () => {
     });
   });
 
+  async function submit() {
+    render(<LoginPage />);
+    await act(async () => {
+      fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'test@piling.ru' } });
+      fireEvent.change(screen.getByLabelText('Пароль'), { target: { value: 'secret123' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Войти' }));
+    });
+  }
+
+  it('says «нет связи» instead of the browser\'s «Failed to fetch»', async () => {
+    const { toast } = await import('sonner');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test: cast to a mock shape or to reach internals not in the public type
+    (global.fetch as any).mockRejectedValueOnce(new TypeError('Failed to fetch'));
+    await submit();
+    await vi.waitFor(() => {
+      expect(toast.error).toHaveBeenCalledWith('Нет связи с сервером. Проверьте интернет и повторите.');
+    });
+  });
+
+  it('shows how long the login lockout lasts', async () => {
+    const { toast } = await import('sonner');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test: cast to a mock shape or to reach internals not in the public type
+    (global.fetch as any).mockResolvedValueOnce({
+      ok: false,
+      status: 429,
+      json: async () => ({ error: 'Слишком много попыток входа. Попробуйте позже.', retryAfter: 736 }),
+    });
+    await submit();
+    await vi.waitFor(() => {
+      expect(toast.error).toHaveBeenCalledWith('Слишком много попыток входа. Повторите через 13 мин.');
+    });
+  });
+
   it('toggles password visibility', () => {
     render(<LoginPage />);
 

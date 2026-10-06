@@ -11,11 +11,14 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Camera, ClipboardCheck, Loader2, UserCog, Wrench } from '@/components/piling/icons/unified-icons';
+import { Camera, ClipboardCheck, Loader2, UserCog, Wrench } from '@/components/piling/icons/unified-icons';
+import { OpsBreadcrumb } from '@/components/piling/ops-shell';
 import { toast } from 'sonner';
 import { authFetch } from '@/lib/api';
 import { formatRuDate } from '@/lib/format';
+import { formatDateTimeInTimezone } from '@/lib/timezone';
 import { usePilingStore } from '@/lib/store';
+import { resolveEffectiveRole } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -28,7 +31,7 @@ import {
   STATUS_LABEL, STATUS_STYLE, PRIORITY_LABEL, PRIORITY_STYLE, TYPE_LABEL,
   type MaintenanceStatus, type MaintenancePriority, type MaintenanceType,
 } from './maintenance-labels';
-import { nextStatusActions, resolveAssigneeName } from './maintenance-helpers';
+import { nextStatusActions, resolveAssigneeName, maintenanceErrorText, maintenanceCatchText } from './maintenance-helpers';
 import { WorkOrderFormDialog } from './work-order-form-dialog';
 import { WorkOrderPhotos } from './work-order-photos';
 
@@ -95,6 +98,10 @@ export function WorkOrderDetail({ recordId }: { recordId: string }) {
   const [record, setRecord] = useState<WorkOrderRecord | null>(null);
   const [assignees, setAssignees] = useState<AssigneeOption[]>([]);
   const [quick, setQuick] = useState<QuickFields | null>(null);
+  // Почему наряд не показан: HTTP-статус отказа чтения или 'network' при обрыве.
+  // Раньше любой не-ok давал «Наряд не найден.» — 403 (нет права) и 5xx путались
+  // с «запись удалена».
+  const [loadError, setLoadError] = useState<number | 'network' | null>(null);
   const [loading, setLoading] = useState(true);
   const [savingStatus, setSavingStatus] = useState<MaintenanceStatus | null>(null);
   const [savingQuick, setSavingQuick] = useState(false);
@@ -102,7 +109,13 @@ export function WorkOrderDetail({ recordId }: { recordId: string }) {
   const [dialogOpen, setDialogOpen] = useState(false);
   // null — отмену не запрашивали; строка — открыто поле «почему».
   const [cancelDraft, setCancelDraft] = useState<string | null>(null);
-  const isAdmin = usePilingStore((s) => s.currentUser?.role === 'ADMIN');
+  const currentUser = usePilingStore((s) => s.currentUser);
+  const actingAs = usePilingStore((s) => s.actingAs);
+  // Приёмку подписывает администратор — и интерфейс, и API
+  // (api/maintenance/[id]/accept) считают исполняемую роль, а не собственную:
+  // иначе в режиме «Действую как» кнопка «Принять» остаётся видимой и
+  // отвечает 403.
+  const isAdmin = resolveEffectiveRole(currentUser?.role ?? '', actingAs) === 'ADMIN';
 
   const names = useMemo(() => new Map(assignees.map((u) => [u.id, u.name])), [assignees]);
 
@@ -110,12 +123,18 @@ export function WorkOrderDetail({ recordId }: { recordId: string }) {
     setLoading(true);
     try {
       const res = await authFetch(`/api/maintenance/${recordId}`);
-      if (!res.ok) throw new Error();
+      if (!res.ok) {
+        setLoadError(res.status);
+        setRecord(null);
+        return;
+      }
       const rec = (await res.json()).record as WorkOrderRecord;
       setRecord(rec);
       setQuick(quickFromRecord(rec));
+      setLoadError(null);
     } catch {
-      toast.error('Не удалось загрузить наряд');
+      // fetch без сети бросает TypeError — это обрыв, а не «наряд не найден».
+      setLoadError('network');
       setRecord(null);
     } finally {
       setLoading(false);
@@ -140,7 +159,15 @@ export function WorkOrderDetail({ recordId }: { recordId: string }) {
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      toast.error(err.error || 'Ошибка сохранения');
+      if (res.status === 409) {
+        // 409 — запись изменили или приняли, пока форма была открыта.
+        // Перечитываем наряд, чтобы повтор не упёрся в тот же конфликт: совет
+        // «обновите страницу» без перечитывания повторялся бесконечно.
+        await load();
+        toast.error('Запись изменилась — данные обновлены, повторите действие.');
+        return false;
+      }
+      toast.error(maintenanceErrorText(res.status, err.error));
       return false;
     }
     return true;
@@ -184,12 +211,12 @@ export function WorkOrderDetail({ recordId }: { recordId: string }) {
       const res = await authFetch(`/api/maintenance/${recordId}/accept`, { method: 'POST' });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || 'Не удалось принять');
+        throw new Error(maintenanceErrorText(res.status, err.error));
       }
       toast.success('Принято');
       await load();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Ошибка');
+      toast.error(maintenanceCatchText(err, 'Ошибка'));
     } finally {
       setAccepting(false);
     }
@@ -208,10 +235,24 @@ export function WorkOrderDetail({ recordId }: { recordId: string }) {
   }
 
   if (!record || !quick) {
+    // Сбой повторяемый — обрыв связи и 5xx; 403/404 повтором не лечатся.
+    const retryable = loadError === 'network' || (typeof loadError === 'number' && loadError >= 500);
+    const message = loadError === 'network'
+      ? 'Нет связи с сервером — повторите при появлении сети.'
+      : typeof loadError === 'number'
+        ? maintenanceErrorText(loadError)
+        : 'Наряд не найден.';
     return (
       <div className="mx-auto w-full max-w-3xl px-4 py-6">
         <BackLink />
-        <p className="mt-6 rounded-lg bg-muted px-3 py-6 text-center text-sm text-muted-foreground">Наряд не найден.</p>
+        <div className="mt-6 rounded-lg bg-muted px-3 py-6 text-center text-sm text-muted-foreground">
+          <p>{message}</p>
+          {retryable && (
+            <Button size="sm" variant="outline" className="mt-3 min-h-11 sm:min-h-0" onClick={() => void load()}>
+              Повторить
+            </Button>
+          )}
+        </div>
       </div>
     );
   }
@@ -243,7 +284,7 @@ export function WorkOrderDetail({ recordId }: { recordId: string }) {
 
   return (
     <div className="mx-auto w-full max-w-3xl px-4 py-6 field-type">
-      <BackLink />
+      <BackLink current={record.title} />
 
       <div className="mt-4 rounded-xl border bg-card p-4">
         <div className="flex flex-wrap items-center gap-2">
@@ -262,7 +303,7 @@ export function WorkOrderDetail({ recordId }: { recordId: string }) {
           <span>{TYPE_LABEL[record.type]}</span>
           <span>приоритет: {PRIORITY_LABEL[record.priority]}</span>
           {record.scheduledAt && <span>план {formatRuDate(record.scheduledAt)}</span>}
-          {record.completedAt && <span>факт {formatRuDate(record.completedAt)}</span>}
+          {record.completedAt && <span>факт {formatDateTimeInTimezone(record.completedAt)}</span>}
         </div>
         {record.description && <p className="mt-2 text-sm text-muted-foreground">{record.description}</p>}
         {record.status === 'CANCELLED' && (
@@ -275,7 +316,7 @@ export function WorkOrderDetail({ recordId }: { recordId: string }) {
         {actions.length > 0 && (
           <div className="mt-3 flex flex-wrap gap-2 border-t border-border pt-3">
             {actions.map((s) => (
-              <Button key={s} size="sm" variant="outline" disabled={savingStatus !== null}
+              <Button key={s} size="sm" variant="outline" disabled={savingStatus !== null} className="min-h-11 sm:min-h-0"
                 // Отмена — единственный переход, который сначала спрашивает «почему»:
                 // сервер её без причины не примет, и лучше спросить до отказа.
                 onClick={() => (s === 'CANCELLED' ? setCancelDraft('') : changeStatus(s))}>
@@ -283,7 +324,7 @@ export function WorkOrderDetail({ recordId }: { recordId: string }) {
                 {STATUS_LABEL[s]}
               </Button>
             ))}
-            <Button size="sm" className="ml-auto bg-signal hover:bg-signal-strong text-white" onClick={() => setDialogOpen(true)}>
+            <Button size="sm" className="min-h-11 ml-auto bg-signal hover:bg-signal-strong text-white sm:min-h-0" onClick={() => setDialogOpen(true)}>
               Полное редактирование
             </Button>
           </div>
@@ -295,10 +336,10 @@ export function WorkOrderDetail({ recordId }: { recordId: string }) {
               placeholder="Напр. работа выполнена по другому наряду; узел заменён целиком"
               onChange={(e) => setCancelDraft(e.target.value)} />
             <div className="mt-2 flex justify-end gap-2">
-              <Button size="sm" variant="outline" onClick={() => setCancelDraft(null)} disabled={savingStatus !== null}>
+              <Button size="sm" variant="outline" className="min-h-11 sm:min-h-0" onClick={() => setCancelDraft(null)} disabled={savingStatus !== null}>
                 Не отменять
               </Button>
-              <Button size="sm" variant="destructive" disabled={savingStatus !== null || cancelDraft.trim() === ''}
+              <Button size="sm" variant="destructive" className="min-h-11 sm:min-h-0" disabled={savingStatus !== null || cancelDraft.trim() === ''}
                 onClick={() => changeStatus('CANCELLED', { cancelReason: cancelDraft.trim() })}>
                 {savingStatus === 'CANCELLED' && <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />}
                 Отменить наряд
@@ -308,7 +349,7 @@ export function WorkOrderDetail({ recordId }: { recordId: string }) {
         )}
         {actions.length === 0 && (
           <div className="mt-3 flex border-t border-border pt-3">
-            <Button size="sm" className="ml-auto bg-signal hover:bg-signal-strong text-white" onClick={() => setDialogOpen(true)}>
+            <Button size="sm" className="min-h-11 ml-auto bg-signal hover:bg-signal-strong text-white sm:min-h-0" onClick={() => setDialogOpen(true)}>
               Полное редактирование
             </Button>
           </div>
@@ -360,19 +401,19 @@ export function WorkOrderDetail({ recordId }: { recordId: string }) {
           </div>
           <div>
             <Label htmlFor="q-started">Начато</Label>
-            <Input id="q-started" type="date" value={quick.startedAt} onChange={(e) => setQ('startedAt', e.target.value)} />
+            <Input id="q-started" type="date" value={quick.startedAt} onChange={(e) => setQ('startedAt', e.target.value)} className="min-h-11 sm:min-h-0" />
           </div>
           <div>
             <Label htmlFor="q-hours">Моточасы</Label>
-            <Input id="q-hours" type="number" min={0} value={quick.engineHoursAtService} onChange={(e) => setQ('engineHoursAtService', e.target.value)} />
+            <Input id="q-hours" type="number" min={0} value={quick.engineHoursAtService} onChange={(e) => setQ('engineHoursAtService', e.target.value)} className="min-h-11 sm:min-h-0" />
           </div>
           <div>
             <Label htmlFor="q-labor">Трудочасы</Label>
-            <Input id="q-labor" type="number" min={0} value={quick.laborHours} onChange={(e) => setQ('laborHours', e.target.value)} />
+            <Input id="q-labor" type="number" min={0} value={quick.laborHours} onChange={(e) => setQ('laborHours', e.target.value)} className="min-h-11 sm:min-h-0" />
           </div>
           <div>
             <Label htmlFor="q-cost">Стоимость, ₽</Label>
-            <Input id="q-cost" type="number" min={0} value={quick.cost} onChange={(e) => setQ('cost', e.target.value)} />
+            <Input id="q-cost" type="number" min={0} value={quick.cost} onChange={(e) => setQ('cost', e.target.value)} className="min-h-11 sm:min-h-0" />
           </div>
         </div>
         <div className="mt-3 space-y-3">
@@ -391,7 +432,7 @@ export function WorkOrderDetail({ recordId }: { recordId: string }) {
         </div>
         <div className="mt-3 flex items-center justify-between">
           <span className="text-xs text-muted-foreground">Назначено: {resolveAssigneeName(record.assigneeId, names)}</span>
-          <Button size="sm" disabled={savingQuick} className="bg-signal hover:bg-signal-strong text-white" onClick={saveQuick}>
+          <Button size="sm" disabled={savingQuick} className="min-h-11 bg-signal hover:bg-signal-strong text-white sm:min-h-0" onClick={saveQuick}>
             {savingQuick && <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />}
             Сохранить
           </Button>
@@ -414,12 +455,12 @@ export function WorkOrderDetail({ recordId }: { recordId: string }) {
         <h2 className="mb-2 flex items-center gap-2 text-sm font-semibold text-foreground"><ClipboardCheck className="h-4 w-4 text-muted-foreground" />Приёмка</h2>
         {record.acceptedAt ? (
           <p className="text-sm text-success-strong">
-            ✓ Принято {formatRuDate(record.acceptedAt)}
+            ✓ Принято {formatDateTimeInTimezone(record.acceptedAt)}
           </p>
         ) : isAdmin ? (
           <div className="flex items-center justify-between gap-3">
             <span className="text-sm text-muted-foreground">Работа ещё не принята.</span>
-            <Button size="sm" disabled={accepting} className="bg-success-strong hover:bg-success-strong text-white" onClick={accept}>
+            <Button size="sm" disabled={accepting} className="min-h-11 bg-success-strong hover:bg-success-strong text-white sm:min-h-0" onClick={accept}>
               {accepting && <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />}
               Принять
             </Button>
@@ -451,16 +492,19 @@ function PersonRow({ label, name, at, fallback }: {
       <dt className="shrink-0 text-xs text-muted-foreground">{label}</dt>
       <dd className={cn('text-right text-sm', name ? 'font-medium text-foreground' : 'text-muted-foreground')}>
         {name ?? fallback}
-        {name && at && <span className="ml-1.5 text-xs font-normal text-muted-foreground">{formatRuDate(at)}</span>}
+        {name && at && <span className="ml-1.5 text-xs font-normal text-muted-foreground">{formatDateTimeInTimezone(at)}</span>}
       </dd>
     </div>
   );
 }
 
-function BackLink() {
+function BackLink({ current }: { current?: string } = {}) {
   return (
-    <Link href="/admin/maintenance" className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-signal-strong">
-      <ArrowLeft className="w-3 h-3" /> К списку нарядов
-    </Link>
+    <OpsBreadcrumb
+      items={[
+        { label: 'Наряды ТО', href: '/admin/maintenance' },
+        ...(current ? [{ label: current }] : []),
+      ]}
+    />
   );
 }

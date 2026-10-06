@@ -1,5 +1,6 @@
 import type { OperationalUserDTO } from '@/lib/types';
 import type { OpsKpiItem } from '@/components/piling/ops-shell/types';
+import { normalizeSearch } from '@/components/piling/to/readiness/shared/text-search';
 
 export type UserQuickFilter =
   | 'all'
@@ -78,14 +79,14 @@ export function filterOperationalUsers(
   users: OperationalUserDTO[],
   filters: OperationalUserFilters
 ): OperationalUserDTO[] {
-  const search = filters.search.trim().toLocaleLowerCase('ru');
+  const search = normalizeSearch(filters.search);
 
   return users.filter((user) => {
     if (!matchesQuickFilter(user, filters.quick, filters.now)) return false;
     if (!search) return true;
 
     if ([user.name, user.email, user.phone]
-      .some((value) => value.toLocaleLowerCase('ru').includes(search))) return true;
+      .some((value) => normalizeSearch(value).includes(search))) return true;
 
     // Номер набирают как помнят: сплошными цифрами, через 8 или через +7.
     // В базе он хранится с дефисами, и точное совпадение строк не находило

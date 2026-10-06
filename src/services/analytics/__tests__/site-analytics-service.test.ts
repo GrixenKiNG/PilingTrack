@@ -40,6 +40,29 @@ describe('getSiteAnalytics — actual pile meters source', () => {
     expect(actualBlock).not.toContain('metersPerUnit');
     expect(actualBlock).not.toContain('SitePilePlan');
   });
+
+  it('computes planned pile meters from PileGrade.lengthMm, never parsing the grade name (F-16)', async () => {
+    await getSiteAnalytics({ tenantId: 'orion' });
+
+    const [strings] = queryRaw.mock.calls[0];
+    const sql = (strings as string[]).join('?');
+
+    // Нигде в запросе имя марки больше не парсится эвристикой.
+    expect(sql).not.toContain('substring');
+    expect(sql).not.toContain('pg.name');
+
+    const planBlockStart = sql.indexOf('spp."siteId"');
+    const planBlockEnd = sql.indexOf(') pp ON');
+    expect(planBlockStart).toBeGreaterThan(-1);
+    expect(planBlockEnd).toBeGreaterThan(planBlockStart);
+    const planBlock = sql.slice(planBlockStart, planBlockEnd);
+
+    // Явный план на объекте (metersPerUnit) остаётся первым, запасной источник —
+    // lengthMm марки, тот же, что и у факта.
+    expect(planBlock).toContain('"lengthMm"');
+    expect(planBlock).toContain('"metersPerUnit"');
+    expect(planBlock).not.toContain('substring');
+  });
 });
 
 /**
@@ -70,7 +93,8 @@ describe('getSiteAnalytics — deactivated sites of a past period', () => {
 
     expect(siteFilter).toContain('FROM "Report" r');
     expect(siteFilter).toContain('r."siteId" = s.id');
-    expect(siteFilter).toContain("r.status = 'submitted'");
+    expect(siteFilter).toContain('r.status = ?');
+    expect(params).toContain('submitted');
     expect(siteFilter).toContain('r.date >= ?');
     expect(siteFilter).toContain('r.date <= ?');
 
@@ -83,4 +107,102 @@ describe('getSiteAnalytics — deactivated sites of a past period', () => {
     // isActive travels with the row so the UI can mark «объект закрыт».
     expect(sql).toMatch(/s\."isActive"\s+AS "isActive"/);
   });
+});
+
+/**
+ * Regression for F-R52: pile/drilling progress must be cumulative (all-time
+ * actual vs whole-site plan), never the period actual. In the «7 дней» mode a
+ * finished site (950 of 1000 piles) with 20 piles that week used to show 2%
+ * and raised a false «отставание плана».
+ */
+describe('getSiteAnalytics — cumulative progress (F-R52)', () => {
+  beforeEach(() => {
+    queryRaw.mockReset();
+    queryRaw.mockResolvedValue([]);
+  });
+
+  it('derives progress from the all-time actual, not the period actual', async () => {
+    queryRaw.mockResolvedValue([
+      {
+        siteId: 's1', siteName: 'Объект А', isActive: true,
+        plannedPiles: 1000, plannedPileMeters: 5000, plannedDrillingCount: 10,
+        actualPiles: 20, actualPileMeters: 100, actualDrillingCount: 0,
+        plannedDrilling: 100, actualDrilling: 5,
+        actualPilesAllTime: 950, actualPileMetersAllTime: 4750, actualDrillingAllTime: 60,
+        totalDowntime: 0, totalReports: 3,
+      },
+    ]);
+
+    const [row] = await getSiteAnalytics({
+      tenantId: 'orion', dateFrom: '2026-09-23', dateTo: '2026-09-29',
+    });
+
+    // 20 шт за неделю из 950 всего при плане 1000 → 95%, не 2%.
+    expect(row.pileProgress).toBe(95);
+    expect(row.drillingProgress).toBe(60);
+    expect(row.actualPiles).toBe(20); // «за период» остаётся периодным
+    expect(row.actualPilesAllTime).toBe(950);
+  });
+
+  it('queries the all-time actuals without a date filter', async () => {
+    await getSiteAnalytics({ tenantId: 'orion', dateFrom: '2026-09-23', dateTo: '2026-09-29' });
+
+    const [strings] = queryRaw.mock.calls[0];
+    const sql = (strings as string[]).join('?');
+
+    // Unfiltered totals and FILTER period totals share the same aggregate.
+    const allTimeBlock = sql.slice(sql.indexOf('SUM(pw.count)'), sql.indexOf(') p ON'));
+    expect(allTimeBlock).toContain('SUM(pw.count)::int AS total_piles_all');
+    expect(allTimeBlock).toContain('r.status = ?');
+    expect(queryRaw.mock.calls[0].slice(1)).toContain('submitted');
+    expect(allTimeBlock).toContain('FILTER (WHERE r.date >=');
+  });
+});
+
+/**
+ * F-ANALYTICS-TENANT-SQL (F-20): тенант — только строгое равенство по
+ * `s."tenantId"`, а отсутствующий tenantId падает ДО запроса. Единственный
+ * `IS NULL OR` в этом запросе — необязательный фильтр объекта интерфейса
+ * (siteId); если он когда-нибудь переедет на tenantId, запрос начнёт отдавать
+ * строки всех организаций.
+ */
+describe('getSiteAnalytics — tenant isolation (F-ANALYTICS-TENANT-SQL)', () => {
+  beforeEach(() => {
+    queryRaw.mockReset();
+    queryRaw.mockResolvedValue([]);
+  });
+
+  it('scopes the raw query by strict tenant equality, never `tenantId … IS NULL`', async () => {
+    await getSiteAnalytics({ tenantId: 'orion', siteId: 'site_A' });
+
+    const [strings, ...params] = queryRaw.mock.calls[0];
+    const sql = (strings as string[]).join('?');
+
+    expect(sql).toContain('s."tenantId" = ?');
+    expect(sql).not.toMatch(/tenantId"?\s*(::text\s*)?IS NULL/i);
+    expect(params).toContain('orion');
+
+    // Единственное IS NULL OR — фильтр объекта, и он привязан к s.id, не к тенанту.
+    expect(sql.match(/IS NULL OR/g) ?? []).toHaveLength(1);
+    expect(sql).toMatch(/\?::text IS NULL OR s\.id = \?/);
+  });
+
+  it('throws on a missing tenantId and never reaches $queryRaw', async () => {
+    const withoutTenant = {} as Parameters<typeof getSiteAnalytics>[0];
+
+    await expect(getSiteAnalytics(withoutTenant)).rejects.toThrow(/tenantId/i);
+    await expect(getSiteAnalytics({ tenantId: '' })).rejects.toThrow(/tenantId/i);
+
+    expect(queryRaw).not.toHaveBeenCalled();
+  });
+});
+
+
+it('период и весь срок читают PileWork одним агрегатом', async () => {
+  queryRaw.mockReset().mockResolvedValue([]);
+  await getSiteAnalytics({tenantId:'orion',dateFrom:'2026-09-01',dateTo:'2026-09-30'});
+  const sql = queryRaw.mock.calls[0][0].join('?');
+  expect(sql.match(/JOIN "PileWork"/g)).toHaveLength(1);
+  expect(sql).toContain('FILTER (WHERE r.date >=');
+  expect(sql).toContain('total_piles_all');
 });

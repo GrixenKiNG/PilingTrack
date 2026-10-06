@@ -112,6 +112,17 @@ export async function invalidateSites(tenantId: string): Promise<void> {
   recordDeletion();
 }
 
+/**
+ * Журнал отчётов после создания, правки или удаления отчёта.
+ *
+ * /api/reports/all и /api/reports/my кэшируются на 10 с, и сброса не было
+ * вовсе: созданный отчёт не появлялся в журнале, удалённый ещё висел в нём
+ * (автотест AutoClaw C3, 28.09.2026). Префикс снимает оба списка.
+ */
+export function invalidateReports(): void {
+  getResponseCache('reports').invalidate('GET:/api/reports');
+}
+
 export async function invalidateCrews(): Promise<void> {
   await cacheAsideInvalidate('crews:all');
   recordDeletion();

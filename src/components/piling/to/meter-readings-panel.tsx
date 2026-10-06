@@ -13,7 +13,7 @@ import { toast } from 'sonner';
 import { authFetch } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { LoadFailure, loadFailureText } from '@/components/piling/to/load-failure';
+import { LoadFailure, loadFailureText, catchText } from '@/components/piling/to/load-failure';
 
 interface MeterReading {
   id: string;
@@ -62,7 +62,6 @@ export function MeterReadingsPanel({
       if (!res.ok && res.status !== 404) {
         setReadings([]);
         setLoadError(loadFailureText(res.status));
-        toast.error('Не удалось загрузить показания');
         return [];
       }
       const body = res.ok
@@ -75,7 +74,6 @@ export function MeterReadingsPanel({
     } catch {
       setReadings([]);
       setLoadError(loadFailureText(null));
-      toast.error('Не удалось загрузить показания');
       return [];
     } finally {
       setLoading(false);
@@ -121,7 +119,8 @@ export function MeterReadingsPanel({
       const list = await load(equipmentId);
       onChanged?.(latestHours(list));
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Не удалось сохранить показание');
+      // Обрыв сети fetch бросает TypeError с английским «Failed to fetch» (F-R112-2).
+      toast.error(catchText(err, 'Не удалось сохранить показание'));
     } finally {
       setSubmitting(false);
     }
@@ -148,7 +147,7 @@ export function MeterReadingsPanel({
       </div>
 
       {!formOpen && (
-        <Button variant="outline" size="sm" className="mb-3 h-9 w-full" onClick={() => setFormOpen(true)}>
+        <Button variant="outline" size="sm" className="mb-3 h-11 w-full sm:h-9" onClick={() => setFormOpen(true)}>
           <Plus className="mr-1 h-4 w-4" /> Добавить показание
         </Button>
       )}
@@ -169,18 +168,18 @@ export function MeterReadingsPanel({
               value={hours}
               onChange={(e) => setHours(e.target.value)}
               placeholder="напр. 5670"
-              className="h-9"
+              className="h-11 sm:h-9"
             />
           </div>
           <div>
             <label className="mb-1 block text-2xs text-muted-foreground">Дата снятия</label>
-            <Input type="date" value={recordedAt} onChange={(e) => setRecordedAt(e.target.value)} className="h-9" />
+            <Input type="date" value={recordedAt} onChange={(e) => setRecordedAt(e.target.value)} className="h-11 sm:h-9" />
           </div>
           <div>
             <label className="mb-1 block text-2xs text-muted-foreground">Примечание</label>
-            <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="необязательно" className="h-9" />
+            <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="необязательно" className="h-11 sm:h-9" />
           </div>
-          <Button size="sm" className="h-9 w-full" onClick={submit} disabled={submitting}>
+          <Button size="sm" className="h-11 w-full sm:h-9" onClick={submit} disabled={submitting}>
             {submitting ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : null}
             Сохранить
           </Button>

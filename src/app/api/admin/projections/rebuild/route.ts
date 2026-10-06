@@ -46,7 +46,7 @@ export const POST = withMutation(
     const nameParam = (request.nextUrl.searchParams.get('name') || 'all') as ProjectionName;
     if (!VALID.includes(nameParam)) {
       return NextResponse.json(
-        { error: `Unknown projection. Allowed: ${VALID.join(', ')}` },
+        { error: `Неизвестная проекция. Допустимые: ${VALID.join(', ')}` },
         { status: 400 },
       );
     }

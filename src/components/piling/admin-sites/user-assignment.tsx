@@ -16,6 +16,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import type { AssignedUser, SiteFullData } from './types';
+import { extractApiError } from './use-site-mutations';
 
 interface UserAssignmentDialogProps {
   siteId: string;
@@ -27,19 +28,27 @@ interface UserAssignmentDialogProps {
 export function UserAssignmentDialog({ siteId, loadingUsers, users }: UserAssignmentDialogProps) {
   const [assignedUsers, setAssignedUsers] = useState<AssignedUser[]>([]);
   const [loadingAssign, setLoadingAssign] = useState(false);
+  const [unassigningUserId, setUnassigningUserId] = useState<string | null>(null);
+  // Сбой чтения показывает «назначений нет», хотя данных нет: пустой список
+  // неотличим от отказа (находка 7).
+  const [loadError, setLoadError] = useState(false);
 
   const loadAssignedUsers = useCallback(async (targetSiteId: string) => {
     setLoadingAssign(true);
-    setAssignedUsers([]);
+    setLoadError(false);
     try {
       const res = await authFetch(`/api/sites/${targetSiteId}`);
-      if (res.ok) {
-        const data = await res.json();
-        const tree = data.site as SiteFullData;
-        setAssignedUsers(tree.users || []);
+      if (!res.ok) {
+        setAssignedUsers([]);
+        setLoadError(true);
+        return;
       }
+      const data = await res.json();
+      const tree = data.site as SiteFullData;
+      setAssignedUsers(tree.users || []);
     } catch {
-      // ignore
+      setAssignedUsers([]);
+      setLoadError(true);
     } finally {
       setLoadingAssign(false);
     }
@@ -62,13 +71,17 @@ export function UserAssignmentDialog({ siteId, loadingUsers, users }: UserAssign
       if (res.ok) {
         toast.success('Оператор назначен');
         await loadAssignedUsers(siteId);
+      } else {
+        toast.error(await extractApiError(res, 'Не удалось назначить оператора'));
       }
     } catch {
-      toast.error('Ошибка назначения');
+      toast.error('Нет соединения с сервером. Проверьте связь и повторите.');
     }
   };
 
   const handleUnassignUser = async (userId: string) => {
+    if (unassigningUserId === userId) return;
+    setUnassigningUserId(userId);
     try {
       const res = await authFetch(`/api/sites/${siteId}/assign?userId=${userId}`, {
         method: 'DELETE',
@@ -76,9 +89,13 @@ export function UserAssignmentDialog({ siteId, loadingUsers, users }: UserAssign
       if (res.ok) {
         toast.success('Назначение снято');
         await loadAssignedUsers(siteId);
+      } else {
+        toast.error(await extractApiError(res, 'Не удалось снять назначение'));
       }
     } catch {
-      toast.error('Ошибка');
+      toast.error('Нет соединения с сервером. Проверьте связь и повторите.');
+    } finally {
+      setUnassigningUserId(null);
     }
   };
 
@@ -86,13 +103,20 @@ export function UserAssignmentDialog({ siteId, loadingUsers, users }: UserAssign
   const assignedIds = new Set(assignedUsers.map((a) => a.userId));
 
   return (
-    <DialogContent aria-describedby={undefined}>
+    <DialogContent aria-describedby={undefined} className="max-h-[90vh] overflow-y-auto">
       <DialogHeader>
         <DialogTitle>Операторы на объекте</DialogTitle>
       </DialogHeader>
       {loadingAssign || loadingUsers ? (
         <div className="py-8 flex justify-center">
           <Loader2 className="w-6 h-6 animate-spin text-signal-strong" />
+        </div>
+      ) : loadError ? (
+        <div className="space-y-3 rounded-md border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive-strong">
+          <p>Не удалось загрузить назначения</p>
+          <Button type="button" variant="outline" onClick={() => void loadAssignedUsers(siteId)}>
+            Повторить
+          </Button>
         </div>
       ) : (
         <div className="space-y-3">
@@ -117,6 +141,7 @@ export function UserAssignmentDialog({ siteId, loadingUsers, users }: UserAssign
                     </div>
                     <button
                       onClick={() => handleUnassignUser(a.userId)}
+                      disabled={unassigningUserId === a.userId}
                       className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-destructive/10 text-muted-foreground hover:text-destructive-strong transition-colors"
                       title="Снять назначение"
                     >

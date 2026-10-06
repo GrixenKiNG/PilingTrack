@@ -66,6 +66,10 @@ ls -lh /opt/pilingtrack/backups/pre-rls-flip-*.dump
 
 ## Этап 1. Роль опознания (до миграции)
 
+**Этот шаг обязателен и в ранбуке 011** (`docs/runbooks/011-app-db-role.md`):
+перевод приложения на роль `pilingtrack_app` без роли опознания роняет вход
+всем (401), поэтому там его выполняют до переключения `DATABASE_URL`/`APP_DB_*`.
+
 ```bash
 # Заводит pilingtrack_identity: BYPASSRLS, без LOGIN, права ровно на две
 # таблицы и ровно на те колонки, которые нужны опознанию.
@@ -100,8 +104,12 @@ docker-compose.yml. Переменная там уже есть (добавле�
 опознания и войти не сможет никто:
 
 ```bash
-grep -c 'DB_IDENTITY_ROLE' docker-compose.yml   # ждём 3: app, workers, ws
+grep -c 'DB_IDENTITY_ROLE' docker-compose.yml   # ждём 2: app, workers
 ```
+
+Число `2` — это ровно две строки `- DB_IDENTITY_ROLE=...` в блоках `environment:`
+сервисов `app` и `workers` (`docker-compose.yml:107,194`); сервис `ws` удалён
+26.09.2026, и своей строки у него больше нет.
 
 После подъёма контейнеров переменная обязана быть видна изнутри:
 
@@ -112,7 +120,7 @@ docker compose exec -T app printenv DB_IDENTITY_ROLE   # pilingtrack_identity
 Перезапуск приложения и воркеров, чтобы переменная доехала:
 
 ```bash
-docker compose up -d app workers ws
+docker compose up -d app workers
 docker compose ps
 ```
 
@@ -157,7 +165,7 @@ docker compose exec -T postgres psql -U piling -d pilingtrack -c \
 и `20260819120000_rls_fail_closed_all`.
 
 ```bash
-docker compose up -d app workers ws
+docker compose up -d app workers
 ```
 
 ---
@@ -283,17 +291,31 @@ docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U piling -d pilingtrack
 
 ## Что изменится в повседневной работе
 
-**psql руками больше ничего не покажет без организации.** Роль `piling` —
-владелец, а `FORCE ROW LEVEL SECURITY` распространяется и на владельца:
+**psql руками под ролью приложения больше ничего не покажет без организации, а
+под владельцем `piling` — покажет всё.** Это не противоречие, а разные роли.
+
+`FORCE ROW LEVEL SECURITY` действует на владельца таблиц **только если он не
+суперпользователь**. На проде владелец `piling` — суперпользователь
+(`rolsuper=t`, `rolbypassrls=t`), а суперпользователь обходит RLS **всегда**;
+`FORCE` на него не распространяется (`docs/runbooks/011-app-db-role.md:3-13`,
+`docs/adr/0044-rls-fail-closed-scope.md:74-77`). Поэтому `psql -U piling` без
+организации видит все строки всех организаций — «данные не пропали», просто
+владелец смотрит поверх политик. Владельца правильно использовать там, где нужен
+взгляд сразу на все организации.
+
+Ноль строк строгие политики отдают только непривилегированной роли — той, под
+которой ходит рантайм (`pilingtrack_app`, `rolsuper=f`, `rolbypassrls=f`):
 
 ```sql
+-- под ролью приложения (pilingtrack_app), НЕ под владельцем piling
 SELECT * FROM "Report";           -- 0 строк, и это не потеря данных
 SET app.current_tenant = 'orion'; -- назвать организацию в начале сессии
 SELECT * FROM "Report";           -- строки на месте
 ```
 
-Суперпользователь (`postgres`) RLS обходит всегда — если нужен взгляд сразу на
-все организации, заходить надо им.
+Проверено на бою 30.09.2026: app/workers = pilingtrack_app (`docker-compose.yml`
+на сервере совпадает с git). Локально владелец — `postgres`, тоже
+суперпользователь и ведёт себя так же.
 
 **Одноразовые скрипты из `scripts/` перестанут находить данные,** если ходят
 тем же `DATABASE_URL`, что и приложение (то есть ролью `pilingtrack_app`).

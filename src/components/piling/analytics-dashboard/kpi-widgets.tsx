@@ -24,6 +24,7 @@ import {
   DEFAULT_ANALYTICS_DASHBOARD_TEMPLATE,
 } from './kpi-catalog';
 import { formatDowntimeHours } from '@/lib/downtime-hours';
+import { formatCountMeters } from '@/lib/format';
 
 export interface AnalyticsKpiData {
   totalEquipment: number;
@@ -31,6 +32,7 @@ export interface AnalyticsKpiData {
   pilesToday: number;
   pileMetersToday: number;
   drillingToday: number;
+  drillingCountToday: number;
   downtimeHoursToday: number;
   crewsOnShiftToday: number;
   operatorsOnShiftToday: number;
@@ -40,11 +42,12 @@ export interface AnalyticsKpiData {
     meters: { value: number; deltaPct: number | null };
     piles: { value: number; deltaPct: number | null };
     drilling: { value: number; deltaPct: number | null };
+    drillingCount: { value: number; deltaPct: number | null };
     downtime: { value: number | null; deltaPp: number | null };
   };
 }
 
-const ANALYTICS_KPI_ICONS: Record<string, PilingIconName> = { 'kpi-equipment': 'equipment-rig', 'kpi-sites': 'site', 'kpi-piles': 'pile-group', 'kpi-pile-meters': 'linear-meters', 'kpi-drilling': 'drilling-auger', 'kpi-downtime': 'downtime', 'kpi-crews': 'crew', 'kpi-operators': 'operator' };
+const ANALYTICS_KPI_ICONS: Record<string, PilingIconName> = { 'kpi-equipment': 'equipment-rig', 'kpi-sites': 'site', 'kpi-piles': 'pile-group', 'kpi-drilling': 'drilling-auger', 'kpi-downtime': 'downtime', 'kpi-crews': 'crew', 'kpi-operators': 'operator' };
 
 function KpiTile({ id, label, value, hint, delta }: { id: string; label: string; value: string; hint: string; delta?: { text: string; good: boolean } | null }) {
   return (
@@ -68,7 +71,6 @@ function KpiTile({ id, label, value, hint, delta }: { id: string; label: string;
   );
 }
 
-const fmtRu = (n: number) => n.toLocaleString('ru-RU', { maximumFractionDigits: 0 });
 const signed = (n: number, suffix: string) => `${n > 0 ? '+' : ''}${n.toLocaleString('ru-RU', { maximumFractionDigits: 1 })}${suffix}`;
 
 export function buildAnalyticsKpiWidgets(d: AnalyticsKpiData): Record<string, RenderablePageWidget> {
@@ -78,32 +80,62 @@ export function buildAnalyticsKpiWidgets(d: AnalyticsKpiData): Record<string, Re
     render: () => <KpiTile id={id} label={title} value={value} hint={hint} delta={delta} />,
   });
   const p = d.period;
+  // Дельта «Свай» и «Бурения» считается по погонным метрам (overview.kpi.meters /
+  // drilling), а плитка печатает и штуки, и метры: без единицы «+X % к пред. неделе»
+  // рядом с «шт. / м.п.» читается как процент по штукам (R139 №2).
   const pctDelta = (deltaPct: number | null | undefined) =>
-    p && deltaPct != null ? { text: `${signed(deltaPct, '%')} ${p.label}`, good: deltaPct >= 0 } : null;
+    p && deltaPct != null ? { text: `м.п. ${signed(deltaPct, '%')} ${p.label}`, good: deltaPct >= 0 } : null;
+  // Нет прошлого периода с ненулевой базой → deltaPct = null, и дельта не рисуется.
+  // Молчать нельзя: пустое место читается как «изменений нет», хотя сравнить не с
+  // чем (R139 №21).
+  const periodHint = (deltaPct: number | null | undefined) =>
+    p && deltaPct == null ? 'нет данных для сравнения' : 'за период';
   return {
-    'kpi-equipment': tile('kpi-equipment', 'Установок', String(d.totalEquipment), 'всего'),
-    'kpi-sites': tile('kpi-sites', 'Объектов', String(d.sitesCount), 'активных'),
+    // Дневные плитки (снимок парка) подписаны «на сегодня», периодные — «за период»:
+    // иначе в одной полосе 7-дневный итог и текущий день читаются как один срез (R139 №1).
+    // «Установок» — только активные машины парка (fleet.totalEquipment), «Объектов» —
+    // все объекты тенанта, включая закрытые (/api/sites/all с includeInactive) (R139 №14, №19).
+    'kpi-equipment': tile('kpi-equipment', 'Установок', String(d.totalEquipment), 'активных в парке на сегодня'),
+    'kpi-sites': tile('kpi-sites', 'Объектов', String(d.sitesCount), 'всего на сегодня, включая закрытые'),
+    // Сваи и бурение — одной записью «шт. / м.п.», как на всех экранах
+    // (решение владельца 28.09.2026). Отдельная плитка «Погонные метры» убрана:
+    // её число теперь во второй половине плитки «Сваи». Динамика — по м.п.
     // Данные за сегодня приходят из снимка парка, а он не смотрит на статус
     // отчёта: в «сделано сегодня» входят и несданные смены (черновики). Период
     // же считается по сданным отчётам, поэтому пометка стоит только у дневных
     // значений — иначе она обещала бы несданные смены там, где их нет.
-    'kpi-piles': tile('kpi-piles', 'Сваи (шт)',
-      p ? `${fmtRu(p.piles.value)} шт` : `${d.pilesToday} шт`,
-      p ? 'за период' : 'за сегодня, включая несданные смены', pctDelta(p?.piles.deltaPct)),
-    'kpi-pile-meters': tile('kpi-pile-meters', 'Погонные метры',
-      p ? `${fmtRu(p.meters.value)} м` : `${Math.round(d.pileMetersToday)} м`,
-      p ? 'за период' : 'за сегодня, включая несданные смены', pctDelta(p?.meters.deltaPct)),
+    'kpi-piles': tile('kpi-piles', 'Сваи',
+      p ? formatCountMeters(p.piles.value, p.meters.value) : formatCountMeters(d.pilesToday, d.pileMetersToday),
+      p ? periodHint(p.meters.deltaPct) : 'за сегодня, включая несданные смены', pctDelta(p?.meters.deltaPct)),
     'kpi-drilling': tile('kpi-drilling', 'Бурение',
-      p ? `${fmtRu(p.drilling.value)} м` : `${Math.round(d.drillingToday)} м`,
-      p ? 'за период' : 'за сегодня, включая несданные смены', pctDelta(p?.drilling.deltaPct)),
+      p ? formatCountMeters(p.drillingCount.value, p.drilling.value) : formatCountMeters(d.drillingCountToday, d.drillingToday),
+      p ? periodHint(p.drilling.deltaPct) : 'за сегодня, включая несданные смены', pctDelta(p?.drilling.deltaPct)),
     'kpi-downtime': tile('kpi-downtime', p ? 'Доля простоя в смене, %' : 'Простой',
       p ? (p.downtime.value != null ? `${p.downtime.value.toLocaleString('ru-RU', { maximumFractionDigits: 1 })} %` : '—') : formatDowntimeHours(d.downtimeHoursToday),
       p ? 'по отчётам с указанным временем смены' : 'за сегодня, включая несданные смены',
       // For downtime a NEGATIVE delta (less idle time) is the good direction.
       p && p.downtime.deltaPp != null ? { text: `${signed(p.downtime.deltaPp, ' п.п.')} ${p.label}`, good: p.downtime.deltaPp <= 0 } : null),
-    'kpi-crews': tile('kpi-crews', 'Бригады', String(d.crewsOnShiftToday), 'на смене, включая несданные смены'),
-    'kpi-operators': tile('kpi-operators', 'Операторы', String(d.operatorsOnShiftToday), 'на смене, включая несданные смены'),
+    'kpi-crews': tile('kpi-crews', 'Бригады', String(d.crewsOnShiftToday), 'на смене сегодня, включая несданные смены'),
+    'kpi-operators': tile('kpi-operators', 'Операторы', String(d.operatorsOnShiftToday), 'на смене сегодня, включая несданные смены'),
   };
+}
+
+/**
+ * Плитки-заглушки для предпросмотра в настройках, когда живые данные парка не
+ * пришли. Показывать «Установок 0» / «Объектов 0» на отказе загрузки нельзя:
+ * нули читаются как реальный пустой парк (R106 №6).
+ */
+function buildAnalyticsKpiPlaceholders(): Record<string, RenderablePageWidget> {
+  const out: Record<string, RenderablePageWidget> = {};
+  for (const w of ANALYTICS_DASHBOARD_WIDGETS) {
+    if (w.zone !== 'kpi') continue;
+    out[w.id] = {
+      id: w.id,
+      title: w.title,
+      render: () => <KpiTile id={w.id} label={w.title} value="—" hint="данные не загрузились" />,
+    };
+  }
+  return out;
 }
 
 /** Labelled placeholders for the tab-section widgets (used in the configurator). */
@@ -137,6 +169,7 @@ export function useAnalyticsDashboardLayout(): PageLayoutController {
 export function AnalyticsDashboardLayoutEditor() {
   const controller = useAnalyticsDashboardLayout();
   const [data, setData] = useState<AnalyticsKpiData | null>(null);
+  const [previewError, setPreviewError] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -146,9 +179,17 @@ export function AnalyticsDashboardLayoutEditor() {
           authFetch('/api/monitoring/fleet'),
           authFetch('/api/sites/all'),
         ]);
-        const fleet = fleetRes.ok ? await fleetRes.json() : null;
-        const sites = sitesRes.ok ? await sitesRes.json() : [];
+        // Оба источника обязательны для честного предпросмотра: рисовать
+        // плитки из нулей на отказе (403/5xx) — значит выдавать «Установок 0»
+        // за реальные данные пустого парка (R106 №6).
+        if (!fleetRes.ok || !sitesRes.ok) {
+          if (active) { setData(null); setPreviewError(true); }
+          return;
+        }
+        const fleet = await fleetRes.json();
+        const sites = await sitesRes.json();
         if (!active) return;
+        setPreviewError(false);
         const t = fleet?.totals ?? {};
         setData({
           totalEquipment: t.totalEquipment ?? 0,
@@ -156,24 +197,31 @@ export function AnalyticsDashboardLayoutEditor() {
           pilesToday: t.pilesToday ?? 0,
           pileMetersToday: t.pileMetersToday ?? 0,
           drillingToday: t.drillingToday ?? 0,
+          drillingCountToday: t.drillingCountToday ?? 0,
           downtimeHoursToday: t.downtimeHoursToday ?? 0,
           crewsOnShiftToday: t.crewsOnShiftToday ?? 0,
           operatorsOnShiftToday: t.operatorsOnShiftToday ?? 0,
         });
       } catch {
-        if (active) setData(null);
+        if (active) { setData(null); setPreviewError(true); }
       }
     })();
     return () => { active = false; };
   }, []);
 
   const widgets = {
-    ...buildAnalyticsKpiWidgets(data ?? {
-      totalEquipment: 0, sitesCount: 0, pilesToday: 0, pileMetersToday: 0,
-      drillingToday: 0, downtimeHoursToday: 0, crewsOnShiftToday: 0, operatorsOnShiftToday: 0,
-    }),
+    ...(data ? buildAnalyticsKpiWidgets(data) : buildAnalyticsKpiPlaceholders()),
     ...buildSectionPlaceholders(),
   };
 
-  return <PageLayoutEditor title="Дашборд аналитики" controller={controller} widgets={widgets} />;
+  return (
+    <>
+      {previewError && (
+        <p className="mb-2 text-xs text-warning-strong" role="status">
+          Данные парка не загрузились — плитки показаны без значений.
+        </p>
+      )}
+      <PageLayoutEditor title="Дашборд аналитики" controller={controller} widgets={widgets} />
+    </>
+  );
 }

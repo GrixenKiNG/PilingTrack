@@ -16,6 +16,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Cog, Droplets, Activity } from '@/components/piling/icons/unified-icons';
 import { authFetch } from '@/lib/api';
+import { catchText } from '@/components/piling/admin-crews/crew-messages';
 import { cn } from '@/lib/utils';
 import { formatNum, formatRelative } from '@/lib/format';
 
@@ -168,7 +169,8 @@ export function EquipmentMonitoring({ equipmentId }: Props) {
       const data = await res.json();
       setRecords(Array.isArray(data.records) ? data.records : []);
     } catch (err) {
-      setError((err as Error).message);
+      // Обрыв сети fetch бросает TypeError с английским «Failed to fetch» (F-R112-1).
+      setError(catchText(err, 'Не удалось загрузить телеметрию'));
     }
   }, [equipmentId, from, to]);
 
@@ -205,7 +207,7 @@ export function EquipmentMonitoring({ equipmentId }: Props) {
     arr.sort((a, b) => orderOf(a.type) - orderOf(b.type) || a.type.localeCompare(b.type));
   }
 
-  const chip = 'rounded-md border border-border px-2 py-1 text-xs text-muted-foreground hover:bg-muted';
+  const chip = 'min-h-11 rounded-md border border-border px-2 py-1 text-xs text-muted-foreground hover:bg-muted sm:min-h-0';
 
   return (
     <div className="space-y-4">
@@ -214,11 +216,11 @@ export function EquipmentMonitoring({ equipmentId }: Props) {
       <div className="flex flex-wrap items-end gap-3">
         <label className="text-sm">
           <span className="block text-2xs uppercase tracking-wide text-muted-foreground">С</span>
-          <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="rounded-md border border-border bg-card px-2 py-1 text-sm" />
+          <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="min-h-11 rounded-md border border-border bg-card px-2 py-1 text-sm sm:min-h-0" />
         </label>
         <label className="text-sm">
           <span className="block text-2xs uppercase tracking-wide text-muted-foreground">По</span>
-          <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="rounded-md border border-border bg-card px-2 py-1 text-sm" />
+          <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="min-h-11 rounded-md border border-border bg-card px-2 py-1 text-sm sm:min-h-0" />
         </label>
         <div className="flex gap-1">
           <button type="button" onClick={() => { const t = todayYmd(); setFrom(t); setTo(t); }} className={chip}>Сегодня</button>

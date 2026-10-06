@@ -12,6 +12,7 @@ import { useState } from 'react';
 import { Pencil, Trash2, Plus, FileText, Loader2 } from '@/components/piling/icons/unified-icons';
 import { toast } from 'sonner';
 import { authFetch } from '@/lib/api';
+import { catchText } from '@/components/piling/admin-crews/crew-messages';
 import { formatRuDate } from '@/lib/format';
 import { documentExpiry } from '@/lib/document-expiry';
 import { Button } from '@/components/ui/button';
@@ -137,7 +138,8 @@ export function EquipmentDocuments({ equipmentId, documents, canManage, onChange
       setDialogOpen(false);
       await onChanged();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Ошибка');
+      // Обрыв сети fetch бросает TypeError с английским «Failed to fetch» (F-R112-1).
+      toast.error(catchText(err, 'Ошибка'));
     } finally {
       setBusy(false);
     }
@@ -153,7 +155,8 @@ export function EquipmentDocuments({ equipmentId, documents, canManage, onChange
       toast.success('Документ удалён');
       await onChanged();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Ошибка');
+      // Обрыв сети fetch бросает TypeError с английским «Failed to fetch» (F-R112-1).
+      toast.error(catchText(err, 'Ошибка'));
     } finally {
       setDeletingId(null);
       setPendingDelete(null);
@@ -168,7 +171,7 @@ export function EquipmentDocuments({ equipmentId, documents, canManage, onChange
           и подсвечивается, если истекает.
         </p>
         {canManage && (
-          <Button onClick={openCreate} size="sm" className="bg-signal hover:bg-signal-strong text-white">
+          <Button onClick={openCreate} size="sm" className="min-h-11 bg-signal hover:bg-signal-strong text-white sm:min-h-0">
             <Plus className="w-3.5 h-3.5 mr-1" /> Добавить
           </Button>
         )}
@@ -223,7 +226,7 @@ export function EquipmentDocuments({ equipmentId, documents, canManage, onChange
       )}
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent aria-describedby={undefined} className="sm:max-w-md">
+        <DialogContent aria-describedby={undefined} className="sm:max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editing ? 'Редактировать документ' : 'Новый документ'}</DialogTitle>
           </DialogHeader>

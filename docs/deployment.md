@@ -29,7 +29,6 @@ git checkout main
 ```bash
 # Сгенерировать 32-байтные секреты
 openssl rand -hex 32   # для SESSION_SECRET
-openssl rand -hex 32   # для PIN_LOOKUP_SECRET
 openssl rand -hex 32   # для DEVICE_KEY_LOOKUP_SECRET
 openssl rand -hex 32   # для ENCRYPTION_KEY
 openssl rand -hex 16   # для POSTGRES_PASSWORD
@@ -45,12 +44,11 @@ POSTGRES_DB=pilingtrack
 
 # Application secrets — все обязательны, иначе compose упадёт
 SESSION_SECRET=<32 bytes hex, 64 chars>
-PIN_LOOKUP_SECRET=<32 bytes hex>
+# PIN_LOOKUP_SECRET удалён вместе со входом по ПИН-коду 27.09.2026
 DEVICE_KEY_LOOKUP_SECRET=<32 bytes hex>
 ENCRYPTION_KEY=<32 bytes hex>
 
-# Public WebSocket URL — обязательно с прод-доменом
-NEXT_PUBLIC_WS_URL=wss://piling.example.com/ws
+# WebSocket-сервер удалён 26.09.2026, статус связи — опросом.
 
 # S3 / MinIO для PDF-хранилища (можно вынести на S3 / Yandex Object Storage)
 S3_ENDPOINT=http://minio:9000
@@ -81,16 +79,15 @@ docker compose --env-file .env.production logs -f app
 
 Что произойдёт:
 - `migrate` контейнер прогонит `prisma migrate deploy` и завершится.
-- `app`, `workers`, `ws` стартуют и пройдут healthcheck.
+- `app`, `workers` стартуют и пройдут healthcheck.
 - БД, Redis, MinIO будут доступны **только во внутренней сети** (порты не выставлены наружу).
 
 ## 4. Reverse-proxy (TLS + домен)
 
-Прод-overlay связывает `app` с `127.0.0.1:3000` и `ws` с `127.0.0.1:3001`. Снаружи доступа нет — нужен HTTPS-фронт. Пример **Caddy** (один конфиг + Let's Encrypt):
+Прод-overlay связывает `app` с `127.0.0.1:3000`. Снаружи доступа нет — нужен HTTPS-фронт. Пример **Caddy** (один конфиг + Let's Encrypt):
 
 ```caddyfile
 piling.example.com {
-    reverse_proxy /ws/* 127.0.0.1:3001
     reverse_proxy 127.0.0.1:3000
 }
 ```
@@ -104,14 +101,6 @@ server {
     ssl_certificate /etc/letsencrypt/live/piling/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/piling/privkey.pem;
 
-    location /ws/ {
-        proxy_pass http://127.0.0.1:3001/;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-        proxy_read_timeout 3600s;
-    }
-
     location / {
         proxy_pass http://127.0.0.1:3000;
         proxy_set_header Host $host;
@@ -120,8 +109,6 @@ server {
     }
 }
 ```
-
-После настройки HTTPS — поправь `NEXT_PUBLIC_WS_URL=wss://...` в `.env.production` и перезапусти `app`.
 
 ## 5. Создание первого админа
 

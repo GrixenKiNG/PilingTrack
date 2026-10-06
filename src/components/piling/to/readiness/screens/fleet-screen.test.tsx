@@ -1,11 +1,13 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { CurrentReadinessDto } from '../api/contracts';
+import type { CurrentReadinessDto, DefectDto } from '../api/contracts';
 import type { EquipmentOption } from '../../to-module-bits';
 import type { ReferenceUiProps } from './types';
 import { bootstrapEnvelope } from '../api/__tests__/fixtures';
+import { formatDateTimeInTimezone } from '@/lib/timezone';
 import { FleetScreen } from './fleet-screen';
 import { buildFleetItems, countFleetGroups, DEFAULT_FLEET_VIEW, filterFleetItems, readFleetViewState, writeFleetViewState } from './fleet-workspace-model';
+import type { MaintenanceSummary } from '../../readiness-design-views';
 
 const fetchDefects = vi.hoisted(() => vi.fn());
 vi.mock('../api/client', async (original) => ({ ...await original<typeof import('../api/client')>(), fetchReadinessDefects: fetchDefects }));
@@ -30,6 +32,17 @@ const snapshot = (id: string, overrides: Partial<CurrentReadinessDto> = {}): Cur
   evidence: { equipmentId: id, inspectionId: 'source-inspection', inspectionSource: 'OPERATOR_CHECKLIST',
     permitId: null, maintenanceRecordIds: [], evaluatedAt: '2026-09-05T20:00:00Z' },
   ...overrides,
+});
+const defect = (title: string): DefectDto => ({
+  id: `defect-${title}`, equipmentId: 'rig-1', severity: 'HIGH', status: 'OPEN',
+  title, description: 'Описание дефекта.', node: null, reportedById: 'user-1', reportedAt: '2026-09-05T10:00:00Z',
+  inspectionId: null, shiftId: null, triagedById: null, triagedAt: null, maintenanceRecordId: null,
+  resolvedById: null, resolvedAt: null, resolution: null, version: 1, createdAt: '2026-09-05T10:00:00Z', updatedAt: '2026-09-05T10:00:00Z',
+});
+const maintenanceRecord = (id: string, title: string): MaintenanceSummary => ({
+  id, type: 'TO', status: 'COMPLETED', priority: 'NORMAL', title,
+  scheduledAt: null, completedAt: null, createdAt: '2026-09-05T10:00:00Z',
+  equipment: { id: 'rig-1', name: 'Установка 1', model: 'Модель' },
 });
 const propsFor = (overrides: Partial<ReferenceUiProps> = {}): ReferenceUiProps => ({
   equipment: [equipment('rig-1', 'Установка 1'), equipment('rig-2', 'Установка 2')],
@@ -123,5 +136,229 @@ describe('Fleet evidence interactions', () => {
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Недостаточно прав'));
     expect(screen.queryByText(/В ответе журнала нет дефектов/)).not.toBeInTheDocument();
     expect(fetchDefects).toHaveBeenCalledWith(expect.any(AbortSignal), { equipmentId: 'rig-1' });
+  });
+  /**
+   * F-N1004-DEFECT-REFRESH (R151 №8): «Обновить данные» перезагружает модуль,
+   * но не пересоздаёт панель (её ключ — equipmentId). Прежний эффект зависел
+   * только от [equipment.id, section], поэтому открытый журнал дефектов
+   * оставался старым рядом со свежим снимком. Новый снимок (новый snapshotId)
+   * обязан перечитать список.
+   */
+  it('перечитывает открытые дефекты после обновления снимка', async () => {
+    fetchDefects.mockResolvedValueOnce([defect('Дефект до обновления')]);
+    const { rerender } = render(<FleetScreen {...propsFor()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Дефекты' }));
+    await waitFor(() => expect(screen.getByText('Дефект до обновления')).toBeInTheDocument());
+
+    fetchDefects.mockResolvedValueOnce([defect('Дефект после обновления')]);
+    rerender(<FleetScreen {...propsFor({ currentReadiness: [snapshot('rig-1', { snapshotId: 'snapshot-rig-1-v2' })] })} />);
+
+    await waitFor(() => expect(screen.getByText('Дефект после обновления')).toBeInTheDocument());
+    // Прежний список не выдаётся за свежий: он заменён ответом по новому снимку.
+    expect(screen.queryByText('Дефект до обновления')).not.toBeInTheDocument();
+    expect(fetchDefects).toHaveBeenCalledTimes(2);
+  });
+  /**
+   * Обратная сторона: тот же снимок и повторный рендер (в т.ч. тик загрузки)
+   * не должны порождать новый запрос — иначе журнал дёргается на каждом
+   * рендере.
+   */
+  it('не перезапрашивает дефекты на каждый рендер с тем же снимком', async () => {
+    fetchDefects.mockResolvedValue([defect('Дефект')]);
+    const { rerender } = render(<FleetScreen {...propsFor()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Дефекты' }));
+    await waitFor(() => expect(screen.getByText('Дефект')).toBeInTheDocument());
+    expect(fetchDefects).toHaveBeenCalledTimes(1);
+
+    rerender(<FleetScreen {...propsFor({ loading: true })} />);
+    rerender(<FleetScreen {...propsFor()} />);
+    expect(fetchDefects).toHaveBeenCalledTimes(1);
+  });
+  /**
+   * Сбой перечитывания по новому снимку виден как ошибка, а не как прежний
+   * список или пустой журнал.
+   */
+  it('при сбое обновления показывает ошибку, а не прежний список дефектов', async () => {
+    fetchDefects.mockResolvedValueOnce([defect('Старый дефект')]);
+    const { rerender } = render(<FleetScreen {...propsFor()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Дефекты' }));
+    await waitFor(() => expect(screen.getByText('Старый дефект')).toBeInTheDocument());
+
+    fetchDefects.mockRejectedValueOnce(new Error('Журнал дефектов недоступен'));
+    rerender(<FleetScreen {...propsFor({ currentReadiness: [snapshot('rig-1', { snapshotId: 'snapshot-rig-1-v2' })] })} />);
+
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Журнал дефектов недоступен'));
+    expect(screen.queryByText('Старый дефект')).not.toBeInTheDocument();
+    expect(screen.queryByText(/В ответе журнала нет дефектов/)).not.toBeInTheDocument();
+  });
+  /**
+   * F-N1004-SELECTED-SOURCES (R151 №3): отказ догрузки журнала выбранной
+   * установки должен быть виден в панели, а не выдаваться за пустой журнал.
+   */
+  it('shows the journal load failure for the selected machine instead of an empty journal', () => {
+    render(<FleetScreen {...propsFor({ workspaceIssues: [
+      { source: 'Журнал «Установка 1»', message: 'Источник временно недоступен (код 500).' },
+    ] })} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Обслуживание' }));
+    expect(screen.getByRole('alert')).toHaveTextContent('Источник временно недоступен (код 500).');
+    expect(screen.queryByText(/В загруженном журнале нет записей/)).not.toBeInTheDocument();
+  });
+  /**
+   * F-N1004-SELECTED-SOURCES: отказ загрузки карточки выбранной установки
+   * показывается её причиной, а не общей подсказкой «подробности ещё не
+   * получены».
+   */
+  it('shows the card load failure reason for the selected machine', () => {
+    render(<FleetScreen {...propsFor({ details: {}, workspaceIssues: [
+      { source: 'Карточка «Установка 1»', message: 'Недостаточно прав для загрузки данных.' },
+    ] })} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Документы' }));
+    expect(screen.getByText('Недостаточно прав для загрузки данных.')).toBeInTheDocument();
+    expect(screen.queryByText(/Подробности установки ещё не получены/)).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * F-N1005-MAINTENANCE-SOURCE: отказ журнала выбранной установки
+ * (/api/to/journal) — отдельный источник от «Обслуживания»
+ * (props.maintenance). Раньше он стоял в одном тернарном выражении перед
+ * записями, поэтому сбой журнала прятал уже полученные записи независимого
+ * источника и выдавал пустой ответ за успешно прочитанный.
+ */
+describe('Панель парка: сбой журнала не скрывает записи обслуживания (F-N1005)', () => {
+  const openMaintenance = () => fireEvent.click(screen.getByRole('button', { name: 'Обслуживание' }));
+
+  it('показывает и запись обслуживания, и ошибку журнала', () => {
+    render(<FleetScreen {...propsFor({
+      maintenance: [maintenanceRecord('m-1', 'Плановое ТО двигателя')],
+      workspaceIssues: [{ source: 'Журнал «Установка 1»', message: 'Источник временно недоступен (код 500).' }],
+    })} />);
+    openMaintenance();
+
+    expect(screen.getByText('Плановое ТО двигателя')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Открыть эту запись/ })).toHaveAttribute('href', '/admin/maintenance/m-1');
+    expect(screen.getByRole('alert')).toHaveTextContent('Источник временно недоступен (код 500).');
+  });
+
+  it('настоящий отказ обслуживания показывает ошибку, а не пустой журнал', () => {
+    render(<FleetScreen {...propsFor({
+      workspaceIssues: [{ source: 'Обслуживание', message: 'Не удалось загрузить журнал ТО.' }],
+    })} />);
+    openMaintenance();
+
+    expect(screen.getByRole('alert')).toHaveTextContent('Не удалось загрузить журнал ТО.');
+    expect(screen.queryByText(/В загруженном журнале нет записей/)).not.toBeInTheDocument();
+  });
+
+  it('успешный пустой ответ показывает отсутствие записей без ошибки', () => {
+    render(<FleetScreen {...propsFor()} />);
+    openMaintenance();
+
+    expect(screen.getByText(/В загруженном журнале нет записей/)).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('роль без доступа к обслуживанию видит ограничение, а не пустой журнал', () => {
+    render(<FleetScreen {...propsFor({ outOfRoleSources: ['Обслуживание и журнал ТО'] })} />);
+    openMaintenance();
+
+    expect(screen.getByText('Журнал ТО недоступен текущей роли.')).toBeInTheDocument();
+    expect(screen.queryByText(/В загруженном журнале нет записей/)).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * R141 №2: в панели все блокеры рисовались красным, хотя домен различает
+ * запрет пуска (`DENY_START`) и возврат оператору (`RETURN_TO_OPERATOR`) —
+ * второй это незакрытый шаг, а не критический дефект.
+ */
+describe('Панель парка: блокеры показаны по действию (R141 №2)', () => {
+  const withBlocker = (action: string, label: string, actionLabel: string) =>
+    snapshot('rig-1', { blockers: [{ condition: 'INSPECTION_BELOW_80', action, label, actionLabel }] });
+  const panelFor = () => within(screen.getByRole('complementary', { name: 'Подробности Установка 1' }));
+
+  it('возврат оператору не красится как запрет пуска', () => {
+    render(<FleetScreen {...propsFor({ currentReadiness: [withBlocker('RETURN_TO_OPERATOR', 'Нет осмотра за сегодня', 'Вернуть оператору')] })} />);
+
+    const item = panelFor().getByText('Нет осмотра за сегодня').closest('li');
+    expect(item).toHaveClass('bg-warning/10');
+    expect(item).not.toHaveClass('bg-destructive/10');
+    expect(panelFor().getByText('Вернуть оператору')).toBeInTheDocument();
+  });
+
+  it('запрет пуска остаётся красным', () => {
+    render(<FleetScreen {...propsFor({ currentReadiness: [withBlocker('DENY_START', 'Критический дефект гидравлики', 'Запретить запуск')] })} />);
+
+    expect(panelFor().getByText('Критический дефект гидравлики').closest('li')).toHaveClass('bg-destructive/10');
+  });
+});
+
+/**
+ * R141 №5: в строке парка не было видно, когда сделана оценка — машина с
+ * недельным и свежим снимком выглядели одинаково. Время берём из снимка в
+ * поясе организации, порог устаревания не вводим (владелец 04.10.2026).
+ */
+describe('Время оценки в строке парка (R141 №5)', () => {
+  it('различает две оценки с разным временем без открытия панели', () => {
+    const older = '2026-09-01T06:00:00Z';
+    const fresher = '2026-09-05T20:00:00Z';
+    render(<FleetScreen {...propsFor({ currentReadiness: [
+      snapshot('rig-1', { calculatedAt: older }),
+      snapshot('rig-2', { calculatedAt: fresher }),
+    ] })} />);
+
+    expect(screen.getByText(formatDateTimeInTimezone(fresher, 'Europe/Moscow'))).toBeInTheDocument();
+    expect(screen.getAllByText(formatDateTimeInTimezone(older, 'Europe/Moscow')).length).toBeGreaterThan(0);
+  });
+
+  it('пустое время оценки показывается словами, а не свежей датой', () => {
+    render(<FleetScreen {...propsFor({ currentReadiness: [] })} />);
+
+    expect(screen.getAllByText('Время оценки не указано').length).toBeGreaterThan(0);
+  });
+});
+
+/**
+ * R141 №3: в строке парка была видна только первая причина из нескольких
+ * (`blockers[0] ?? warnings[0]`), остальные — лишь после выбора машины.
+ * Первую краткую причину оставляем, а число остальных ведёт в ту же панель
+ * «Основания оценки» выбранной установки.
+ */
+describe('Несколько причин блокировки видны в списке (R141 №3)', () => {
+  const blocker = (label: string, action = 'DENY_START') => ({ condition: 'CRITICAL_DEFECT', label, action, actionLabel: 'Запретить запуск' });
+  const warning = (message: string) => ({ message, action: 'REQUIRE_CONFIRMATION', actionLabel: 'Требуется подтверждение' });
+
+  it('0 и 1 причина не показывают счётчик «ещё»', () => {
+    expect(buildFleetItems(propsFor())[0].extraReasonCount).toBe(0);
+    const one = buildFleetItems(propsFor({ currentReadiness: [snapshot('rig-1', {
+      status: 'BLOCKED', verdict: 'DENIED', blockers: [blocker('Критический дефект')],
+    })] }))[0];
+    expect(one.reason).toBe('Критический дефект');
+    expect(one.extraReasonCount).toBe(0);
+  });
+
+  it('три причины дают «ещё 2 причины», первая остаётся краткой', () => {
+    const props = propsFor({ currentReadiness: [snapshot('rig-1', {
+      status: 'BLOCKED', verdict: 'DENIED',
+      blockers: [blocker('Критический дефект гидравлики'), blocker('Нет осмотра за сегодня', 'RETURN_TO_OPERATOR')],
+      warnings: [warning('Просрочено ТО по дате')],
+    })] });
+    const item = buildFleetItems(props)[0];
+    expect(item.reason).toBe('Критический дефект гидравлики');
+    expect(item.extraReasonCount).toBe(2);
+
+    const onSelect = vi.fn();
+    render(<FleetScreen {...props} selectedId="rig-2" onSelect={onSelect} />);
+    const more = screen.getByRole('button', { name: /Открыть основания оценки Установка 1: ещё 2 причины/ });
+    more.focus();
+    expect(more).toHaveFocus();
+    fireEvent.click(more);
+    expect(onSelect).toHaveBeenCalledWith('rig-1');
+  });
+
+  it('неизвестный снимок не показывает счётчик причин', () => {
+    render(<FleetScreen {...propsFor({ currentReadiness: [] })} />);
+
+    expect(screen.queryByRole('button', { name: /Открыть основания оценки/ })).not.toBeInTheDocument();
   });
 });

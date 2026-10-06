@@ -8,14 +8,14 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-const { findManyMock, decryptMock, isEncryptedMock } = vi.hoisted(() => ({
-  findManyMock: vi.fn(),
+const { findManyMock, updateManyMock, decryptMock, isEncryptedMock } = vi.hoisted(() => ({
+  findManyMock: vi.fn(), updateManyMock: vi.fn(),
   decryptMock: vi.fn(),
   isEncryptedMock: vi.fn(),
 }));
 
 vi.mock('@/lib/db', () => ({
-  db: { telegramConfig: { findMany: findManyMock } },
+  db: { telegramConfig: { findMany: findManyMock, updateMany: updateManyMock } },
 }));
 
 vi.mock('@/core/security/encryption', () => ({
@@ -27,14 +27,16 @@ vi.mock('@/lib/logger', () => ({
   logger: { warn: vi.fn(), error: vi.fn(), info: vi.fn() },
 }));
 
-import { telegramNotifier } from '../telegram';
+import { telegramNotifier, describeTelegramError } from '../telegram';
+import { createTelegramDeliveryProgress } from '../telegram-delivery-progress';
+import type { Prisma } from '@/generated/postgres-client/client';
 
 describe('telegramNotifier — botToken decryption', () => {
   let fetchMock: ReturnType<typeof vi.fn>;
   const originalDefaultTenantId = process.env.DEFAULT_TENANT_ID;
 
   beforeEach(() => {
-    findManyMock.mockReset();
+    findManyMock.mockReset(); updateManyMock.mockReset().mockResolvedValue({ count: 1 });
     decryptMock.mockReset();
     isEncryptedMock.mockReset();
     // getConfig() has no per-request tenant (this notifier is called from
@@ -43,7 +45,7 @@ describe('telegramNotifier — botToken decryption', () => {
     process.env.DEFAULT_TENANT_ID = 'test-tenant';
     fetchMock = vi.fn().mockResolvedValue({
       ok: true,
-      json: async () => ({ result: { title: 'Test Chat' } }),
+      json: async () => ({ ok: true, result: { title: 'Test Chat' } }),
       text: async () => '',
     });
     vi.stubGlobal('fetch', fetchMock);
@@ -73,6 +75,18 @@ describe('telegramNotifier — botToken decryption', () => {
     expect(url).not.toContain('enc:CIPHERTEXT');
   });
 
+  it('F4: selection filters before chat dedupe and uses the explicit session tenant', async () => {
+    const configs = [
+      { id: 'first', botToken: 'token-first', chatId: 'same-chat', enabled: true },
+      { id: 'second', botToken: 'token-second', chatId: 'same-chat', enabled: true },
+    ];
+    findManyMock.mockImplementation(async ({ where }) => configs.filter(config => !where.id || config.id === where.id));
+    isEncryptedMock.mockReturnValue(false);
+    expect((await telegramNotifier.testConnection('second', 'tenant-b')).ok).toBe(true);
+    expect(findManyMock).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 'second', tenantId: 'tenant-b' } }));
+    expect(fetchMock.mock.calls[0][0]).toContain('token-second');
+    expect(fetchMock.mock.calls[0][0]).not.toContain('token-first');
+  });
   it('passes plain-text botToken through without decrypting', async () => {
     findManyMock.mockResolvedValue([
       { botToken: '999:plain-token', chatId: '-100123', enabled: true },
@@ -86,10 +100,10 @@ describe('telegramNotifier — botToken decryption', () => {
     expect(fetchMock.mock.calls[0][0]).toContain('999:plain-token');
   });
 
-  it('returns Not configured when no enabled config row exists', async () => {
+  it('returns a Russian message when no enabled config row exists', async () => {
     findManyMock.mockResolvedValue([]);
     const res = await telegramNotifier.testConnection();
-    expect(res).toEqual({ ok: false, error: 'Not configured' });
+    expect(res).toEqual({ ok: false, error: 'Telegram не настроен — добавьте канал в настройках' });
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
@@ -109,7 +123,7 @@ describe('telegramNotifier — botToken decryption', () => {
   it('fails closed (no config, no DB call) when DEFAULT_TENANT_ID is unset', async () => {
     delete process.env.DEFAULT_TENANT_ID;
     const res = await telegramNotifier.testConnection();
-    expect(res).toEqual({ ok: false, error: 'Not configured' });
+    expect(res).toEqual({ ok: false, error: 'Telegram не настроен — добавьте канал в настройках' });
     expect(findManyMock).not.toHaveBeenCalled();
   });
 
@@ -141,13 +155,13 @@ describe('telegramNotifier — доставка во все конфигурац
   const originalDefaultTenantId = process.env.DEFAULT_TENANT_ID;
 
   beforeEach(() => {
-    findManyMock.mockReset();
+    findManyMock.mockReset(); updateManyMock.mockReset().mockResolvedValue({ count: 1 });
     decryptMock.mockReset();
     isEncryptedMock.mockReset();
     process.env.DEFAULT_TENANT_ID = 'test-tenant';
     fetchMock = vi.fn().mockResolvedValue({
       ok: true,
-      json: async () => ({ result: {} }),
+      json: async () => ({ ok: true, result: {} }),
       text: async () => '',
     });
     vi.stubGlobal('fetch', fetchMock);
@@ -186,15 +200,90 @@ describe('telegramNotifier — доставка во все конфигурац
     isEncryptedMock.mockReturnValue(false);
     fetchMock
       .mockResolvedValueOnce({ ok: false, status: 400, text: async () => 'bad chat' })
-      .mockResolvedValueOnce({ ok: true, text: async () => '' });
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ ok: true }), text: async () => '' });
 
     const res = await telegramNotifier.sendAlert({ severity: 'critical', message: 'тревога' });
 
-    expect(res).toBe(true);
+    expect(res).toBe(false);
     expect(sentChatIds()).toEqual(['-100A', '-100B']);
   });
 
-  it('считает доставку неуспешной, только если упали все чаты', async () => {
+  it.each(['alert', 'document'])('F3: %s delivered to A ignores permanently broken B and marks its setting', async (kind) => {
+    findManyMock.mockResolvedValue([
+      { id: 'config-a', label: 'Рабочий', tenantId: 'test-tenant', botToken: 'test-a', chatId: 'A', enabled: true },
+      { id: 'config-b', label: 'Сломанный', tenantId: 'test-tenant', botToken: 'test-b', chatId: 'B', enabled: true },
+    ]);
+    isEncryptedMock.mockReturnValue(false);
+    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({ ok: true }) })
+      .mockResolvedValueOnce({ ok: false, status: 400, text: async () => '{"ok":false,"description":"Bad Request: chat not found"}' });
+    let payload: Prisma.JsonValue = { message: 'batch' };
+    const progress = createTelegramDeliveryProgress(payload, async next => { payload = JSON.parse(JSON.stringify(next)); });
+    const result = kind === 'alert'
+      ? await telegramNotifier.sendAlert({ severity: 'high', message: 'batch' }, progress)
+      : await telegramNotifier.sendDocument('test.pdf', Buffer.from('%PDF'), undefined, progress);
+    expect(result).toBe(true);
+    expect(updateManyMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ id: 'config-b', tenantId: 'test-tenant', enabled: true }),
+      data: { enabled: false, label: expect.stringContaining('Чат не найден') },
+    }));
+    expect(payload).toMatchObject({ telegramDeliveredChatIds: ['A'] });
+  });
+  it.each([[403, 'Forbidden: bot was blocked', true], [401, 'Unauthorized', true], [429, 'Too Many Requests', false], [503, 'unavailable', false]] as const)('F3: status %s classifies permanent/transient failure', async (status, description, permanent) => {
+    findManyMock.mockResolvedValue([
+      { id: 'a', label: 'A', botToken: 'test-a', chatId: 'A', enabled: true },
+      { id: 'b', label: 'B', botToken: 'test-b', chatId: 'B', enabled: true },
+    ]);
+    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({ ok: true }) })
+      .mockResolvedValueOnce({ ok: false, status, text: async () => description });
+    expect(await telegramNotifier.sendMessage('batch')).toBe(permanent);
+    expect(updateManyMock).toHaveBeenCalledTimes(permanent ? 1 : 0);
+  });
+  it('I08: persists a partial batch and retries only unconfirmed chats after restart', async () => {
+    findManyMock.mockResolvedValue([{ botToken: 'test-a', chatId: 'A', enabled: true }, { botToken: 'test-b', chatId: 'B', enabled: true }]);
+    isEncryptedMock.mockReturnValue(false);
+    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({ ok: true }) })
+      .mockRejectedValueOnce(new Error('ambiguous timeout'));
+    let payload: Prisma.JsonValue = { message: 'batch' };
+    const progress = () => createTelegramDeliveryProgress(payload, async next => { payload = JSON.parse(JSON.stringify(next)); });
+    expect(await telegramNotifier.sendMessage('batch', progress())).toBe(false);
+    expect(payload).toEqual({ message: 'batch', telegramDeliveredChatIds: ['A'] });
+    expect(sentChatIds()).toEqual(['A', 'B']);
+    fetchMock.mockClear().mockResolvedValue({ ok: true, json: async () => ({ ok: true }) });
+    // Fresh progress reconstructed from persisted JSON, no in-memory delivery cache.
+    expect(await telegramNotifier.sendMessage('batch', progress())).toBe(true);
+    expect(sentChatIds()).toEqual(['B']);
+    expect(payload).toEqual({ message: 'batch', telegramDeliveredChatIds: ['A', 'B'] });
+  });
+
+  it('I08: HTTP success without a Telegram acknowledgement stays unconfirmed', async () => {
+    findManyMock.mockResolvedValue([{ botToken: 'test-a', chatId: 'A', enabled: true }]);
+    isEncryptedMock.mockReturnValue(false);
+    fetchMock.mockResolvedValue({ ok: true, json: async () => ({ ok: false }) });
+    const confirm = vi.fn();
+    expect(await telegramNotifier.sendMessage('batch', { deliveredChatIds: new Set(), confirm })).toBe(false);
+    expect(confirm).not.toHaveBeenCalled();
+  });
+
+  it('F6 review6: a PDF upload acknowledged after 6s succeeds within a bounded 30s budget', async () => {
+    findManyMock.mockResolvedValue([{ botToken: 'test-a', chatId: 'A', enabled: true }]);
+    vi.useFakeTimers();
+    const timeout = vi.spyOn(AbortSignal, 'timeout').mockImplementation(ms => {
+      const controller = new AbortController();
+      setTimeout(() => controller.abort(), ms); return controller.signal;
+    });
+    fetchMock.mockImplementation((_url, init: RequestInit) => new Promise((resolve, reject) => {
+      init.signal?.addEventListener('abort', () => reject(new Error('timeout')), { once: true });
+      setTimeout(() => resolve({ ok: true, json: async () => ({ ok: true }) }), 6000);
+    }));
+    try {
+      const pending = telegramNotifier.sendDocument('slow.pdf', Buffer.from('%PDF'));
+      await vi.waitFor(() => expect(fetchMock).toHaveBeenCalled());
+      await vi.advanceTimersByTimeAsync(6000);
+      expect(await pending).toBe(true);
+      expect(timeout).toHaveBeenCalledWith(30_000);
+    } finally { timeout.mockRestore(); vi.useRealTimers(); }
+  });
+  it('считает доставку неуспешной, если упали все чаты', async () => {
     findManyMock.mockResolvedValue([
       { botToken: '999:token-a', chatId: '-100A', enabled: true },
       { botToken: '999:token-b', chatId: '-100B', enabled: true },
@@ -220,7 +309,7 @@ describe('telegramNotifier — человекочитаемые поля и зо
   const originalDefaultTenantId = process.env.DEFAULT_TENANT_ID;
 
   beforeEach(() => {
-    findManyMock.mockReset();
+    findManyMock.mockReset(); updateManyMock.mockReset().mockResolvedValue({ count: 1 });
     decryptMock.mockReset();
     isEncryptedMock.mockReset();
     process.env.DEFAULT_TENANT_ID = 'test-tenant';
@@ -228,7 +317,7 @@ describe('telegramNotifier — человекочитаемые поля и зо
       { botToken: '999:plain-token', chatId: '-100123', enabled: true },
     ]);
     isEncryptedMock.mockReturnValue(false);
-    fetchMock = vi.fn().mockResolvedValue({ ok: true, text: async () => '' });
+    fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ ok: true }), text: async () => '' });
     vi.stubGlobal('fetch', fetchMock);
   });
 
@@ -289,7 +378,7 @@ describe('telegramNotifier — человекочитаемые поля и зо
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date('2026-09-26T21:30:00Z'));
 
-    fetchMock.mockResolvedValue({ ok: true, text: async () => '' });
+    fetchMock.mockResolvedValue({ ok: true, json: async () => ({ ok: true }), text: async () => '' });
     await telegramNotifier.sendAlert({
       severity: 'medium',
       message: 'тревога',
@@ -297,5 +386,163 @@ describe('telegramNotifier — человекочитаемые поля и зо
     });
 
     expect(sentText()).toContain('⏰ 27.09.2026, 04:30');
+  });
+});
+
+/**
+ * F-R120-3: кнопка «Тест» дергала `getChat` без `AbortSignal.timeout` —
+ * при недоступном Telegram (чёрная дыра сети, блокировка) запрос висел
+ * бесконечно, а спиннер на экране настроек не останавливался. `sendMessage`
+ * тайм-аут уже имел. Теперь у обоих запросов один и тот же лимит 5 с.
+ */
+describe('telegramNotifier — тайм-аут проверки канала (F-R120-3)', () => {
+  let fetchMock: ReturnType<typeof vi.fn>;
+  const originalDefaultTenantId = process.env.DEFAULT_TENANT_ID;
+
+  beforeEach(() => {
+    findManyMock.mockReset(); updateManyMock.mockReset().mockResolvedValue({ count: 1 });
+    decryptMock.mockReset();
+    isEncryptedMock.mockReset().mockReturnValue(false);
+    process.env.DEFAULT_TENANT_ID = 'test-tenant';
+    findManyMock.mockResolvedValue([
+      { botToken: '999:plain-token', chatId: '-100123', enabled: true },
+    ]);
+    fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    if (originalDefaultTenantId === undefined) delete process.env.DEFAULT_TENANT_ID;
+    else process.env.DEFAULT_TENANT_ID = originalDefaultTenantId;
+  });
+
+  it('ограничивает getChat тем же тайм-аутом 5 с, что и sendMessage', async () => {
+    const timeoutSpy = vi.spyOn(AbortSignal, 'timeout');
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({ result: { title: 'Test Chat' } }),
+      text: async () => '',
+    });
+
+    await telegramNotifier.testConnection();
+
+    expect(timeoutSpy).toHaveBeenCalledWith(5000);
+    expect(fetchMock.mock.calls[0][1].signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it('зависший getChat завершается ошибкой тайм-аута, а не бесконечным ожиданием', async () => {
+    const controller = new AbortController();
+    vi.spyOn(AbortSignal, 'timeout').mockReturnValue(controller.signal);
+    fetchMock.mockImplementation(
+      (_url: string, init: RequestInit) =>
+        new Promise((_resolve, reject) => {
+          init.signal?.addEventListener('abort', () =>
+            reject(new DOMException('The operation was aborted due to timeout', 'TimeoutError')),
+          );
+        }),
+    );
+
+    const pending = telegramNotifier.testConnection();
+    // Дать коду дойти до fetch и повесить обработчик на сигнал.
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    controller.abort();
+
+    const res = await pending;
+    expect(res.ok).toBe(false);
+    // F-R120-2: текст тайм-аута теперь человекочитаемый, а не имя DOMException.
+    expect(res.error).toBe('Telegram не ответил за 5 секунд — проверьте доступ в интернет');
+  });
+});
+
+/**
+ * PDF отчёта не доходил в Telegram ни разу с 25.09.2026: обработчик шлёт его
+ * изнутри `db.$transaction(async (tx) => …)` (блокировка строки события,
+ * event-handlers.ts), а обёртка транзакции помечает область «тенант уже в
+ * базе» (tenant-rls.ts: runWithGucApplied). Чтение настроек бота идёт
+ * глобальным клиентом МИМО этой транзакции, но пометку наследовало — тенант к
+ * запросу не прикладывался, строгий RLS возвращал ноль строк, и в журнале
+ * было «Telegram not configured — skipping document». Сообщения об ошибках
+ * идут вне транзакций и доходили.
+ */
+describe('telegramNotifier — чтение настроек внутри чужой транзакции', () => {
+  const originalDefaultTenantId = process.env.DEFAULT_TENANT_ID;
+
+  beforeEach(() => {
+    findManyMock.mockReset(); updateManyMock.mockReset().mockResolvedValue({ count: 1 });
+    isEncryptedMock.mockReset().mockReturnValue(false);
+    process.env.DEFAULT_TENANT_ID = 'orion';
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({ ok: true }), text: async () => '' }));
+  });
+
+  afterEach(() => {
+    if (originalDefaultTenantId === undefined) delete process.env.DEFAULT_TENANT_ID;
+    else process.env.DEFAULT_TENANT_ID = originalDefaultTenantId;
+  });
+
+  it('запрос настроек несёт тенанта, даже если вызван из области runWithGucApplied', async () => {
+    const { runWithGucApplied, resolveGucTenantId } = await import('@/core/security/tenant-rls');
+    let tenantSeenByQuery: string | null | undefined;
+    findManyMock.mockImplementation(async () => {
+      // Ровно то, что решает расширение Prisma: доставлять ли тенанта в базу.
+      tenantSeenByQuery = resolveGucTenantId();
+      return [{ botToken: 'plain-token', chatId: '-100', enabled: true }];
+    });
+
+    const sent = await runWithGucApplied(() =>
+      telegramNotifier.sendDocument('r.pdf', Buffer.from('%PDF'), 'подпись'),
+    );
+
+    expect(tenantSeenByQuery).toBe('orion');
+    expect(sent).toBe(true);
+  });
+});
+
+/**
+ * F-R120-2: кнопка «Тест» показывала сырой ответ Telegram API
+ * (`{"ok":false,"error_code":401,…}`) или английское «Not configured».
+ * Частые отказы переводим в русский с подсказкой, остальное — «Telegram отказал: …».
+ */
+describe('describeTelegramError — сопоставление отказов Telegram (F-R120-2)', () => {
+  it('токен неверный (401 Unauthorized)', () => {
+    expect(describeTelegramError('{"ok":false,"error_code":401,"description":"Unauthorized"}'))
+      .toBe('Токен бота неверный — проверьте токен в настройках');
+  });
+
+  it('чат не найден', () => {
+    expect(describeTelegramError('{"ok":false,"error_code":400,"description":"Bad Request: chat not found"}'))
+      .toBe('Чат не найден — проверьте ID чата');
+  });
+
+  it('бот заблокирован пользователем', () => {
+    expect(describeTelegramError('{"ok":false,"error_code":403,"description":"Forbidden: bot was blocked by the user"}'))
+      .toBe('Бот заблокирован — разблокируйте его в чате');
+  });
+
+  it('недостаточно прав на отправку', () => {
+    expect(describeTelegramError('{"ok":false,"error_code":400,"description":"Bad Request: not enough rights to send text messages to the chat"}'))
+      .toBe('Недостаточно прав — добавьте бота в чат с правом отправки');
+  });
+
+  it('тайм-аут запроса', () => {
+    expect(describeTelegramError('The operation was aborted due to timeout'))
+      .toBe('Telegram не ответил за 5 секунд — проверьте доступ в интернет');
+  });
+
+  it('прочий ответ — короткий текст «Telegram отказал: …»', () => {
+    expect(describeTelegramError('Internal Server Error'))
+      .toBe('Telegram отказал: Internal Server Error');
+  });
+
+  it('длинный незнакомый ответ обрезается', () => {
+    const raw = 'x'.repeat(200);
+    const result = describeTelegramError(raw);
+    expect(result.startsWith('Telegram отказал: ')).toBe(true);
+    expect(result.length).toBeLessThanOrEqual('Telegram отказал: '.length + 120);
+    expect(result.endsWith('…')).toBe(true);
+  });
+
+  it('пустой ответ — понятный фолбэк', () => {
+    expect(describeTelegramError('')).toBe('Telegram отказал: неизвестная ошибка');
   });
 });

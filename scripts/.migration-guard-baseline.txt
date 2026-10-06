@@ -1,9 +1,16 @@
-# Migrations reviewed and known to contain intentional destructive
-# statements (DROP COLUMN / DROP TABLE / TRUNCATE). Checked by
-# scripts/check-migrations.js. One migration directory name per line.
+# Migrations reviewed and allowlisted. Two reasons to be here:
+#   1. the migration contains an intentional destructive statement
+#      (DROP COLUMN / DROP TABLE / TRUNCATE / DELETE FROM);
+#   2. a migration newer than 20260930000000 does data-dependent DDL
+#      (CREATE UNIQUE INDEX, ADD CONSTRAINT UNIQUE/CHECK/FOREIGN KEY,
+#      SET NOT NULL, ADD COLUMN NOT NULL without DEFAULT) without a
+#      `DO $$ … RAISE EXCEPTION` pre-flight block — only after the
+#      operation was verified on a copy of the prod database.
+# Checked by scripts/check-migrations.js. One migration directory name
+# per line.
 #
 # Add a line here ONLY after reading the migration.sql and confirming
-# the destructive change is intentional. See check-migrations.js header.
+# what it does. See check-migrations.js header.
 
 # Contains the historical `DROP COLUMN "journalPhotoMediaId"` (the
 # 2026-05-30 incident). Already applied to prod and compensated by
@@ -25,3 +32,8 @@
 # список тогда внесена не была — с тех пор npm run verify падал на ней.
 20260913140000_drop_device_sync_last_accepted_sequence
 20260924120000_drop_refresh_token
+
+# DELETE справочников без организации (PileGrade / DrillingType /
+# DowntimeReason с tenantId IS NULL) уже после ремапа на тенант-строки, в
+# одном файле с SET NOT NULL. Проверено 22.06.2026.
+20260622020000_tenant_dictionaries

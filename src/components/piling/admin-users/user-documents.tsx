@@ -13,10 +13,11 @@
  * экран и выборка диспетчера не разошлись.
  */
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useId, useState } from 'react';
 import { Plus, Pencil, Trash2, Loader2, FileText } from '@/components/piling/icons/unified-icons';
 import { toast } from 'sonner';
 import { authFetch } from '@/lib/api';
+import { catchText } from '@/components/piling/admin-crews/crew-messages';
 import { formatRuDate } from '@/lib/format';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -79,6 +80,7 @@ export function UserDocuments({ userId }: { userId: string }) {
    * когда `owner` совпадает с текущим `userId`. Это ответ на вопрос «чьи это
    * данные», а не на вопрос «загрузилось ли что-нибудь».
    */
+  const uid = useId();
   const [loaded, setLoaded] = useState<{ owner: string; rows: DocumentRow[] } | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
   const [types, setTypes] = useState<DocumentType[]>([]);
@@ -185,7 +187,8 @@ export function UserDocuments({ userId }: { userId: string }) {
       setForm(EMPTY_FORM);
       await load();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Ошибка');
+      // Обрыв сети fetch бросает TypeError с английским «Failed to fetch» (F-R112-1).
+      toast.error(catchText(err, 'Ошибка'));
     } finally {
       setBusy(false);
     }
@@ -198,7 +201,8 @@ export function UserDocuments({ userId }: { userId: string }) {
       toast.success('Документ удалён');
       await load();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Ошибка');
+      // Обрыв сети fetch бросает TypeError с английским «Failed to fetch» (F-R112-1).
+      toast.error(catchText(err, 'Ошибка'));
     }
   };
 
@@ -216,7 +220,7 @@ export function UserDocuments({ userId }: { userId: string }) {
         <p className="font-medium text-destructive-strong">{failed}</p>
         {/* Ни одной строки: чужие документы под чужим именем хуже пустоты. */}
         <p className="text-muted-foreground">Документы этого сотрудника не показаны. Это не значит, что их нет.</p>
-        <Button size="sm" variant="outline" onClick={() => void load()}>Повторить</Button>
+        <Button size="sm" variant="outline" onClick={() => void load()} className="min-h-11 sm:min-h-0">Повторить</Button>
       </div>
     );
   }
@@ -238,7 +242,7 @@ export function UserDocuments({ userId }: { userId: string }) {
         <span className="text-xs text-muted-foreground">
           {documents.length ? `Документов: ${documents.length}` : 'Документов нет'}
         </span>
-        <Button size="sm" variant="outline" onClick={openCreate}>
+        <Button size="sm" variant="outline" onClick={openCreate} className="min-h-11 sm:min-h-0">
           <Plus className="mr-1 h-3.5 w-3.5" /> Добавить
         </Button>
       </div>
@@ -263,10 +267,10 @@ export function UserDocuments({ userId }: { userId: string }) {
                 <span className={cn('rounded px-2 py-0.5 text-xs font-medium', STATUS_STYLE[doc.expiry.status])}>
                   {statusText(doc.expiry)}
                 </span>
-                <Button size="icon" variant="ghost" onClick={() => openEdit(doc)} aria-label="Изменить документ">
+                <Button size="icon" variant="ghost" onClick={() => openEdit(doc)} aria-label="Изменить документ" className="min-h-11 min-w-11 sm:min-h-0 sm:min-w-0">
                   <Pencil className="h-3.5 w-3.5" />
                 </Button>
-                <Button size="icon" variant="ghost" onClick={() => setPendingDelete(doc)} aria-label="Удалить документ">
+                <Button size="icon" variant="ghost" onClick={() => setPendingDelete(doc)} aria-label="Удалить документ" className="min-h-11 min-w-11 sm:min-h-0 sm:min-w-0">
                   <Trash2 className="h-3.5 w-3.5" />
                 </Button>
               </div>
@@ -282,9 +286,9 @@ export function UserDocuments({ userId }: { userId: string }) {
           </DialogHeader>
           <div className="space-y-3">
             <div className="space-y-1">
-              <Label>Вид документа</Label>
+              <Label htmlFor={`${uid}-type`}>Вид документа</Label>
               <Select value={form.typeId} onValueChange={(typeId) => setForm((prev) => ({ ...prev, typeId }))}>
-                <SelectTrigger><SelectValue placeholder="Выберите вид" /></SelectTrigger>
+                <SelectTrigger id={`${uid}-type`}><SelectValue placeholder="Выберите вид" /></SelectTrigger>
                 <SelectContent>
                   {types.map((type) => (
                     <SelectItem key={type.id} value={type.id}>{type.name}</SelectItem>
@@ -293,22 +297,22 @@ export function UserDocuments({ userId }: { userId: string }) {
               </Select>
             </div>
             <div className="space-y-1">
-              <Label>Номер</Label>
-              <Input value={form.number} onChange={(e) => setForm((prev) => ({ ...prev, number: e.target.value }))} />
+              <Label htmlFor={`${uid}-number`}>Номер</Label>
+              <Input id={`${uid}-number`} value={form.number} maxLength={100} onChange={(e) => setForm((prev) => ({ ...prev, number: e.target.value }))} />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
-                <Label>Выдан</Label>
-                <Input type="date" value={form.issuedAt} onChange={(e) => onIssuedChange(e.target.value)} />
+                <Label htmlFor={`${uid}-issued`}>Выдан</Label>
+                <Input id={`${uid}-issued`} type="date" value={form.issuedAt} onChange={(e) => onIssuedChange(e.target.value)} />
               </div>
               <div className="space-y-1">
-                <Label>Действует до</Label>
-                <Input type="date" value={form.expiresAt} onChange={(e) => setForm((prev) => ({ ...prev, expiresAt: e.target.value }))} />
+                <Label htmlFor={`${uid}-expires`}>Действует до</Label>
+                <Input id={`${uid}-expires`} type="date" value={form.expiresAt} onChange={(e) => setForm((prev) => ({ ...prev, expiresAt: e.target.value }))} />
               </div>
             </div>
             <div className="space-y-1">
-              <Label>Примечание</Label>
-              <Textarea rows={2} value={form.notes} onChange={(e) => setForm((prev) => ({ ...prev, notes: e.target.value }))} />
+              <Label htmlFor={`${uid}-notes`}>Примечание</Label>
+              <Textarea id={`${uid}-notes`} rows={2} maxLength={2000} value={form.notes} onChange={(e) => setForm((prev) => ({ ...prev, notes: e.target.value }))} />
             </div>
           </div>
           <DialogFooter>
@@ -324,7 +328,9 @@ export function UserDocuments({ userId }: { userId: string }) {
         open={pendingDelete !== null}
         onOpenChange={(open) => !open && setPendingDelete(null)}
         title="Удалить документ?"
-        description={pendingDelete ? `${pendingDelete.type.name}${pendingDelete.number ? ` № ${pendingDelete.number}` : ''}` : ''}
+        description={pendingDelete
+          ? `Документ «${pendingDelete.type.name}${pendingDelete.number ? ` № ${pendingDelete.number}` : ''}» будет удалён без возможности восстановления.`
+          : ''}
         confirmLabel="Удалить"
         onConfirm={async () => {
           if (pendingDelete) await remove(pendingDelete);

@@ -38,9 +38,14 @@ vi.mock('@/lib/logger', () => ({
 }));
 
 import { recordAuditEvent } from '../audit-service';
+import {
+  getAuditFeedbackFailureCount,
+  resetAuditFeedbackMetrics,
+} from '@/core/observability/audit-feedback-metrics';
 
 beforeEach(() => {
   vi.clearAllMocks();
+  resetAuditFeedbackMetrics();
   mocks.recordFeedbackEvent.mockResolvedValue(undefined);
   mocks.userFindUnique.mockResolvedValue(null);
 });
@@ -159,6 +164,7 @@ describe('recordAuditEvent — context propagation', () => {
     expect(mocks.recordFeedbackEvent).toHaveBeenCalledWith(
       expect.objectContaining({ actor: { id: 'op-1' } }),
     );
+    expect(getAuditFeedbackFailureCount()).toBe(0);
   });
 
   it('пишет событие без имени, когда пользователь не найден', async () => {
@@ -181,12 +187,54 @@ describe('recordAuditEvent — context propagation', () => {
 });
 
 describe('recordAuditEvent — failure isolation', () => {
+  it('shares failures between separately loaded module instances', async () => {
+    vi.resetModules();
+    const first = await import('@/core/observability/audit-feedback-metrics');
+    first.resetAuditFeedbackMetrics();
+    try {
+      first.recordAuditFeedbackFailure();
+      vi.resetModules();
+      const second = await import('@/core/observability/audit-feedback-metrics');
+
+      expect(second).not.toBe(first);
+      expect(second.recordAuditFeedbackFailure).not.toBe(first.recordAuditFeedbackFailure);
+      expect(second.getAuditFeedbackFailureCount()).toBe(1);
+      expect(second.exportAuditFeedbackMetricsPrometheus()).toContain('audit_feedback_write_failures_total 1\n');
+      second.resetAuditFeedbackMetrics();
+      expect(first.getAuditFeedbackFailureCount()).toBe(0);
+    } finally {
+      first.resetAuditFeedbackMetrics();
+      vi.resetModules();
+    }
+  });
+
   it('does not throw when recordFeedbackEvent rejects', async () => {
     mocks.recordFeedbackEvent.mockRejectedValue(new Error('feedback table missing'));
 
     await expect(
       recordAuditEvent({ action: 'report.created', scope: 'reports' }),
     ).resolves.toBeUndefined();
+    expect(getAuditFeedbackFailureCount()).toBe(1);
+  });
+
+  it('counts each failed write once and preserves the count after a successful write', async () => {
+    mocks.recordFeedbackEvent
+      .mockRejectedValueOnce(new Error('first failure'))
+      .mockRejectedValueOnce(new Error('second failure'));
+
+    await recordAuditEvent({ action: 'report.created', scope: 'reports' });
+    await recordAuditEvent({ action: 'site.updated', scope: 'sites', actorId: 'op-1' });
+    expect(getAuditFeedbackFailureCount()).toBe(2);
+
+    await recordAuditEvent({ action: 'report.created', scope: 'reports' });
+    expect(getAuditFeedbackFailureCount()).toBe(2);
+    expect(mocks.recordFeedbackEvent).toHaveBeenCalledTimes(3);
+  });
+
+  it('does not count successful feedback writes', async () => {
+    await recordAuditEvent({ action: 'report.created', scope: 'reports' });
+    expect(mocks.recordFeedbackEvent).toHaveBeenCalledOnce();
+    expect(getAuditFeedbackFailureCount()).toBe(0);
   });
 
   // Сбой записи следа раньше проглатывался пустым catch: в проде это значило,
@@ -1061,6 +1109,157 @@ describe('recordAuditEvent — наряды ТО', () => {
 
     expect(mocks.recordFeedbackEvent).toHaveBeenCalledWith(
       expect.objectContaining({ message: 'Создан наряд ТО «Осмотр» (WARRANTY).' }),
+    );
+  });
+});
+
+/**
+ * Запись показания моточасов и удаление наряда ТО не оставляли следа
+ * (F-R72-FEED-METER-MAINT): добавленное показание двигает наработку и сроки ТО,
+ * а удалённый наряд (в том числе открытый ремонт) держит блокер готовности.
+ * В ленте должно быть видно, по какой установке вписали цифру и какой наряд
+ * убрали — человеческими словами, без внутренних id.
+ */
+describe('recordAuditEvent — ввод показания моточасов и удаление наряда ТО', () => {
+  it('называет внесённое показание и установку', async () => {
+    await recordAuditEvent({
+      action: 'meter.reading.added',
+      scope: 'equipment',
+      actorId: 'admin-1',
+      metadata: { name: 'ЭО-5111', after: { engineHours: 1234 } },
+    });
+
+    expect(mocks.recordFeedbackEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        level: 'info',
+        priority: 'MEDIUM',
+        title: 'Показание моточасов внесено',
+        message: 'Внесено показание моточасов 1234 м/ч — «ЭО-5111».',
+      }),
+    );
+  });
+
+  it('остаётся читаемым без названия установки и значения', async () => {
+    await recordAuditEvent({ action: 'meter.reading.added', scope: 'equipment' });
+
+    expect(mocks.recordFeedbackEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'Показание моточасов внесено',
+        message: 'Внесено показание моточасов.',
+      }),
+    );
+  });
+
+  it('называет удалённый наряд, его вид, состояние, плановую дату и установку', async () => {
+    await recordAuditEvent({
+      action: 'maintenance.record.deleted',
+      scope: 'equipment',
+      actorId: 'admin-1',
+      targetId: 'rec-1',
+      metadata: {
+        name: 'Замена РВД',
+        before: {
+          type: 'REPAIR',
+          status: 'IN_PROGRESS',
+          scheduledAt: new Date('2026-10-01T00:00:00.000Z'),
+          equipmentName: 'ЭО-5111',
+        },
+      },
+    });
+
+    expect(mocks.recordFeedbackEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        level: 'warn',
+        priority: 'HIGH',
+        title: 'Наряд ТО удалён',
+        message: 'Удалён наряд ТО «Замена РВД» (ремонт, в работе, плановая дата 01.10.2026): установка «ЭО-5111».',
+      }),
+    );
+  });
+
+  it('остаётся читаемым без снимка удалённого наряда', async () => {
+    await recordAuditEvent({ action: 'maintenance.record.deleted', scope: 'equipment' });
+
+    expect(mocks.recordFeedbackEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ title: 'Наряд ТО удалён', message: 'Удалён наряд ТО.' }),
+    );
+  });
+});
+
+/**
+ * Завершение осмотра не оставляло следа нигде (F-R72-FEED-INSPECTION), хотя это
+ * самый «допусковый» акт: считается балл состояния, закрывается наряд ТО,
+ * пишутся моточасы и заводятся дефекты. Осмотр с неисправностями (неполный
+ * балл) или с заведёнными дефектами должен читаться в ленте как предупреждение,
+ * осмотр без замечаний — как обычное событие.
+ */
+describe('recordAuditEvent — завершение осмотра', () => {
+  it('называет установку, уровень осмотра, балл и число дефектов', async () => {
+    await recordAuditEvent({
+      action: 'inspection.completed',
+      scope: 'inspections',
+      actorId: 'operator-1',
+      targetId: 'insp-1',
+      metadata: { name: 'ЭО-5111', after: { level: 'EO', healthScore: 82, defectCount: 2 } },
+    });
+
+    expect(mocks.recordFeedbackEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        level: 'warn',
+        priority: 'HIGH',
+        title: 'Осмотр завершён',
+        message: 'Осмотр завершён — «ЭО-5111»: ЕО, балл 82%, дефектов 2.',
+      }),
+    );
+  });
+
+  it('осмотр без замечаний пишет info, а не предупреждение', async () => {
+    await recordAuditEvent({
+      action: 'inspection.completed',
+      scope: 'inspections',
+      actorId: 'operator-1',
+      metadata: { name: 'ЭО-5111', after: { level: 'TO1', healthScore: 100, defectCount: 0 } },
+    });
+
+    expect(mocks.recordFeedbackEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        level: 'info',
+        priority: 'MEDIUM',
+        title: 'Осмотр завершён',
+        message: 'Осмотр завершён — «ЭО-5111»: ТО-1, балл 100%, дефектов 0.',
+      }),
+    );
+  });
+
+  it('остаётся читаемым без названия установки и итога осмотра', async () => {
+    await recordAuditEvent({ action: 'inspection.completed', scope: 'inspections' });
+
+    expect(mocks.recordFeedbackEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        level: 'info',
+        title: 'Осмотр завершён',
+        message: 'Осмотр завершён.',
+      }),
+    );
+  });
+
+  // Число дефектов может быть неизвестно (чтение упало после завершения осмотра).
+  // Тогда в ленте не должно быть «дефектов 0»: ноль — это утверждение, что
+  // дефектов нет, а не отсутствие данных (F-R72-FEED-b).
+  it('не пишет «дефектов 0», когда число дефектов неизвестно', async () => {
+    await recordAuditEvent({
+      action: 'inspection.completed',
+      scope: 'inspections',
+      actorId: 'operator-1',
+      metadata: { name: 'ЭО-5111', after: { level: 'EO', healthScore: 82, defectCount: null } },
+    });
+
+    expect(mocks.recordFeedbackEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        level: 'warn',
+        title: 'Осмотр завершён',
+        message: 'Осмотр завершён — «ЭО-5111»: ЕО, балл 82%.',
+      }),
     );
   });
 });

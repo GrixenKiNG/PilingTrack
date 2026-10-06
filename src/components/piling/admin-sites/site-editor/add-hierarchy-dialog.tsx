@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { Loader2 } from '@/components/piling/icons/unified-icons';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -26,10 +26,11 @@ interface AddHierarchyDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   type: HierarchyType;
-  onAdd: (name: string) => Promise<void>;
+  onAdd: (name: string) => Promise<boolean>;
 }
 
 export function AddHierarchyDialog({ open, onOpenChange, type, onAdd }: AddHierarchyDialogProps) {
+  const uid = useId();
   const [name, setName] = useState('');
   const [adding, setAdding] = useState(false);
 
@@ -40,8 +41,10 @@ export function AddHierarchyDialog({ open, onOpenChange, type, onAdd }: AddHiera
     }
     setAdding(true);
     try {
-      await onAdd(name.trim());
-      setName('');
+      // Имя очищается только при успехе: при отказе набранное название
+      // пикета/куста терять нельзя (находка 10).
+      const ok = await onAdd(name.trim());
+      if (ok) setName('');
     } finally {
       setAdding(false);
     }
@@ -55,11 +58,13 @@ export function AddHierarchyDialog({ open, onOpenChange, type, onAdd }: AddHiera
         </DialogHeader>
         <div className="space-y-3">
           <div className="space-y-1.5">
-            <Label>Название</Label>
+            <Label htmlFor={`${uid}-name`}>Название</Label>
             <Input
+              id={`${uid}-name`}
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder={`Название ${TYPE_LABELS[type].toLowerCase()}`}
+              maxLength={200}
               className="h-11"
               onKeyDown={(e) => {
                 if (e.key === 'Enter') void submit();

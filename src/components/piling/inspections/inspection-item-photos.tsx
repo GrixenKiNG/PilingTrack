@@ -16,6 +16,7 @@ import { Camera, Loader2, Trash2 } from '@/components/piling/icons/unified-icons
 import { toast } from 'sonner';
 import { authFetch } from '@/lib/api';
 import { getThumbnailUrl } from '@/lib/media-thumbnails';
+import { InspectionLoadError, isRetryableLoadError, loadErrorText, catchText } from './inspection-api-error';
 
 interface MediaRecord {
   id: string;
@@ -47,6 +48,9 @@ export function InspectionItemPhotos({ inspectionId, itemId, onCountChange }: Pr
   const [photos, setPhotos] = useState<PhotoTile[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  // Сбой чтения галереи — не «фото нет»: раньше он молча отдавал пустой
+  // список и обнулял счётчик у родителя (R100 №8).
+  const [loadError, setLoadError] = useState<InspectionLoadError | null>(null);
 
   // Keep the latest onCountChange in a ref so `refresh` does not depend on it.
   // The parent passes an inline callback; depending on it would re-create
@@ -62,9 +66,10 @@ export function InspectionItemPhotos({ inspectionId, itemId, onCountChange }: Pr
       const res = await authFetch(
         `/api/media?entityType=inspection&entityId=${encodeURIComponent(entityId)}`
       );
+      // Отказ (403/500) — не «фото нет»: пустая галерея обнуляла счётчик у
+      // родителя, и завершение требовало фото, которое на сервере есть.
       if (!res.ok) {
-        setPhotos([]);
-        onCountChangeRef.current?.(0);
+        setLoadError(new InspectionLoadError(res.status));
         return;
       }
       const json = await res.json();
@@ -79,9 +84,10 @@ export function InspectionItemPhotos({ inspectionId, itemId, onCountChange }: Pr
         })
       );
       setPhotos(tiles);
+      setLoadError(null);
       onCountChangeRef.current?.(tiles.length);
     } catch {
-      toast.error('Не удалось загрузить фото');
+      setLoadError(new InspectionLoadError(null));
     } finally {
       setLoading(false);
     }
@@ -127,7 +133,8 @@ export function InspectionItemPhotos({ inspectionId, itemId, onCountChange }: Pr
       toast.success('Фото загружено');
       await refresh();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Ошибка загрузки');
+      // Обрыв сети fetch бросает TypeError с английским «Failed to fetch» (F-R112-2).
+      toast.error(catchText(err, 'Ошибка загрузки'));
     } finally {
       setBusy(false);
       if (inputRef.current) inputRef.current.value = '';
@@ -145,7 +152,8 @@ export function InspectionItemPhotos({ inspectionId, itemId, onCountChange }: Pr
       setPhotos(next);
       onCountChange?.(next.length);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Ошибка удаления');
+      // Обрыв сети fetch бросает TypeError с английским «Failed to fetch» (F-R112-2).
+      toast.error(catchText(err, 'Ошибка удаления'));
     } finally {
       setBusy(false);
     }
@@ -156,17 +164,51 @@ export function InspectionItemPhotos({ inspectionId, itemId, onCountChange }: Pr
       window.open(tile.fullUrl, '_blank', 'noreferrer');
       return;
     }
-    const dl = await authFetch(`/api/media/${tile.id}/download`);
-    if (!dl.ok) return;
-    const url = (await dl.json()).url as string;
-    setPhotos((prev) => prev.map((p) => (p.id === tile.id ? { ...p, fullUrl: url } : p)));
-    window.open(url, '_blank', 'noreferrer');
+    try {
+      const dl = await authFetch(`/api/media/${tile.id}/download`);
+      // Тихий `return` на отказе давал клик без окна и без объяснения (F-R115-9).
+      if (!dl.ok) {
+        toast.error(dl.status === 403
+          ? 'Нет прав на просмотр фото. Смените роль или обратитесь к администратору.'
+          : 'Не удалось открыть фото. Повторите попытку.');
+        return;
+      }
+      const url = (await dl.json()).url as string;
+      setPhotos((prev) => prev.map((p) => (p.id === tile.id ? { ...p, fullUrl: url } : p)));
+      window.open(url, '_blank', 'noreferrer');
+    } catch (err) {
+      // Обрыв сети fetch бросает TypeError с английским «Failed to fetch» (F-R112-2).
+      toast.error(catchText(err, 'Не удалось открыть фото. Повторите попытку.'));
+    }
   };
 
   if (loading) {
     return (
       <div className="h-10 flex items-center gap-1.5 text-muted-foreground text-xs">
         <Loader2 className="w-3.5 h-3.5 animate-spin" /> Загрузка фото…
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+        <span>
+          {loadErrorText(loadError, {
+            forbidden: 'Нет прав на просмотр фото. Смените роль или обратитесь к администратору.',
+            notFound: 'Фото не найдены.',
+            server: 'Не удалось загрузить фото. Сервер вернул ошибку.',
+          })}
+        </span>
+        {isRetryableLoadError(loadError) && (
+          <button
+            type="button"
+            onClick={() => void refresh()}
+            className="inline-flex min-h-11 items-center text-xs font-medium text-signal-strong underline hover:no-underline sm:min-h-0"
+          >
+            Повторить
+          </button>
+        )}
       </div>
     );
   }
@@ -216,7 +258,7 @@ export function InspectionItemPhotos({ inspectionId, itemId, onCountChange }: Pr
         type="button"
         onClick={() => inputRef.current?.click()}
         disabled={busy}
-        className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-signal-strong disabled:opacity-50"
+        className="inline-flex min-h-11 items-center gap-1 text-xs text-muted-foreground hover:text-signal-strong disabled:opacity-50 sm:min-h-0"
       >
         {busy
           ? <Loader2 className="w-3.5 h-3.5 animate-spin" />

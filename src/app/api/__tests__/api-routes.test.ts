@@ -8,6 +8,7 @@
 import { describe, it, expect } from 'vitest';
 import { readdirSync, statSync, existsSync, readFileSync } from 'fs';
 import { join, relative, sep } from 'path';
+import * as ts from 'typescript';
 
 function findRouteFiles(dir: string): string[] {
   const results: string[] = [];
@@ -126,11 +127,9 @@ describe('Rate Limiter', () => {
   });
 
   it('has correct default configs', async () => {
-    const { AUTH_RATE_LIMIT, PIN_RATE_LIMIT } = await import('@/lib/rate-limiter');
+    const { AUTH_RATE_LIMIT } = await import('@/lib/rate-limiter');
 
     expect(AUTH_RATE_LIMIT.maxAttempts).toBe(5);
-    expect(PIN_RATE_LIMIT.maxAttempts).toBe(3);
-    expect(PIN_RATE_LIMIT.maxAttempts).toBeLessThan(AUTH_RATE_LIMIT.maxAttempts);
   });
 });
 
@@ -150,7 +149,16 @@ describe('Rate Limiter', () => {
 // Проверка идёт по каждому методу отдельно, а не по файлу. Файл проходил бы
 // зачёт по любому упоминанию защиты в любом месте — так и вышло на
 // place-presets: POST шёл через withReadinessCommand, а объявленный рядом
-// DELETE не был закрыт ничем, и файл всё равно считался закрытым.
+// DELETE не был закрыт ничем, и файл всё равно считался закрытым. Поэтому
+// личность проверяется там же, где CSRF, — по телу обработчика, а списки
+// исключений ключуются методом (`путь#МЕТОД`), а не файлом (R80 №3).
+//
+// Ручной withCsrf перестал быть доказательством защиты изменяющего метода
+// (R80 №4). Обёртка withMutation закрывает и межсайтовый вызов, и лимит
+// запросов; ручной вызов — только первое, лимита у него нет вовсе. Раньше
+// эти два состояния считались одним, поэтому телеметрия жила мимо правила
+// «POST передаётся в withMutation». Теперь ручной CSRF допустим лишь для
+// строки из MANUAL_CSRF_METHODS — с причиной и на разбор.
 //
 // Списки исключений — не «замазать красное». Каждая строка называет причину, и
 // тест ломается в обе стороны: и когда защита пропала у нового маршрута, и
@@ -172,26 +180,35 @@ const AUTH_GATES = [
   'ALERTMANAGER_WEBHOOK_TOKEN',      // общий секрет, сверяется constantTimeEquals
 ];
 
-/** Всё, что закрывает межсайтовый вызов с чужой страницы. */
-const CSRF_GATES = ['withMutation', 'withReadinessCommand', 'withCsrf', 'withOperatorV3Command'];
+/**
+ * Полная защита изменяющего метода: межсайтовый вызов и лимит запросов в одной
+ * обёртке. Все три внутри себя вызывают withMutation, а тот — withCsrf и
+ * rateLimiter.check.
+ */
+const FULL_CSRF_GATES = ['withMutation', 'withReadinessCommand', 'withOperatorV3Command'];
+
+/** Вызов CSRF руками, в теле обработчика; лимита не даёт. */
+const MANUAL_CSRF_GATE = 'withCsrf';
 
 /** Всё, что ловит исключение до того, как оно уйдёт наружу стеком. */
 const WRAPPERS = ['withApi', 'withMutation', 'withReadinessCommand', 'withOperatorV3Command'];
 
 /**
- * Маршруты без проверки личности — и почему это правильно.
- * Ключ — путь от src/app/api, значение — причина.
+ * Методы без проверки личности — и почему это правильно.
+ * Ключ — `путь#МЕТОД`, как в остальных списках: файл целиком исключением не
+ * бывает, рядом с публичным GET однажды появится закрытый POST.
  */
-const PUBLIC_ROUTES: Record<string, string> = {
-  'auth/login/route.ts': 'выдаёт сессию — требовать сессию здесь было бы замкнутым кругом',
-  'auth/pin/route.ts': 'то же самое для входа по ПИН-коду',
-  'health/route.ts': 'проба живости для балансировщика; отдаёт только статус и версию',
-  'health/deep/route.ts': 'проба зависимостей для внешнего мониторинга; только ok/down, из кеша фонового трекера',
-  'liveness/route.ts': 'проба живости контейнера',
-  'ready/route.ts': 'проба готовности к приёму трафика',
-  'readiness/route.ts': 'устаревший синоним /api/ready, отдаёт заголовок Sunset',
-  'route.ts': 'корень /api — отдаёт версию, данных не касается',
-  'orion/lead/route.ts': 'форма заявки публичного сайта; закрыта иначе — лимит по IP, ловушка для ботов, экранирование',
+const PUBLIC_METHODS: Record<string, string> = {
+  'auth/login/route.ts#POST': 'выдаёт сессию — требовать сессию здесь было бы замкнутым кругом',
+  'health/route.ts#GET': 'проба живости для балансировщика; отдаёт только статус и версию',
+  'health/deep/route.ts#GET': 'проба зависимостей для внешнего мониторинга; только ok/down, из кеша фонового трекера',
+  'liveness/route.ts#GET': 'проба живости контейнера',
+  'ready/route.ts#GET': 'проба готовности к приёму трафика',
+  'readiness/route.ts#GET': 'устаревший синоним /api/ready, отдаёт заголовок Sunset',
+  'route.ts#GET': 'корень /api — отдаёт версию, данных не касается',
+  'orion/lead/route.ts#POST': 'форма заявки публичного сайта; закрыта иначе — лимит по IP, ловушка для ботов, экранирование',
+  'telemetry/ingest/route.ts#GET': 'справка для контроллера: статус, версия и точки входа, данных не касается. R80: разобрать — проверка по методу показала его впервые',
+  'alerts/webhook/route.ts#POST': 'T-API-CONTRACT-b: разобрать — токен вебхука сверяет локальная isAuthorized, но это не вызов известной функции проверки, поэтому одним вызовом защита не доказывается',
 };
 
 /**
@@ -200,12 +217,23 @@ const PUBLIC_ROUTES: Record<string, string> = {
  * дотянется: либо сессии ещё нет, либо вызывающий вообще не браузер.
  */
 const CSRF_EXEMPT_METHODS: Record<string, string> = {
-  'auth/login/route.ts#POST': 'сессии ещё нет — угонять нечего',
-  'auth/pin/route.ts#POST': 'то же самое для входа по ПИН-коду',
   'orion/lead/route.ts#POST': 'публичная форма без сессии; защита — лимит по IP и ловушка для ботов',
   'alerts/webhook/route.ts#POST': 'вызывает Alertmanager по общему секрету, не браузер',
   'telemetry/ingest/route.ts#POST': 'вызывает контроллер по ключу устройства, не браузер',
   'telemetry/ingest/route.ts#PATCH': 'то же самое — настройка порогов на устройстве',
+};
+
+/**
+ * Изменяющие данные методы, закрытые вручную, — и почему это пока терпимо.
+ * Ключ вида `путь#МЕТОД`. Полной защитой такой вызов не является: лимит
+ * обёртки (per-route ключ `mut:<путь>:<сессия>:<ip>` и общий `mut:source:<ip>`)
+ * к маршруту не применяется. Список — очередь на перевод в withMutation, где
+ * лимит задаётся опцией `rateLimit`; уйти из него можно только вместе с
+ * ручным вызовом, иначе тест протухания не отпустит.
+ */
+const MANUAL_CSRF_METHODS: Record<string, string> = {
+  'telemetry/route.ts#POST': 'R80 №2: withApi + withCsrf руками; лимит обёртки не применяется — перевести на withMutation с { rateLimit }',
+  'telemetry/batch/route.ts#POST': 'R80 №2: то же самое на пакетной записи телеметрии — перевести на withMutation с { rateLimit }',
 };
 
 /** Методы без обёртки — и почему. Ключ вида `путь#МЕТОД`. */
@@ -225,8 +253,15 @@ interface RouteMethod {
   key: string;
   path: string;
   method: string;
-  /** Объявление метода: от его export до следующего export в файле. */
+  /** Объявление метода — исходный текст экспортируемой строки. */
   declaration: string;
+  /**
+   * Имена, которые обработчик вызывает как функцию, — в своём теле и в телах
+   * локальных функций, которые он действительно запускает. Собраны по AST,
+   * поэтому упоминание имени в комментарии, строке или объекте-литерале
+   * (`{ isAuthorized: false }`) вызовом не считается.
+   */
+  calls: Set<string>;
   wrapped: boolean;
 }
 
@@ -237,21 +272,259 @@ interface RouteFacts {
 }
 
 /**
- * Вырезать объявление одного метода: от его export до следующего export.
- * Так проверка не засчитывает соседнему методу защиту, стоящую в этом.
+ * Разбор ведётся по AST (пакет typescript уже в node_modules): текстовый поиск
+ * принимал за вызов упоминание имени — в комментарии, строке, недостижимом
+ * коде или объекте-литерале (`{ isAuthorized: false }`) — и приписывал методу
+ * проверку личности, которой в нём нет. Узел вызова (CallExpression) от
+ * упоминания неотличим только текстом; в дереве он виден явно.
  */
-function sliceMethod(source: string, method: string): string | null {
-  const asConst = source.indexOf('export const ' + method + ' ');
-  const asFn = source.indexOf('export async function ' + method + '(');
-  const start = asConst >= 0 ? asConst : asFn;
-  if (start < 0) return null;
+function isExported(node: ts.Node): boolean {
+  const modifiers = ts.canHaveModifiers(node) ? ts.getModifiers(node) : undefined;
+  return modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword) ?? false;
+}
 
-  const nextExports = HTTP_METHODS.flatMap((m) => [
-    source.indexOf('export const ' + m + ' ', start + 1),
-    source.indexOf('export async function ' + m + '(', start + 1),
-  ]).filter((i) => i > start);
+/** Тела локальных — не экспортируемых — функций файла: имя → узел тела. */
+function localFunctionBodies(sf: ts.SourceFile): Map<string, ts.Node> {
+  const bodies = new Map<string, ts.Node>();
+  for (const statement of sf.statements) {
+    if (ts.isFunctionDeclaration(statement) && statement.name && statement.body) {
+      bodies.set(statement.name.text, statement.body);
+    } else if (ts.isVariableStatement(statement)) {
+      for (const declaration of statement.declarationList.declarations) {
+        if (!ts.isIdentifier(declaration.name) || declaration.initializer === undefined) continue;
+        const { initializer } = declaration;
+        if (ts.isArrowFunction(initializer) || ts.isFunctionExpression(initializer)) {
+          bodies.set(declaration.name.text, initializer.body);
+        }
+      }
+    }
+  }
+  return bodies;
+}
 
-  return source.slice(start, nextExports.length > 0 ? Math.min(...nextExports) : undefined);
+interface HandlerSite {
+  /** Узел, с которого начинается разбор вызовов: тело или обёртка обработчика. */
+  node: ts.Node;
+  /** Исходный текст объявления — для проверок обёртки и CSRF. */
+  text: string;
+}
+
+/**
+ * Объявление обработчика по AST: `export const GET = withApi(handleGet)`,
+ * `export async function GET(...)` и псевдоним `export const PATCH = POST;`.
+ * Тело берётся из дерева, поэтому скобка в аннотации типа возврата
+ * (`Promise<{ user: User }>`) больше не принимается за начало тела.
+ * `null` — метода в файле нет.
+ */
+function handlerSite(sf: ts.SourceFile, bodies: Map<string, ts.Node>, method: string): HandlerSite | null {
+  for (const statement of sf.statements) {
+    if (!isExported(statement)) continue;
+
+    let node: ts.Node | null = null;
+    if (ts.isFunctionDeclaration(statement) && statement.name?.text === method) {
+      node = statement.body ?? statement;
+    } else if (ts.isVariableStatement(statement)) {
+      for (const declaration of statement.declarationList.declarations) {
+        if (ts.isIdentifier(declaration.name) && declaration.name.text === method && declaration.initializer) {
+          node = declaration.initializer;
+          break;
+        }
+      }
+    }
+    if (node === null) continue;
+
+    // `export const PATCH = POST;` — псевдоним, а не отдельный обработчик:
+    // защита стоит на том методе, на который он указывает.
+    if (ts.isIdentifier(node)) {
+      const aliased = handlerSite(sf, bodies, node.text);
+      if (aliased !== null) return aliased;
+      const local = bodies.get(node.text);
+      if (local !== undefined) return { node: local, text: local.getText(sf) };
+    }
+
+    return { node, text: statement.getText(sf) };
+  }
+  return null;
+}
+
+/**
+ * Узел, тело которого — отдельная область выполнения: функция любой формы,
+ * метод объекта/класса, аксессор, конструктор и тело класса целиком. Границы
+ * нужны, чтобы не засчитывать вызов из тела, которое никто не запускает:
+ * `const unused = { check() { requireAuth(request); } }` защитой не является.
+ */
+function isFunctionLikeNode(node: ts.Node): boolean {
+  return (
+    ts.isArrowFunction(node) ||
+    ts.isFunctionExpression(node) ||
+    ts.isFunctionDeclaration(node) ||
+    ts.isMethodDeclaration(node) ||
+    ts.isGetAccessorDeclaration(node) ||
+    ts.isSetAccessorDeclaration(node) ||
+    ts.isConstructorDeclaration(node) ||
+    ts.isClassDeclaration(node) ||
+    ts.isClassExpression(node)
+  );
+}
+
+/**
+ * Имя, под которым объявлена функция (`function helper()`,
+ * `const helper = () => …`). У анонимной функции имени нет — её запускает
+ * только тот вызов, аргументом которого она стоит.
+ */
+function declaredFunctionName(node: ts.Node): string | null {
+  if (ts.isFunctionDeclaration(node)) return node.name?.text ?? null;
+  if (ts.isArrowFunction(node) || ts.isFunctionExpression(node)) {
+    const parent = node.parent;
+    if (parent !== undefined && ts.isVariableDeclaration(parent) && ts.isIdentifier(parent.name)) {
+      return parent.name.text;
+    }
+  }
+  return null;
+}
+
+// ============================================================================
+// Известные пределы разбора
+//
+// Разбор — эвристика против случайных ошибок в обычных маршрутах, а не
+// доказательство защиты от нарочно запутанного кода. Ниже — два места, где
+// разбор намеренно не усложняется; ревью маршрутов человеком остаётся
+// обязательным.
+//
+// №2. Колбэком считается функция-аргумент ЛЮБОГО вызова: `console.log(() =>
+//     requireAuth(request))` засчитает проверку, хотя console.log тело не
+//     запускает. Различать «выполняющие» и «не выполняющие» приёмники — своя
+//     предметная область (обёртки известны, сторонние функции — нет).
+// №4. Одноимённые функции в разных блоках не различаются: тело ищется по имени
+//     в пределах файла, поэтому функция из другого блока с тем же именем может
+//     быть принята за запускаемую. Разбор ведётся по имени, а не по привязке
+//     идентификатора.
+// ============================================================================
+
+/**
+ * Имена, запускаемые в этой области: вызовы `f(...)` и колбэки-аргументы
+ * вызовов (`db.$transaction(async tx => …)`, `promise.then(() => …)`) — их
+ * выполнит тот, кому их передали. В тела прочих вложенных функций обход не
+ * идёт: чтобы зайти в них, нужно доказательство запуска.
+ */
+function collectInvokedNames(node: ts.Node, invoked: Set<string>): void {
+  if (ts.isCallExpression(node)) {
+    if (ts.isIdentifier(node.expression)) invoked.add(node.expression.text);
+    for (const argument of node.arguments) {
+      if (isFunctionLikeNode(argument)) collectInvokedNames(argument, invoked);
+    }
+  }
+  ts.forEachChild(node, (child) => {
+    if (isFunctionLikeNode(child)) return;
+    collectInvokedNames(child, invoked);
+  });
+}
+
+/**
+ * Имена, вызываемые как функции (`f(...)`), в выполняемом коде узла — только по
+ * AST. Во вложенную функцию обход заходит, лишь когда есть доказательство, что
+ * её действительно запускают: (а) она передана аргументом вызова (колбэк) либо
+ * (б) объявлена под именем, которое эта область вызывает
+ * (`const check = () => …; check()`). Невызванная
+ * `const unused = () => requireAuth(request)` доказательством защиты не
+ * является: R80/Codex — «ложное защищён» пропускает незащищённый маршрут.
+ */
+function calledIdentifiers(node: ts.Node, calls: Set<string>): void {
+  const invoked = new Set<string>();
+  collectInvokedNames(node, invoked);
+  scanExecutedCode(node, calls, invoked);
+}
+
+function scanExecutedCode(node: ts.Node, calls: Set<string>, invoked: Set<string>): void {
+  if (ts.isCallExpression(node)) {
+    if (ts.isIdentifier(node.expression)) calls.add(node.expression.text);
+    // Колбэк вызова выполняется — заходим в его тело.
+    for (const argument of node.arguments) {
+      if (isFunctionLikeNode(argument)) calledIdentifiers(argument, calls);
+    }
+  }
+  ts.forEachChild(node, (child) => {
+    if (isFunctionLikeNode(child)) {
+      // Вложенная функция: заходим, только если область её запускает по имени.
+      const name = declaredFunctionName(child);
+      if (name !== null && invoked.has(name)) calledIdentifiers(child, calls);
+      return;
+    }
+    scanExecutedCode(child, calls, invoked);
+  });
+}
+
+/**
+ * Локальные функции, которые узел действительно запускает: вызванные по имени
+ * (`helper()`) или переданные обёртке аргументом-идентификатором
+ * (`withApi(handleGet)` — обёртка вызовет handleGet). Аргумент-идентификатор
+ * считается запуском только у известных обёрток: `console.log(helper)` функцию
+ * не выполняет, и тело helper защитой не становится.
+ *
+ * Границы обхода те же, что у сбора вызовов (collectInvokedNames +
+ * scanExecutedCode): в тело вложенной функции заходим, лишь когда доказано её
+ * выполнение. Иначе `const unused = () => helper(request)` засчитывал бы тело
+ * helper как запущенное (Codex, out48 №1).
+ */
+function invokedLocalNames(node: ts.Node, names: Set<string>): void {
+  const invoked = new Set<string>();
+  collectInvokedNames(node, invoked);
+  scanInvokedLocalNames(node, names, invoked);
+}
+
+function scanInvokedLocalNames(node: ts.Node, names: Set<string>, invoked: Set<string>): void {
+  if (ts.isCallExpression(node)) {
+    if (ts.isIdentifier(node.expression)) {
+      names.add(node.expression.text);
+      if (WRAPPERS.includes(node.expression.text)) {
+        for (const argument of node.arguments) {
+          if (ts.isIdentifier(argument)) names.add(argument.text);
+        }
+      }
+    }
+    // Колбэк вызова выполняется — заходим в его тело.
+    for (const argument of node.arguments) {
+      if (isFunctionLikeNode(argument)) invokedLocalNames(argument, names);
+    }
+  }
+  ts.forEachChild(node, (child) => {
+    if (isFunctionLikeNode(child)) {
+      // Вложенная функция: заходим, только если область её запускает по имени.
+      const name = declaredFunctionName(child);
+      if (name !== null && invoked.has(name)) invokedLocalNames(child, names);
+      return;
+    }
+    scanInvokedLocalNames(child, names, invoked);
+  });
+}
+
+/**
+ * Вызовы, досягаемые из обработчика: прямо в его теле и в телах локальных
+ * функций, которые он запускает, — на два уровня вглубь. Дальше не ходим:
+ * цепочка вызовов ушла бы в половину файла и перестала что-либо доказывать.
+ */
+function reachableCalls(site: ts.Node, bodies: Map<string, ts.Node>): Set<string> {
+  const calls = new Set<string>();
+  const seen = new Set<string>();
+  let level: ts.Node[] = [site];
+
+  for (let depth = 0; depth < 3 && level.length > 0; depth++) {
+    const next: ts.Node[] = [];
+    for (const node of level) {
+      calledIdentifiers(node, calls);
+      const invoked = new Set<string>();
+      invokedLocalNames(node, invoked);
+      for (const name of invoked) {
+        if (seen.has(name)) continue;
+        seen.add(name);
+        const body = bodies.get(name);
+        if (body !== undefined) next.push(body);
+      }
+    }
+    level = next;
+  }
+
+  return calls;
 }
 
 function collectRouteFacts(): RouteFacts[] {
@@ -262,29 +535,194 @@ function collectRouteFacts(): RouteFacts[] {
     // единому виду, иначе списки исключений пришлось бы держать в двух.
     const path = rel.split(sep).slice(2).join('/');
 
+    const sourceFile = ts.createSourceFile(path, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+    const bodies = localFunctionBodies(sourceFile);
+
     const methods: RouteMethod[] = [];
     for (const method of HTTP_METHODS) {
-      let declaration = sliceMethod(source, method);
-      if (declaration === null) continue;
-
-      // `export const PATCH = POST;` — псевдоним, а не отдельный обработчик:
-      // защита стоит на том методе, на который он указывает. Без этой ветки
-      // тест требовал бы замок там, где нет и тела.
-      const alias = HTTP_METHODS.find((m) => declaration?.startsWith('export const ' + method + ' = ' + m + ';'));
-      if (alias !== undefined) declaration = sliceMethod(source, alias) ?? declaration;
+      const site = handlerSite(sourceFile, bodies, method);
+      if (site === null) continue;
 
       methods.push({
         key: path + '#' + method,
         path,
         method,
-        declaration,
-        wrapped: WRAPPERS.some((w) => declaration.includes('= ' + w + '(')),
+        declaration: site.text,
+        calls: reachableCalls(site.node, bodies),
+        wrapped: WRAPPERS.some((w) => site.text.includes('= ' + w + '(')),
       });
     }
 
     return { path, source, methods };
   });
 }
+
+/**
+ * Проверки разбора на синтетических исходниках: настоящие маршруты обязаны
+ * оставаться закрытыми, но убедиться, что разбор не путает вызов с упоминанием,
+ * можно только на исходнике, где упоминание и есть. Тексты — строкой в тесте.
+ */
+describe('Контракт маршрутов — разбор тела обработчика', () => {
+  function callsOf(source: string, method: string): Set<string> | null {
+    const sf = ts.createSourceFile('synthetic.ts', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+    const bodies = localFunctionBodies(sf);
+    const site = handlerSite(sf, bodies, method);
+    return site === null ? null : reachableCalls(site.node, bodies);
+  }
+
+  it('упоминание имени проверки без вызова защитой не считается', () => {
+    const source = [
+      "import { withApi } from '@/core/api-wrapper';",
+      "import { requireAuth } from '@/lib/auth';",
+      'async function isAuthorized(request: Request) {',
+      '  const { error } = await requireAuth(request);',
+      '  return error === null;',
+      '}',
+      'export const GET = withApi(async (request: Request) => {',
+      '  const flags = { isAuthorized: false };',
+      '  return Response.json(flags);',
+      '});',
+    ].join('\n');
+
+    const calls = callsOf(source, 'GET');
+    // GET лишь упоминает isAuthorized как поле объекта: тело помощника не
+    // достраивается, requireAuth в него не протекает.
+    expect(calls?.has('isAuthorized')).toBe(false);
+    expect(calls?.has('requireAuth')).toBe(false);
+  });
+
+  it('проверка личности только в комментарии или строке защитой не считается', () => {
+    const source = [
+      "import { withApi } from '@/core/api-wrapper';",
+      'export const GET = withApi(async (request: Request) => {',
+      '  // requireAuth(request) — так было бы закрыто, но вызова нет',
+      "  const note = 'requireAuth(request)';",
+      '  return Response.json({ note });',
+      '});',
+    ].join('\n');
+
+    expect(callsOf(source, 'GET')?.has('requireAuth')).toBe(false);
+  });
+
+  it('аннотация типа возврата с объектом не мешает найти тело', () => {
+    const source = [
+      "import { withApi } from '@/core/api-wrapper';",
+      "import { requireAuth } from '@/lib/auth';",
+      'async function loadUser(request: Request): Promise<{ user: unknown }> {',
+      '  const { user, error } = await requireAuth(request);',
+      '  if (error) throw error;',
+      '  return { user };',
+      '}',
+      'export const GET = withApi(loadUser);',
+    ].join('\n');
+
+    // Раньше первая «{» из `Promise<{ user: unknown }>` принималась за начало
+    // тела, и помощник с проверкой не достраивался.
+    expect(callsOf(source, 'GET')?.has('requireAuth')).toBe(true);
+  });
+
+  it('невызванная вложенная функция с проверкой защитой не считается', () => {
+    const source = [
+      "import { withApi } from '@/core/api-wrapper';",
+      "import { requireAuth } from '@/lib/auth';",
+      'export const GET = withApi(async (request: Request) => {',
+      '  const unused = () => requireAuth(request);',
+      '  return Response.json({});',
+      '});',
+    ].join('\n');
+
+    // Раньше обход заходил в тело `unused` и находил requireAuth, будто проверка
+    // выполняется; на деле функцию никто не вызывает.
+    expect(callsOf(source, 'GET')?.has('requireAuth')).toBe(false);
+  });
+
+  it('невызванная вложенная функция, зовущая помощника, защитой не считается', () => {
+    const source = [
+      "import { withApi } from '@/core/api-wrapper';",
+      "import { requireAuth } from '@/lib/auth';",
+      'async function helper(request: Request) {',
+      '  await requireAuth(request);',
+      '}',
+      'export const GET = withApi(async (request: Request) => {',
+      '  const unused = () => helper(request);',
+      '  return Response.json({});',
+      '});',
+    ].join('\n');
+
+    // Тело `unused` не выполняется, значит и helper в нём не запускается: сбор
+    // «запускаемых» имён обязан иметь те же границы, что сбор вызовов, иначе
+    // тело helper засчитывается без вызова (Codex, out48 №1).
+    expect(callsOf(source, 'GET')?.has('requireAuth')).toBe(false);
+  });
+
+  it('метод объекта без вызова защитой не считается', () => {
+    const source = [
+      "import { withApi } from '@/core/api-wrapper';",
+      "import { requireAuth } from '@/lib/auth';",
+      'export const GET = withApi(async (request: Request) => {',
+      '  const unused = {',
+      '    check() {',
+      '      requireAuth(request);',
+      '    },',
+      '  };',
+      '  return Response.json({ unused });',
+      '});',
+    ].join('\n');
+
+    // Тело метода — отдельная область выполнения, как у функции; объект его не
+    // вызывает, значит requireAuth в разбор попадать не должен (Codex, out48 №3).
+    expect(callsOf(source, 'GET')?.has('requireAuth')).toBe(false);
+  });
+
+  it('помощник, переданный console.log, а не обёртке, защитой не считается', () => {
+    const source = [
+      "import { withApi } from '@/core/api-wrapper';",
+      "import { requireAuth } from '@/lib/auth';",
+      'async function helper(request: Request) {',
+      '  await requireAuth(request);',
+      '}',
+      'export const GET = withApi(async (request: Request) => {',
+      '  console.log(helper);',
+      '  return Response.json({});',
+      '});',
+    ].join('\n');
+
+    // Раньше любой идентификатор-аргумент считался запуском: console.log(helper)
+    // засчитывал проверку из тела helper.
+    expect(callsOf(source, 'GET')?.has('requireAuth')).toBe(false);
+  });
+
+  it('проверка в колбэке вызова защитой считается', () => {
+    const source = [
+      "import { withApi } from '@/core/api-wrapper';",
+      "import { requireAuth } from '@/lib/auth';",
+      "declare const db: { $transaction: (fn: (tx: unknown) => Promise<void>) => Promise<void> };",
+      'export const GET = withApi(async (request: Request) => {',
+      '  await db.$transaction(async (tx) => {',
+      '    await requireAuth(request);',
+      '  });',
+      '  return Response.json({});',
+      '});',
+    ].join('\n');
+
+    // Колбэк выполняется вместе с вызовом — в его тело обход обязан заходить.
+    expect(callsOf(source, 'GET')?.has('requireAuth')).toBe(true);
+  });
+
+  it('проверка в вызванной по имени локальной функции защитой считается', () => {
+    const source = [
+      "import { withApi } from '@/core/api-wrapper';",
+      "import { requireAuth } from '@/lib/auth';",
+      'export const GET = withApi(async (request: Request) => {',
+      '  const check = () => requireAuth(request);',
+      '  check();',
+      '  return Response.json({});',
+      '});',
+    ].join('\n');
+
+    expect(callsOf(source, 'GET')?.has('requireAuth')).toBe(true);
+  });
+});
 
 describe('Контракт маршрутов — у каждого есть замок', () => {
   const routes = collectRouteFacts();
@@ -295,11 +733,11 @@ describe('Контракт маршрутов — у каждого есть з�
     expect(routes.filter((r) => r.methods.length === 0).map((r) => r.path)).toEqual([]);
   });
 
-  it('каждый маршрут либо проверяет личность, либо назван публичным с причиной', () => {
-    const unguarded = routes
-      .filter((r) => !AUTH_GATES.some((gate) => r.source.includes(gate)))
-      .filter((r) => !(r.path in PUBLIC_ROUTES))
-      .map((r) => r.path);
+  it('каждый метод либо проверяет личность, либо назван публичным с причиной', () => {
+    const unguarded = allMethods
+      .filter((m) => !AUTH_GATES.some((gate) => m.calls.has(gate)))
+      .filter((m) => !(m.key in PUBLIC_METHODS))
+      .map((m) => m.key);
 
     expect(unguarded).toEqual([]);
   });
@@ -307,8 +745,12 @@ describe('Контракт маршрутов — у каждого есть з�
   it('каждый изменяющий данные метод закрыт от межсайтового вызова', () => {
     const unguarded = allMethods
       .filter((m) => STATE_CHANGING.includes(m.method))
-      .filter((m) => !CSRF_GATES.some((gate) => m.declaration.includes(gate)))
+      .filter((m) => !FULL_CSRF_GATES.some((gate) => m.declaration.includes(gate)))
       .filter((m) => !(m.key in CSRF_EXEMPT_METHODS))
+      // Ручной CSRF закрывает только межсайтовый вызов: лимита запросов у него
+      // нет, а правило требует обоих. Поэтому такой метод обязан быть в
+      // списке на перевод, а не считаться защищённым сам по себе.
+      .filter((m) => !(m.declaration.includes(MANUAL_CSRF_GATE) && m.key in MANUAL_CSRF_METHODS))
       .map((m) => m.key);
 
     expect(unguarded).toEqual([]);
@@ -329,24 +771,21 @@ describe('Контракт маршрутов — у каждого есть з�
 // прикрывать следующий маршрут, который попадёт на то же место.
 describe('Контракт маршрутов — списки исключений не протухли', () => {
   const routes = collectRouteFacts();
-  const knownPaths = new Set(routes.map((r) => r.path));
   const byKey = new Map(routes.flatMap((r) => r.methods).map((m) => [m.key, m]));
 
-  it('в списке публичных нет строк про несуществующие файлы', () => {
-    expect(Object.keys(PUBLIC_ROUTES).filter((p) => !knownPaths.has(p))).toEqual([]);
-  });
-
   it.each([
+    ['публичных', PUBLIC_METHODS],
     ['без CSRF', CSRF_EXEMPT_METHODS],
+    ['с ручным CSRF', MANUAL_CSRF_METHODS],
     ['без обёртки', NO_WRAPPER_METHODS],
   ])('в списке %s нет строк про несуществующие методы', (_label, list) => {
     expect(Object.keys(list).filter((k) => !byKey.has(k))).toEqual([]);
   });
 
-  it('в списке публичных нет маршрутов, куда защиту уже вернули', () => {
-    const stale = Object.keys(PUBLIC_ROUTES).filter((p) => {
-      const route = routes.find((r) => r.path === p);
-      return route !== undefined && AUTH_GATES.some((gate) => route.source.includes(gate));
+  it('в списке публичных нет методов, куда защиту уже вернули', () => {
+    const stale = Object.keys(PUBLIC_METHODS).filter((k) => {
+      const method = byKey.get(k);
+      return method !== undefined && AUTH_GATES.some((gate) => method.calls.has(gate));
     });
 
     expect(stale).toEqual([]);
@@ -355,7 +794,16 @@ describe('Контракт маршрутов — списки исключен�
   it('в списке без CSRF нет методов, куда защиту уже вернули', () => {
     const stale = Object.keys(CSRF_EXEMPT_METHODS).filter((k) => {
       const method = byKey.get(k);
-      return method !== undefined && CSRF_GATES.some((gate) => method.declaration.includes(gate));
+      return method !== undefined && FULL_CSRF_GATES.some((gate) => method.declaration.includes(gate));
+    });
+
+    expect(stale).toEqual([]);
+  });
+
+  it('в списке с ручным CSRF нет методов, у которых ручной вызов уже убрали', () => {
+    const stale = Object.keys(MANUAL_CSRF_METHODS).filter((k) => {
+      const method = byKey.get(k);
+      return method !== undefined && !method.declaration.includes(MANUAL_CSRF_GATE);
     });
 
     expect(stale).toEqual([]);
@@ -366,7 +814,7 @@ describe('Контракт маршрутов — списки исключен�
   });
 
   it('каждая причина в списках исключений написана, а не оставлена пустой', () => {
-    const empty = [PUBLIC_ROUTES, CSRF_EXEMPT_METHODS, NO_WRAPPER_METHODS]
+    const empty = [PUBLIC_METHODS, CSRF_EXEMPT_METHODS, MANUAL_CSRF_METHODS, NO_WRAPPER_METHODS]
       .flatMap((list) => Object.entries(list))
       .filter(([, reason]) => reason.trim().length < 20)
       .map(([key]) => key);

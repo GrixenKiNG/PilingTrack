@@ -31,7 +31,8 @@ vi.mock('@/lib/db', () => {
   };
 });
 
-import { saveSettings } from '../settings-service';
+import { isNotificationEnabled, saveSettings } from '../settings-service';
+import { getRequestTenantId, runWithTenantContext, setRequestTenantId } from '@/core/security/tenant-context';
 
 /** SQL тегированного шаблона с `?` вместо параметров — для проверки формы запроса. */
 const sqlOf = (call: unknown[]): string => (call[0] as TemplateStringsArray).join('?');
@@ -89,5 +90,54 @@ describe('saveSettings', () => {
     const [{ update }] = upsertMock.mock.calls[0];
     expect(update.timezone).toBe('Asia/Yekaterinburg');
     expect(update.updatedBy).toBe('admin-2');
+  });
+});
+
+describe('isNotificationEnabled', () => {
+  beforeEach(() => {
+    dbFindUniqueMock.mockReset();
+  });
+
+  it('читает настройки организации в своём контексте вне какого-либо запроса (R86 №3)', async () => {
+    // Вебхук Alertmanager приходит без сессии: внешнего контекста нет вовсе.
+    // Во время чтения настроек контекст должен быть выставлен переданным
+    // tenantId, иначе строгий RLS отдаст 0 строк и вернётся умолчание.
+    let tenantDuringRead: string | null = null;
+    dbFindUniqueMock.mockImplementation(async () => {
+      tenantDuringRead = getRequestTenantId();
+      return { ...storedRow, notifications: { systemAlerts: false } };
+    });
+
+    const enabled = await isNotificationEnabled('tenant-a', 'systemAlerts');
+
+    expect(tenantDuringRead).toBe('tenant-a');
+    expect(enabled).toBe(false); // явное false владельца соблюдено
+    // Внешний контекст как был не открыт, так и остался не открытым.
+    expect(getRequestTenantId()).toBeNull();
+  });
+
+  it('не переписывает внешний контекст организации (R86 №3)', async () => {
+    let tenantDuringRead: string | null = null;
+    dbFindUniqueMock.mockImplementation(async () => {
+      tenantDuringRead = getRequestTenantId();
+      return { ...storedRow, notifications: { systemAlerts: true } };
+    });
+
+    await runWithTenantContext(async () => {
+      setRequestTenantId('tenant-outer');
+      await isNotificationEnabled('tenant-a', 'systemAlerts');
+      // Свой контекст открыт в отдельной области — внешний не подменён.
+      expect(getRequestTenantId()).toBe('tenant-outer');
+    });
+
+    expect(tenantDuringRead).toBe('tenant-a');
+    expect(getRequestTenantId()).toBeNull();
+  });
+
+  it('без tenantId отправляет и не трогает базу (поведение не изменено)', async () => {
+    const enabled = await isNotificationEnabled(null, 'systemAlerts');
+
+    expect(enabled).toBe(true);
+    expect(dbFindUniqueMock).not.toHaveBeenCalled();
   });
 });

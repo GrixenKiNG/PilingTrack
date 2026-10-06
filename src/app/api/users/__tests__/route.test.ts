@@ -79,6 +79,15 @@ describe('/api/users tenant boundary', () => {
     expect((await call()).status).toBe(400);
   });
 
+  // ПИН-вход удалён 27.09.2026: присланный ПИН не заменяет пароль.
+  it('refuses to create a user with a PIN instead of a password', async () => {
+    const { password: _password, ...body } = validCreateBody();
+    const response = await POST(req('POST', { ...body, pin: '1234' }));
+
+    expect(response.status).toBe(400);
+    expect(createUserMock).not.toHaveBeenCalled();
+  });
+
   it('uses the authenticated tenant when creating a user', async () => {
     const response = await POST(req('POST', {
       ...validCreateBody(),
@@ -127,29 +136,6 @@ describe('/api/users tenant boundary', () => {
     }
   );
 
-  it('passes a valid PIN to the user service without treating it as a password', async () => {
-    const { password: _password, ...body } = validCreateBody();
-
-    const response = await POST(req('POST', { ...body, pin: '1234' }));
-
-    expect(response.status).toBe(201);
-    expect(createUserMock).toHaveBeenCalledWith(
-      expect.objectContaining({ pin: '1234', password: undefined, tenantId: 'tenant-a' }),
-      'admin-a'
-    );
-  });
-
-  it('passes a valid PIN through the update endpoint', async () => {
-    const response = await PUT(req('PUT', { id: 'user-a', pin: '5678' }));
-
-    expect(response.status).toBe(200);
-    expect(updateUserMock).toHaveBeenCalledWith(
-      'tenant-a',
-      expect.objectContaining({ id: 'user-a', pin: '5678' }),
-      'admin-a'
-    );
-  });
-
   it.each([
     ['POST', () => POST(invalidJsonReq('POST'))],
     ['PUT', () => PUT(invalidJsonReq('PUT'))],
@@ -158,16 +144,7 @@ describe('/api/users tenant boundary', () => {
     expect((await call()).status).toBe(400);
   });
 
-  it.each(['123', '12345678901', '12a4'])(
-    'rejects a PIN that is not 4 to 10 digits',
-    async (pin) => {
-      const { password: _password, ...body } = validCreateBody();
-      const response = await POST(req('POST', { ...body, pin }));
 
-      expect(response.status).toBe(400);
-      expect(createUserMock).not.toHaveBeenCalled();
-    }
-  );
 });
 
 function validCreateBody() {

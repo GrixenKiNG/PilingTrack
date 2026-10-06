@@ -5,7 +5,7 @@ import type { FleetCard } from '@/components/piling/admin-equipment/fleet-types'
 import { getEquipmentBrand } from '@/components/piling/admin-equipment/equipment-brand-logo';
 import { getEquipmentPhoto } from '@/components/piling/admin-equipment/equipment-photo';
 import { KIND_LABEL } from '@/components/piling/admin-equipment/equipment-status';
-import { formatFixed, formatHours } from '@/lib/format';
+import { formatCountMeters, formatFixed, formatHours } from '@/lib/format';
 import { checkMaintenanceDue } from '@/lib/maintenance-due';
 import type { EquipmentTileAssetStorage } from './equipment-tile-asset-storage';
 import type { EquipmentTileBlock } from './equipment-tile-template';
@@ -31,41 +31,74 @@ function Value({ label, value, icon }: { label: string; value: React.ReactNode; 
   );
 }
 
+// Четыре состояния: «фото нет», «ссылка ещё получается», «ссылка не выдалась»
+// и «ссылка есть, но сам снимок не открылся». Отказ выдачи (403/500/обрыв)
+// раньше схлопывался в «Фото не загружено», и диспетчер принимал непрочитанный
+// снимок за отсутствующий; время получения ссылки — тоже ещё не «нет фото».
+type PhotoResolution =
+  | { status: 'none' }
+  | { status: 'loading' }
+  | { status: 'error' }
+  | { status: 'ok'; url: string };
+
 // The media download endpoint returns { url } with a presigned S3 link (same
 // contract report-thumbnail.tsx and equipment-photos.tsx consume) — an <img>
 // can't point at it directly, so resolve it first. cdnUrl values pass through.
-function useResolvedPhotoUrl(photoUrl: string | null | undefined): string | null {
-  const [url, setUrl] = useState<string | null>(
-    photoUrl && !photoUrl.startsWith('/api/') ? photoUrl : null,
+function useResolvedPhotoUrl(photoUrl: string | null | undefined): PhotoResolution {
+  const [state, setState] = useState<PhotoResolution>(() =>
+    !photoUrl
+      ? { status: 'none' }
+      : photoUrl.startsWith('/api/')
+        ? { status: 'loading' }
+        : { status: 'ok', url: photoUrl },
   );
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- resets the resolved URL when photoUrl changes; the async resolve below sets the real value
-    if (!photoUrl) { setUrl(null); return; }
-    if (!photoUrl.startsWith('/api/')) { setUrl(photoUrl); return; }
+    if (!photoUrl) { setState({ status: 'none' }); return; }
+    if (!photoUrl.startsWith('/api/')) { setState({ status: 'ok', url: photoUrl }); return; }
     let active = true;
-    setUrl(null);
+    setState({ status: 'loading' });
     void (async () => {
       try {
         const res = await authFetch(photoUrl);
-        if (!res.ok) return;
+        if (!active) return;
+        if (!res.ok) { setState({ status: 'error' }); return; }
         const body: unknown = await res.json();
         const signed = (body as { url?: unknown }).url;
-        if (active && typeof signed === 'string') setUrl(signed);
+        if (!active) return;
+        setState(typeof signed === 'string' ? { status: 'ok', url: signed } : { status: 'error' });
       } catch {
-        // leave the placeholder — a broken photo must not break the tile
+        // Отказ или обрыв сети — это не «фото нет»: помечаем как ошибку чтения,
+        // сломанное фото по-прежнему не ломает плитку.
+        if (active) setState({ status: 'error' });
       }
     })();
     return () => { active = false; };
   }, [photoUrl]);
 
-  return url;
+  return state;
 }
 
 function ServerPhoto({ photoUrl, alt, fit }: { photoUrl: string; alt: string; fit: 'cover' | 'contain' }) {
-  const url = useResolvedPhotoUrl(photoUrl);
-  if (!url) return <span className="text-xs text-muted-foreground">Фото не загружено</span>;
-  return <img src={url} alt={alt} className="h-full w-full" style={{ objectFit: fit }} />;
+  const photo = useResolvedPhotoUrl(photoUrl);
+  // Ссылка получена, но сам <img> может не открыться (истёкшая presigned-ссылка,
+  // обрыв) — это тоже не «фото нет», а сбой загрузки. Храним адрес сбоя, чтобы
+  // сброс происходил сам при смене ссылки.
+  const [failedUrl, setFailedUrl] = useState<string | null>(null);
+  if (photo.status === 'error') return <span className="text-xs text-muted-foreground">Не удалось загрузить фото</span>;
+  if (photo.status === 'loading') return <span className="text-xs text-muted-foreground">Загрузка фото…</span>;
+  if (photo.status === 'none') return <span className="text-xs text-muted-foreground">Фото не загружено</span>;
+  if (failedUrl === photo.url) return <span className="text-xs text-muted-foreground">Фото не загрузилось</span>;
+  return (
+    <img
+      src={photo.url}
+      alt={alt}
+      className="h-full w-full"
+      style={{ objectFit: fit }}
+      onError={() => setFailedUrl(photo.url)}
+    />
+  );
 }
 
 function PhotoBlock({ card }: { card: FleetCard }) {
@@ -86,13 +119,13 @@ function PhotoBlock({ card }: { card: FleetCard }) {
 
   return (
     <div className="relative h-full min-h-0 overflow-hidden" style={{ backgroundColor: brand?.tint ?? 'var(--foreground)' }}>
-      {photo && (
+      {photo.status === 'ok' && (
         <>
           {/* Обычный img, а не next/image: фото из Media приходит presigned-ссылкой
               на S3 — внешний динамический хост, для next/image потребовал бы
               remotePatterns и всё равно не кэшировался бы (ссылка одноразовая). */}
-          <img src={photo} alt="" aria-hidden className="absolute inset-0 h-full w-full scale-125 object-cover opacity-70 blur-lg" />
-          <img src={photo} alt="" className="absolute inset-0 h-full w-full object-contain" />
+          <img src={photo.url} alt="" aria-hidden className="absolute inset-0 h-full w-full scale-125 object-cover opacity-70 blur-lg" />
+          <img src={photo.url} alt="" className="absolute inset-0 h-full w-full object-contain" />
         </>
       )}
       <div className="absolute inset-0 bg-gradient-to-br from-black/60 via-black/10 to-transparent" />
@@ -157,9 +190,9 @@ export function EquipmentTileBlockContent({
     case 'maintenance':
       return <Value label="Ближайшее ТО" value={hoursLeft != null ? `${Math.max(0, Math.round(hoursLeft))} ч` : '—'} icon={<Wrench className="h-4 w-4" />} />;
     case 'todayPiles':
-      return <Value label="Сваи" value={card.todayTotals ? `${card.todayTotals.piles} / ${formatFixed(card.todayTotals.pileMeters, 1)} м` : '—'} />;
+      return <Value label="Сваи" value={card.todayTotals ? formatCountMeters(card.todayTotals.piles, card.todayTotals.pileMeters) : '—'} />;
     case 'todayDrilling':
-      return <Value label="Бурение" value={card.todayTotals ? `${card.todayTotals.drillingCount} / ${formatFixed(card.todayTotals.drillingMeters, 1)} м` : '—'} />;
+      return <Value label="Бурение" value={card.todayTotals ? formatCountMeters(card.todayTotals.drillingCount, card.todayTotals.drillingMeters) : '—'} />;
     case 'todayDowntime':
       return <Value label="Простой" value={card.todayTotals && card.todayTotals.downtimeHours > 0 ? formatHours(card.todayTotals.downtimeHours) : '—'} />;
     case 'maintenanceAlert': {

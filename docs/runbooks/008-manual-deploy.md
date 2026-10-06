@@ -1,4 +1,4 @@
-# Runbook 008 — Manual deploy to prod (zero-downtime)
+# Runbook 008 — Manual deploy to prod (controlled generation replacement)
 
 For automated deploy via GitHub Actions, see `007-github-actions-deploy.md`.
 This runbook is for the case when you SSH in and deploy by hand —
@@ -12,7 +12,7 @@ missing env var) the prod app stayed dead for the duration of the
 fix-rebuild loop — observed at ≥15 min on 2026-05-21.
 
 The new sequence keeps the old container running until the new image is
-built and tested. `docker compose up -d` does the swap atomically.
+built and tested. The generation barrier then stops/verifies all old app/workers before START; plan a short outage window. It restores old images/restart policies on failure.
 
 ## Pre-flight
 
@@ -24,9 +24,13 @@ cd /opt/pilingtrack
 # Start the build at <=75% (≈7 GB free); even then it can dip toward 100%
 # mid-export. Free space first if tight:
 df -h /
-docker builder prune -af   # frees ~2-3 GB
-docker image prune -af     # frees more if old images linger
+# Если места недостаточно — остановиться и разобрать безопасную очистку; не удалять rollback images/volumes вслепую.
 
+# Перед git pull/build сохранить текущие app/workers images:
+OLD_SHA=$(git rev-parse --short HEAD)
+ROLLBACK="$OLD_SHA-$(date +%Y%m%d)"
+for svc in app workers; do docker tag "pilingtrack-$svc:latest" "pilingtrack-$svc:$ROLLBACK"; done
+# При новых миграциях сохранить migrate тоже. Проверить, что теги разрешаются в прежние imageIDs.
 # 2. Pull
 git pull origin main
 git log -1 --oneline       # confirm expected HEAD
@@ -50,15 +54,68 @@ docker builder prune -af          # reclaim this build's cache before the next
 docker compose build workers
 # NOTE: if the diff adds a new prisma/migrations/* folder, build `migrate`
 # too (separately, same pattern) — see the "Migrations" section below.
-
-# Atomic swap. Compose stops the old container only after the new one
-# starts and reports healthy. If the new container fails to start,
-# the old one keeps running.
-docker compose up -d app workers
 ```
 
-Add `ws` to both lines only if the WebSocket server changed (rare —
-look for `src/core/realtime/server/` in the diff).
+## Smoke образа workers перед выкладкой
+
+**Зачем.** 01.10.2026 выкладка уронила воркеров на старте: в образе
+`Dockerfile.workers` нет `node_modules/next` (строка `rm -rf node_modules/next`),
+а `@sentry/nextjs` при загрузке тянет `next/constants` — `Cannot find module`.
+Все юнит-тесты и `tsc` при этом были зелёные: они проверяют код, а не собранный
+образ, который никто ни разу не запускал. Smoke ниже запускает **тот же образ**,
+что уедет на бой, поэтому ловит именно эту поломку до переключения контейнеров.
+
+**Когда обязателен** — если в диапазоне выкладки есть хотя бы одно:
+
+- изменения в `src/workers/**`;
+- изменения в `Dockerfile.workers`;
+- изменения в `package.json` / `package-lock.json`;
+- новые импорты в модулях, которые подключает воркер (что-то из `src/`, попавшее
+  в статический граф `unified-worker`).
+
+**Команды** (локально, на машине сборки; адреса фиктивные — база и Redis тут не
+нужны):
+
+```bash
+docker build -f Dockerfile.workers --target runner -t pilingtrack-workers:smoke .
+
+docker run --rm --name wsmoke \
+  -e NODE_ENV=production \
+  -e DATABASE_URL=postgresql://u:p@127.0.0.1:1/x \
+  -e DATABASE_URL_POSTGRES=postgresql://u:p@127.0.0.1:1/x \
+  -e REDIS_URL=redis://127.0.0.1:1 \
+  pilingtrack-workers:smoke
+# через ~45 с остановить (Ctrl+C или из другого терминала):
+docker rm -f wsmoke
+```
+
+**Как читать вывод.**
+
+- Строк `Cannot find module …` / `MODULE_NOT_FOUND` быть **не должно** — это та
+  самая поломка.
+- Должны появиться `Unified Worker Service starting` и хотя бы одна
+  `Arming … worker` (outbox, projection и т.д.).
+- Ошибки подключения к базе и Redis — **ожидаемы**: адреса фиктивные, до сети
+  дело не доходит.
+
+**Сторож кода — не замена smoke.** `src/workers/__tests__/no-next-in-workers.test.ts`
+обходит статический граф воркеров и валит сборку на импорте `next`/`@sentry/nextjs`
+(и на пакете с `next` в `dependencies`). Но он видит только исходники: ни `npm prune
+--omit=dev`, ни `rm -rf node_modules/next`, ни реальный `node_modules` образа он не
+проверяет. Поэтому оба нужны: сторож ловит импорт в коде на каждом прогоне тестов,
+smoke выше подтверждает, что собранный образ действительно стартует.
+
+```bash
+# Внешние standalone/systemd/pm2/другие хосты заранее остановлены оператором.
+WORKER_GENERATION_EXTERNAL_STOPPED=1 bash scripts/replace-worker-generation.sh app workers
+```
+
+`ws` сервиса нет; app и workers заменяются вместе, включая app-only запрос.
+
+## Workers image smoke
+
+`WORKER_GENERATION_EXTERNAL_STOPPED=1 bash scripts/deploy-prod.sh --replace-worker-generation app workers` автоматически проверяет образ workers после локальной сборки, до первого SSH; ошибка smoke останавливает выкладку.
+Аварийный обход — только `SKIP_WORKERS_SMOKE=1`, с предупреждением о непроверенном образе.
 
 ## Post-deploy check (mandatory — the deploy is not done until this passes)
 
@@ -105,8 +162,10 @@ So when the diff includes a new migration, **rebuild `migrate` too**:
 git diff --name-only --diff-filter=A HEAD@{1}..HEAD -- 'prisma/migrations/**'
 
 # if yes, add `migrate` to the build line:
-docker compose build migrate app workers
-docker compose up -d app workers          # runs the fresh migrate via depends_on
+docker compose build migrate
+docker compose build app
+docker compose build workers
+WORKER_GENERATION_EXTERNAL_STOPPED=1 bash scripts/replace-worker-generation.sh app workers # fresh migrate via depends_on
 ```
 
 Then **verify the migration actually applied — don't trust exit 0**:
@@ -117,6 +176,75 @@ docker compose exec -T postgres psql -U piling -d pilingtrack -c \
   "SELECT migration_name FROM _prisma_migrations ORDER BY finished_at DESC NULLS LAST LIMIT 1;"
 # must be the migration you just shipped, not the previous one.
 ```
+
+### Rehearse the migration on a copy of prod data first (R57)
+
+Before shipping a deploy whose diff adds a `prisma/migrations/*` folder,
+apply it once against a **copy of the prod database** on the local stand.
+CI only ever runs `migrate deploy` on an empty `postgres:18-alpine`
+(`.github/workflows/ci.yml`), and prod runs it straight on live data — so
+everything that depends on real rows (a unique index over existing rows,
+`SET NOT NULL`, backfill, fail-closed RLS) is invisible until prod. That
+gap is finding **R57** (`docs/audits/hermes-night/R57-migration-upgrade.md`,
+F-13, top-1: «migrate deploy ни разу не репетируется на копии боевой базы»).
+The rehearsal is cheap; a bad migration on prod is not.
+
+The stand does the whole thing: `--refresh-db` takes a read-only `pg_dump`
+from prod, restores it, recreates the cluster roles and re-applies the
+grants (`scripts/app-role-grants.sql`, `scripts/identity-role-grants.sql`),
+then brings the stand up — and its `migrate` service applies the new
+migrations to the copy, which is exactly what will happen on deploy.
+
+```bash
+# from the workstation, on the branch/commit you are about to ship.
+# Prerequisite: the working tree is clean (the script refuses otherwise —
+# the image must be the commit) and Docker is running.
+bash scripts/staging-local.sh --refresh-db
+
+# without --refresh-db it reuses the stand's existing database copy;
+# use the plain form only when you know that copy is already recent.
+
+# watch the migrate step (same image and command as prod):
+docker compose -p pilingtrack-staging logs migrate | grep -E 'Applying|applied|No pending|Error'
+```
+
+The stand prints its own check at the end; **success is all of:**
+
+- `последние миграции:` — the first line is **your** `migration_name`
+  (the script runs `SELECT migration_name FROM _prisma_migrations ORDER BY finished_at DESC NULLS LAST LIMIT 3;`
+  against the stand's postgres itself);
+- `health: {...}` healthy, `deep: 200`, `/login: 200`;
+- `ошибок в журналах app/workers после подъёма: 0`.
+
+If the top row of `_prisma_migrations` is still the *previous* migration
+(or `Applying` never appears in the log), the migration did not run —
+the same stale-image trap as the section above, not a passing rehearsal.
+Stop the stand with `bash scripts/staging-local.sh --down` (the database is
+kept; `--destroy` wipes it).
+
+**If the rehearsal fails — do not deploy.** A migration that fails inside
+`prisma migrate deploy` leaves **P3009**, and Prisma then refuses to apply
+*any* migration until someone runs `prisma migrate resolve --rolled-back
+<migration_name>` by hand on prod. On prod that is an outage of the whole
+deploy path, not just this release. So:
+
+1. Read the failing statement in the `migrate` log on the stand.
+2. Inspect the data on the copy — the failure is nearly always data, not
+   SQL (duplicate rows under a new unique index, `NULL`s under
+   `SET NOT NULL`, a constraint or index name that diverged). R57 lists the
+   known candidates with the exact queries to run.
+3. Resolve the data dependency (dedupe / backfill) or rework the migration:
+   add a `DO $$ … RAISE EXCEPTION` pre-check with the query from step 2, and
+   `NOT VALID` + `VALIDATE CONSTRAINT` for constraints. Never ship the
+   failing migration with a plan to `resolve --rolled-back` on prod.
+4. Re-run the rehearsal with `--refresh-db` on the fixed commit.
+
+**Time estimate.** A rehearsal on a warm stand (images already built for
+this SHA) is the prod dump + restore of a ~130 MB database plus the stand's
+health checks — minutes, **≈2–5 min (estimate, not measured; the stand was
+never run for this task)**. The first run on a cold machine also builds the
+`app` / `workers` / `migrate` images, which is the slow part (tens of
+minutes on this hardware); it is skipped for the same SHA afterwards.
 
 If the migration is **destructive** (Prisma prints a `Warnings:` /
 `DROP COLUMN` / `DROP TABLE` block in the `.sql`), check the target on prod
@@ -167,35 +295,29 @@ npm run backfill:analytics -- --days=2 # narrower window
 
 ## Rollback
 
-If the new deploy is bad:
+Сначала сохранить диагностику, проверить оба ранее сохранённых rollback tags и совместимость schema/compose. Остановить все внешние новые исполнители и их автозапуск. На сервере по команде владельца:
 
 ```bash
-git log --oneline -5
-git checkout <previous-good-sha>
-docker compose build app workers
-docker compose up -d app workers
+docker tag "pilingtrack-app:$ROLLBACK" pilingtrack-app:latest
+docker tag "pilingtrack-workers:$ROLLBACK" pilingtrack-workers:latest
+WORKER_GENERATION_EXTERNAL_STOPPED=1 bash scripts/replace-worker-generation.sh app workers
 ```
 
-Image registry isn't used here, so rollback also rebuilds. A future
-improvement (M-12 — not yet tagged): tag the previous image as
-`:previous` before deploy, so rollback is `docker tag previous latest
-&& up -d` (under 1 minute instead of 5).
+Не пересобирать случайный предыдущий SHA и не удалять контейнеры/образы до снимка: это уничтожает возможность автоматического возврата. При OOM локальной сборки разбирать причину; не освобождать RAM сервера удалением работающего поколения. Полная ручная процедура —016, схема БД не откатывается заменой images.
+## Смена поколения workers (I02)
 
-## When the old runbook IS the right choice
+У app по умолчанию встроены outbox/projection workers. Для этого релиза используйте
+`WORKER_GENERATION_EXTERNAL_STOPPED=1 bash scripts/deploy-prod.sh --replace-worker-generation app workers`.
+До подтверждения вручную остановите все standalone/systemd/pm2/другие хосты; отключите их автоматический рестарт.
+Режим заменяет app и workers вместе: stop всех реплик → проверка фактического завершения (workers: exit 0; app: exit 0 или 143, без OOM) и отсутствия RUNNING → up нового поколения.
+One-off реплики учитываются и отклоняются до STOP: оператор должен остановить/удалить их заранее. Все preflight проверки выполняются до restart=no; при отказе после STOP — автоматический возврат старого поколения, см. ниже.
+При откате после переключения тегов применяйте тот же `scripts/replace-worker-generation.sh app workers` с подтверждением внешних остановок.
+Compose ждёт 30 секунд; внутренний WORKER_SHUTDOWN_TIMEOUT_MS старого worker по умолчанию 8000.
+Больший compose timeout не продлевает внутренний дедлайн: exit 1 после 8 секунд блокирует старт и требует проверки drain/незавершённых задач.
+Перед новым запуском подтвердите, что внешние старые процессы действительно завершены.
 
-If the build itself OOMs (this VPS has 3.8 GB RAM; large Turbopack
-builds occasionally OOM the kernel), the old `stop && rm` sequence
-frees the RAM of the running container so the build can complete.
-Symptoms:
-  - `docker compose build` exits with no clear error
-  - `dmesg | grep -i kill` shows OOM messages
-  - Available memory <500 MB during build
+## Уточнение барьера после релиза 03.10 (E0a/F1)
 
-In that case, take the outage knowingly:
+Next standalone app штатно завершается по SIGTERM с exit 143; helper принимает его только для service=app при exited и OOM=false. Для workers по-прежнему требуется exit 0; killed/OOM/ошибки drain запрещают новое поколение. Встроенные workers app также проверяются по журналам shutdown.
 
-```bash
-docker compose stop app workers
-docker compose rm -f app workers
-docker rmi pilingtrack-app:latest pilingtrack-workers:latest
-docker compose build app workers && docker compose up -d app workers
-```
+При отказе после STOP helper автоматически возвращает прежние контейнеры и restart-политики; если force-recreate удалил ID — запускает сохранённые immutable imageIDs с прежним числом реплик и restart, используя текущий compose. Перед возвратом частично поднятое новое поколение останавливается и проверяется отсутствие RUNNING. Exit остаётся1: RECOVERED означает восстановление старой версии, не успешную выкладку. Если Docker/остановка/возврат недоступны — OUTAGE и ручная проверка; только после проверки безопасна аварийная команда `cd /opt/pilingtrack && docker compose up -d app workers`. Автовозврат не откатывает миграции/env/volumes/topology. Обычным up барьер не обходить.

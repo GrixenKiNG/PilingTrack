@@ -7,6 +7,8 @@
  */
 
 import { db } from '@/lib/db';
+import { logger } from '@/lib/logger';
+import { getRequestTenantId } from '@/core/security/tenant-context';
 
 // Здесь до 17.08.2026 жили projectReportStats, projectOperatorPerformance,
 // projectOperatorPerformanceFull и projectDowntimeSummary — 255 строк, три
@@ -26,8 +28,17 @@ import { db } from '@/lib/db';
  *   всем объектам. Событийный путь обязан передавать дату отчёта: раньше
  *   неделя всегда считалась от `new Date()`, поэтому отчёт за прошлую неделю
  *   обновлял тренд текущей, а своя неделя так и оставалась без строки.
+ * @param expectedTenantId организация, из которой пришло событие. Нужна,
+ *   чтобы отличить удалённый объект от скрытого строгой RLS: пустой
+ *   findUnique доказывает удаление только при совпадении контекста запроса с
+ *   ожидаемой организацией. Часовой пересчёт передаёт её не всегда — там
+ *   объект только что найден в той же организации.
  */
-export async function projectWeeklyTrend(siteId: string, refDate?: string | null) {
+export async function projectWeeklyTrend(
+  siteId: string,
+  refDate?: string | null,
+  expectedTenantId?: string | null
+) {
   const reference = refDate && /^\d{4}-\d{2}-\d{2}$/.test(refDate)
     ? new Date(`${refDate}T00:00:00Z`)
     : new Date();
@@ -48,7 +59,25 @@ export async function projectWeeklyTrend(siteId: string, refDate?: string | null
     where: { id: siteId },
     select: { tenantId: true },
   });
-  if (!site?.tenantId) {
+  // findUnique возвращает null и когда объекта правда нет (удалили до
+  // обработки события), и когда объект скрыт строгой RLS. Скрыть его RLS
+  // может и без контекста организации, и при чужой (неверной) организации в
+  // контексте — ненулевой контекст сам по себе удаление не доказывает.
+  // Удаление подтверждено только когда контекст запроса совпал с организацией
+  // события: тогда RLS вернула бы строку, будь она жива. Во всех остальных
+  // случаях это настоящая ошибка доставки — событие должно уйти в retry/DLQ,
+  // а не быть молча помечено обработанным.
+  if (!site) {
+    const contextTenantId = getRequestTenantId();
+    if (expectedTenantId != null && contextTenantId === expectedTenantId) {
+      logger.info('Объект удалён — недельная сводка не пересчитывается', { siteId });
+      return;
+    }
+    throw new Error(
+      `projectWeeklyTrend: site ${siteId} not visible (context ${contextTenantId}, expected ${expectedTenantId})`
+    );
+  }
+  if (!site.tenantId) {
     throw new Error(`projectWeeklyTrend: site ${siteId} has no tenantId`);
   }
   const tenantId = site.tenantId;

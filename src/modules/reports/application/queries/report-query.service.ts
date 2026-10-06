@@ -1,3 +1,4 @@
+import { SUBMITTED_REPORT_STATUS } from '@/lib/report-status';
 /**
  * Report Query Service — CQRS Read Side
  *
@@ -82,6 +83,44 @@ export async function getReportsByPeriod(
   return getReportsByPeriodRaw(tenantId || '', dateFrom, dateTo, siteId, userId);
 }
 
+/**
+ * Итоги по ВСЕМУ отбору журнала, а не по загруженной странице: журнал
+ * листается по 100, и плитки над ним показывали сумму первой сотни (955 свай
+ * при 2832 в базе). Считаются только сданные отчёты — как «Аналитика» и
+ * дашборд; черновик в итоги не входит ни на одном экране.
+ */
+async function sumSubmittedReports(where: Record<string, unknown>) {
+  const reportWhere = { ...where, status: SUBMITTED_REPORT_STATUS };
+  const [reports, pilesByGrade, drilling, downtime] = await Promise.all([
+    db.report.count({ where: reportWhere }),
+    db.pileWork.groupBy({ by: ['pileGradeId'], where: { report: reportWhere }, _sum: { count: true } }),
+    db.leaderDrilling.aggregate({ where: { report: reportWhere }, _sum: { count: true, meters: true } }),
+    db.reportDowntime.aggregate({ where: { report: reportWhere }, _sum: { duration: true } }),
+  ]);
+  const grades = pilesByGrade.length
+    ? await db.pileGrade.findMany({
+        where: { id: { in: pilesByGrade.map((row) => row.pileGradeId) } },
+        select: { id: true, lengthMm: true },
+      })
+    : [];
+  const lengthById = new Map(grades.map((g) => [g.id, g.lengthMm]));
+  let piles = 0;
+  let pileMeters = 0;
+  for (const row of pilesByGrade) {
+    const count = row._sum.count ?? 0;
+    piles += count;
+    pileMeters += count * pileLengthMeters({ gradeLengthMm: lengthById.get(row.pileGradeId) });
+  }
+  return {
+    reports,
+    piles,
+    pileMeters,
+    drillingCount: drilling._sum.count ?? 0,
+    drillingMeters: drilling._sum.meters ?? 0,
+    downtimeHours: downtime._sum.duration ?? 0,
+  };
+}
+
 export async function listReportsForReview(
   sessionUser: { id: string; role: string; tenantId?: string | null },
   siteId?: string | null,
@@ -111,6 +150,7 @@ export async function listReportsForReview(
   // тут, а не вторым условием на экране: расхождение условий дало бы «100 из
   // 90» и веру пользователя в цифру, которой нет.
   const total = await db.report.count({ where });
+  const sums = await sumSubmittedReports(where);
 
   const page = await paginateQuery(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
@@ -119,7 +159,11 @@ export async function listReportsForReview(
     {
       where,
       include: reportDetailInclude,
-      orderBy: { date: 'desc' },
+      // Тай-брейкер id (F-R140-PAGING): у отчётов за один день порядок внутри
+      // даты был недетерминирован, и «Загрузить ещё» с курсором по id мог
+      // показать строку дважды или пропустить её. Уникальный id делает порядок
+      // полным, поэтому страницы стыкуются без дублей и пропусков.
+      orderBy: [{ date: 'desc' }, { id: 'desc' }],
     }
   );
 
@@ -144,6 +188,7 @@ export async function listReportsForReview(
   return {
     ...page,
     total,
+    sums,
     data: page.data.map((r) => {
       const row = r as { reportId?: string; journalPhotoMediaId?: string | null };
       const thumbnailMediaId = (row.reportId ? thumbByReport.get(row.reportId) : undefined) ?? row.journalPhotoMediaId ?? null;

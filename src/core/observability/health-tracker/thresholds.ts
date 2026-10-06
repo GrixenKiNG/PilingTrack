@@ -5,6 +5,9 @@ export const OUTBOX_STALE_MS = 60 * 60 * 1000;
 export const WORKER_STALE_MS = 90 * 1000;
 export const DB_CHECK_TIMEOUT_MS = 2000;
 export const REDIS_CHECK_TIMEOUT_MS = 1000;
+// Внешний HTTP-сервис (R2/S3): обычная сетевая задержка до хранилища больше 2 с —
+// норма, а не отказ. Отдельный порог вместо DB_CHECK_TIMEOUT_MS.
+export const STORAGE_CHECK_TIMEOUT_MS = 5000;
 export const POLL_INTERVAL_MS = 15000;
 export const BACKUP_STALE_HOURS = 26;
 export const BACKUP_CRITICAL_HOURS = 48;

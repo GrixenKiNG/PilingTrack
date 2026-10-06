@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # One-command bootstrap for PilingTrack on a fresh machine.
 # Generates secrets if missing, brings the full stack up via Docker
-# (Postgres + Redis + app + workers + WebSocket), and waits for
+# (Postgres + Redis + app + workers), and waits for
 # migration + seed to finish before printing credentials.
 
 set -euo pipefail
@@ -38,7 +38,6 @@ if [ ! -f .env.docker ]; then
   }
 
   SESSION_SECRET=$(rand_hex 32)
-  PIN_LOOKUP_SECRET=$(rand_hex 32)
   DEVICE_KEY_LOOKUP_SECRET=$(rand_hex 32)
   ENCRYPTION_KEY=$(rand_hex 32)
   POSTGRES_PASSWORD=$(rand_alphanum 24)
@@ -52,7 +51,7 @@ if [ ! -f .env.docker ]; then
 POSTGRES_USER=piling
 POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
 POSTGRES_DB=pilingtrack
-# DATABASE_URL здесь намеренно НЕ задаётся. Для app/workers/ws адрес собирается
+# DATABASE_URL здесь намеренно НЕ задаётся. Для app/workers адрес собирается
 # в docker-compose.yml из APP_DB_USER / APP_DB_PASSWORD и ведёт на pgbouncer, а
 # секция environment: перекрывает всё, что написано в .env. Прежде эти две
 # строки записывались сюда со ролью-владельцем piling и читались как рабочая
@@ -67,7 +66,6 @@ REDIS_URL=redis://redis:6379
 
 # Security secrets (32 bytes hex each)
 SESSION_SECRET=${SESSION_SECRET}
-PIN_LOOKUP_SECRET=${PIN_LOOKUP_SECRET}
 DEVICE_KEY_LOOKUP_SECRET=${DEVICE_KEY_LOOKUP_SECRET}
 ENCRYPTION_KEY=${ENCRYPTION_KEY}
 
@@ -111,7 +109,6 @@ echo "============================================================"
 echo " PilingTrack is up."
 echo
 echo " App:        http://localhost:3000"
-echo " WebSocket:  ws://localhost:3001"
 echo " Postgres:   localhost:5432   (user: piling)"
 echo " PgBouncer:  localhost:6432"
 echo " Redis:      localhost:6379"

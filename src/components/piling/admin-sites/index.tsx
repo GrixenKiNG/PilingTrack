@@ -7,9 +7,10 @@ import { MapPin, HardHat, Drill, Users, AlertTriangle, Plus, Pencil, Trash2, Use
 import { authFetch } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Dialog } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { QueryErrorBanner } from '@/components/piling/async-ui';
-import { formatNumber, pluralizeRu } from '@/lib/format';
+import { formatCountMeters, formatNumber, pluralizeRu } from '@/lib/format';
 import {
   OpsPage,
   OpsHeader,
@@ -22,6 +23,7 @@ import {
   OpsFact,
   OpsRiskBadge,
   resolveRisk,
+  useDocumentTitle,
   type OpsColumn,
   type OpsQuickFilter,
   type OpsKpiItem,
@@ -40,6 +42,9 @@ import { useSitesOverview, type SiteOverviewRow } from './use-sites-overview';
 import { getEquipmentPhoto } from '@/components/piling/admin-equipment/equipment-photo';
 import type { SiteCrew, SiteFullData, SiteListItem } from './types';
 import { formatDowntimeHours } from '@/lib/downtime-hours';
+import { ConfirmActionDialog } from '@/components/piling/confirm-action-dialog';
+import { deactivateDescription } from './site-deactivate';
+import { normalizeSearch } from '@/components/piling/to/readiness/shared/text-search';
 
 type QuickKey = 'all' | 'active' | 'inactive' | 'behind' | 'noCrew' | 'noReports' | 'downtime';
 
@@ -75,15 +80,21 @@ function toListItem(row: SiteOverviewRow): SiteListItem {
 }
 
 export function AdminSites() {
+  useDocumentTitle('Объекты');
   const canManage = useAbility('sites.manage');
   const { rows, loading, error, crewsError, reload } = useSitesOverview();
   const { sites, sitesError, reloadSites, users, pileGrades, loadingUsers, loadingPileGrades, loadUsers, loadPileGrades, setSites } = useSitesData();
 
   const [quick, setQuick] = useState<QuickKey>('all');
+  const [search, setSearch] = useState('');
   const [activeId, setActiveId] = useState<string | null>(null);
 
   // Hierarchy tree of the selected site (loaded on demand).
   const [siteTree, setSiteTree] = useState<Record<string, SiteFullData>>({});
+  // Отказ загрузки дерева: блоки «Иерархия» и «Установки и бригады»
+  // оставались вечным «Загрузка…» (находка 8).
+  const [treeError, setTreeError] = useState<Record<string, boolean>>({});
+  const [treeAttempt, setTreeAttempt] = useState(0);
   const [, setExpandedSiteId] = useState<string | null>(null);
 
   const mutations = useSiteMutations({ setSites, setSiteTree, setExpandedSiteId });
@@ -91,6 +102,10 @@ export function AdminSites() {
   const [showCreate, setShowCreate] = useState(false);
   const [editSite, setEditSite] = useState<SiteListItem | null>(null);
   const [deleteSite, setDeleteSite] = useState<SiteListItem | null>(null);
+  // Деактивация — с подтверждением (решение владельца 28.09.2026): объект
+  // пропадает из выбора при назначении бригад, это задевает работу диспетчера.
+  // Активация обратно — сразу, без окна.
+  const [deactivateRow, setDeactivateRow] = useState<SiteOverviewRow | null>(null);
   const [showAdd, setShowAdd] = useState(false);
   const [addType, setAddType] = useState<'field' | 'cluster' | 'picket'>('field');
   const [addSiteId, setAddSiteId] = useState('');
@@ -112,12 +127,15 @@ export function AdminSites() {
       ? { ...operational.get(site.id)!, siteName: site.name, isActive: site.isActive, completionDate: site.completionDate }
       : { siteId: site.id, siteName: site.name, isActive: site.isActive, completionDate: site.completionDate,
           plannedPiles: site.plannedPiles, plannedPileMeters: 0, actualPiles: 0, actualPileMeters: 0,
+          plannedDrillingCount: 0, actualDrillingCount: 0,
           plannedDrilling: site.plannedDrilling, actualDrilling: 0, pileProgress: 0, drillingProgress: 0,
           totalReports: 0, totalDowntime: 0, crewCount: crewsError ? null : 0, rigNames: [] });
   }, [rows, sites, crewsError]);
 
   const filtered = useMemo(() => {
+    const query = normalizeSearch(search);
     return allRows.filter((r) => {
+      if (query && !normalizeSearch([r.siteName, ...r.rigNames].join(' ')).includes(query)) return false;
       if (quick === 'active') return r.isActive;
       if (quick === 'inactive') return !r.isActive;
       if (quick === 'behind') return r.plannedPiles > 0 && r.pileProgress < 60;
@@ -126,7 +144,7 @@ export function AdminSites() {
       if (quick === 'downtime') return r.totalDowntime > 0;
       return true;
     });
-  }, [allRows, quick]);
+  }, [allRows, quick, search]);
 
   const active = useMemo(
     () => filtered.find((r) => r.siteId === activeId) ?? filtered[0] ?? null,
@@ -141,16 +159,17 @@ export function AdminSites() {
     void (async () => {
       try {
         const res = await authFetch(`/api/sites/${id}`);
-        if (res.ok && !cancelled) {
-          const data = await res.json();
-          setSiteTree((prev) => ({ ...prev, [id]: data.site }));
-        }
+        if (!res.ok) throw new Error('tree load failed');
+        const data = await res.json();
+        if (cancelled) return;
+        setSiteTree((prev) => ({ ...prev, [id]: data.site }));
+        setTreeError((prev) => (prev[id] ? { ...prev, [id]: false } : prev));
       } catch {
-        /* tree is best-effort */
+        if (!cancelled) setTreeError((prev) => ({ ...prev, [id]: true }));
       }
     })();
     return () => { cancelled = true; };
-  }, [active?.siteId, siteTree]);
+  }, [active?.siteId, siteTree, treeAttempt]);
 
   const refreshTree = async (siteId: string) => {
     try {
@@ -165,6 +184,8 @@ export function AdminSites() {
   const kpis: OpsKpiItem[] = useMemo(() => {
     const piles = rows.reduce((s, r) => s + r.actualPiles, 0);
     const meters = rows.reduce((s, r) => s + r.actualPileMeters, 0);
+    const drillCount = rows.reduce((s, r) => s + r.actualDrillingCount, 0);
+    const drillMeters = rows.reduce((s, r) => s + r.actualDrilling, 0);
     const behind = rows.filter((r) => r.plannedPiles > 0 && r.pileProgress < 60).length;
     const noCrew = rows.filter((r) => r.crewCount === 0).length;
     return [
@@ -172,8 +193,10 @@ export function AdminSites() {
       { label: 'Отставание', value: String(behind), detail: '< 60% плана', icon: AlertTriangle, tone: behind > 0 ? 'amber' : 'slate' },
       // Бригады не загрузились — «Без бригад: 0» было бы утверждением о данных.
       { label: 'Без бригад', value: crewsError ? '—' : String(noCrew), detail: 'не назначены', icon: Users, tone: crewsError ? 'slate' : noCrew > 0 ? 'red' : 'slate' },
-      { label: 'Сваи факт', value: formatNumber(piles), detail: 'шт. суммарно', icon: HardHat, tone: 'orange' },
-      { label: 'Метры факт', value: formatNumber(meters), detail: 'м.п. суммарно', icon: Drill, tone: 'blue' },
+      // «Метры факт» с иконкой бура показывали м.п. СВАЙ — читалось как бурение.
+      // Сваи и бурение — отдельными плитками, каждая «шт. / м.п.» (28.09.2026).
+      { label: 'Сваи факт', value: formatCountMeters(piles, meters), detail: 'суммарно', icon: HardHat, tone: 'orange' },
+      { label: 'Бурение факт', value: formatCountMeters(drillCount, drillMeters), detail: 'суммарно', icon: Drill, tone: 'blue' },
     ];
   }, [rows, allRows, crewsError]);
 
@@ -242,7 +265,7 @@ export function AdminSites() {
       countLabel={`${filtered.length} ${pluralizeRu(filtered.length, ['объект', 'объекта', 'объектов'])}`}
       subtitle="План/факт стройки: прогресс, бригады, простои, отчёты"
       actions={canManage &&
-        <Button onClick={() => setShowCreate(true)} className="h-10 bg-signal text-white hover:bg-signal-strong">
+        <Button onClick={() => setShowCreate(true)} className="h-11 bg-signal text-white hover:bg-signal-strong sm:h-10">
           <Plus className="mr-1.5 h-4 w-4" />
           Новый объект
         </Button>
@@ -276,12 +299,15 @@ export function AdminSites() {
               row={active}
               canManage={canManage}
               togglingId={mutations.togglingId}
+              completingId={mutations.completingId}
               onEdit={() => setEditSite(toListItem(active))}
               onDelete={() => setDeleteSite(toListItem(active))}
               onAssign={() => setAssignSiteId(active.siteId)}
               onToggleCompleted={() => mutations.handleSetCompleted(toListItem(active), !active.completionDate)}
-              onToggleActive={() => mutations.handleToggleActive(toListItem(active))}
+              onToggleActive={() => (active.isActive ? setDeactivateRow(active) : mutations.handleToggleActive(toListItem(active)))}
               tree={siteTree[active.siteId]}
+              treeError={!!treeError[active.siteId]}
+              onRetryTree={() => setTreeAttempt((value) => value + 1)}
               onAddHierarchy={(type, siteId, parentId) => { setAddType(type); setAddSiteId(siteId); setAddParentId(parentId); setShowAdd(true); }}
               onDeleteHierarchy={async (siteId, type, itemId) => { await mutations.handleDeleteHierarchy(siteId, type, itemId); await refreshTree(siteId); }}
             />
@@ -294,7 +320,21 @@ export function AdminSites() {
             Бригады не загрузились — число бригад не показано
           </p>
         )}
-        <OpsFilterBar quickFilters={QUICK_FILTERS} active={quick} onSelect={setQuick} footer={`Показано ${filtered.length} из ${allRows.length}`} />
+        <OpsFilterBar
+          quickFilters={QUICK_FILTERS}
+          active={quick}
+          onSelect={setQuick}
+          extra={
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Поиск по объекту"
+              aria-label="Поиск по названию объекта или установки"
+              className="min-h-11 w-full min-w-[200px] rounded-lg border border-border bg-card px-3 py-2 text-xs text-foreground focus:border-info focus:outline-none sm:min-h-0 sm:w-auto"
+            />
+          }
+          footer={`Показано ${filtered.length} из ${allRows.length}`}
+        />
         <OpsTable
           columns={columns}
           rows={filtered}
@@ -333,6 +373,20 @@ export function AdminSites() {
         }}
       />
 
+      <ConfirmActionDialog
+        open={!!deactivateRow}
+        onOpenChange={(open) => { if (!open) setDeactivateRow(null); }}
+        title={`Деактивировать объект «${deactivateRow?.siteName ?? ''}»?`}
+        description={deactivateRow ? deactivateDescription(deactivateRow) : ''}
+        confirmLabel="Деактивировать"
+        onConfirm={async () => {
+          if (!deactivateRow) return;
+          const row = deactivateRow;
+          setDeactivateRow(null);
+          await mutations.handleToggleActive(toListItem(row));
+        }}
+      />
+
       <DeleteSiteDialog
         site={deleteSite}
         open={!!deleteSite}
@@ -356,6 +410,7 @@ export function AdminSites() {
         onAdd={async (name) => {
           const ok = await mutations.handleAddHierarchy(addSiteId, addParentId, addType, name);
           if (ok) { setShowAdd(false); await refreshTree(addSiteId); }
+          return ok;
         }}
       />
 
@@ -374,12 +429,15 @@ export function AdminSites() {
 }
 
 function SiteDetail({
-  row, canManage, togglingId, tree, onEdit, onDelete, onAssign, onToggleCompleted, onToggleActive, onAddHierarchy, onDeleteHierarchy,
+  row, canManage, togglingId, completingId, tree, treeError, onRetryTree, onEdit, onDelete, onAssign, onToggleCompleted, onToggleActive, onAddHierarchy, onDeleteHierarchy,
 }: {
   row: SiteOverviewRow;
   canManage: boolean;
   togglingId: string | null;
+  completingId: string | null;
   tree?: SiteFullData;
+  treeError: boolean;
+  onRetryTree: () => void;
   onEdit: () => void;
   onDelete: () => void;
   onAssign: () => void;
@@ -393,20 +451,22 @@ function SiteDetail({
   return (
     <OpsDetailPanel title={row.siteName} subtitle={`Объект · ${row.totalReports} ${pluralizeRu(row.totalReports, ['отчёт', 'отчёта', 'отчётов'])}`} status={<OpsRiskBadge level={risk.level} label={risk.label} />}>
       {canManage && <div className="flex flex-wrap gap-2">
-        <Button size="sm" variant="outline" onClick={onEdit} className="h-8 text-xs"><Pencil className="mr-1 h-3.5 w-3.5" />Редактировать</Button>
-        <Button size="sm" variant="outline" onClick={onAssign} className="h-8 text-xs"><UserPlus className="mr-1 h-3.5 w-3.5" />Пользователи</Button>
-        <Button size="sm" variant="outline" onClick={onToggleCompleted} className="h-8 text-xs"><CheckCircle2 className="mr-1 h-3.5 w-3.5" />{completed ? 'Снять «Выполнен»' : 'Выполнен'}</Button>
-        <Button size="sm" variant="outline" onClick={onToggleActive} disabled={togglingId === row.siteId} className="h-8 text-xs">{row.isActive ? <PowerOff className="mr-1 h-3.5 w-3.5" /> : <Power className="mr-1 h-3.5 w-3.5" />}{row.isActive ? 'Деактивировать' : 'Активировать'}</Button>
-        <Button size="sm" variant="outline" onClick={onDelete} className="h-8 text-xs text-destructive-strong hover:bg-destructive/10"><Trash2 className="mr-1 h-3.5 w-3.5" />Удалить навсегда</Button>
+        <Button size="sm" variant="outline" onClick={onEdit} className="h-11 text-xs sm:h-8"><Pencil className="mr-1 h-3.5 w-3.5" />Редактировать</Button>
+        <Button size="sm" variant="outline" onClick={onAssign} className="h-11 text-xs sm:h-8"><UserPlus className="mr-1 h-3.5 w-3.5" />Пользователи</Button>
+        <Button size="sm" variant="outline" onClick={onToggleCompleted} disabled={completingId === row.siteId} className="h-11 text-xs sm:h-8"><CheckCircle2 className="mr-1 h-3.5 w-3.5" />{completed ? 'Снять «Выполнен»' : 'Выполнен'}</Button>
+        <Button size="sm" variant="outline" onClick={onToggleActive} disabled={togglingId === row.siteId} className="h-11 text-xs sm:h-8">{row.isActive ? <PowerOff className="mr-1 h-3.5 w-3.5" /> : <Power className="mr-1 h-3.5 w-3.5" />}{row.isActive ? 'Деактивировать' : 'Активировать'}</Button>
+        <Button size="sm" variant="outline" onClick={onDelete} className="h-11 text-xs text-destructive-strong hover:bg-destructive/10 sm:h-8"><Trash2 className="mr-1 h-3.5 w-3.5" />Удалить навсегда</Button>
       </div>}
 
       <div className="grid grid-cols-2 divide-x rounded-md border border-border bg-muted">
         <OpsFact label="Сваи план" value={`${formatNumber(row.plannedPiles)} шт.`} sub={`${formatNumber(row.plannedPileMeters)} м.п.`} />
         <OpsFact label="Сваи факт" value={`${formatNumber(row.actualPiles)} шт.`} sub={`${formatNumber(row.actualPileMeters)} м.п.`} />
       </div>
-      <div className="grid grid-cols-3 divide-x rounded-md border border-border">
-        <OpsFact label="Бурение план" value={formatNumber(row.plannedDrilling)} sub="м" />
-        <OpsFact label="Бурение факт" value={formatNumber(row.actualDrilling)} sub="м" />
+      <div className="grid grid-cols-2 divide-x rounded-md border border-border">
+        <OpsFact label="Бурение план" value={`${formatNumber(row.plannedDrillingCount)} шт.`} sub={`${formatNumber(row.plannedDrilling)} м.п.`} />
+        <OpsFact label="Бурение факт" value={`${formatNumber(row.actualDrillingCount)} шт.`} sub={`${formatNumber(row.actualDrilling)} м.п.`} />
+      </div>
+      <div className="grid grid-cols-1 rounded-md border border-border">
         <OpsFact label="Простой" value={row.totalDowntime > 0 ? formatDowntimeHours(row.totalDowntime) : '—'} />
       </div>
 
@@ -416,13 +476,20 @@ function SiteDetail({
         <LabeledProgress label="Бурение" pct={row.drillingProgress} planned={row.plannedDrilling} tone="blue" />
       </div>
 
-      <SiteCrewBoard crews={tree?.crews} />
+      <SiteCrewBoard crews={tree?.crews} error={treeError} />
 
       <div className="rounded-md border border-border p-2.5">
         <h3 className="mb-1.5 flex items-center gap-2 text-xs font-semibold text-foreground"><Network className="h-4 w-4 text-muted-foreground" />Иерархия</h3>
         {tree
           ? <HierarchyTree readOnly={!canManage} siteId={row.siteId} tree={tree} onAdd={onAddHierarchy} onDelete={onDeleteHierarchy} />
-          : <p className="text-2xs text-muted-foreground">Загрузка структуры…</p>}
+          : treeError
+            ? (
+              <div className="space-y-2">
+                <p className="text-2xs text-destructive-strong">Не удалось загрузить структуру</p>
+                <Button size="sm" variant="outline" onClick={onRetryTree} className="h-11 text-xs sm:h-8">Повторить</Button>
+              </div>
+            )
+            : <p className="text-2xs text-muted-foreground">Загрузка структуры…</p>}
       </div>
 
       <PermittedEntityHistory scope="sites" targetId={row.siteId} title="История изменений" />
@@ -448,7 +515,7 @@ const EQUIPMENT_STATE: Record<string, { label: string; className: string }> = {
  * снимок модели узнаётся быстрее названия. Снимка на модель нет — показываем
  * название, а не пустую рамку.
  */
-function SiteCrewBoard({ crews }: { crews?: SiteCrew[] }) {
+function SiteCrewBoard({ crews, error }: { crews?: SiteCrew[]; error?: boolean }) {
   return (
     <div className="rounded-md border border-border p-2.5">
       <h3 className="mb-1.5 flex items-center gap-2 text-xs font-semibold text-foreground">
@@ -457,7 +524,10 @@ function SiteCrewBoard({ crews }: { crews?: SiteCrew[] }) {
         {crews?.length ? <span className="font-mono text-2xs text-muted-foreground">{crews.length}</span> : null}
       </h3>
 
-      {crews === undefined ? <p className="text-2xs text-muted-foreground">Загрузка…</p> : null}
+      {crews === undefined && error ? (
+        <p className="text-2xs text-destructive-strong">Не удалось загрузить состав бригад — повторите в блоке «Иерархия».</p>
+      ) : null}
+      {crews === undefined && !error ? <p className="text-2xs text-muted-foreground">Загрузка…</p> : null}
       {crews?.length === 0 ? (
         <p className="text-2xs text-muted-foreground">
           За объектом не закреплено ни одной бригады. Закрепление — в модуле «Бригады».

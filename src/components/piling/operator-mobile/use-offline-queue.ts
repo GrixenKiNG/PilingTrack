@@ -6,6 +6,7 @@ import {sendQueuedCommand} from './api';
 import {discard, flushQueue, readQueue, retry, subscribeQueue, type QueuedCommand} from './offline-queue';
 
 const RETRY_EVERY_MS = 30_000;
+const OFFLINE_RETRY_EVERY_MS = 60_000;
 
 /**
  * Очередь устройства для любого экрана машиниста: что лежит и когда слать.
@@ -25,9 +26,11 @@ export function useOfflineQueue(onSent?: () => unknown) {
   const [queued, setQueued] = useState<QueuedCommand[]>([]);
   const ownerId = usePilingStore((state) => state.currentUser?.id ?? null);
   const onSentRef = useRef(onSent);
+  const lastAttemptAtRef = useRef(Date.now());
   useEffect(() => { onSentRef.current = onSent; }, [onSent]);
 
   const flush = useCallback(async () => {
+    lastAttemptAtRef.current = Date.now();
     try {
       const {sent} = await flushQueue(sendQueuedCommand);
       // Сервер увидел новые записи — экран должен их показать.
@@ -50,8 +53,12 @@ export function useOfflineQueue(onSent?: () => unknown) {
       if (globalThis.document?.visibilityState === 'visible') void flush();
     };
     const timer = setInterval(() => {
-      if (globalThis.navigator?.onLine === false) return;
-      if (readQueue().some((item) => item.state === 'PENDING')) void flush();
+      if (!readQueue().some((item) => item.state === 'PENDING')) return;
+      if (
+        globalThis.navigator?.onLine === false
+        && Date.now() - lastAttemptAtRef.current < OFFLINE_RETRY_EVERY_MS
+      ) return;
+      void flush();
     }, RETRY_EVERY_MS);
     globalThis.addEventListener?.('online', onOnline);
     globalThis.document?.addEventListener('visibilitychange', onVisible);

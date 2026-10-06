@@ -2,6 +2,7 @@
 
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { cn } from '@/lib/utils';
+import { useDocumentTitle } from '@/components/piling/ops-shell';
 import { usePilingStore } from '@/lib/store';
 import { can } from '@/services/auth/authorization-service';
 import { PileJournal } from '@/components/piling/pile-journal';
@@ -26,6 +27,7 @@ import { AdminReports } from './admin-reports';
 type ReportsView = 'shifts' | 'piles';
 
 export function ReportsModule() {
+  useDocumentTitle('Отчёты');
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -66,7 +68,7 @@ export function ReportsModule() {
             type="button"
             onClick={() => openView(tab.id)}
             className={cn(
-              'rounded-t-md border border-b-0 px-3 py-1.5 text-xs font-medium',
+              'rounded-t-md border border-b-0 px-3 py-1.5 text-xs font-medium min-h-11 sm:min-h-0',
               view === tab.id
                 ? 'border-border bg-card text-foreground'
                 : 'border-transparent text-muted-foreground hover:text-foreground',

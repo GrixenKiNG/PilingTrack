@@ -15,6 +15,7 @@ import Image from 'next/image';
 import { Camera, Loader2, Trash2 } from '@/components/piling/icons/unified-icons';
 import { toast } from 'sonner';
 import { authFetch } from '@/lib/api';
+import { catchText } from '@/components/piling/admin-crews/crew-messages';
 import { getThumbnailUrl } from '@/lib/media-thumbnails';
 import { ConfirmActionDialog } from '@/components/piling/confirm-action-dialog';
 
@@ -114,7 +115,8 @@ export function EquipmentPhotos({ equipmentId }: Props) {
       toast.success('Фото загружено');
       await refresh();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Ошибка загрузки');
+      // Обрыв сети fetch бросает TypeError с английским «Failed to fetch» (F-R112-1).
+      toast.error(catchText(err, 'Ошибка загрузки'));
     } finally {
       setBusy(false);
       if (inputRef.current) inputRef.current.value = '';
@@ -129,7 +131,8 @@ export function EquipmentPhotos({ equipmentId }: Props) {
       toast.success('Фото удалено');
       setPhotos((prev) => prev.filter((p) => p.id !== id));
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Ошибка удаления');
+      // Обрыв сети fetch бросает TypeError с английским «Failed to fetch» (F-R112-1).
+      toast.error(catchText(err, 'Ошибка удаления'));
     } finally {
       setBusy(false);
       setPendingDeleteId(null);
@@ -143,11 +146,22 @@ export function EquipmentPhotos({ equipmentId }: Props) {
       window.open(tile.fullUrl, '_blank', 'noreferrer');
       return;
     }
-    const dl = await authFetch(`/api/media/${tile.id}/download`);
-    if (!dl.ok) return;
-    const url = (await dl.json()).url as string;
-    setPhotos((prev) => prev.map((p) => (p.id === tile.id ? { ...p, fullUrl: url } : p)));
-    window.open(url, '_blank', 'noreferrer');
+    try {
+      const dl = await authFetch(`/api/media/${tile.id}/download`);
+      // Тихий `return` на отказе давал клик без окна и без объяснения (F-R115-9).
+      if (!dl.ok) {
+        toast.error(dl.status === 403
+          ? 'Нет прав на просмотр фото. Смените роль или обратитесь к администратору.'
+          : 'Не удалось открыть фото. Повторите попытку.');
+        return;
+      }
+      const url = (await dl.json()).url as string;
+      setPhotos((prev) => prev.map((p) => (p.id === tile.id ? { ...p, fullUrl: url } : p)));
+      window.open(url, '_blank', 'noreferrer');
+    } catch (err) {
+      // Обрыв сети fetch бросает TypeError с английским «Failed to fetch» (F-R112-1).
+      toast.error(catchText(err, 'Не удалось открыть фото. Повторите попытку.'));
+    }
   };
 
   return (
@@ -160,7 +174,7 @@ export function EquipmentPhotos({ equipmentId }: Props) {
           type="button"
           onClick={() => inputRef.current?.click()}
           disabled={busy}
-          className="inline-flex items-center gap-1.5 rounded-md bg-signal px-3 py-1.5 text-xs font-medium text-white hover:bg-signal-strong disabled:opacity-50"
+          className="inline-flex min-h-11 items-center gap-1.5 rounded-md bg-signal px-3 py-1.5 text-xs font-medium text-white hover:bg-signal-strong disabled:opacity-50 sm:min-h-0"
         >
           {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Camera className="w-3.5 h-3.5" />}
           Добавить фото

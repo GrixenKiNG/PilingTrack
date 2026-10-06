@@ -95,7 +95,8 @@ function getSecretKey() {
 
 export interface RevocationStore {
   isRevoked(jti: string): Promise<boolean>;
-  revoke(jti: string, ttlSeconds: number): Promise<void>;
+  /** true — отзыв записан; false — не записан (Redis недоступен или отказ записи). */
+  revoke(jti: string, ttlSeconds: number): Promise<boolean>;
 }
 
 class RedisRevocationStore implements RevocationStore {
@@ -152,16 +153,18 @@ class RedisRevocationStore implements RevocationStore {
     }
   }
 
-  async revoke(jti: string, ttlSeconds: number): Promise<void> {
+  async revoke(jti: string, ttlSeconds: number): Promise<boolean> {
     const client = this.getClient();
     if (!client) {
       logger.warn('session-revocation: redis unavailable — revocation NOT persisted');
-      return;
+      return false;
     }
     try {
       await client.set(`revoked-jti:${jti}`, '1', 'EX', Math.max(1, ttlSeconds));
+      return true;
     } catch (err) {
       logger.warn('session-revocation: SET failed', { error: (err as Error).message });
+      return false;
     }
   }
 }
@@ -241,7 +244,10 @@ export async function verifySessionToken(token: string): Promise<SessionPayload 
 
 /**
  * Revoke a session token by adding its jti to the denylist until its natural
- * expiration. Idempotent. Returns true if a denylist entry was written.
+ * expiration. Idempotent. Returns true only if the denylist entry was
+ * actually persisted: when Redis is down the token stays valid until its
+ * natural expiry (fail-open by design, see top of file), and the caller must
+ * not be told otherwise (аудит Codex out55, F02).
  *
  * Tokens issued before jti was added to the schema have no jti and cannot be
  * revoked — they expire naturally within SESSION_TTL_SECONDS (12h).
@@ -253,8 +259,7 @@ export async function revokeSessionToken(token: string): Promise<boolean> {
   const ttl = payload.exp - Math.floor(Date.now() / 1000);
   if (ttl <= 0) return false;
 
-  await revocationStore.revoke(payload.jti, ttl);
-  return true;
+  return revocationStore.revoke(payload.jti, ttl);
 }
 
 export function readSessionToken(request: NextRequest) {

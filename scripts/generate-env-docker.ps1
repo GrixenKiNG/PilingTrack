@@ -20,7 +20,6 @@ function New-Secret {
 }
 
 $sessionSecret = New-Secret 32
-$pinSecret     = New-Secret 32
 $deviceSecret  = New-Secret 32
 $encryptionKey = New-Secret 32
 $pgPassword    = New-Secret 16
@@ -62,7 +61,6 @@ REDIS_URL=redis://redis:6379
 # Security secrets (32 bytes hex each)
 # ============================================================
 SESSION_SECRET=$sessionSecret
-PIN_LOOKUP_SECRET=$pinSecret
 DEVICE_KEY_LOOKUP_SECRET=$deviceSecret
 ENCRYPTION_KEY=$encryptionKey
 
@@ -133,7 +131,6 @@ REDIS_URL=redis://localhost:6380
 # in the DB is readable from both local npm and Docker stack).
 # ------------------------------------------------------------
 SESSION_SECRET=$sessionSecret
-PIN_LOOKUP_SECRET=$pinSecret
 DEVICE_KEY_LOOKUP_SECRET=$deviceSecret
 ENCRYPTION_KEY=$encryptionKey
 
@@ -164,7 +161,7 @@ NODE_ENV=development
 
 Set-Content -LiteralPath '.env' -Value $localContent -Encoding utf8 -NoNewline
 
-Write-Host "  - 32-byte secrets generated (SESSION/PIN/DEVICE/ENCRYPTION)."
+Write-Host "  - 32-byte secrets generated (SESSION/DEVICE/ENCRYPTION)."
 Write-Host "  - Postgres password: $pgPassword (saved to .env.docker + .env)"
 Write-Host "  - pgAdmin password:  $pgadminPass (saved to .env.docker)"
 Write-Host "  - .env.docker  -> Docker stack secrets (hosts: postgres, redis, ws)"

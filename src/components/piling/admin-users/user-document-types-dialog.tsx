@@ -36,9 +36,16 @@ const LEAD_DAYS_MIN = 0;
 const LEAD_DAYS_MAX = 365;
 const DEFAULT_LEAD_DAYS = 30;
 
-/** Поля формы → тело запроса: пустой срок — «не задан», пустое предупреждение — 30 дней. */
+/**
+ * Поля формы → тело запроса: пустой срок — «не задан», пустое предупреждение — 30 дней.
+ *
+ * Срок «0» (или отрицательное) тоже уходит как «не задан»: zod-схема маршрута
+ * (`app/api/user-document-types/schema.ts`) требует `int ≥ 1`, а HTML `min={1}`
+ * отправку не блокирует — прежде форма слала заведомо отклоняемый `0` и
+ * получала 400 без имени поля (R121 №9).
+ */
 const limitsBody = (months: string, leadDays: string) => ({
-  defaultValidMonths: months ? Number(months) : null,
+  defaultValidMonths: Number(months) > 0 ? Number(months) : null,
   leadTimeDays: leadDays ? Number(leadDays) : DEFAULT_LEAD_DAYS,
 });
 
@@ -63,6 +70,14 @@ export function UserDocumentTypesDialog({ open, onOpenChange }: {
   const [leadDays, setLeadDays] = useState(String(DEFAULT_LEAD_DAYS));
   const [busy, setBusy] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<TypeRow | null>(null);
+  /** Переключение флага вида (обязателен для смены / отключён) до подтверждения. */
+  const [pendingToggle, setPendingToggle] = useState<{
+    row: TypeRow;
+    patch: Record<string, unknown>;
+    title: string;
+    description: string;
+    confirmLabel: string;
+  } | null>(null);
   /** Черновик правки строки списка; null — ни одна строка не редактируется. */
   const [draft, setDraft] = useState<{ id: string; name: string; months: string; leadDays: string } | null>(null);
 
@@ -156,7 +171,7 @@ export function UserDocumentTypesDialog({ open, onOpenChange }: {
             <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_110px_130px_auto] sm:items-end">
               <div>
                 <Label htmlFor="dt-name">Название</Label>
-                <Input id="dt-name" value={name} onChange={(event) => setName(event.target.value)}
+                <Input id="dt-name" value={name} maxLength={200} onChange={(event) => setName(event.target.value)}
                   placeholder="Напр. Удостоверение стропальщика" />
               </div>
               <div>
@@ -194,7 +209,7 @@ export function UserDocumentTypesDialog({ open, onOpenChange }: {
                       <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_110px_130px_auto] sm:items-end">
                         <div>
                           <Label htmlFor={`dt-edit-name-${row.id}`}>Название</Label>
-                          <Input id={`dt-edit-name-${row.id}`} value={draft.name}
+                          <Input id={`dt-edit-name-${row.id}`} value={draft.name} maxLength={200}
                             onChange={(event) => setDraft({ ...draft, name: event.target.value })} />
                         </div>
                         <div>
@@ -211,11 +226,11 @@ export function UserDocumentTypesDialog({ open, onOpenChange }: {
                         </div>
                         <div className="flex gap-2 sm:justify-end">
                           <Button onClick={() => void saveEdit(row)} disabled={busy}
-                            className="h-8 text-2xs bg-signal text-white hover:bg-signal-strong">
+                            className="h-11 text-2xs bg-signal text-white hover:bg-signal-strong sm:h-8">
                             {busy && <Loader2 className="h-4 w-4 animate-spin" />}
                             Сохранить
                           </Button>
-                          <Button variant="outline" className="h-8 text-2xs" onClick={() => setDraft(null)}>
+                          <Button variant="outline" className="h-11 text-2xs sm:h-8" onClick={() => setDraft(null)}>
                             Отмена
                           </Button>
                         </div>
@@ -235,18 +250,34 @@ export function UserDocumentTypesDialog({ open, onOpenChange }: {
                             )}
                           </div>
                         </div>
-                        <Button variant="outline" className="h-8 text-2xs" onClick={() => startEdit(row)}>
+                        <Button variant="outline" className="h-11 text-2xs sm:h-8" onClick={() => startEdit(row)}>
                           Изменить
                         </Button>
                         {/* Обязательность останавливает работу людей: без действующего
                             документа оператор не начнёт смену. Поэтому переключатель
                             стоит рядом со списком, а не прячется в отдельной форме. */}
-                        <Button variant="outline" className="h-8 text-2xs"
-                          onClick={() => void patch(row, { requiredForOperator: !row.requiredForOperator })}>
+                        <Button variant="outline" className="h-11 text-2xs sm:h-8"
+                          onClick={() => setPendingToggle({
+                            row,
+                            patch: { requiredForOperator: !row.requiredForOperator },
+                            title: row.requiredForOperator ? 'Снять требование?' : 'Требовать для смены?',
+                            description: row.requiredForOperator
+                              ? `Вид «${row.name}» перестанет быть обязательным: операторы смогут начать смену без него.`
+                              : `Вид «${row.name}» станет обязательным: операторы без действующего документа не начнут смену.`,
+                            confirmLabel: row.requiredForOperator ? 'Не требовать' : 'Требовать для смены',
+                          })}>
                           {row.requiredForOperator ? 'Не требовать' : 'Требовать для смены'}
                         </Button>
-                        <Button variant="outline" className="h-8 text-2xs"
-                          onClick={() => void patch(row, { isActive: !row.isActive })}>
+                        <Button variant="outline" className="h-11 text-2xs sm:h-8"
+                          onClick={() => setPendingToggle({
+                            row,
+                            patch: { isActive: !row.isActive },
+                            title: row.isActive ? 'Отключить вид документа?' : 'Включить вид документа?',
+                            description: row.isActive
+                              ? `Вид «${row.name}» исчезнет из выбора у документов; уже подшитые документы сохранятся.`
+                              : `Вид «${row.name}» снова появится в выборе у документов.`,
+                            confirmLabel: row.isActive ? 'Отключить' : 'Включить',
+                          })}>
                           {row.isActive ? 'Отключить' : 'Включить'}
                         </Button>
                         {/* Кнопка есть всегда, но у используемого вида сервер ответит
@@ -255,7 +286,7 @@ export function UserDocumentTypesDialog({ open, onOpenChange }: {
                           type="button"
                           onClick={() => setPendingDelete(row)}
                           aria-label={`Удалить вид «${row.name}»`}
-                          className="flex h-8 w-8 items-center justify-center rounded-md text-destructive-strong hover:bg-destructive/10"
+                          className="flex h-11 w-11 items-center justify-center rounded-md text-destructive-strong hover:bg-destructive/10 sm:h-8 sm:w-8"
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                         </button>
@@ -283,6 +314,19 @@ export function UserDocumentTypesDialog({ open, onOpenChange }: {
         onConfirm={async () => {
           if (pendingDelete) await remove(pendingDelete);
           setPendingDelete(null);
+        }}
+      />
+
+      <ConfirmActionDialog
+        open={pendingToggle !== null}
+        onOpenChange={(next) => !next && setPendingToggle(null)}
+        title={pendingToggle?.title ?? ''}
+        description={pendingToggle?.description ?? ''}
+        confirmLabel={pendingToggle?.confirmLabel ?? ''}
+        onConfirm={async () => {
+          const pending = pendingToggle;
+          setPendingToggle(null);
+          if (pending) await patch(pending.row, pending.patch);
         }}
       />
     </>

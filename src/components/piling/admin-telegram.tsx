@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { motion } from 'framer-motion';
 import {
   Send,
@@ -29,12 +29,34 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { ConfirmActionDialog } from '@/components/piling/confirm-action-dialog';
+import { apiErrorMessage } from '@/lib/api-error-message';
 import type { TelegramConfigDTO } from '@/lib/types';
 import { cn } from '@/lib/utils';
+
+// Формат ID чата: число (у групп и каналов отрицательное) или @имя канала.
+const CHAT_ID_PATTERN = /^-?\d+$|^@[A-Za-z0-9_]{5,}$/;
+
+/**
+ * Текст отказа API для тоста.
+ *
+ * Сервер отвечает `{ error, details }` (400 с полем и причиной, 404), а экран
+ * показывал на любой отказ одну строку «Ошибка сохранения»: админ не знал,
+ * какое поле не принято, и правил наугад (F-R120-4). 404 — запись уже удалена,
+ * общий текст тут сбил бы с толку.
+ */
+async function apiFailureText(res: Response, fallback: string): Promise<string> {
+  if (res.status === 401) return 'Сессия истекла — войдите снова.';
+  if (res.status === 404) return 'Запись не найдена — возможно, её уже удалили, обновите список';
+  const body = await res.json().catch(() => null);
+  return apiErrorMessage(body, fallback);
+}
 
 export function AdminTelegram() {
   const [configs, setConfigs] = useState<TelegramConfigDTO[]>([]);
   const [loading, setLoading] = useState(true);
+  // Текст сбоя чтения списка. Отдельно от `configs`: пустой список после 5xx —
+  // это «неизвестно», а не «ботов нет» (F-R120-7).
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   // Create / edit dialog (mode = 'create' | 'edit')
   const [dialogMode, setDialogMode] = useState<'create' | 'edit' | null>(null);
@@ -44,8 +66,13 @@ export function AdminTelegram() {
   const [newChatId, setNewChatId] = useState('');
   const [saving, setSaving] = useState(false);
   const [togglingId, setTogglingId] = useState<string | null>(null);
-  const [testing, setTesting] = useState(false);
+  const [testingId, setTestingId] = useState<string | null>(null);
   const [pendingDelete, setPendingDelete] = useState<TelegramConfigDTO | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  // Radix закрывает диалог по клику на «Удалить» раньше, чем React применит
+  // setDeleting, — закрытие откладываем через ref, иначе кнопка не успевает
+  // заблокироваться и второй клик шлёт второй DELETE (F-R128-4).
+  const deletingRef = useRef(false);
 
   const openCreate = () => {
     setDialogMode('create');
@@ -70,10 +97,17 @@ export function AdminTelegram() {
     setEditingId(null);
   };
 
-  const handleTest = async () => {
-    setTesting(true);
+  const handleTest = async (config: TelegramConfigDTO) => {
+    setTestingId(config.id);
     try {
-      const res = await authFetch('/api/notifications/telegram/test', { method: 'POST' });
+      // Канал проверяем именно тот, у которого нажата кнопка: без id сервер
+      // брал первую включённую запись, и админ у второго бота видел результат
+      // первого (F-R120-1).
+      const res = await authFetch('/api/notifications/telegram/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ configId: config.id }),
+      });
       const data = await res.json();
       if (res.ok && data.ok) {
         toast.success(
@@ -82,12 +116,12 @@ export function AdminTelegram() {
             : 'Соединение установлено',
         );
       } else {
-        toast.error(`Ошибка: ${data.error || 'Не удалось подключиться'}`);
+        toast.error(data.error || 'Не удалось подключиться — проверьте токен и повторите');
       }
     } catch {
       toast.error('Ошибка тестирования');
     } finally {
-      setTesting(false);
+      setTestingId(null);
     }
   };
 
@@ -95,12 +129,25 @@ export function AdminTelegram() {
     setLoading(true);
     try {
       const res = await authFetch('/api/telegram/configs');
-      if (res.ok) {
-        const data = await res.json();
-        setConfigs(data.configs || []);
+      if (!res.ok) {
+        // Раньше отказ молча оставлял пустой список — админ видел «Нет
+        // конфигураций Telegram», думал, что ботов нет, и заводил дубли.
+        const message = res.status === 401
+          ? 'Сессия истекла — войдите снова.'
+          : res.status === 403
+            ? 'Нет доступа к настройкам Telegram'
+            : 'Не удалось загрузить конфигурации Telegram';
+        setLoadError(message);
+        toast.error(message);
+        return;
       }
+      const data = await res.json();
+      setConfigs(data.configs || []);
+      setLoadError(null);
     } catch {
-      toast.error('Ошибка загрузки конфигураций');
+      const message = 'Не удалось загрузить конфигурации Telegram';
+      setLoadError(message);
+      toast.error(message);
     } finally {
       setLoading(false);
     }
@@ -119,6 +166,14 @@ export function AdminTelegram() {
       toast.error('Заполните все поля');
       return;
     }
+    // Формат ID чата проверяем до отправки: без этого опечатка или вставленный
+    // «Chat ID: -100…» сохранялись с enabled=true, и алерты о дефектах молча не
+    // доходили (F-R120-5). Серверная схема формат не проверяет — принимает
+    // любую непустую строку.
+    if (!CHAT_ID_PATTERN.test(newChatId.trim())) {
+      toast.error('ID чата — число (например, -1001234567890) или имя канала вида @name');
+      return;
+    }
     setSaving(true);
     try {
       const res = await authFetch('/api/telegram/configs', {
@@ -131,7 +186,10 @@ export function AdminTelegram() {
           chatId: newChatId.trim(),
         }),
       });
-      if (!res.ok) throw new Error('Ошибка сохранения');
+      if (!res.ok) {
+        toast.error(await apiFailureText(res, 'Ошибка сохранения'));
+        return;
+      }
       const data = await res.json();
       if (isEdit) {
         setConfigs((prev) => prev.map((c) => (c.id === editingId ? data.config : c)));
@@ -149,18 +207,25 @@ export function AdminTelegram() {
   };
 
   const handleDelete = async (id: string) => {
+    deletingRef.current = true;
+    setDeleting(true);
     try {
       const res = await authFetch('/api/telegram/configs', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id }),
       });
-      if (!res.ok) throw new Error('Ошибка удаления');
+      if (!res.ok) {
+        toast.error(await apiFailureText(res, 'Ошибка удаления'));
+        return;
+      }
       setConfigs((prev) => prev.filter((c) => c.id !== id));
       toast.success('Конфигурация удалена');
     } catch {
       toast.error('Ошибка удаления');
     } finally {
+      deletingRef.current = false;
+      setDeleting(false);
       setPendingDelete(null);
     }
   };
@@ -176,7 +241,10 @@ export function AdminTelegram() {
           enabled: !config.enabled,
         }),
       });
-      if (!res.ok) throw new Error('Ошибка');
+      if (!res.ok) {
+        toast.error(await apiFailureText(res, 'Ошибка переключения'));
+        return;
+      }
       setConfigs((prev) =>
         prev.map((c) =>
           c.id === config.id ? { ...c, enabled: !c.enabled } : c
@@ -224,7 +292,16 @@ export function AdminTelegram() {
       </div>
 
       {/* Configs List */}
-      {configs.length === 0 ? (
+      {loadError && (
+        <div role="alert" className="flex flex-col gap-3 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive-strong sm:flex-row sm:items-center sm:justify-between">
+          <p className="min-w-0 break-words">{loadError}</p>
+          <Button type="button" variant="outline" size="sm" className="shrink-0" onClick={() => void loadData()}>
+            Повторить
+          </Button>
+        </div>
+      )}
+
+      {!loadError && (configs.length === 0 ? (
         <div className="text-center py-16">
           <MessageSquare className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
           <p className="text-sm text-muted-foreground">Нет конфигураций Telegram</p>
@@ -260,11 +337,11 @@ export function AdminTelegram() {
                           {config.label}
                         </p>
                         <p className="text-xs text-muted-foreground font-mono mt-0.5">
-                          Chat ID: {config.chatId}
+                          ID чата: {config.chatId}
                         </p>
                         <p className="text-3xs text-muted-foreground font-mono">
                           {config.hasBotToken
-                            ? `Token: ••••${config.botTokenHint}`
+                            ? `Токен: ••••${config.botTokenHint}`
                             : 'Токен не задан — введите заново'}
                         </p>
                       </div>
@@ -284,11 +361,11 @@ export function AdminTelegram() {
                   </div>
                   <div className="flex items-center justify-end gap-2 mt-3">
                     <button
-                      onClick={handleTest}
-                      disabled={testing || !config.enabled}
+                      onClick={() => handleTest(config)}
+                      disabled={testingId !== null || !config.enabled}
                       className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-info-strong transition-colors px-2 py-1.5 rounded-lg hover:bg-info/10 disabled:opacity-50"
                     >
-                      {testing ? (
+                      {testingId === config.id ? (
                         <Loader2 className="w-3.5 h-3.5 animate-spin" />
                       ) : (
                         <Send className="w-3.5 h-3.5" />
@@ -329,11 +406,11 @@ export function AdminTelegram() {
             </motion.div>
           ))}
         </div>
-      )}
+      ))}
 
       {/* Create / Edit Dialog */}
       <Dialog open={dialogMode !== null} onOpenChange={(open) => !open && closeDialog()}>
-        <DialogContent aria-describedby={undefined}>
+        <DialogContent aria-describedby={undefined} className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Bot className="w-4 h-4" />
@@ -394,12 +471,13 @@ export function AdminTelegram() {
 
       <ConfirmActionDialog
         open={Boolean(pendingDelete)}
-        onOpenChange={(open) => { if (!open) setPendingDelete(null); }}
+        onOpenChange={(open) => { if (!open && !deletingRef.current) setPendingDelete(null); }}
         title="Удалить канал уведомлений?"
         description={pendingDelete
-          ? `Канал «${pendingDelete.label}» (Chat ID: ${pendingDelete.chatId}) будет удалён без возможности восстановления.`
+          ? `Канал «${pendingDelete.label}» (ID чата: ${pendingDelete.chatId}) будет удалён без возможности восстановления.`
           : ''}
         confirmLabel="Удалить"
+        busy={deleting}
         onConfirm={() => { if (pendingDelete) void handleDelete(pendingDelete.id); }}
       />
     </div>

@@ -2,12 +2,13 @@
 
 import {useCallback, useEffect, useRef, useState, type ReactNode} from 'react';
 import {Ellipsis, HardHat, ShieldCheck, Wrench} from 'lucide-react';
+import {logoutClient} from '@/lib/api';
 import type {
   ChecklistAnswer, ChecklistStage, OperatorMobileState, OperatorPhase,
 } from '@/modules/operator-mobile/contracts';
 import {
-  ApiError, currentPosition, fetchState, newCommandId, QueuedOffline, sendCommand,
-  type ProductionEntryInput,
+  ApiError, currentPosition, fetchState, newCommandId, operatorErrorDetails, operatorErrorText, QueuedOffline,
+  sendCommand, type ProductionEntryInput,
 } from './api';
 import {OfflineQueueBanner} from './offline-queue-banner';
 import {useOfflineQueue} from './use-offline-queue';
@@ -15,7 +16,7 @@ import {OperatorStatusStrip} from './operator-status-strip';
 import {BigButton, Panel, PanelTitle, PhaseBar, Screen, TabBar} from './ui';
 import {IdentityScreen} from './screens/identity-screen';
 import {BriefingScreen} from './screens/briefing-screen';
-import {KnowledgeScreen} from './screens/knowledge-screen';
+import {KnowledgeScreen, isKnowledgeAttemptExpired} from './screens/knowledge-screen';
 import {PpeScreen} from './screens/ppe-screen';
 import {AdmissionScreen} from './screens/admission-screen';
 import {ChecklistScreen} from './screens/checklist-screen';
@@ -37,6 +38,50 @@ const PHASE_STAGE: Partial<Record<OperatorMobileState['phase'], ChecklistStage>>
   STARTUP: 'EO_BEFORE',
   SITE_READY: 'SITE_READY',
 };
+
+/**
+ * Истёкший вход на команде — уводим на вход, но не мгновенно.
+ *
+ * Задержка нужна, чтобы машинист успел прочитать, почему экран уходит: без неё
+ * перезагрузка выглядит как сбой приложения. Тот же переход, что на загрузке
+ * состояния (`reload`).
+ */
+const AUTH_REDIRECT_MS = 2500;
+const AUTH_EXPIRED_NOTICE =
+  'Сессия истекла. Записи сохранены на телефоне и уйдут после входа.';
+
+/**
+ * Текст о несвежем экране после принятой команды.
+ *
+ * Обещал «обновится автоматически при связи», но автоматического перечитывания
+ * не было: экран оставался несвежим до следующего действия (аудит F-V1-QUIET-RELOAD-b).
+ * Теперь обещание исполняется — ниже повторное перечитывание, — а к записи
+ * приписано прямое «не вводите повторно».
+ */
+const STALE_SCREEN_NOTICE =
+  'Записано. Экран не обновился — обновим, как появится связь. Не вводите запись повторно.';
+
+/**
+ * Текст о несвежем экране после ОТКЛОНЁННОЙ команды (F-V1-409-NOTICE-TEXT).
+ *
+ * На 409 запись не принята — сервер уже в другом состоянии. Прежний
+ * `STALE_SCREEN_NOTICE` утверждал «Записано … не вводите запись повторно»:
+ * машинист прочитал бы это как «отказ принят» и не ввёл бы отклонённую запись
+ * снова — молчаливая потеря. Поэтому здесь только про несвежесть экрана, без
+ * «Записано» и без «не вводите повторно»; сам текст отказа 409 остаётся на
+ * месте (`actionError`).
+ */
+const STALE_AFTER_REJECT_NOTICE =
+  'Экран не обновился — обновим, как появится связь.';
+
+/**
+ * Как часто повторять тихое перечитывание, пока экран остаётся несвежим.
+ *
+ * Пятнадцать секунд — не чаще: сбой перечитывания обычно значит недоступный
+ * сервер, и долбить его каждую секунду незачем. События `online` и возврата на
+ * вкладку пробуют раньше таймера.
+ */
+const QUIET_RELOAD_EVERY_MS = 15_000;
 
 /**
  * Разделы, доступные после начала работы.
@@ -67,8 +112,56 @@ type Detour =
 export function OperatorMobileApp() {
   const [state, setState] = useState<OperatorMobileState | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  /**
+   * Отказ сервера (5xx) на загрузке состояния, в отличие от обрыва связи.
+   *
+   * Держится отдельно от `loadError`: текст «восстановите связь» на 500/503
+   * отправляет машиниста искать сеть, которой нет проблем, тогда как чинить
+   * надо сервер — об этом и должен узнать диспетчер (R76, находка 4).
+   */
+  const [serverFault, setServerFault] = useState(false);
   const [forbidden, setForbidden] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  /**
+   * Короткое уведомление над текущим экраном.
+   *
+   * Держится отдельно от `actionError`: отказ команды и короткая заметка о
+   * состоянии — разные вещи, и красная плашка отказа здесь была бы неправдой.
+   * Показывается, когда: экран остался несвежим после принятой команды (аудит
+   * R76, находка 9); сессия истекла; запись сохранена на устройстве; сервер
+   * ответил отказом 409. Это не плашка отказа.
+   */
+  const [notice, setNotice] = useState<string | null>(null);
+  /**
+   * Экран остался несвежим после принятой команды: тихое перечитывание упало.
+   *
+   * Отдельно от `notice`, потому что уведомление бывает двух разных родов: об
+   * этом сбое (лечится повтором перечитывания) и об истёкшей сессии (лечится
+   * входом). Повторять `reload` на втором значило бы стучаться в закрытую дверь
+   * (аудит F-V1-QUIET-RELOAD-b).
+   */
+  const [staleScreen, setStaleScreen] = useState(false);
+  /** Тихое перечитывание уже идёт: параллельных вызовов не заводим. */
+  const reloadingQuietly = useRef(false);
+  /**
+   * Подробности последнего отказа — что именно не заполнено.
+   *
+   * Держатся рядом с текстом отказа и снимаются вместе с ним: общая фраза
+   * «Паспорт заполнен не полностью» без списка полей бесполезна (аудит R76,
+   * находка 10). Отбор строк из `ApiError.details` — `operatorErrorDetails`.
+   */
+  const [actionErrorDetails, setActionErrorDetails] = useState<string[]>([]);
+  /**
+   * Отказ проверки знаний из-за просроченной попытки. Держится отдельно от
+   * `actionError`: экрану мало текста отказа, ему нужно знать, что повтор
+   * бесполезен и что выход один — взять новый набор вопросов. У самого экрана
+   * ответа сервера нет, поэтому примету считает рабочее место.
+   *
+   * Снимается началом нового действия или кнопкой «Начать заново», и этого
+   * достаточно: попасть в это состояние можно только на итоговом экране
+   * проверки, а там других кнопок нет.
+   */
+  const [knowledgeExpired, setKnowledgeExpired] = useState(false);
   const [busy, setBusy] = useState(false);
   const [online, setOnline] = useState(true);
   const [detour, setDetour] = useState<Detour | null>(null);
@@ -80,6 +173,8 @@ export function OperatorMobileApp() {
   const [equipmentId, setEquipmentId] = useState<string | null>(null);
   const [workTab, setWorkTab] = useState<WorkTab>('SHIFT');
   const coordinates = useRef<{latitude: number; longitude: number} | null>(null);
+  /** Таймер перехода на вход после истёкшей сессии: снимаем при размонтировании. */
+  const authRedirectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   /**
    * Ключ открытого чек-листа. К нему привязываются снимки, сделанные до
@@ -106,7 +201,19 @@ export function OperatorMobileApp() {
   const [incidentCommandId, setIncidentCommandId] = useState(newCommandId);
   const [correctionCommandId, setCorrectionCommandId] = useState(newCommandId);
 
-  const reload = useCallback(async () => {
+  /**
+   * Перечитать состояние смены.
+   *
+   * `quiet` — вызов после уже принятой команды. Там сбой перечитывания значит
+   * лишь несвежий экран, а не «нет связи»: если показать его как отказ на весь
+   * экран, машинист решит, что запись не прошла, и отправит её второй раз
+   * (аудит R76, находка 9; в v5 для этого тот же режим). Поэтому ошибку отдаём
+   * наверх — вызывающий скажет о ней коротким уведомлением, оставив экран.
+   *
+   * 401 и 403 «тихими» не бывают: истёкшая сессия и роль — не несвежий экран,
+   * и обрабатываются здесь же, до выхода наружу.
+   */
+  const reload = useCallback(async (options: {quiet?: boolean} = {}) => {
     try {
       const next = await fetchState({
         coordinates: coordinates.current,
@@ -114,6 +221,10 @@ export function OperatorMobileApp() {
       });
       setState(next);
       setLoadError(null);
+      setServerFault(false);
+      // Экран снова свежий — прежняя заметка о несвежести больше не верна.
+      setNotice(null);
+      setStaleScreen(false);
     } catch (error) {
       if (error instanceof ApiError && error.status === 401) {
         // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- намеренно: сессия истекла, полная перезагрузка сбрасывает кэш маршрутов и память вкладки прежнего входа
@@ -126,7 +237,12 @@ export function OperatorMobileApp() {
         setForbidden(error.message);
         return;
       }
-      setLoadError(error instanceof Error ? error.message : 'Не удалось загрузить смену');
+      // Тихое перечитывание: экран остаётся прежним, о сбое скажет вызывающий.
+      if (options.quiet) throw error;
+      // 5xx — сломан сервер, а не связь: совет «восстановите связь» здесь врёт,
+      // и машинист ищет причину не там.
+      setServerFault(error instanceof ApiError && error.status >= 500);
+      setLoadError(operatorErrorText(error));
     }
   }, [equipmentId]);
 
@@ -137,6 +253,57 @@ export function OperatorMobileApp() {
     })();
   }, [reload]);
 
+  /**
+   * Тихое перечитывание, пригодное для повтора: не бросает наружу и не
+   * запускается вторым, пока идёт первое.
+   *
+   * Успех сам снимает уведомление (это делает `reload`), сбой оставляет экран
+   * несвежим — и повод для следующей попытки.
+   */
+  const quietReload = useCallback(async () => {
+    if (reloadingQuietly.current) return;
+    reloadingQuietly.current = true;
+    try {
+      await reload({quiet: true});
+    } catch {
+      // Экран остался несвежим: уведомление не снимаем, повторим по следующему поводу.
+    } finally {
+      reloadingQuietly.current = false;
+    }
+  }, [reload]);
+
+  /**
+   * Пока экран несвежий — повторять тихое перечитывание, не дожидаясь действия
+   * человека.
+   *
+   * Прежнее уведомление обещало «обновится автоматически при связи», но
+   * перечитывал экран только слив очереди, а после удачной немедленной команды
+   * очередь пуста: счётчик свай и фаза оставались прежними, и машинист мог
+   * ввести ту же сваю второй раз (ключи команд после успеха новые). Поводы —
+   * событие `online`, возврат на вкладку и таймер; успешное чтение снимает
+   * `notice`, а с ним и подписки, и таймер (аудит F-V1-QUIET-RELOAD-b).
+   */
+  useEffect(() => {
+    if (!staleScreen) return;
+    const retry = () => { void quietReload(); };
+    const onVisible = () => {
+      if (globalThis.document?.visibilityState === 'visible') retry();
+    };
+    const timer = setInterval(() => {
+      // Флаг браузера врёт и в обе стороны, но при явном «сети нет» стучаться
+      // смысла нет — дождёмся события `online`.
+      if (globalThis.navigator?.onLine === false) return;
+      retry();
+    }, QUIET_RELOAD_EVERY_MS);
+    globalThis.addEventListener?.('online', retry);
+    globalThis.document?.addEventListener('visibilitychange', onVisible);
+    return () => {
+      clearInterval(timer);
+      globalThis.removeEventListener?.('online', retry);
+      globalThis.document?.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [staleScreen, quietReload]);
+
   useEffect(() => {
     const update = () => setOnline(globalThis.navigator?.onLine ?? true);
     update();
@@ -146,6 +313,29 @@ export function OperatorMobileApp() {
       globalThis.removeEventListener?.('online', update);
       globalThis.removeEventListener?.('offline', update);
     };
+  }, []);
+
+  /** Отложенный переход на вход не должен сработать после ухода с экрана. */
+  useEffect(() => () => {
+    if (authRedirectTimer.current !== null) clearTimeout(authRedirectTimer.current);
+  }, []);
+
+  /**
+   * Уйти на вход с уведомлением об истёкшей сессии.
+   *
+   * Истёкший вход приходит двумя путями: отложенная запись (`QueuedOffline` с
+   * `reason === 'auth'`) и прямой 401 на команде-переходе (`close-shift`,
+   * `finish-work`, `submit-checklist`…), которая в очередь не кладётся. Делать
+   * в обоих случаях надо одно и то же, поэтому переход и текст собраны здесь:
+   * задержка нужна, чтобы машинист успел прочитать причину — без неё
+   * перезагрузка выглядит как сбой приложения.
+   */
+  const leaveToLogin = useCallback(() => {
+    setNotice(AUTH_EXPIRED_NOTICE);
+    authRedirectTimer.current = setTimeout(() => {
+      // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- намеренно: сессия истекла, полная перезагрузка сбрасывает кэш маршрутов и память вкладки прежнего входа
+      window.location.href = '/login';
+    }, AUTH_REDIRECT_MS);
   }, []);
 
   /**
@@ -160,6 +350,10 @@ export function OperatorMobileApp() {
   const run = useCallback(async (work: () => Promise<unknown>): Promise<boolean> => {
     setBusy(true);
     setActionError(null);
+    setActionErrorDetails([]);
+    setKnowledgeExpired(false);
+    setNotice(null);
+    setStaleScreen(false);
     try {
       await work();
       setChecklistCommandId(newCommandId());
@@ -167,7 +361,19 @@ export function OperatorMobileApp() {
       setIncidentCommandId(newCommandId());
       setCorrectionCommandId(newCommandId());
       setDetour(null);
-      await reload();
+      /*
+        ТИХОЕ ПЕРЕЧИТЫВАНИЕ (аудит R76, находка 9). Команда уже принята
+        сервером, а это чтение лишь освежает экран. Упади оно полноэкранным
+        «Нет связи» — машинист прочитал бы «моя свая не записалась» и набрал
+        бы её заново. Поэтому экран остаётся прежним, а человек получает
+        короткую заметку.
+      */
+      try {
+        await reload({quiet: true});
+      } catch {
+        setNotice(STALE_SCREEN_NOTICE);
+        setStaleScreen(true);
+      }
       return true;
     } catch (error) {
       // Запись легла в очередь на устройстве — это принято, а не отказ. Форму
@@ -181,28 +387,113 @@ export function OperatorMobileApp() {
         setCorrectionCommandId(newCommandId());
         setDetour(null);
         setActionError(null);
+        setActionErrorDetails([]);
+        /*
+          ИСТЁКШИЙ ВХОД — НЕ ПРОСТО ОЧЕРЕДЬ (аудит R76, находка 8). Отложенная
+          по 401 запись сольётся после входа того же пользователя: очередь
+          привязана к человеку (`ownerId` в `offline-queue.ts`), а
+          `use-offline-queue.ts` шлёт её при появлении вошедшего. Но пока входа
+          нет, ни одна запись не уйдёт, а машинист об этом не знает — прежний
+          экран лишь молча копил «Ожидает отправки: N», и он продолжал вводить
+          сваи. Поэтому говорим прямо и тем же переходом, что на загрузке
+          состояния (`reload`), уводим на вход — с задержкой, чтобы успеть
+          прочитать причину.
+        */
+        if (error.reason === 'auth') {
+          leaveToLogin();
+        } else {
+          /*
+            ОБРЫВ СВЯЗИ — НЕ МОЛЧАНИЕ (аудит R76, находка 18). Запись легла на
+            устройство, форма закрылась, и машинист не получает ни одного слова о
+            том, что введённое не потеряно: остаётся только плашка вверху, которую
+            на рабочем экране легко не заметить. Говорим тем же коротким
+            уведомлением, что и о несвежем экране, но без кнопки «Обновить»:
+            перечитывать нечего — сервер этой записи ещё не видел.
+          */
+          setNotice(error.message);
+        }
         return true;
       }
-      setActionError(error instanceof Error ? error.message : 'Команда не выполнена');
+      /*
+        ИСТЁКШИЙ ВХОД НА КОМАНДЕ-ПЕРЕХОДЕ (аудит R89, находка 5). 401 приходит
+        не только отложенной записью: у команд, которые в очередь не кладутся
+        (`close-shift`, `finish-work`, `submit-checklist`, `submit-report`,
+        `accept-equipment`, `confirm-ppe`, `acknowledge-briefing`), сервер
+        отвечает `ApiError` 401 напрямую. Раньше это был просто текст отказа
+        «Войдите в систему»: машинист оставался на экране без единого действия
+        и без входа. Теперь тот же уход на вход с уведомлением, что у
+        отложенной записи, — общий помощник `leaveToLogin`. Отказа команды при
+        этом не показываем: экран уходит на вход, а не разбирает ошибку.
+      */
+      if (error instanceof ApiError && error.status === 401) {
+        leaveToLogin();
+        return false;
+      }
+      setActionError(operatorErrorText(error));
+      setActionErrorDetails(operatorErrorDetails(error));
+      // Просроченная попытка проверки знаний — единственный отказ, который
+      // повтором не лечится: экран предложит новую попытку вместо кнопки
+      // повторной отправки. Признак считает `isKnowledgeAttemptExpired` (400 и
+      // текст отказа `admission.ts:314`).
+      if (error instanceof ApiError && isKnowledgeAttemptExpired(error)) setKnowledgeExpired(true);
       // 409 — сервер уже в другом состоянии (ответ на прошлое нажатие
       // потерялся, смена закрыта): перечитываем, чтобы экран не спорил с ним.
       // Другие ошибки не перечитываем: без связи это сменило бы экран с
       // введёнными цифрами на «Нет связи».
-      if (error instanceof ApiError && error.status === 409) void reload();
+      //
+      // ПЕРЕЧИТЫВАНИЕ ТИХОЕ (аудит R82, находка 4). Прежний обычный `reload`
+      // на сбое чтения (сеть/5xx) заменял весь экран на «Нет связи» / «Сервер
+      // не отвечает» и уносил с собой текст отказа 409 вместе с формой:
+      // машинист не успевал прочитать, что именно произошло. Теперь сбой лишь
+      // помечает экран несвежим — тот же `staleScreen` и тот же повтор, что
+      // после принятой команды, — а отказ 409 остаётся на месте. Текст заметки
+      // другой: запись отклонена, а не принята (F-V1-409-NOTICE-TEXT).
+      if (error instanceof ApiError && error.status === 409) {
+        try {
+          await reload({quiet: true});
+        } catch {
+          setNotice(STALE_AFTER_REJECT_NOTICE);
+          setStaleScreen(true);
+        }
+      }
       return false;
     } finally {
       setBusy(false);
     }
-  }, [reload]);
+  }, [reload, leaveToLogin]);
 
   // Что лежит на устройстве и ещё не ушло: машинист видит это постоянно, а не
   // узнаёт по факту пропажи. Когда слать — решает общий хук (use-offline-queue).
-  const {queued, retry: retryQueued, discard: discardQueued} = useOfflineQueue(reload);
+  const {queued, flush: flushQueued, retry: retryQueued, retryFailed, discard: discardQueued} = useOfflineQueue(reload);
 
   if (forbidden) {
     return (
       <OperatorFrame>
-        <Screen title="Рабочее место машиниста">
+        {/*
+          Строка состояния и плашка очереди нужны и здесь (аудит R76, находка 17).
+          Отказ по роли не отменяет записей, уже лежащих на устройстве: без плашки
+          машинист не увидит ни причины отклонённых записей, ни кнопок «Повторить»/
+          «Удалить запись», а строка состояния обещает «причина показана ниже»,
+          когда ниже ничего нет.
+        */}
+        <OperatorStatusStrip online={online} items={queued} />
+        {/*
+          Без `shownElsewhere`: `ErrorNote` на этом экране нет, и признак «причина
+          уже показана у кнопки» был бы неправдой — причина пропадала отовсюду
+          (F-R89-DUP-REJECT-b). Причина отказа печатается в карточке очереди.
+        */}
+        <OfflineQueueBanner items={queued} onRetry={retryQueued} onDiscard={discardQueued} />
+        <Screen
+          title="Рабочее место машиниста"
+          /*
+            Выход из отказа по роли. Раньше экран 403 был тупиком: ни выйти,
+            ни войти другим пользователем — только текст причины (аудит R76,
+            находки 23 и 26). Смена человека возможна только сменой сессии,
+            поэтому кнопка делает то же, что выход в остальных экранах
+            приложения, — `logoutClient` (оболочка затем уводит на /login).
+          */
+          footer={<BigButton onClick={() => void logoutClient()}>Войти другим пользователем</BigButton>}
+        >
           <Panel>
             <PanelTitle>{forbidden}</PanelTitle>
             <p className="mt-1 text-sm text-muted-foreground">
@@ -219,12 +510,27 @@ export function OperatorMobileApp() {
     return (
       <OperatorFrame>
         <OperatorStatusStrip online={online} items={queued} />
-        <Screen title="Нет связи" footer={<BigButton onClick={() => void reload()}>Повторить</BigButton>}>
+        {/*
+          Плашка очереди — сразу под строкой состояния (аудит R76, находка 17).
+          Строка состояния при отклонённых записях пишет «Сервер отклонил запись —
+          причина показана ниже», а ниже ничего не было: карточки с причиной и
+          карточки с причиной и кнопками оставались на невидимом экране работы.
+
+          Без `shownElsewhere` по той же причине, что у отказа по роли:
+          `ErrorNote` здесь не рисуется, и причина обязана остаться в карточке
+          (F-R89-DUP-REJECT-b).
+        */}
+        <OfflineQueueBanner items={queued} onRetry={retryQueued} onDiscard={discardQueued} />
+        <Screen
+          title={serverFault ? 'Сервер не отвечает' : 'Нет связи'}
+          footer={<BigButton onClick={() => void reload()}>Повторить</BigButton>}
+        >
           <Panel tone="danger">
             <PanelTitle tone="danger">{loadError}</PanelTitle>
             <p className="mt-1 text-sm">
-              Без загруженного состояния нельзя безопасно открыть или закрыть смену. Восстановите
-              связь и повторите. Уже сохранённые на устройстве выработка и события не пропадут.
+              {serverFault
+                ? 'Связь есть, но сервер временно не работает. Сообщите механику или диспетчеру и повторите через несколько минут.'
+                : 'Без загруженного состояния нельзя безопасно открыть или закрыть смену. Восстановите связь и повторите. Уже сохранённые на устройстве выработка и события не пропадут.'}
             </p>
           </Panel>
         </Screen>
@@ -282,6 +588,43 @@ export function OperatorMobileApp() {
     `detour` — любой открытый шаг.
   */
   const tabsVisible = !detour && !checklist;
+
+  /*
+    ПОКАЗАНА ЛИ ПРИЧИНА ОТКАЗА НА ЭКРАНЕ (F-R89-DUP-REJECT-b).
+
+    `shownElsewhere` говорит плашке очереди: эту фразу уже печатает `ErrorNote`
+    у кнопки, в карточке её повторять незачем. Но `actionError` живёт дольше
+    своего экрана: его снимает только новое действие (`run`), а не перечитывание
+    состояния. Дойди экран до отказа загрузки («Нет связи», «Сервер не
+    отвечает») или до отказа по роли — `ErrorNote` там не рисуется вовсе, и
+    безусловный `shownElsewhere={actionError}` уносил причину отовсюду: строка
+    состояния обещала «причина показана ниже», а ниже её не было.
+
+    Поэтому признак считаем по фактической ветке: где `ErrorNote` есть —
+    причина показана у кнопки, где нет — `null`, и причина остаётся в карточке.
+  */
+  const rejectionShownOnScreen = (() => {
+    // Обходной просмотр — единственный без `ErrorNote`; остальные обходные
+    // экраны (ППО, инструктаж, знания) и чек-лист его рисуют.
+    if (detour?.kind === 'REVIEW') return null;
+    if (detour) return actionError;
+    if (checklist) return actionError;
+    // Вкладки вне «Работы»: происшествия (`MORE`) рисуют `ErrorNote`, «Техника» и «ТБ» — нет.
+    if (tabsVisible && workTab !== 'SHIFT') {
+      return workTab === 'MORE' ? actionError : null;
+    }
+    switch (state.phase) {
+      case 'ADMISSION':
+      case 'CLOSED':
+        return actionError;
+      // Без смены экран — `ShiftMissingScreen`, у него `ErrorNote` нет.
+      case 'WORK':
+      case 'CLOSING':
+        return shift ? actionError : null;
+      default:
+        return null;
+    }
+  })();
 
   const alarmingIncidents = state.incidents.filter(
     (incident) => isIncidentOpen(incident.reviewedAt),
@@ -414,6 +757,7 @@ export function OperatorMobileApp() {
       return (
         <BriefingScreen
           busy={busy}
+          error={actionError}
           onAcknowledge={() => void run(() => sendCommand({command: 'acknowledge-briefing'}))}
           onBack={() => setDetour(null)}
         />
@@ -425,6 +769,10 @@ export function OperatorMobileApp() {
         <KnowledgeScreen
           busy={busy}
           error={actionError}
+          expired={knowledgeExpired}
+          // Новая попытка начата: прежний отказ снимаем, иначе он висел бы на
+          // экране поверх новых вопросов.
+          onRestart={() => { setActionError(null); setActionErrorDetails([]); setKnowledgeExpired(false); }}
           onDone={(picks, attemptToken) => void run(() => sendCommand({command: 'submit-knowledge', picks, attemptToken}))}
           onBack={() => setDetour(null)}
         />
@@ -440,6 +788,7 @@ export function OperatorMobileApp() {
           onSubmit={submitChecklist(checklist.stage)}
           busy={busy}
           error={actionError}
+          errorDetails={actionErrorDetails}
           commandId={checklistCommandId}
           lastMeter={state.assignment?.lastMeter ?? null}
           known={knownAnswers(checklist.stage, state)}
@@ -469,6 +818,7 @@ export function OperatorMobileApp() {
             tabs={tabBar}
             busy={busy}
             error={actionError}
+            errorDetails={actionErrorDetails}
             onSelectEquipment={setEquipmentId}
             onAccept={(input) => void run(() => sendCommand({
               command: 'accept-equipment',
@@ -478,12 +828,13 @@ export function OperatorMobileApp() {
           />
         );
       case 'WORK':
-        if (!shift) return <Screen title="Смена"><p className="text-sm">Смена не найдена.</p></Screen>;
+        if (!shift) return <ShiftMissingScreen onReload={() => void reload()} />;
         return (
           <WorkScreen
             state={state}
             busy={busy}
             error={actionError}
+            errorDetails={actionErrorDetails}
             onLog={(entry: ProductionEntryInput) => run(() => sendCommand({
               command: 'log-production',
               clientCommandId: productionCommandId,
@@ -497,12 +848,13 @@ export function OperatorMobileApp() {
           />
         );
       case 'CLOSING':
-        if (!shift) return <Screen title="Смена"><p className="text-sm">Смена не найдена.</p></Screen>;
+        if (!shift) return <ShiftMissingScreen onReload={() => void reload()} />;
         return (
           <ClosingScreen
             state={state}
             busy={busy}
             error={actionError}
+            errorDetails={actionErrorDetails}
             onOpenService={() => setDetour({kind: 'CHECKLIST', stage: 'EO_AFTER'})}
             onClose={(comment) => void run(() => sendCommand({
               command: 'close-shift',
@@ -510,10 +862,32 @@ export function OperatorMobileApp() {
               comment,
             }))}
             tabs={tabBar}
+            /*
+              Ждущие и отклонённые считаются раздельно: отправка пропускает
+              `FAILED`, и общий счётчик запирал закрытие смены без выхода
+              (аудит R76, F-V1-CLOSE-FAILED).
+            */
+            pending={queued.filter((item) => item.state === 'PENDING').length}
+            failed={queued.filter((item) => item.state === 'FAILED').length}
+            onSendNow={() => void flushQueued()}
+            onRetryFailed={retryFailed}
           />
         );
       case 'CLOSED':
-        return <ClosedScreen state={state} tabs={tabBar} />;
+        /*
+          Отказ, из-за которого экран сюда и попал, не теряем (аудит R82,
+          находка 5): смену закрыли на другом устройстве, машинист ввёл сваю и
+          получил 409, и без этой строки итог смены молча отличался бы от
+          введённого. Плашку с отклонённой записью рисует оболочка выше.
+        */
+        return (
+          <ClosedScreen
+            state={state}
+            tabs={tabBar}
+            error={actionError}
+            errorDetails={actionErrorDetails}
+          />
+        );
       default:
         return <Screen title="Смена"><p className="text-sm">Экран готовится…</p></Screen>;
     }
@@ -526,7 +900,32 @@ export function OperatorMobileApp() {
         onOpen={(phase) => setDetour({kind: 'REVIEW', phase: phase as OperatorPhase})}
       />
       <OperatorStatusStrip online={online} items={queued} />
-      <OfflineQueueBanner items={queued} onRetry={retryQueued} onDiscard={discardQueued} />
+      <OfflineQueueBanner items={queued} onRetry={retryQueued} onDiscard={discardQueued} shownElsewhere={rejectionShownOnScreen} />
+      {/*
+        Короткая заметка над экраном; повод бывает разный (аудит R76, находка
+        9): принятая запись с несвежим экраном; отказ 409 — записи на сервере
+        нет; запись сохранена на устройстве — на сервере её ещё нет; истёкшая
+        сессия. Тон предупреждения, а не отказа. `role` без `alert` —
+        объявление не должно прерывать чтение экрана.
+      */}
+      {notice ? (
+        <div className="px-3 pt-2">
+          <Panel tone="warning">
+            <p role="status" className="text-sm font-medium">{notice}</p>
+            {/*
+              Ручной выход к тому же тихому перечитыванию: машинист видит, что
+              экран несвежий, и может обновить его сам, не дожидаясь связи или
+              таймера. Кнопки нет у уведомления об истёкшей сессии — там нужен
+              вход, а не перечитывание (F-V1-QUIET-RELOAD-b).
+            */}
+            {staleScreen ? (
+              <div className="mt-2">
+                <BigButton tone="ghost" onClick={() => void quietReload()}>Обновить</BigButton>
+              </div>
+            ) : null}
+          </Panel>
+        </div>
+      ) : null}
       {screen()}
     </OperatorFrame>
   );
@@ -580,6 +979,26 @@ function OperatorFrame({children}: {children: ReactNode}) {
     >
       {children}
     </div>
+  );
+}
+
+/**
+ * Работа или сдача, а смены в состоянии нет.
+ *
+ * Раньше это была голая строка «Смена не найдена.» — тупик без выхода и без
+ * объяснения (аудит R76, находки 23 и 26). Причина у состояния без смены ровно
+ * одна: смену закрыли на другом устройстве, и сервер отдаёт факты уже без неё.
+ * Поэтому говорим об этом прямо и даём перечитать состояние — тот же `reload`,
+ * что у экрана «Нет связи».
+ */
+function ShiftMissingScreen({onReload}: {onReload: () => void}) {
+  return (
+    <Screen title="Смена" footer={<BigButton onClick={onReload}>Обновить</BigButton>}>
+      <Panel>
+        <PanelTitle>Смена не найдена.</PanelTitle>
+        <p className="mt-1 text-sm text-muted-foreground">Смену могли закрыть на другом устройстве.</p>
+      </Panel>
+    </Screen>
   );
 }
 

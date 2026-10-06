@@ -84,6 +84,12 @@ export function PileJournal() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
 
+  // Перепутанный порядок дат (с 30.09 по 01.09) сервер превращает в gte > lt —
+  // выборка пуста, и журнал говорит «записей нет», хотя паспорта есть. Ловим
+  // до запроса: показываем подсказку у полей и не беспокоим сервер.
+  const dateRangeInvalid =
+    filters.dateFrom !== '' && filters.dateTo !== '' && filters.dateFrom > filters.dateTo;
+
   // Объекты — только для фильтра. Их список не меняется по ходу разбора, и
   // перезапрашивать его вместе с журналом незачем.
   useEffect(() => {
@@ -113,6 +119,9 @@ export function PileJournal() {
   // Загрузка отменяется вместе с экраном: ответ, пришедший после ухода со
   // страницы, не должен писать в размонтированный список.
   useEffect(() => {
+    // Даты в перепутанном порядке — запрос не шлём: подсказка у полей уже
+    // объясняет, почему журнал не меняется.
+    if (dateRangeInvalid) return;
     let cancelled = false;
     void (async () => {
       try {
@@ -131,7 +140,7 @@ export function PileJournal() {
       }
     })();
     return () => { cancelled = true; };
-  }, [load]);
+  }, [load, dateRangeInvalid]);
 
   const reload = useCallback(async () => {
     try {
@@ -165,13 +174,22 @@ export function PileJournal() {
   };
 
   const exportJournal = async () => {
+    // Пустая выборка давала файл с одним титулом и зелёное «Журнал выгружен»:
+    // мастер подшивал пустой документ и решал, что свай нет по ошибке фильтра.
+    if (rows && rows.length === 0) {
+      toast.error('По этой выборке свай нет — выгружать нечего. Измените фильтр или период.');
+      return;
+    }
     setExporting(true);
     let objectUrl: string | null = null;
     try {
       const response = await authFetch(`/api/pile-passports/export?${journalParams(filters).toString()}`);
       if (!response.ok) {
+        // Истёкшая сессия приходит английским «Unauthorized», а ответ прокси
+        // без тела — техническим статусом. Человеку нужен русский текст.
+        if (response.status === 401) throw new Error('Сессия истекла — войдите заново.');
         const body = await response.json().catch(() => ({}));
-        throw new Error(body.error || `Сервер ответил ${response.status}`);
+        throw new Error(body.error || 'Сервер не выдал журнал — повторите или обратитесь к администратору.');
       }
       objectUrl = URL.createObjectURL(await response.blob());
       const link = document.createElement('a');
@@ -180,7 +198,13 @@ export function PileJournal() {
       link.click();
       toast.success('Журнал выгружен');
     } catch (exportError) {
-      toast.error(exportError instanceof Error ? exportError.message : 'Не удалось выгрузить журнал');
+      // fetch без сети бросает TypeError с английским «Failed to fetch» — в
+      // русском интерфейсе это не сообщение.
+      toast.error(
+        exportError instanceof TypeError
+          ? 'Нет связи с сервером, выгрузка не выполнена — повторите'
+          : exportError instanceof Error ? exportError.message : 'Не удалось выгрузить журнал',
+      );
     } finally {
       if (objectUrl) URL.revokeObjectURL(objectUrl);
       setExporting(false);
@@ -190,7 +214,7 @@ export function PileJournal() {
   const patch = (part: Partial<JournalFilters>) => setFilters((current) => ({ ...current, ...part }));
 
   return (
-    <div className="space-y-3 p-4">
+    <div className="space-y-3 p-4 field-type">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-lg font-semibold">Журнал забивки свай</h1>
@@ -199,7 +223,7 @@ export function PileJournal() {
             Принимает сваю мастер, он же отправляет её на добивку.
           </p>
         </div>
-        <Button size="sm" variant="outline" className="h-8 text-xs" disabled={exporting}
+        <Button size="sm" variant="outline" className="h-11 text-xs sm:h-8" disabled={exporting || dateRangeInvalid}
           onClick={() => void exportJournal()}>
           {exporting ? 'Выгрузка…' : 'Выгрузить журнал (.xlsx)'}
         </Button>
@@ -212,7 +236,7 @@ export function PileJournal() {
               key={option.key}
               size="sm"
               variant={filters.status === option.key ? 'default' : 'outline'}
-              className="h-8 text-xs"
+              className="min-h-11 text-xs sm:min-h-8"
               onClick={() => patch({ status: option.key })}
             >
               {option.label}
@@ -225,7 +249,7 @@ export function PileJournal() {
           <select
             value={filters.siteId}
             onChange={(event) => patch({ siteId: event.target.value })}
-            className="mt-0.5 block h-8 rounded-md border bg-card px-2 text-xs"
+            className="mt-0.5 block min-h-11 rounded-md border bg-card px-2 text-xs sm:min-h-8 sm:h-8"
           >
             <option value="all">Все объекты</option>
             {sites.map((site) => (
@@ -240,7 +264,7 @@ export function PileJournal() {
             type="date"
             value={filters.dateFrom}
             onChange={(event) => patch({ dateFrom: event.target.value })}
-            className="mt-0.5 block h-8 rounded-md border bg-card px-2 text-xs"
+            className="mt-0.5 block min-h-11 rounded-md border bg-card px-2 text-xs sm:min-h-8 sm:h-8"
           />
         </label>
         <label className="text-2xs text-muted-foreground">
@@ -249,9 +273,15 @@ export function PileJournal() {
             type="date"
             value={filters.dateTo}
             onChange={(event) => patch({ dateTo: event.target.value })}
-            className="mt-0.5 block h-8 rounded-md border bg-card px-2 text-xs"
+            className="mt-0.5 block min-h-11 rounded-md border bg-card px-2 text-xs sm:min-h-8 sm:h-8"
           />
         </label>
+
+        {dateRangeInvalid ? (
+          <p className="text-2xs font-medium text-destructive-strong">
+            Дата начала позже даты окончания
+          </p>
+        ) : null}
 
         <label className="text-2xs text-muted-foreground">
           № сваи
@@ -259,11 +289,11 @@ export function PileJournal() {
             value={filters.pileNumber}
             onChange={(event) => patch({ pileNumber: event.target.value })}
             placeholder="С-130"
-            className="mt-0.5 block h-8 w-28 rounded-md border bg-card px-2 text-xs"
+            className="mt-0.5 block min-h-11 w-28 rounded-md border bg-card px-2 text-xs sm:min-h-8 sm:h-8"
           />
         </label>
 
-        <Button size="sm" variant="ghost" className="h-8 text-xs"
+        <Button size="sm" variant="ghost" className="min-h-11 text-xs sm:min-h-8"
           onClick={() => setFilters(EMPTY_FILTERS)}>
           Сбросить
         </Button>
@@ -283,10 +313,22 @@ export function PileJournal() {
 
       {rows === null ? <p className="text-sm text-muted-foreground">Загрузка журнала…</p> : null}
       {rows?.length === 0 ? (
-        <p className="rounded-md border border-border p-4 text-sm text-muted-foreground">
-          По этой выборке записей нет. Паспорта свай заводит машинист на вкладке «Сваи»,
-          мастер может дописать пропущенную сваю за него.
-        </p>
+        filters.status === 'PENDING' && !error ? (
+          // Пусто из-за стартового фильтра «Не разобранные» — это не «паспортов
+          // нет», а «все сваи уже разобраны». Объясняем фильтр и даём выход в «Все».
+          <div className="rounded-md border border-border p-4 text-sm text-muted-foreground">
+            <p>Все сваи объекта разобраны — среди неразобранных записей нет.</p>
+            <Button size="sm" variant="outline" className="mt-2 min-h-11 text-xs sm:min-h-8"
+              onClick={() => patch({ status: 'ALL' })}>
+              Показать все
+            </Button>
+          </div>
+        ) : (
+          <p className="rounded-md border border-border p-4 text-sm text-muted-foreground">
+            По этой выборке записей нет. Паспорта свай заводит машинист на вкладке «Сваи»,
+            мастер может дописать пропущенную сваю за него.
+          </p>
+        )
       ) : null}
 
       {rows && rows.length > 0 ? (

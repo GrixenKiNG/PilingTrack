@@ -7,7 +7,7 @@ import {
   type OperatorAnswer, type WorkWarning,
 } from '@/modules/operator-mobile/contracts';
 import {cn} from '@/lib/utils';
-import {uploadPhoto} from '../api';
+import {operatorErrorText, uploadPhoto} from '../api';
 import {BigButton, ErrorNote, Panel, PanelTitle, Screen} from '../ui';
 import {WarningsPanel} from '../warnings-panel';
 import type {KnownAnswer} from '../safety/known-answers';
@@ -68,13 +68,15 @@ function bulkItems(
  * Секции по узлам дают ориентир: течь была «где-то в гидравлике».
  */
 export function ChecklistScreen({
-  checklist, warnings, onSubmit, busy, error, commandId, onBack, lastMeter, known = {},
+  checklist, warnings, onSubmit, busy, error, errorDetails, commandId, onBack, lastMeter, known = {},
 }: {
   checklist: ChecklistView;
   warnings: WorkWarning[];
   onSubmit: (answers: ChecklistAnswer[]) => void;
   busy: boolean;
   error: string | null;
+  /** Подробности отказа: какие пункты не заполнены (аудит R76, находка 10). */
+  errorDetails?: string[];
   /** Ключ команды. Нужен уже сейчас: к нему привязываются снимки. */
   commandId: string;
   onBack?: () => void;
@@ -295,7 +297,7 @@ export function ChecklistScreen({
         })}
       </ul>
 
-      <ErrorNote message={error} />
+      <ErrorNote message={error} details={errorDetails} />
     </Screen>
   );
 }
@@ -324,7 +326,7 @@ function ItemCard({item, draft, commandId, onChange, lastMeter, known}: {
       const mediaId = await uploadPhoto({file, clientCommandId: commandId, itemId: item.id});
       onChange({mediaIds: [...draft.mediaIds, mediaId], uploading: false});
     } catch (error) {
-      setPhotoError(error instanceof Error ? error.message : 'Снимок не загрузился');
+      setPhotoError(operatorErrorText(error));
       onChange({uploading: false});
     }
   };

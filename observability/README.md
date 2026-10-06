@@ -77,11 +77,17 @@ Rules live in `prometheus/alerts.yml`. Highlights:
 | Alert | Condition | Severity |
 |-------|-----------|----------|
 | `HighAPILatencyP95` | p95 > 500ms for 5m | warning |
-| `HighErrorRate` | 5xx rate > 5% for 2m | critical |
-| `PostgresPoolNearExhaustion` | active connections > 90% of pool | critical |
-| `RedisMemoryHigh` | usage > 80% for 5m | warning |
-| `OutboxBacklogStuck` | pending > 1000 for 10m | warning |
+| `HighAPIErrorRate` | 5xx rate > 1% for 2m | critical |
+| `PostgresConnectionPoolExhausted` | active connections > 90% of pool | critical |
+| `RedisHighMemory` | usage > 80% for 5m | warning |
+| `OutboxBacklog` | pending > 1000 for 10m | warning |
 | `TargetDown` | scrape target unreachable for 2m | critical |
+| `AlertmanagerDown` | `up{job="alertmanager"} == 0` for 5m | critical |
+| `AlertmanagerNotificationsFailing` | Alertmanager delivery failures for 15m | warning |
+
+The two `Alertmanager*` alerts are delivered through that same Alertmanager,
+so `AlertmanagerDown` cannot report a total Alertmanager outage by itself —
+that failure is caught by the external watchdog (F-APP-GUARD).
 
 Each alert carries a `runbook_url` annotation pointing to the wiki.
 

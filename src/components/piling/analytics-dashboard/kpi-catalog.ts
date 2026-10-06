@@ -24,8 +24,7 @@ export interface AnalyticsWidgetMeta {
 export const ANALYTICS_DASHBOARD_WIDGETS: readonly AnalyticsWidgetMeta[] = [
   { id: 'kpi-equipment', title: 'Установок', zone: 'kpi', defaultSize: 'sm' },
   { id: 'kpi-sites', title: 'Объектов', zone: 'kpi', defaultSize: 'sm' },
-  { id: 'kpi-piles', title: 'Сваи (шт)', zone: 'kpi', defaultSize: 'sm' },
-  { id: 'kpi-pile-meters', title: 'Метры свай', zone: 'kpi', defaultSize: 'sm' },
+  { id: 'kpi-piles', title: 'Сваи', zone: 'kpi', defaultSize: 'sm' },
   { id: 'kpi-drilling', title: 'Бурение', zone: 'kpi', defaultSize: 'sm' },
   { id: 'kpi-downtime', title: 'Простой', zone: 'kpi', defaultSize: 'sm' },
   { id: 'kpi-crews', title: 'Бригады', zone: 'kpi', defaultSize: 'sm' },

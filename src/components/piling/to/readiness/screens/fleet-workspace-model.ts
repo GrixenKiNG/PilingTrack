@@ -1,4 +1,5 @@
 import type { ReferenceUiProps } from './types';
+import { normalizeSearch } from '../shared/text-search';
 import { buildAuthoritativeReadinessPresentation, buildUnavailableReadinessPresentation } from '../authoritative-presentation';
 
 export type FleetGroup = 'ready' | 'attention' | 'blocked' | 'unknown';
@@ -66,10 +67,21 @@ export function buildFleetItems(props: Pick<ReferenceUiProps, 'equipment' | 'fle
       : presentation.outcome === 'BLOCKED' ? 'blocked'
         : presentation.outcome === 'READY' ? 'ready' : 'attention';
     const fleet = cards.get(equipment.id);
-    const reason = presentation.blockers[0]?.label ?? presentation.warnings[0]?.label
+    /*
+      Причины — это все замечания авторитетной оценки в том порядке, в каком
+      их показывает панель: сначала блокеры, затем предупреждения (см.
+      fleet-evidence-panel, раздел «Основания оценки»). Список оставляем
+      полным, но в строке показываем одну краткую причину — первую, как и
+      прежде: приоритет допуска не меняем. Число остальных строку не
+      расширяет, а ведёт в ту же панель, где причины уже перечислены целиком.
+      Порядок «блокер важнее предупреждения» повторяет `nextAction` и панель.
+    */
+    const reasons = [...presentation.blockers, ...presentation.warnings];
+    const reason = reasons[0]?.label
       ?? (group === 'unknown' ? 'Нет подтверждённой оценки'
         : group === 'ready' ? 'Блокирующих условий в оценке нет' : presentation.description);
     return { equipment, fleet, snapshot, presentation, group, reason,
+      extraReasonCount: Math.max(0, reasons.length - 1),
       site: fleet?.assignedSiteName || 'Без объекта' };
   });
 }
@@ -77,13 +89,13 @@ export function buildFleetItems(props: Pick<ReferenceUiProps, 'equipment' | 'fle
 export type FleetItem = ReturnType<typeof buildFleetItems>[number];
 
 export function filterFleetItems(items: FleetItem[], view: FleetViewState): FleetItem[] {
-  const query = view.query.trim().toLocaleLowerCase('ru-RU');
+  const query = normalizeSearch(view.query);
   const priorities: Record<FleetGroup, number> = { blocked: 0, unknown: 1, attention: 2, ready: 3 };
   return items.filter((item) =>
     (view.status === 'all' || item.group === view.status)
     && (!view.site || item.site === view.site)
-    && [item.equipment.name, item.equipment.model, item.site, item.fleet?.assignedCrewName]
-      .filter(Boolean).join(' ').toLocaleLowerCase('ru-RU').includes(query),
+    && normalizeSearch([item.equipment.name, item.equipment.model, item.site, item.fleet?.assignedCrewName]
+      .filter(Boolean).join(' ')).includes(query),
   ).sort((a, b) => {
     const order = view.sort === 'priority' ? priorities[a.group] - priorities[b.group]
       : view.sort === 'hours' ? (b.equipment.engineHoursTotal ?? -1) - (a.equipment.engineHoursTotal ?? -1) : 0;

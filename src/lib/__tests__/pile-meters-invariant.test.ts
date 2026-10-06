@@ -41,7 +41,7 @@ describe('pile metres are consistent across reports screen and period summary', 
   it('computePeriodSummary == expected', () => {
     const summary = computePeriodSummary(
       [{
-        siteId: SITE,
+        status: 'submitted', siteId: SITE,
         userId: 'op_1',
         piles: piles.map((p) => ({
           count: p.count,

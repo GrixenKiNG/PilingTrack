@@ -9,8 +9,9 @@ import { cn } from '@/lib/utils';
 import { buildHandoverJournal, handoverRoleLabel, type HandoverEventKind, type HandoverJournalEvent } from '../handover-journal';
 import { isOpenRecord } from '../../to-stats';
 import type { AuthoritativeReadinessFactsDto, ReadinessShiftDto } from '../api/contracts';
-import { buildAuthoritativeReadinessPresentation, buildUnavailableReadinessPresentation, type AuthoritativeReadinessPresentation, type PresentationEvidence, type PresentationStage } from '../authoritative-presentation';
-import { EquipmentPhoto, ReadinessRing, STAGE_CTA, muted } from './shared';
+import { buildAuthoritativeReadinessPresentation, buildUnavailableReadinessPresentation, type AuthoritativeReadinessPresentation, type PresentationEvidence, type PresentationNotice, type PresentationStage } from '../authoritative-presentation';
+import { EquipmentPhoto, ReadinessRing, STAGE_CTA, muted, blockerTone, type BlockerTone, BLOCKER_TONE_CLASS, BLOCKER_TONE_LABEL } from './shared';
+import { blockerGuidance } from './blocker-guidance';
 import type { EquipmentDetailSnapshot, ReferenceUiProps, ReferenceView } from './types';
 
 const ROLE_FLOW = [
@@ -209,6 +210,37 @@ const HANDOVER_PILL: Record<HandoverEventKind, { label: string; cls: string }> =
   ACCEPTED: { label: 'Принято', cls: 'border-border text-muted-foreground' },
 };
 
+/**
+ * Счёт блокеров по тону действия — тому же, которым блокер красится.
+ *
+ * Правило «нет осмотра за сегодня» (`RETURN_TO_OPERATOR`) — незакрытый шаг, а
+ * не критический дефект; «нужно подтверждение» (`REQUIRE_CONFIRMATION`) —
+ * решение ответственного. Раньше плитка и блок называли ЛЮБОЙ блокер
+ * критическим. Неизвестное действие `blockerTone` относит к строгому запрету,
+ * поэтому в «Критические» попадает и оно: недооценить блокировку пуска хуже,
+ * чем перестраховаться. Сами условия допуска остаются блокерами — меняется
+ * лишь подпись и цвет счётчика.
+ */
+function countBlockersByTone(blockers: readonly PresentationNotice[]): Record<BlockerTone, number> {
+  const counts: Record<BlockerTone, number> = { critical: 0, attention: 0, info: 0 };
+  for (const notice of blockers) counts[blockerTone(notice.action)] += 1;
+  return counts;
+}
+
+/** Слово-итог счётчика по тону блокера: «Критическое» — только строгий запрет. */
+const BLOCKER_COUNT_LABEL: Record<BlockerTone, string> = {
+  critical: 'Критические',
+  attention: BLOCKER_TONE_LABEL.attention,
+  info: BLOCKER_TONE_LABEL.info,
+};
+
+/** Заливка счётчика по тону блокера: красная — только у запрета пуска. */
+const BLOCKER_COUNT_CLASS: Record<BlockerTone, string> = {
+  critical: 'bg-destructive/10 text-destructive-strong',
+  attention: 'bg-warning/10 text-warning-strong',
+  info: 'bg-info/10 text-info-strong',
+};
+
 interface ReadinessMetricTile {
   key: string;
   label: string;
@@ -257,6 +289,8 @@ function buildReadinessMetricTiles(
   const daysLeft = nextDate
     ? Math.ceil((new Date(nextDate).getTime() - Date.now()) / 86_400_000)
     : null;
+  // Блокеры одного вердикта разных исходов — «критический» только запрет пуска.
+  const blockerTones = countBlockersByTone(presentation.blockers);
 
   return [
     {
@@ -289,13 +323,19 @@ function buildReadinessMetricTiles(
       key: 'findings',
       label: 'Замечания и дефекты',
       icon: AlertTriangle,
-      pill: presentation.blockers.length > 0
-        ? { label: 'Есть', cls: 'bg-destructive/10 text-destructive-strong' }
-        : presentation.warnings.length > 0
-          ? { label: 'Есть замечания', cls: 'bg-warning/10 text-warning-strong' }
-          : { label: 'Нет', cls: 'bg-success/10 text-success-strong' },
+      pill: blockerTones.critical > 0
+        ? { label: 'Есть', cls: BLOCKER_COUNT_CLASS.critical }
+        : blockerTones.attention > 0
+          ? { label: 'Есть', cls: BLOCKER_COUNT_CLASS.attention }
+          : blockerTones.info > 0
+            ? { label: 'Есть', cls: BLOCKER_COUNT_CLASS.info }
+            : presentation.warnings.length > 0
+              ? { label: 'Есть замечания', cls: 'bg-warning/10 text-warning-strong' }
+              : { label: 'Нет', cls: 'bg-success/10 text-success-strong' },
       rows: [
-        { caption: 'Критические', value: String(presentation.blockers.length) },
+        { caption: BLOCKER_COUNT_LABEL.critical, value: String(blockerTones.critical) },
+        ...(blockerTones.attention > 0 ? [{ caption: BLOCKER_COUNT_LABEL.attention, value: String(blockerTones.attention) }] : []),
+        ...(blockerTones.info > 0 ? [{ caption: BLOCKER_COUNT_LABEL.info, value: String(blockerTones.info) }] : []),
         { caption: 'Обычные', value: String(facts?.findings ?? presentation.warnings.length) },
       ],
       view: 'maintenance',
@@ -429,6 +469,9 @@ export function ReadinessCentre(props: ReferenceUiProps) {
   };
   const blockers = presentation.blockers.length;
   const warnings = presentation.warnings.length;
+  // Счёт по исходу, а не «все блокеры критические»: возврат оператору и
+  // подтверждение — не критический дефект, красным красится только запрет пуска.
+  const blockerTones = countBlockersByTone(presentation.blockers);
   const facts = authoritativeCurrent?.facts ?? null;
   const doneStages = presentation.stages.filter((stage) => stage.state === 'pass').length;
   const stageProgress = Math.round((doneStages / presentation.stages.length) * 100);
@@ -479,8 +522,32 @@ export function ReadinessCentre(props: ReferenceUiProps) {
   */
   const pendingStages = presentation.stages.filter((stage) => stage.state !== 'pass');
   const pendingSummary = pendingStages.map((stage) => `${stage.label} — ${stage.value.toLowerCase()}`).join('; ');
+  const topBlocker = presentation.blockers[0] ?? null;
+  /*
+    Блокер блокеру не равен: запрет пуска (`DENY_START`), возврат оператору
+    (`RETURN_TO_OPERATOR`) и «нужно подтверждение» (`REQUIRE_CONFIRMATION`) —
+    разные исходы. Раньше любой из них звался «критическим замечанием» и
+    красился красным, и подпись правила «нет осмотра за сегодня» читалась как
+    критический дефект. Тон берём из действия блокера.
+  */
+  const topTone = topBlocker ? BLOCKER_TONE_CLASS[blockerTone(topBlocker.action)] : null;
+  /*
+    Кто снимает причину и куда идти. Доменный `actionLabel` («Вернуть
+    оператору») — команда системе, а не адрес для человека; маршрутизация
+    «кто/куда» уже описана в blocker-guidance и до сих пор жила только в
+    «Отчётах». Показываем её рядом с причиной; кнопка перехода ведёт на ту же
+    вкладку, но только если вкладка доступна роли (полоса вкладок фильтруется
+    по тем же capabilities.screens — иначе обещали бы переход в никуда).
+  */
+  const topGuidance = topBlocker ? blockerGuidance(topBlocker) : null;
+  const guidanceView = topGuidance?.view ?? null;
+  const guidanceAvailable = guidanceView != null
+    && props.bootstrap?.capabilities.screens[guidanceView] !== false;
+  const hasBlockingDeny = presentation.blockers.some((notice) => blockerTone(notice.action) === 'critical');
   const recommendation = blockers > 0
-    ? 'Рекомендация: устранить критические замечания для допуска к работе.'
+    ? hasBlockingDeny
+      ? 'Рекомендация: устранить блокирующие условия для допуска к работе.'
+      : 'Рекомендация: закрыть условие допуска — требуется действие ответственного.'
     : warnings > 0
       ? 'Рекомендация: закрыть замечания до начала смены.'
       : presentation.status === 'READY'
@@ -564,6 +631,9 @@ export function ReadinessCentre(props: ReferenceUiProps) {
                   ? `Балл готовности ${presentation.score} из 100`
                   : 'Авторитетной оценки ещё нет'}
               </div>
+              <div className="mt-0.5 text-2xs leading-relaxed text-muted-foreground">
+                Взвешенная оценка состояния узлов. Пуск разрешают не баллы, а блокирующие правила.
+              </div>
             </div>
           </div>
           {/*
@@ -583,7 +653,8 @@ export function ReadinessCentre(props: ReferenceUiProps) {
                 <div className="mt-2 font-bold">
                   {blockers === 0 && nextStage ? `Завершить шаг «${nextStage.label}»` : presentation.nextAction}
                 </div>
-                <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                {/* 14px на телефоне — норма служебного текста (QA F-MOB-READINESS-TEXT); на компьютере размер прежний. */}
+                <p className="mt-1 text-sm sm:text-xs leading-relaxed text-muted-foreground">
                   {props.authoritativeReadinessError
                     ?? (blockers === 0 && nextStage
                       ? `${nextStage.value}. Ход за: ${stageOwner ?? 'не назначен'}.`
@@ -665,13 +736,20 @@ export function ReadinessCentre(props: ReferenceUiProps) {
             приходилось пересчитывать глазами, чтобы понять, далеко ли до смены.
           */}
           <div className="mt-auto pt-4">
+            {/*
+              «Готовность чек-листа смены» стояла рядом с баллом готовности и
+              читалась как второй балл: совпадение «3 из 5 · 60 %» с баллом
+              случайно. Здесь доля процедуры, а не оценка узлов, и подпись
+              говорит, что это именно этапы предсменного контроля.
+            */}
+            <div className="text-2xs font-semibold">Пройдено шагов процедуры</div>
             <div
-              className="h-1.5 overflow-hidden rounded-full bg-muted"
+              className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted"
               role="progressbar"
               aria-valuenow={stageProgress}
               aria-valuemin={0}
               aria-valuemax={100}
-              aria-label="Готовность чек-листа смены"
+              aria-label="Пройдено шагов процедуры"
             >
               <div
                 className={cn('h-full rounded-full', stageProgress === 100 ? 'bg-success-strong' : 'bg-signal')}
@@ -682,6 +760,10 @@ export function ReadinessCentre(props: ReferenceUiProps) {
               <span>Выполнено {doneStages} из {presentation.stages.length} шагов</span>
               <span className="font-semibold tabular-nums">{stageProgress}%</span>
             </div>
+            {/* 14px на телефоне — норма служебного текста (QA F-MOB-READINESS-TEXT); на компьютере размер прежний. */}
+            <p className="mt-1 text-sm sm:text-2xs leading-relaxed text-muted-foreground">
+              Сколько этапов предсменного контроля уже пройдено. Это не балл готовности.
+            </p>
           </div>
         </div>
       </section>
@@ -694,10 +776,16 @@ export function ReadinessCentre(props: ReferenceUiProps) {
               <div className="mt-4 flex flex-wrap items-center gap-4 sm:gap-8">
                 <ReadinessRing value={presentation.score} />
                 <div>
-                  <div className="text-xs text-muted-foreground">Итоговый балл готовности</div>
+                  <div className="text-xs text-muted-foreground">Балл готовности</div>
                   <div className="mt-1 font-mono text-2xl font-bold">{presentation.score ?? '—'} <span className="text-sm font-normal text-muted-foreground">/100</span></div>
-                  <div className="mt-3 flex gap-4 text-xs">
-                    <span>Критические блокеры <b className="ml-1 rounded bg-destructive/10 px-1.5 py-0.5 text-destructive-strong">{blockers}</b></span>
+                  {/* 14px на телефоне — норма служебного текста (QA F-MOB-READINESS-TEXT); на компьютере размер прежний. */}
+                  <p className="mt-1 text-sm sm:text-2xs leading-relaxed text-muted-foreground">
+                    Взвешенная оценка состояния узлов. Пуск разрешают не баллы, а блокирующие правила.
+                  </p>
+                  <div className="mt-3 flex flex-wrap gap-4 text-xs">
+                    <span>Критические блокеры <b className={cn('ml-1 rounded px-1.5 py-0.5', BLOCKER_COUNT_CLASS.critical)}>{blockerTones.critical}</b></span>
+                    {blockerTones.attention > 0 && <span>{BLOCKER_COUNT_LABEL.attention} <b className={cn('ml-1 rounded px-1.5 py-0.5', BLOCKER_COUNT_CLASS.attention)}>{blockerTones.attention}</b></span>}
+                    {blockerTones.info > 0 && <span>{BLOCKER_COUNT_LABEL.info} <b className={cn('ml-1 rounded px-1.5 py-0.5', BLOCKER_COUNT_CLASS.info)}>{blockerTones.info}</b></span>}
                     <span>Замечания <b className="ml-1 rounded bg-signal/10 px-1.5 py-0.5 text-signal-strong">{warnings}</b></span>
                   </div>
                 </div>
@@ -798,15 +886,34 @@ export function ReadinessCentre(props: ReferenceUiProps) {
             )}
           </div>
           <div className="border-t border-border p-4">
-            <h3 className="flex items-center gap-2 font-bold"><AlertTriangle className="h-4 w-4 text-destructive-strong" />Критическое замечание</h3>
-            <div className="mt-3 flex items-center gap-3 rounded-lg border border-destructive/25 bg-destructive/10 p-3">
-              <AlertTriangle className="h-7 w-7 text-destructive-strong" />
+            <h3 className="flex items-center gap-2 font-bold"><AlertTriangle className={cn('h-4 w-4', topTone?.icon ?? 'text-muted-foreground')} />Что держит допуск</h3>
+            <div className={cn('mt-3 flex items-center gap-3 rounded-lg border p-3', topTone?.box ?? 'border-border bg-muted')}>
+              <AlertTriangle className={cn('h-7 w-7', topTone?.icon ?? 'text-muted-foreground')} />
               <div className="flex-1">
-                <div className="font-semibold">{presentation.blockers[0]?.label ?? (presentation.status === 'UNCONFIRMED' ? presentation.title : 'Критических замечаний не обнаружено')}</div>
-                <div className="mt-1 text-xs text-muted-foreground">{presentation.blockers[0]?.actionLabel ?? presentation.description}</div>
+                <div className="font-semibold">{topBlocker?.label ?? (presentation.status === 'UNCONFIRMED' ? presentation.title : 'Ничего не держит допуск')}</div>
+                <div className="mt-1 text-xs text-muted-foreground">{topBlocker?.actionLabel ?? presentation.description}</div>
+                {/* Карта интерфейса: кто отвечает за снятие и на каком экране это делается. */}
+                {topGuidance && (
+                  <div className="mt-1 flex flex-wrap items-center gap-x-1 text-xs text-muted-foreground">
+                    <span>Снимает</span>
+                    <span className="font-semibold text-foreground">{topGuidance.who}</span>
+                    <span aria-hidden>·</span>
+                    <span>{topGuidance.where}</span>
+                  </div>
+                )}
               </div>
-              <span className="rounded border border-destructive px-2 py-1 text-xs text-destructive-strong">{blockers ? 'Критическое' : 'Нет блокеров'}</span>
+              <span className={cn('rounded border px-2 py-1 text-xs', topTone?.badge ?? 'border-border text-muted-foreground')}>{topBlocker ? BLOCKER_TONE_LABEL[blockerTone(topBlocker.action)] : 'Нет блокеров'}</span>
             </div>
+            {guidanceAvailable && (
+              <Button
+                type="button"
+                variant="outline"
+                className="mt-2 h-9 w-full"
+                onClick={() => guidanceView && props.onViewChange(guidanceView)}
+              >
+                Перейти к снятию <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            )}
           </div>
           <div className="flex flex-1 flex-col border-t border-border p-4">
             <h3 className="flex items-center gap-2 font-bold"><FileText className="h-4 w-4 text-muted-foreground" />Доказательства готовности</h3>

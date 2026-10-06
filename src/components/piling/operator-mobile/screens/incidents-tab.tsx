@@ -8,7 +8,7 @@ import {
   type IncidentCategory, type IncidentSign, type OperatorMobileState,
 } from '@/modules/operator-mobile/contracts';
 import {cn} from '@/lib/utils';
-import {uploadPhoto} from '../api';
+import {operatorErrorText, uploadPhoto} from '../api';
 import {BigButton, ErrorNote, Panel, PanelTitle, Sign} from '../ui';
 
 /**
@@ -70,7 +70,7 @@ export function IncidentsTab({state, busy, error, commandId, onReport}: {
       const mediaId = await uploadPhoto({file, clientCommandId: commandId, entityType: 'safety_incident'});
       setMediaIds((current) => [...current, mediaId]);
     } catch (uploadError) {
-      setPhotoError(uploadError instanceof Error ? uploadError.message : 'Снимок не загрузился');
+      setPhotoError(operatorErrorText(uploadError));
     } finally {
       setUploading(false);
     }
@@ -158,6 +158,15 @@ export function IncidentsTab({state, busy, error, commandId, onReport}: {
         <h2 className="text-3xs font-semibold uppercase tracking-wider text-muted-foreground">
           Что произошло
         </h2>
+        {/*
+          Новичок начинает с описания и только потом ищет, чем отправить, — а
+          кнопка внизу гаснет, пока не выбрана категория, и молчит. Инструкция
+          над карточками называет этот шаг и его место в форме: дальше человек
+          заполняет признаки, пострадавших, описание и отправляет.
+        */}
+        <p className="text-2xs text-muted-foreground">
+          Шаг 1 из 2: выберите, что произошло
+        </p>
         {INCIDENT_CATEGORIES.map((option) => (
           <button
             key={option}
@@ -287,6 +296,14 @@ export function IncidentsTab({state, busy, error, commandId, onReport}: {
         <BigButton tone="danger" onClick={() => void submit()} disabled={!ready || busy || uploading}>
           {busy ? 'Записываем…' : 'Записать происшествие'}
         </BigButton>
+        {/* Серая кнопка молчит, и человек, уже написавший описание, не понимает,
+            чего не хватает. Пока категория не выбрана, называем причину прямо
+            здесь — под гаснущей кнопкой. */}
+        {category === null ? (
+          <p className="text-center text-2xs font-medium text-muted-foreground">
+            Сначала выберите, что произошло
+          </p>
+        ) : null}
         <BigButton tone="ghost" onClick={() => setOpen(false)}>Отмена</BigButton>
       </div>
     </>

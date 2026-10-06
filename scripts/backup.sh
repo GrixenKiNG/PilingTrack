@@ -92,9 +92,9 @@ backup_database() {
 
     # Update Redis with backup metadata for health monitoring
     if command -v redis-cli &> /dev/null && [ -n "$REDIS_URL" ]; then
-      redis-cli -u "$REDIS_URL" SET "system:backup:last_timestamp" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" EX 172800 2>/dev/null || true
-      redis-cli -u "$REDIS_URL" SET "system:backup:last_size" "$BACKUP_SIZE" EX 172800 2>/dev/null || true
-      redis-cli -u "$REDIS_URL" SET "system:backup:s3_synced" "false" EX 172800 2>/dev/null || true
+      redis-cli -u "$REDIS_URL" SET "pilingtrack:system:backup:last_timestamp" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" EX 172800 2>/dev/null || true
+      redis-cli -u "$REDIS_URL" SET "pilingtrack:system:backup:last_size" "$BACKUP_SIZE" EX 172800 2>/dev/null || true
+      redis-cli -u "$REDIS_URL" SET "pilingtrack:system:backup:s3_synced" "false" EX 172800 2>/dev/null || true
     fi
   else
     log "ERROR: Backup failed!"
@@ -164,7 +164,7 @@ upload_to_s3() {
       log "S3 upload OK"
       # Update Redis s3_synced flag
       if command -v redis-cli &> /dev/null && [ -n "$REDIS_URL" ]; then
-        redis-cli -u "$REDIS_URL" SET "system:backup:s3_synced" "true" EX 172800 2>/dev/null || true
+        redis-cli -u "$REDIS_URL" SET "pilingtrack:system:backup:s3_synced" "true" EX 172800 2>/dev/null || true
       fi
     else
       log "WARNING: S3 upload failed"
@@ -173,7 +173,7 @@ upload_to_s3() {
     if mc cp "$BACKUP_FILE" "$s3_url"; then
       log "S3 upload OK (via mc)"
       if command -v redis-cli &> /dev/null && [ -n "$REDIS_URL" ]; then
-        redis-cli -u "$REDIS_URL" SET "system:backup:s3_synced" "true" EX 172800 2>/dev/null || true
+        redis-cli -u "$REDIS_URL" SET "pilingtrack:system:backup:s3_synced" "true" EX 172800 2>/dev/null || true
       fi
     else
       log "WARNING: S3 upload failed (via mc)"

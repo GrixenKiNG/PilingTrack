@@ -9,6 +9,7 @@
 import Link from 'next/link';
 import { CheckCircle2, FileText, Loader2, Printer } from '@/components/piling/icons/unified-icons';
 import { formatRuDate } from '@/lib/format';
+import { formatDateTimeInTimezone } from '@/lib/timezone';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import {
@@ -21,6 +22,7 @@ import { TYPE_LABEL } from './maintenance-labels';
 import { statusView, type MaintenanceCrewView, type WorkOrderRow } from './maintenance-board-model';
 import { ActionIcon } from './maintenance-board-bits';
 import { WorkOrderPhotos } from './work-order-photos';
+import { PrintScreenStyles } from '../admin-reports/print-screen';
 
 export function MaintenanceDetailPanel({
   record,
@@ -53,7 +55,10 @@ export function MaintenanceDetailPanel({
   const closeBusy = busyAction === `${record.id}:DONE`;
 
   return (
-    <aside className="min-h-screen border-l border-border bg-card">
+    // print-area: при печати на лист попадает только карточка наряда — без
+    // шапки, меню и обрезки по краю прокрутки (R134, находка 1).
+    <aside className="print-area min-h-screen border-l border-border bg-card">
+      <PrintScreenStyles />
       <div className="flex h-full flex-col">
         <header className="flex items-center justify-between border-b border-border px-5 py-4">
           <div className="min-w-0">
@@ -84,7 +89,7 @@ export function MaintenanceDetailPanel({
                 <div className="h-full rounded-full bg-signal" style={{ width: `${progress}%` }} />
               </div>
               <MetricLine label="Порог ТО" value={interval != null ? `${interval} м/ч` : 'не задан'} />
-              <MetricLine label="Закрыто" value={record.completedAt ? `${formatRuDate(record.completedAt)} (${hours ?? '—'} м/ч)` : 'не закрывалось'} />
+              <MetricLine label="Закрыто" value={record.completedAt ? `${formatDateTimeInTimezone(record.completedAt)} (${hours ?? '—'} м/ч)` : 'не закрывалось'} />
             </div>
           </PanelSection>
 
@@ -126,10 +131,10 @@ export function MaintenanceDetailPanel({
           <PanelSection title="Состояние наряда">
             <div className="space-y-3 text-xs">
               <TimelineLine tone="green" date={formatRuDate(record.scheduledAt)} text="Плановая дата ТО" actor="План" />
-              <TimelineLine tone="green" date={formatRuDate(record.startedAt)} text={record.startedAt ? 'Работы начаты' : 'Работы не начаты'} actor={assigneeName} />
-              <TimelineLine tone={record.completedAt ? 'green' : 'orange'} date={formatRuDate(record.completedAt)} text={record.completedAt ? 'ТО закрыто' : 'Закрытие ожидается'} actor={assigneeName} />
+              <TimelineLine tone="green" date={record.startedAt ? formatDateTimeInTimezone(record.startedAt) : '—'} text={record.startedAt ? 'Работы начаты' : 'Работы не начаты'} actor={assigneeName} />
+              <TimelineLine tone={record.completedAt ? 'green' : 'orange'} date={record.completedAt ? formatDateTimeInTimezone(record.completedAt) : '—'} text={record.completedAt ? 'ТО закрыто' : 'Закрытие ожидается'} actor={assigneeName} />
             </div>
-            <Link href={`/admin/maintenance/${record.id}`} className="mt-3 inline-flex text-xs font-medium text-info-strong hover:text-info-strong">
+            <Link href={`/admin/maintenance/${record.id}`} className="mt-3 inline-flex min-h-11 items-center text-xs font-medium text-info-strong hover:text-info-strong sm:min-h-0">
               Показать все события
             </Link>
           </PanelSection>
@@ -138,8 +143,10 @@ export function MaintenanceDetailPanel({
         <footer className="grid grid-cols-2 gap-2 border-t border-border px-4 py-3">
           <Button
             size="sm"
-            className="h-9 bg-signal px-2 text-white hover:bg-signal-strong"
-            disabled={closeBusy || record.status === 'DONE'}
+            className="h-11 bg-signal px-2 text-white hover:bg-signal-strong sm:h-9"
+            // Отменённый наряд закрыть нельзя (F-R122-6): PUT {status:'DONE'} вернул бы
+            // его из CANCELLED в DONE, сдвинув регламент и записав показание счётчика.
+            disabled={closeBusy || record.status === 'DONE' || record.status === 'CANCELLED'}
             onClick={() => void onClose(record)}
           >
             {closeBusy ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-1 h-4 w-4" />} Закрыть ТО
@@ -148,7 +155,7 @@ export function MaintenanceDetailPanel({
             type="button"
             size="sm"
             variant="outline"
-            className="h-9 px-2"
+            className="h-11 px-2 sm:h-9"
             onClick={() => window.print()}
           >
             <Printer className="mr-1 h-4 w-4" /> Печать

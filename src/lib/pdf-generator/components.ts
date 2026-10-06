@@ -1,5 +1,5 @@
 import { COLORS, CONTENT_WIDTH, PAGE } from './constants';
-import { formatNumber, formatRuDate, safeText } from './format';
+import { formatNumber, formatRuDate, safeText, statusLabel } from './format';
 import { sumDowntime, sumDrilling, sumPiles } from './period-row';
 import { formatDowntimeHours } from '@/lib/downtime-hours';
 import type { PdfDoc, PeriodReportRow } from './types';
@@ -81,8 +81,9 @@ export function addInfoGrid(doc: PdfDoc, rows: string[][]) {
     doc.text(row[2], x2 + 6, y + 7, { width: labelWidth - 10, height: rowHeight - 8 });
 
     doc.font('Regular').fontSize(8.5).fillColor(COLORS.dark);
-    doc.text(row[1], x1 + 6, y + 7, { width: valueWidth - 10, height: rowHeight - 8 });
-    doc.text(row[3], x3 + 6, y + 7, { width: valueWidth - 10, height: rowHeight - 8 });
+    // Значения идут через safeText: строка из пробелов проходит `|| '—'` и печаталась пустой ячейкой.
+    doc.text(safeText(row[1]), x1 + 6, y + 7, { width: valueWidth - 10, height: rowHeight - 8 });
+    doc.text(safeText(row[3]), x3 + 6, y + 7, { width: valueWidth - 10, height: rowHeight - 8 });
 
     doc.y = y + rowHeight;
   });
@@ -199,7 +200,7 @@ export function addTable(
 export function addPeriodTable(doc: PdfDoc, reports: PeriodReportRow[]) {
   addTable(
     doc,
-    ['Дата', 'Объект', 'Оператор', 'Сваи', 'Бурение', 'Простои'],
+    ['Дата', 'Объект', 'Оператор', 'Сваи, шт.', 'Бурение, м.п.', 'Простои'],
     reports.map((report) => [
       formatRuDate(report.date || ''),
       report.site?.name || '—',
@@ -214,7 +215,7 @@ export function addPeriodTable(doc: PdfDoc, reports: PeriodReportRow[]) {
 
 export function addReportBreakdown(doc: PdfDoc, report: PeriodReportRow, index: number) {
   ensureSpace(doc, 54);
-  const title = `${index}. ${formatRuDate(report.date || '')} | ${report.site?.name || 'Объект'} | ${report.user?.name || 'Оператор'}`;
+  const title = `${index}. ${formatRuDate(report.date || '')} | ${report.site?.name || 'Объект'} | ${report.user?.name || 'Оператор'} | ${statusLabel(report.status || '')}`;
   doc.font('Bold').fontSize(9.5).fillColor(COLORS.dark);
   doc.text(title, PAGE.left, doc.y, { width: CONTENT_WIDTH });
   doc.moveDown(0.25);
@@ -222,7 +223,7 @@ export function addReportBreakdown(doc: PdfDoc, report: PeriodReportRow, index: 
   if ((report.piles || []).length > 0) {
     addTable(
       doc,
-      ['Свайные работы', 'Кол-во'],
+      ['Свайные работы', 'Кол-во, шт.'],
       (report.piles || []).map((pile) => [pile.pileGrade?.name || '—', formatNumber(pile.count || 0)]),
       [0.72, 0.28],
       true
@@ -232,7 +233,7 @@ export function addReportBreakdown(doc: PdfDoc, report: PeriodReportRow, index: 
   if ((report.drillings || []).length > 0) {
     addTable(
       doc,
-      ['Бурение', 'Метров'],
+      ['Бурение', 'Метров, м.п.'],
       (report.drillings || []).map((drilling) => [drilling.type?.name || '—', formatNumber(drilling.meters || 0)]),
       [0.72, 0.28],
       true

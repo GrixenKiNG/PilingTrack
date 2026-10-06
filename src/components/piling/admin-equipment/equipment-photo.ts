@@ -9,6 +9,7 @@ const PHOTO_BY_MODEL: Record<string, string> = {
   'Banut 655': '/icons/equipment-photos/banut-655.jpg',
   'LRH 100': '/icons/equipment-photos/liebherr-lrh100.jpg',
   'RTG RM20': '/icons/equipment-photos/rtg-rm20.jpg',
+  'Kopernik SD-20C': '/icons/equipment-photos/kopernik-sd20c.jpg',
 };
 
 export function getEquipmentPhoto(model: string | null | undefined): string | null {

@@ -54,7 +54,7 @@ describe('GET /api/reports/period', () => {
       error: null,
     });
     getByPeriodMock.mockResolvedValue([
-      { siteId: 's1', userId: 'u1', piles: [{ count: 2, pileGradeId: 'g1', pileGrade: { lengthMm: 5000 } }], drillings: [], downtimes: [] },
+      { status: 'submitted', siteId: 's1', userId: 'u1', piles: [{ count: 2, pileGradeId: 'g1', pileGrade: { lengthMm: 5000 } }], drillings: [], downtimes: [] },
     ]);
 
     const res = await GET(req('dateFrom=2026-04-01&dateTo=2026-04-30&siteId=s1&userId=u1'));

@@ -14,7 +14,7 @@
  * confirmUpload must reject (mark 'failed', throw) when the downloaded
  * bytes don't match the declared content type's file signature.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 const { sendMock, sharpMock } = vi.hoisted(() => ({
   sendMock: vi.fn(),
@@ -106,6 +106,9 @@ vi.mock('@/lib/db', () => ({
 }));
 
 import { MediaService } from '../media-service';
+import { db } from '@/lib/db';
+import { PutObjectCommand } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
 function seedMedia(over: Partial<FakeMediaRow>): FakeMediaRow {
   const row: FakeMediaRow = {
@@ -304,5 +307,144 @@ describe('MediaService SEC-02 — upload size limit enforcement', () => {
 
     expect(result.fileSize).toBe(10);
     expect(mediaTable.get('media-1')?.fileSize).toBe(10);
+  });
+});
+
+describe('MediaService.confirmUpload — F-R50-2 download timeout', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mediaTable.clear();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('aborts a hanging object download after 30s with a retryable 504, leaves the row pending, and a repeat confirm then succeeds', async () => {
+    vi.useFakeTimers();
+    seedMedia({ contentType: 'application/pdf', fileName: 'doc.pdf', uploadStatus: 'pending' });
+
+    let receivedSignal: AbortSignal | undefined;
+    let aborted = false;
+    sendMock.mockImplementation(
+      (command: { __type: string }, options?: { abortSignal?: AbortSignal }) => {
+        if (command.__type !== 'GetObjectCommand') return Promise.resolve({});
+        receivedSignal = options?.abortSignal;
+        // A real R2 that never answers: this promise only settles on abort.
+        return new Promise((_resolve, reject) => {
+          options?.abortSignal?.addEventListener('abort', () => {
+            aborted = true;
+            reject(new Error('aborted'));
+          });
+        });
+      },
+    );
+
+    const service = makeService();
+    const assertion = expect(service.confirmUpload('media-1')).rejects.toMatchObject({
+      status: 504,
+      message: 'Хранилище не ответило, повторите отправку фото',
+    });
+
+    await vi.advanceTimersByTimeAsync(30_000);
+    await assertion;
+
+    // The request must carry an AbortSignal and actually have been aborted.
+    expect(receivedSignal).toBeInstanceOf(AbortSignal);
+    expect(aborted).toBe(true);
+    // Unlike a size/type rejection ('failed'), a timeout must leave the row
+    // 'pending' so the id stays retryable.
+    expect(mediaTable.get('media-1')?.uploadStatus).toBe('pending');
+
+    // Retry of the SAME photoId now that the storage answers again.
+    vi.useRealTimers();
+    mockDownload(Buffer.from('%PDF-1.4\n', 'ascii'));
+
+    const result = await service.confirmUpload('media-1');
+
+    expect(result.id).toBe('media-1');
+    expect(mediaTable.get('media-1')?.uploadStatus).toBe('completed');
+  });
+
+  it('F-R50-2b: aborts when the BODY read stalls past the deadline (headers arrived fast) — 504, row untouched, signal aborted', async () => {
+    vi.useFakeTimers();
+    seedMedia({ contentType: 'application/pdf', fileName: 'doc.pdf', uploadStatus: 'pending' });
+
+    let receivedSignal: AbortSignal | undefined;
+    let aborted = false;
+    sendMock.mockImplementation(
+      (command: { __type: string }, options?: { abortSignal?: AbortSignal }) => {
+        if (command.__type !== 'GetObjectCommand') return Promise.resolve({});
+        receivedSignal = options?.abortSignal;
+        receivedSignal?.addEventListener('abort', () => {
+          aborted = true;
+        });
+        // Headers arrive immediately with a valid size; the BODY then stalls
+        // forever — the R2 this fix must still bound.
+        return Promise.resolve({
+          ContentLength: 8,
+          Body: { transformToByteArray: () => new Promise<Uint8Array>(() => {}) },
+        });
+      },
+    );
+
+    const service = makeService();
+    const assertion = expect(service.confirmUpload('media-1')).rejects.toMatchObject({
+      status: 504,
+      message: 'Хранилище не ответило, повторите отправку фото',
+    });
+
+    await vi.advanceTimersByTimeAsync(30_000);
+    await assertion;
+
+    expect(receivedSignal).toBeInstanceOf(AbortSignal);
+    expect(aborted).toBe(true);
+    // A timed-out body read (unlike a size/type rejection) leaves the row
+    // 'pending' and never writes 'failed' — the id stays retryable.
+    expect(db.media.update).not.toHaveBeenCalled();
+    expect(mediaTable.get('media-1')?.uploadStatus).toBe('pending');
+  });
+});
+
+describe('MediaService F-MEDIA-PUT-SIZE — declared size is bound into the presigned PUT', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mediaTable.clear();
+  });
+
+  it('rejects a declared size above maxFileSize with 400 before signing — no URL is ever issued', async () => {
+    const service = makeService();
+
+    await expect(service.getPresignedUrl({
+      fileName: 'huge.jpg', contentType: 'image/jpeg',
+      fileSize: 10 * 1024 * 1024 + 1, // one byte over the limit
+      tenantId: 'tenant-a', userId: 'user-1',
+    })).rejects.toMatchObject({ status: 400 });
+
+    // Nothing was signed and no S3 command was even built…
+    expect(getSignedUrl).not.toHaveBeenCalled();
+    expect(PutObjectCommand).not.toHaveBeenCalled();
+    // …and no pending media row was left behind for a rejected request.
+    expect(db.media.create).not.toHaveBeenCalled();
+  });
+
+  it('signs the PUT with ContentLength = the declared size, so storage rejects a body of any other length', async () => {
+    const service = makeService();
+    const declared = 4096;
+
+    await service.getPresignedUrl({
+      fileName: 'photo.jpg', contentType: 'image/jpeg',
+      fileSize: declared,
+      tenantId: 'tenant-a', userId: 'user-1',
+    });
+
+    expect(getSignedUrl).toHaveBeenCalledTimes(1);
+    // The second argument of getSignedUrl is the command being signed — the
+    // very PutObject the URL authorises. Its ContentLength is what the
+    // signature binds; a PUT of a different length fails signature check.
+    const signedCommand = vi.mocked(getSignedUrl).mock.calls[0][1] as unknown as {
+      input: { ContentLength?: number };
+    };
+    expect(signedCommand.input.ContentLength).toBe(declared);
   });
 });

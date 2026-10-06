@@ -128,7 +128,7 @@ async function projectEvent(event: ReportDomainEvent) {
       enrichedEvent.type.startsWith('Drilling')
     ) {
       if (enrichedEvent.siteId) {
-        await projectWeeklyTrend(enrichedEvent.siteId, reportDate);
+        await projectWeeklyTrend(enrichedEvent.siteId, reportDate, enrichedEvent.tenantId);
       }
     }
   } catch (error) {
@@ -181,7 +181,7 @@ export function startProjectionWorker(intervalMs = 5000) {
       await forEachTenant(async (tenantId) => {
         const sites = await db.site.findMany({ where: { tenantId }, select: { id: true } });
         for (const site of sites) {
-          await projectWeeklyTrend(site.id);
+          await projectWeeklyTrend(site.id, null, tenantId);
         }
       });
     } catch (error) {

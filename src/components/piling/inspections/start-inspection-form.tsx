@@ -23,6 +23,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import { LEVEL_LABEL, type InspectionLevel } from './inspection-labels';
+import { catchText } from './inspection-api-error';
 import { getConsumables } from '@/modules/inspections/domain/consumables';
 import { LubricationMap } from './lubrication-map';
 import { getTodayInTimezone } from '@/lib/timezone';
@@ -175,7 +176,8 @@ export function StartInspectionForm() {
       const { inspection } = await res.json();
       router.push(`/inspections/${inspection.id}`);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Ошибка');
+      // Обрыв сети fetch бросает TypeError с английским «Failed to fetch» (F-R112-2).
+      toast.error(catchText(err, 'Ошибка'));
     } finally {
       setBusy(false);
     }
@@ -272,7 +274,7 @@ export function StartInspectionForm() {
                 <div className="flex items-center gap-1.5 text-sm font-semibold text-success-strong">
                   <ShoppingCart className="h-4 w-4" /> Заказать перед ТО
                 </div>
-                <Button type="button" variant="outline" size="sm" onClick={copyConsumables} className="h-7 gap-1 px-2 text-xs">
+                <Button type="button" variant="outline" size="sm" onClick={copyConsumables} className="h-11 gap-1 px-2 text-xs sm:h-7">
                   <Copy className="h-3 w-3" /> Скопировать
                 </Button>
               </div>
@@ -328,7 +330,7 @@ export function StartInspectionForm() {
 
           <div>
             <Label htmlFor="si-hours">Моточасы</Label>
-            <Input id="si-hours" type="number" min={0} placeholder="Необязательно" value={engineHours} onChange={(e) => setEngineHours(e.target.value)} />
+            <Input id="si-hours" type="number" min={0} placeholder="Необязательно" value={engineHours} onChange={(e) => setEngineHours(e.target.value)} className="min-h-11 sm:min-h-0" />
           </div>
 
           <div className="flex gap-2 pt-2">

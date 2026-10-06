@@ -32,7 +32,7 @@ async function handleGet(request: NextRequest) {
     }
     const limit = params.has('limit') ? Number(params.get('limit')) : 50;
     if (!Number.isInteger(limit) || limit < 1 || limit > 200) {
-      throw new ReadinessCommandError('VALIDATION_ERROR', 400, 'limit must be between 1 and 200');
+      throw new ReadinessCommandError('VALIDATION_ERROR', 400, 'Некорректный размер страницы');
     }
     const result = await withReadinessRequestTransaction(context.tenantId, async (tx) => {
       const timezone = (await tx.tenantSettings.findUnique({where: {tenantId: context.tenantId}, select: {timezone: true}}))?.timezone;

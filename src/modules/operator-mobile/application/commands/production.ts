@@ -7,13 +7,15 @@
  */
 import type {Prisma} from '@/generated/postgres-client/client';
 import {withReadinessTenantTransaction} from '@/modules/readiness/server';
+// eslint-disable-next-line no-restricted-imports -- legacy cross-layer import pending the parked services<->modules migration (CLAUDE.md); behavior-neutral
+import {writeReportAuditRow} from '@/services/reports/audit-service';
 import {DOWNTIME_MAX_HOURS, downtimeHoursBetween} from '@/lib/downtime-hours';
 import {validatePassport} from '../../domain/pile-passport';
 import {safetyChecklistPeriod} from '../../domain/safety-checklist-period';
 import {findDowntimeConflict} from '../../domain/downtime-interval';
 import type {ReadWeather} from '../../domain/view-contracts';
 import {
-  OperatorCommandError, requireCrew, requireOpenShift, ensureReport,
+  OperatorCommandError, requireCrew, requireOpenShift, ensureReport, businessReportId,
   requireDowntimeReason, requireDrillingType, requirePileGrade, requireProductionPermit,
 } from './shared';
 import type {Tx} from './shared';
@@ -245,11 +247,14 @@ export async function logProduction(input: {
       });
     }
 
+    // Краткий по-русски след записи — что именно дописали в отчёт (F-R34-2).
+    let auditDiff: Record<string, unknown>;
+
     if (entry.kind === 'PILES') {
       if (entry.count <= 0) throw new OperatorCommandError(400, 'Количество свай должно быть больше нуля');
       // Марка — только своей организации (см. requirePileGrade): чужая
       // записывалась молча и портила расчёт погонных метров.
-      await requirePileGrade(tx, input.tenantId, entry.pileGradeId);
+      const grade = await requirePileGrade(tx, input.tenantId, entry.pileGradeId, shift.startedAt ?? shift.createdAt);
       await tx.pileWork.create({
         data: {
           reportId,
@@ -262,11 +267,12 @@ export async function logProduction(input: {
           occurredAt: now,
         },
       });
+      auditDiff = {'Выработка': {old: null, new: `сваи: +${entry.count} шт (${grade.name})`}};
     } else if (entry.kind === 'PILE_PASSPORT') {
       // Длину сваи берём из её марки — единственного источника длины в
       // продукте (см. lib/pile-length). Она нужна правилу глубины: свая не
       // уходит глубже собственной длины, кроме погружения добойником.
-      const grade = await requirePileGrade(tx, input.tenantId, entry.pileGradeId);
+      const grade = await requirePileGrade(tx, input.tenantId, entry.pileGradeId, shift.startedAt ?? shift.createdAt);
 
       const problems = validatePassport({
         pileNumber: entry.passport.pileNumber,
@@ -302,7 +308,7 @@ export async function logProduction(input: {
           where: {id: entry.passport.picketId, cluster: {field: {siteId: crew.siteId}}},
           select: {id: true},
         });
-        if (!picket) throw new OperatorCommandError(400, 'Пикет не относится к объекту смены');
+        if (!picket) throw new OperatorCommandError(400, 'Пикет не относится к объекту смены — выберите пикет этого объекта');
       }
 
       // Молот снимаем с карточки установки: позднейшая замена молота не должна
@@ -371,6 +377,10 @@ export async function logProduction(input: {
             : undefined,
         },
       });
+      auditDiff = {'Выработка': {
+        old: null,
+        new: `паспорт сваи №${entry.passport.pileNumber.trim()}`,
+      }};
     } else if (entry.kind === 'DRILLING') {
       if (entry.count <= 0) throw new OperatorCommandError(400, 'Количество скважин должно быть больше нуля');
       if (entry.metersPerUnit <= 0) throw new OperatorCommandError(400, 'Глубина скважины должна быть больше нуля');
@@ -388,6 +398,7 @@ export async function logProduction(input: {
           occurredAt: now,
         },
       });
+      auditDiff = {'Выработка': {old: null, new: `бурение: +${entry.count * entry.metersPerUnit} м.п.`}};
     } else {
       const startedAt = new Date(entry.startedAt);
       const endedAt = new Date(entry.endedAt);
@@ -451,7 +462,7 @@ export async function logProduction(input: {
             + 'Если записанный неверен — поправьте его, а не добавляйте второй.');
       }
 
-      await requireDowntimeReason(tx, input.tenantId, entry.reasonId);
+      const reason = await requireDowntimeReason(tx, input.tenantId, entry.reasonId);
       await tx.reportDowntime.create({
         data: {
           reportId,
@@ -472,7 +483,30 @@ export async function logProduction(input: {
           occurredAt: startedAt,
         },
       });
+      auditDiff = {'Выработка': {old: null, new: `простой: ${hours} ч (${reason.name})`}};
     }
+
+    /*
+      СЛЕД ЗАПИСИ ВЫРАБОТКИ В ИСТОРИИ ОТЧЁТА.
+
+      `ReportAudit` писали только создание и правка отчёта
+      (`report-command.service.ts`), а выработка мобильного контура — сваи,
+      паспорт сваи, бурение и простой — ложилась без единой строки: в истории
+      отчёта не было видно, что и когда в него дописали (F-R34-2).
+
+      Пишем в ТОЙ ЖЕ транзакции, что и саму запись: иначе выработка сохранится,
+      а следа о ней не останется. Действие — `updated` («Изменён»):
+      существующий отчёт дополняется, отдельного шага «создан» у выработки нет.
+      Номер в следе — деловой (`RM-…`), а не первичный ключ: история отчёта
+      ищет строки по нему (`report-history-service.ts`). Повтор уже принятой
+      команды отсекается выше по `clientCommandId` и сюда не доходит.
+    */
+    await writeReportAuditRow({
+      reportId: await businessReportId(tx, reportId),
+      action: 'updated',
+      userId: input.operatorId,
+      diff: auditDiff,
+    }, tx as unknown as Parameters<typeof writeReportAuditRow>[1]);
 
     return {reportId};
   }).catch(async (error: unknown) => {

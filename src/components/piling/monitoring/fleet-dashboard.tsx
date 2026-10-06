@@ -21,9 +21,10 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useDocumentTitle } from '@/components/piling/ops-shell';
 import { cn } from '@/lib/utils';
 import { authFetch } from '@/lib/api';
-import { formatHours, formatFixed, formatRelative, formatRuDate } from '@/lib/format';
+import { formatCountMeters, formatHours, formatRelative, formatRuDate } from '@/lib/format';
 import { useMinSkeletonDuration } from '@/components/piling/async-ui';
 import { KpiTile, KPI_GRID, kpiGridStyle } from '@/components/piling/kpi-tile';
 import type { EquipmentStatus, FleetCard, FleetSnapshot } from '@/components/piling/admin-equipment/fleet-types';
@@ -52,7 +53,30 @@ function sortCards(cards: FleetCard[], sortBy: SortBy): FleetCard[] {
   return sorted;
 }
 
+/**
+ * Причина отказа снимка — разная, и текст должен быть разным.
+ *
+ * Раньше любой не-ok ответ назывался «Сервис мониторинга временно недоступен.»,
+ * а таймаут и мусорный ответ — «Нет соединения»: сбой БД (500), ограничение
+ * частоты (429) и отсутствие сети выглядели одинаково, и человек шёл чинить
+ * интернет вместо того, чтобы просто повторить запрос.
+ *
+ * Совет повторного запроса был жёстким хвостом у всех отказов сразу: таймаут
+ * («…Повторите попытку.») превращался в «…Повторите попытку. Повторите
+ * попытку.», а 401/403 советовали повторить то, что повтором не чинится (идёт
+ * редирект на вход / нет прав). Теперь совет живёт внутри текста только там,
+ * где повтор уместен, и экран его не дописывает.
+ */
+function fleetFailureMessage(status: number): string {
+  if (status === 429) return 'Слишком много запросов — сервис ограничил частоту. Повторите попытку.';
+  if (status >= 500) return 'Сервер мониторинга временно недоступен. Повторите попытку.';
+  if (status === 403) return 'Нет доступа к мониторингу. Обратитесь к администратору.';
+  if (status === 401) return 'Сессия истекла — войдите снова.';
+  return `Не удалось загрузить снимок мониторинга (код ${status}). Повторите попытку.`;
+}
+
 export function FleetDashboard() {
+  useDocumentTitle('Мониторинг');
   const [snap, setSnap] = useState<FleetSnapshot | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [siteFilter, setSiteFilter] = useState('');
@@ -67,18 +91,47 @@ export function FleetDashboard() {
       const res = await authFetch(url, {signal: AbortSignal.timeout(15_000)});
       if (request !== snapshotRequest.current) return;
       if (!res.ok) {
-        setError('Сервис мониторинга временно недоступен.');
+        setError(fleetFailureMessage(res.status));
         return;
       }
-      const data: FleetSnapshot = await res.json();
+      // Разбор тела — в отдельном try: 200 с битым/обрезанным телом (прокси,
+      // таймаут шлюза) попадал в общий catch и выдавался за обрыв связи, хотя
+      // сервер ответил. Человека отправляли «чинить интернет» вместо повтора.
+      let data: FleetSnapshot;
+      try {
+        data = await res.json() as FleetSnapshot;
+      } catch {
+        if (request !== snapshotRequest.current) return;
+        setError('Некорректный ответ сервера. Повторите попытку.');
+        return;
+      }
       if (request !== snapshotRequest.current) return;
       setSnap(data);
       setError(null);
-    } catch {
+    } catch (err) {
       if (request !== snapshotRequest.current) return;
-      setError('Нет соединения с сервисом мониторинга.');
+      // AbortSignal.timeout отклоняет запрос DOMException с именем TimeoutError:
+      // это не обрыв сети — связь есть, сервер не ответил вовремя. Имя читаем
+      // через свойство: DOMException в браузере не обязан быть instanceof Error.
+      const timedOut = typeof err === 'object' && err !== null && (err as { name?: unknown }).name === 'TimeoutError';
+      setError(timedOut
+        ? 'Сервер не ответил за 15 секунд. Повторите попытку.'
+        : 'Нет соединения с сервисом мониторинга. Повторите попытку.');
     }
   }, []);
+
+  // «Повторить загрузку» на полноэкранном отказе была тихой: повторный сбой
+  // не менял экран, и человек жал кнопку снова и снова. Пока запрос идёт,
+  // кнопка заблокирована и подписана «Повторяем…».
+  const [retrying, setRetrying] = useState(false);
+  const retryLoad = useCallback(async () => {
+    setRetrying(true);
+    try {
+      await fetchSnapshot({ bust: true });
+    } finally {
+      setRetrying(false);
+    }
+  }, [fetchSnapshot]);
 
   // Refetch after an admin uploads/replaces an equipment photo so the new
   // card.photoUrl shows up without waiting for the next 30-second refresh.
@@ -87,10 +140,10 @@ export function FleetDashboard() {
   }, [fetchSnapshot]);
   const tile = useEquipmentTileTemplate(undefined, onPhotoUploaded);
 
-  // Initial load
+  // Reopening after an upload must read a fresh fleet snapshot.
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- loads data on mount / dependency change; the async loader sets state
-    void fetchSnapshot();
+    void fetchSnapshot({ bust: true });
   }, [fetchSnapshot]);
 
   // Живое обновление — опрос раз в 30 с, при возврате связи и на вкладку.
@@ -103,6 +156,18 @@ export function FleetDashboard() {
     document.addEventListener('visibilitychange', refresh);
     return () => { clearInterval(timer); window.removeEventListener('online', refresh); document.removeEventListener('visibilitychange', refresh); };
   }, [fetchSnapshot]);
+
+  // Метка «Данные обновлены N назад» считается на рендер (formatRelative смотрит
+  // на Date.now()). При потере связи опрос каждые 30 с ставит одну и ту же строку
+  // ошибки, React пропускает повторный рендер (bailout) — и метка замирает на
+  // последнем успешном кадре, хотя числа давно устарели. Отдельный тик раз в 30 с
+  // перерисовывает подпись, чтобы относительное время росло; таймер снимается при
+  // размонтировании.
+  const [, setClockTick] = useState(0);
+  useEffect(() => {
+    const timer = setInterval(() => setClockTick((t) => t + 1), 30_000);
+    return () => clearInterval(timer);
+  }, []);
 
   // Связь — это ответ последнего опроса, а не сокет.
   const conn: Connection = error ? 'offline' : snap ? 'live' : 'connecting';
@@ -137,13 +202,14 @@ export function FleetDashboard() {
       <div className="p-6">
         <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-destructive-strong">
           <p className="text-sm font-semibold">Мониторинг не загрузился</p>
-          <p className="mt-1 text-sm">{error} Проверьте подключение и повторите попытку.</p>
+          <p className="mt-1 text-sm">{error}</p>
           <button
             type="button"
-            onClick={() => void fetchSnapshot({ bust: true })}
-            className="mt-3 text-sm font-semibold text-destructive-strong underline underline-offset-2"
+            onClick={() => void retryLoad()}
+            disabled={retrying}
+            className="mt-3 inline-flex min-h-11 items-center text-sm font-semibold text-destructive-strong underline underline-offset-2 disabled:opacity-60 sm:min-h-0"
           >
-            Повторить загрузку
+            {retrying ? 'Повторяем…' : 'Повторить загрузку'}
           </button>
         </div>
       </div>
@@ -167,7 +233,7 @@ export function FleetDashboard() {
     <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
       {error && <div role="alert" className="rounded-lg border border-destructive p-3 text-destructive-strong">
         {error} Показан предыдущий снимок.
-        <button type="button" className="ml-3 underline" onClick={() => void fetchSnapshot({bust: true})}>Обновить</button>
+        <button type="button" className="ml-3 inline-flex min-h-11 items-center underline sm:min-h-0" onClick={() => void fetchSnapshot({bust: true})}>Обновить</button>
       </div>}
       <StatusBar snap={snap} conn={conn} />
 
@@ -223,7 +289,7 @@ export function FleetDashboard() {
 }
 
 const selectCls =
-  'rounded-lg border border-border bg-muted px-3 py-2 text-xs text-foreground focus:border-info focus:outline-none focus:ring-2 focus:ring-info/30/15';
+  'min-h-11 rounded-lg border border-border bg-muted px-3 py-2 text-xs text-foreground focus:border-info focus:outline-none focus:ring-2 focus:ring-info/30/15 sm:min-h-0';
 
 // ----------------------------------------------------------------------------
 
@@ -269,9 +335,9 @@ function StatusBar({ snap, conn }: { snap: FleetSnapshot; conn: Connection }) {
             смены (черновики). Подписываем это прямо на плитках — иначе
             «сделано сегодня» здесь больше, чем в аналитике, и расхождение
             выглядит потерей данных. */}
-        <KpiTile icon="pile-driving" label="Свай" tone="info" value={snap.totals.pilesToday}
+        <KpiTile icon="pile-driving" label="Сваи" tone="info" value={formatCountMeters(snap.totals.pilesToday, snap.totals.pileMetersToday)}
           detail="включая несданные смены" />
-        <KpiTile icon="drilling-auger" label="Бурения, м" tone="info" value={formatFixed(snap.totals.drillingToday, 1)}
+        <KpiTile icon="drilling-auger" label="Бурение" tone="info" value={formatCountMeters(snap.totals.drillingCountToday, snap.totals.drillingToday)}
           detail="включая несданные смены" />
         <KpiTile icon="downtime" label="Простой" tone={snap.totals.downtimeHoursToday > 0 ? 'danger' : 'neutral'}
           value={formatHours(snap.totals.downtimeHoursToday)} detail="включая несданные смены" />

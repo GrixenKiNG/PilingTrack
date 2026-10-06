@@ -58,6 +58,15 @@ const DETOUR_BACK: Record<Detour['kind'], string> = {
 export function OperatorV7App() {
   const [state, setState] = useState<OperatorMobileState | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  /**
+   * Отказ по роли при загрузке состояния — отдельно от «нет связи».
+   *
+   * 403 значит, что экран не для этой роли: ни «Повторить», ни «уйдёт при
+   * связи» здесь не помогут — помощник машиниста будет жать кнопку до вечера,
+   * а обещание отправки он прочтёт как «подожди и всё появится». Поэтому текст
+   * про роль показываем сам по себе, без кнопки повтора (как в `/operator`).
+   */
+  const [forbidden, setForbidden] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -82,11 +91,18 @@ export function OperatorV7App() {
       const next = await fetchState({coordinates: coordinates.current});
       setState(next);
       setLoadError(null);
+      setForbidden(null);
       setSyncedAt(new Date().toLocaleTimeString('ru-RU', {hour: '2-digit', minute: '2-digit'}));
     } catch (cause) {
       if (cause instanceof ApiError && cause.status === 401) {
         // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- намеренно: сессия истекла, полная перезагрузка сбрасывает кэш маршрутов и память вкладки прежнего входа
         window.location.href = '/login';
+        return;
+      }
+      // Отказ по роли — не обрыв связи: «Повторить» его не исправит, а «данные
+      // отправятся позже» — неправда, при 403 не уйдёт ничего.
+      if (cause instanceof ApiError && cause.status === 403) {
+        setForbidden(cause.message);
         return;
       }
       setLoadError(cause instanceof ApiError ? cause.message : 'Не удалось получить состояние смены');
@@ -122,24 +138,34 @@ export function OperatorV7App() {
    *
    * Отказ по существу показываем текстом: «сохранено на устройстве» — не
    * ошибка, а обещание, и форму после него можно закрывать.
+   *
+   * ПРИЗНАК ЗАПИСИ, ПРИНЯТОЙ СЕРВЕРОМ (F-R43-3c). Форму паспорта эта функция
+   * кормит своим результатом: она чистит поля только по `true`
+   * (`screens/pile-passport-form.tsx`), иначе отказ 400/409 уничтожал бы
+   * набранный журнал забивки. `true` — сервер принял команду либо она легла в
+   * очередь на устройстве; `false` — отказ по существу.
+   *
+   * ПРИЗНАК ИДЁТ ОТ ОТВЕТА СЕРВЕРА, А НЕ ОТ ПЕРЕЧИТЫВАНИЯ ЭКРАНА (F-R43-3a).
+   * Когда команда прошла, запись уже сохранена: сбой следующего `reload()` не
+   * повод возвращать `false` — иначе машинист набрал бы то же заново и отправил
+   * вторую выработку. Поэтому запись закрывается по ответу, а перечитывание
+   * состояния идёт своим шагом.
    */
   const run = useCallback(async (
     command: Parameters<typeof sendCommand>[0],
     options: {close?: boolean} = {close: true},
-  ) => {
+  ): Promise<boolean> => {
     setBusy(true);
     setActionError(null);
     setNotice(null);
+    let accepted = false;
     try {
       await sendCommand(command);
-      setCommandId(newCommandId());
-      await reload();
-      if (options.close !== false) setDetour(null);
+      accepted = true;
     } catch (cause) {
       if (cause instanceof QueuedOffline) {
         setNotice(cause.message);
-        setCommandId(newCommandId());
-        if (options.close !== false) setDetour(null);
+        accepted = true;
       } else if (cause instanceof ApiError && cause.status === 401) {
         // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- намеренно: сессия истекла, полная перезагрузка сбрасывает кэш маршрутов и память вкладки прежнего входа
         window.location.href = '/login';
@@ -149,7 +175,30 @@ export function OperatorV7App() {
     } finally {
       setBusy(false);
     }
+
+    if (!accepted) return false;
+
+    setCommandId(newCommandId());
+    if (options.close !== false) setDetour(null);
+    try {
+      await reload();
+    } catch {
+      // Перечитывание состояния не отменяет принятую запись: о своей неудаче
+      // `reload` сообщает сам текстом ошибки состояния.
+    }
+    return true;
   }, [reload]);
+
+  if (forbidden) {
+    return (
+      <Shell online={online} syncedAt={syncedAt} pending={0}>
+        <div className="state">
+          <h2>{forbidden}</h2>
+          <p>Смену ведёт машинист, закреплённый за установкой. Записи о выработке и осмотрах подаёт он.</p>
+        </div>
+      </Shell>
+    );
+  }
 
   if (loadError) {
     return (
@@ -289,9 +338,9 @@ export function OperatorV7App() {
             onSubmit={(entry: ProductionEntryInput) => {
               if (!shiftId) {
                 setActionError('Смена не начата');
-                return;
+                return Promise.resolve(false);
               }
-              void run({command: 'log-production', clientCommandId: commandId, shiftId, entry});
+              return run({command: 'log-production', clientCommandId: commandId, shiftId, entry});
             }}
           />
         ) : null}

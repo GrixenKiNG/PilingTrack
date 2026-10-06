@@ -272,10 +272,18 @@ describe('acceptMaintenance — приёмка', () => {
 });
 
 describe('deleteMaintenance — удаление', () => {
+  // Строка, которую возвращает `delete` (DELETE … RETURNING) — снимок для ленты
+  // и единственный достоверный источник «был ли наряд открыт» (F-R72-FEED-b).
+  const REMOVED = {
+    id: 'rec_1', title: 'Замена РВД', type: 'REPAIR', status: 'IN_PROGRESS', scheduledAt: null,
+  };
+
   beforeEach(() => {
     findUniqueRecMock.mockReset();
     deleteRecMock.mockReset();
-    deleteRecMock.mockResolvedValue({});
+    deleteRecMock.mockResolvedValue(REMOVED);
+    outboxCreateManyMock.mockReset();
+    outboxCreateManyMock.mockResolvedValue({ count: 1 });
   });
 
   it('не даёт удалить принятый наряд — приёмку не стереть', async () => {
@@ -283,6 +291,35 @@ describe('deleteMaintenance — удаление', () => {
     await expect(deleteMaintenance('eq_1', 'rec_1', { tenantId: 'orion' }))
       .rejects.toMatchObject({ status: 409 });
     expect(deleteRecMock).not.toHaveBeenCalled();
+  });
+
+  it('возвращает удалённую строку с полями снимка', async () => {
+    findUniqueRecMock.mockResolvedValue({ id: 'rec_1', equipmentId: 'eq_1', tenantId: 'orion', status: 'IN_PROGRESS', acceptedById: null });
+    const removed = await deleteMaintenance('eq_1', 'rec_1', { tenantId: 'orion' });
+
+    expect(removed).toEqual(REMOVED);
+    expect(deleteRecMock.mock.calls[0][0].select).toEqual({
+      id: true, title: true, type: true, status: true, scheduledAt: true,
+    });
+  });
+
+  // Статус между чтением и удалением могли поменять: снимок готовности решает
+  // ВОЗВРАЩЁННАЯ строка, а не предварительное чтение.
+  it('заказывает снимок, если удалённая строка открыта, хотя чтение дало CLOSED', async () => {
+    findUniqueRecMock.mockResolvedValue({ id: 'rec_1', equipmentId: 'eq_1', tenantId: 'orion', status: 'DONE', acceptedById: null });
+
+    await deleteMaintenance('eq_1', 'rec_1', { tenantId: 'orion' });
+
+    expect(outboxCreateManyMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('не заказывает снимок, если удалённая строка закрыта, хотя чтение дало OPEN', async () => {
+    findUniqueRecMock.mockResolvedValue({ id: 'rec_1', equipmentId: 'eq_1', tenantId: 'orion', status: 'PLANNED', acceptedById: null });
+    deleteRecMock.mockResolvedValue({ ...REMOVED, status: 'DONE' });
+
+    await deleteMaintenance('eq_1', 'rec_1', { tenantId: 'orion' });
+
+    expect(outboxCreateManyMock).not.toHaveBeenCalled();
   });
 });
 

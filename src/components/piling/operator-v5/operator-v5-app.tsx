@@ -883,6 +883,15 @@ export function CloseScreen({state, busy, onClose, unsent, onFlush}: {
 export function OperatorV5App() {
   const [state, setState] = useState<OperatorMobileState | null>(null);
   const [error, setError] = useState<string | null>(null);
+  /**
+   * Отказ по роли при загрузке состояния — отдельно от «нет связи».
+   *
+   * 403 значит, что экран не для этой роли: ни «Повторить», ни «данные
+   * отправятся позже» здесь не помогут — при 403 ничего не уйдёт, а помощник
+   * машиниста жал бы кнопку до вечера. Поэтому текст про роль показываем сам
+   * по себе, без кнопки повтора (как в `/operator`).
+   */
+  const [forbidden, setForbidden] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [tab, setTab] = useState<Tab>('SHIFT');
@@ -892,12 +901,28 @@ export function OperatorV5App() {
   const [commandId, setCommandId] = useState(newCommandId);
   const [online, setOnline] = useState(true);
 
-  const reload = useCallback(async () => {
+  /**
+   * Перечитать состояние смены.
+   *
+   * quiet — вызов после уже принятой команды. Там сбой перечитывания означает
+   * лишь несвежий экран, а не «нет связи»: если показать его как отказ на весь
+   * экран, машинист решит, что запись не прошла, и отправит её второй раз.
+   * Поэтому ошибку отдаём наверх — вызывающий скажет о ней отдельной строкой.
+   */
+  const reload = useCallback(async (options: {quiet?: boolean} = {}) => {
     try {
       const coordinates = await currentPosition();
       setState(await fetchState({coordinates}));
       setError(null);
+      setForbidden(null);
     } catch (cause) {
+      // Отказ по роли — не обрыв связи: «Повторить» его не исправит, а
+      // «данные отправятся позже» было бы неправдой, при 403 не уйдёт ничего.
+      if (cause instanceof ApiError && cause.status === 403) {
+        setForbidden(cause.message);
+        return;
+      }
+      if (options.quiet) throw cause;
       setError(cause instanceof ApiError || cause instanceof Error
         ? cause.message
         : 'Состояние смены недоступно');
@@ -923,6 +948,18 @@ export function OperatorV5App() {
   // Возвращает признак успеха: форма чистит поля только по нему. Отказ по
   // существу (400/409) — это false: введённое человеком должно остаться на
   // экране. Уход в очередь — принятая запись, то есть true.
+  //
+  // Успех — это «сервер принял запись (или она легла в очередь)», а не «весь
+  // обработчик дошёл до конца». Перечитывание экрана идёт отдельным шагом:
+  // его сбой не отменяет уже записанное, иначе машинист увидит ошибку, наберёт
+  // то же число заново и выработка задвоится.
+  //
+  // КНОПКА ЖДЁТ ПЕРЕЧИТЫВАНИЯ (F-R43-3d). Ключ команды меняется сразу по её
+  // принятию, а состояние смены приходит только после перечитывания. Отпусти
+  // кнопку раньше — машинист увидит прежние счётчики, нажмёт второй раз, и та
+  // же выработка уйдёт с новым ключом, то есть задвоится. Поэтому busy снимаем
+  // после reload — когда запись принята сервером. Отказ по существу (400/409)
+  // перечитывать нечего: там сразу.
   const run = useCallback(async (fn: () => Promise<unknown>, done: string): Promise<boolean> => {
     setBusy(true);
     setNotice(null);
@@ -930,22 +967,35 @@ export function OperatorV5App() {
       await fn();
       setCommandId(newCommandId());
       setNotice(done);
-      await reload();
-      return true;
     } catch (cause) {
       // Запись легла в очередь — это принятая запись, а не отказ: следующая
       // обязана получить новый ключ. Со старым ключом очередь считала её
       // повтором той же записи и молча не брала, а сервер — тем более.
+      //
+      // ПЕРЕЧИТЫВАНИЯ ЗДЕСЬ НЕТ (F-R43-3d). Сервер этой записи ещё не видел,
+      // обновлять на экране нечего — а без связи reload падает и затирает
+      // сообщение очереди текстом «Записано. Не удалось обновить экран»:
+      // машинист решит, что запись уже на сервере, хотя она в телефоне. Кнопку
+      // отпускаем сразу: держать её занятой до таймаута сети незачем.
       if (cause instanceof QueuedOffline) {
         setCommandId(newCommandId());
         setNotice(cause.message);
+        setBusy(false);
         return true;
+      } else {
+        setNotice(cause instanceof Error ? cause.message : 'Действие не выполнено');
+        setBusy(false);
+        return false;
       }
-      setNotice(cause instanceof Error ? cause.message : 'Действие не выполнено');
-      return false;
-    } finally {
-      setBusy(false);
     }
+    try {
+      await reload({quiet: true});
+    } catch {
+      // Запись уже принята — говорим только о несвежем экране.
+      setNotice('Записано. Не удалось обновить экран — потяните вниз / обновите.');
+    }
+    setBusy(false);
+    return true;
   }, [reload]);
 
   const {queued, flush: flushQueued, retry: retryQueued, discard: discardQueued} = useOfflineQueue(reload);
@@ -1036,6 +1086,19 @@ export function OperatorV5App() {
     );
   }, [commandId, run, state]);
 
+  if (forbidden) {
+    return (
+      <div className="app">
+        <div className="scr">
+          <h2 className="h">{forbidden}</h2>
+          <p className="note">
+            Смену ведёт машинист, закреплённый за установкой. Записи о выработке и осмотрах
+            подаёт он.
+          </p>
+        </div>
+      </div>
+    );
+  }
   if (error) {
     return (
       <div className="app">

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import {
   Loader2,
   Pencil,
@@ -14,6 +14,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { QueryErrorBanner } from '@/components/piling/async-ui';
+import { normalizeSearch } from '@/components/piling/to/readiness/shared/text-search';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Dialog,
@@ -30,6 +31,12 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import type { CrewDTO, EquipmentDTO, SiteDTO, UserDTO } from '@/lib/types';
+
+/** Подпись помощника, чей пользователь удалён: вместо сырого id (R124 №5). */
+const DELETED_ASSISTANT_NAME = 'Помощник удалён';
+
+/** Предупреждение о закрытии окна с несохранёнными правками (R132 №6). */
+const CONFIRM_LEAVE = 'Закрыть без сохранения? Введённые данные будут потеряны.';
 
 interface CrewFormDialogProps {
   open: boolean;
@@ -115,6 +122,7 @@ export function CrewFormDialog({
   onSubmit,
   submitting,
 }: CrewFormDialogProps) {
+  const uid = useId();
   const [operatorId, setOperatorId] = useState(editItem?.operatorId || '');
   const [equipmentId, setEquipmentId] = useState(editItem?.equipmentId || '');
   const [siteId, setSiteId] = useState(editItem?.siteId || '');
@@ -151,9 +159,33 @@ export function CrewFormDialog({
     .map(id => assistants.find(user => user.id === id)?.name)
     .filter((assistantName): assistantName is string => Boolean(assistantName));
 
+  /*
+    Помощник, чей пользователь удалён или отключён, не попадает в активный
+    справочник, но имя осталось в составе бригады (`editItem.assistants`).
+    Раньше он исчезал из формы, оставаясь в отправляемых `assistantUserIds`:
+    состав выглядел пустым, а сохранить бригаду было нельзя — сервер отбивал
+    невидимого помощника 400, убрать его из формы было нечем (R124 №5).
+  */
+  const assistantNameById: Record<string, string> = {};
+  for (const user of assistants) assistantNameById[user.id] = user.name;
+  for (const assistant of editItem?.assistants ?? []) {
+    if (assistant.userId && assistant.name && !assistantNameById[assistant.userId]) {
+      assistantNameById[assistant.userId] = assistant.name;
+    }
+  }
+  const assistantDisplayNames = assistantUserIds
+    .map(id => assistantNameById[id] ?? DELETED_ASSISTANT_NAME);
+
   const handleSubmit = async () => {
     if (!operatorId || !equipmentId || !siteId) {
       toast.error('Выберите оператора, установку и объект');
+      return;
+    }
+
+    // Пустое название сервер подставляет английским «Unnamed Crew» в русском
+    // интерфейсе — название обязательно (R102, важно №7).
+    if (!name.trim()) {
+      toast.error('Укажите название бригады');
       return;
     }
 
@@ -161,14 +193,29 @@ export function CrewFormDialog({
       operatorId,
       equipmentId,
       siteId,
-      name: name.trim() || undefined,
+      name: name.trim(),
       assistantUserIds,
       assistantNames: selectedAssistantNames,
       isActive: mode === 'edit' ? active : true,
     });
   };
 
+  // Несохранённые правки: сравнение с составом на момент открытия. Помощники —
+  // массив, поэтому сравниваем по идентификаторам.
+  const baselineAssistantIds = editItem?.assistants
+    ?.map(a => a.userId)
+    .filter((id): id is string => !!id) || [];
+  const dirty =
+    operatorId !== (editItem?.operatorId || '')
+    || equipmentId !== (editItem?.equipmentId || '')
+    || siteId !== (editItem?.siteId || '')
+    || name !== (editItem?.name || '')
+    || active !== (editItem?.isActive ?? true)
+    || assistantUserIds.join(',') !== baselineAssistantIds.join(',');
+
+  /** Закрытие по Esc/клику вне окна/«Отмена» — с вопросом, если есть правки. */
   const handleClose = () => {
+    if (dirty && !window.confirm(CONFIRM_LEAVE)) return;
     onClose();
   };
 
@@ -214,11 +261,11 @@ export function CrewFormDialog({
           ) : (
             <div className="space-y-3">
               <div className="space-y-1.5">
-                <Label>
+                <Label htmlFor={`${uid}-operator`}>
                   Оператор <span className="text-destructive-strong">*</span>
                 </Label>
                 <Select value={operatorId} onValueChange={setOperatorId}>
-                  <SelectTrigger className="h-11 w-full">
+                  <SelectTrigger id={`${uid}-operator`} className="h-11 w-full">
                     <SelectValue placeholder="Выберите оператора" />
                   </SelectTrigger>
                   <SelectContent>
@@ -229,14 +276,18 @@ export function CrewFormDialog({
                     ))}
                   </SelectContent>
                 </Select>
+                {/* Пустой список читается как «операторов нет» — называем причину. */}
+                {availableOps.length === 0 && (
+                  <p className="text-xs text-muted-foreground">Нет активных машинистов — заведите пользователя с ролью «Машинист».</p>
+                )}
               </div>
 
               <div className="space-y-1.5">
-                <Label>
+                <Label htmlFor={`${uid}-equipment`}>
                   Установка <span className="text-destructive-strong">*</span>
                 </Label>
                 <Select value={equipmentId} onValueChange={setEquipmentId}>
-                  <SelectTrigger className="h-11 w-full">
+                  <SelectTrigger id={`${uid}-equipment`} className="h-11 w-full">
                     <SelectValue placeholder="Выберите установку" />
                   </SelectTrigger>
                   <SelectContent>
@@ -247,14 +298,17 @@ export function CrewFormDialog({
                     ))}
                   </SelectContent>
                 </Select>
+                {equipment.length === 0 && (
+                  <p className="text-xs text-muted-foreground">Список установок пуст — заведите технику в разделе «Техника».</p>
+                )}
               </div>
 
               <div className="space-y-1.5">
-                <Label>
+                <Label htmlFor={`${uid}-site`}>
                   Объект <span className="text-destructive-strong">*</span>
                 </Label>
                 <Select value={siteId} onValueChange={setSiteId}>
-                  <SelectTrigger className="h-11 w-full">
+                  <SelectTrigger id={`${uid}-site`} className="h-11 w-full">
                     <SelectValue placeholder="Выберите объект" />
                   </SelectTrigger>
                   <SelectContent>
@@ -265,21 +319,28 @@ export function CrewFormDialog({
                     ))}
                   </SelectContent>
                 </Select>
+                {sites.length === 0 && (
+                  <p className="text-xs text-muted-foreground">Список объектов пуст — заведите объект в разделе «Объекты».</p>
+                )}
               </div>
 
               <div className="space-y-1.5">
-                <Label>Название (необязательно)</Label>
+                <Label htmlFor={`${uid}-name`}>
+                  Название <span className="text-destructive-strong">*</span>
+                </Label>
                 <Input
+                  id={`${uid}-name`}
                   value={name}
                   onChange={event => setName(event.target.value)}
                   placeholder="Бригада №1"
+                  maxLength={200}
                   className="h-11"
                 />
               </div>
 
               <AssistantSelector
                 label="Помощники"
-                names={selectedAssistantNames}
+                names={assistantDisplayNames}
                 onOpen={() => setShowAssistantDialog(true)}
               />
 
@@ -304,7 +365,7 @@ export function CrewFormDialog({
             </Button>
             <Button
               onClick={handleSubmit}
-              disabled={submitting || loadingReferenceData || !operatorId || !equipmentId || !siteId}
+              disabled={submitting || loadingReferenceData || !operatorId || !equipmentId || !siteId || !name.trim()}
               className="bg-signal text-white hover:bg-signal-strong"
             >
               {submitting
@@ -320,16 +381,12 @@ export function CrewFormDialog({
         open={showAssistantDialog}
         onClose={() => setShowAssistantDialog(false)}
         assistantUsers={assistants}
+        assistantNameById={assistantNameById}
         selectedIds={assistantUserIds}
-        onToggleId={(selectedId) => setAssistantUserIds(prev => (
-          prev.includes(selectedId)
-            ? prev.filter(idItem => idItem !== selectedId)
-            : [...prev, selectedId]
-        ))}
-        onRemoveId={(removedId) => setAssistantUserIds(prev => (
-          prev.filter(idItem => idItem !== removedId)
-        ))}
-        onConfirm={() => setShowAssistantDialog(false)}
+        onApply={(ids) => {
+          setAssistantUserIds(ids);
+          setShowAssistantDialog(false);
+        }}
       />
     </>
   );
@@ -339,25 +396,38 @@ function AssistantSelectorModal({
   open,
   onClose,
   assistantUsers,
+  assistantNameById,
   selectedIds,
-  onToggleId,
-  onRemoveId,
-  onConfirm,
+  onApply,
 }: {
   open: boolean;
   onClose: () => void;
   assistantUsers: UserDTO[];
+  assistantNameById: Record<string, string>;
   selectedIds: string[];
-  onToggleId: (id: string) => void;
-  onRemoveId: (id: string) => void;
-  onConfirm: () => void;
+  onApply: (ids: string[]) => void;
 }) {
   const [search, setSearch] = useState('');
-  const query = search.trim().toLowerCase();
+  /*
+    Выбор копится в черновике: «Отмена» отбрасывает правки, «Применить»
+    переносит их в состав бригады. Раньше клик по чекбоксу менял состав сразу,
+    и обе кнопки лишь закрывали диалог — «Отмена» врала (R124 №1).
+  */
+  const [draftIds, setDraftIds] = useState<string[]>(selectedIds);
+
+  useEffect(() => {
+    if (open) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- syncs the draft to the source list when the dialog opens
+      setDraftIds(selectedIds);
+      setSearch('');
+    }
+  }, [open, selectedIds]);
+
+  const query = normalizeSearch(search);
   const filteredUsers = query
     ? assistantUsers.filter(user => (
-      user.name.toLowerCase().includes(query)
-      || user.email.toLowerCase().includes(query)
+      normalizeSearch(user.name).includes(query)
+      || normalizeSearch(user.email).includes(query)
     ))
     : assistantUsers;
 
@@ -367,6 +437,16 @@ function AssistantSelectorModal({
     }
 
     onClose();
+  };
+
+  const toggleDraftId = (id: string) => {
+    setDraftIds(prev => (
+      prev.includes(id) ? prev.filter(idItem => idItem !== id) : [...prev, id]
+    ));
+  };
+
+  const removeDraftId = (id: string) => {
+    setDraftIds(prev => prev.filter(idItem => idItem !== id));
   };
 
   return (
@@ -394,8 +474,8 @@ function AssistantSelectorModal({
                 className="flex cursor-pointer items-center gap-3 rounded-lg border p-3 transition-colors hover:bg-muted"
               >
                 <Checkbox
-                  checked={selectedIds.includes(user.id)}
-                  onCheckedChange={() => onToggleId(user.id)}
+                  checked={draftIds.includes(user.id)}
+                  onCheckedChange={() => toggleDraftId(user.id)}
                 />
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-medium">{user.name}</p>
@@ -411,18 +491,18 @@ function AssistantSelectorModal({
             )}
           </div>
 
-          {selectedIds.length > 0 && (
+          {draftIds.length > 0 && (
             <div className="flex flex-wrap gap-1.5 rounded-lg border border-border bg-muted p-2.5">
-              {selectedIds.map(id => (
+              {draftIds.map(id => (
                 <span
                   key={id}
                   className="inline-flex items-center gap-1 rounded-md border border-warning/30 bg-warning/10 px-2 py-1 text-xs font-medium text-warning-strong"
                 >
-                  {assistantUsers.find(user => user.id === id)?.name ?? id}
+                  {assistantNameById[id] ?? DELETED_ASSISTANT_NAME}
                   <button
                     type="button"
-                    onClick={() => onRemoveId(id)}
-                    aria-label={`Удалить ассистента ${assistantUsers.find(user => user.id === id)?.name ?? id}`}
+                    onClick={() => removeDraftId(id)}
+                    aria-label={`Удалить ассистента ${assistantNameById[id] ?? DELETED_ASSISTANT_NAME}`}
                     title="Удалить ассистента"
                     className="flex min-h-11 min-w-11 items-center justify-center rounded text-warning-strong transition-colors hover:bg-warning/10 hover:text-warning-strong"
                   >
@@ -446,7 +526,7 @@ function AssistantSelectorModal({
           )}
 
           <p className="text-xs text-muted-foreground">
-            {selectedIds.length} помощник(ов) выбрано
+            {draftIds.length} помощник(ов) выбрано
           </p>
         </div>
 
@@ -454,7 +534,7 @@ function AssistantSelectorModal({
           <Button variant="outline" onClick={onClose}>
             Отмена
           </Button>
-          <Button onClick={onConfirm} className="bg-signal text-white hover:bg-signal-strong">
+          <Button onClick={() => onApply(draftIds)} className="bg-signal text-white hover:bg-signal-strong">
             Применить
           </Button>
         </DialogFooter>

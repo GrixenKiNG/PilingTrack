@@ -1,0 +1,212 @@
+# R69 — Куда реально доходят алерты мониторинга на бою
+
+Read-only аудит ветки `hermes/q4-0926`, worktree `D:\PillingR\wt-night`. Ни один существующий файл не изменён; создан только этот отчёт. Замороженные зоны (варианты экрана оператора, ORION) не затрагивались.
+
+Путь доставки: правило Prometheus → Alertmanager → вебхук приложения → Telegram. Отдельно проверено, есть ли на этом пути outbox, повтор, группировка, подавление дублей, и какие правила вообще способны дойти до человека.
+
+## Итог
+
+Цепочка целиком существует и на бумаге выглядит рабочей: 19 активных правил `alerts.yml`, у всех есть `severity`, Alertmanager маршрутизирует **всё** в один receiver — вебхук приложения, а тот пересылает каждый firing-алерт в Telegram-чаты тенанта. Outbox на этом пути **нет** — это не та ветка, что у доменных алертов (дефект/происшествие идут через `durable-alert` → outbox → DLQ, а тревоги мониторинга идут напрямую).
+
+Слабое место одно и оно системное: доставка тревоги обеспечивается тем самым приложением, о падении которого эта тревога и сообщает. Внешнего сторожа (dead-man switch, внешний пинг, второй receiver) в проекте нет — поиск `Watchdog|deadman|absent(` по `observability/`, `scripts/`, `deploy/` не дал ничего. Prometheus при этом даже не скрейпит Alertmanager, поэтому отказ самого Alertmanager не виден никак.
+
+Второе системное: вебхук приложения **всегда отвечает HTTP 200**, независимо от того, дошло ли сообщение в Telegram. Любая потеря после этого шага (бот заблокирован в чате, 429, таймаут 5 с, пустой `DEFAULT_TENANT_ID`, выключенный тумблер «Сбои сервера») для Alertmanager выглядит как успешная доставка — повторов не будет, в логах одна строка, метрики доставки не существует.
+
+Счёт по важности: **критично — 4, важно — 15, мелочь — 9** (всего 28).
+
+Топ-5 «алерт сработал, но никто не узнал»:
+1. Приложение лежит: тревога о нём самом идёт через приложение (вебхук не отвечает) → узнают только после восстановления, не раньше `repeat_interval` (4 ч, для critical 1 ч). Внешнего сторожа нет — находка 1.
+2. Telegram не принял сообщение (прокси недоступен, 429, бот кикнут из чата, 5-секундный таймаут) → вебхук всё равно 200, ретрая и outbox нет → потеряно молча. Находки 2, 3, 10.
+3. Пустой `DEFAULT_TENANT_ID` или ни одной включённой записи `TelegramConfig` → `sendAlert` возвращает `false`, ответ 200 → все серверные тревоги исчезают, след только `logger.warn`. Находка 6.
+4. Тумблер «Сбои сервера (мониторинг)» выключен в настройках → 200 `{forwarded:0}` → тишина, и снаружи это неотличимо от «всё в порядке». Находка 5.
+5. Alertmanager (или весь стек мониторинга) не поднят / упал → никто не проверяет ни `up{job="alertmanager"}`, ни `alertmanager_notifications_failed_total`, ни живость конвейера. Находка 4.
+
+## Методика
+
+Прочитаны целиком: `observability/alertmanager/alertmanager.yml`, `observability/prometheus/prometheus-prod.yml`, `observability/prometheus/alerts.yml`, `observability/README.md`, `docker-compose.monitoring-prod.yml`, `docker-compose.observability.yml` (фрагменты 95-134), `docker-compose.monitoring-standalone.yml` (98-127), `docker-compose.yml` (58-152, 440-444), `docker-compose.prod.yml` (1-70), `deploy/Caddyfile.prod`, `deploy/systemd/pilingtrack-disk-guard.service`, `scripts/disk-guard.sh`, `scripts/validate-env.ts` (95-174), `docs/runbooks/013-prod-timers.md`, `src/app/api/alerts/webhook/route.ts` и его тест, `src/core/notifications/{telegram.ts,durable-alert.ts,index.ts}`, `src/services/notifications/durable-alert-delivery.ts`, `src/app/api/metrics/route.ts`, `src/proxy.ts`, `src/modules/settings/{domain/settings.ts,application/settings-service.ts}`, `src/app/api/telegram/configs/route.ts`, `src/core/observability/health-tracker/checkers/backup.ts` (1-30), `prisma/schema.prisma` (2498-2514).
+
+Поиски (`search_files`, весь репозиторий, кроме `node_modules`): `telegramNotifier|TELEGRAM_API_BASE`; `systemAlerts|isNotificationEnabled`; `NotificationDeliveryRequested|ALERT_DELIVERY_EVENT|enqueueAlert|enqueueCriticalDefects`; `alertmanager|ALERTMANAGER`; `outbox_pending_count|outbox_lag_seconds|dlq_pending_count|backup_s3_synced|http_requests_total|nodejs_eventloop_lag`; `Watchdog|deadman|dead-man|absent(` по `observability/ scripts/ deploy/`; `wiki.pilingtrack`; `runbook_url`; `BACKUP_ENABLED`; `telegramConfig` по `prisma/` и `src/`.
+
+Семантика Alertmanager (повтор, группировка, `send_resolved`, `credentials_file`, отсутствие `max_alerts`/`timeout`) сверена по документации через context7 (`/prometheus/alertmanager`, `docs/configuration.md`, `docs/high_availability.md`), а не по памяти.
+
+Повторить: `git grep -n "alertmanager\|ALERTMANAGER"`; открыть перечисленные файлы; для проверки контура, который «никто не наблюдает», — `rg "Watchdog|absent\(" observability scripts deploy`.
+
+## Схема цепочки (текстом)
+
+```
+[1] Prometheus (docker-compose.monitoring-prod.yml:14-52)
+      rule_files: alerts.yml (prometheus-prod.yml:20-21)
+      19 активных правил, у всех есть severity (warning|critical)
+      правило ждёт `for` (1m..26h) и уходит в Alertmanager
+      alerting.alertmanagers -> alertmanager:9093 (prometheus-prod.yml:15-18)
+        │
+        ▼
+[2] Alertmanager (observability/alertmanager/alertmanager.yml)
+      route: group_by [alertname, job] (5), group_wait 30s (6),
+             group_interval 5m (7), repeat_interval 4h (8),
+             sub-route severity="critical": group_wait 10s, repeat 1h (11-14)
+      inhibit: critical гасит warning при равных alertname+job (29-32)
+      receiver 'pilingtrack-telegram' -> webhook (16-27):
+             POST http://app:3000/api/alerts/webhook (22)
+             Authorization: Bearer <из /etc/alertmanager/webhook-token> (23-26)
+             send_resolved: true (27)
+      токен материализуется entrypoint'ом из env (monitoring-prod.yml:134-138)
+        │  (сеть pilingtrack_pilingtrack, monitoring-prod.yml:140-142,182-183)
+        ▼
+[3] POST /api/alerts/webhook (src/app/api/alerts/webhook/route.ts)
+      401 если токен пуст/не совпал (74-83)
+      400 если body не по схеме (39-53, 92-99)
+      выключатель «Сбои сервера (мониторинг)»: systemAlerts (109-116)
+      цикл по alerts[:100] (58, 101): только status=firing (120),
+        severity -> low|medium|high|critical (60-65,121),
+        текст = summary + description (122-124)
+      telegramNotifier.sendAlert({severity,message,ruleId:alertname}) (126-130)
+      ВСЕГДА 200 {ok:true, forwarded:N} (135)
+        │   ← outbox/DLQ здесь НЕТ (см. находку 2)
+        ▼
+[4] TelegramNotifier (src/core/notifications/telegram.ts)
+      getConfigs(): tenant = getRequestTenantId() ?? DEFAULT_TENANT_ID (43),
+        нет тенанта -> [] (44);
+        findMany({enabled:true, tenantId}) (64-67), дедуп по chatId (71-80)
+      deliverToAll: по очереди все чаты, успех = «хотя бы один» (93-105)
+      sendTelegramMessage: ${TELEGRAM_API_BASE||api.telegram.org}/bot<token>/sendMessage (197),
+        AbortSignal.timeout(5000) (201), одна попытка, ошибка -> false (211-221)
+        │
+        ▼
+[5] Telegram (реальные получатели — все включённые чаты тенанта)
+```
+
+Ответственность за честность результата теряется между [3] и [4]: `sendAlert()==false` ни на что не влияет — `forwarded` уходит только в лог (route.ts:131,134).
+
+## Таблица звеньев
+
+| # | Звено | Файл:строка | Что будет при его отказе | Повтор / группировка / дедуп | Кому уходит |
+|---|---|---|---|---|---|
+| 1 | Prometheus + правила | `observability/prometheus/prometheus-prod.yml:20-21`; правила `alerts.yml:9-280` | Prometheus лёг/стек не поднят → ни одного алерта, и об этом никто не сообщит (нет правила на `absent(...)`, нет внешнего пинга) | `for:` в каждом правиле (гасит дребезг); `repeat_interval` не применим | — (внутрь, в Alertmanager) |
+| 2 | Alertmanager | `alertmanager.yml:4-32`; `docker-compose.monitoring-prod.yml:118-149` | Alertmanager лёг → Prometheus шлёт алерты в никуда, ошибок никто не видит; метрика `alertmanager_notifications_failed_total` не собирается (нет scrape-job, `prometheus-prod.yml:23-78`) | Группировка по `[alertname, job]`, `group_wait` 30s/10s, `repeat_interval` 4ч/1ч; подавление только critical→warning при равных `alertname+job` | receiver один — вебхук приложения |
+| 3 | Вебхук приложения | `src/app/api/alerts/webhook/route.ts:85-135` | Приложение лежит → соединение отвергнуто, алерт ждёт восстановления; 401 при пустом токене; выключенный `systemAlerts` → 200/0 | Своего повтора нет; дедупа нет; отвечает 200 всегда, поэтому Alertmanager потерю не увидит | Telegram через `telegramNotifier` |
+| 4 | Чтение чатов | `telegram.ts:43-44,60-86` | Нет `DEFAULT_TENANT_ID` или нет включённых записей `TelegramConfig` → `sendAlert` = false → потеря | дедуп чатов по `chatId` (71-80) | все включённые чаты тенанта, без ролей и назначения |
+| 5 | Отправка в Telegram | `telegram.ts:191-222` | Прокси/бот/сеть недоступны, 429, 403 (бот удалён из чата) → `false`, сообщение потеряно | Ретрая нет, лимита нет (хотя шапка файла их обещает: `telegram.ts:8,11`) | чат (Telegram) |
+| — | Outbox/DLQ (на этом пути) | — | Отсутствует: `durable-alert.ts:9-16` и `durable-alert-delivery.ts:21-46` обслуживают только доменные алерты (дефект/происшествие), вебхук мониторинга их не использует | — | — |
+
+## Топ-5 «алерт сработал, но никто не узнал»
+
+1. **Падение приложения.** Алерты `APIEndpointDown` (`alerts.yml:44-52`) и `TargetDown` (`alerts.yml:217-224`) срабатывают, Alertmanager пытается отдать их на `http://app:3000/api/alerts/webhook` (`alertmanager.yml:22`) — то есть в тот самый контейнер, который лежит. Доставка произойдёт только после подъёма приложения и только при следующей попытке/`repeat_interval` (1 ч для critical, `alertmanager.yml:14`). Внешнего канала («приложение молчит 5 минут») нет ни в репозитории, ни в Alertmanager (единственный receiver — `alertmanager.yml:16-27`).
+2. **Telegram не принял сообщение.** `sendTelegramMessage` возвращает `false` при любом отказе (`telegram.ts:211-221`), вебхук отвечает 200 (`route.ts:135`), Alertmanager считает алерт доставленным. Outbox/DLQ на этом пути нет. Метрики доставки нет — `/api/metrics` не содержит ни одной метрики об уведомлениях (`src/app/api/metrics/route.ts:54-132`).
+3. **Нет тенанта или нет чатов.** `DEFAULT_TENANT_ID` в compose по умолчанию пуст (`docker-compose.yml:99`), тогда `getConfigs()` возвращает `[]` (`telegram.ts:43-44`) и `sendAlert` = `false` с одной строкой `logger.warn` (`telegram.ts:264-267`). Все серверные тревоги исчезают молча.
+4. **Тумблер выключен.** Админ может выключить «Сбои сервера (мониторинг)» (`src/modules/settings/domain/settings.ts:59`), тогда вебхук отвечает 200 `{forwarded:0}` (`route.ts:109-116`) — снаружи это неотличимо от благополучия.
+5. **Мониторинг мёртв.** Нет job'а на Alertmanager и нет правил на его живость (`prometheus-prod.yml`: только app, workers, node, postgresql, redis, prometheus — 28-78), нет dead-man switch (`rg "Watchdog|absent\("` по `observability/ scripts/ deploy/` — ничего). О том, что алерты не уходят, узнать неоткуда.
+
+## Находки
+
+| # | severity | path:line | проблема | сценарий / почему важно | предлагаемый фикс |
+|---|---|---|---|---|---|
+| 1 | критично | `observability/alertmanager/alertmanager.yml:9,16-27` + `observability/prometheus/alerts.yml:44-52,217-224` + `docker-compose.monitoring-prod.yml:118-149` | Единственный получатель алертов — вебхук приложения (`http://app:3000/api/alerts/webhook`). Тревога «приложение недоступно» доставляется через приложение. Внешнего сторожа нет: `rg "Watchdog|deadman|dead-man|absent("` по `observability/ scripts/ deploy/` — пусто. | Полный отказ приложения = полная тишина на время аварии; сообщение придёт после восстановления. Второго канала (email/Slack/внешний пинг) нет. | Завести внешний dead-man switch (healthchecks.io / UptimeRobot / вторая Alertmanager-инстанция вне хоста) и второй receiver (email или прямой Telegram-бот из Alertmanager, минуя приложение). |
+| 2 | критично | `src/app/api/alerts/webhook/route.ts:118-135` против `src/services/notifications/durable-alert-delivery.ts:43` | Результат доставки не влияет на ответ: сервер всегда отвечает 200 `{ok:true, forwarded}` (135), `forwarded` уходит только в лог (131,134). На доменном пути (`durable-alert-delivery.ts:43`) провал доставки бросает исключение → outbox-backoff и DLQ; здесь ни того, ни другого. | Alertmanager считает алерт доставленным и не повторяет. Любая потеря на шаге Telegram невидима; именно в крупную аварию это и происходит. | Возвращать 5xx (или 429), если `forwarded == 0` при непустой пачке firing-алертов, чтобы Alertmanager повторил; либо ставить событие в outbox и переиспользовать `deliverQueuedAlert` с ретраем/DLQ. |
+| 3 | критично | `scripts/validate-env.ts:130-132` + `docker-compose.yml:91` + `src/core/notifications/telegram.ts:197,211-215` | На боевом сервере `api.telegram.org` заблокирован провайдером (комментарий `validate-env.ts:130-132`), вся доставка зависит от `TELEGRAM_API_BASE`, который приходит в контейнер как `${TELEGRAM_API_BASE:-}` (`docker-compose.yml:91`). Проверка — только предупреждение на этапе сборки (`validate-env.ts:145-152`), в рантайме не проверяется никто. | Переменная потерялась/прокси лёг → все запросы падают, `sendTelegramMessage` → `false` → 200 в Alertmanager → отказ всей системы оповещения без единого видимого признака. | Fail-fast/предупреждение в рантайме + метрика неудачных отправок + алерт на неё; при выключенном `TELEGRAM_API_BASE` в prod — явный отказ доставки вместо тихого false. |
+| 4 | критично | `observability/prometheus/prometheus-prod.yml:23-78` | Prometheus не скрейпит Alertmanager (нет job'а на `alertmanager:9093`), поэтому `alertmanager_notifications_failed_total` (документированная метрика Alertmanager) недоступна, а правила на `up{job="alertmanager"}` нет. Dead-man switch отсутствует. | Если Alertmanager не поднят/упал, Prometheus продолжает считать, что шлёт алерты, — а их не видит никто. Отказ самого конвейера оповещения не наблюдаем. | Добавить scrape-job `alertmanager` и правила: `up{job="alertmanager"}==0`, `increase(alertmanager_notifications_failed_total[15m])>0`, `alertmanager_notifications_total == 0` при живых правилах. |
+| 5 | важно | `src/app/api/alerts/webhook/route.ts:109-116` + `src/modules/settings/domain/settings.ts:59,81` | Выключатель «Сбои сервера (мониторинг)» (`systemAlerts`, по умолчанию `true`) глушит **все** тревоги мониторинга: вебхук возвращает 200 `{forwarded:0}` (114-115). | Один тумблер отключает наблюдение за сервером, и Alertmanager об этом не узнаёт (200 = успех). Восстановления потом тоже не будет — до момента, когда кто-то заметит руками. | Не гасить `systemAlerts` на этом маршруте (или хотя бы уведомлять о самом выключении) и отвечать 200 только когда что-то реально дошло. |
+| 6 | важно | `src/core/notifications/telegram.ts:43-44,264-267` + `docker-compose.yml:99` | `DEFAULT_TENANT_ID` в контейнере приложения по умолчанию пуст (`${DEFAULT_TENANT_ID:-}`). При пустом значении `getConfigs()` выходит с `[]` (44) и `sendAlert` возвращает `false`; след — один `logger.warn` (265). То же, если в `TelegramConfig` нет включённых строк. | Инфраструктурные тревоги исчезают целиком; Alertmanager видит 200. Ранее ровно так уже терялись уведомления об отчётах (`docker-compose.yml:92-99`). | Добавить `DEFAULT_TENANT_ID` в обязательные/проверяемые в проде; при `configs.length===0` отвечать 5xx, чтобы Alertmanager повторил, и (лучше) писать в Telegram через отдельный инфраструктурный бот. |
+| 7 | важно | `src/app/api/alerts/webhook/route.ts:74-83` | Токен читается как `ALERTMANAGER_WEBHOOK_TOKEN`; при пустом значении — всегда 401 (76). Переменная не валидируется: в `scripts/validate-env.ts` её нет ни в `ENV_CONFIG`, ни в `PRODUCTION_WARNINGS` (ср. 129-143), в шаблонах нет (см. R61 #7). | Опечатка/пропуск переменной при выкладке = 401 на каждый алерт, Alertmanager повторяет и в итоге теряет; ни один экран/алерт об этом не сообщает. | Добавить переменную в `PRODUCTION_WARNINGS` (или в обязательные для prod) и, при 401 на этом маршруте, сигналить наружу (второй канал). |
+| 8 | важно | `src/app/api/alerts/webhook/route.ts:57-58,101` | Пачка обрезается до `MAX_FORWARDED = 100`; в `alertmanager.yml` `max_alerts` не задан, значит Alertmanager присылает все алерты группы, а лишние молча отбрасываются с кодом 200. | При крупной аварии (например, недоступность десятков таргетов) алерты за №100 не дойдут, и никто об этом не узнает — включая самого Alertmanager. | Либо вернуть 5xx при `alerts.length > MAX_FORWARDED`, либо агрегировать лишние в одно сводное сообщение («и ещё N тревог»). |
+| 9 | важно | `observability/alertmanager/alertmanager.yml:18-27` + `src/app/api/alerts/webhook/route.ts:119-132` + `src/core/notifications/telegram.ts:201,263` | У `webhook_configs` не задан `timeout` (по умолчанию 0 — без таймаута), а `group_interval` (5 м, `alertmanager.yml:7`) служит таймаутом всего конвейера уведомления. Обработка вебхука последовательная: до 100 алертов, на каждый — чтение конфигов из БД (`telegram.ts:263`) и до 5 с на чат (`telegram.ts:201`). | Пачка из 100 алертов легко превышает 5 минут → Alertmanager отменяет уведомление и повторит позже: часть сообщений придёт с опозданием, часть — дважды. | Задать `timeout` меньше `group_interval` и/или слать в Telegram одним сводным сообщением на группу; кэшировать конфиги чатов на время обработки пачки. |
+| 10 | важно | `src/core/notifications/telegram.ts:8,11 против :191-222` | Шапка файла обещает «Rate limiting (max 30 msg/sec)» и «Retry with exponential backoff»; в коде ни того, ни другого: одна попытка, `retry_after` из 429 игнорируется, `response.ok` просто логируется. | Один 429/таймаут = сообщение потеряно; пачка алертов идёт без пауз и сама провоцирует 429. Ложное обещание в комментарии уводит разбор инцидента в неверную сторону. | Либо реализовать лимит и ретрай (учитывая `retry_after`), либо убрать обещание из шапки и опереться на outbox-путь. |
+| 11 | важно | `src/app/api/alerts/webhook/route.ts:126-130` | На каждый алерт — отдельный вызов `sendAlert`, который заново читает конфиги чатов из БД (`telegram.ts:263`) и делает отдельный HTTP-запрос на каждый чат. | Пачка 100 алертов = 100 запросов в БД и до 100×N запросов в Telegram подряд → торможение вебхука, 429, потеря хвоста пачки (см. находку 9). | Читать конфиги один раз на запрос (передавать готовый список) и ограничить параллелизм/частоту. |
+| 12 | важно | `src/app/api/alerts/webhook/route.ts:120` + `observability/alertmanager/alertmanager.yml:27` | Alertmanager шлёт и resolved-уведомления (`send_resolved: true`), но вебхук отбрасывает всё, кроме `firing` (120). | Никто не узнаёт, что авария закончилась: люди остаются в режиме «ещё чинят», а на панели — старые тревоги. Обратного сигнала нет вообще. | Либо поддержать resolved (отдельным сообщением «устранено»), либо осознанно задать `send_resolved: false` и записать решение. |
+| 13 | важно | `docker-compose.monitoring-prod.yml:129` против `deploy/Caddyfile.prod:45-54` | Alertmanager запускается с `--web.external-url=https://orionpiling.ru/alertmanager`, но в Caddy-конфиге есть только маршрут `/grafana` (46-49); `/alertmanager` попадает в общий `handle` → Next.js (52-54) и отдаёт 404. Порт 9093 слушает только 127.0.0.1 (121-122). | Посмотреть тревоги и поставить silence снаружи нельзя — только через SSH и `amtool`. В тексте алерта в Telegram ссылки на Alertmanager тоже нет. | Добавить `handle_path /alertmanager/*` в `deploy/Caddyfile.prod` (за basic-auth) и/или положить в Telegram-сообщение ссылку на UI. |
+| 14 | важно | `observability/prometheus/alerts.yml:20,31,42,68,119` + `src/app/api/alerts/webhook/route.ts:122-124` | Аннотации `runbook_url` ссылаются на `https://wiki.pilingtrack.com/runbooks/...` — такого сайта/вики в проекте нет (в репозитории ранбуки локальные, `docs/runbooks/001..013`). И в Telegram эти аннотации не пересылаются вовсе: берутся только `summary` и `description` (122-124). | Инженер по тревоге не понимает, что делать: правило приходит без инструкции, а ссылка ведёт в никуда. В 00:00 это стоит времени аварии. | Указать реальные пути (например, `docs/runbooks/001-postgresql-down.md`) и добавить `runbook_url` в текст Telegram-сообщения. |
+| 15 | важно | `scripts/disk-guard.sh:10-11,29,57-68` + `docs/runbooks/013-prod-timers.md:24` | Единственный «независимый от Prometheus/Docker-стека» контур (host-таймер, порог 85 %) доставляет алерт тем же путём — POST'ом на `http://localhost:3000/api/alerts/webhook` (`disk-guard.sh:29,57`). Если Docker/приложение лежат (ровно сценарий «диск забит, стек погиб»), curl падает, скрипт выходит с кодом 1 (`:66-68`), сообщение остаётся в journal. | Обещанная независимость не достигнута: сценарий, ради которого контур заводили, он не покрывает. | Отправлять из disk-guard напрямую в Telegram (свой бот/токен, без участия приложения) или в внешний эндпоинт; порог и результат фиксировать в journald с алертом на пропуск. |
+| 16 | важно | `src/proxy.ts:119-127` + `src/app/api/alerts/webhook/route.ts:1-9` | В `enforceTenant` список путей без обязательного тенанта — только `/api/health`, `/api/ready`, `/api/readiness`, `/api/liveness` (120); `/api/alerts/webhook` в него не входит. | При включении `MULTI_TENANT_MODE=multi` (или `true`, `validate-env.ts:95-104`) каждый вебхук Alertmanager получит 403 «Tenant ID required» — все инфраструктурные тревоги исчезнут разом. Сейчас режим одноарендаторный, то есть это риск «до тенанта №2», но в список он обязан попасть заранее. | Добавить путь вебхука в `publicPaths` (тенант для него берётся из конфигурации развёртывания, а не из заголовка). |
+| 17 | важно | `observability/alertmanager/alertmanager.yml:29-32` + `observability/prometheus/alerts.yml:44-52,217-224,226-237` | Подавление дублей (`inhibit_rules`) работает только при равных `alertname` и `job`, а парные правила имеют разные имена: `APIEndpointDown` и `TargetDown` срабатывают на одном и том же `up{job="pilingtrack-app"}==0`, `WorkersDown` — на том же событии для воркеров. | На одну аварию приложения приходят 2-3 сообщения, а не одно; шума больше, доверия к каналу меньше. Inhibit намерения «critical гасит warning» не выполняет и для пар вида `OutboxLagWarn`/`OutboxLagHigh` (`alerts.yml:179-200`). | Свести дубли в одно правило (или переименовать общее `component`-label и подавлять по нему), тогда `equal` будет работать. |
+| 18 | важно | `src/app/api/alerts/webhook/route.ts:80-82` + `deploy/Caddyfile.prod:61-65` | Вебхук принимает токен ещё и в query-параметре `?token=` (80-82), а Caddy по умолчанию логирует полный URI с query (`log` в `Caddyfile.prod:65`, лог в journald). | Секрет, которым открываются все тревоги, может попасть в журнал доступа — его увидит всякий, у кого доступ к `journalctl`. В alertmanager.yml используется только заголовок, так что query-путь не нужен. | Убрать приём токена из query (оставить только `Authorization: Bearer`); при необходимости — редать параметр в логе Caddy. |
+| 19 | важно | `src/core/notifications/telegram.ts:64-67` + `prisma/schema.prisma:2502-2514` | `getConfigs()` берёт **все** включённые записи `TelegramConfig` тенанта; в модели нет ни назначения, ни роли, ни «чата для тревог» (только `label`, `botToken`, `chatId`, `enabled`). | Серверные тревоги («диск 95 %», «БД недоступна») уходят в те же чаты, что бизнес-уведомления (отчёты, простои), включая чаты операторов/диспетчеров. Отделить инфраструктурный канал нельзя, кроме выключения всех чатов. | Завести признак назначения канала (например, `purpose: 'alerts' | 'business'`) и слать тревоги мониторинга только в него. |
+| 20 | мелочь | `observability/alertmanager/alertmanager.yml:5,7,11-14` | `group_by: ['alertname','job']`, `group_interval` критической ветки не переопределён (остаётся 5 мин). Разные имена правил = разные группы = отдельные сообщения. | При массовом сбое человек получает поток одиночных сообщений вместо одной сводки; при частой смене состава группы — задержки до 5 минут. | Группировать по `service`/`job` и агрегировать текст («N тревог: …») на стороне вебхука или Alertmanager-шаблона. |
+| 21 | мелочь | `src/app/api/alerts/webhook/route.ts:101-132` + `src/core/notifications/durable-alert-delivery.ts:42` | Дедупликации нет: повтор того же вебхука (Alertmanager повторяет пачку после ошибки, см. R60 #5) отправит те же сообщения снова; в тексте нет ни id алерта, ни `startsAt` (124) — отличить дубль нечем. На доменном пути id события дописывается в текст (`durable-alert-delivery.ts:42`), здесь — нет. | Дубликаты в Telegram и невозможность понять, новый это алерт или повтор старого. | Добавить в текст `startsAt`/идентификатор группы и ключ дедупликации на короткое окно (например, в Redis). |
+| 22 | мелочь | `docker-compose.observability.yml:104-116` + `docker-compose.monitoring-standalone.yml:102-114` | Оба dev/standalone-стека монтируют тот же `alertmanager.yml` (`credentials_file: /etc/alertmanager/webhook-token`), но не создают файл токена и не передают `ALERTMANAGER_WEBHOOK_TOKEN` (это делает только `docker-compose.monitoring-prod.yml:134-138`). В `docker-compose.observability.yml` сервиса `app` нет вообще (сервисы: prometheus, grafana, loki, tempo, alertmanager, экспортёры, pushgateway). | Локально контур алертов нерабочий: либо ошибка чтения файла токена, либо неразрешимое имя `app` → «алерты не доходят» даже при верном конфиге. Проверить маршрут локально нельзя. | Либо сделать dev-конфиг Alertmanager с заглушкой-receiver'ом, либо документировать, что локально маршрут доставки не проверяется. |
+| 23 | мелочь | `observability/README.md:24,42` | Документация обещает «Full stack (app + observability)» (24) и «routing + receivers (Slack/email)» (42); фактически в compose нет сервиса app, а receiver один — webhook приложения. | Неверная карта при разборе «почему не пришёл алерт»: ищут Slack/email-интеграцию, которой нет. | Привести README к фактическому состоянию. |
+| 24 | мелочь | `src/app/api/metrics/route.ts:54-132` | Экспорт метрик не содержит ни одной метрики о доставке уведомлений (ни отправок, ни отказов, ни возраста последнего успешного алерта). | О состоянии канала оповещения нельзя ни построить панель, ни завести правило — при том что это единственный канал. | Добавить счётчики `notifications_sent_total`/`notifications_failed_total{channel}` и алерт на рост отказов. |
+| 25 | мелочь | `observability/prometheus/alerts.yml:269-280` + `src/core/observability/health-tracker/checkers/backup.ts:15-19` | Правило `OffsiteBackupNotSynced` требует `backup_age_hours > 0`, а гейт `BACKUP_ENABLED` (без него `backupAgeHours` = 0) не задан ни в одном шаблоне окружения. Правило существует, но сработать не может. | Нет облачной копии базы — узнают только руками. Уже разобрано в R56 #1/R61 #1, здесь зафиксировано как «правило, которого не будет», чтобы не считать его покрытием. | См. R56 #1: задать `BACKUP_ENABLED=true`/`BACKUP_DIR` в прод-`.env` либо убрать гейт. |
+| 26 | мелочь | `src/app/api/alerts/webhook/route.ts:85-88,134-135` | Маршрут не обёрнут `withApi`/`withMutation` (осознанно, см. R36/R60) и не имеет собственного лимита частоты: тело цикла вне `try/catch`, исключение даёт 500 и повтор всей пачки Alertmanager'ом, а учёт запросов в `http_requests_total` не ведётся. | Диагностика и защита от потока запросов на этом пути отсутствуют; при сбое на 40-м алерте первые 39 уйдут в Telegram повторно. | Обернуть тело цикла в `try/catch` (R60 #5) и добавить простой лимит на источник; учёт запросов не критичен. |
+| 27 | мелочь | `observability/prometheus/prometheus-prod.yml:4` | Комментарий в шапке: «Без AlertManager и pushgateway», хотя блок `alerting.alertmanagers` (15-18) присутствует и контейнер Alertmanager поднят (`docker-compose.monitoring-prod.yml:118`). | При разборе легко решить, что доставка алертов «и не предполагалась». | Поправить комментарий (дубль R56 #15, оставлен как контекст). |
+| 28 | мелочь | `src/app/api/alerts/webhook/route.ts:129` + `src/core/notifications/telegram.ts:162` | В Telegram уходит `ruleId = labels.alertname` — техническое английское имя правила; человекочитаемого заголовка («Диск сервера почти полон») у алертов мониторинга нет, хотя у доменных он формируется. | Мастер/диспетчер читают «HostDiskSpaceCritical» вместо понятной фразы — растёт время реакции. | Брать текст из `annotations.summary` (он уже приходит) как заголовок сообщения. |
+
+## Не проверено
+
+- Что стек мониторинга (`docker-compose.monitoring-prod.yml`) реально поднят на боевом хосте и что Alertmanager в нём запущен именно с этим `alertmanager.yml` — прямого доступа к проду нет (AGENTS.md §1).
+- Заданы ли на бою `ALERTMANAGER_WEBHOOK_TOKEN`, `TELEGRAM_API_BASE`, `DEFAULT_TENANT_ID`, `BACKUP_ENABLED` — содержимое `.env*` не читалось (запрет AGENTS.md §1). Выводы о поведении при пустых значениях сделаны из кода и шаблонов compose.
+- Какие именно чаты и тенант заведены в `TelegramConfig` (кто фактически получает тревоги) — это состояние БД, отсюда недоступное; проверен только способ выборки (`telegram.ts:64-67`).
+- Точный алгоритм повторов Alertmanager при отказе уведомления (интервалы backoff и момент отказа) — по документации подтверждён сам факт «Notify & retry intermittent failures» и что `group_interval` служит таймаутом конвейера; исходники Alertmanager в этой сессии не читались, числовые интервалы не проверены.
+- Существование метрики `alertmanager_notifications_failed_total` — по документации Alertmanager (context7, `notify/metrics.go`), живой инстанс не опрашивался.
+- Реальный состав метрик внешних экспортёров (`pg_stat_activity_count`, `pg_stat_database_deadlocks`, `redis_memory_*`, `node_filesystem_*{mountpoint="/host"}`) — экспортёры не запускались (та же оговорка, что в R56).
+- Используется ли Sentry как второй канал оповещения об авариях (`src/instrumentation.ts:8` → `Sentry.captureRequestError`, `sentry.server.config.ts`) — правила алертов Sentry живут вне репозитория.
+- Установлен ли на боевом хосте `pilingtrack-disk-guard.timer` и срабатывает ли он — снимок таймеров есть только в `docs/runbooks/013-prod-timers.md:24` (снимок 29.09.2026).
+
+---
+
+## Текущий статус доставки алертов (проверка 2026-10-02, CX-H12)
+
+Раздел добавлен позже; таблицы и «Не проверено» выше **не переписаны** — это снимок на дату
+отчёта. Проверка сделана **чтением текущего исходника и git-истории** (все коммиты ниже — предки
+`HEAD` ветки `hermes/q4-0926`); **на боевом хосте ничего не проверялось** — доступа к проду нет
+(AGENTS.md §1), поэтому «закрыто» здесь значит «подтверждено кодом и существующим тестом», а **не**
+«работает на сервере». Наличие файла-сторожа или правила в репозитории **не доказывает их установку
+на хосте** (см. ниже про `app-guard` и пересоздание контейнера Prometheus).
+
+### Что видит Alertmanager (различение исходов)
+
+Ответ вебхука сейчас различает четыре состояния (`src/app/api/alerts/webhook/route.ts`):
+
+| Исход | Условие в коде | HTTP | Тело | Повторит ли Alertmanager |
+|---|---|---|---|---|
+| **успех** | доставлен хотя бы один firing-алерт, либо firing-алертов в пачке нет вовсе (только `resolved`/пустая пачка) | 200 | `{ ok: true, forwarded: N }` | нет |
+| **suppression** | выключен тумблер «Сбои сервера (мониторинг)» (`systemAlerts`) — `route.ts:109-116` | 200 | `{ ok: true, forwarded: 0, reason: 'disabled' }` | нет |
+| **частичный отказ** | пачка firing, часть дошла (`0 < forwarded < firing`) — `route.ts:147-148` | 200 | `{ ok: true, forwarded: N }` | **нет** (недоставленный хвост теряется молча) |
+| **полный отказ** | пачка firing, ни один не дошёл (`firing > 0 && forwarded === 0`) — `route.ts:136-145` | **503** | `{ ok: false, forwarded: 0, error: … }` | да, **всю пачку** |
+
+Строка «полный отказ» — это и есть исправление находки 2 (коммит `df0e08ff`, «503 при сбое доставки
+алертов в Telegram», F-WEBHOOK-RETRY). До него вебхук отвечал 200 всегда. Ответ закреплён автотестом
+`src/app/api/alerts/webhook/__tests__/route.test.ts` (блок «delivery failure»: 503 при
+`sendAlert === false`; 200 при частичной доставке; 200 на пачку только из `resolved`).
+
+### Риск дублей при повторе всей пачки (политика I08 — не решалась здесь)
+
+503 заставляет Alertmanager повторить **всю пачку**, а дедупликации в вебхуке нет (находка 21: в
+тексте сообщения нет ни id алерта, ни `startsAt`). Для сценария **полного** отказа это безопасно —
+до повтора не дошло ни одного сообщения. Но если сделать 503 и на **частичном** отказе, повторится
+в том числе то, что уже ушло: получатель увидит дубликаты. Поэтому простой 503 для всей пачки без
+защиты от дублей здесь **не предлагается** — это вопрос политики I08 (нужен ключ дедупликации на
+короткое окно, например в Redis), и в задаче CX-H12 он не реализуется. Сейчас частичный отказ
+остаётся 200: хвост пачки не повторяется, дубликатов нет, но и потеря не сигнализируется.
+
+### Статус ключевых находок отчёта
+
+| # | Статус на 2026-10-02 | Подтверждение |
+|---|---|---|
+| 1 | **в репозитории есть, установка на хосте не подтверждена** | Сторож `app-guard` (скрипт + два systemd-юнита) добавлен коммитами `8a30bc00` и `d2aecd13` (предки `HEAD`); закрывает слепое пятно «приложение лежит — тревога о нём идёт через приложение». Но это **не Docker**, а ручная установка на хосте: `scripts/app-guard.sh` → `/opt/pilingtrack/scripts/`, юниты → `/etc/systemd/system/`, креды владельца → `/etc/pilingtrack/app-guard.env` (`../../runbooks/014-post-deploy-2026-10.md`, шаг 2). В самом ранбуке шаг 2 **не помечен ВЫПОЛНЕНО** (в отличие от шага 4); прямых доказательств установки (напр. `systemctl list-timers`) в репозитории нет. Отсутствие сторожа на хосте = слепое пятно не закрыто. |
+| 2 | **закрыто (полный отказ)** | 503 при полном отказе доставки — `route.ts:136-145`, коммит `df0e08ff`; автотест выше. Частичный отказ и suppression по-прежнему 200. |
+| 4 | **закрыто (в коде), требует пересоздания контейнера Prometheus** | Добавлен job `alertmanager` (`observability/prometheus/prometheus-prod.yml:80-92`) и два правила — `AlertmanagerDown` (`alerts.yml:242-252`) и `AlertmanagerNotificationsFailing` (`alerts.yml:254-264`), коммит `052031d9` (F-ALERTMANAGER-WATCH). Заодно `TargetDown` исключает Alertmanager (`alerts.yml:217-227`, коммит `5493421d`), чтобы одно падение не давало двух тревог. |
+| 5, 21, 26 | **не менялись — открыты** | Тумблер `systemAlerts` по-прежнему глушит всё (200 `reason:'disabled'`, отличимо от успеха только в теле, для Alertmanager — успех); дедупликации нет; тело цикла вне `try/catch`. |
+
+Отдельно: **правило `AlertmanagerDown` само уходит через тот же Alertmanager** — при его полном
+падении сообщение не придёт, и это ловится только внешним сторожем. Правило честно пишет об этом в
+своём `description` (`alerts.yml:252`), но правда это лишь при **установленном** `app-guard`;
+пока установка не подтверждена, слепое пятно остаётся.
+
+И ещё одно ограничение приёмки: `prometheus-prod.yml` и `alerts.yml` монтируются в контейнер как
+отдельные файлы (`docker-compose.monitoring-prod.yml:20-21`), поэтому после `git pull` правки
+подхватятся только при `--force-recreate prometheus` (ранбук 014, шаг 1). В репозитории правила
+есть; что они **загружены** на боевом Prometheus — не проверено.
+
+### Команды проверки (каждая — отдельно, exit как есть)
+
+1. `git diff --check` → **exit 0** (whitespace-ошибок нет).
+2. `npx.cmd vitest run src/app/api/alerts/webhook/__tests__/route.test.ts` → **exit 0**,
+   `1 passed / 0 failed / 0 skipped` (16 тестов).
+3. `git merge-base --is-ancestor` для `df0e08ff`, `052031d9`, `5493421d`, `8a30bc00`, `d2aecd13`
+   → все пять **ANCESTOR of HEAD** (подтверждены в текущей ветке, не только «в репозитории»).
+4. `Test-Path`/`test -f` для новых ссылок раздела: `docs/runbooks/014-post-deploy-2026-10.md` и
+   `src/app/api/alerts/webhook/__tests__/route.test.ts` → оба **present**.
+
+Браузерной и боевой приёмки не было: 503 вживую не воспроизводился (для этого пришлось бы ломать
+доставку на бою), установка `app-guard` и перезагрузка правил Prometheus на хосте не проверялись —
+это ручные шаги ранбука 014, а не то, что доказывает репозиторий.

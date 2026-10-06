@@ -24,7 +24,8 @@ import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { COMPACT_KPI_GRID, ScreenTitle, card } from '../settings/shared-ui';
 import { kpiGridStyle } from '@/components/piling/kpi-tile';
-import { RefKpi } from './shared';
+import { loadFailureMessage, RefKpi } from './shared';
+import { normalizeSearch } from '../shared/text-search';
 
 interface Attempt {
   entry: BriefingJournalEntry;
@@ -39,14 +40,11 @@ export function KnowledgeScreen() {
   const load = useCallback(async () => {
     try {
       const response = await authFetch('/api/briefings/journal?kind=KNOWLEDGE');
-      if (!response.ok) {
-        const body = await response.json().catch(() => ({}));
-        throw new Error(body.error || `Сервер вернул ${response.status}`);
-      }
+      if (!response.ok) throw response;
       setRows(((await response.json()).rows ?? []) as BriefingJournalEntry[]);
       setFailed(null);
     } catch (error) {
-      setFailed(error instanceof Error ? error.message : 'Не удалось загрузить проверки знаний');
+      setFailed(await loadFailureMessage(error, 'Не удалось загрузить проверки знаний'));
       setRows(null);
     }
   }, []);
@@ -76,9 +74,9 @@ export function KnowledgeScreen() {
     return result;
   }, [rows]);
 
-  const needle = query.trim().toLocaleLowerCase('ru-RU');
+  const needle = normalizeSearch(query);
   const visible = latest.filter(({ entry }) => !needle
-    || entry.userName.toLocaleLowerCase('ru-RU').includes(needle));
+    || normalizeSearch(entry.userName).includes(needle));
   const expired = latest.filter((attempt) => attempt.expired).length;
 
   return (
@@ -92,9 +90,9 @@ export function KnowledgeScreen() {
       />
 
       <section className={COMPACT_KPI_GRID} style={kpiGridStyle(3)}>
-        <RefKpi icon="accepted" label="Сдавали проверку" tone="success" value={latest.length}
+        <RefKpi icon="accepted" label="Сдавали проверку" tone="success" value={rows === null ? '—' : latest.length}
           detail="человек с записью в журнале" />
-        <RefKpi icon="defect" label="Срок вышел" tone="danger" value={expired} alert={expired > 0}
+        <RefKpi icon="defect" label="Срок вышел" tone="danger" value={rows === null ? '—' : expired} alert={expired > 0}
           detail="требуется пересдача" />
         <RefKpi icon="documents" label="Всего попыток" tone="info" value={rows?.length ?? '—'}
           detail="записей за всё время" />

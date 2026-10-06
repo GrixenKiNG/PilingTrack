@@ -13,32 +13,41 @@ import { NextRequest } from 'next/server';
 const {
   requireAuthMock,
   findFirstMock,
+  equipmentFindFirstMock,
   updateMaintenanceMock,
   deleteMaintenanceMock,
   recordAuditEventMock,
   loggerErrorMock,
+  loggerWarnMock,
 } = vi.hoisted(() => ({
   requireAuthMock: vi.fn(),
   findFirstMock: vi.fn(),
+  equipmentFindFirstMock: vi.fn(),
   updateMaintenanceMock: vi.fn(),
   deleteMaintenanceMock: vi.fn(),
   recordAuditEventMock: vi.fn(),
   loggerErrorMock: vi.fn(),
+  loggerWarnMock: vi.fn(),
 }));
 
 vi.mock('@/lib/auth', () => ({ requireAuth: requireAuthMock }));
 vi.mock('@/lib/csrf-protection', () => ({ withCsrf: () => null }));
-vi.mock('@/lib/db', () => ({ db: { maintenanceRecord: { findFirst: findFirstMock } } }));
+vi.mock('@/lib/db', () => ({
+  db: {
+    maintenanceRecord: { findFirst: findFirstMock },
+    equipment: { findFirst: equipmentFindFirstMock },
+  },
+}));
 vi.mock('@/modules/equipment', () => ({
   updateMaintenance: updateMaintenanceMock,
   deleteMaintenance: deleteMaintenanceMock,
 }));
 vi.mock('@/services/audit/audit-service', () => ({ recordAuditEvent: recordAuditEventMock }));
 vi.mock('@/lib/logger', () => ({
-  logger: { error: loggerErrorMock, warn: vi.fn(), info: vi.fn(), debug: vi.fn() },
+  logger: { error: loggerErrorMock, warn: loggerWarnMock, info: vi.fn(), debug: vi.fn() },
 }));
 
-import { PUT } from '../route';
+import { PUT, DELETE } from '../route';
 
 const ADMIN = { id: 'admin-1', name: 'Админ А.', role: 'ADMIN', tenantId: 'tenant-a' };
 
@@ -144,5 +153,128 @@ describe('PUT /api/equipment/[id]/maintenance/[recordId] — след правк
 
     expect(res.status).toBe(200);
     expect(loggerErrorMock).toHaveBeenCalled();
+  });
+});
+
+/**
+ * DELETE /api/equipment/[id]/maintenance/[recordId] — след удаления наряда ТО
+ * (F-R72-FEED-METER-MAINT).
+ *
+ * Удаление наряда не оставляло следа нигде, хотя создание, правка и приёмка
+ * того же наряда писались. Удалить можно и открытый наряд, который держит
+ * блокер по ремонту, поэтому роут берёт снимок из результата команды
+ * (`delete` возвращает снятую строку — F-R72-FEED-b) и после успеха пишет
+ * `maintenance.record.deleted`. Название установки читается отдельно.
+ */
+const REMOVED = {
+  id: 'rec-1',
+  title: 'Замена РВД',
+  type: 'REPAIR',
+  status: 'IN_PROGRESS',
+  scheduledAt: new Date('2026-10-01T00:00:00.000Z'),
+};
+
+function deleteReq(): NextRequest {
+  return new NextRequest('http://localhost/api/equipment/eq-1/maintenance/rec-1', {
+    method: 'DELETE',
+  });
+}
+
+describe('DELETE /api/equipment/[id]/maintenance/[recordId] — след удаления (F-R72-FEED-METER-MAINT)', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    requireAuthMock.mockResolvedValue({ user: ADMIN, error: null });
+    deleteMaintenanceMock.mockResolvedValue(REMOVED);
+    equipmentFindFirstMock.mockResolvedValue({ name: 'ЭО-5111' });
+    recordAuditEventMock.mockResolvedValue(undefined);
+  });
+
+  it('берёт снимок из результата команды, не читая наряд заранее', async () => {
+    const res = await DELETE(deleteReq(), params());
+
+    expect(res.status).toBe(200);
+    expect(findFirstMock).not.toHaveBeenCalled();
+    expect(equipmentFindFirstMock).toHaveBeenCalledWith({
+      where: { id: 'eq-1', tenantId: 'tenant-a' },
+      select: { name: true },
+    });
+  });
+
+  it('пишет maintenance.record.deleted со снимком из результата команды', async () => {
+    await DELETE(deleteReq(), params());
+
+    expect(recordAuditEventMock).toHaveBeenCalledTimes(1);
+    expect(recordAuditEventMock).toHaveBeenCalledWith({
+      action: 'maintenance.record.deleted',
+      scope: 'equipment',
+      actorId: 'admin-1',
+      targetId: 'rec-1',
+      tenantId: 'tenant-a',
+      metadata: {
+        name: 'Замена РВД',
+        before: {
+          type: 'REPAIR',
+          status: 'IN_PROGRESS',
+          scheduledAt: REMOVED.scheduledAt,
+          equipmentName: 'ЭО-5111',
+        },
+      },
+    });
+  });
+
+  it('не пишет след, когда наряд не найден (404)', async () => {
+    const { ServiceError } = await import('@/services/service-error');
+    deleteMaintenanceMock.mockRejectedValue(new ServiceError('Наряд ТО не найден', 404));
+
+    const res = await DELETE(deleteReq(), params());
+
+    expect(res.status).toBe(404);
+    expect(recordAuditEventMock).not.toHaveBeenCalled();
+  });
+
+  it('пишет событие без названия установки, когда её не нашли', async () => {
+    equipmentFindFirstMock.mockResolvedValue(null);
+
+    const res = await DELETE(deleteReq(), params());
+
+    expect(res.status).toBe(200);
+    expect(recordAuditEventMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'maintenance.record.deleted',
+        metadata: expect.objectContaining({ name: 'Замена РВД', before: expect.objectContaining({ equipmentName: undefined }) }),
+      }),
+    );
+  });
+
+  // Наряд к этому моменту уже удалён: сбой дообогащения не должен превращать
+  // успех в 500 (F-R72-FEED-c) — повтор запроса дал бы 404, а следа в ленте не
+  // было бы вовсе.
+  it('остаётся успешным, когда чтение установки упало, и пишет событие без названия', async () => {
+    equipmentFindFirstMock.mockRejectedValue(new Error('db down'));
+
+    const res = await DELETE(deleteReq(), params());
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true });
+    expect(loggerWarnMock).toHaveBeenCalledWith(
+      'maintenance.record.deleted.enrichment_failed',
+      expect.objectContaining({ recordId: 'rec-1', error: 'db down' }),
+    );
+    expect(recordAuditEventMock).toHaveBeenCalledWith({
+      action: 'maintenance.record.deleted',
+      scope: 'equipment',
+      actorId: 'admin-1',
+      targetId: 'rec-1',
+      tenantId: 'tenant-a',
+      metadata: {
+        name: 'Замена РВД',
+        before: {
+          type: 'REPAIR',
+          status: 'IN_PROGRESS',
+          scheduledAt: REMOVED.scheduledAt,
+          equipmentName: undefined,
+        },
+      },
+    });
   });
 });

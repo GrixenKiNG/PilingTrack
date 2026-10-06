@@ -17,6 +17,7 @@ import { generatePeriodPdf, generateSinglePdf, savePdfBuffer, PeriodPdfData, Sin
 import { loadCompanyName } from '@/lib/pdf-data';
 import { PdfJobData, PdfJobResult } from '@/lib/pdf-queue';
 import { logger } from '@/lib/logger';
+import { positiveIntEnv } from './unified-worker/env-int';
 
 // ============================================================
 // Configuration
@@ -24,7 +25,7 @@ import { logger } from '@/lib/logger';
 
 const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
 const QUEUE_NAME = 'pdf-generation';
-const CONCURRENCY = parseInt(process.env.PDF_WORKER_CONCURRENCY || '2', 10);
+const CONCURRENCY = positiveIntEnv('PDF_WORKER_CONCURRENCY', 2);
 
 // ============================================================
 // Redis Connection

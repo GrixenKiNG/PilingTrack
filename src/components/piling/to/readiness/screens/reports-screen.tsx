@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 import { AlertTriangle, Search } from '@/components/piling/icons/unified-icons';
 import { COMPACT_KPI_GRID, ScreenTitle, card } from '../settings/shared-ui';
-import { pluralizeRu } from '@/lib/format';
+import { formatPercent, pluralizeRu } from '@/lib/format';
 import { auditActionLabel, isCriticalAuditAction } from '../settings/audit-labels';
 import { kpiGridStyle } from '@/components/piling/kpi-tile';
 import { Button } from '@/components/ui/button';
@@ -16,6 +16,7 @@ import type { ReadinessShiftDto } from '../api/contracts';
 import { type ReadinessUrlFilters } from '../api/client';
 import { describeBlockers } from './blocker-guidance';
 import { RefKpi, downloadReadinessExport } from './shared';
+import { normalizeSearch } from '../shared/text-search';
 import type { ReferenceUiProps } from './types';
 
 /** Период отчёта по умолчанию, если фильтр дат не задан. */
@@ -87,6 +88,15 @@ export function ReportsScreen(props: ReferenceUiProps) {
   const [reportPeriod, setReportPeriod] = useState<'day' | 'week'>('day');
   const [fleetMetric, setFleetMetric] = useState<'readiness' | 'usage'>('readiness');
   const [journalSearch, setJournalSearch] = useState('');
+  // Выгрузка отчёта — не мгновенная операция; кнопка блокируется и показывает
+  // ход, чтобы двойной клик не отправлял две полные выгрузки втихую.
+  const [exportPending, setExportPending] = useState(false);
+  const exportReport = async () => {
+    setExportPending(true);
+    try { await downloadReadinessExport('reports', props.filters); }
+    catch (error) { toast.error(error instanceof Error ? error.message : 'Не удалось сформировать экспорт'); }
+    finally { setExportPending(false); }
+  };
   const states = Object.values(props.readinessByEquipment);
   const authoritative = props.currentReadiness.length > 0 ? props.currentReadiness : null;
   const ready = authoritative
@@ -94,7 +104,13 @@ export function ReportsScreen(props: ReferenceUiProps) {
     : states.filter((item) => item.canOperate).length;
   const readinessPercent = authoritative?.length
     ? Math.round(authoritative.reduce((sum, item) => sum + item.score, 0) / authoritative.length * 10) / 10
-    : states.length ? Math.round(ready / states.length * 1000) / 10 : 0;
+    : props.authoritativeReadinessError
+      // Отказ авторитетного чтения — производный процент по журналу не
+      // показываем: сервер вердикта не вынес, и число было бы выдуманным
+      // (F-N1004-UNKNOWN-READINESS). Неизвестное — прочерк, а не ноль.
+      ? null
+      : states.length ? Math.round(ready / states.length * 1000) / 10 : 0;
+  const readinessPercentLabel = readinessPercent == null ? '—' : formatPercent(readinessPercent);
   const timezone = props.bootstrap?.tenant.timezone ?? 'Europe/Moscow';
   const period = resolveReportPeriod(props.filters, timezone);
   // Сравнение строк «ГГГГ-ММ-ДД» — то же, что сравнение календарных дней.
@@ -216,14 +232,14 @@ export function ReportsScreen(props: ReferenceUiProps) {
     .sort((left, right) => new Date(right.at).getTime() - new Date(left.at).getTime());
   // Поле поиска над журналом было мёртвым: ни значения, ни обработчика — текст
   // вводился и ничего не менял. Ищем по всему, что в строке видно.
-  const journalQuery = journalSearch.trim().toLocaleLowerCase('ru-RU');
+  const journalQuery = normalizeSearch(journalSearch);
   const journalRows = journalQuery === '' ? allJournalRows : allJournalRows.filter((record) => [
     record.event,
     record.reason,
     record.actor,
     record.equipmentId ? nameByEquipment.get(record.equipmentId) : null,
     record.equipmentId ? siteByEquipment.get(record.equipmentId) : null,
-  ].some((value) => value?.toLocaleLowerCase('ru-RU').includes(journalQuery)));
+  ].some((value) => value != null && normalizeSearch(value).includes(journalQuery)));
   /**
    * Причины блокировки — по фактам авторитетных снимков.
    *
@@ -237,7 +253,7 @@ export function ReportsScreen(props: ReferenceUiProps) {
   const facts = props.currentReadiness.flatMap((item) => item.facts ? [item.facts] : []);
   const blockerRows: Array<readonly [string, number]> = [
     ['Критический дефект', facts.filter((item) => item.criticalDefect).length],
-    ['Осмотр не завершён', facts.filter((item) => !item.inspectionCompleted).length],
+    ['Нет осмотра за сегодня', facts.filter((item) => !item.inspectionCompleted).length],
     ['Наряд-допуск', facts.filter((item) => item.permitValid === false || item.permitExpired).length],
     ['Просрочено ТО', facts.filter((item) => item.maintenanceOverdueHours > 0 || item.maintenanceOverdueDays > 0).length],
     ['Приёмка не подтверждена', facts.filter((item) => !item.accepted).length],
@@ -273,8 +289,8 @@ export function ReportsScreen(props: ReferenceUiProps) {
         heading="Отчёты"
         subtitle="Аналитика доказательной готовности"
         actions={(
-          <Button className="bg-signal-strong hover:bg-signal-strong" onClick={() => void downloadReadinessExport('reports', props.filters).catch((error) => toast.error(error instanceof Error ? error.message : 'Не удалось сформировать экспорт'))}>
-            Экспорт отчёта
+          <Button className="bg-signal-strong hover:bg-signal-strong" disabled={exportPending} onClick={() => void exportReport()}>
+            {exportPending ? 'Готовим файл…' : 'Экспорт отчёта'}
           </Button>
         )}
       />
@@ -288,13 +304,28 @@ export function ReportsScreen(props: ReferenceUiProps) {
         Период: {formatTenantDay(period.fromDay)} — {formatTenantDay(period.toDay)}
         {' · '}{period.days} {pluralizeRu(period.days, ['сутки', 'суток', 'суток'])}
       </p>
+      {/*
+        История готовности — отдельный источник от текущего снимка. Раньше её
+        отказ выдавался за отказ текущей оценки и гасил весь парк; теперь он
+        виден здесь, где история и читается, и не трогает готовность центра/парка.
+      */}
+      {props.readinessHistoryError && (
+        <p
+          role="alert"
+          className="mb-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive-strong"
+        >
+          История готовности не загружена: {props.readinessHistoryError}. Динамика и снимки в журнале за период могут быть неполными.
+        </p>
+      )}
       <section className={COMPACT_KPI_GRID} style={kpiGridStyle(5)}>
         <RefKpi
           icon="technical-readiness"
           label="Готовность парка"
           tone="success"
-          value={`${readinessPercent}%`}
-          detail={deltaDetail(readinessPercent, previousScore, 'п.п.') ?? 'сравнить не с чем'}
+          value={readinessPercentLabel}
+          detail={readinessPercent == null
+            ? 'авторитетная оценка недоступна'
+            : deltaDetail(readinessPercent, previousScore, 'п.п.') ?? 'сравнить не с чем'}
         />
         {/*
           Было «Смен допущено» со значением ready — это количество ГОТОВЫХ
@@ -365,7 +396,7 @@ export function ReportsScreen(props: ReferenceUiProps) {
                   За выбранный период снимков готовности нет.
                 </div>
               )}
-              <div className="absolute right-3 top-3 rounded border border-border bg-card px-3 py-2 text-xs"><b>{readinessPercent}%</b><br /><span className="text-muted-foreground">сегодня</span></div>
+              <div className="absolute right-3 top-3 rounded border border-border bg-card px-3 py-2 text-xs"><b>{readinessPercentLabel}</b><br /><span className="text-muted-foreground">сегодня</span></div>
             </div>
           </div>
           {dailyTrend.length > 0 && (
@@ -381,7 +412,19 @@ export function ReportsScreen(props: ReferenceUiProps) {
         </section>
         <section className={cn(card, 'p-3')}>
           <h2 className="font-bold">Причины блокировки · Парето</h2>
-          {blockerTotal === 0 ? (
+          {/*
+            Отказ авторитетного текущего снимка оставлял `facts` пустыми (`:253`),
+            и блок писал «Ни одна причина сейчас не срабатывает» — неотличимо от
+            честного успешного пустого ответа. Пока оценок нет, показываем
+            непроверенность, а не подтверждённое отсутствие блокировок
+            (F-N1005-PARETO-UNKNOWN). Ошибка истории сюда не входит: её
+            собственный баннер выше, и она не гасит достоверное текущее Парето.
+          */}
+          {props.authoritativeReadinessError ? (
+            <p role="alert" className="mt-6 text-center text-xs text-destructive-strong">
+              Причины блокировки не проверены: авторитетная оценка недоступна — {props.authoritativeReadinessError}.
+            </p>
+          ) : blockerTotal === 0 ? (
             <p className="mt-6 text-center text-xs text-muted-foreground">Ни одна причина сейчас не срабатывает.</p>
           ) : (
             <>
