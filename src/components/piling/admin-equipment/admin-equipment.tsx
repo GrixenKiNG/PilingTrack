@@ -13,7 +13,7 @@ import { EquipmentTile } from './equipment-tile';
 import { EquipmentCardGrid } from './equipment-card-grid';
 import { EquipmentTable } from './equipment-table';
 import { EquipmentDetail } from './detail/equipment-detail';
-import { buildFleetFilterOptions, applyFleetFilters } from './fleet-filter';
+import { buildFleetFilterOptions, applyFleetFilters, hasActiveFleetFilters } from './fleet-filter';
 import { CreateEquipmentDialog } from './equipment-dialogs';
 import { PilingIcon } from '@/components/piling/icons';
 import { usePilingStore } from '@/lib/store';
@@ -62,6 +62,8 @@ export function AdminEquipment() {
   const options = useMemo(() => buildFleetFilterOptions(cards), [cards]);
 
   const filtered = useMemo(() => applyFleetFilters(cards, filters), [cards, filters]);
+
+  const filtersActive = useMemo(() => hasActiveFleetFilters(filters), [filters]);
 
   if (loading) {
     return (
@@ -129,7 +131,16 @@ export function AdminEquipment() {
               value={filters}
               onChange={setFilters}
             />
-            <EquipmentViewToggle view={view} onChange={setView} />
+            <div className="flex items-center gap-3">
+              {/* R130 №6: сброс доступен и при непустом списке — раньше кнопка
+                  пряталась до тех пор, пока отбор не обнулит список. */}
+              {filtersActive && (
+                <button onClick={() => setFilters(EMPTY_FILTERS)} className="inline-flex min-h-11 items-center text-xs text-info-strong underline sm:min-h-0">
+                  Сбросить фильтры
+                </button>
+              )}
+              <EquipmentViewToggle view={view} onChange={setView} />
+            </div>
           </div>
 
           {filtered.length === 0 ? (
@@ -138,11 +149,6 @@ export function AdminEquipment() {
               <p className="text-sm text-muted-foreground">
                 {cards.length === 0 ? 'Нет установок' : 'Нет установок под выбранные фильтры'}
               </p>
-              {cards.length > 0 && (
-                <button onClick={() => setFilters(EMPTY_FILTERS)} className="mt-2 inline-flex min-h-11 items-center text-xs text-info-strong underline sm:min-h-0">
-                  Сбросить фильтры
-                </button>
-              )}
             </div>
           ) : view === 'tiles' ? (
             <div className="grid gap-3 sm:grid-cols-2">

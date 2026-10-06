@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildFleetFilterOptions, applyFleetFilters } from '../fleet-filter';
+import { buildFleetFilterOptions, applyFleetFilters, hasActiveFleetFilters } from '../fleet-filter';
 import type { FleetCard } from '../fleet-types';
 import type { FleetFilterState } from '../equipment-filters';
 
@@ -131,5 +131,25 @@ describe('applyFleetFilters', () => {
 
     expect(applyFleetFilters([kopior, other], { ...EMPTY_FILTERS, search: 'копер' }).map((c) => c.id)).toEqual(['k']);
     expect(applyFleetFilters([kopior, other], { ...EMPTY_FILTERS, search: '  копёр  ' }).map((c) => c.id)).toEqual(['k']);
+  });
+});
+
+/**
+ * R130 №6: «Сбросить фильтры» была видна только в пустом списке. Кнопку
+ * показывает флаг активного отбора — он должен быть false ровно тогда, когда
+ * сбрасывать нечего.
+ */
+describe('hasActiveFleetFilters', () => {
+  it('пустой отбор — сбрасывать нечего', () => {
+    expect(hasActiveFleetFilters(EMPTY_FILTERS)).toBe(false);
+  });
+
+  it('любое непустое поле — отбор активен', () => {
+    expect(hasActiveFleetFilters({ ...EMPTY_FILTERS, search: 'копер' })).toBe(true);
+    expect(hasActiveFleetFilters({ ...EMPTY_FILTERS, site: 'Объект А' })).toBe(true);
+    expect(hasActiveFleetFilters({ ...EMPTY_FILTERS, kind: 'PILE_DRIVER' })).toBe(true);
+    expect(hasActiveFleetFilters({ ...EMPTY_FILTERS, equipmentStatus: 'working' })).toBe(true);
+    expect(hasActiveFleetFilters({ ...EMPTY_FILTERS, reportStatus: 'missing' })).toBe(true);
+    expect(hasActiveFleetFilters({ ...EMPTY_FILTERS, crew: 'Бр-1' })).toBe(true);
   });
 });
