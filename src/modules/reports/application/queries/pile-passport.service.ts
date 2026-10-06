@@ -689,7 +689,7 @@ export async function exportPileJournalXlsx(filters: PileJournalFilters): Promis
     // журнал, выгруженный 26.09 в 01:00 МСК, не должен датироваться 25.09 по UTC.
     ['Журнал выгружен', printMoment(new Date(), timezone)],
     // Не молчим о срезе: иначе подшитый документ выглядел бы как полный.
-    ...(truncated ? [[`Показаны первые ${PILE_JOURNAL_EXPORT_LIMIT} строк — сузьте период или объект`]] : []),
+    ...(truncated ? [[`Показаны первые ${PILE_JOURNAL_EXPORT_LIMIT} записей — сузьте период или объект`]] : []),
   ];
 
   const piles: (string | number | null)[][] = [[

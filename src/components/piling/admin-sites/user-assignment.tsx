@@ -163,7 +163,7 @@ export function UserAssignmentDialog({ siteId, loadingUsers, users }: UserAssign
             <Input
               value={availableSearch}
               onChange={(e) => setAvailableSearch(e.target.value)}
-              placeholder="Поиск по имени или email"
+              placeholder="Поиск по имени или почте"
               aria-label="Поиск доступных операторов"
               className="mb-2 min-h-11 w-full min-w-[200px] rounded-lg border border-border bg-card px-3 py-2 text-xs text-foreground focus:border-info focus:outline-none sm:min-h-0 sm:w-auto"
             />
