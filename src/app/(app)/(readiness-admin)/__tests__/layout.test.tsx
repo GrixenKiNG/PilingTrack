@@ -48,12 +48,12 @@ describe('ReadinessAdminLayout', () => {
     }
   );
 
-  it('redirects ASSISTANT away from readiness admin routes', async () => {
+  it('redirects ASSISTANT to the no-access screen', async () => {
     const role = 'ASSISTANT';
     withUser(role);
     await expect(
       ReadinessAdminLayout({ children: null })
-    ).rejects.toThrow('REDIRECT:/operator');
+    ).rejects.toThrow('REDIRECT:/no-access');
   });
 
   it('rejects a stale mechanic session', async () => {
