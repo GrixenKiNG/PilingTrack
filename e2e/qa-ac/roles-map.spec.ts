@@ -10,10 +10,10 @@
  * вычисляется при сборке отчёта по ожидаемому меню.
  */
 import { expect, test } from '@playwright/test';
-import { login, matrix } from '../qa/helpers';
-import { pause, readButtons, readMenu, writeRunJson, expectDefined } from './util';
+import { login, matrix, must } from '../qa/helpers';
+import { pause, readButtons, readMenu, writeRunJson } from './util';
 
-const roleEmail = (role: string) => expectDefined(matrix.roles.find((r) => r.role === role), `role ${role} not found in matrix`).email;
+const roleEmail = (role: string) => must(matrix.roles.find((r) => r.role === role), `роль ${role}`).email;
 const ADMIN_EMAIL = roleEmail('ADMIN');
 const REAL = [
   ...matrix.roles.filter((r) => r.role !== 'ADMIN'),

@@ -5,10 +5,10 @@
  * фокус виден, Esc закрывает окна, Enter открывает строку списка.
  */
 import { expect, test, type Page } from '@playwright/test';
-import { login, matrix } from '../qa/helpers';
-import { pause, writeRunJson, expectDefined } from './util';
+import { login, matrix, must } from '../qa/helpers';
+import { pause, writeRunJson } from './util';
 
-const ADMIN = expectDefined(matrix.roles.find((r) => r.role === 'ADMIN'), 'ADMIN role not found in matrix').email;
+const ADMIN = must(matrix.roles.find((r) => r.role === 'ADMIN'), 'роль ADMIN').email;
 const report: Array<{ step: string; ok: boolean; note: string }> = [];
 
 async function tabWalk(page: Page, limit = 120) {

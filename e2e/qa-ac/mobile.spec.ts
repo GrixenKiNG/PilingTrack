@@ -6,10 +6,10 @@
  * открывается и закрывается. Скриншоты — в папку прогона.
  */
 import { expect, test, type Page } from '@playwright/test';
-import { login, matrix, shot, watchErrors } from '../qa/helpers';
-import { RUN_SUF, pause, writeRunJson, expectDefined } from './util';
+import { login, matrix, shot, watchErrors, must } from '../qa/helpers';
+import { RUN_SUF, pause, writeRunJson } from './util';
 
-const ADMIN = expectDefined(matrix.roles.find((r) => r.role === 'ADMIN'), 'ADMIN role not found in matrix').email;
+const ADMIN = must(matrix.roles.find((r) => r.role === 'ADMIN'), 'роль ADMIN').email;
 const SECTIONS: Array<[string, string]> = [
   ['Дашборд', '/admin'],
   ['Мониторинг', '/monitoring'],

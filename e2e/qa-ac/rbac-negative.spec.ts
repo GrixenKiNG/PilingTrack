@@ -11,10 +11,10 @@
  * /api/reports/all не отдаёт ответ чужой роли в пределах 10 с кэша.
  */
 import { expect, test, type Page } from '@playwright/test';
-import { login, matrix } from '../qa/helpers';
-import { RUN_SUF, api, sweepAcqa, writeRunJson, expectDefined } from './util';
+import { login, matrix, must } from '../qa/helpers';
+import { RUN_SUF, api, sweepAcqa, writeRunJson } from './util';
 
-const roleEmail = (role: string) => expectDefined(matrix.roles.find((r) => r.role === role), `role ${role} not found in matrix`).email;
+const roleEmail = (role: string) => must(matrix.roles.find((r) => r.role === role), `роль ${role}`).email;
 const ADMIN = roleEmail('ADMIN');
 const DISPATCHER = roleEmail('DISPATCHER');
 const MECHANIC = roleEmail('MECHANIC');
@@ -69,12 +69,11 @@ test('B1: негативные права ролей и IDOR операторо�
     const grades = (dict.pileGrades ?? dict.pileGrade ?? (dict.data as Record<string, unknown> | undefined)?.pileGrades ?? []) as Array<{ id: string; isActive?: boolean }>;
     const grade = grades.find((g) => g.isActive !== false) ?? grades[0];
     expect(grade, 'активная марка сваи найдена').toBeTruthy();
-    const gradeId = expectDefined(grade, 'grade missing after check').id;
 
     reportId = crypto.randomUUID();
     const mkReport = await api(page).post('/api/reports/admin-upsert', { data: {
       reportId, userId: userBId, siteId, date: todayMsk(),
-      piles: [{ pileGradeId: gradeId, count: 1 }],
+      piles: [{ pileGradeId: must(grade, 'активная марка сваи').id, count: 1 }],
     } });
     expect(mkReport.status(), 'AC-QA отчёт оператора Б создан').toBe(200);
 
@@ -82,7 +81,7 @@ test('B1: негативные права ролей и IDOR операторо�
     await login(page, OP_A);
     await expectDenied('PDF чужого отчёта', 'OPERATOR-A', await api(page).get(`/api/reports/single-pdf?reportId=${reportId}`));
     await expectDenied('правка чужого отчёта', 'OPERATOR-A', await api(page).post('/api/reports/upsert', { data: {
-      reportId, siteId, userId: userBId, date: todayMsk(), piles: [{ pileGradeId: gradeId, count: 2 }],
+      reportId, siteId, userId: userBId, date: todayMsk(), piles: [{ pileGradeId: must(grade, 'активная марка сваи').id, count: 2 }],
     } }));
     await expectDenied('список чужого оператора', 'OPERATOR-A', await api(page).get(`/api/reports/my?userId=${userBId}`));
 

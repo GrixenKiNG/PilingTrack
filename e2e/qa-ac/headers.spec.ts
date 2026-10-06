@@ -6,10 +6,10 @@
  * Дев-сервер: часть заголовков на бою ставит Caddy — здесь проверяемо только это.
  */
 import { expect, test } from '@playwright/test';
-import { login, matrix } from '../qa/helpers';
-import { writeRunJson, expectDefined } from './util';
+import { login, matrix, must } from '../qa/helpers';
+import { writeRunJson } from './util';
 
-const ADMIN = expectDefined(matrix.roles.find((r) => r.role === 'ADMIN'), 'ADMIN role not found in matrix').email;
+const ADMIN = must(matrix.roles.find((r) => r.role === 'ADMIN'), 'роль ADMIN').email;
 const HDRS = [
   'content-security-policy',
   'x-frame-options',
