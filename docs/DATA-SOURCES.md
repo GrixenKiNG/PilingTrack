@@ -1,7 +1,8 @@
 # Источники данных и привязка к модулям
 
 > Карта «откуда берутся данные» + аудит честности (нет ли заглушек/фейка в путях, отдающих данные).
-> Обновлено: 2026-10-02. Граф знаний GitNexus PilingTrack: **24 935 узлов / 55 355 рёбер / 833 потока** —
+> Обновлено: 2026-10-07 (журнал забивки: источник `PileWork`, итоги периода и выгрузка — после W14 `965df4a4`, W21 `59384c2d`, W30 `5baf2fff`).
+> Граф знаний GitNexus PilingTrack: **24 935 узлов / 55 355 рёбер / 833 потока** —
 > пересчитано из `.gitnexus/meta.json` этого worktree (индексация 2026-10-01, коммит `615b31e2`).
 > Прежний снимок 2026-06-20 (8 892 / 19 816 / 300) — исторический, не текущее состояние.
 > Ниже перечислены точки инициализации в коде — это НЕ подтверждение production-подключений:
@@ -27,6 +28,7 @@
 | Карточка техники → телеметрия | `/api/telemetry?equipmentId=` → `telemetry-ingestion-service` | Prisma: `TelemetryRecord` (пусто, пока нет бокса) |
 | Дашборд `/admin` | агрегирует `getSiteAnalytics` | тот же живой SQL (не projections) |
 | Отчёты / история | `modules/reports/*` (полный DDD) | `Report`, `ReportAudit`, `ReportVersion`, `Media` — см. [[report-evidence-model]] |
+| Журнал забивки свай | `/api/pile-passports` → `listPilePassports`; выгрузка `/api/pile-passports/export` → `exportPileJournalXlsx` (`src/modules/reports/application/queries/pile-passport.service.ts`) | живой SQL: строки из `PileWork` (одна строка = одна запись выработки), паспорт — `LEFT JOIN PilePassport` по `pileWorkId`; сваи пачкой видны с пометкой «без паспорта» — см. [[pile-journal]] |
 
 ## Аудит честности (заглушки / фейк / нестыковки)
 
