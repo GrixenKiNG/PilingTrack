@@ -138,3 +138,14 @@ describe('POST /api/pile-passports/[id]/decide — след решения ма�
     expect(recordAuditEventMock).not.toHaveBeenCalled();
   });
 });
+
+describe('D4: основание добивки на границе API', () => {
+  it.each([undefined, '', ' \t\n '])('отклоняет пустое основание %j до обращения к БД', async (note) => {
+    const response = await POST(req({ acceptance: 'NEEDS_REDRIVE', note }), { params });
+    expect(response.status).toBe(400);
+    expect((await response.json()).error).toBe('Укажите, почему свая идёт на добивку');
+    expect(findFirstMock).not.toHaveBeenCalled();
+    expect(decideMock).not.toHaveBeenCalled();
+    expect(recordAuditEventMock).not.toHaveBeenCalled();
+  });
+});

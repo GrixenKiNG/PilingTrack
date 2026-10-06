@@ -3,7 +3,8 @@ import {z} from 'zod';
 
 export const ALERT_DELIVERY_EVENT = 'NotificationDeliveryRequested';
 export const alertSchema = z.object({severity: z.enum(['low', 'medium', 'high', 'critical']), message: z.string().min(1),
-  siteId: z.string().optional(), reportId: z.string().optional(), ruleId: z.string().optional()});
+  siteId: z.string().optional(), reportId: z.string().optional(), ruleId: z.string().optional(),
+  notificationKey: z.literal('systemAlerts').optional()});
 
 /** Enqueue inside the transaction which records the incident or defect. */
 export async function enqueueAlert(tx: Pick<Prisma.TransactionClient, 'outboxEvent'>, input: {

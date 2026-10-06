@@ -1,5 +1,4 @@
 import { hash as bcryptHash, compare as bcryptCompare } from 'bcryptjs';
-import { createHash, timingSafeEqual } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import { attachRequestIdHeader } from '@/lib/request-context';
 import {
@@ -13,7 +12,6 @@ import { logger } from '@/lib/logger';
 import { withIdentityRole } from '@/core/security/identity-role';
 
 const BCRYPT_ROUNDS = 12;
-const SHA256_HEX_PATTERN = /^[a-f0-9]{64}$/i;
 /**
  * bcrypt-хеш случайной строки, которой никто не знает. Сверка с ним занимает
  * столько же, сколько сверка с настоящим паролем: без неё ответ «нет такого
@@ -29,54 +27,26 @@ export async function verifyPassword(value: string, hash: string): Promise<boole
   return bcryptCompare(value, hash);
 }
 
-function hashLegacyPassword(value: string) {
-  return createHash('sha256').update(value).digest('hex');
-}
-
 function isBcryptHash(hash: string) {
   return hash.startsWith('$2');
 }
 
-function isLegacySha256Hash(hash: string) {
-  return SHA256_HEX_PATTERN.test(hash);
-}
-
-function safeHexEqual(aHex: string, bHex: string) {
-  if (aHex.length !== bHex.length) return false;
-  try {
-    return timingSafeEqual(Buffer.from(aHex, 'hex'), Buffer.from(bHex, 'hex'));
-  } catch {
-    return false;
-  }
-}
-
-async function verifyPasswordWithLegacySupport(value: string, storedHash: string) {
+/**
+ * Сверка пароля с хешем из базы. Принимается только bcrypt.
+ *
+ * Поддержка SHA-256 без соли снята 01.10.2026: на бою все пароли уже в bcrypt,
+ * а та ветка отвечала заметно быстрее bcrypt — по времени ответа было видно,
+ * у каких учёток старый хеш, и такой хеш легко перебирается офлайн (аудит
+ * Codex out55, F01). Хеш неизвестного формата (SHA-256, открытый текст,
+ * пусто) не пускает, но тратит то же время, что настоящая сверка: иначе
+ * формат хранимого пароля читался бы по секундомеру.
+ */
+async function verifyStoredPassword(value: string, storedHash: string): Promise<boolean> {
   if (isBcryptHash(storedHash)) {
-    return { isValid: await verifyPassword(value, storedHash), needsUpgrade: false };
+    return verifyPassword(value, storedHash);
   }
-
-  if (isLegacySha256Hash(storedHash)) {
-    return {
-      isValid: safeHexEqual(hashLegacyPassword(value), storedHash),
-      needsUpgrade: true,
-    };
-  }
-
-  // Unknown hash format — refuse authentication rather than falling through
-  // to plaintext comparison (historical footgun — stored plaintext passwords
-  // would otherwise authenticate successfully).
-  return { isValid: false, needsUpgrade: false };
-}
-
-async function upgradeLegacyPasswordIfNeeded(userId: string, plainTextPassword: string, needsUpgrade: boolean) {
-  if (!needsUpgrade) {
-    return;
-  }
-
-  const hashed = await hashPassword(plainTextPassword);
-  await withIdentityRole((client) =>
-    client.user.update({ where: { id: userId }, data: { password: hashed } }),
-  );
+  await bcryptCompare(value, TIMING_EQUALIZER_HASH);
+  return false;
 }
 
 function toSessionUser(user: {
@@ -158,13 +128,11 @@ export async function authenticateUserByEmailPassword(
   }
 
   try {
-    const verification = await verifyPasswordWithLegacySupport(password, user.password);
-    const isValid = verification.isValid;
+    const isValid = await verifyStoredPassword(password, user.password);
     if (!isValid) {
       return { user: null, rateLimited: false };
     }
 
-    await upgradeLegacyPasswordIfNeeded(user.id, password, verification.needsUpgrade);
     await rateLimiter.reset(accountKey);
     await rateLimiter.reset(lockoutKey);
     return { user: toSessionUser(user), rateLimited: false };

@@ -1,192 +1,105 @@
-import {describe, expect, it} from 'vitest';
-import {
-  TECH_READINESS_ENTITIES,
-  TECH_READINESS_TEST_TENANT,
-  TECH_READINESS_USERS,
-} from '../fixtures/tech-readiness.fixture';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { PrismaPg } from '@prisma/adapter-pg';
+import { PrismaClient } from '../../src/generated/postgres-client/client';
+import { applyTenantGuc, wrapTransaction } from '../../src/core/security/tenant-rls';
+import { runWithTenantContext, setRequestTenantId } from '../../src/core/security/tenant-context';
+import { createFixture } from './helpers/disposable-db';
 
-interface IntegrationHarness {
-  reset(): Promise<void>;
-  seed(): Promise<void>;
-  completeInspection(input: Record<string, unknown>): Promise<{id: string; version: number}>;
-  startShift(input: Record<string, unknown>): Promise<{status: number; body: unknown}>;
-  projectOutbox(): Promise<void>;
-  transactionTrace(correlationId: string): Promise<{
-    committed: boolean;
-    aggregateWrites: number;
-    auditWrites: number;
-    outboxWrites: number;
-    idempotencyWrites: number;
-  }>;
-  auditEvents(): Promise<Array<Record<string, unknown>>>;
-  outboxEvents(): Promise<Array<Record<string, unknown>>>;
-  snapshots(): Promise<Array<Record<string, unknown>>>;
-  currentReadiness(): Promise<Record<string, unknown>>;
-  readSourceInspection(id: string): Promise<Record<string, unknown>>;
-  mutateSourceInspection(id: string, patch: Record<string, unknown>): Promise<void>;
-  failNextWrite(stage: 'aggregate' | 'audit' | 'outbox' | 'snapshot'): Promise<void>;
-}
+const state = vi.hoisted(() => ({ db: undefined as PrismaClient | undefined }));
+vi.mock('@/lib/db', () => ({ get db() { return state.db; }, DEFAULT_TX_OPTIONS: { timeout: 10_000, maxWait: 5_000 } }));
+// Keep the real command and SQL; avoid booting unrelated equipment/worker services.
+vi.mock('@/modules/equipment', async () => ({ recordMeterReadingInTx: (await import('../../src/modules/equipment/application/commands/meter-reading')).recordMeterReadingInTx }));
+vi.mock('@/modules/readiness/server', async () => ({ requestReadinessSnapshot: (await import('../../src/modules/readiness/application/projection/request-snapshot')).requestReadinessSnapshot }));
 
-const harness = new Proxy({} as IntegrationHarness, {
-  get() {
-    return async () => {
-      throw new Error('Bind IntegrationHarness to an isolated readiness test database');
-    };
-  },
-});
+const appUrl = process.env.INTEGRATION_DATABASE_URL_APP;
+const enabled = Boolean(process.env.INTEGRATION_DATABASE_URL_OWNER && appUrl);
+if (!enabled) console.info('SKIP real readiness pipeline: supply both INTEGRATION_DATABASE_URL_* from scripts/test-db-up.sh');
 
-describe.skip('Tech Readiness source write → audit/outbox → snapshot → read model', () => {
-  it('commits source, audit, outbox and idempotency claim in one transaction', async () => {
-    const correlationId = 'test-correlation-inspection-001';
-    const inspection = await harness.completeInspection({
-      tenantId: TECH_READINESS_TEST_TENANT.id,
-      equipmentId: TECH_READINESS_ENTITIES.equipmentId,
-      actorId: TECH_READINESS_USERS.mechanic.id,
-      correlationId,
-      idempotencyKey: 'test-inspection-complete-001',
-    });
-    const trace = await harness.transactionTrace(correlationId);
-    const [audit] = await harness.auditEvents();
-    const [outbox] = await harness.outboxEvents();
-
-    expect(trace).toEqual({
-      committed: true,
-      aggregateWrites: 1,
-      auditWrites: 1,
-      outboxWrites: 1,
-      idempotencyWrites: 1,
-    });
-    expect(audit).toMatchObject({
-      tenantId: TECH_READINESS_TEST_TENANT.id,
-      action: 'inspection.completed',
-      entityId: inspection.id,
-      entityVersion: inspection.version,
-      correlationId,
-    });
-    expect(outbox).toMatchObject({
-      tenantId: TECH_READINESS_TEST_TENANT.id,
-      aggregateId: inspection.id,
-      triggerType: 'INSPECTION_COMPLETED',
-      equipmentId: TECH_READINESS_ENTITIES.equipmentId,
-      projected: false,
-    });
-    expect(outbox).not.toHaveProperty('payload.operatorEmail');
-  });
-
-  it('rolls back the source write when audit or outbox append fails', async () => {
-    await harness.failNextWrite('outbox');
-
-    await expect(harness.completeInspection({
-      tenantId: TECH_READINESS_TEST_TENANT.id,
-      equipmentId: TECH_READINESS_ENTITIES.equipmentId,
-      actorId: TECH_READINESS_USERS.mechanic.id,
-      correlationId: 'test-correlation-rollback-001',
-      idempotencyKey: 'test-inspection-rollback-001',
-    })).rejects.toThrow();
-
-    expect(await harness.auditEvents()).toHaveLength(0);
-    expect(await harness.outboxEvents()).toHaveLength(0);
-    await expect(
-      harness.readSourceInspection('test-inspection-rollback-001'),
-    ).rejects.toThrow(/not found/i);
-  });
-
-  it('projects one immutable snapshot and marks its event projected atomically', async () => {
-    await harness.completeInspection({
-      tenantId: TECH_READINESS_TEST_TENANT.id,
-      equipmentId: TECH_READINESS_ENTITIES.equipmentId,
-      actorId: TECH_READINESS_USERS.mechanic.id,
-      correlationId: 'test-correlation-project-001',
-      idempotencyKey: 'test-inspection-project-001',
-    });
-    await harness.projectOutbox();
-
-    const [event] = await harness.outboxEvents();
-    const [snapshot] = await harness.snapshots();
-    expect(event).toMatchObject({projected: true});
-    expect(snapshot).toMatchObject({
-      tenantId: TECH_READINESS_TEST_TENANT.id,
-      equipmentId: TECH_READINESS_ENTITIES.equipmentId,
-      triggerType: 'INSPECTION_COMPLETED',
-      triggerId: expect.any(String),
-      ruleSetId: TECH_READINESS_ENTITIES.ruleSetId,
-      ruleSetVersion: expect.any(String),
-      factsHash: expect.stringMatching(/^[a-f0-9]{64}$/),
-      calculatedAt: expect.anything(),
-      blockers: expect.any(Array),
-      warnings: expect.any(Array),
-      evidence: expect.objectContaining({inspectionId: expect.any(String)}),
-    });
-
-    await harness.projectOutbox();
-    expect(await harness.snapshots()).toHaveLength(1);
-  });
-
-  it('does not commit snapshot without projected marker when projection fails', async () => {
-    await harness.completeInspection({
-      tenantId: TECH_READINESS_TEST_TENANT.id,
-      equipmentId: TECH_READINESS_ENTITIES.equipmentId,
-      actorId: TECH_READINESS_USERS.mechanic.id,
-      correlationId: 'test-correlation-project-rollback',
-      idempotencyKey: 'test-inspection-project-rollback',
-    });
-    await harness.failNextWrite('snapshot');
-
-    await expect(harness.projectOutbox()).rejects.toThrow();
-    expect(await harness.snapshots()).toHaveLength(0);
-    expect(await harness.outboxEvents()).toEqual([
-      expect.objectContaining({projected: false}),
-    ]);
-  });
-
-  it('updates current read model to the latest snapshot without mutating history', async () => {
-    const inspection = await harness.completeInspection({
-      tenantId: TECH_READINESS_TEST_TENANT.id,
-      equipmentId: TECH_READINESS_ENTITIES.equipmentId,
-      actorId: TECH_READINESS_USERS.mechanic.id,
-      correlationId: 'test-correlation-current-001',
-      idempotencyKey: 'test-inspection-current-001',
-    });
-    await harness.projectOutbox();
-    const [firstSnapshot] = await harness.snapshots();
-
-    await harness.mutateSourceInspection(inspection.id, {result: 'FAILED'});
-    await harness.projectOutbox();
-    const snapshots = await harness.snapshots();
-    const current = await harness.currentReadiness();
-
-    expect(snapshots).toHaveLength(2);
-    expect(snapshots[0]).toEqual(firstSnapshot);
-    expect(current).toMatchObject({
-      equipmentId: TECH_READINESS_ENTITIES.equipmentId,
-      snapshotId: snapshots[1].id,
-      status: expect.stringMatching(/LIMITED|BLOCKED/),
-    });
-  });
-
-  it('authorizes shift start from authoritative rows and persists decision snapshot synchronously', async () => {
-    const response = await harness.startShift({
-      tenantId: TECH_READINESS_TEST_TENANT.id,
-      equipmentId: TECH_READINESS_ENTITIES.equipmentId,
-      actorId: TECH_READINESS_USERS.mechanic.id,
-      expectedVersion: 1,
-      idempotencyKey: 'test-shift-authoritative-gate',
-    });
-
-    expect(response.status).toBe(422);
-    expect(response.body).toMatchObject({
-      error: {
-        code: 'SHIFT_START_BLOCKED',
-        details: {
-          blockers: [expect.objectContaining({code: 'VALID_WORK_PERMIT_REQUIRED'})],
-        },
+describe.skipIf(!enabled)('Tech Readiness real source → outbox → snapshot → read model', () => {
+  let fixture: Awaited<ReturnType<typeof createFixture>>;
+  let raw: PrismaClient;
+  let complete: typeof import('../../src/modules/inspections/application/commands/inspection-commands').completeInspectionWithOutcome;
+  let project: typeof import('../../src/modules/readiness/application/projection/project-event').projectReadinessEvent;
+  beforeAll(async () => {
+    if (!appUrl) throw new Error('INTEGRATION_DATABASE_URL_APP is required');
+    raw = new PrismaClient({ adapter: new PrismaPg({ connectionString: appUrl, max: 1 }) });
+    const scoped = applyTenantGuc(raw);
+    state.db = new Proxy(scoped, {
+      get(client, key) {
+        if (key === '$transaction') return (...args: unknown[]) => wrapTransaction(client, client.$transaction as never, args);
+        return Reflect.get(client, key);
       },
     });
-    expect(await harness.snapshots()).toContainEqual(
-      expect.objectContaining({
-        triggerType: 'SHIFT_START_DECISION',
-        status: 'BLOCKED',
-      }),
-    );
+    complete = (await import('../../src/modules/inspections/application/commands/inspection-commands')).completeInspectionWithOutcome;
+    project = (await import('../../src/modules/readiness/application/projection/project-event')).projectReadinessEvent;
+  });
+  beforeEach(async () => { fixture = await createFixture(); });
+  afterAll(async () => { await raw?.$disconnect(); });
+  afterEach(async () => {
+    if (fixture) {
+      for (const tenant of fixture.tenants) {
+        await fixture.owner.query('DELETE FROM "CurrentReadiness" WHERE "tenantId" = $1', [tenant]);
+        await fixture.owner.query('DELETE FROM "OutboxEvent" WHERE "tenantId" = $1', [tenant]);
+      }
+      // Immutable snapshots deliberately remain until this disposable container is removed.
+      await fixture.close();
+    }
+  });
+  const tenant = () => fixture.tenants[0];
+  const inspectionId = () => fixture.id(tenant(), 'Inspection');
+  const scoped = <T>(work: () => Promise<T>) => runWithTenantContext(async () => { setRequestTenantId(tenant()); return work(); });
+  const finish = () => scoped(() => complete(inspectionId(), { tenantId: tenant(), signedByName: 'Disposable operator' }));
+  const events = () => fixture.owner.query('SELECT id, projected, payload FROM "OutboxEvent" WHERE "aggregateId" = $1 ORDER BY id', [inspectionId()]);
+
+  it('rolls back the source when the real database rejects the outbox insert', async () => {
+    await fixture.owner.query(`CREATE FUNCTION codex_reject_outbox() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW."tenantId" = '${tenant()}' THEN RAISE EXCEPTION 'codex injected outbox failure'; END IF; RETURN NEW; END $$`);
+    await fixture.owner.query('CREATE TRIGGER codex_reject_outbox BEFORE INSERT ON "OutboxEvent" FOR EACH ROW EXECUTE FUNCTION codex_reject_outbox()');
+    try {
+      await expect(finish()).rejects.toThrow(/codex injected outbox failure/);
+      expect((await fixture.owner.query('SELECT status FROM "Inspection" WHERE id = $1', [inspectionId()])).rows).toEqual([{ status: 'DRAFT' }]);
+      expect((await events()).rows).toEqual([]);
+    } finally {
+      await fixture.owner.query('DROP TRIGGER codex_reject_outbox ON "OutboxEvent"');
+      await fixture.owner.query('DROP FUNCTION codex_reject_outbox()');
+    }
+  });
+  it('commits completion and exactly one outbox event, replaying without another event', async () => {
+    expect((await finish()).replayed).toBe(false);
+    expect((await finish()).replayed).toBe(true);
+    const rows = (await events()).rows;
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ projected: false, payload: { triggerType: 'INSPECTION_COMPLETED', inspectionId: inspectionId() } });
+    expect((await fixture.owner.query('SELECT status FROM "Inspection" WHERE id = $1', [inspectionId()])).rows).toEqual([{ status: 'COMPLETED' }]);
+  });
+  it('rejects another tenant and leaves its source unchanged', async () => {
+    const other = fixture.tenants[1];
+    await expect(scoped(() => complete(fixture.id(other, 'Inspection'), { tenantId: tenant(), signedByName: 'Disposable operator' }))).rejects.toThrow('Inspection not found');
+    expect((await fixture.owner.query('SELECT status FROM "Inspection" WHERE id = $1', [fixture.id(other, 'Inspection')])).rows).toEqual([{ status: 'DRAFT' }]);
+  });
+  it('does not commit a snapshot or projected marker when the database rejects the read model', async () => {
+    await finish();
+    const event = (await events()).rows[0];
+    await fixture.owner.query(`CREATE FUNCTION codex_reject_current() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW."tenantId" = '${tenant()}' THEN RAISE EXCEPTION 'codex injected projection failure'; END IF; RETURN NEW; END $$`);
+    await fixture.owner.query('CREATE TRIGGER codex_reject_current BEFORE INSERT ON "CurrentReadiness" FOR EACH ROW EXECUTE FUNCTION codex_reject_current()');
+    try {
+      await expect(project(event.id)).rejects.toThrow(/codex injected projection failure/);
+      expect((await events()).rows[0].projected).toBe(false);
+      expect((await fixture.owner.query('SELECT id FROM "ReadinessScoreSnapshot" WHERE "tenantId" = $1', [tenant()])).rows).toEqual([]);
+    } finally {
+      await fixture.owner.query('DROP TRIGGER codex_reject_current ON "CurrentReadiness"');
+      await fixture.owner.query('DROP FUNCTION codex_reject_current()');
+    }
+  });
+  it('projects the real event once and persists the immutable snapshot and current model', async () => {
+    await finish();
+    const event = (await events()).rows[0];
+    expect(await project(event.id)).toMatchObject({ projected: true, duplicate: false });
+    expect(await project(event.id)).toEqual({ projected: false, duplicate: true });
+    expect((await events()).rows[0].projected).toBe(true);
+    const snapshots = await fixture.owner.query('SELECT id, "triggerType", "factsHash", facts FROM "ReadinessScoreSnapshot" WHERE "tenantId" = $1', [tenant()]);
+    expect(snapshots.rows).toHaveLength(1);
+    await expect(fixture.owner.query('UPDATE "ReadinessScoreSnapshot" SET score = 0 WHERE id = $1', [snapshots.rows[0].id])).rejects.toThrow('ReadinessScoreSnapshot is immutable');
+    expect(snapshots.rows[0]).toMatchObject({ triggerType: 'INSPECTION_COMPLETED', factsHash: expect.any(Buffer), facts: expect.any(Object) });
+    expect((await fixture.owner.query('SELECT "snapshotId" FROM "CurrentReadiness" WHERE "tenantId" = $1', [tenant()])).rows).toEqual([{ snapshotId: snapshots.rows[0].id }]);
   });
 });

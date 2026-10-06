@@ -18,12 +18,13 @@ export const GET = withApi(
   async (request: NextRequest) => {
     const { user, error } = await requireAuth(request);
     if (error) return error;
+    if (!user) return NextResponse.json({ error: 'Требуется авторизация' }, { status: 401 });
 
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     assertCan(user!, 'crews.read');
     const crews: CrewSummary[] = await getCachedCrewsAll() as CrewSummary[];
 
-    const tenantId = requireTenantId(user!);
+    const tenantId = requireTenantId(user);
     return NextResponse.json({ crews: crews.filter((crew) => crew.site?.tenantId === tenantId) });
   },
   { domain: 'crews', cache: true, cacheTTL: 15_000 }

@@ -156,10 +156,13 @@ export function BriefingsScreen(props: ReferenceUiProps) {
     if (kind) search.set('kind', kind);
     // Заблокированное браузером всплывающее окно возвращает null: без проверки
     // кнопка «Печатная форма» молча ничего не делала (F-R115-13).
-    const opened = window.open(`/print/briefing-journal?${search.toString()}`, '_blank', 'noopener');
+    const opened = window.open('', '_blank');
     if (!opened) {
       toast.error('Браузер заблокировал окно печати. Разрешите всплывающие окна и повторите.');
+      return;
     }
+    opened.opener = null;
+    opened.location.href = `/print/briefing-journal?${search.toString()}`;
   };
 
   const instructions = rows?.filter((row) => row.kind === 'INSTRUCTION') ?? [];

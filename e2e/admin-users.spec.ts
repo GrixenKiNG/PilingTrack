@@ -1,10 +1,12 @@
-import { expect, test } from '@playwright/test';
+import { TEST_USERS } from './fixtures/auth.fixture';
+import { expect, test } from './fixtures/disposable.fixture';
 import { login } from './page-objects/login.page';
 
-const ADMIN = { email: 'admin@piling.ru', password: 'admin123' };
+const ADMIN = { email: TEST_USERS.admin.email, password: TEST_USERS.admin.password };
 
 test.describe('Пользователи — операционный модуль', () => {
   test('таблица, поиск и правая панель работают на desktop и mobile', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
     await login(page, ADMIN.email, ADMIN.password);
     await page.goto('/admin/users');
 

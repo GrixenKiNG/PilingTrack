@@ -6,23 +6,28 @@ import { join } from 'path';
 // `storage/pdf-results/`. S3 is preferred for production so files survive
 // container restarts and are available across multiple app replicas.
 //
-// Retention: the ~1 hour TTL of PDF job metadata in Redis (RESULTS_TTL in
-// `pdf-queue.ts`) expires only the queue entry — it does NOT delete the PDF
-// object from S3 or the local file. No cleanup removes these files
-// automatically, and no retention policy for them is approved yet (decide it
-// before adding any deletion). These PDFs are temporary generation results,
-// separate from report attachments (`Media`).
-function isS3Enabled(): boolean {
+// I11: temporary results older than 30 days are eligible only for the opt-in
+// cleanup worker. Redis job TTL does not remove the underlying PDF.
+export const TEMPORARY_PDF_PREFIX = 'pdf-results/';
+const TEMPORARY_PDF_KEY = /^pdf-results\/[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.pdf$/i;
+export function isTemporaryPdfKey(key: string): boolean {
+  return key.startsWith(TEMPORARY_PDF_PREFIX) && TEMPORARY_PDF_KEY.test(key);
+}
+
+export function isS3Enabled(): boolean {
   return Boolean(
     process.env.S3_ENDPOINT && process.env.S3_ACCESS_KEY_ID && process.env.S3_SECRET_ACCESS_KEY
   );
 }
 
 function pdfS3Key(jobId: string): string {
-  return `pdf-results/${jobId}.pdf`;
+  const key = `${TEMPORARY_PDF_PREFIX}${jobId}.pdf`;
+  if (!isTemporaryPdfKey(key)) throw new Error('Invalid temporary PDF job id');
+  return key;
 }
 
 export async function savePdfBuffer(jobId: string, pdfBuffer: Buffer): Promise<string> {
+  pdfS3Key(jobId);
   if (isS3Enabled()) {
     const { uploadBuffer } = await import('@/core/storage/s3-service');
     return await uploadBuffer(pdfS3Key(jobId), pdfBuffer, 'application/pdf');
@@ -35,6 +40,7 @@ export async function savePdfBuffer(jobId: string, pdfBuffer: Buffer): Promise<s
 }
 
 export async function readPdfResult(jobId: string): Promise<Buffer> {
+  pdfS3Key(jobId);
   if (isS3Enabled()) {
     const { S3Client, GetObjectCommand } = await import('@aws-sdk/client-s3');
     const s3 = new S3Client({
@@ -62,6 +68,7 @@ export async function readPdfResult(jobId: string): Promise<Buffer> {
 }
 
 export async function deletePdfResult(jobId: string): Promise<void> {
+  pdfS3Key(jobId);
   if (isS3Enabled()) {
     try {
       const { deleteFile } = await import('@/core/storage/s3-service');

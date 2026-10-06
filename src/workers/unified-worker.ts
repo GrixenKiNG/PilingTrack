@@ -24,6 +24,7 @@ import { positiveIntEnv } from './unified-worker/env-int';
 import { startHealthServer } from './unified-worker/health-server';
 import { startOutbox } from './unified-worker/outbox';
 import { startPdf } from './unified-worker/pdf';
+import { startPdfCleanupScheduler } from './unified-worker/pdf-cleanup-scheduler';
 import { startProjection } from './unified-worker/projection';
 import { startPmScheduler } from './unified-worker/pm-scheduler';
 import { startProjectionRebuildScheduler } from './unified-worker/projection-rebuild-scheduler';
@@ -39,6 +40,7 @@ let stopPmScheduler: (() => void) | null = null;
 let stopProjectionRebuild: (() => void) | null = null;
 let stopReadinessScheduler: (() => void) | null = null;
 let stopIdempotencyCleanup: (() => void) | null = null;
+let stopPdfCleanup: (() => Promise<void>) | null = null;
 
 // Предел на остановку. Docker после SIGTERM ждёт 10 с (stop_grace_period не
 // задан) и присылает SIGKILL, поэтому свой дедлайн держим короче: зависшая
@@ -97,6 +99,11 @@ async function gracefulShutdown(signal: string): Promise<void> {
   if (stopIdempotencyCleanup) {
     stopIdempotencyCleanup();
     stopIdempotencyCleanup = null;
+  }
+
+  if (stopPdfCleanup) {
+    await stopPdfCleanup();
+    stopPdfCleanup = null;
   }
 
   if (healthServer) {
@@ -196,6 +203,8 @@ async function main(): Promise<void> {
   if (isIdempotencyCleanupEnabled()) {
     stopIdempotencyCleanup = startIdempotencyCleanupScheduler();
   }
+
+  stopPdfCleanup = startPdfCleanupScheduler();
 
   logger.info('Unified Worker Service ready');
 

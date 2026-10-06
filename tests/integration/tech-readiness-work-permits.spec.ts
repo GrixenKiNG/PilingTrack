@@ -46,7 +46,6 @@ describe.runIf(Boolean(connectionString))('work permits on disposable PostgreSQL
   let prisma: PrismaClient;
 
   const tenantA = 'tenant-a';
-  const tenantB = 'tenant-b';
   const equipmentA = 'equipment-a';
   const equipmentB = 'equipment-b';
   const mechanicA = 'mechanic-a';
@@ -100,9 +99,10 @@ describe.runIf(Boolean(connectionString))('work permits on disposable PostgreSQL
   };
 
   beforeAll(async () => {
+    if (!connectionString) throw new Error("DATABASE_URL_POSTGRES is required");
     await admin.connect();
     await admin.query(`CREATE DATABASE "${database}"`);
-    const url = new URL(connectionString!);
+    const url = new URL(connectionString);
     url.pathname = `/${database}`;
     testConnectionString = url.toString();
     testDb = new Client({connectionString: testConnectionString});

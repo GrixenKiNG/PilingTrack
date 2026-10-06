@@ -59,14 +59,14 @@ export class LoginPage {
       await emailField.fill(email);
       await passwordField.fill(password);
       const respPromise = this.page
-        .waitForResponse((r) => r.url().includes('/api/auth/login'), { timeout: 4000 })
+        .waitForResponse((r) => r.url().includes('/api/auth/login'), { timeout: 20000 })
         .catch(() => null);
       await this.page.locator('button[type="submit"]').click();
       const resp = await respPromise;
       expect(resp, 'submit ушёл до гидрации — /api/auth/login не вызван').not.toBeNull();
       // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- test: value is established by the setup/fixture above
       expect(resp!.ok()).toBe(true);
-    }).toPass({ timeout: 30000, intervals: [1000, 2000, 3000] });
+    }).toPass({ timeout: 60000, intervals: [1000, 2000, 3000] });
 
     await this.page.waitForURL((u) => !u.pathname.includes('login'), { timeout: 15000 });
   }

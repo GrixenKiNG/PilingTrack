@@ -38,9 +38,14 @@ vi.mock('@/lib/logger', () => ({
 }));
 
 import { recordAuditEvent } from '../audit-service';
+import {
+  getAuditFeedbackFailureCount,
+  resetAuditFeedbackMetrics,
+} from '@/core/observability/audit-feedback-metrics';
 
 beforeEach(() => {
   vi.clearAllMocks();
+  resetAuditFeedbackMetrics();
   mocks.recordFeedbackEvent.mockResolvedValue(undefined);
   mocks.userFindUnique.mockResolvedValue(null);
 });
@@ -159,6 +164,7 @@ describe('recordAuditEvent — context propagation', () => {
     expect(mocks.recordFeedbackEvent).toHaveBeenCalledWith(
       expect.objectContaining({ actor: { id: 'op-1' } }),
     );
+    expect(getAuditFeedbackFailureCount()).toBe(0);
   });
 
   it('пишет событие без имени, когда пользователь не найден', async () => {
@@ -181,12 +187,54 @@ describe('recordAuditEvent — context propagation', () => {
 });
 
 describe('recordAuditEvent — failure isolation', () => {
+  it('shares failures between separately loaded module instances', async () => {
+    vi.resetModules();
+    const first = await import('@/core/observability/audit-feedback-metrics');
+    first.resetAuditFeedbackMetrics();
+    try {
+      first.recordAuditFeedbackFailure();
+      vi.resetModules();
+      const second = await import('@/core/observability/audit-feedback-metrics');
+
+      expect(second).not.toBe(first);
+      expect(second.recordAuditFeedbackFailure).not.toBe(first.recordAuditFeedbackFailure);
+      expect(second.getAuditFeedbackFailureCount()).toBe(1);
+      expect(second.exportAuditFeedbackMetricsPrometheus()).toContain('audit_feedback_write_failures_total 1\n');
+      second.resetAuditFeedbackMetrics();
+      expect(first.getAuditFeedbackFailureCount()).toBe(0);
+    } finally {
+      first.resetAuditFeedbackMetrics();
+      vi.resetModules();
+    }
+  });
+
   it('does not throw when recordFeedbackEvent rejects', async () => {
     mocks.recordFeedbackEvent.mockRejectedValue(new Error('feedback table missing'));
 
     await expect(
       recordAuditEvent({ action: 'report.created', scope: 'reports' }),
     ).resolves.toBeUndefined();
+    expect(getAuditFeedbackFailureCount()).toBe(1);
+  });
+
+  it('counts each failed write once and preserves the count after a successful write', async () => {
+    mocks.recordFeedbackEvent
+      .mockRejectedValueOnce(new Error('first failure'))
+      .mockRejectedValueOnce(new Error('second failure'));
+
+    await recordAuditEvent({ action: 'report.created', scope: 'reports' });
+    await recordAuditEvent({ action: 'site.updated', scope: 'sites', actorId: 'op-1' });
+    expect(getAuditFeedbackFailureCount()).toBe(2);
+
+    await recordAuditEvent({ action: 'report.created', scope: 'reports' });
+    expect(getAuditFeedbackFailureCount()).toBe(2);
+    expect(mocks.recordFeedbackEvent).toHaveBeenCalledTimes(3);
+  });
+
+  it('does not count successful feedback writes', async () => {
+    await recordAuditEvent({ action: 'report.created', scope: 'reports' });
+    expect(mocks.recordFeedbackEvent).toHaveBeenCalledOnce();
+    expect(getAuditFeedbackFailureCount()).toBe(0);
   });
 
   // Сбой записи следа раньше проглатывался пустым catch: в проде это значило,

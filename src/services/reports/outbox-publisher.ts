@@ -171,12 +171,14 @@ async function consumeOutboxEvents(
       const errorMessage = error instanceof Error ? error.message : String(error);
 
       if (attempts >= MAX_RETRIES) {
+        // Delivery handlers may have committed partial receipts since this batch was read.
+        const latest = await db.outboxEvent.findUnique({ where: { id: outboxEvent.id }, select: { payload: true } });
         // Max retries exceeded — move to DLQ for manual inspection
         await moveToDlq(
           outboxEvent.id,
           outboxEvent.type,
           outboxEvent.aggregateId,
-          outboxEvent.payload,
+          latest?.payload ?? outboxEvent.payload,
           error,
           attempts,
           {

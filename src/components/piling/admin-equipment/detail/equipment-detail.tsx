@@ -133,11 +133,11 @@ export function EquipmentDetail({ equipmentId, embedded = false, onSaved }: Prop
     const res = await authFetch(`/api/equipment/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
+      body: JSON.stringify({ ...payload, expectedUpdatedAt: details?.equipment.updatedAt }),
     });
     if (!res.ok) {
-      // 401 и CSRF-403 приходят английскими, а 400 несёт построчные `details`
-      // (R97 №9–№10): показываем причину по-русски (R119 №6–№7).
+      if (res.status === 409) await refresh();
+      // Preserve E4 conflict refresh and Hermes validation messages.
       throw new Error(await extractApiError(res, 'Ошибка сохранения'));
     }
     await refresh();

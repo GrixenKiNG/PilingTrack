@@ -9,7 +9,7 @@
  * сносил весь экран — эти тесты падали.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 
 const mocks = vi.hoisted(() => ({
   authFetch: vi.fn(),
@@ -25,6 +25,11 @@ vi.mock('@/components/piling/main-dashboard/dashboard-layout', () => ({
   useMainDashboardLayout: () => ({ template: { id: 'main-dashboard', version: 1, widgets: mocks.layoutWidgets } }),
 }));
 
+vi.mock('@/components/piling/layout-editor/page-layout-renderer', () => ({
+  PageLayoutRenderer: ({ widgets }: { widgets: Record<string, { render: () => import('react').ReactNode }> }) => (
+    <section aria-label="KPI">{Object.entries(widgets).map(([id, widget]) => <div key={id}>{widget.render()}</div>)}</section>
+  ),
+}));
 import { AdminDashboard } from '../admin-dashboard';
 
 const json = (body: unknown, status = 200) =>
@@ -52,6 +57,21 @@ describe('AdminDashboard: сбой аналитики не уносит весь
     mocks.authFetch.mockReset();
   });
 
+  it.each([403, 500])('F6 review10: failed analytics %s marks production KPI unavailable without false zeros', async status => {
+    mockFetch(json({ error: 'failure' }, status));
+    // Парк не пуст: иначе плитки парка честно показывают «нет установок» (F-R127),
+    // а проверяется именно независимость живой метрики парка от сбоя аналитики.
+    const base = mocks.authFetch.getMockImplementation() as (url: string) => Promise<Response>;
+    mocks.authFetch.mockImplementation((url: string) => url.startsWith('/api/monitoring/fleet')
+      ? Promise.resolve(json({ ...fleet, totals: { ...fleet.totals, totalEquipment: 1 } }))
+      : base(url));
+    render(<AdminDashboard />);
+    await screen.findByText(status === 403 ? 'Нет прав на аналитику' : 'Не удалось загрузить, обновите страницу');
+    const kpi = within(screen.getByRole('region', { name: 'KPI' }));
+    expect(kpi.getAllByText('Данные не загрузились')).toHaveLength(3);
+    expect(kpi.getAllByText('—')).toHaveLength(3);
+    expect(kpi.getByText('0 / 0')).toBeInTheDocument(); // independent live fleet metric remains visible
+  });
   it('403 объясняет отсутствие прав и оставляет остальные блоки', async () => {
     mockFetch(json({ error: 'Доступ запрещён' }, 403));
     render(<AdminDashboard />);
@@ -197,6 +217,31 @@ describe('AdminDashboard: отметка свежести аналитики (F-
     expect(await screen.findByText('Не удалось загрузить, обновите страницу')).toBeInTheDocument();
     expect(screen.queryByText(/^Обновлено в /)).not.toBeInTheDocument();
   });
+});
+
+it('D6: поздний JSON прежнего запроса объектов не перезаписывает результат повтора', async () => {
+  mocks.authFetch.mockReset();
+  let finishOld: (value: unknown) => void = () => { throw new Error('old JSON not started'); };
+  const oldJson = new Promise((resolve) => { finishOld = resolve; });
+  const oldResponse = json({}); vi.spyOn(oldResponse, 'json').mockReturnValue(oldJson);
+  let calls = 0;
+  mocks.authFetch.mockImplementation((url: string) => {
+    if (url.startsWith('/api/sites/all')) {
+      calls += 1;
+      return Promise.resolve(calls === 1 ? oldResponse : json({ sites: [{ id: 'fresh', name: 'Свежий объект' }] }));
+    }
+    if (url.startsWith('/api/monitoring/fleet')) return Promise.resolve(json(fleet));
+    if (url.startsWith('/api/maintenance')) return Promise.resolve(json({ records: [] }));
+    if (url.startsWith('/api/reports/recent')) return Promise.resolve(json({ reports: [] }));
+    return Promise.resolve(json({ analytics: [] }));
+  });
+  render(<AdminDashboard />);
+  await waitFor(() => expect(oldResponse.json).toHaveBeenCalled());
+  fireEvent.click(await screen.findByRole('button', { name: 'Обновить дашборд' }));
+  expect(await screen.findByText('Свежий объект')).toBeInTheDocument();
+  await act(async () => { finishOld({ sites: [{ id: 'old', name: 'Прежний объект' }] }); });
+  expect(screen.getByText('Свежий объект')).toBeInTheDocument();
+  expect(screen.queryByText('Прежний объект')).not.toBeInTheDocument();
 });
 
 /**

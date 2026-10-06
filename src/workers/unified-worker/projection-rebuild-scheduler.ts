@@ -22,7 +22,11 @@ import { positiveIntEnv } from './env-int';
 const REBUILD_INTERVAL = positiveIntEnv('PROJECTION_REBUILD_INTERVAL_MS', 24 * 60 * 60 * 1000);
 const REBUILD_STARTUP_DELAY = positiveIntEnv('PROJECTION_REBUILD_STARTUP_DELAY_MS', 90000);
 
+let passRunning = false;
+
 async function runOnce(): Promise<void> {
+  if (passRunning) return;
+  passRunning = true;
   try {
     const results = await rebuildAll();
     const rows = results.reduce((sum, r) => sum + r.rowsWritten, 0);
@@ -33,6 +37,8 @@ async function runOnce(): Promise<void> {
       error: error instanceof Error ? error.message : String(error),
     });
     Sentry.captureException(error, { tags: { task: 'projection-rebuild' } });
+  } finally {
+    passRunning = false;
   }
 }
 

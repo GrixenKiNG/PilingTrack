@@ -1,3 +1,4 @@
+import { SUBMITTED_REPORT_STATUS } from '@/lib/report-status';
 import { db } from '@/lib/db';
 
 interface SiteAnalyticsRow {
@@ -88,8 +89,8 @@ export async function getSiteAnalytics(opts: SiteAnalyticsOptions) {
       COALESCE(d.total_meters, 0)::float    AS "actualDrilling",
       COALESCE(d.total_count, 0)::int       AS "actualDrillingCount",
       COALESCE(dt.total_duration, 0)::float AS "totalDowntime",
-      COALESCE(p_all.total_piles, 0)::int   AS "actualPilesAllTime",
-      COALESCE(p_all.total_pile_meters, 0)::float AS "actualPileMetersAllTime",
+      COALESCE(p.total_piles_all, 0)::int   AS "actualPilesAllTime",
+      COALESCE(p.total_pile_meters_all, 0)::float AS "actualPileMetersAllTime",
       COALESCE(d_all.total_meters, 0)::float AS "actualDrillingAllTime",
       COALESCE(rc.report_count, 0)::int     AS "totalReports"
     FROM "Site" s
@@ -115,18 +116,20 @@ export async function getSiteAnalytics(opts: SiteAnalyticsOptions) {
     LEFT JOIN (
       SELECT r."siteId", COUNT(*)::int AS report_count
       FROM "Report" r
-      WHERE r.date >= ${dateFrom} AND r.date <= ${dateTo} AND r.status = 'submitted'
+      WHERE r.date >= ${dateFrom} AND r.date <= ${dateTo} AND r.status = ${SUBMITTED_REPORT_STATUS}
       GROUP BY r."siteId"
     ) rc ON rc."siteId" = s.id
     LEFT JOIN (
       SELECT
         r."siteId",
-        SUM(pw.count)::int AS total_piles,
-        SUM(pw.count * (COALESCE(pg."lengthMm", 0)::float / 1000))::float AS total_pile_meters
+        SUM(pw.count) FILTER (WHERE r.date >= ${dateFrom} AND r.date <= ${dateTo})::int AS total_piles,
+        SUM(pw.count * (COALESCE(pg."lengthMm", 0)::float / 1000)) FILTER (WHERE r.date >= ${dateFrom} AND r.date <= ${dateTo})::float AS total_pile_meters,
+        SUM(pw.count)::int AS total_piles_all,
+        SUM(pw.count * (COALESCE(pg."lengthMm", 0)::float / 1000))::float AS total_pile_meters_all
       FROM "Report" r
       JOIN "PileWork" pw ON pw."reportId" = r.id
       JOIN "PileGrade" pg ON pg.id = pw."pileGradeId"
-      WHERE r.date >= ${dateFrom} AND r.date <= ${dateTo} AND r.status = 'submitted'
+      WHERE r.status = ${SUBMITTED_REPORT_STATUS}
       GROUP BY r."siteId"
     ) p ON p."siteId" = s.id
     LEFT JOIN (
@@ -136,32 +139,21 @@ export async function getSiteAnalytics(opts: SiteAnalyticsOptions) {
         SUM(ld.count)::int AS total_count
       FROM "Report" r
       JOIN "LeaderDrilling" ld ON ld."reportId" = r.id
-      WHERE r.date >= ${dateFrom} AND r.date <= ${dateTo} AND r.status = 'submitted'
+      WHERE r.date >= ${dateFrom} AND r.date <= ${dateTo} AND r.status = ${SUBMITTED_REPORT_STATUS}
       GROUP BY r."siteId"
     ) d ON d."siteId" = s.id
     LEFT JOIN (
       SELECT r."siteId", SUM(rd.duration)::float AS total_duration
       FROM "Report" r
       JOIN "ReportDowntime" rd ON rd."reportId" = r.id
-      WHERE r.date >= ${dateFrom} AND r.date <= ${dateTo} AND r.status = 'submitted'
+      WHERE r.date >= ${dateFrom} AND r.date <= ${dateTo} AND r.status = ${SUBMITTED_REPORT_STATUS}
       GROUP BY r."siteId"
     ) dt ON dt."siteId" = s.id
-    LEFT JOIN (
-      SELECT
-        r."siteId",
-        SUM(pw.count)::int AS total_piles,
-        SUM(pw.count * (COALESCE(pg."lengthMm", 0)::float / 1000))::float AS total_pile_meters
-      FROM "Report" r
-      JOIN "PileWork" pw ON pw."reportId" = r.id
-      JOIN "PileGrade" pg ON pg.id = pw."pileGradeId"
-      WHERE r.status = 'submitted'
-      GROUP BY r."siteId"
-    ) p_all ON p_all."siteId" = s.id
     LEFT JOIN (
       SELECT r."siteId", SUM(ld.meters)::float AS total_meters
       FROM "Report" r
       JOIN "LeaderDrilling" ld ON ld."reportId" = r.id
-      WHERE r.status = 'submitted'
+      WHERE r.status = ${SUBMITTED_REPORT_STATUS}
       GROUP BY r."siteId"
     ) d_all ON d_all."siteId" = s.id
     WHERE (
@@ -169,7 +161,7 @@ export async function getSiteAnalytics(opts: SiteAnalyticsOptions) {
         OR EXISTS (
           SELECT 1 FROM "Report" r
           WHERE r."siteId" = s.id
-            AND r.status = 'submitted'
+            AND r.status = ${SUBMITTED_REPORT_STATUS}
             AND r.date >= ${dateFrom} AND r.date <= ${dateTo}
         )
       )

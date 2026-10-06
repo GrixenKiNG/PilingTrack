@@ -5,27 +5,19 @@ import { LoginPage } from '../page-objects/login.page';
  * Test Users — predefined accounts for E2E testing.
  */
 
+function testAccount(role: string) {
+  return {
+    email: process.env[`E2E_${role}_EMAIL`] || `codex-${role.toLowerCase()}@example.invalid`,
+    password: process.env[`E2E_${role}_PASSWORD`] || '',
+    role,
+  };
+}
+
 export const TEST_USERS = {
-  admin: {
-    email: 'admin@piling.ru',
-    password: process.env.ADMIN_PASSWORD || 'admin123',
-    role: 'ADMIN',
-  },
-  dispatcher: {
-    email: 'dispatch@piling.ru',
-    password: process.env.DISPATCH_PASSWORD || 'dispatch123',
-    role: 'DISPATCHER',
-  },
-  operator: {
-    email: 'operator@piling.ru',
-    password: process.env.OPERATOR_PASSWORD || 'operator123',
-    role: 'OPERATOR',
-  },
-  assistant: {
-    email: 'helper@piling.ru',
-    password: process.env.ASSISTANT_PASSWORD || 'helper123',
-    role: 'ASSISTANT',
-  },
+  admin: testAccount('ADMIN'),
+  dispatcher: testAccount('DISPATCHER'),
+  operator: testAccount('OPERATOR'),
+  assistant: testAccount('ASSISTANT'),
 };
 
 /**

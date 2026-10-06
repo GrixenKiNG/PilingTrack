@@ -369,3 +369,22 @@ describe('exportReportsCsv — формат даты', () => {
     expect(csv).not.toContain('2026-08-17');
   });
 });
+
+it('I05: XLSX drafts remain labelled on a separate sheet, then move to submitted totals', async () => {
+  const report = { reportId: 'draft-1', date: '2026-10-02', shiftType: 'DAY', status: 'draft',
+    site: { name: 'Site' }, user: { name: 'Operator' }, crew: null, equipment: null,
+    piles: [{ count: 2, pileGrade: { name: 'Grade', lengthMm: 6000 } }], drillings: [], downtimes: [] };
+  findManyMock.mockReset().mockResolvedValue([report]);
+  getSettingsMock.mockResolvedValue({ timezone: 'Europe/Moscow', companyName: '', inn: '' });
+  await exportReportsXlsx({ tenantId: 'orion' });
+  expect(sheets.current.find(sheet => sheet.name === 'Итоги')?.rows).toHaveLength(1);
+  const drafts = sheets.current.find(sheet => sheet.name === 'Черновики');
+  expect(drafts?.rows[1]).toContain('draft-1');
+  expect(drafts?.rows[1]).toContain('черновик (смена не сдана)');
+  report.status = 'submitted';
+  await exportReportsXlsx({ tenantId: 'orion' });
+  expect(sheets.current.find(sheet => sheet.name === 'Черновики')).toBeUndefined();
+  const totals = sheets.current.find(sheet => sheet.name === 'Итоги');
+  expect(totals?.rows[1][6]).toBe(2);
+  expect(totals?.rows[1][7]).toBe(12);
+});

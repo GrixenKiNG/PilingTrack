@@ -1,3 +1,4 @@
+import { isSubmittedReport } from '@/lib/report-status';
 /**
  * Итоги отчётов за период — чистая агрегация.
  *
@@ -10,6 +11,7 @@
 import { pileLengthMeters } from '@/lib/pile-length';
 
 export interface PeriodReportInput {
+  status?: string | null;
   siteId: string;
   userId: string;
   piles?: Array<{ count: number; pileGradeId: string; pileGrade?: { name: string; lengthMm?: number | null } | null }>;
@@ -26,7 +28,8 @@ export function computePeriodSummary(reports: PeriodReportInput[]) {
   const sites = new Set<string>();
   const operators = new Set<string>();
 
-  for (const r of reports) {
+  const submittedReports = reports.filter(isSubmittedReport);
+  for (const r of submittedReports) {
     sites.add(r.siteId);
     operators.add(r.userId);
     for (const p of r.piles || []) {
@@ -44,7 +47,7 @@ export function computePeriodSummary(reports: PeriodReportInput[]) {
 
   return {
     totalPiles, totalPileMeters, totalDrillingCount, totalDrilling, totalDowntime,
-    reportCount: reports.length,
+    reportCount: submittedReports.length,
     uniqueSites: sites.size,
     uniqueOperators: operators.size,
   };

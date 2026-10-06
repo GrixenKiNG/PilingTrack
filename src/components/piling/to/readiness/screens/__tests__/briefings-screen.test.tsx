@@ -61,6 +61,22 @@ describe('журнал инструктажей: печать при забло�
     }
   });
 });
+it('opens a blank window first, clears its opener and then navigates without a false blocked toast', async () => {
+  mocks.authFetch.mockResolvedValue({ ok: true, json: async () => ({ rows: [journalRow], truncated: false }) });
+  const popup = { opener: window, location: { href: '' } };
+  const open = vi.spyOn(window, 'open').mockReturnValue(popup as unknown as Window);
+  try {
+    render(<BriefingsScreen {...({ bootstrap: null } as unknown as ReferenceUiProps)} />);
+    const button = await screen.findByRole('button', { name: 'Печатная форма' });
+    await waitFor(() => expect(button).toBeEnabled());
+    fireEvent.click(button);
+    expect(open).toHaveBeenCalledWith('', '_blank');
+    expect(popup.opener).toBeNull();
+    expect(popup.location.href).toMatch(/^\/print\/briefing-journal\?/);
+    expect(toast.error).not.toHaveBeenCalled();
+  } finally { open.mockRestore(); }
+});
+
 
 describe('журнал инструктажей: подсчёт сегодняшних событий по часовому поясу тенанта (F-R114-8)', () => {
   const previousTimezone = process.env.TZ;

@@ -20,6 +20,7 @@ const mocks = vi.hoisted(() => ({
   },
   runPmScheduler: vi.fn(),
   runReadinessScheduler: vi.fn(),
+  rebuildAll: vi.fn(),
   forEachTenant: vi.fn(),
   recordSchedulerHeartbeat: vi.fn(),
 }));
@@ -52,6 +53,10 @@ vi.mock('@/modules/readiness/application/scheduler', () => ({
   runReadinessScheduler: mocks.runReadinessScheduler,
 }));
 
+vi.mock('@/modules/reports/application/projections/rebuild', () => ({
+  rebuildAll: mocks.rebuildAll,
+}));
+
 vi.mock('@/workers/unified-worker/scheduler-heartbeat', () => ({
   recordSchedulerHeartbeat: mocks.recordSchedulerHeartbeat,
 }));
@@ -62,12 +67,18 @@ const ENV_KEYS = [
   'PM_SCHEDULER_INTERVAL_MS',
   'READINESS_SCHEDULER_STARTUP_DELAY_MS',
   'READINESS_SCHEDULER_INTERVAL_MS',
+  'PROJECTION_REBUILD_STARTUP_DELAY_MS',
+  'PROJECTION_REBUILD_INTERVAL_MS',
 ] as const;
 
 describe('Sentry в процессе воркера', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.resetModules();
+    mocks.runPmScheduler.mockResolvedValue({ created: 0, due: 0, overdue: [] });
+    mocks.runReadinessScheduler.mockResolvedValue({ permitsExpired: 0, shiftsAutoClosed: 0 });
+    mocks.rebuildAll.mockResolvedValue([]);
+    mocks.recordSchedulerHeartbeat.mockResolvedValue(undefined);
     for (const key of ENV_KEYS) delete process.env[key];
     // Один тенант в прогоне — планировщики идут через forEachTenant.
     mocks.forEachTenant.mockImplementation(async (run: (tenantId: string) => Promise<unknown>) => [
@@ -76,6 +87,7 @@ describe('Sentry в процессе воркера', () => {
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     for (const key of ENV_KEYS) delete process.env[key];
   });
 
@@ -186,5 +198,93 @@ describe('Sentry в процессе воркера', () => {
 
       expect(mocks.recordSchedulerHeartbeat).not.toHaveBeenCalled();
     });
+  });
+
+  const schedulers = [
+    {
+      name: 'pm',
+      prefix: 'PM_SCHEDULER',
+      run: mocks.runPmScheduler,
+      result: { created: 0, due: 0, overdue: [] },
+      start: async () => (await import('../pm-scheduler')).startPmScheduler(),
+    },
+    {
+      name: 'readiness',
+      prefix: 'READINESS_SCHEDULER',
+      run: mocks.runReadinessScheduler,
+      result: { permitsExpired: 0, shiftsAutoClosed: 0 },
+      start: async () => (await import('../readiness-scheduler')).startReadinessScheduler(),
+    },
+    {
+      name: 'projection-rebuild',
+      prefix: 'PROJECTION_REBUILD',
+      run: mocks.rebuildAll,
+      result: [],
+      start: async () => (await import('../projection-rebuild-scheduler')).startProjectionRebuildScheduler(),
+    },
+  ];
+
+  it.each(schedulers)('$name skips ticks until the active pass completes', async (scheduler) => {
+    vi.useFakeTimers();
+    process.env[scheduler.prefix + '_STARTUP_DELAY_MS'] = '1';
+    process.env[scheduler.prefix + '_INTERVAL_MS'] = '100';
+    let complete!: (value: unknown) => void;
+    scheduler.run.mockReturnValueOnce(new Promise((resolve) => { complete = resolve; }));
+    const stop = await scheduler.start();
+    try {
+      await vi.advanceTimersByTimeAsync(1);
+      expect(scheduler.run).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(299);
+      expect(scheduler.run).toHaveBeenCalledTimes(1);
+      complete(scheduler.result);
+      await vi.advanceTimersByTimeAsync(0);
+      await vi.advanceTimersByTimeAsync(100);
+      expect(scheduler.run).toHaveBeenCalledTimes(2);
+    } finally {
+      stop();
+    }
+  });
+
+  it.each(schedulers)('$name releases the guard after a failed pass', async (scheduler) => {
+    vi.useFakeTimers();
+    process.env[scheduler.prefix + '_STARTUP_DELAY_MS'] = '1';
+    process.env[scheduler.prefix + '_INTERVAL_MS'] = '100';
+    let fail!: (reason: Error) => void;
+    scheduler.run.mockReturnValueOnce(new Promise((_resolve, reject) => { fail = reject; }));
+    const stop = await scheduler.start();
+    try {
+      await vi.advanceTimersByTimeAsync(1);
+      await vi.advanceTimersByTimeAsync(299);
+      expect(scheduler.run).toHaveBeenCalledTimes(1);
+      fail(new Error('blocked pass failed'));
+      await vi.advanceTimersByTimeAsync(0);
+      expect(mocks.captureException).toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(100);
+      expect(scheduler.run).toHaveBeenCalledTimes(2);
+    } finally {
+      stop();
+    }
+  });
+
+  it.each(schedulers)('$name holds the guard through heartbeat and releases it on failure', async (scheduler) => {
+    vi.useFakeTimers();
+    process.env[scheduler.prefix + '_STARTUP_DELAY_MS'] = '1';
+    process.env[scheduler.prefix + '_INTERVAL_MS'] = '100';
+    let fail!: (reason: Error) => void;
+    mocks.recordSchedulerHeartbeat.mockReturnValueOnce(new Promise((_resolve, reject) => { fail = reject; }));
+    const stop = await scheduler.start();
+    try {
+      await vi.advanceTimersByTimeAsync(1);
+      expect(mocks.recordSchedulerHeartbeat).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(299);
+      expect(scheduler.run).toHaveBeenCalledTimes(1);
+      fail(new Error('heartbeat unavailable'));
+      await vi.advanceTimersByTimeAsync(0);
+      expect(mocks.captureException).toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(100);
+      expect(scheduler.run).toHaveBeenCalledTimes(2);
+    } finally {
+      stop();
+    }
   });
 });

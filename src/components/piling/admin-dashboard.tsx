@@ -190,6 +190,7 @@ export function AdminDashboard() {
           return;
         }
         const sites = ((await res.json()).sites ?? []) as SiteOption[];
+        if (cancelled) return;
         setSiteOptions(sites.map((s) => ({ id: s.id, name: s.name })));
         setStale((prev) => ({ ...prev, sites: false }));
       })
@@ -349,9 +350,9 @@ export function AdminDashboard() {
     // обещало смены: две смены одной установки дают два отчёта, но одну
     // машину (F-R35-3).
     'dk-reports': { id: 'dk-reports', title: 'Отчёты', render: () => <KpiTile icon="reports" tone="blue" label="Отчёты" value={noFleet ? '—' : `${formatNumber(kpis.shiftsDone)} / ${formatNumber(kpis.reportsExpected)}`} sub={noFleet ? 'нет установок' : 'машин с отчётом сегодня'} /> },
-    'dk-piles': { id: 'dk-piles', title: 'Сваи', render: () => <KpiTile icon="pile-group" tone="emerald" label="Сваи" value={noData ? '—' : formatCountMeters(kpis.actualPiles, kpis.actualPileMeters)} sub={noData ? 'данных пока нет' : `план ${formatCountMeters(kpis.plannedPiles, kpis.plannedPileMeters)}`} progress={noData ? undefined : pileProgress} /> },
-    'dk-drilling': { id: 'dk-drilling', title: 'Бурение', render: () => <KpiTile icon="drilling-auger" tone="teal" label="Бурение" value={noData ? '—' : formatCountMeters(kpis.actualDrillingCount, kpis.actualDrilling)} sub={noData ? 'данных пока нет' : `план ${formatCountMeters(kpis.plannedDrillingCount, kpis.plannedDrilling)}`} progress={noData ? undefined : drillingProgress} /> },
-    'dk-downtime': { id: 'dk-downtime', title: 'Простой', render: () => <KpiTile icon="downtime" tone="amber" label="Простой" value={noData ? '—' : formatDowntimeHours(kpis.downtime)} sub={noData ? 'данных пока нет' : 'за период'} /> },
+    'dk-piles': { id: 'dk-piles', title: 'Сваи', render: () => <KpiTile icon="pile-group" tone="emerald" label="Сваи" value={loadError || noData ? '—' : formatCountMeters(kpis.actualPiles, kpis.actualPileMeters)} sub={loadError ? 'Данные не загрузились' : noData ? 'данных пока нет' : `план ${formatCountMeters(kpis.plannedPiles, kpis.plannedPileMeters)}`} progress={loadError || noData ? undefined : pileProgress} /> },
+    'dk-drilling': { id: 'dk-drilling', title: 'Бурение', render: () => <KpiTile icon="drilling-auger" tone="teal" label="Бурение" value={loadError || noData ? '—' : formatCountMeters(kpis.actualDrillingCount, kpis.actualDrilling)} sub={loadError ? 'Данные не загрузились' : noData ? 'данных пока нет' : `план ${formatCountMeters(kpis.plannedDrillingCount, kpis.plannedDrilling)}`} progress={loadError || noData ? undefined : drillingProgress} /> },
+    'dk-downtime': { id: 'dk-downtime', title: 'Простой', render: () => <KpiTile icon="downtime" tone="amber" label="Простой" value={loadError || noData ? '—' : formatDowntimeHours(kpis.downtime)} sub={loadError ? 'Данные не загрузились' : noData ? 'данных пока нет' : 'за период'} /> },
     'dk-rigs': { id: 'dk-rigs', title: 'Установки', render: () => <KpiTile icon="equipment-rig" tone="violet" label="Установки" value={noFleet || kpis.rigsWorking == null ? '—' : `${kpis.rigsWorking} в работе`} sub={noFleet ? 'нет установок' : kpis.rigsTotal == null ? 'не загрузилось' : `из ${kpis.rigsTotal}`} progress={noFleet ? undefined : fleetProgress ?? undefined} /> },
     'dk-maintenance': { id: 'dk-maintenance', title: 'ТО', render: () => <KpiTile icon="maintenance-due" tone="red" label="ТО" value={noFleet ? '—' : canReadMaintenance ? (kpis.toRisk == null ? '—' : `${formatNumber(kpis.toRisk)} риска`) : '—'} sub={noFleet ? 'нет установок' : canReadMaintenance ? (kpis.toRisk == null || kpis.rigsTotal == null ? 'не загрузилось' : `из ${kpis.rigsTotal} установок`) : 'Недоступно вашей роли'} /> },
   };

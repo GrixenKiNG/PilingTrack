@@ -10,8 +10,11 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { timingSafeEqual } from 'node:crypto';
-import { telegramNotifier } from '@/core/notifications/telegram';
+import { timingSafeEqual, createHash, randomUUID } from 'node:crypto';
+import { ALERT_DELIVERY_EVENT } from '@/core/notifications/durable-alert';
+import { deliverQueuedAlert } from '@/services/notifications/durable-alert-delivery';
+import { db } from '@/lib/db';
+import { runWithTenantContext, setRequestTenantId } from '@/core/security/tenant-context';
 import { isNotificationEnabled } from '@/modules/settings';
 import { logger } from '@/lib/logger';
 
@@ -52,9 +55,8 @@ const webhookSchema = z.object({
   alerts: z.array(alertSchema),
 }).passthrough();
 
-// Большую пачку не отклоняем: на 400 Alertmanager повторяет ту же пачку
-// бесконечно и тревоги теряются именно в крупную аварию. Пересылаем первые
-// MAX_FORWARDED, чтобы не завалить Telegram.
+// За HTTP-запрос отправляем до MAX_FORWARDED новых сообщений; весь хвост
+// сохраняется в outbox. Повтор пропускает уже доставленные алерты.
 const MAX_FORWARDED = 100;
 
 const SEVERITY_MAP: Record<string, 'low' | 'medium' | 'high' | 'critical'> = {
@@ -98,7 +100,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Некорректный JSON' }, { status: 400 });
   }
 
-  const alerts = (payload.alerts ?? []).slice(0, MAX_FORWARDED);
+  const alerts = payload.alerts ?? [];
   if (alerts.length === 0) {
     return NextResponse.json({ ok: true, forwarded: 0 });
   }
@@ -117,29 +119,57 @@ export async function POST(request: NextRequest) {
 
   let forwarded = 0;
   let firing = 0;
+  let attempted = 0;
+  const tenantId = process.env.DEFAULT_TENANT_ID;
   for (const alert of alerts) {
     if (alert.status !== 'firing') continue;
     firing++;
+    if (!tenantId) continue;
     const severity = SEVERITY_MAP[alert.labels.severity] ?? 'medium';
     const summary = alert.annotations.summary || alert.annotations.description || alert.labels.alertname || 'Alert';
     const description = alert.annotations.description;
-    const message = description && description !== summary ? `${summary}\n${description}` : summary;
-
-    const sent = await telegramNotifier.sendAlert({
-      severity,
-      message,
-      ruleId: alert.labels.alertname,
-    });
-    if (sent) forwarded++;
+    const message = description && description !== summary ? summary + '\n' + description : summary;
+    // Match Alertmanager reminders (critical1h, others4h); retries within a window dedupe.
+    const repeatMs = alert.labels.severity === 'critical' ? 3600_000 : 4 * 3600_000;
+    const repeatWindow = Math.floor(Date.now() / repeatMs);
+    // Missing/invalid start is ambiguous: a new id favors retry over silent loss.
+    const identity = typeof alert.startsAt === 'string' && Number.isFinite(Date.parse(alert.startsAt))
+      ? createHash('sha256').update(JSON.stringify([Object.keys(alert.labels).sort().map(key => [key, alert.labels[key]]), alert.startsAt, repeatWindow])).digest('hex')
+      : randomUUID();
+    try {
+      const delivered = await runWithTenantContext(async () => {
+        setRequestTenantId(tenantId);
+        let row = await db.outboxEvent.upsert({
+          where: { tenantId_dedupeKey: { tenantId, dedupeKey: 'alertmanager:' + identity } },
+          create: { type: ALERT_DELIVERY_EVENT, aggregateType: 'Notification', aggregateId: identity,
+            tenantId, dedupeKey: 'alertmanager:' + identity, projected: true,
+            payload: { severity, message, ...(alert.labels.alertname ? { ruleId: alert.labels.alertname } : {}), notificationKey: 'systemAlerts' } },
+          update: {}, select: { id: true, published: true, payload: true, lastError: true },
+        });
+        if (row.published && row.lastError?.startsWith('Moved to DLQ:')) {
+          // Preserve the DLQ record; a recovered channel gets a fresh attempt.
+          row = await db.outboxEvent.create({
+            data: { type: ALERT_DELIVERY_EVENT, aggregateType: 'Notification', aggregateId: identity,
+              tenantId, dedupeKey: 'alertmanager:' + identity + ':retry:' + randomUUID(), projected: true,
+              payload: { severity, message, ...(alert.labels.alertname ? { ruleId: alert.labels.alertname } : {}), notificationKey: 'systemAlerts' } },
+            select: { id: true, published: true, payload: true, lastError: true },
+          });
+        }
+        if (row.published) return true;
+        if (attempted >= MAX_FORWARDED) return false;
+        attempted++;
+        await deliverQueuedAlert({ id: row.id, tenantId, data: row.payload });
+        return true;
+      });
+      if (delivered) forwarded++;
+    } catch (error) {
+      logger.error('Alertmanager alert retained for retry', error, { alertname: alert.labels.alertname });
+    }
   }
-
-  // Ни одно сообщение не ушло при непустой пачке firing-алертов — это сбой
-  // доставки (нет конфигурации/тенанта, прокси недоступен, 429, таймаут).
-  // Отвечаем 503, чтобы Alertmanager повторил, а не считал доставку успешной.
-  if (firing > 0 && forwarded === 0) {
-    logger.error('Alertmanager webhook: no alert delivered to Telegram', { total: alerts.length, firing });
+  if (forwarded < firing) {
+    logger.error('Alertmanager webhook: incomplete Telegram delivery', { total: alerts.length, firing, forwarded });
     return NextResponse.json(
-      { ok: false, forwarded: 0, error: 'Не удалось доставить алерты в Telegram' },
+      { ok: false, forwarded, error: 'Не удалось доставить алерты в Telegram' },
       { status: 503 },
     );
   }

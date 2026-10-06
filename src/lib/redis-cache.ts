@@ -269,7 +269,9 @@ export async function invalidatePattern(pattern: string): Promise<number> {
   if (!client) return 0;
 
   let deleted = 0;
-  const fullPattern = buildKey(pattern);
+  const prefix = client.options.keyPrefix ?? '';
+  // SCAN matches physical keys; ioredis only prefixes key arguments (DEL).
+  const fullPattern = prefix + buildKey(pattern);
 
   try {
     // Collect all keys first, then delete in batches
@@ -288,8 +290,7 @@ export async function invalidatePattern(pattern: string): Promise<number> {
 
     // Now delete sequentially — each batch is awaited
     for (const keys of allKeys) {
-      await client.del(keys);
-      deleted += keys.length;
+      deleted += await client.del(...keys.map((key) => key.slice(prefix.length)));
     }
   } catch (err) {
     logger.warn('Cache: pattern invalidation failed', { error: (err as Error).message });

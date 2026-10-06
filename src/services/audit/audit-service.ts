@@ -3,6 +3,7 @@ import { formatRuDate } from '@/lib/format';
 import { logger } from '@/lib/logger';
 import { ROLE_LABELS, type FeedbackEventLevel } from '@/lib/types';
 import { recordFeedbackEvent } from '@/services/feedback/feedback-event-service';
+import { recordAuditFeedbackFailure } from '@/core/observability/audit-feedback-metrics';
 
 export interface AuditEvent {
   action: string;
@@ -976,6 +977,7 @@ export async function recordAuditEvent(event: AuditEvent): Promise<void> {
   } catch (error) {
     // Запись следа не должна ронять основное действие — но и пропадать
     // бесследно тоже: без этой строки отказ ленты не оставлял ничего в логах.
+    recordAuditFeedbackFailure();
     logger.warn('audit.feedback_write_failed', {
       action: event.action,
       scope: event.scope,

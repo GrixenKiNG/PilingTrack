@@ -54,3 +54,11 @@ it('dispatcher reads only crews of their organization', async () => {
   expect(response.status).toBe(200);
   expect((await response.json()).crews.map((crew: {id: string}) => crew.id)).toEqual(['own']);
 });
+
+it('D5: rejects an absent authenticated user before reading cached crews', async () => {
+  requireAuthMock.mockResolvedValue({ user: null, error: null });
+  cachedCrewsMock.mockClear();
+  const response = await GET(req());
+  expect(response.status).toBe(401);
+  expect(cachedCrewsMock).not.toHaveBeenCalled();
+});

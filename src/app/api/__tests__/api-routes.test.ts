@@ -217,7 +217,6 @@ const PUBLIC_METHODS: Record<string, string> = {
  * дотянется: либо сессии ещё нет, либо вызывающий вообще не браузер.
  */
 const CSRF_EXEMPT_METHODS: Record<string, string> = {
-  'auth/login/route.ts#POST': 'сессии ещё нет — угонять нечего',
   'orion/lead/route.ts#POST': 'публичная форма без сессии; защита — лимит по IP и ловушка для ботов',
   'alerts/webhook/route.ts#POST': 'вызывает Alertmanager по общему секрету, не браузер',
   'telemetry/ingest/route.ts#POST': 'вызывает контроллер по ключу устройства, не браузер',

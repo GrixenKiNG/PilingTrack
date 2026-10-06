@@ -539,3 +539,13 @@ describe('планировщики: истёкший пульс виден и д
     expect(mocks.stateGet).toHaveBeenCalledWith('system:scheduler:idempotency-cleanup');
   });
 });
+
+describe('F6 review7: health snapshot survives a second module instance', () => {
+  it('reads the snapshot collected by the producer rather than null', async () => {
+    const producer = await import('../health-tracker/tracker');
+    const produced = await producer.getFreshStatus();
+    vi.resetModules();
+    const consumer = await import('../health-tracker/tracker');
+    expect(consumer.getCurrentStatus()).toEqual(produced);
+  });
+});

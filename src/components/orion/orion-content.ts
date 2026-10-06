@@ -21,7 +21,6 @@ const pvePhotos: OrionEquipmentPhoto[] = [
   { src: '/orion/equipment/pve-50pr/02.jpg', alt: 'PVE 50PR в рабочей конфигурации', credit: 'Dieseko Group', sourceUrl: 'https://www.diesekogroup.com/our-brands/woltman/' },
   { src: '/orion/equipment/pve-50pr/03.jpg', alt: 'PVE 50PR, общий вид', credit: 'Imeco', sourceUrl: 'https://www.imeco.at/used-equipment/piling-rigs-with-impact-hammers/' },
   { src: '/orion/equipment/pve-50pr/04.jpg', alt: 'PVE 50PR, вид со стороны мачты', credit: 'Imeco', sourceUrl: 'https://www.imeco.at/used-equipment/piling-rigs-with-impact-hammers/' },
-  { src: '/orion/equipment/pve-50pr/05.jpg', alt: 'PVE 50PR в демонстрационном видео', credit: 'SMT Sweden / YouTube', sourceUrl: 'https://www.mascus.fr/construction/piling-rigs/pve-50-pr/en8q8rgq.html' },
 ];
 
 const liebherrPhotos: OrionEquipmentPhoto[] = [
@@ -32,15 +31,17 @@ const liebherrPhotos: OrionEquipmentPhoto[] = [
   { src: '/orion/equipment/liebherr-lrh100/05.webp', alt: 'Liebherr LRH 100, модельный ракурс', credit: 'Liebherr', sourceUrl: 'https://www.liebherr.com/en-us/p/lrh100-4424797' },
 ];
 
-const kburgPhotos: OrionEquipmentPhoto[] = Array.from({ length: 5 }, (_, index) => ({
-  src: `/orion/equipment/kburg-16/0${index + 1}.jpg`,
+// Снимки подобраны владельцем 30.09.2026: часть старых ракурсов убрана, поэтому
+// список файлов явный, а не 01..05 по счёту.
+const kburgPhotos: OrionEquipmentPhoto[] = ['02', '03', '0005'].map((file, index) => ({
+  src: `/orion/equipment/kburg-16/${file}.jpg`,
   alt: `Копрово-бурильная установка КБУРГ-16, ракурс ${index + 1}`,
   credit: 'БашСтрой / Gruzovik.com',
   sourceUrl: 'https://www.gruzovik.com/stroitelnaya-tehnika/svaeboynye-ustanovki/bashstroy-kburg-16-a9759783.html',
 }));
 
-const kopernikPhotos: OrionEquipmentPhoto[] = Array.from({ length: 5 }, (_, index) => ({
-  src: `/orion/equipment/kopernik-sd20/0${index + 1}.jpg`,
+const kopernikPhotos: OrionEquipmentPhoto[] = ['01', 'maxresdefault'].map((file, index) => ({
+  src: `/orion/equipment/kopernik-sd20/${file}.jpg`,
   alt: `Сваебойная установка Kopernik SD-20C, ракурс ${index + 1}`,
   credit: 'Ehkskavator.ru',
   sourceUrl: 'https://ehkskavator.ru/item/1038754',

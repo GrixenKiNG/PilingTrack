@@ -13,7 +13,7 @@ describe('computePeriodSummary', () => {
   it('sums pile metres from the grade length', () => {
     const reports = [
       {
-        siteId: 'site_A',
+        status: 'submitted', siteId: 'site_A',
         userId: 'op_1',
         piles: [
           { count: 10, pileGradeId: 'pg_1', pileGrade: { name: 'Ж/Б', lengthMm: 6000 } },
@@ -29,7 +29,7 @@ describe('computePeriodSummary', () => {
   it('treats a grade with no stored length as 0 m (no name parsing)', () => {
     const reports = [
       {
-        siteId: 'site_A',
+        status: 'submitted', siteId: 'site_A',
         userId: 'op_1',
         piles: [{ count: 3, pileGradeId: 'pg_x', pileGrade: { name: 'С300' } }],
       },
@@ -41,12 +41,12 @@ describe('computePeriodSummary', () => {
   it('aggregates drillings, downtimes and unique sets', () => {
     const reports = [
       {
-        siteId: 's1', userId: 'u1',
+        status: 'submitted', siteId: 's1', userId: 'u1',
         drillings: [{ count: 2, meters: 50 }, { count: 3, meters: 100 }],
         downtimes: [{ duration: 4 }],
       },
       {
-        siteId: 's2', userId: 'u1',
+        status: 'submitted', siteId: 's2', userId: 'u1',
         drillings: [{ meters: 25 }], // count missing → defaults to 1
         downtimes: [{ duration: 2 }, { duration: 3 }],
       },
@@ -68,4 +68,17 @@ describe('computePeriodSummary', () => {
       uniqueSites: 0, uniqueOperators: 0,
     });
   });
+});
+
+it('I05: draft and unknown statuses do not change KPI; submission does', () => {
+  const report = { status: 'draft', siteId: 's1', userId: 'u1',
+    piles: [{ count: 2, pileGradeId: 'g1', pileGrade: { name: 'Grade', lengthMm: 6000 } }],
+    drillings: [{ count: 3, meters: 18 }], downtimes: [{ duration: 1.5 }] };
+  const zero = computePeriodSummary([]);
+  expect(computePeriodSummary([report])).toEqual(zero);
+  expect(computePeriodSummary([{ ...report, status: 'unknown' }, { ...report, status: null }, { ...report, status: undefined }])).toEqual(zero);
+  report.status = 'submitted';
+  expect(computePeriodSummary([report])).toEqual({ totalPiles: 2, totalPileMeters: 12,
+    totalDrillingCount: 3, totalDrilling: 18, totalDowntime: 1.5,
+    reportCount: 1, uniqueSites: 1, uniqueOperators: 1 });
 });

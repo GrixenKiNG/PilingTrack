@@ -1,83 +1,47 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './fixtures/disposable.fixture';
 
-test.describe('ORION Industrial Cinematic', () => {
+test.describe('ORION current public route', () => {
   test('stays usable at mobile width', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 812 });
     await page.goto('/orion');
-
-    await expect(page.getByRole('heading', { level: 1 })).toContainText('Свайные работы');
+    await expect(page.getByRole('heading', { level: 1 })).toContainText('Основания');
     await expect(page.getByRole('link', { name: /обсудить объект/i }).first()).toBeVisible();
-    await expect(page.getByText('единиц собственного парка')).toBeVisible();
-    await expect(page.getByText(/референс модели/i)).toBeVisible();
-
-    const metrics = await page.evaluate(() => ({
-      clientWidth: document.documentElement.clientWidth,
-      scrollWidth: document.documentElement.scrollWidth,
-    }));
+    await expect(page.getByText('единиц подтверждённого парка', { exact: true })).toBeVisible();
+    const metrics = await page.evaluate(() => ({ clientWidth: document.documentElement.clientWidth, scrollWidth: document.documentElement.scrollWidth }));
     expect(metrics.scrollWidth).toBeLessThanOrEqual(metrics.clientWidth);
   });
 
-  // AC: At 375x812, the PVE 50PR passport exposes its sourced details and stays usable without horizontal overflow.
-  // Behavior: Open the PVE passport -> inspect its document actions -> close it with Enter.
-  // @category: fixture-e2e
-  // @lane: fixture-e2e
-  // @dependency: ORION static equipment profiles
-  // @complexity: medium
-  // ROI: 65
-  test('opens and closes the PVE technical passport on mobile', async ({ page }) => {
+  // /orion now renders OrionHandoffSite; the former passport disclosure
+  // is absent. Exercise its live equipment selector instead of a dead control.
+  test('switches equipment and exposes technical data on mobile', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 812 });
     await page.goto('/orion');
-
-    const toggle = page.getByRole('button', { name: 'Все характеристики PVE 50PR' });
-    await toggle.scrollIntoViewIfNeeded();
-    await toggle.click();
-
-    await expect(toggle).toHaveAttribute('aria-expanded', 'true');
-    const region = page.getByRole('region', { name: 'Технические характеристики PVE 50PR' });
-    await expect(region).toBeVisible();
-    await expect(region.getByText(
-      'Справочные характеристики модели. Фактическая комплектация конкретной установки уточняется по паспорту машины.',
-      { exact: true },
-    )).toBeVisible();
-
-    const downloadLink = region.getByRole('link', { name: /скачать pdf на русском/i });
-    await expect(downloadLink).toHaveAttribute('href', '/orion/specs/pve-50pr.pdf');
-    await expect(downloadLink).toHaveAttribute('download', '');
-
-    const sourceLink = region.getByRole('link', { name: /источник характеристик/i });
-    await expect(sourceLink).toHaveAttribute('href', 'https://au.diesekogroup.com/wp-content/uploads/2021/01/Woltman_Piling_Drilling_Rigs_1119_ENG-LR.pdf');
-    await expect(sourceLink).toHaveAttribute('target', '_blank');
-    await expect(sourceLink).toHaveAttribute('rel', 'noreferrer');
-
-    const metrics = await page.evaluate(() => ({
-      clientWidth: document.documentElement.clientWidth,
-      scrollWidth: document.documentElement.scrollWidth,
-    }));
-    expect(metrics.scrollWidth).toBeLessThanOrEqual(metrics.clientWidth);
-
-    await toggle.focus();
+    const tabs = page.getByRole('tablist', { name: 'Установки ОРИОН' }).getByRole('tab');
+    await expect(tabs.first()).toBeVisible();
+    expect(await tabs.count()).toBeGreaterThan(1);
+    await tabs.nth(1).click();
+    await expect(tabs.nth(1)).toHaveAttribute('aria-selected', 'true');
+    await expect(page.locator('#fleet dl')).toBeVisible();
+    await tabs.first().focus();
     await page.keyboard.press('Enter');
-    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
-    await expect(region).toBeHidden();
+    await expect(tabs.first()).toHaveAttribute('aria-selected', 'true');
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   });
 
   test('keeps content available with reduced motion', async ({ page }) => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.goto('/orion');
-
     await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
-    await expect(page.getByRole('heading', { name: /свой контроль/i })).toBeVisible();
-    await expect(page.getByRole('heading', { name: /вашего объекта/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Инженерная уверенность/ })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Начнём с исходных данных/ })).toBeVisible();
   });
 
   test('closes the mobile menu with Escape', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 812 });
     await page.goto('/orion');
-
     await page.getByRole('button', { name: 'Открыть меню' }).click();
     await expect(page.getByRole('button', { name: 'Закрыть меню' })).toBeVisible();
     await page.keyboard.press('Escape');
     await expect(page.getByRole('button', { name: 'Открыть меню' })).toBeVisible();
   });
 });
-

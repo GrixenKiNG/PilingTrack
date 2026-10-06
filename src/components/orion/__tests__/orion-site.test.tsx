@@ -1,5 +1,7 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
 
 vi.mock('../orion-site.module.css', () => ({
   default: new Proxy({}, {
@@ -40,7 +42,12 @@ describe('ORION public site', () => {
     ]);
     expect(orionEquipment.every(({ photoSlots }) => photoSlots === 5)).toBe(true);
     for (const equipment of orionEquipment) {
-      expect(equipment.photos).toHaveLength(5);
+      // Число снимков у машин разное (владелец убрал часть ракурсов 30.09.2026);
+      // важно, чтобы каждый указанный файл существовал — иначе на сайте пустая рамка.
+      expect(equipment.photos.length).toBeGreaterThan(0);
+      for (const { src } of equipment.photos) {
+        expect(existsSync(join(process.cwd(), 'public', src)), src).toBe(true);
+      }
       expect(equipment.photos.every(({ sourceUrl }) => sourceUrl.startsWith('https://'))).toBe(true);
     }
     expect(orionEquipment.map(({ name, profileKey }) => ({ name, profileKey }))).toEqual([

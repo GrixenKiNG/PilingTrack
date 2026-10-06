@@ -1,3 +1,4 @@
+import { SUBMITTED_REPORT_STATUS } from '@/lib/report-status';
 import { db } from '@/lib/db';
 import { ServiceError } from '@/lib/service-error';
 import { pileLengthMeters } from '@/lib/pile-length';
@@ -87,32 +88,43 @@ export async function getEquipmentDetails(equipmentId: string, tenantId: string)
   if (!equipment) throw new ServiceError('Установка не найдена', 404);
 
   const cutoff = new Date(Date.now() - 30 * 86_400_000).toISOString().slice(0, 10);
+  const reportSelect = {
+    id: true, reportId: true, date: true, shiftType: true, status: true,
+    site: { select: { id: true, name: true } },
+    user: { select: { id: true, name: true } },
+    piles: { select: { count: true, pileGrade: { select: { name: true, lengthMm: true } } } },
+    drillings: { select: { count: true, meters: true } },
+    downtimes: { select: { duration: true } },
+    updatedAt: true,
+  } as const;
   const allReports = await db.report.findMany({
     where: { equipmentId },
     orderBy: { date: 'desc' },
     take: 1000,
-    select: {
-      id: true, reportId: true, date: true, shiftType: true, status: true,
-      site: { select: { id: true, name: true } },
-      user: { select: { id: true, name: true } },
-      piles: { select: { count: true, pileGrade: { select: { name: true, lengthMm: true } } } },
-      drillings: { select: { count: true, meters: true } },
-      updatedAt: true,
-    },
+    select: reportSelect,
   });
-  const analyticsRows = allReports.length
+  // The history cap must not truncate the independent 30-day KPI window.
+  const reports30d = await db.report.findMany({
+    where: { equipmentId, date: { gte: cutoff }, status: SUBMITTED_REPORT_STATUS },
+    select: reportSelect,
+  });
+  const reportIds = [...new Set([...allReports, ...reports30d].map((r) => r.reportId))];
+  const analyticsRows = reportIds.length
     ? await db.reportAnalytics.findMany({
-        where: { reportId: { in: allReports.map((r) => r.reportId) } },
+        where: { reportId: { in: reportIds } },
         select: { reportId: true, totalPiles: true, totalDrilling: true, totalDowntime: true },
       })
     : [];
   const analyticsByReport = new Map(analyticsRows.map((a) => [a.reportId, a]));
-
-  const reports30d = allReports.filter((r) => r.date >= cutoff);
+  // Match ReportAnalytics rebuild formulas only when the read model is missing.
+  const totalsForReport = (report: (typeof allReports)[number]) => analyticsByReport.get(report.reportId) ?? {
+    totalPiles: report.piles.reduce((sum, pile) => sum + (pile.count || 0), 0),
+    totalDrilling: report.drillings.reduce((sum, drilling) => sum + (drilling.meters || 0), 0),
+    totalDowntime: report.downtimes.reduce((sum, downtime) => sum + (downtime.duration || 0), 0),
+  };
   const stats30d = reports30d.reduce(
     (acc, r) => {
-      const a = analyticsByReport.get(r.reportId);
-      if (!a) return acc;
+      const a = totalsForReport(r);
       acc.piles += a.totalPiles;
       acc.pileMeters += r.piles.reduce(
         (sum, pile) => sum + pile.count * pileLengthMeters({ gradeLengthMm: pile.pileGrade?.lengthMm }),
@@ -127,14 +139,14 @@ export async function getEquipmentDetails(equipmentId: string, tenantId: string)
   );
 
   const timeline = allReports.map((r) => {
-    const a = analyticsByReport.get(r.reportId);
+    const a = totalsForReport(r);
     return {
       reportId: r.reportId, date: r.date, shiftType: r.shiftType, status: r.status,
       siteName: r.site?.name ?? null,
       operatorId: r.user?.id ?? null, operatorName: r.user?.name ?? null,
       updatedAt: r.updatedAt.toISOString(),
-      piles: a?.totalPiles ?? null, drillingMeters: a?.totalDrilling ?? null,
-      downtimeHours: a?.totalDowntime ?? null,
+      piles: a.totalPiles, drillingMeters: a.totalDrilling,
+      downtimeHours: a.totalDowntime,
     };
   });
 
@@ -492,7 +504,7 @@ export async function listAllEquipment(
   const list = await db.equipment.findMany({
     where,
     select: {
-      id: true, name: true, model: true, qty: true, isActive: true, hammerKind: true, isCombined: true,
+      id: true, name: true, model: true, qty: true, isActive: true, hammerKind: true, isCombined: true, updatedAt: true,
       engineHoursTotal: true, nextMaintenanceAtHours: true, nextMaintenanceDate: true,
       crews: { where: { isActive: true }, select: { id: true } },
     },

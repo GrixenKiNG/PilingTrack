@@ -9,6 +9,7 @@ import { recordAuditEvent } from '@/services/audit/audit-service';
 import { resolveTenantContext } from '@/services/tenancy/tenant-context-service';
 import { withApi, readJsonBody } from '@/core/api-wrapper';
 import { getRateLimitIdentifier } from '@/lib/rate-limiter';
+import { withCsrf } from '@/lib/csrf-protection';
 
 
 export const runtime = 'nodejs';
@@ -16,6 +17,15 @@ export const runtime = 'nodejs';
 export const POST = withApi(
   async (request: NextRequest) => {
     const requestId = getRequestId(request);
+
+    // Вход идёт через withApi (сессии ещё нет, свой лимитер попыток), поэтому
+    // CSRF-проверку withMutation он не получает. Межсайтовый вход отклоняем
+    // здесь, до разбора тела: иначе чужая страница могла войти в браузере
+    // сотрудника под учётной записью атакующего (login CSRF, аудит Codex
+    // out55, F09). Запросы без браузерных заголовков withCsrf для входа
+    // пропускает (см. CSRF_HEADERLESS_ALLOWED_PATHS).
+    const csrfRejection = withCsrf(request);
+    if (csrfRejection) return csrfRejection;
 
     const body = await readJsonBody(request);
     const tenantContext = resolveTenantContext(request);

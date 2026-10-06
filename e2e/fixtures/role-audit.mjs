@@ -2,13 +2,11 @@ import { PrismaClient } from '../../src/generated/postgres-client/client.js';
 import { PrismaPg } from '@prisma/adapter-pg';
 import bcrypt from 'bcryptjs';
 import { randomBytes } from 'node:crypto';
-import dotenv from 'dotenv';
-dotenv.config({ quiet: true });
 export async function createRoleAuditFixture(){
- const connectionString=process.env.DATABASE_URL_POSTGRES; const u=new URL(connectionString);
- if(!['localhost','127.0.0.1'].includes(u.hostname)||!/^\/pilingtrack_(test|ci)$/.test(u.pathname))throw new Error('Role audit fixtures require a local pilingtrack_test or pilingtrack_ci database');
+ const connectionString=process.env.INTEGRATION_DATABASE_URL_OWNER; const u=new URL(connectionString);
+ if(!['localhost','127.0.0.1'].includes(u.hostname)||u.pathname!=='/codex_test'||u.username!=='piling'||!/^codex-pg-[a-f0-9]{12}$/.test(process.env.INTEGRATION_DB_CONTAINER||''))throw new Error('Role audit fixtures require the owned disposable codex_test database');
  const db=new PrismaClient({adapter:new PrismaPg({connectionString})});
- const prefix='role-audit-'+Date.now(); const password=randomBytes(18).toString('hex');
+ const prefix='role-audit-'+randomBytes(6).toString('hex'); const password=randomBytes(18).toString('hex');
  try {const tenant=await db.tenant.create({data:{slug:prefix,name:'QA browser '+prefix,maxUsers:20,subscriptionStatus:'active'}});
  await db.tenantSettings.create({data:{tenantId:tenant.id,companyName:'QA browser',notifications:{criticalDefect:false}}});
  const users={}; for(const role of ['ADMIN','DISPATCHER','OPERATOR','ASSISTANT','MECHANIC','FOREMAN','SAFETY_ENGINEER']){
