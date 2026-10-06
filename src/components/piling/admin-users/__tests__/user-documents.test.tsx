@@ -85,6 +85,22 @@ describe('UserDocuments ownership', () => {
 });
 
 /**
+ * F-R131 №25: у кнопок-иконок правки и удаления документа был только
+ * `aria-label` — при наведении мышью подсказки не было. Стандарт проекта — и
+ * доступное имя, и `title`.
+ */
+describe('UserDocuments: подсказки у кнопок-иконок (F-R131 №25)', () => {
+  it('правка и удаление документа подписаны и всплывающей подсказкой', async () => {
+    documentsResponse = () => Promise.resolve(ok({ documents: [docRow('doc-4', 'Медосмотр Орлова')] }));
+    render(<UserDocuments userId="orlov" />);
+    await screen.findByText('Медосмотр Орлова');
+
+    expect(screen.getByLabelText('Изменить документ')).toHaveAttribute('title', 'Изменить документ');
+    expect(screen.getByLabelText('Удалить документ')).toHaveAttribute('title', 'Удалить документ');
+  });
+});
+
+/**
  * F-R112-1: обрыв сети при удалении документа показывал браузерное «Failed to
  * fetch» — английскую строку на русском экране. Обрыв связи `fetch` бросает
  * TypeError, и он должен превращаться в понятный русский текст.

@@ -267,10 +267,10 @@ export function UserDocuments({ userId }: { userId: string }) {
                 <span className={cn('rounded px-2 py-0.5 text-xs font-medium', STATUS_STYLE[doc.expiry.status])}>
                   {statusText(doc.expiry)}
                 </span>
-                <Button size="icon" variant="ghost" onClick={() => openEdit(doc)} aria-label="Изменить документ" className="min-h-11 min-w-11 sm:min-h-0 sm:min-w-0">
+                <Button size="icon" variant="ghost" onClick={() => openEdit(doc)} aria-label="Изменить документ" title="Изменить документ" className="min-h-11 min-w-11 sm:min-h-0 sm:min-w-0">
                   <Pencil className="h-3.5 w-3.5" />
                 </Button>
-                <Button size="icon" variant="ghost" onClick={() => setPendingDelete(doc)} aria-label="Удалить документ" className="min-h-11 min-w-11 sm:min-h-0 sm:min-w-0">
+                <Button size="icon" variant="ghost" onClick={() => setPendingDelete(doc)} aria-label="Удалить документ" title="Удалить документ" className="min-h-11 min-w-11 sm:min-h-0 sm:min-w-0">
                   <Trash2 className="h-3.5 w-3.5" />
                 </Button>
               </div>

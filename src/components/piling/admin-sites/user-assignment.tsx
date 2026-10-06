@@ -143,6 +143,7 @@ export function UserAssignmentDialog({ siteId, loadingUsers, users }: UserAssign
                       onClick={() => handleUnassignUser(a.userId)}
                       disabled={unassigningUserId === a.userId}
                       className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-destructive/10 text-muted-foreground hover:text-destructive-strong transition-colors"
+                      aria-label="Снять назначение"
                       title="Снять назначение"
                     >
                       <X className="w-3.5 h-3.5" />
