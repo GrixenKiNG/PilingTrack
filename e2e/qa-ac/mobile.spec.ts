@@ -7,9 +7,9 @@
  */
 import { expect, test, type Page } from '@playwright/test';
 import { login, matrix, shot, watchErrors } from '../qa/helpers';
-import { RUN_SUF, pause, writeRunJson } from './util';
+import { RUN_SUF, pause, writeRunJson, expectDefined } from './util';
 
-const ADMIN = matrix.roles.find((r) => r.role === 'ADMIN')!.email;
+const ADMIN = expectDefined(matrix.roles.find((r) => r.role === 'ADMIN'), 'ADMIN role not found in matrix').email;
 const SECTIONS: Array<[string, string]> = [
   ['Дашборд', '/admin'],
   ['Мониторинг', '/monitoring'],

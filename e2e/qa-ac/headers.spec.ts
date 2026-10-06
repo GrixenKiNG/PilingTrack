@@ -7,9 +7,9 @@
  */
 import { expect, test } from '@playwright/test';
 import { login, matrix } from '../qa/helpers';
-import { writeRunJson } from './util';
+import { writeRunJson, expectDefined } from './util';
 
-const ADMIN = matrix.roles.find((r) => r.role === 'ADMIN')!.email;
+const ADMIN = expectDefined(matrix.roles.find((r) => r.role === 'ADMIN'), 'ADMIN role not found in matrix').email;
 const HDRS = [
   'content-security-policy',
   'x-frame-options',

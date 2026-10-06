@@ -88,6 +88,12 @@ export async function pause(page: Page, ms = 900) {
   await page.waitForTimeout(ms);
 }
 
+/** Утверждает, что значение определено (не null/undefined), иначе бросает с сообщением. */
+export function expectDefined<T>(value: T | null | undefined, message: string): T {
+  if (value == null) throw new Error(message);
+  return value;
+}
+
 /** Записать JSON рядом с результатами прогона. */
 export function writeRunJson(name: string, data: unknown) {
   fs.mkdirSync(OUT_DIR, { recursive: true });

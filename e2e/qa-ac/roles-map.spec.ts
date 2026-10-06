@@ -11,9 +11,9 @@
  */
 import { expect, test } from '@playwright/test';
 import { login, matrix } from '../qa/helpers';
-import { pause, readButtons, readMenu, writeRunJson } from './util';
+import { pause, readButtons, readMenu, writeRunJson, expectDefined } from './util';
 
-const roleEmail = (role: string) => matrix.roles.find((r) => r.role === role)!.email;
+const roleEmail = (role: string) => expectDefined(matrix.roles.find((r) => r.role === role), `role ${role} not found in matrix`).email;
 const ADMIN_EMAIL = roleEmail('ADMIN');
 const REAL = [
   ...matrix.roles.filter((r) => r.role !== 'ADMIN'),

@@ -13,9 +13,9 @@ import { expect, test } from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
 import { login, matrix, OUT_DIR } from '../qa/helpers';
-import { RUN_SUF, api, kpiTiles, parseCountMeters, parseCsv, pause, readZipEntries, sweepAcqa, writeRunJson } from './util';
+import { RUN_SUF, api, kpiTiles, parseCountMeters, parseCsv, pause, readZipEntries, sweepAcqa, writeRunJson, expectDefined } from './util';
 
-const ADMIN = matrix.roles.find((r) => r.role === 'ADMIN')!.email;
+const ADMIN = expectDefined(matrix.roles.find((r) => r.role === 'ADMIN'), 'ADMIN role not found in matrix').email;
 const todayMsk = () => new Date(Date.now() + 3 * 3600_000).toISOString().slice(0, 10);
 
 const num = (s: string) => Number(s.replace(/\s/g, '').replace(',', '.'));
@@ -54,6 +54,10 @@ test('D: выгрузки CSV/XLSX/PDF — файлы, запятые, итог�
     expect(drill, 'активный тип бурения найден').toBeTruthy();
     expect(reason, 'активная причина простоя найдена').toBeTruthy();
 
+    const gradeId = expectDefined(grade, 'grade missing after check').id;
+    const drillId = expectDefined(drill, 'drill missing after check').id;
+    const reasonId = expectDefined(reason, 'reason missing after check').id;
+
     reportId = crypto.randomUUID();
     const users = (await (await api(page).get('/api/users')).json()).users as Array<{ id: string; email: string }>;
     const owner = users.find((u) => u.email === matrix.operatorVersions[0].operator) ?? users[0];
@@ -63,11 +67,11 @@ test('D: выгрузки CSV/XLSX/PDF — файлы, запятые, итог�
     const mkReport = await api(page).post('/api/reports/admin-upsert', { data: {
       reportId, userId: owner.id,
       siteId, date: todayMsk(),
-      piles: [{ pileGradeId: grade!.id, count: 5 }],
-      drillings: [{ typeId: drill!.id, count: 2, metersPerUnit: 8.35, meters: 16.7 }],
+      piles: [{ pileGradeId: gradeId, count: 5 }],
+      drillings: [{ typeId: drillId, count: 2, metersPerUnit: 8.35, meters: 16.7 }],
       downtimes: [
-        { reasonId: reason!.id, duration: 2, comment: '=1+1' },
-        { reasonId: reason!.id, duration: 1, comment: '@SUM(A1)' },
+        { reasonId: reasonId, duration: 2, comment: '=1+1' },
+        { reasonId: reasonId, duration: 1, comment: '@SUM(A1)' },
       ],
     } });
     expect(mkReport.status(), 'AC-QA отчёт с формульными комментариями создан').toBe(200);
@@ -130,9 +134,13 @@ test('D: выгрузки CSV/XLSX/PDF — файлы, запятые, итог�
       const c = (r[idx] ?? '').trim();
       return /^[\d\s]+([.,]\d+)?$/.test(c) ? s + num(c) : s;
     }, 0);
-    await compare('CSV: сваи шт. против плитки', () => sumIfNum(iPileCount), () => tilesPiles!.count);
-    await compare('CSV: сваи м.п. против плитки', () => sumIfNum(iPileMeters), () => tilesPiles!.meters);
-    await compare('CSV: бурение м.п. против плитки', () => sumIfNum(iDrillMeters), () => tilesDrill!.meters);
+    const tilesPilesCount = expectDefined(tilesPiles, 'tilesPiles missing after check').count;
+    const tilesPilesMeters = expectDefined(tilesPiles, 'tilesPiles missing after check').meters;
+    const tilesDrillCount = expectDefined(tilesDrill, 'tilesDrill missing after check').count;
+    const tilesDrillMeters = expectDefined(tilesDrill, 'tilesDrill missing after check').meters;
+    await compare('CSV: сваи шт. против плитки', () => sumIfNum(iPileCount), () => tilesPilesCount);
+    await compare('CSV: сваи м.п. против плитки', () => sumIfNum(iPileMeters), () => tilesPilesMeters);
+    await compare('CSV: бурение м.п. против плитки', () => sumIfNum(iDrillMeters), () => tilesDrillMeters);
 
     async function compare(name: string, got: () => number, want: () => number) {
       const g = got();
@@ -156,7 +164,7 @@ test('D: выгрузки CSV/XLSX/PDF — файлы, запятые, итог�
     const allXml = sheetKeys.map((k) => zip[k].toString('utf8')).join('\n');
     checks.push({ name: 'XLSX: листы', ok: sheetKeys.length >= 2, note: sheetKeys.join(', ') });
     expect.soft(sheetKeys.length, 'в книге два листа').toBeGreaterThanOrEqual(2);
-    expect.soft(allXml, 'XLSX: нет формул <f>').not.toMatch(/<f[ >\/]/);
+    expect.soft(allXml, 'XLSX: нет формул <f>').not.toMatch(/<f[ >/]/);
     expect.soft(allXml, 'XLSX: комментарий присутствует текстом').toContain('=1+1');
     expect.soft(allXml, 'XLSX: второй комментарий присутствует').toContain('@SUM(A1)');
     // Итоги листа «Итоги»: Свай, всего / Свай, м.п. / Бурение, скв. / Бурение, м.
@@ -170,10 +178,10 @@ test('D: выгрузки CSV/XLSX/PDF — файлы, запятые, итог�
     const dataRowsX = sheet2.split('<row ').slice(2).map(cellsOfRow);
     const sumCol = (idx: number) => dataRowsX.reduce((s, r) => s + (typeof r[idx] === 'number' ? (r[idx] as number) : 0), 0);
     const xPiles = sumCol(6), xPileM = sumCol(7), xDrillN = sumCol(8), xDrillM = sumCol(9);
-    await compare('XLSX: сваи шт. против плитки', () => xPiles, () => tilesPiles!.count);
-    await compare('XLSX: сваи м.п. против плитки', () => xPileM, () => tilesPiles!.meters);
-    await compare('XLSX: бурение шт. против плитки', () => xDrillN, () => tilesDrill!.count);
-    await compare('XLSX: бурение м.п. против плитки', () => xDrillM, () => tilesDrill!.meters);
+    await compare('XLSX: сваи шт. против плитки', () => xPiles, () => tilesPilesCount);
+    await compare('XLSX: сваи м.п. против плитки', () => xPileM, () => tilesPilesMeters);
+    await compare('XLSX: бурение шт. против плитки', () => xDrillN, () => tilesDrillCount);
+    await compare('XLSX: бурение м.п. против плитки', () => xDrillM, () => tilesDrillMeters);
 
     // ===== PDF =====
     const row = page.locator('div.grid.gap-3.px-3.py-3', { hasText: siteName }).first();
@@ -201,7 +209,7 @@ test.afterAll(async ({ browser }) => {
   // Страховка: если прогон прервался, «AC-QA»-записи не остаются в базе.
   const page = await browser.newPage();
   try {
-    await login(page, matrix.roles.find((r) => r.role === 'ADMIN')!.email);
+    await login(page, expectDefined(matrix.roles.find((r) => r.role === 'ADMIN'), 'ADMIN role not found in matrix').email);
     await sweepAcqa(page);
   } finally {
     await page.close();

@@ -6,9 +6,9 @@
  */
 import { expect, test, type Page } from '@playwright/test';
 import { login, matrix } from '../qa/helpers';
-import { pause, writeRunJson } from './util';
+import { pause, writeRunJson, expectDefined } from './util';
 
-const ADMIN = matrix.roles.find((r) => r.role === 'ADMIN')!.email;
+const ADMIN = expectDefined(matrix.roles.find((r) => r.role === 'ADMIN'), 'ADMIN role not found in matrix').email;
 const report: Array<{ step: string; ok: boolean; note: string }> = [];
 
 async function tabWalk(page: Page, limit = 120) {

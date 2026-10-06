@@ -6,9 +6,9 @@
  */
 import { expect, test } from '@playwright/test';
 import { login, matrix } from '../qa/helpers';
-import { kpiTiles, parseCountMeters, pause, writeRunJson } from './util';
+import { kpiTiles, parseCountMeters, pause, writeRunJson, expectDefined } from './util';
 
-const ADMIN = matrix.roles.find((r) => r.role === 'ADMIN')!.email;
+const ADMIN = expectDefined(matrix.roles.find((r) => r.role === 'ADMIN'), 'ADMIN role not found in matrix').email;
 
 /** Плитки с ожиданием: дашборд рисует скелет, пока грузятся данные. */
 async function tilesWith(page: import('@playwright/test').Page, needed: string[], tries = 25) {
@@ -56,20 +56,33 @@ test('E: «Сваи» и «Бурение» совпадают на дашбор
   expect(rPiles, `отчёты «Сваи»: «${rep['Сваи']}»; ${keysInfo(rep)}`).toBeTruthy();
   expect(rDrill, `отчёты «Бурение»: «${rep['Бурение']}»; ${keysInfo(rep)}`).toBeTruthy();
 
+  const dPilesCount = expectDefined(dPiles, 'dPiles missing after check').count;
+  const dPilesMeters = expectDefined(dPiles, 'dPiles missing after check').meters;
+  const dDrillCount = expectDefined(dDrill, 'dDrill missing after check').count;
+  const dDrillMeters = expectDefined(dDrill, 'dDrill missing after check').meters;
+  const sPilesCount = expectDefined(sPiles, 'sPiles missing after check').count;
+  const sPilesMeters = expectDefined(sPiles, 'sPiles missing after check').meters;
+  const sDrillCount = expectDefined(sDrill, 'sDrill missing after check').count;
+  const sDrillMeters = expectDefined(sDrill, 'sDrill missing after check').meters;
+  const rPilesCount = expectDefined(rPiles, 'rPiles missing after check').count;
+  const rPilesMeters = expectDefined(rPiles, 'rPiles missing after check').meters;
+  const rDrillCount = expectDefined(rDrill, 'rDrill missing after check').count;
+  const rDrillMeters = expectDefined(rDrill, 'rDrill missing after check').meters;
+
   const rows: Array<{ name: string; ok: boolean; note: string }> = [];
   const cmp = (label: string, x: number | undefined, y: number | undefined) => {
     const okl = x != null && y != null && Math.abs(x - y) <= (Number.isInteger(x) ? 0.001 : 0.06);
     rows.push({ name: label, ok: okl, note: `${x} против ${y}` });
     expect.soft(okl, `${label}: ${x} против ${y}`).toBe(true);
   };
-  cmp('сваи шт.: дашборд = объекты', dPiles!.count, sPiles!.count);
-  cmp('сваи шт.: дашборд = отчёты', dPiles!.count, rPiles!.count);
-  cmp('сваи м.п.: дашборд = объекты', dPiles!.meters, sPiles!.meters);
-  cmp('сваи м.п.: дашборд = отчёты', dPiles!.meters, rPiles!.meters);
-  cmp('бурение шт.: дашборд = объекты', dDrill!.count, sDrill!.count);
-  cmp('бурение шт.: дашборд = отчёты', dDrill!.count, rDrill!.count);
-  cmp('бурение м.п.: дашборд = объекты', dDrill!.meters, sDrill!.meters);
-  cmp('бурение м.п.: дашборд = отчёты', dDrill!.meters, rDrill!.meters);
+  cmp('сваи шт.: дашборд = объекты', dPilesCount, sPilesCount);
+  cmp('сваи шт.: дашборд = отчёты', dPilesCount, rPilesCount);
+  cmp('сваи м.п.: дашборд = объекты', dPilesMeters, sPilesMeters);
+  cmp('сваи м.п.: дашборд = отчёты', dPilesMeters, rPilesMeters);
+  cmp('бурение шт.: дашборд = объекты', dDrillCount, sDrillCount);
+  cmp('бурение шт.: дашборд = отчёты', dDrillCount, rDrillCount);
+  cmp('бурение м.п.: дашборд = объекты', dDrillMeters, sDrillMeters);
+  cmp('бурение м.п.: дашборд = отчёты', dDrillMeters, rDrillMeters);
 
   writeRunJson('kpi-consistency.json', { generatedAt: new Date().toISOString(), dash, sites, rep, rows });
 });

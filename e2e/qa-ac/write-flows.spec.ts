@@ -9,10 +9,10 @@
  */
 import { expect, test } from '@playwright/test';
 import { login, matrix } from '../qa/helpers';
-import { RUN_SUF, api, pause, sweepAcqa, writeRunJson } from './util';
+import { RUN_SUF, api, pause, sweepAcqa, writeRunJson, expectDefined } from './util';
 
-const ADMIN = matrix.roles.find((r) => r.role === 'ADMIN')!.email;
-const DISPATCHER = matrix.roles.find((r) => r.role === 'DISPATCHER')!.email;
+const ADMIN = expectDefined(matrix.roles.find((r) => r.role === 'ADMIN'), 'ADMIN role not found in matrix').email;
+const DISPATCHER = expectDefined(matrix.roles.find((r) => r.role === 'DISPATCHER'), 'DISPATCHER role not found in matrix').email;
 
 test('C1: справочники — добавить, архивировать с «Отменить», массовая архивация', async ({ page }) => {
   test.setTimeout(20 * 60_000);
@@ -135,7 +135,9 @@ test('C3: отчёт — диспетчер создаёт на AC-QA объек
   const users = (await (await api(page).get('/api/users')).json()).users as Array<{ id: string; email: string; name: string }>;
   const ka = users.find((u) => u.email === matrix.operatorVersions[0].operator);
   expect(ka, 'оператор ka найден').toBeTruthy();
-  const assign = await api(page).post(`/api/sites/${siteId}/assign`, { data: { userId: ka!.id } });
+  const kaId = expectDefined(ka, 'ka missing after check').id;
+  const kaName = expectDefined(ka, 'ka missing after check').name;
+  const assign = await api(page).post(`/api/sites/${siteId}/assign`, { data: { userId: kaId } });
   expect(assign.status(), 'оператор закреплён за AC-QA объектом').toBe(200);
 
   await page.goto('/admin/reports');
@@ -146,7 +148,7 @@ test('C3: отчёт — диспетчер создаёт на AC-QA объек
 
   // Оператор — Краснов (закреплён за объектом); объект — свой AC-QA.
   await dlg.getByText('Выберите оператора').click();
-  await page.getByRole('option', { name: ka!.name }).click();
+  await page.getByRole('option', { name: kaName }).click();
   await dlg.getByText('Выберите объект').click();
   await page.getByRole('option', { name: siteName }).click();
 
