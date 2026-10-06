@@ -2,6 +2,7 @@ import { db } from '@/lib/db';
 import { ServiceError } from '@/lib/service-error';
 import { zonedDayStartUtc } from '@/lib/timezone';
 import { pileLengthMeters } from '@/lib/pile-length';
+import { isSubmittedReport } from '@/lib/report-status';
 import { getSettings } from '@/modules/settings';
 import {
   actualRefusalMm,
@@ -42,8 +43,20 @@ export interface PileDrivingSetRow {
 }
 
 export interface PilePassportRow {
+  /** Ключ строки: паспорт, если он есть, иначе запись выработки. */
   id: string;
-  pileNumber: string;
+  /** Запись выработки, из которой построена строка журнала. */
+  pileWorkId: string;
+  /** Паспорт сваи. `null` — свая записана без паспорта (пачкой). */
+  passportId: string | null;
+  /** Есть паспорт. Только у такой строки показывают замеры и решение. */
+  hasPassport: boolean;
+  /** Строка из отчёта-черновика: решение по ней ещё не окончательное. */
+  isDraft: boolean;
+  /** Сколько свай в записи. Отрицательное число — поправка к выработке. */
+  count: number;
+  /** Номер сваи по проекту. `null` — паспорта нет, номера взять негде. */
+  pileNumber: string | null;
   drivenAt: string;
   siteName: string;
   /** Смена, в которую забита свая (DAY/NIGHT). `null` — отчёт не привязан. */
@@ -81,7 +94,8 @@ export interface PilePassportRow {
   hammerEnergyKj: number | null;
   dropHeightM: number | null;
   note: string | null;
-  acceptance: PileAcceptanceValue;
+  /** Решение мастера. `null` — паспорта нет, решать нечего. */
+  acceptance: PileAcceptanceValue | null;
   acceptanceNote: string | null;
   acceptedAt: string | null;
   acceptedByName: string | null;
@@ -187,36 +201,51 @@ export async function listPilePassports(input: PileJournalFilters): Promise<Pile
       input.timezone ?? (await getSettings(input.tenantId)).timezone,
     )
     : null;
-  const rows = await db.pilePassport.findMany({
+  // Строки журнала — записи выработки: одна строка PileWork (марка, количество,
+  // смена, объект, кто записал, дата) = одна строка журнала. Паспорт подключаем
+  // к строке по `pileWorkId` ради замеров и решения: сваи, записанные пачкой,
+  // паспорта не имеют и всё равно обязаны быть в журнале.
+  const rows = await db.pileWork.findMany({
     where: {
+      // Организация — строгим равенством: чужой выработки журнал не показывает
+      // (никаких `tenantId IS NULL OR ...` — это отдало бы строки всех тенантов).
       tenantId: input.tenantId,
-      ...(acceptance ? { acceptance } : {}),
-      ...(input.pileNumber
-        ? { pileNumber: { contains: input.pileNumber, mode: 'insensitive' as const } }
+      ...(input.siteId ? { report: { siteId: input.siteId } } : {}),
+      // Решение и номер сваи живут в паспорте: фильтруем по нему, когда он
+      // задан. Сваи без паспорта под эти фильтры не попадают — их нечего решать.
+      ...(acceptance || input.pileNumber
+        ? {
+          passport: {
+            ...(acceptance ? { acceptance } : {}),
+            ...(input.pileNumber
+              ? { pileNumber: { contains: input.pileNumber, mode: 'insensitive' as const } }
+              : {}),
+          },
+        }
         : {}),
-      ...(bounds ? { drivenAt: bounds } : {}),
-      ...(input.siteId ? { pileWork: { report: { siteId: input.siteId } } } : {}),
+      // Дата забивки — момент работы, а не момент сохранения отчёта. Строку без
+      // `occurredAt` ставим по `receivedAt`, иначе она выпала бы из любого периода.
+      ...(bounds
+        ? { OR: [{ occurredAt: bounds }, { occurredAt: null, receivedAt: bounds }] }
+        : {}),
     },
-    orderBy: { drivenAt: 'desc' },
+    orderBy: [{ occurredAt: { sort: 'desc', nulls: 'last' } }, { receivedAt: 'desc' }],
     // Лишняя строка — только признак среза: в ответ уйдёт ровно `limit` строк.
     take: limit + 1,
     include: {
-      sets: { orderBy: { ordinal: 'asc' } },
-      pileWork: {
+      pileGrade: { select: { name: true, lengthMm: true, sectionOrDiameter: true } },
+      picket: { select: { name: true, cluster: { select: { name: true } } } },
+      report: {
         select: {
-          pileGrade: { select: { name: true, lengthMm: true, sectionOrDiameter: true } },
-          picket: { select: { name: true, cluster: { select: { name: true } } } },
-          report: {
-            select: {
-              site: { select: { name: true } },
-              user: { select: { name: true } },
-              equipment: { select: { name: true } },
-              crew: { select: { equipment: { select: { name: true } } } },
-              shiftType: true,
-            },
-          },
+          site: { select: { name: true } },
+          user: { select: { name: true } },
+          equipment: { select: { name: true } },
+          crew: { select: { equipment: { select: { name: true } } } },
+          shiftType: true,
+          status: true,
         },
       },
+      passport: { include: { sets: { orderBy: { ordinal: 'asc' } } } },
     },
   });
 
@@ -224,7 +253,9 @@ export async function listPilePassports(input: PileJournalFilters): Promise<Pile
   const page = truncated ? rows.slice(0, limit) : rows;
 
   // Кто принял сваю — одним запросом на всю страницу, а не по строке.
-  const deciderIds = [...new Set(page.map((row) => row.acceptedById).filter((id): id is string => !!id))];
+  const deciderIds = [...new Set(
+    page.map((work) => work.passport?.acceptedById).filter((id): id is string => !!id),
+  )];
   const deciders = deciderIds.length > 0
     ? await db.user.findMany({
       where: { tenantId: input.tenantId, id: { in: deciderIds } },
@@ -233,8 +264,14 @@ export async function listPilePassports(input: PileJournalFilters): Promise<Pile
     : [];
   const deciderById = new Map(deciders.map((user) => [user.id, user.name]));
 
-  const items = page.map((row) => {
-    const sets: DrivingSet[] = row.sets.map((set) => ({
+  const items = page.map((work) => {
+    const passport = work.passport;
+    const report = work.report;
+    const picket = work.picket;
+
+    // Замеры и решение живут в паспорте. У сваи, записанной пачкой, паспорта
+    // нет — строка остаётся, а замеров и решения у неё не будет.
+    const sets: DrivingSet[] = (passport?.sets ?? []).map((set) => ({
       ordinal: set.ordinal,
       blows: set.blows,
       penetrationMm: set.penetrationMm,
@@ -245,18 +282,22 @@ export async function listPilePassports(input: PileJournalFilters): Promise<Pile
     // записи одним замером: там считаем по паре refusalSet* в самом паспорте,
     // тем же правилом.
     const journal = journalRefusalMm(sets);
-    const refusalMm = journal?.refusalMm ?? actualRefusalMm({
-      penetrationMm: row.refusalSetPenetrationMm,
-      blows: row.refusalSetBlows,
-    });
-
-    const picket = row.pileWork.picket;
-    const report = row.pileWork.report;
+    const refusalMm = passport
+      ? journal?.refusalMm ?? actualRefusalMm({
+        penetrationMm: passport.refusalSetPenetrationMm,
+        blows: passport.refusalSetBlows,
+      })
+      : null;
 
     return {
-      id: row.id,
-      pileNumber: row.pileNumber,
-      drivenAt: row.drivenAt.toISOString(),
+      id: passport?.id ?? work.id,
+      pileWorkId: work.id,
+      passportId: passport?.id ?? null,
+      hasPassport: passport !== null,
+      isDraft: !isSubmittedReport(report),
+      count: work.count,
+      pileNumber: passport?.pileNumber ?? null,
+      drivenAt: (work.occurredAt ?? work.receivedAt).toISOString(),
       siteName: report?.site?.name ?? '—',
       shiftType: report?.shiftType ?? null,
       locationName: picket
@@ -264,47 +305,51 @@ export async function listPilePassports(input: PileJournalFilters): Promise<Pile
         : null,
       operatorName: report?.user?.name ?? '—',
       equipmentName: report?.equipment?.name ?? report?.crew?.equipment?.name ?? null,
-      recordedByForeman: row.recordedByForeman,
-      pileGradeName: row.pileWork.pileGrade?.name ?? '—',
-      pileSection: row.pileWork.pileGrade?.sectionOrDiameter ?? null,
-      pileLengthM: row.pileWork.pileGrade?.lengthMm != null
-        ? pileLengthMeters({ gradeLengthMm: row.pileWork.pileGrade.lengthMm })
+      recordedByForeman: passport?.recordedByForeman ?? false,
+      pileGradeName: work.pileGrade?.name ?? '—',
+      pileSection: work.pileGrade?.sectionOrDiameter ?? null,
+      pileLengthM: work.pileGrade?.lengthMm != null
+        ? pileLengthMeters({ gradeLengthMm: work.pileGrade.lengthMm })
         : null,
-      designHeadLevelM: row.designHeadLevelM,
-      actualHeadLevelM: row.actualHeadLevelM,
-      drivenDepthM: row.drivenDepthM,
-      followerUsed: row.followerUsed,
-      redriven: row.redriven,
-      headCutOff: row.headCutOff,
-      refusalSetPenetrationMm: row.refusalSetPenetrationMm,
-      refusalSetBlows: row.refusalSetBlows,
-      designRefusalMm: row.designRefusalMm,
+      designHeadLevelM: passport?.designHeadLevelM ?? null,
+      actualHeadLevelM: passport?.actualHeadLevelM ?? null,
+      drivenDepthM: passport?.drivenDepthM ?? null,
+      followerUsed: passport?.followerUsed ?? false,
+      redriven: passport?.redriven ?? false,
+      headCutOff: passport?.headCutOff ?? false,
+      refusalSetPenetrationMm: passport?.refusalSetPenetrationMm ?? null,
+      refusalSetBlows: passport?.refusalSetBlows ?? null,
+      designRefusalMm: passport?.designRefusalMm ?? null,
       refusalMm,
-      refusalSetsUsed: journal?.setsUsed ?? (refusalMm !== null ? 1 : 0),
-      sets: row.sets.map((set) => ({
+      refusalSetsUsed: passport ? journal?.setsUsed ?? (refusalMm !== null ? 1 : 0) : 0,
+      sets: sets.map((set) => ({
         ordinal: set.ordinal,
         blows: set.blows,
         penetrationMm: set.penetrationMm,
         dropHeightM: set.dropHeightM,
         refusalMm: setRefusalMm({ blows: set.blows, penetrationMm: set.penetrationMm }),
       })),
-      drivingComplete: drivingComplete({ sets, designRefusalMm: row.designRefusalMm }),
-      totalBlows: row.totalBlows,
-      blowsLastMeter: row.blowsLastMeter,
-      planDeviationMm: row.planDeviationMm,
-      tiltPercent: row.tiltPercent,
-      hammerType: row.hammerType,
-      hammerEnergyKj: row.hammerEnergyKj,
-      dropHeightM: row.dropHeightM,
-      note: row.note,
-      acceptance: row.acceptance as PileAcceptanceValue,
-      acceptanceNote: row.acceptanceNote,
-      acceptedAt: row.acceptedAt?.toISOString() ?? null,
-      acceptedByName: row.acceptedById ? deciderById.get(row.acceptedById) ?? null : null,
-      redriveReadyAt: row.acceptance === 'NEEDS_REDRIVE' && row.acceptedAt
-        ? redriveReadyAt(row.acceptedAt).toISOString()
+      drivingComplete: passport
+        ? drivingComplete({ sets, designRefusalMm: passport.designRefusalMm })
         : null,
-      suggestion: suggestAcceptance({ actualRefusalMm: refusalMm, designRefusalMm: row.designRefusalMm }),
+      totalBlows: passport?.totalBlows ?? null,
+      blowsLastMeter: passport?.blowsLastMeter ?? null,
+      planDeviationMm: passport?.planDeviationMm ?? null,
+      tiltPercent: passport?.tiltPercent ?? null,
+      hammerType: passport?.hammerType ?? null,
+      hammerEnergyKj: passport?.hammerEnergyKj ?? null,
+      dropHeightM: passport?.dropHeightM ?? null,
+      note: passport?.note ?? null,
+      acceptance: (passport?.acceptance as PileAcceptanceValue | undefined) ?? null,
+      acceptanceNote: passport?.acceptanceNote ?? null,
+      acceptedAt: passport?.acceptedAt?.toISOString() ?? null,
+      acceptedByName: passport?.acceptedById ? deciderById.get(passport.acceptedById) ?? null : null,
+      redriveReadyAt: passport?.acceptance === 'NEEDS_REDRIVE' && passport.acceptedAt
+        ? redriveReadyAt(passport.acceptedAt).toISOString()
+        : null,
+      suggestion: passport
+        ? suggestAcceptance({ actualRefusalMm: refusalMm, designRefusalMm: passport.designRefusalMm })
+        : null,
     };
   });
 
@@ -380,7 +425,9 @@ export function pileJournalHeader(rows: PilePassportRow[], timezone?: string): P
     designRefusalMm: uniq(rows.map((row) => row.designRefusalMm)).sort((a, b) => a - b),
     dateFrom: periodEdge(dates[0]),
     dateTo: periodEdge(dates[dates.length - 1]),
-    pilesTotal: rows.length,
+    // «Свай в журнале» — число свай, а не строк: запись пачкой приносит сразу
+    // несколько, а поправка с отрицательным счётом вычитается, как и в учёте.
+    pilesTotal: rows.reduce((sum, row) => sum + row.count, 0),
     accepted: rows.filter((row) => row.acceptance === 'ACCEPTED').length,
     needsRedrive: rows.filter((row) => row.acceptance === 'NEEDS_REDRIVE').length,
     pending: rows.filter((row) => row.acceptance === 'PENDING').length,
@@ -505,6 +552,7 @@ export async function exportPileJournalXlsx(filters: PileJournalFilters): Promis
     'Молот', 'Энергия удара, кДж', 'Высота подъёма, м',
     'Добивка', 'Добойник', 'Голова срублена',
     'Машинист', 'Установка', 'Решение', 'Принял', 'Дата решения', 'Основание решения', 'Примечание',
+    'Количество, шт', 'Пометка',
   ]];
 
   const setsSheet: (string | number | null)[][] = [[
@@ -514,12 +562,19 @@ export async function exportPileJournalXlsx(filters: PileJournalFilters): Promis
 
   const yesNo = (value: boolean): string => (value ? 'да' : 'нет');
 
+  // Та же пометка, что и на экране: свая без паспорта и черновик отчёта.
+  // Подшитый документ не должен выглядеть полнее экрана, на котором его собрали.
+  const marks = (row: PilePassportRow): string => [
+    row.hasPassport ? null : 'без паспорта',
+    row.isDraft ? 'черновик' : null,
+  ].filter((part): part is string => part !== null).join(', ');
+
   rows.forEach((row, index) => {
     piles.push([
       index + 1,
       printDay(row.drivenAt, timezone),
       shiftText(row.shiftType),
-      row.pileNumber,
+      row.pileNumber ?? '',
       row.locationName ?? '',
       row.pileGradeName,
       row.pileSection ?? '',
@@ -543,16 +598,18 @@ export async function exportPileJournalXlsx(filters: PileJournalFilters): Promis
       yesNo(row.headCutOff),
       row.operatorName,
       row.equipmentName ?? '',
-      ACCEPTANCE_TEXT[row.acceptance],
+      row.acceptance ? ACCEPTANCE_TEXT[row.acceptance] : '',
       row.acceptedByName ?? '',
       row.acceptedAt ? printDay(row.acceptedAt, timezone) : '',
       row.acceptanceNote ?? '',
       row.note ?? '',
+      row.count,
+      marks(row),
     ]);
 
     for (const set of row.sets) {
       setsSheet.push([
-        row.pileNumber,
+        row.pileNumber ?? '',
         printDay(row.drivenAt, timezone),
         set.ordinal,
         set.blows,

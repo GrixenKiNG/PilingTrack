@@ -35,7 +35,7 @@ export function PileDetail({ row, busy, onDecide }: {
         <div className="flex flex-wrap items-center gap-2">
           <span className="font-mono text-base font-semibold">{row.pileNumber}</span>
           <span className="rounded bg-muted px-1.5 py-0.5 text-3xs font-semibold text-muted-foreground">
-            {PILE_ACCEPTANCE_LABELS[row.acceptance]}
+            {row.acceptance ? PILE_ACCEPTANCE_LABELS[row.acceptance] : '—'}
           </span>
           {row.recordedByForeman ? (
             <span className="rounded bg-info/15 px-1.5 py-0.5 text-3xs font-semibold text-info-strong">

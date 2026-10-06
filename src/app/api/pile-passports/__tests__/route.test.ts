@@ -45,6 +45,7 @@ const row = (drivenAt: string) => ({
   hammerEnergyKj: 40,
   designRefusalMm: 2,
   acceptance: 'PENDING',
+  count: 1,
   suggestion: null,
 });
 

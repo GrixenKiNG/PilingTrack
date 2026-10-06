@@ -37,6 +37,12 @@ const ACCEPTANCE_STYLE: Record<PileAcceptanceValue, string> = {
   NEEDS_REDRIVE: 'bg-warning/15 text-warning-strong',
 };
 
+/** Смена в печатном виде. Пустое/чужое значение печатаем как есть. */
+const SHIFT_LABEL: Record<string, string> = {
+  DAY: 'Дневная',
+  NIGHT: 'Ночная',
+};
+
 type StatusFilter = 'PENDING' | 'ACCEPTED' | 'NEEDS_REDRIVE' | 'ALL';
 
 const STATUS_FILTERS: Array<{ key: StatusFilter; label: string }> = [
@@ -55,7 +61,10 @@ interface JournalFilters {
 }
 
 const EMPTY_FILTERS: JournalFilters = {
-  status: 'PENDING',
+  // Стартовый фильтр — «Все»: иначе сваи, записанные без паспорта, не видны
+  // вовсе — ни в «Не разобранных», ни в «Принятых», и журнал снова выглядит
+  // пустым при фактически забитых сваях.
+  status: 'ALL',
   siteId: 'all',
   dateFrom: '',
   dateTo: '',
@@ -155,10 +164,12 @@ export function PileJournal() {
   }, [load]);
 
   const decide = async (row: PilePassportRow, acceptance: 'ACCEPTED' | 'NEEDS_REDRIVE', note: string) => {
+    // Решать можно только сваю с паспортом: решение живёт в паспорте.
+    if (!row.passportId) return;
     setBusyId(row.id);
     setError(null);
     try {
-      const response = await authFetch(`/api/pile-passports/${row.id}/decide`, {
+      const response = await authFetch(`/api/pile-passports/${row.passportId}/decide`, {
         method: 'POST',
         body: JSON.stringify({ acceptance, note: note.trim() || undefined }),
       });
@@ -325,22 +336,23 @@ export function PileJournal() {
           </div>
         ) : (
           <p className="rounded-md border border-border p-4 text-sm text-muted-foreground">
-            По этой выборке записей нет. Паспорта свай заводит машинист на вкладке «Сваи»,
-            мастер может дописать пропущенную сваю за него.
+            За период свай нет.
           </p>
         )
       ) : null}
 
       {rows && rows.length > 0 ? (
         <div className="overflow-x-auto rounded-md border border-border">
-          <table className="w-full min-w-[1100px] text-2xs">
+          <table className="w-full min-w-[1500px] text-2xs">
             <thead className="bg-muted">
               <tr className="text-left">
                 <Th>№</Th>
                 <Th>Дата</Th>
+                <Th>Смена</Th>
                 <Th>№ сваи</Th>
                 <Th>Куст, пикет</Th>
                 <Th>Марка</Th>
+                <Th className="text-right">Кол-во</Th>
                 <Th className="text-right">Длина, м</Th>
                 <Th className="text-right">Глубина, м</Th>
                 <Th className="text-right">Отметка головы, м</Th>
@@ -348,7 +360,9 @@ export function PileJournal() {
                 <Th className="text-right">Отказ, мм/уд</Th>
                 <Th className="text-right">Проектный</Th>
                 <Th>По норме</Th>
+                <Th>Машинист</Th>
                 <Th>Решение</Th>
+                <Th>Пометка</Th>
               </tr>
             </thead>
             <tbody>
@@ -366,9 +380,12 @@ export function PileJournal() {
                   >
                     <Td className="text-muted-foreground">{index + 1}</Td>
                     <Td>{new Date(row.drivenAt).toLocaleDateString('ru-RU')}</Td>
-                    <Td className="font-semibold">{row.pileNumber}</Td>
+                    <Td>{row.shiftType ? SHIFT_LABEL[row.shiftType] ?? row.shiftType : '—'}</Td>
+                    <Td className="font-semibold">{row.pileNumber ?? '—'}</Td>
                     <Td>{row.locationName ?? '—'}</Td>
                     <Td>{row.pileGradeName}</Td>
+                    {/* Количество со знаком: отрицательная запись — поправка к выработке. */}
+                    <Td className="text-right">{row.count}</Td>
                     <Td className="text-right">{num(row.pileLengthM)}</Td>
                     <Td className="text-right">{num(row.drivenDepthM)}</Td>
                     <Td className="text-right">{num(row.actualHeadLevelM)}</Td>
@@ -384,20 +401,48 @@ export function PileJournal() {
                           ? <span className="text-success-strong">да</span>
                           : <span className="text-warning-strong">нет</span>}
                     </Td>
+                    <Td>{row.operatorName}</Td>
                     <Td>
-                      <span className={cn('rounded px-1.5 py-0.5 text-3xs font-semibold', ACCEPTANCE_STYLE[row.acceptance])}>
-                        {PILE_ACCEPTANCE_LABELS[row.acceptance]}
+                      {row.acceptance
+                        ? (
+                          <span className={cn('rounded px-1.5 py-0.5 text-3xs font-semibold', ACCEPTANCE_STYLE[row.acceptance])}>
+                            {PILE_ACCEPTANCE_LABELS[row.acceptance]}
+                          </span>
+                        )
+                        : <span className="text-muted-foreground">—</span>}
+                    </Td>
+                    <Td>
+                      <span className="flex flex-wrap gap-1">
+                        {!row.hasPassport ? (
+                          <span className="rounded bg-muted px-1.5 py-0.5 text-3xs font-semibold text-muted-foreground">
+                            без паспорта
+                          </span>
+                        ) : null}
+                        {row.isDraft ? (
+                          <span className="rounded bg-warning/15 px-1.5 py-0.5 text-3xs font-semibold text-warning-strong">
+                            черновик
+                          </span>
+                        ) : null}
                       </span>
                     </Td>
                   </tr>,
                   open ? (
                     <tr key={`${row.id}-detail`} className="border-t border-border bg-card">
-                      <td colSpan={13} className="p-0">
-                        <PileDetail
-                          row={row}
-                          busy={busyId === row.id}
-                          onDecide={(acceptance, note) => void decide(row, acceptance, note)}
-                        />
+                      <td colSpan={17} className="p-0">
+                        {row.hasPassport ? (
+                          <PileDetail
+                            row={row}
+                            busy={busyId === row.id}
+                            onDecide={(acceptance, note) => void decide(row, acceptance, note)}
+                          />
+                        ) : (
+                          // Сваю без паспорта принимать нечем: решение и замеры
+                          // живут в паспорте, а его не заводили.
+                          <p className="p-3 text-2xs text-muted-foreground">
+                            Свая записана без паспорта — замеров нет, принимать нечего.
+                            Принять или отправить на добивку можно только сваю с паспортом.
+                          </p>
+                        )}
                       </td>
                     </tr>
                   ) : null,
