@@ -5,7 +5,6 @@
  *   node e2e/operator-next/tools/probe7.mjs [.auth/ivv.json]
  */
 import {chromium} from '@playwright/test';
-import fs from 'node:fs';
 
 const auth = process.argv[2] ?? '.auth/ivv.json';
 const browser = await chromium.launch();

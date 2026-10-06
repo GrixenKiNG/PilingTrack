@@ -38,7 +38,19 @@ function db(sql: string): string {
   ).trim();
 }
 
-async function stateOf(page: Page): Promise<Record<string, any>> {
+/** Состояние смены из живого API: только поля, которые читает прогон. */
+type LiveState = {
+  phase: string;
+  shift: {id: string; startedAt: string; state?: string} | null;
+  identity: {ppe: {confirmed: boolean}; briefing: {ok: boolean}; knowledge: {ok: boolean}};
+  checklists: {stage: string; done?: boolean}[];
+  dictionaries: {downtimeReasons: {id: string; name: string}[]};
+};
+
+/** Команда, которую прогон наблюдает в сети (тело запроса как есть). */
+type SentCommand = {command?: string; entry?: {kind?: string; count?: number}};
+
+async function stateOf(page: Page): Promise<LiveState> {
   const response = await page.request.get('/api/operator/mobile/state');
   expect(response.status(), 'сессия должна быть жива (обновите .auth через tools/login.mjs)').toBe(200);
   return (await response.json()).data;
@@ -221,7 +233,7 @@ test('полный цикл смены на /operator/next (375×812)', async ({
     } catch { /* чужой формат */ }
   });
 
-  const commands: Record<string, any>[] = [];
+  const commands: SentCommand[] = [];
   page.on('request', (request) => {
     if (request.url().includes('/api/operator/mobile/command')) {
       try { commands.push(request.postDataJSON()); } catch { /* тело не нужно */ }
@@ -416,10 +428,12 @@ test('полный цикл смены на /operator/next (375×812)', async ({
         return;
       }
       await ensureList(page);
-      const reason = (await stateOf(page)).dictionaries.downtimeReasons[0];
+      const live = await stateOf(page);
+      if (!live.shift) throw new Error('смена исчезла из состояния — проверьте фазу');
+      const reason = live.dictionaries.downtimeReasons[0];
       // Интервал строим ВНУТРИ смены: сервер (верно) не принимает простой,
       // начавшийся раньше смены — «последние 30 минут» на старте отклонялись.
-      const shiftStart = new Date((await stateOf(page)).shift.startedAt);
+      const shiftStart = new Date(live.shift.startedAt);
       const now = new Date();
       const startAt = new Date(Math.max(shiftStart.getTime() + 60_000, now.getTime() - 10 * 60_000));
       const endAt = new Date(Math.max(startAt.getTime() + 60_000, now.getTime() - 30_000));
@@ -489,7 +503,7 @@ test('полный цикл смены на /operator/next (375×812)', async ({
     await step(page, 'закрытие: ЕО после работы приходит и выполняется', async () => {
       await page.goto('/operator/next', {waitUntil: 'domcontentloaded'});
       await page.waitForTimeout(2500);
-      const eo = (await stateOf(page)).checklists.find((c: any) => c.stage === 'EO_AFTER');
+      const eo = (await stateOf(page)).checklists.find((c) => c.stage === 'EO_AFTER');
       dbChecks.push(`EO_AFTER в конце смены: ${eo ? 'пришёл' : 'НЕ пришёл'}`);
       expect(eo, 'сервер отдал чек-лист ЕО после работы').toBeTruthy();
       if (!eo.done) {

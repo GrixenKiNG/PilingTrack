@@ -37,7 +37,19 @@ function db(sql: string): string {
   ).trim();
 }
 
-async function stateOf(page: Page): Promise<Record<string, any>> {
+/** Состояние смены из живого API: только поля, которые читает прогон. */
+type LiveState = {
+  phase: string;
+  shift: {id: string; startedAt: string; state?: string} | null;
+  identity: {ppe: {confirmed: boolean}; briefing: {ok: boolean}; knowledge: {ok: boolean}};
+  checklists: {stage: string; done?: boolean}[];
+  dictionaries: {downtimeReasons: {id: string; name: string}[]};
+};
+
+/** Команда, которую прогон наблюдает в сети (тело запроса как есть). */
+type SentCommand = {command?: string; entry?: {kind?: string; count?: number}};
+
+async function stateOf(page: Page): Promise<LiveState> {
   const response = await page.request.get('/api/operator/mobile/state');
   expect(response.status(), 'сессия должна быть жива (обновите .auth через tools/login.mjs)').toBe(200);
   return (await response.json()).data;
@@ -225,7 +237,7 @@ test('повторный цикл по правкам №10 на /operator/next 
     if (/log-production/.test(raw) && /"count":3[,}]/.test(raw)) flushedProductionSends += 1;
   });
 
-  const commands: Record<string, any>[] = [];
+  const commands: SentCommand[] = [];
   page.on('request', (request) => {
     if (request.url().includes('/api/operator/mobile/command')) {
       try { commands.push(request.postDataJSON()); } catch { /* тело не нужно */ }
@@ -426,8 +438,10 @@ test('повторный цикл по правкам №10 на /operator/next 
         return;
       }
       await ensureList(page);
-      const reason = (await stateOf(page)).dictionaries.downtimeReasons[0];
-      const shiftStart = new Date((await stateOf(page)).shift.startedAt);
+      const live = await stateOf(page);
+      if (!live.shift) throw new Error('смена исчезла из состояния — проверьте фазу');
+      const reason = live.dictionaries.downtimeReasons[0];
+      const shiftStart = new Date(live.shift.startedAt);
       const hhmm = (value: Date) => new Intl.DateTimeFormat('ru-RU', {
         timeZone: 'Europe/Moscow', hour: '2-digit', minute: '2-digit', hour12: false,
       }).format(value);
@@ -526,7 +540,7 @@ test('повторный цикл по правкам №10 на /operator/next 
     await step(page, 'закрытие: ЕО после работы приходит и выполняется', async () => {
       await page.goto('/operator/next', {waitUntil: 'domcontentloaded'});
       await page.waitForTimeout(2500);
-      const eo = (await stateOf(page)).checklists.find((c: any) => c.stage === 'EO_AFTER');
+      const eo = (await stateOf(page)).checklists.find((c) => c.stage === 'EO_AFTER');
       dbChecks.push(`EO_AFTER в конце смены: ${eo ? 'пришёл' : 'НЕ пришёл'}`);
       expect(eo, 'сервер отдал чек-лист ЕО после работы').toBeTruthy();
       if (!eo.done) {
