@@ -735,3 +735,20 @@ npx eslint src/components/piling/operator-next src/app/operator/next
 - `operator-mobile/warnings-panel.tsx`: значок-надпись («Нарушение · видит диспетчер», «Критическое предупреждение», «Запрет…») 10 → 14 px; строка «К сведению: N» — не ниже 44 px (`min-h-11`); подпись строки и текст раскрытого списка — 14 px.
 
 Правка общая для всех версий оператора — проверена шире обычного: `tsc` — 0; **272/272** тестов в 32 файлах (operator, v2, v5, mobile и v7/v10, next, модуль оператора, корневые piling-тесты); `eslint` по тронутым каталогам — 0/0. Новый тест читаемости (`operator-mobile/__tests__/field-readability.test.tsx`) падает при откате — журнал r9, записи «СШ1» и «СШ2».
+
+---
+
+## 20. №11: слияние с main 06.10
+
+Слияние `main` (9f63f92d) в ветку — коммит `54ffd06a`, конфликтов нет: общий код машиниста взят из main, правки 05.10 (шапка, предупреждения) легли поверх автоматически и проверены на месте. Три зависавших теста в `operator-next/**` починены под новый контракт очереди — разбор записан в JOURNAL (круг 11): отклонённая по существу запись больше не снимается с очереди и видна в плашке (отсюда «multiple» в одиночных запросах тестов и упор в `asyncUtilTimeout` = 5000 мс), «Некорректная команда» переформулируется на слое API, а поднятый в main `asyncUtilTimeout` вскрыл «мягкую паузу» в правиле 6. Правки — только в `operator-next/**`, `e2e/operator-next/**` и `docs/operator-next/**`; `operator-mobile/**` и `src/modules/**` не трогались.
+
+**Сверх правок тестов (в рамках того же гейта):** регенерирован клиент Prisma (`npm run db:generate` — после слияния схема пополнилась `archivedAt` у PileGrade; каталог `src/generated/` в .gitignore, на чистом клоне его создаёт postinstall); в спеках прогона `any` заменены точными типами (`LiveState`, `SentCommand`) — иначе `eslint e2e/operator-next` давал 7 предупреждений.
+
+**Проверки (все зелёные):**
+- `npx tsc --noEmit` — 0;
+- `npx vitest run src/components/piling/operator-next src/components/piling/operator-mobile src/modules/operator-mobile` — **404/404** (40 файлов);
+- полный `npx vitest run` — **3566 passed / 0 failed** (229 skipped; 371 файл). Первый прогон дал 3 таймаута под нагрузкой вне наших зон (contract/auth-api, workers/unified-worker, admin-sites) — в изоляции 27/27 зелёные, повторный полный прогон чистый;
+- `npx eslint src/components/piling/operator-next src/app/operator/next e2e/operator-next --max-warnings 0` — 0/0;
+- `npx playwright test --list` — **219 тестов в 25 файлах** (не уменьшилось; наши `walk.spec.ts` и `walk10.spec.ts` в списке), `-c playwright.opnext.config.ts --list` — 2 спеки.
+
+Коммиты этого задания: слияние — `54ffd06a`; тесты — `1f31a88b`; типы в спеках — `10b4e71d`; этот отчёт — данным коммитом.
