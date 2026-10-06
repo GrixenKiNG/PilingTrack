@@ -250,3 +250,113 @@ test-app-bluegreen-stand.cjs +482; test-app-bluegreen-stand.sh +9;
 test-app-bluegreen.cjs +105; test-worker-generation.sh +7.
 Все строки относятся к G2, удалённых paths нет; runtime Leader код,
 Prisma/Auth/UI/ORION и зависимости в G2 не менялись.
+
+## G3 — выполняется, не завершено
+
+G2 зафиксирован: реализация bccac339; документация и отчёт 35177205
+(+285/-51 в пяти файлах). Изменения G3 пока не коммитились. Подробные
+доказательства: docs/audits/codex-t7-authz-matrix.md. Новые тестовые файлы
+прямо требуются задачей. ORION, интерфейс машиниста, схема БД, зависимости,
+секреты и сервер в G3 не менялись.
+
+Документы и телеметрия: валидный RED дал 11 падений — обычный ADMIN
+успешно выполнил операции, затем ADMIN в режиме FOREMAN/SAFETY_ENGINEER
+получил 201/200 вместо 403. Исправлены три маршрута документов и два
+telemetry guards. После production build на свежем собственном E1 с S3:
+11 passed, exit 0, 8.00s; два других теста пропущены из-за выбора pattern.
+Положительные telemetry controls наблюдались в PG до cleanup, запрещённых
+значений не было. Контекст организации не менялся.
+
+CSRF: три настоящих обхода через схему Origin/Referer и downgrade при
+XFP=https; unit RED — 9 failed. После исправления scheme+host+port и
+доверенного XFP focused tests дали 77 passed, exit 0. Реальный HTTP GREEN:
+120 passed, 0 skipped, exit 0, 30.76s. Включены CSRF для 109 изменяющих
+методов, logout/password replay, JWT tamper и account/IP/session/source limits.
+
+Проверенный TLS-контракт: app доступен только через loopback/Caddy,
+TRUST_PROXY=true. Независимость Next URL от XFP при TRUST_PROXY=false
+не доказана: Next строит URL из header раньше withCsrf. Владельцу нужно
+проверить закрытость app ports и trusted proxy config; сервер и .env
+в этой задаче не проверялись и не менялись.
+
+Загрузка: настоящий RED — filename object вызвал 500. Добавлен Zod
+safeParse и используются только validated.data. Browser GREEN:
+5 passed, 0 skipped, exit 0, 19.9s — malformed 400, MIME, заявленный и
+фактический размер, HTML 422, oversize 413, PNG PUT→confirm→GET,
+неактивные HTML/формулы в PDF/XLSX/CSV. Отдельно исправлялись ошибки
+декодера PDF и ожидание полного текста там, где renderer его обрезает.
+PDF получен sync GET в памяти; storage и jobs для него не создавались.
+
+Обязательные проверки текущего G3:
+- tsc перед build: exit 0.
+- lint: exit 0, 0 errors / 0 warnings, text integrity passed.
+- production build на own env: exit 0.
+- Playwright collection: exit 0, 132 tests / 13 files (раньше 117/12).
+  Пять новых сценариев собираются в трёх projects; запись выполняется
+  только Chromium, два остальных проекта пропускают эти сценарии.
+- Первый полный unit: exit 1, 3139 passed / 412 skipped / 1 failed,
+  3552 tests / 357 files, 117.18s. Единственный отказ — существующий
+  unified-worker health cold import, timeout 30s. Worker код не менялся.
+  Focused повтор без изменения таймаута: exit 0, 11 passed, 4.03s.
+  Полный unit пока не объявляется GREEN.
+- Полные integration и Playwright после окончательных G3 изменений
+  ещё не прогонялись.
+
+Первая полная HTTP-матрица: exit 1, 1626 passed / 35 failed / 171 skipped,
+1832 tests, 65.84s. Закреплены 202 метода × 9 категорий; новый метод без
+строки роняет static test. 160 положительных lifecycle cells ещё PENDING.
+Ещё 11 skips — acting suite не прошёл login fixture из-за IP limit 429.
+Восемь настоящих acting bypasses (layout PUT/DELETE, template PUT,
+settings PUT × две роли) исправлены в трёх маршрутах (+7/-4).
+Их GREEN предстоит. Остальные 25 падений классифицированы как ошибки
+fixtures: настройки bootstrap, назначения помощника, даты telemetry,
+logout login quota, approval state, admin-upsert DTO, updatedAt и
+положительный GET→PUT control без авторизации.
+
+Cleanup наткнулся на append-only AuditLog. Собственные immutable
+histories сохраняем до удаления codex PG; session_replication_role и
+обход trigger не используются.
+
+Дополнительный Feedback RED: 6 failed / 120 pattern-skipped,
+126 tests, exit 1, 2.23s — acting acknowledgement, audience ALL и
+чтение чужого USER event. Scoped fix в работе. Meter decrease для
+ADMIN-as-SAFETY_ENGINEER пока кандидат, требуется настоящий RED.
+
+GitNexus impact/detect: UNKNOWN, exit 1, CLI отсутствует. Bootstrap и
+установка не вызывались; применён разрешённый THREAD5 fallback:
+текстовые callers и scoped review. Чистый граф не заявляется.
+G3 ещё не завершена; G4–G6 и merge Hermes не выполнялись.
+
+## Повторная проверка G3 (04.10)
+
+Второй полный matrix run: exit 1, 1697 passed / 2 failed / 133 skipped,
+1832 tests, 74.14s. Восемь acting guards и 11 ранних regressions прошли.
+Два падения admin-upsert: собственному новому Site недоставало назначения
+оператора. Cleanup отдельно встретил immutable ReadinessScoreSnapshot;
+эти снимки и зависимые записи сохраняются до удаления собственного PG,
+обход триггеров запрещён. 133 положительных сценария ещё не завершены.
+
+После свежего production build: g3-attacks-final exit 0, 126 passed /
+0 skipped, 30.02s. Дополнительные шесть Feedback RED стали GREEN:
+acknowledge запрещён действующим ролям, audience принудительно USER,
+private USER event не виден при переключении с тёплого ADMIN cache.
+Meter RED: настоящее HTTP201 при попытке Инженера ОТ уменьшить 200→199;
+исправление применяет effectiveRole. Unit RED 1→GREEN 6/6, actual browser
+GREEN: g3-browser-final exit 0, 6 passed / 0 skipped, 44.4s.
+
+CSRF enumeration переведён с regex на общий AST inventory (109 mutations;
+до замены списки совпадали). Таким образом named reexports тоже попадают
+в проверку. Повтор этого теста на новом стенде ещё требуется.
+
+Новый стенд использует e2e/fixtures/disposable-telegram-transport.mjs:
+локальный loopback HTTP transport getChat/sendMessage/sendDocument;
+токены и тела не сохраняются, внешние сообщения не отправляются.
+Production notifier не заменяется. Это доказательство прикладного
+контракта с собственным HTTP сервером, а не доступности Telegram.
+
+Read-only review субагента: focused existing unit suite exit 0,
+120 passed / 0 skipped, 7 files, 3.86s (CSRF, api-wrapper, feedback,
+user-documents, meter, media content/extension). Отдельного logfile у
+этого запуска нет; результат зафиксирован в tool stdout.
+Media signature tests не доказывают полное декодирование каждого
+поддерживаемого формата. Настоящий S3 PNG roundtrip проверен браузером.
