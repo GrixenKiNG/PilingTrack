@@ -1,6 +1,6 @@
 import {readFileSync, readdirSync} from 'node:fs';
 import path from 'node:path';
-import {fireEvent, render, screen, within} from '@testing-library/react';
+import {fireEvent, render, screen, waitFor, within} from '@testing-library/react';
 import {describe, expect, it, vi} from 'vitest';
 import {useState} from 'react';
 import {ApiError, QueuedOffline} from '@/components/piling/operator-mobile/api';
@@ -229,8 +229,10 @@ describe('правило 6 — введённое не стирается, по�
     fireEvent.change(screen.getByLabelText('Сколько свай забито, шт'), {target: {value: '5'}});
     fireEvent.click(screen.getByRole('button', {name: /^Записать/}));
 
-    await screen.findByText('Выберите марку сваи.', {exact: false}).catch(() => undefined);
-    expect(onSubmitEntry).toHaveBeenCalledTimes(1);
+    // Честное ожидание результата нажатия вместо прежней «мягкой паузы»
+    // findByText(...).catch(): после main asyncUtilTimeout = 5000 стал равен
+    // testTimeout, и пауза съедала весь бюджет теста (задание №11).
+    await waitFor(() => expect(onSubmitEntry).toHaveBeenCalledTimes(1));
     expect(screen.getByRole('button', {name: /С 100\.30/})).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByLabelText('Сколько свай забито, шт')).toHaveValue(5);
   });

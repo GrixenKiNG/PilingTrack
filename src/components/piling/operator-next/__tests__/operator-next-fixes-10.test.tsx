@@ -136,8 +136,14 @@ describe('№10, Ж1: быстрый простой не заходит рань
     fireEvent.click(screen.getByRole('button', {name: /Простой за последние 30 минут/}));
     fireEvent.click(screen.getByRole('button', {name: /^Записать$/}));
 
-    expect(await screen.findByText(/Простой не может начаться раньше смены — смена начата в 09:15\./)).toBeInTheDocument();
-    expect(screen.queryByText(/Сервер не принял данные: проверьте заполненное/)).toBeNull();
+    // Новый контракт очереди (main): отклонённая по существу запись остаётся
+    // видимой, поэтому текст причины встречается дважды — в плашке очереди и в
+    // полосе ошибки формы. Проверяем присутствие, а не единственность.
+    const detailCopies = await screen.findAllByText(/Простой не может начаться раньше смены — смена начата в 09:15\./);
+    expect(detailCopies.length).toBeGreaterThan(0);
+    expect(document.querySelector('[data-testid="offline-queue-banner"]')?.textContent ?? '')
+      .toContain('Простой не может начаться раньше смены — смена начата в 09:15.');
+    expect(screen.queryAllByText(/Сервер не принял данные: проверьте заполненное/)).toHaveLength(0);
   });
 
   it('техническая отписка без детали остаётся общим текстом', async () => {
@@ -148,7 +154,11 @@ describe('№10, Ж1: быстрый простой не заходит рань
     fireEvent.click(screen.getByRole('button', {name: /Простой за последние 30 минут/}));
     fireEvent.click(screen.getByRole('button', {name: /^Записать$/}));
 
-    expect(await screen.findByText(/Сервер не принял данные: проверьте заполненное/)).toBeInTheDocument();
-    expect(screen.queryByText(/Некорректная команда/)).toBeNull();
+    // Новый контракт (main): «Некорректная команда» переводится в человеческую
+    // подсказку на слое API (BAD_COMMAND_HINT), а запись остаётся в очереди
+    // видимой. Сырая техническая строка машинисту не показывается.
+    expect((await screen.findAllByText(/Не удалось отправить — обновите экран и повторите/)).length)
+      .toBeGreaterThan(0);
+    expect(screen.queryAllByText(/Некорректная команда/)).toHaveLength(0);
   });
 });
