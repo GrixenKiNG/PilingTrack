@@ -9,6 +9,7 @@ import { withApi, withMutation, readJsonBody } from '@/core/api-wrapper';
 import { ServiceError } from '@/services/service-error';
 import { db } from '@/lib/db';
 import { recordAuditEvent } from '@/services/audit/audit-service';
+import { resolveEffectiveRole } from '@/lib/types';
 
 export const runtime = 'nodejs';
 
@@ -100,7 +101,7 @@ export const POST = withMutation(
         recordedById: user!.id,
         // Оператору счётчик назад не отмотать: цифра меньше предыдущей — опечатка.
         // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
-        allowDecrease: canDecreaseMeter(user!.role),
+        allowDecrease: canDecreaseMeter(resolveEffectiveRole(user!.role, user!.actingAs)),
       });
     } catch (err) {
       if (err instanceof ServiceError) return NextResponse.json({ error: err.message }, { status: err.status });

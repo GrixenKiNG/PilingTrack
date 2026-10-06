@@ -23,7 +23,7 @@ export const GET = withApi(
     try {
       const documents = await listDocumentsNeedingAttention({
         tenantId,
-        actor: { id: actor.id, role: actor.role },
+        actor: { id: actor.id, role: actor.role, actingAs: actor.actingAs },
       });
       return NextResponse.json({
         documents,
