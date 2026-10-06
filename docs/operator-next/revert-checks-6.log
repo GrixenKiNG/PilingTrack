@@ -1,0 +1,16 @@
+Revert-checks r7 (review No.6): каждый тест должен падать без своей правки.
+Дата: 2026-09-29T18:44:56.262Z. Стенд: vitest, модуль src/components/piling/operator-next.
+
+### Е1 — признак «пара загружена» снова сбрасывается отказом чтения — следующее чтение затирает память
+- Откат: src/components/piling/operator-next/operator-next-app.tsx — вернул строку: "      draftsLoadedRef.current = readOk ? scopeKey : null; // ОТКАТ"
+- Прогон: `npx vitest run <файл> -t "повторный отказ чтения"`
+- Результат: EXIT=1; ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯; упали: повторный отказ чтения не заменяет свежую память старым документом 457ms
+  Первое сообщение: AssertionError: expected [ <input …(6)></input> ] to have a length of 3 but got 1
+
+### Е2 — сверка владельца убрана из-за flush — чужая ошибка очереди снова попадает на экран Б
+- Откат: src/components/piling/operator-next/operator-next-app.tsx — вернул строку: "        await flush();\n        const fresh = ownPendingCount(); // ОТКАТ: без сверки владельца"
+- Прогон: `npx vitest run <файл> -t "ошибка А не показывается"`
+- Результат: EXIT=1; ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯; упали: А→Б во время flush с непустой очередью — ошибка А не показывается Б 231ms
+  Первое сообщение: AssertionError: expected 3 to be 2 // Object.is equality
+
+DONE. Все откаты возвращены; целевые тесты падают без своих правок (проверено).

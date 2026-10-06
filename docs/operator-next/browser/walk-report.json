@@ -1,0 +1,303 @@
+{
+  "base": "http://localhost:3210",
+  "executedAt": "2026-09-29T19:43:07.570Z",
+  "steps": [
+    {
+      "step": "допуск: СИЗ (выполнено в предыдущем прогоне)",
+      "status": "OK",
+      "evidence": "01-допуск-сиз.png"
+    },
+    {
+      "step": "приёмка: ночная смена (выполнено в предыдущем прогоне)",
+      "status": "OK",
+      "evidence": "03-приёмка.png"
+    },
+    {
+      "step": "осмотр фазы PRESHIFT_INSPECTION (выполнено в предыдущем прогоне)",
+      "status": "OK",
+      "evidence": "04-осмотр-предсменный.png"
+    },
+    {
+      "step": "осмотр фазы SITE_READY (выполнено в предыдущем прогоне)",
+      "status": "OK",
+      "evidence": "05-площадка.png"
+    },
+    {
+      "step": "осмотр фазы STARTUP (выполнено в предыдущем прогоне)",
+      "status": "OK",
+      "evidence": "06-пуск.png"
+    },
+    {
+      "step": "работа: экран",
+      "status": "OK",
+      "evidence": "07-работа.png"
+    },
+    {
+      "step": "работа: записать сваи (10 шт) (выполнено в предыдущем прогоне)",
+      "status": "OK",
+      "evidence": "08-сваи-записаны.png"
+    },
+    {
+      "step": "работа: записать сваи (10 шт)",
+      "status": "OK",
+      "evidence": "08-сваи-записаны.png"
+    },
+    {
+      "step": "сервер: повтор команды с тем же clientCommandId (№6)",
+      "status": "OK",
+      "evidence": ""
+    },
+    {
+      "step": "работа: паспорт — три залога заполнены",
+      "status": "OK",
+      "evidence": "09-паспорт-три-залога.png"
+    },
+    {
+      "step": "черновик: перезагрузка страницы (проверка №3)",
+      "status": "OK",
+      "evidence": "10-паспорт-после-перезагрузки.png"
+    },
+    {
+      "step": "работа: паспорт — отправка после перезагрузки",
+      "status": "OK",
+      "evidence": "09-паспорт-три-залога.png"
+    },
+    {
+      "step": "работа: простой (выполнено в предыдущем прогоне)",
+      "status": "OK",
+      "evidence": "11-простой.png"
+    },
+    {
+      "step": "работа: простой (интервал внутри смены)",
+      "status": "OK",
+      "evidence": "11-простой.png"
+    },
+    {
+      "step": "работа: без связи — очередь и ровно одна запись",
+      "status": "ДЕФЕКТ",
+      "evidence": "падение: ровно одна отправка записи из очереди \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m Expected: \u001b[32m1\u001b[39m Received:  (снимок fail-работа_без_связи_очередь_и_ровно_одна_запи.png)"
+    },
+    {
+      "step": "работа: завершение (двойное нажатие — одна команда)",
+      "status": "OK",
+      "evidence": "13-завершение-работы.png"
+    },
+    {
+      "step": "закрытие: ЕО после работы приходит и выполняется",
+      "status": "OK",
+      "evidence": "14-ео-после-работы.png"
+    },
+    {
+      "step": "закрытие: заметка и отправка отчёта",
+      "status": "OK",
+      "evidence": "16-смена-закрыта.png"
+    },
+    {
+      "step": "консоль браузера",
+      "status": "OK",
+      "evidence": "ошибок нет"
+    }
+  ],
+  "dbChecks": [
+    "повтор log-production: ответ 200; записей до 2, после 2",
+    "черновики в localStorage после ввода паспорта: 1 ключей",
+    "очередь: записей count=3 после отправки — 1; отправок в сети — 2",
+    "finish-work: два нажатия — команд 1",
+    "EO_AFTER в конце смены: пришёл"
+  ],
+  "checks": [
+    {
+      "step": "работа",
+      "shot": "07-работа.png",
+      "controls": [],
+      "captions": [],
+      "texts": [
+        "p.text-2xs.text-muted-foreground «Связь есть» — 11px",
+        "p.mt-0.5.text-2xs «КБУРГ-16.02 №1» — 11px",
+        "h2.text-2xs.font-semibold «Следующее действие» — 11px",
+        "p.mt-1.text-sm «Сваи, бурение и простой записывают» — 14px",
+        "h2.text-2xs.font-semibold «Записать» — 11px",
+        "h2.text-2xs.font-semibold «Происшествие и неисправность» — 11px",
+        "p.mt-1.text-2xs «Происшествие и неисправность запис» — 11px",
+        "h2.text-2xs.font-semibold «Журнал записей смены» — 11px"
+      ],
+      "scrollX": false
+    },
+    {
+      "step": "паспорт-три-залога",
+      "shot": "09-паспорт-три-залога.png",
+      "controls": [
+        "button.text-2xs.font-medium «убрать» — 38×16",
+        "input.h-5.w-5 «» — 20×20",
+        "input.h-5.w-5 «» — 16×20",
+        "input.h-5.w-5 «» — 18×20"
+      ],
+      "captions": [
+        "span.text-2xs.font-medium «Марка сваи» — 11px",
+        "span.text-2xs.font-medium «Номер сваи по проекту» — 11px",
+        "span.text-2xs.font-medium «Проектная головы» — 11px",
+        "span.text-2xs.font-medium «Фактическая головы» — 11px",
+        "span.text-2xs.font-medium «Глубина погружения, м» — 11px",
+        "span.text-2xs.font-medium «Ударов» — 11px",
+        "span.text-2xs.font-medium «Погружение, мм» — 11px",
+        "span.text-2xs.font-medium «Высота, м» — 11px",
+        "span.text-2xs.font-medium «Проектный отказ, мм/удар» — 11px",
+        "span.mt-1.block «Из проекта. С ним сравнивают получ» — 11px",
+        "span.text-2xs.font-medium «Всего» — 11px",
+        "span.text-2xs.font-medium «На последний метр» — 11px",
+        "span.text-2xs.font-medium «Высота падения молота, м» — 11px",
+        "span.mt-1.block «Марка молота и энергия удара берут» — 11px",
+        "span.text-2xs.font-medium «В плане, мм» — 11px",
+        "span.text-2xs.font-medium «От вертикали, %» — 11px",
+        "span.text-sm.font-medium «Добивка после отдыха грунта» — 14px",
+        "span.text-sm.font-medium «Погружение добойником (голова ниже» — 14px",
+        "span.text-sm.font-medium «Голова срублена под проектную отме» — 14px",
+        "span.text-2xs.font-medium «Примечание» — 11px"
+      ],
+      "texts": [
+        "p.text-2xs.text-muted-foreground «Связь есть» — 11px",
+        "p.mt-0.5.text-2xs «КБУРГ-16.02 №1» — 11px",
+        "p.mt-1.text-2xs «Залоги нумеруются самим списком. «» — 11px",
+        "p.mt-1.text-2xs «Залог — серия ударов, после которо» — 11px",
+        "p.mt-3.rounded-md «Отказ: 0.3 мм/удар» — 14px"
+      ],
+      "scrollX": false
+    },
+    {
+      "step": "паспорт-после-перезагрузки",
+      "shot": "10-паспорт-после-перезагрузки.png",
+      "controls": [
+        "button.text-2xs.font-medium «убрать» — 38×16",
+        "input.h-5.w-5 «» — 20×20",
+        "input.h-5.w-5 «» — 16×20",
+        "input.h-5.w-5 «» — 18×20"
+      ],
+      "captions": [
+        "span.text-2xs.font-medium «Марка сваи» — 11px",
+        "span.text-2xs.font-medium «Номер сваи по проекту» — 11px",
+        "span.text-2xs.font-medium «Проектная головы» — 11px",
+        "span.text-2xs.font-medium «Фактическая головы» — 11px",
+        "span.text-2xs.font-medium «Глубина погружения, м» — 11px",
+        "span.text-2xs.font-medium «Ударов» — 11px",
+        "span.text-2xs.font-medium «Погружение, мм» — 11px",
+        "span.text-2xs.font-medium «Высота, м» — 11px",
+        "span.text-2xs.font-medium «Проектный отказ, мм/удар» — 11px",
+        "span.mt-1.block «Из проекта. С ним сравнивают получ» — 11px",
+        "span.text-2xs.font-medium «Всего» — 11px",
+        "span.text-2xs.font-medium «На последний метр» — 11px",
+        "span.text-2xs.font-medium «Высота падения молота, м» — 11px",
+        "span.mt-1.block «Марка молота и энергия удара берут» — 11px",
+        "span.text-2xs.font-medium «В плане, мм» — 11px",
+        "span.text-2xs.font-medium «От вертикали, %» — 11px",
+        "span.text-sm.font-medium «Добивка после отдыха грунта» — 14px",
+        "span.text-sm.font-medium «Погружение добойником (голова ниже» — 14px",
+        "span.text-sm.font-medium «Голова срублена под проектную отме» — 14px",
+        "span.text-2xs.font-medium «Примечание» — 11px"
+      ],
+      "texts": [
+        "p.text-2xs.text-muted-foreground «Связь есть» — 11px",
+        "p.mt-0.5.text-2xs «КБУРГ-16.02 №1» — 11px",
+        "p.mt-1.text-2xs «Залоги нумеруются самим списком. «» — 11px",
+        "p.mt-1.text-2xs «Залог — серия ударов, после которо» — 11px",
+        "p.mt-3.rounded-md «Отказ: 0.3 мм/удар» — 14px"
+      ],
+      "scrollX": false
+    },
+    {
+      "step": "оффлайн-очередь",
+      "shot": "12-оффлайн-очередь.png",
+      "controls": [],
+      "captions": [],
+      "texts": [
+        "p.text-2xs.font-semibold «Связи нет — записи сохраняются на » — 11px",
+        "p.mt-0.5.text-2xs «КБУРГ-16.02 №1» — 11px",
+        "h2.text-2xs.font-semibold «Следующее действие» — 11px",
+        "p.mt-1.text-sm «Сваи, бурение и простой записывают» — 14px",
+        "h2.text-2xs.font-semibold «Записать» — 11px",
+        "h2.text-2xs.font-semibold «Происшествие и неисправность» — 11px",
+        "p.mt-1.text-2xs «Происшествие и неисправность запис» — 11px",
+        "h2.text-2xs.font-semibold «Журнал записей смены» — 11px"
+      ],
+      "scrollX": false
+    },
+    {
+      "step": "завершение-работы",
+      "shot": "13-завершение-работы.png",
+      "controls": [],
+      "captions": [],
+      "texts": [
+        "p.text-2xs.text-muted-foreground «Связь есть» — 11px",
+        "p.mt-0.5.text-2xs «КБУРГ-16.02 №1» — 11px",
+        "h2.text-2xs.font-semibold «Следующее действие» — 11px",
+        "p.mt-1.text-sm «Сваи, бурение и простой записывают» — 14px",
+        "h2.text-2xs.font-semibold «Записать» — 11px",
+        "h2.text-2xs.font-semibold «Происшествие и неисправность» — 11px",
+        "p.mt-1.text-2xs «Происшествие и неисправность запис» — 11px",
+        "p.text-sm.font-bold «Завершить работу? Дальше — осмотр » — 14px",
+        "p.text-2xs.text-muted-foreground «За смену: 15 свай, 0 скважин, прос» — 11px",
+        "h2.text-2xs.font-semibold «Журнал записей смены» — 11px"
+      ],
+      "scrollX": false
+    },
+    {
+      "step": "ео-после-работы",
+      "shot": "14-ео-после-работы.png",
+      "controls": [],
+      "captions": [
+        "span.text-2xs.font-medium «Моточасы, м/ч» — 11px",
+        "span.mt-1.block «Прошлое показание: 1296 м/ч» — 11px",
+        "span.text-2xs.font-medium «Остаток топлива, %» — 11px"
+      ],
+      "texts": [
+        "p.text-2xs.text-muted-foreground «Связь есть» — 11px",
+        "p.mt-0.5.text-2xs «Что сделать до ухода, чтобы завтра» — 11px",
+        "p.text-sm.font-semibold «Машина на ровном основании, мачта » — 14px",
+        "p.text-2xs.font-medium «Пункт не заполнен» — 11px",
+        "p.text-sm.font-semibold «Осмотр на деформации и трещины: ма» — 14px",
+        "p.text-sm.font-semibold «Течи после смены: двигатель, гидра» — 14px",
+        "p.text-2xs.text-muted-foreground «На горячей машине течь видно там, » — 11px",
+        "p.text-sm.font-semibold «Тросы после смены: новых обрывов п» — 14px",
+        "p.text-sm.font-semibold «Моточасы на конец смены сняты» — 14px",
+        "p.text-2xs.text-muted-foreground «Разница с утренним показанием — на» — 11px",
+        "p.text-sm.font-semibold «Остаток топлива снят с указателя» — 14px",
+        "p.text-2xs.text-muted-foreground «Пойдёт в отчёт и покажется утром п» — 11px",
+        "p.text-sm.font-semibold «Двигатель заглушен, масса отключен» — 14px"
+      ],
+      "scrollX": false
+    },
+    {
+      "step": "закрытие-смены",
+      "shot": "15-закрытие-смены.png",
+      "controls": [],
+      "captions": [],
+      "texts": [
+        "p.text-2xs.text-muted-foreground «Связь есть» — 11px",
+        "p.mt-0.5.text-2xs «КБУРГ-16.02 №1» — 11px",
+        "h2.text-2xs.font-semibold «Следующее действие» — 11px",
+        "p.mt-1.text-sm «Итоги ниже. Если всё верно — закро» — 14px",
+        "p.text-3xs.font-bold «Нарушение · видит диспетчер» — 10px",
+        "p.mt-1.text-sm «Срок по наработке пройден.» — 14px",
+        "p.mt-2.text-sm «Сообщите диспетчеру: машину надо п» — 14px",
+        "p.mt-1.text-sm «Машина осмотрена и обслужена. Оста» — 14px",
+        "p.mt-1.text-sm «Все записи отправлены на сервер. Д» — 14px",
+        "h2.text-2xs.font-semibold «Заметка на завтра» — 11px",
+        "p.mt-1.text-2xs «Что оставить себе на завтра: незак» — 11px"
+      ],
+      "scrollX": false
+    },
+    {
+      "step": "смена-закрыта",
+      "shot": "16-смена-закрыта.png",
+      "controls": [],
+      "captions": [],
+      "texts": [
+        "p.text-2xs.text-muted-foreground «Связь есть» — 11px",
+        "p.mt-0.5.text-2xs «КБУРГ-16.02 №1» — 11px",
+        "p.mt-1.text-sm «Отчёт отправлен диспетчеру. Можно » — 14px"
+      ],
+      "scrollX": false
+    }
+  ],
+  "consoleErrors": [],
+  "netErrors": []
+}

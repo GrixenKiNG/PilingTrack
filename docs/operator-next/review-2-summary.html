@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PilingTrack · /operator/next — доработка по ревью №2</title>
+<style>
+  :root{
+    --bg:#f7f7f4;
+    --ink:#151515;
+    --muted:#5d5d58;
+    --line:#d8d8d1;
+    --panel:#efefe9;
+    --accent:#b3510e;
+    --mono:'Cascadia Mono','Consolas','SFMono-Regular',ui-monospace,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:400 15px/1.55 'Segoe UI','Helvetica Neue',Arial,sans-serif;}
+  .page{max-width:960px;margin:0 auto;padding:48px 32px 64px;}
+  header.doc{border-bottom:1px solid var(--ink);padding-bottom:20px;}
+  .kicker{font:600 11px/1.4 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--muted);}
+  h1{font-size:34px;line-height:1.12;margin:10px 0 8px;letter-spacing:-0.02em;font-weight:600;}
+  .sub{color:var(--muted);max-width:72ch;margin:0;}
+  .meta{display:flex;flex-wrap:wrap;gap:6px 28px;margin-top:16px;font:500 12px/1.6 var(--mono);color:var(--muted);}
+  .meta b{color:var(--ink);font-weight:600;}
+  h2{font-size:13px;font-family:var(--mono);letter-spacing:.12em;text-transform:uppercase;
+     margin:40px 0 12px;padding-top:12px;border-top:1px solid var(--line);font-weight:600;}
+  h2::before{content:"";display:inline-block;width:8px;height:8px;background:var(--accent);margin-right:9px;transform:translateY(-1px);}
+  table{width:100%;border-collapse:collapse;margin:4px 0;}
+  th,td{text-align:left;vertical-align:top;padding:8px 10px;border-bottom:1px solid var(--line);font-size:13.5px;}
+  th{font:600 11px/1.3 var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);}
+  td.num{font-family:var(--mono);white-space:nowrap;color:var(--muted);width:44px;}
+  ul{margin:6px 0;padding-left:18px;}
+  li{margin:5px 0;}
+  .cols{display:grid;grid-template-columns:1fr 1fr;gap:20px;}
+  .box{border:1px solid var(--line);padding:14px 16px;background:#fbfbf9;}
+  .box h3{margin:0 0 8px;font:600 11px/1.3 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--muted);}
+  .box p{margin:4px 0;font-size:13.5px;}
+  code{font-family:var(--mono);font-size:12.5px;background:var(--panel);padding:1px 5px;}
+  .cmdblock{border:1px solid var(--line);background:#fbfbf9;padding:12px 16px;font-family:var(--mono);font-size:12.5px;line-height:1.9;}
+  footer{margin-top:48px;padding-top:12px;border-top:1px solid var(--ink);color:var(--muted);font:500 12px/1.7 var(--mono);}
+  @media (max-width:720px){ .cols{grid-template-columns:1fr} h1{font-size:26px} }
+</style>
+</head>
+<body>
+<div class="page">
+
+<header class="doc">
+  <div class="kicker">PilingTrack · /operator/next · ветка autoclaw/operator-next · 28.09.2026</div>
+  <h1>Доработка по ревью №2: защищённый цикл отправки</h1>
+  <p class="sub">Ревью №2 (Codex) отклонило доработку одной формулой: «защита от дубля кончалась раньше, чем
+  жизнь формы». Закрыты все четыре новых дефекта (пп. 1–4) и семь недоделок круга (пп. 5–11), плюс находки
+  Д1 и Д2 аудита. Принцип: одна отправка = один защищённый цикл — замок и блокировка полей от первого
+  нажатия до конца цикла, очистка подтверждённого черновика сразу по подтверждению, перечитывание —
+  отдельным шагом после.</p>
+  <div class="meta">
+    <span>Коммиты: <b>6feb5d98</b> (правки) · <b>4db11a70</b> (тесты) · <b>a25ca1c7</b> (отчёт)</span>
+    <span>Проверки: <b>tsc — 0 · vitest — 65/65 · eslint — 0</b></span>
+    <span>Откаты тестов: <b>13 из 13 падают без исправления</b></span>
+  </div>
+</header>
+
+<h2>Что закрыто</h2>
+<table>
+  <tr><th>№</th><th>Что сделано</th><th>Тест-доказательство</th></tr>
+  <tr><td class="num">1</td><td>Отправка держит замок и блокировку полей до конца цикла; поля очищаются сразу по подтверждению, а не после перечитывания; повтор во время чтения не отправляет вторую команду</td><td>«п.1 … повтор не отправляет»</td></tr>
+  <tr><td class="num">2</td><td>Закрытие смены берёт замок и блокирует заметку до первого шага подготовки (flush); повтор не запускает вторую подготовку</td><td>«п.2 … заметка закрыта»</td></tr>
+  <tr><td class="num">3</td><td>Вход в закрытие один раз показывает «Смену»; после этого «Техника», ТБ и «Ещё» реально открываются, заметка переживает возврат</td><td>«п.3 … реально открывается»</td></tr>
+  <tr><td class="num">4</td><td>Подтверждённая заметка закрытия очищается (только этой смены): после «принято, чтение упало» повторно отправить её нечем</td><td>«п.4 … чтение упало»</td></tr>
+  <tr><td class="num">5</td><td>Ответы осмотра живут в оболочке по этапу; форма паспорта сваи не размонтируется при «Назад к смене» и переключении вкладок (ключ — смена)</td><td>«п.5» — 3 теста</td></tr>
+  <tr><td class="num">6</td><td>Гонка установок: тест реально запускает оба чтения и дожидается обоих ответов; устаревший ответ отброшен, приёмка отправляет последнюю выбранную</td><td>«п.6 … отброшен»</td></tr>
+  <tr><td class="num">7</td><td>Массовая «норма» не перезаписывает FAULT на пункте, входящем в массовую отметку; кнопка гаснет, пока команда в пути</td><td>«п.7» — 2 теста</td></tr>
+  <tr><td class="num">8</td><td>Тест нажимает «Повторить» и сверяет, что ушла именно acknowledge-briefing</td><td>расширенный «находка №7»</td></tr>
+  <tr><td class="num">9</td><td>Обход в отсутствующий чек-лист: объяснение, рабочая «Обновить» и путь «Назад к смене» — сквозной тест оболочки</td><td>«п.9 … работают»</td></tr>
+  <tr><td class="num">10</td><td>Ключи команд: успех одного вида не меняет ключи соседних; ветка «легло в очередь» — то же</td><td>«п.10» — 2 теста</td></tr>
+  <tr><td class="num">11</td><td>Очередь: испорченное хранилище — «проверить не удалось» (−1), а не ноль; считаются только записи вошедшего</td><td>«п.11» + юнит-тесты</td></tr>
+  <tr><td class="num">C</td><td>«Отложить осмотр»: ответы сохраняются, вкладки доступны, «Следующее действие» ведёт обратно; допуск без завершённого осмотра не выдаётся; без связи — честное сообщение про устройство и связь</td><td>«C и Д1» — 2 теста</td></tr>
+</table>
+
+<h2>Доказательства</h2>
+<div class="cols">
+  <div class="box">
+    <h3>Три проверки</h3>
+    <p><code>npx tsc --noEmit</code> — код 0, без замечаний.</p>
+    <p><code>npx vitest run src/components/piling/operator-next</code> — 7 файлов, <b>65 тестов</b>, 0 падений.</p>
+    <p><code>npx eslint src/components/piling/operator-next src/app/operator/next</code> — 0 проблем.</p>
+  </div>
+  <div class="box">
+    <h3>Падение без исправления</h3>
+    <p>Каждая правка временно откатывалась, прогонялся соответствующий тест, фиксировалось падение, правка возвращалась. <b>13 из 13 проверок — тесты падают.</b></p>
+    <p>Журнал: <code>docs/operator-next/revert-checks-2.log</code>.</p>
+  </div>
+</div>
+
+<h2>Ограничения (честно)</h2>
+<ul>
+  <li><b>Серверную очередь для <code>submit-checklist</code> не делали</b> — это серверная модель, вне зоны правки. Без связи осмотр нельзя отправить — можно отложить: ответы сохранятся, отправка произойдёт при связи.</li>
+  <li><b>Форма паспорта не переживает уход в обходной осмотр (детур)</b> — во время детура экран работы размонтируется целиком; «Назад к смене» и вкладки форма переживает.</li>
+  <li><b>Браузерного прогона нет</b> (порт 3000 занят боевым сервером); падение-без-фикса доказано тестами.</li>
+</ul>
+
+<h2>Как перепроверить</h2>
+<div class="cmdblock">
+git log --oneline -5<br>
+npx tsc --noEmit -p tsconfig.json<br>
+npx vitest run src/components/piling/operator-next<br>
+npx eslint src/components/piling/operator-next src/app/operator/next
+</div>
+
+<footer>
+  Отчёт: docs/operator-next/REPORT.md, раздел 12 · Журнал: docs/operator-next/JOURNAL.md · Журнал откатов: docs/operator-next/revert-checks-2.log<br>
+  AutoClaw
+</footer>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,372 @@
+{
+  "base": "http://localhost:3210",
+  "executedAt": "2026-10-03T19:51:14.682Z",
+  "steps": [
+    {
+      "step": "приёмка: ночная смена",
+      "status": "OK",
+      "evidence": "10-03-приёмка.png"
+    },
+    {
+      "step": "осмотр фазы PRESHIFT_INSPECTION",
+      "status": "OK",
+      "evidence": "10-04-осмотр-предсменный.png"
+    },
+    {
+      "step": "осмотр фазы SITE_READY",
+      "status": "OK",
+      "evidence": "10-05-площадка.png"
+    },
+    {
+      "step": "осмотр фазы STARTUP",
+      "status": "OK",
+      "evidence": "10-06-пуск.png"
+    },
+    {
+      "step": "работа: экран",
+      "status": "OK",
+      "evidence": "10-07-работа.png"
+    },
+    {
+      "step": "работа: записать сваи (10 шт)",
+      "status": "OK",
+      "evidence": "10-08-сваи-записаны.png"
+    },
+    {
+      "step": "сервер: повтор команды с тем же clientCommandId (№6)",
+      "status": "OK",
+      "evidence": ""
+    },
+    {
+      "step": "работа: паспорт — три залога заполнены",
+      "status": "OK",
+      "evidence": "10-09-паспорт-три-залога.png"
+    },
+    {
+      "step": "черновик: перезагрузка страницы (проверка №3)",
+      "status": "ДЕФЕКТ",
+      "evidence": "падение: черновик не выжил перезагрузку: номер «», залогов 1 — см. 10-10-паспорт-после-перезагрузки.png (снимок fail-черновик_перезагрузка_страницы_проверка_3_.png)"
+    },
+    {
+      "step": "работа: паспорт — отправка после перезагрузки",
+      "status": "OK",
+      "evidence": "10-09-паспорт-три-залога.png"
+    },
+    {
+      "step": "работа: простой — окно не раньше смены (Ж1) и деталь 400",
+      "status": "OK",
+      "evidence": "10-11-простой.png"
+    },
+    {
+      "step": "работа: без связи — очередь и ровно одна запись",
+      "status": "OK",
+      "evidence": "10-12-оффлайн-очередь.png"
+    },
+    {
+      "step": "работа: завершение (двойное нажатие — одна команда)",
+      "status": "OK",
+      "evidence": "10-13-завершение-работы.png"
+    },
+    {
+      "step": "закрытие: ЕО после работы приходит и выполняется",
+      "status": "OK",
+      "evidence": "10-14-ео-после-работы.png"
+    },
+    {
+      "step": "закрытие: заметка и отправка отчёта",
+      "status": "OK",
+      "evidence": "10-16-смена-закрыта.png"
+    },
+    {
+      "step": "консоль браузера",
+      "status": "OK",
+      "evidence": "ошибок нет; ожидаемых артефактов 400: 1"
+    }
+  ],
+  "dbChecks": [
+    "Ж2: после перезагрузки до открытия смены (фаза ADMISSION) предупреждений черновика: 0 (ожидается 0)",
+    "тип смены в базе: NIGHT",
+    "Ж2: сразу после приёмки предупреждений черновика: 0 (ожидается 0)",
+    "Ж2: на экране работы предупреждений черновика: 0 (ожидается 0)",
+    "повтор log-production: ответ 200; записей до 1, после 1",
+    "черновики в localStorage после ввода паспорта: 1 ключей",
+    "Ж1б: 400 показан деталью: «Простой не может начаться раньше смены — смена начата в 22:50.»",
+    "Ж1а: подпись кнопки «Простой с начала смены, 0 мин»; смена идёт 0 мин",
+    "Ж1а: Начало после кнопки — 22:50, начало смены — 22:50",
+    "Ж1а: в базе начало простоя 2026-10-03 19:50:00+00 (не раньше смены 2026-10-03T19:50:32.390Z)",
+    "очередь: записей count=3 после отправки — 1; запросов count=3 в сети — 2; завершённых команд всего — 8; дошедших count=3 — 0",
+    "finish-work: два нажатия — команд 1",
+    "EO_AFTER в конце смены: пришёл",
+    "фаза после закрытия: CLOSED"
+  ],
+  "checks": [
+    {
+      "step": "приёмка",
+      "shot": "10-03-приёмка.png",
+      "controls": [
+        "button.flex.w-full «!К сведению: 1Замечаний в работе: » — 309×37"
+      ],
+      "captions": [],
+      "texts": [
+        "p.text-sm.text-muted-foreground «Связь есть» — 14px",
+        "p.mt-0.5.text-2xs «ВСМЖ г.Вышний Волочек · 03.10.2026» — 11px",
+        "p.text-3xs.font-bold «Нарушение · видит диспетчер» — 10px",
+        "p.mt-1.text-sm «Срок по наработке пройден.» — 14px",
+        "p.mt-2.text-sm «Сообщите диспетчеру: машину надо п» — 14px",
+        "p.text-sm.text-muted-foreground «PVE 50PR» — 14px",
+        "p.mt-2.text-sm «Сваи, бурение и простой — накопите» — 14px",
+        "p.mt-1.text-sm «Погода недоступна: нет координат л» — 14px",
+        "p.mt-1.text-sm «Смены: дневная 07:00–19:00, ночная» — 14px"
+      ],
+      "scrollX": false
+    },
+    {
+      "step": "PRESHIFT_INSPECTION",
+      "shot": "10-04-осмотр-предсменный.png",
+      "controls": [
+        "button.flex.w-full «!К сведению: 1Замечаний в работе: » — 309×37"
+      ],
+      "captions": [],
+      "texts": [
+        "p.text-sm.text-muted-foreground «Связь есть» — 14px",
+        "p.mt-0.5.text-2xs «Обход холодной машины до пуска. Ищ» — 11px",
+        "p.text-3xs.font-bold «Нарушение · видит диспетчер» — 10px",
+        "p.mt-1.text-sm «Срок по наработке пройден.» — 14px",
+        "p.mt-2.text-sm «Сообщите диспетчеру: машину надо п» — 14px",
+        "p.text-sm.text-muted-foreground «Трещина в лобовом на морозе расход» — 14px",
+        "p.text-sm.font-medium «Пункт не заполнен» — 14px",
+        "p.text-sm.text-muted-foreground «Провисание, потеря пальцев, трещин» — 14px",
+        "p.text-sm.text-muted-foreground «Трещина в мачте — работать нельзя,» — 14px",
+        "p.text-sm.text-muted-foreground «Соляра на горячем коллекторе — это» — 14px",
+        "p.text-sm.text-muted-foreground «Вздутие и «потение» соединения — п» — 14px",
+        "p.text-sm.text-muted-foreground «Обрывы на длине одного шага свивки» — 14px",
+        "p.text-sm.text-muted-foreground «Отказ замка — падение груза» — 14px"
+      ],
+      "scrollX": false
+    },
+    {
+      "step": "SITE_READY",
+      "shot": "10-05-площадка.png",
+      "controls": [
+        "button.flex.w-full «!К сведению: 1Замечаний в работе: » — 309×37"
+      ],
+      "captions": [],
+      "texts": [
+        "p.text-sm.text-muted-foreground «Связь есть» — 14px",
+        "p.mt-0.5.text-2xs «Где машина встанет и что вокруг. О» — 11px",
+        "p.text-3xs.font-bold «Нарушение · видит диспетчер» — 10px",
+        "p.mt-1.text-sm «Срок по наработке пройден.» — 14px",
+        "p.mt-2.text-sm «Сообщите диспетчеру: машину надо п» — 14px",
+        "p.text-sm.text-muted-foreground «Просадка под одной гусеницей при р» — 14px",
+        "p.text-sm.font-medium «Пункт не заполнен» — 14px",
+        "p.text-sm.text-muted-foreground «Один взгляд по кругу. До проводов » — 14px"
+      ],
+      "scrollX": false
+    },
+    {
+      "step": "STARTUP",
+      "shot": "10-06-пуск.png",
+      "controls": [
+        "button.flex.w-full «!К сведению: 1Замечаний в работе: » — 309×37"
+      ],
+      "captions": [],
+      "texts": [
+        "p.text-sm.text-muted-foreground «Связь есть» — 14px",
+        "p.mt-0.5.text-2xs «Пуск, прогрев и холостая проверка.» — 11px",
+        "p.text-3xs.font-bold «Нарушение · видит диспетчер» — 10px",
+        "p.mt-1.text-sm «Срок по наработке пройден.» — 14px",
+        "p.mt-2.text-sm «Сообщите диспетчеру: машину надо п» — 14px",
+        "p.text-sm.font-medium «Пункт не заполнен» — 14px",
+        "p.text-sm.text-muted-foreground «Нагружать холодную гидравлику — эт» — 14px",
+        "p.text-sm.text-muted-foreground «Стук, вой насоса, свист — глушим и» — 14px",
+        "p.text-sm.text-muted-foreground «Тормоз проверяем под грузом, а не » — 14px"
+      ],
+      "scrollX": false
+    },
+    {
+      "step": "работа",
+      "shot": "10-07-работа.png",
+      "controls": [
+        "button.flex.w-full «!К сведению: 1Замечаний в работе: » — 309×37"
+      ],
+      "captions": [],
+      "texts": [
+        "p.text-sm.text-muted-foreground «Связь есть» — 14px",
+        "p.mt-0.5.text-2xs «Woltman-PVE 50PR» — 11px",
+        "p.mt-1.text-sm «Сваи, бурение и простой записывают» — 14px",
+        "p.text-3xs.font-bold «Нарушение · видит диспетчер» — 10px",
+        "p.mt-1.text-sm «Срок по наработке пройден.» — 14px",
+        "p.mt-2.text-sm «Сообщите диспетчеру: машину надо п» — 14px",
+        "p.mt-1.text-sm «Происшествие и неисправность запис» — 14px"
+      ],
+      "scrollX": false
+    },
+    {
+      "step": "сваи-записаны",
+      "shot": "10-08-сваи-записаны.png",
+      "controls": [
+        "button.flex.w-full «!К сведению: 1Замечаний в работе: » — 309×37"
+      ],
+      "captions": [],
+      "texts": [
+        "p.text-sm.text-muted-foreground «Связь есть» — 14px",
+        "p.mt-0.5.text-2xs «Woltman-PVE 50PR» — 11px",
+        "p.mt-1.text-sm «Сваи, бурение и простой записывают» — 14px",
+        "p.text-3xs.font-bold «Нарушение · видит диспетчер» — 10px",
+        "p.mt-1.text-sm «Срок по наработке пройден.» — 14px",
+        "p.mt-2.text-sm «Сообщите диспетчеру: машину надо п» — 14px",
+        "p.mt-1.text-sm «Происшествие и неисправность запис» — 14px"
+      ],
+      "scrollX": false
+    },
+    {
+      "step": "паспорт-три-залога",
+      "shot": "10-09-паспорт-три-залога.png",
+      "controls": [
+        "button.text-2xs.font-medium «убрать» — 38×16",
+        "input.h-5.w-5 «» — 20×20",
+        "input.h-5.w-5 «» — 14×20",
+        "input.h-5.w-5 «» — 16×20"
+      ],
+      "captions": [],
+      "texts": [
+        "p.text-sm.text-muted-foreground «Связь есть» — 14px",
+        "p.mt-0.5.text-2xs «Woltman-PVE 50PR» — 11px",
+        "p.mt-1.text-sm «Залоги нумеруются самим списком. «» — 14px",
+        "p.mt-1.text-sm «Залог — серия ударов, после которо» — 14px"
+      ],
+      "scrollX": false
+    },
+    {
+      "step": "паспорт-после-перезагрузки",
+      "shot": "10-10-паспорт-после-перезагрузки.png",
+      "controls": [
+        "button.flex.w-full «!К сведению: 1Замечаний в работе: » — 309×37"
+      ],
+      "captions": [],
+      "texts": [
+        "p.text-sm.text-muted-foreground «Связь есть» — 14px",
+        "p.mt-0.5.text-2xs «Woltman-PVE 50PR» — 11px",
+        "p.mt-1.text-sm «Сваи, бурение и простой записывают» — 14px",
+        "p.text-3xs.font-bold «Нарушение · видит диспетчер» — 10px",
+        "p.mt-1.text-sm «Срок по наработке пройден.» — 14px",
+        "p.mt-2.text-sm «Сообщите диспетчеру: машину надо п» — 14px",
+        "p.mt-1.text-sm «Происшествие и неисправность запис» — 14px"
+      ],
+      "scrollX": false
+    },
+    {
+      "step": "простой-400-деталь",
+      "shot": "10-простой-400-деталь.png",
+      "controls": [],
+      "captions": [],
+      "texts": [
+        "p.text-sm.text-muted-foreground «Связь есть» — 14px",
+        "p.mt-0.5.text-2xs «Woltman-PVE 50PR» — 11px",
+        "p.text-sm.text-muted-foreground «Набранное сохраняется при перехода» — 14px",
+        "p.rounded-md.bg-info/10 «Длительность: 10 мин» — 14px",
+        "p.rounded-lg.border «Простой не может начаться раньше с» — 14px"
+      ],
+      "scrollX": false
+    },
+    {
+      "step": "оффлайн-очередь",
+      "shot": "10-12-оффлайн-очередь.png",
+      "controls": [
+        "button.flex.w-full «!К сведению: 1Замечаний в работе: » — 309×37"
+      ],
+      "captions": [],
+      "texts": [
+        "p.text-sm.font-semibold «Связи нет — записи сохраняются на » — 14px",
+        "p.mt-0.5.text-2xs «Woltman-PVE 50PR» — 11px",
+        "p.mt-1.text-sm «Сваи, бурение и простой записывают» — 14px",
+        "p.text-3xs.font-bold «Нарушение · видит диспетчер» — 10px",
+        "p.mt-1.text-sm «Срок по наработке пройден.» — 14px",
+        "p.mt-2.text-sm «Сообщите диспетчеру: машину надо п» — 14px",
+        "p.mt-1.text-sm «Происшествие и неисправность запис» — 14px"
+      ],
+      "scrollX": false
+    },
+    {
+      "step": "завершение-работы",
+      "shot": "10-13-завершение-работы.png",
+      "controls": [
+        "button.flex.w-full «!К сведению: 1Замечаний в работе: » — 309×37"
+      ],
+      "captions": [],
+      "texts": [
+        "p.text-sm.text-muted-foreground «Связь есть» — 14px",
+        "p.mt-0.5.text-2xs «Woltman-PVE 50PR» — 11px",
+        "p.mt-1.text-sm «Сваи, бурение и простой записывают» — 14px",
+        "p.text-3xs.font-bold «Нарушение · видит диспетчер» — 10px",
+        "p.mt-1.text-sm «Срок по наработке пройден.» — 14px",
+        "p.mt-2.text-sm «Сообщите диспетчеру: машину надо п» — 14px",
+        "p.mt-1.text-sm «Происшествие и неисправность запис» — 14px",
+        "p.text-sm.text-muted-foreground «За смену: 14 свай, 0 скважин, прос» — 14px"
+      ],
+      "scrollX": false
+    },
+    {
+      "step": "ео-после-работы",
+      "shot": "10-14-ео-после-работы.png",
+      "controls": [
+        "button.flex.w-full «!К сведению: 1Замечаний в работе: » — 309×37"
+      ],
+      "captions": [],
+      "texts": [
+        "p.text-sm.text-muted-foreground «Связь есть» — 14px",
+        "p.mt-0.5.text-2xs «Что сделать до ухода, чтобы завтра» — 11px",
+        "p.text-3xs.font-bold «Нарушение · видит диспетчер» — 10px",
+        "p.mt-1.text-sm «Срок по наработке пройден.» — 14px",
+        "p.mt-2.text-sm «Сообщите диспетчеру: машину надо п» — 14px",
+        "p.text-sm.font-medium «Пункт не заполнен» — 14px",
+        "p.text-sm.text-muted-foreground «На горячей машине течь видно там, » — 14px",
+        "p.text-sm.text-muted-foreground «Разница с утренним показанием — на» — 14px",
+        "p.text-sm.text-muted-foreground «Пойдёт в отчёт и покажется утром п» — 14px"
+      ],
+      "scrollX": false
+    },
+    {
+      "step": "закрытие-смены",
+      "shot": "10-15-закрытие-смены.png",
+      "controls": [
+        "button.flex.w-full «!К сведению: 1Замечаний в работе: » — 309×37"
+      ],
+      "captions": [],
+      "texts": [
+        "p.text-sm.text-muted-foreground «Связь есть» — 14px",
+        "p.mt-0.5.text-2xs «Woltman-PVE 50PR» — 11px",
+        "p.mt-1.text-sm «Итоги ниже. Если всё верно — закро» — 14px",
+        "p.text-3xs.font-bold «Нарушение · видит диспетчер» — 10px",
+        "p.mt-1.text-sm «Срок по наработке пройден.» — 14px",
+        "p.mt-2.text-sm «Сообщите диспетчеру: машину надо п» — 14px",
+        "p.mt-1.text-sm «Машина осмотрена и обслужена. Оста» — 14px",
+        "p.mt-1.text-sm «Все записи отправлены на сервер. Д» — 14px",
+        "p.mt-1.text-sm «Что оставить себе на завтра: незак» — 14px"
+      ],
+      "scrollX": false
+    },
+    {
+      "step": "смена-закрыта",
+      "shot": "10-16-смена-закрыта.png",
+      "controls": [],
+      "captions": [],
+      "texts": [
+        "p.text-sm.text-muted-foreground «Связь есть» — 14px",
+        "p.mt-0.5.text-2xs «Woltman-PVE 50PR» — 11px",
+        "p.mt-1.text-sm «Отчёт отправлен диспетчеру. Можно » — 14px"
+      ],
+      "scrollX": false
+    }
+  ],
+  "consoleErrors": [
+    "Failed to load resource: the server responded with a status of 400 (Bad Request)"
+  ],
+  "expectedConsole": [
+    "Failed to load resource: the server responded with a status of 400 (Bad Request)"
+  ],
+  "unexpectedConsole": [],
+  "netErrors": [
+    "400 /api/operator/mobile/command :: {\"error\":\"Простой не может начаться раньше смены — смена начата в 22:50.\"}"
+  ]
+}
