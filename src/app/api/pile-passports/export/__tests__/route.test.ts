@@ -8,7 +8,7 @@
  * одного IP за NAT. Превышение — 429 и русский текст, без сборки файла.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { NextRequest } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 
 const { requireAuthMock, assertCanMock, exportMock, rateCheckMock } = vi.hoisted(() => ({
   requireAuthMock: vi.fn(),
@@ -31,11 +31,13 @@ vi.mock('@/modules/reports/application/queries/pile-passport.service', () => ({
 }));
 
 import { GET } from '../route';
+import { can } from '@/services/auth/authorization-service';
+import { ServiceError } from '@/lib/service-error';
 
 const admin = { id: 'admin-a', role: 'ADMIN', tenantId: 'tenant-a' };
 
-function req(): NextRequest {
-  return new NextRequest('http://localhost/api/pile-passports/export');
+function req(qs = ''): NextRequest {
+  return new NextRequest(`http://localhost/api/pile-passports/export?${qs}`);
 }
 
 describe('GET /api/pile-passports/export — ограничение частоты (W30)', () => {
@@ -72,5 +74,67 @@ describe('GET /api/pile-passports/export — ограничение частот
       'pile-export:get:admin-a',
       expect.objectContaining({ maxAttempts: 6, windowMs: 60_000 }),
     );
+  });
+});
+
+/**
+ * Права и организация (W25, W31). Выгрузка — тот же документ по сваям, и
+ * право у неё `piles.manage`; организация берётся из сессии, не из query.
+ * `assertCan` считает по настоящей матрице (`can`).
+ */
+describe('GET /api/pile-passports/export — права и организация', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    requireAuthMock.mockResolvedValue({ user: admin, error: null });
+    rateCheckMock.mockResolvedValue({ allowed: true, remaining: 5 });
+    exportMock.mockResolvedValue(Buffer.from('xlsx'));
+    assertCanMock.mockImplementation((user: { role: string; actingAs?: string | null }, ability: string) => {
+      if (!can(user, ability as Parameters<typeof can>[1])) {
+        throw new ServiceError('Доступ запрещён', 403);
+      }
+    });
+  });
+
+  it.each(['OPERATOR', 'ASSISTANT', 'MECHANIC'])(
+    'роль %s без права piles.manage → 403, файл не собирается',
+    async (role) => {
+      requireAuthMock.mockResolvedValue({ user: { id: `${role}-1`, role, tenantId: 'tenant-a' }, error: null });
+
+      const response = await GET(req());
+
+      expect(response.status).toBe(403);
+      expect(exportMock).not.toHaveBeenCalled();
+    },
+  );
+
+  it('нет сессии → 401, файл не собирается', async () => {
+    requireAuthMock.mockResolvedValue({
+      user: null,
+      error: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }),
+    });
+
+    const response = await GET(req());
+
+    expect(response.status).toBe(401);
+    expect(exportMock).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['ADMIN', 'admin-a'],
+    ['DISPATCHER', 'disp-a'],
+  ])('роль %s с правом piles.manage → 200', async (role, id) => {
+    requireAuthMock.mockResolvedValue({ user: { id, role, tenantId: 'tenant-a' }, error: null });
+
+    const response = await GET(req());
+
+    expect(response.status).toBe(200);
+    expect(exportMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('в выгрузку уходит организация сессии, а tenantId из query игнорируется', async () => {
+    const response = await GET(req('tenantId=tenant-b'));
+
+    expect(response.status).toBe(200);
+    expect(exportMock).toHaveBeenCalledWith(expect.objectContaining({ tenantId: 'tenant-a' }));
   });
 });
