@@ -116,7 +116,10 @@ export function AdminAnalytics() {
       if (res.ok) {
         setOverview(await res.json() as OverviewData);
       } else {
-        setOverviewError('Не удалось загрузить аналитику за период.');
+        setOverviewError(
+          res.status === 401 ? 'Сессия истекла — войдите снова.'
+          : 'Не удалось загрузить аналитику за период.'
+        );
       }
     } catch {
       if (reqId === overviewReqRef.current) setOverviewError('Сеть недоступна. Проверьте соединение и повторите.');
@@ -137,7 +140,10 @@ export function AdminAnalytics() {
         const data = await res.json();
         setTrendRows(data.rows || []);
       } else {
-        setTrendsError('Не удалось загрузить тренды по объектам.');
+        setTrendsError(
+          res.status === 401 ? 'Сессия истекла — войдите снова.'
+          : 'Не удалось загрузить тренды по объектам.'
+        );
       }
     } catch {
       setTrendsError('Сеть недоступна. Проверьте соединение и повторите.');
@@ -157,7 +163,10 @@ export function AdminAnalytics() {
       if (res.ok) {
         setKpi((await res.json()).kpi as FleetKpiData);
       } else {
-        setKpiError('Не удалось загрузить показатели техготовности.');
+        setKpiError(
+          res.status === 401 ? 'Сессия истекла — войдите снова.'
+          : 'Не удалось загрузить показатели техготовности.'
+        );
       }
     } catch {
       setKpiError('Сеть недоступна. Проверьте соединение и повторите.');

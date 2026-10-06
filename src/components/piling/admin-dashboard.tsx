@@ -140,7 +140,12 @@ export function AdminDashboard() {
       const res = await authFetch(`/api/analytics/sites?${params.toString()}`);
       if (!res.ok) {
         // 403 — это не сеть: у роли нет прав на аналитику, повтор не поможет.
-        setLoadError(res.status === 403 ? 'Нет прав на аналитику' : 'Не удалось загрузить, обновите страницу');
+        // 401 — сессия истекла: человек увидит текст и перейдёт на вход.
+        setLoadError(
+          res.status === 403 ? 'Нет прав на аналитику'
+          : res.status === 401 ? 'Сессия истекла — войдите снова.'
+          : 'Не удалось загрузить, обновите страницу'
+        );
         return;
       }
       setAnalytics(((await res.json()).analytics ?? []) as SiteAnalyticsDTO[]);
