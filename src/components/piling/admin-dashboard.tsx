@@ -29,7 +29,7 @@ import { useDocumentTitle } from '@/components/piling/ops-shell';
 import {
   AlertTriangle, CameraOff, Clock, FileWarning, LayoutGrid,
   PauseCircle, TrendingDown, Truck, Building2, Wrench,
-  RefreshCw,
+  Loader2, RefreshCw,
 } from '@/components/piling/icons/unified-icons';
 import { authFetch } from '@/lib/api';
 import { Button } from '@/components/ui/button';
@@ -368,9 +368,17 @@ export function AdminDashboard() {
         <div>
           <h1 className="flex items-center gap-2 text-xl font-bold text-foreground"><LayoutGrid className="h-5 w-5 text-signal-strong" />Дашборд</h1>
           <p className="mt-0.5 text-sm text-muted-foreground">Оперативная сводка производства</p>
-          {analyticsUpdatedAt && (
+          {/* F-R128 №7/№19: пока идёт перечитывание (смена периода/объекта или
+              «Обновить дашборд») видно «Обновляется…» — иначе числа меняются
+              «сами», и не понятно, применился ли фильтр. */}
+          {loading ? (
+            <p className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
+              <Loader2 className="h-3 w-3 animate-spin" />
+              Обновляется…
+            </p>
+          ) : analyticsUpdatedAt ? (
             <p className="mt-0.5 text-xs text-muted-foreground">Обновлено в {formatClock(analyticsUpdatedAt)}</p>
-          )}
+          ) : null}
         </div>
 
         {/* Фильтры: период + Объект + Установка.
@@ -416,11 +424,12 @@ export function AdminDashboard() {
           <button
             type="button"
             onClick={refreshAll}
-            className="flex h-9 w-9 items-center justify-center rounded-md border border-border bg-card text-muted-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-info/30"
+            disabled={loading}
+            className="flex h-9 w-9 items-center justify-center rounded-md border border-border bg-card text-muted-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-info/30 disabled:cursor-not-allowed disabled:opacity-50"
             aria-label="Обновить дашборд"
             title="Обновить дашборд"
           >
-            <RefreshCw className="h-4 w-4" />
+            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
           </button>
         </div>
       </div>

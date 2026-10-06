@@ -198,7 +198,13 @@ export function AdminDlq() {
         {STATUS_FILTERS.map((f) => (
           <button
             key={f.key}
-            onClick={() => setStatus(f.key)}
+            onClick={() => {
+              // F-R128-17: смена отбора гасит прежние плитки статистики вместе
+              // со списком — иначе секунду сверху стоят «прежние» цифры, а снизу
+              // уже скелетон, и они противоречат друг другу.
+              if (f.key !== status) setStats(null);
+              setStatus(f.key);
+            }}
             className={cn(
               'px-3 py-1.5 text-xs font-medium rounded-full border transition-colors',
               status === f.key ? f.color : 'bg-card text-muted-foreground border-border hover:bg-muted'

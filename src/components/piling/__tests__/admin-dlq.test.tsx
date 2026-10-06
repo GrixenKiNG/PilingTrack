@@ -287,3 +287,36 @@ describe('AdminDlq: сбой загрузки не выдаёт себя за «
     expect(screen.queryByText('Недоставленных событий нет')).not.toBeInTheDocument();
   });
 });
+
+/**
+ * F-R128-17: при смене отбора статуса список подменялся скелетоном, а плитки
+ * статистики оставались от прежнего отбора — секунду сверху стояли «прежние»
+ * цифры, снизу скелетон, и они противоречили друг другу. Теперь смена отбора
+ * гасит плитки вместе со списком. До правки тест падал.
+ */
+describe('AdminDlq: смена отбора гасит прежнюю статистику (F-R128-17)', () => {
+  beforeEach(() => {
+    mocks.authFetch.mockReset();
+  });
+
+  it('после клика по другому отбору плитки статистики скрыты вместе со списком', async () => {
+    let resolveSecond: (r: Response) => void = () => {};
+    let calls = 0;
+    mocks.authFetch.mockImplementation(() => {
+      calls += 1;
+      if (calls === 1) return Promise.resolve(json({ entries: [makeEntry()], stats }));
+      return new Promise<Response>((resolve) => { resolveSecond = resolve; });
+    });
+    render(<AdminDlq />);
+    await screen.findByText('Доставка PDF отчёта');
+    // Плитка «Всего» — уникальна для статистики (у фильтров такой подписи нет).
+    expect(screen.getByText('Всего')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Все' }));
+
+    await waitFor(() => expect(screen.queryByText('Всего')).toBeNull());
+    expect(screen.queryByText('Доставка PDF отчёта')).toBeNull();
+
+    await act(async () => { resolveSecond(json({ entries: [], stats })); });
+  });
+});
