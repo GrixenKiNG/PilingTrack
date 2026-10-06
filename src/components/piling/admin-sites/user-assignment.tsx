@@ -10,6 +10,7 @@ import {
 import { toast } from 'sonner';
 import { authFetch } from '@/lib/api';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import {
   DialogContent,
   DialogHeader,
@@ -32,6 +33,7 @@ export function UserAssignmentDialog({ siteId, loadingUsers, users }: UserAssign
   // Сбой чтения показывает «назначений нет», хотя данных нет: пустой список
   // неотличим от отказа (находка 7).
   const [loadError, setLoadError] = useState(false);
+  const [availableSearch, setAvailableSearch] = useState('');
 
   const loadAssignedUsers = useCallback(async (targetSiteId: string) => {
     setLoadingAssign(true);
@@ -158,9 +160,21 @@ export function UserAssignmentDialog({ siteId, loadingUsers, users }: UserAssign
             <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">
               Доступные операторы
             </p>
+            <Input
+              value={availableSearch}
+              onChange={(e) => setAvailableSearch(e.target.value)}
+              placeholder="Поиск по имени или email"
+              aria-label="Поиск доступных операторов"
+              className="mb-2 min-h-11 w-full min-w-[200px] rounded-lg border border-border bg-card px-3 py-2 text-xs text-foreground focus:border-info focus:outline-none sm:min-h-0 sm:w-auto"
+            />
             <div className="space-y-1 max-h-48 overflow-y-auto custom-scrollbar">
               {operators
                 .filter((u) => u.isActive && !assignedIds.has(u.id))
+                .filter((u) =>
+                  availableSearch === '' ||
+                  u.name.toLowerCase().includes(availableSearch.toLowerCase()) ||
+                  u.email.toLowerCase().includes(availableSearch.toLowerCase())
+                )
                 .map((user) => (
                   <div
                     key={user.id}

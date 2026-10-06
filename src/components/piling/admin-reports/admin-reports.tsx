@@ -120,10 +120,11 @@ export function AdminReports() {
   const handleExport = async (format: 'csv' | 'xlsx' = 'csv') => {
     const quickFrom = quickFilter === 'today' ? todayYmd()
       : quickFilter === 'yesterday' ? shiftYmd(-1)
-      : quickFilter === 'week' ? shiftYmd(-6) : null;
+      : quickFilter === 'week' ? shiftYmd(-6)
+      : quickFilter === 'downtime' || quickFilter === 'withPhotos' || quickFilter === 'edited' ? shiftYmd(-91) : null;
     const quickTo = quickFilter === 'yesterday' ? shiftYmd(-1) : todayYmd();
     if (!quickFrom && (!periodActive || !periodFrom || !periodTo)) {
-      toast.error('Для выгрузки выберите и примените период до 92 дней либо фильтр Сегодня, Вчера или 7 дней.');
+      toast.error('Для выгрузки выберите и примените период до 92 дней либо фильтр Сегодня, Вчера, 7 дней, С простоем, С фото или Изменены вручную.');
       return;
     }
     const dateFrom = quickFrom && periodActive && periodFrom ? (quickFrom > periodFrom ? quickFrom : periodFrom)
