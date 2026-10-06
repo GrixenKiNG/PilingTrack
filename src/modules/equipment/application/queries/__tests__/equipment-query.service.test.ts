@@ -215,6 +215,18 @@ describe('getEquipmentDetails — complete 30-day stats with existing history ca
     expect(analyticsFindManyMock.mock.calls[0][0].where.reportId.in).toEqual(['uuid-7']);
   });
 
+  // J6: ждёт правки Codex
+  it.fails('J6: сданный отчёт с нулевой проекцией берёт итоги из источника', async () => {
+    reports = [detailReport(7)];
+    analyticsFindManyMock.mockResolvedValue([{ reportId: 'uuid-7', totalPiles: 0, totalDrilling: 0, totalDowntime: 0 }]);
+    const { getEquipmentDetails } = await import('../equipment-query.service');
+    const details = await getEquipmentDetails('equipment-1', 'orion');
+    expect(details.stats30d.piles).toBe(2);
+    expect(details.stats30d.drillingMeters).toBe(18);
+    expect(details.stats30d.downtimeHours).toBe(1.5);
+    expect(details.timeline[0]).toMatchObject({ piles: 2, drillingMeters: 18, downtimeHours: 1.5 });
+  });
+
   it('keeps the inclusive UTC cutoff, future submitted reports', async () => {
     reports = [detailReport(1, '2026-09-01'), detailReport(2, '2026-09-02'), detailReport(3, '2026-10-03')];
     const { getEquipmentDetails } = await import('../equipment-query.service');
