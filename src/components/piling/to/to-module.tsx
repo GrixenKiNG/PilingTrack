@@ -330,6 +330,7 @@ export function ToModule({ surface = 'readiness' }: { surface?: ModuleSurface } 
   // центр судят только по текущему снимку.
   const [readinessHistoryError, setReadinessHistoryError] = useState<string | null>(null);
   const [audit, setAudit] = useState<ReadinessAuditEnvelope | null>(null);
+  const [auditFailed, setAuditFailed] = useState(false);
   const [readinessFilters, setReadinessFilters] = useState<ReadinessUrlFilters>({});
 
   useEffect(() => {
@@ -511,6 +512,7 @@ export function ToModule({ surface = 'readiness' }: { surface?: ModuleSurface } 
       setAuthoritativeReadinessError(currentResult.error);
       setReadinessHistoryError(historyResult.error);
       setAudit(auditResult.data);
+      setAuditFailed(auditResult.failed);
       // Дефекты выведены из общего ИЛИ (F-N1005-DEFECTS-UNKNOWN): у отказа
       // журнала замечаний теперь свой источник с именем, а его состояние
       // (defectsError) экраны показывают прочерком, а не нулём.
@@ -835,6 +837,7 @@ export function ToModule({ surface = 'readiness' }: { surface?: ModuleSurface } 
       readinessHistoryError={readinessHistoryError}
       readinessHistory={readinessHistory}
       audit={audit}
+      auditFailed={auditFailed}
       filters={readinessFilters}
       onFiltersChange={changeReadinessFilters}
       showInternalNavigation={!TECH_READINESS_PRODUCTION_SHELL_ENABLED}

@@ -22,6 +22,8 @@ const AUDIT_TONE: Record<string, string> = {
 
 interface AuditSettingsProps {
   audit: ReadinessAuditEnvelope | null;
+  /** Флаг неудачной загрузки аудита: не показывать «0» в плитках как пустой журнал (R125 №8). */
+  auditFailed: boolean;
   bootstrap: ReadinessBootstrap | null;
   canExport: boolean;
   /** Сколько фильтров ленты сейчас активно: отличает «журнал пуст» от «фильтр не нашёл». */
@@ -31,7 +33,7 @@ interface AuditSettingsProps {
   filtersBar: React.ReactNode;
 }
 
-export function AuditSettings({ audit, bootstrap, canExport, activeFilterCount, onExport, filtersBar }: AuditSettingsProps) {
+export function AuditSettings({ audit, auditFailed, bootstrap, canExport, activeFilterCount, onExport, filtersBar }: AuditSettingsProps) {
   const events = audit?.data ?? [];
   const verification = audit?.verification;
   const [query, setQuery] = useState('');
@@ -58,6 +60,11 @@ export function AuditSettings({ audit, bootstrap, canExport, activeFilterCount, 
   const lastDay = events.filter((event) => Date.now() - new Date(event.occurredAt).getTime() < 86_400_000);
   const criticalCount = events.filter((event) => isCriticalAuditAction(event.action)).length;
 
+  // Значения для плиток: при ошибке загрузки показываем «—», а не 0 (R125 №8)
+  const totalEventsValue = auditFailed ? '—' : (verification?.eventCount ?? events.length);
+  const lastDayValue = auditFailed ? '—' : lastDay.length;
+  const criticalValue = auditFailed ? '—' : criticalCount;
+
   return (
     <>
       <ScreenTitle
@@ -65,9 +72,9 @@ export function AuditSettings({ audit, bootstrap, canExport, activeFilterCount, 
         subtitle="Неизменяемая история действий, решений и изменений данных"
       />
       <SettingsKpis items={[
-        { icon: 'history', label: 'Событий за 24 ч', value: lastDay.length },
-        { icon: 'reports', label: 'Всего в журнале', value: verification?.eventCount ?? events.length },
-        { icon: 'risk', label: 'Критических действий', value: criticalCount, alert: criticalCount > 0 },
+        { icon: 'history', label: 'Событий за 24 ч', value: lastDayValue },
+        { icon: 'reports', label: 'Всего в журнале', value: totalEventsValue },
+        { icon: 'risk', label: 'Критических действий', value: criticalValue, alert: criticalCount > 0 && !auditFailed },
         // Раньше плитка обещала «Срок хранения 5 лет». Ни очистки журнала, ни
         // политики хранения в контуре нет — записи не удаляются вовсе, и в
         // доказательном журнале выдуманный срок опаснее всего.

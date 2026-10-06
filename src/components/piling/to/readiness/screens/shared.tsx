@@ -1,11 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { PilingIcon, type PilingIconName } from '@/components/piling/icons';
 import { getEquipmentPhoto } from '@/components/piling/admin-equipment/equipment-photo';
 import { KpiTile, type KpiTone } from '@/components/piling/kpi-tile';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { authFetch } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -15,6 +16,7 @@ import { SHIFT_TYPE_LABEL } from '../readiness-labels';
 import type { FleetCard } from '@/components/piling/admin-equipment/fleet-types';
 import { readinessFilterQuery, type ReadinessUrlFilters } from '../api/client';
 import { type PresentationStage } from '../authoritative-presentation';
+import { ACTION_LABEL, ENTITY_LABEL } from '../settings/audit-labels';
 
 export const muted = 'text-muted-foreground';
 
@@ -135,7 +137,29 @@ export function ReadinessFiltersBar({filters, onChange, mode}: {
     : mode === 'permits' ? ['status', 'from', 'to', 'risk']
       : mode === 'audit' ? ['from', 'to', 'eventType', 'actor'] : ['status', 'from', 'to'];
   const activeCount = keys.filter((key) => Boolean(filters[key])).length;
-  const update = (key: keyof ReadinessUrlFilters, value: string) => onChange({...filters, [key]: value || undefined});
+  const debounceRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+
+  const update = (key: keyof ReadinessUrlFilters, value: string, debounceMs = 0) => {
+    if (debounceMs > 0) {
+      const existing = debounceRef.current[key];
+      if (existing) clearTimeout(existing);
+      debounceRef.current[key] = setTimeout(() => {
+        onChange({...filters, [key]: value || undefined});
+      }, debounceMs);
+    } else {
+      onChange({...filters, [key]: value || undefined});
+    }
+  };
+
+  // Build eventType options from ACTION_LABEL and ENTITY_LABEL for audit mode
+  const eventTypeOptions = mode === 'audit'
+    ? [
+        { value: '', label: 'Все типы' },
+        ...Object.entries(ACTION_LABEL).map(([code, label]) => ({ value: code, label })),
+        ...Object.entries(ENTITY_LABEL).map(([code, label]) => ({ value: code, label })),
+      ]
+    : [];
+
   return (
     <div aria-label="Фильтры" className="mb-3 flex flex-wrap items-end gap-2 rounded-xl border border-border bg-card p-3 shadow-sm">
       <label className="grid gap-1 text-2xs text-muted-foreground">С даты<Input aria-label="С даты" type="date" value={filters.from ?? ''} onChange={(event) => update('from', event.target.value)} className="h-9 w-[150px]" /></label>
@@ -143,7 +167,29 @@ export function ReadinessFiltersBar({filters, onChange, mode}: {
       {(mode === 'shifts' || mode === 'permits' || mode === 'reports') && <label className="grid gap-1 text-2xs text-muted-foreground">Статус<select aria-label="Статус" value={filters.status ?? ''} onChange={(event) => update('status', event.target.value)} className="h-9 min-w-[150px] rounded-md border border-input bg-background px-3 text-xs text-foreground"><option value="">Все статусы</option>{mode === 'shifts' ? <><option value="PLANNED">Запланирована</option><option value="STARTED">В работе</option><option value="HANDOVER_PENDING">Передача</option><option value="CLOSED">Закрыта</option><option value="CANCELLED">Отменена</option></> : mode === 'permits' ? <><option value="DRAFT">Черновик</option><option value="PENDING_APPROVAL">На согласовании</option><option value="APPROVED">Согласован</option><option value="EXPIRED">Истёк</option><option value="REVOKED">Отозван</option></> : <><option value="READY">Готово</option><option value="ATTENTION">Требует внимания</option><option value="BLOCKED">Заблокировано</option></>}</select></label>}
       {mode === 'shifts' && <label className="grid gap-1 text-2xs text-muted-foreground">Тип смены<select aria-label="Тип смены" value={filters.shiftType ?? ''} onChange={(event) => update('shiftType', event.target.value)} className="h-9 rounded-md border border-input bg-background px-3 text-xs"><option value="">Все</option>{SELECTABLE_SHIFT_TYPES.map((type) => (<option key={type} value={type}>{SHIFT_TYPE_LABEL[type]}</option>))}</select></label>}
       {mode === 'permits' && <label className="grid gap-1 text-2xs text-muted-foreground">Риск<select aria-label="Риск" value={filters.risk ?? ''} onChange={(event) => update('risk', event.target.value)} className="h-9 rounded-md border border-input bg-background px-3 text-xs"><option value="">Все</option><option value="NORMAL">Обычный</option><option value="ELEVATED">Повышенный</option></select></label>}
-      {mode === 'audit' && <><label className="grid gap-1 text-2xs text-muted-foreground">Тип события<Input aria-label="Тип события" value={filters.eventType ?? ''} onChange={(event) => update('eventType', event.target.value)} className="h-9 w-[170px]" /></label><label className="grid gap-1 text-2xs text-muted-foreground">Актор<Input aria-label="Актор" value={filters.actor ?? ''} onChange={(event) => update('actor', event.target.value)} className="h-9 w-[170px]" /></label></>}
+      {mode === 'audit' && (
+        <>
+          <label className="grid gap-1 text-2xs text-muted-foreground">
+            Тип события
+            <Select value={filters.eventType ?? ''} onValueChange={(value) => update('eventType', value, 300)}>
+              <SelectTrigger className="h-9 w-[280px]">
+                <SelectValue placeholder="Все типы" />
+              </SelectTrigger>
+              <SelectContent>
+                {eventTypeOptions.map((opt) => (
+                  <SelectItem key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </label>
+          <label className="grid gap-1 text-2xs text-muted-foreground">
+            Актор
+            <Input aria-label="Актор" value={filters.actor ?? ''} onChange={(event) => update('actor', event.target.value, 300)} className="h-9 w-[170px]" />
+          </label>
+        </>
+      )}
       <span className="inline-flex h-9 items-center rounded-md bg-muted px-3 text-xs font-semibold">Фильтров: {activeCount}</span>
       <Button type="button" variant="outline" className="h-9" disabled={activeCount === 0} onClick={() => onChange(Object.fromEntries(Object.entries(filters).filter(([key]) => !keys.includes(key as keyof ReadinessUrlFilters))))}>Сбросить</Button>
     </div>
