@@ -104,3 +104,12 @@ export async function shot(page: Page, name: string) {
 
 /** Кнопки, которые обход НЕ нажимает: необратимое, выход и отправка данных. */
 export const DESTRUCTIVE = /удал|архив|сброс|выйти|выход|отозв|аннулир|подпис|опублик|отправ|закрыть смену|сдать|завершить смену|принять смену|передать|списать|заблок|деактив|delete|remove|logout|reset/i;
+
+/**
+ * Значение, которое тест уже проверил ожиданием: отсутствие — явная ошибка,
+ * а не "undefined" дальше по коду (замена `!` без правил стиля).
+ */
+export function must<T>(value: T | null | undefined, what: string): T {
+  if (value === null || value === undefined) throw new Error(`Нет значения: ${what}`);
+  return value;
+}

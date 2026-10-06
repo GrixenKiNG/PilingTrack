@@ -1,0 +1,929 @@
+[
+ {
+  "at": "2026-10-06T14:36:03.290Z",
+  "step": "v7-работа",
+  "note": "записи сделаны",
+  "apis": [
+   "200 GET /api/operator/mobile/state? :: {\"data\":{\"operator\":{\"id\":\"cmqig86it000v68vnp5xarirx\",\"name\":\"Щеголев Роман Николаевич\"},\"phase\":\"WORK\",\"progress\":[{\"phase\":\"IDENTITY\",\"label\":\"Допуск\",\"done\":true,\"current\":false},{\"phase\":\"ADMISSION\",\"label\":\"Приём\",\"done\":true,\"current\":false},{\"phase\":\"PR",
+   "200 POST /api/operator/mobile/command :: {\"data\":{\"reportId\":\"cmuws6xq4001st4w5l7w4ishc\"}}",
+   "200 GET /api/operator/mobile/state? :: {\"data\":{\"operator\":{\"id\":\"cmqig86it000v68vnp5xarirx\",\"name\":\"Щеголев Роман Николаевич\"},\"phase\":\"WORK\",\"progress\":[{\"phase\":\"IDENTITY\",\"label\":\"Допуск\",\"done\":true,\"current\":false},{\"phase\":\"ADMISSION\",\"label\":\"Приём\",\"done\":true,\"current\":false},{\"phase\":\"PR",
+   "200 POST /api/operator/mobile/command :: {\"data\":{\"reportId\":\"cmuws6xq4001st4w5l7w4ishc\"}}",
+   "200 GET /api/operator/mobile/state? :: {\"data\":{\"operator\":{\"id\":\"cmqig86it000v68vnp5xarirx\",\"name\":\"Щеголев Роман Николаевич\"},\"phase\":\"WORK\",\"progress\":[{\"phase\":\"IDENTITY\",\"label\":\"Допуск\",\"done\":true,\"current\":false},{\"phase\":\"ADMISSION\",\"label\":\"Приём\",\"done\":true,\"current\":false},{\"phase\":\"PR",
+   "400 POST /api/operator/mobile/command :: {\"error\":\"Простой не может начаться раньше смены — смена начата в 17:14.\"}"
+  ]
+ },
+ {
+  "at": "2026-10-06T14:38:54.375Z",
+  "step": "v7-простой",
+  "dtBefore": 0,
+  "dtAfter": 1,
+  "интервалНачало": "17:28"
+ },
+ {
+  "at": "2026-10-06T14:39:19.877Z",
+  "step": "v7-итог",
+  "shiftId": "ec19a322-cd9c-472f-85a1-321daa5bdfa3",
+  "shiftState": "HANDOVER_PENDING",
+  "reportRow": "RM-ec19a322-2026-10-06|draft|",
+  "piles": "2|28",
+  "drilling": "0|0",
+  "downtime": "600",
+  "apis": [
+   "200 GET /api/auth/me :: {\"user\":{\"id\":\"cmqig86it000v68vnp5xarirx\",\"email\":\"r0mix0n@mail.ru\",\"name\":\"Щеголев Роман Николаевич\",\"role\":\"OPERATOR\",\"isActive\":true}}",
+   "200 GET /api/feedback/events?limit=25 :: {\"requestId\":\"77e0493a-60f2-488e-8fdf-5fae64bf6dd8\",\"events\":[{\"id\":\"cmu8754wv00lb6kw5j38h3loi\",\"level\":\"info\",\"priority\":\"MEDIUM\",\"scope\":\"auth\",\"action\":\"auth.logout\",\"title\":\"Выход выполнен\",\"message\":\"Сессия пользователя была завершена.\",\"audience\":\"OPERAT",
+   "200 GET /api/operator/mobile/state? :: {\"data\":{\"operator\":{\"id\":\"cmqig86it000v68vnp5xarirx\",\"name\":\"Щеголев Роман Николаевич\"},\"phase\":\"WORK\",\"progress\":[{\"phase\":\"IDENTITY\",\"label\":\"Допуск\",\"done\":true,\"current\":false},{\"phase\":\"ADMISSION\",\"label\":\"Приём\",\"done\":true,\"current\":false},{\"phase\":\"PR",
+   "200 GET /api/operator/mobile/state? :: {\"data\":{\"operator\":{\"id\":\"cmqig86it000v68vnp5xarirx\",\"name\":\"Щеголев Роман Николаевич\"},\"phase\":\"WORK\",\"progress\":[{\"phase\":\"IDENTITY\",\"label\":\"Допуск\",\"done\":true,\"current\":false},{\"phase\":\"ADMISSION\",\"label\":\"Приём\",\"done\":true,\"current\":false},{\"phase\":\"PR",
+   "200 POST /api/operator/mobile/command :: {\"data\":{\"reportId\":\"cmuws6xq4001st4w5l7w4ishc\"}}",
+   "200 GET /api/operator/mobile/state? :: {\"data\":{\"operator\":{\"id\":\"cmqig86it000v68vnp5xarirx\",\"name\":\"Щеголев Роман Николаевич\"},\"phase\":\"WORK\",\"progress\":[{\"phase\":\"IDENTITY\",\"label\":\"Допуск\",\"done\":true,\"current\":false},{\"phase\":\"ADMISSION\",\"label\":\"Приём\",\"done\":true,\"current\":false},{\"phase\":\"PR",
+   "200 POST /api/operator/mobile/command :: {\"data\":{\"reportId\":\"cmuws6xq4001st4w5l7w4ishc\"}}",
+   "200 GET /api/operator/mobile/state? :: {\"data\":{\"operator\":{\"id\":\"cmqig86it000v68vnp5xarirx\",\"name\":\"Щеголев Роман Николаевич\"},\"phase\":\"WORK\",\"progress\":[{\"phase\":\"IDENTITY\",\"label\":\"Допуск\",\"done\":true,\"current\":false},{\"phase\":\"ADMISSION\",\"label\":\"Приём\",\"done\":true,\"current\":false},{\"phase\":\"PR",
+   "200 POST /api/operator/mobile/command :: {\"data\":{\"ok\":true}}",
+   "200 GET /api/operator/mobile/state? :: {\"data\":{\"operator\":{\"id\":\"cmqig86it000v68vnp5xarirx\",\"name\":\"Щеголев Роман Николаевич\"},\"phase\":\"CLOSING\",\"progress\":[{\"phase\":\"IDENTITY\",\"label\":\"Допуск\",\"done\":true,\"current\":false},{\"phase\":\"ADMISSION\",\"label\":\"Приём\",\"done\":true,\"current\":false},{\"phase\":"
+  ]
+ },
+ {
+  "at": "2026-10-06T14:42:02.798Z",
+  "step": "v7-итог",
+  "shiftId": "ec19a322-cd9c-472f-85a1-321daa5bdfa3",
+  "shiftState": "HANDOVER_PENDING",
+  "reportRow": "RM-ec19a322-2026-10-06|draft|",
+  "piles": "2|28",
+  "drilling": "2|24",
+  "downtime": "600",
+  "apis": [
+   "200 GET /api/auth/me :: {\"user\":{\"id\":\"cmqig86it000v68vnp5xarirx\",\"email\":\"r0mix0n@mail.ru\",\"name\":\"Щеголев Роман Николаевич\",\"role\":\"OPERATOR\",\"isActive\":true}}",
+   "200 GET /api/auth/me :: {\"user\":{\"id\":\"cmqig86it000v68vnp5xarirx\",\"email\":\"r0mix0n@mail.ru\",\"name\":\"Щеголев Роман Николаевич\",\"role\":\"OPERATOR\",\"isActive\":true}}",
+   "200 GET /api/feedback/events?limit=25 :: {\"requestId\":\"64cc6f14-b680-4694-9ae0-54f6f0592d32\",\"events\":[{\"id\":\"cmu8754wv00lb6kw5j38h3loi\",\"level\":\"info\",\"priority\":\"MEDIUM\",\"scope\":\"auth\",\"action\":\"auth.logout\",\"title\":\"Выход выполнен\",\"message\":\"Сессия пользователя была завершена.\",\"audience\":\"OPERAT",
+   "200 GET /api/operator/mobile/state? :: {\"data\":{\"operator\":{\"id\":\"cmqig86it000v68vnp5xarirx\",\"name\":\"Щеголев Роман Николаевич\"},\"phase\":\"CLOSING\",\"progress\":[{\"phase\":\"IDENTITY\",\"label\":\"Допуск\",\"done\":true,\"current\":false},{\"phase\":\"ADMISSION\",\"label\":\"Приём\",\"done\":true,\"current\":false},{\"phase\":",
+   "200 GET /api/operator/mobile/state? :: {\"data\":{\"operator\":{\"id\":\"cmqig86it000v68vnp5xarirx\",\"name\":\"Щеголев Роман Николаевич\"},\"phase\":\"CLOSING\",\"progress\":[{\"phase\":\"IDENTITY\",\"label\":\"Допуск\",\"done\":true,\"current\":false},{\"phase\":\"ADMISSION\",\"label\":\"Приём\",\"done\":true,\"current\":false},{\"phase\":",
+   "200 GET /api/operator/mobile/state? :: {\"data\":{\"operator\":{\"id\":\"cmqig86it000v68vnp5xarirx\",\"name\":\"Щеголев Роман Николаевич\"},\"phase\":\"CLOSING\",\"progress\":[{\"phase\":\"IDENTITY\",\"label\":\"Допуск\",\"done\":true,\"current\":false},{\"phase\":\"ADMISSION\",\"label\":\"Приём\",\"done\":true,\"current\":false},{\"phase\":",
+   "200 GET /api/operator/mobile/state? :: {\"data\":{\"operator\":{\"id\":\"cmqig86it000v68vnp5xarirx\",\"name\":\"Щеголев Роман Николаевич\"},\"phase\":\"CLOSING\",\"progress\":[{\"phase\":\"IDENTITY\",\"label\":\"Допуск\",\"done\":true,\"current\":false},{\"phase\":\"ADMISSION\",\"label\":\"Приём\",\"done\":true,\"current\":false},{\"phase\":",
+   "400 POST /api/operator/mobile/command :: {\"error\":\"Чек-лист заполнен не полностью\",\"details\":[{\"itemId\":\"fuel-level\",\"message\":\"Остаток топлива: допустимо от 0 до 100 %\",\"label\":\"Остаток топлива снят с указателя\"}]}"
+  ]
+ },
+ {
+  "at": "2026-10-06T14:43:11.195Z",
+  "step": "v7-итог",
+  "shiftId": "ec19a322-cd9c-472f-85a1-321daa5bdfa3",
+  "shiftState": "CLOSED",
+  "reportRow": "RM-ec19a322-2026-10-06|submitted|2026-10-06 14:43:03.633+00",
+  "piles": "2|28",
+  "drilling": "2|24",
+  "downtime": "600",
+  "apis": [
+   "200 GET /api/auth/me :: {\"user\":{\"id\":\"cmqig86it000v68vnp5xarirx\",\"email\":\"r0mix0n@mail.ru\",\"name\":\"Щеголев Роман Николаевич\",\"role\":\"OPERATOR\",\"isActive\":true}}",
+   "200 GET /api/feedback/events?limit=25 :: {\"requestId\":\"36928fcb-30c3-4c5f-9650-dea13726ec6e\",\"events\":[{\"id\":\"cmu8754wv00lb6kw5j38h3loi\",\"level\":\"info\",\"priority\":\"MEDIUM\",\"scope\":\"auth\",\"action\":\"auth.logout\",\"title\":\"Выход выполнен\",\"message\":\"Сессия пользователя была завершена.\",\"audience\":\"OPERAT",
+   "200 GET /api/operator/mobile/state? :: {\"data\":{\"operator\":{\"id\":\"cmqig86it000v68vnp5xarirx\",\"name\":\"Щеголев Роман Николаевич\"},\"phase\":\"CLOSING\",\"progress\":[{\"phase\":\"IDENTITY\",\"label\":\"Допуск\",\"done\":true,\"current\":false},{\"phase\":\"ADMISSION\",\"label\":\"Приём\",\"done\":true,\"current\":false},{\"phase\":",
+   "200 GET /api/operator/mobile/state? :: {\"data\":{\"operator\":{\"id\":\"cmqig86it000v68vnp5xarirx\",\"name\":\"Щеголев Роман Николаевич\"},\"phase\":\"CLOSING\",\"progress\":[{\"phase\":\"IDENTITY\",\"label\":\"Допуск\",\"done\":true,\"current\":false},{\"phase\":\"ADMISSION\",\"label\":\"Приём\",\"done\":true,\"current\":false},{\"phase\":",
+   "200 GET /api/operator/mobile/state? :: {\"data\":{\"operator\":{\"id\":\"cmqig86it000v68vnp5xarirx\",\"name\":\"Щеголев Роман Николаевич\"},\"phase\":\"CLOSING\",\"progress\":[{\"phase\":\"IDENTITY\",\"label\":\"Допуск\",\"done\":true,\"current\":false},{\"phase\":\"ADMISSION\",\"label\":\"Приём\",\"done\":true,\"current\":false},{\"phase\":",
+   "200 GET /api/operator/mobile/state? :: {\"data\":{\"operator\":{\"id\":\"cmqig86it000v68vnp5xarirx\",\"name\":\"Щеголев Роман Николаевич\"},\"phase\":\"CLOSING\",\"progress\":[{\"phase\":\"IDENTITY\",\"label\":\"Допуск\",\"done\":true,\"current\":false},{\"phase\":\"ADMISSION\",\"label\":\"Приём\",\"done\":true,\"current\":false},{\"phase\":",
+   "200 POST /api/operator/mobile/command :: {\"data\":{\"executionId\":\"cmuwsg3d50021t4w57um6hj7f\",\"defects\":0,\"createdDefects\":[]}}",
+   "200 GET /api/operator/mobile/state? :: {\"data\":{\"operator\":{\"id\":\"cmqig86it000v68vnp5xarirx\",\"name\":\"Щеголев Роман Николаевич\"},\"phase\":\"CLOSING\",\"progress\":[{\"phase\":\"IDENTITY\",\"label\":\"Допуск\",\"done\":true,\"current\":false},{\"phase\":\"ADMISSION\",\"label\":\"Приём\",\"done\":true,\"current\":false},{\"phase\":",
+   "200 POST /api/operator/mobile/command :: {\"data\":{\"ok\":true,\"reportId\":\"cmuws6xq4001st4w5l7w4ishc\"}}",
+   "200 GET /api/operator/mobile/state? :: {\"data\":{\"operator\":{\"id\":\"cmqig86it000v68vnp5xarirx\",\"name\":\"Щеголев Роман Николаевич\"},\"phase\":\"CLOSED\",\"progress\":[{\"phase\":\"IDENTITY\",\"label\":\"Допуск\",\"done\":true,\"current\":false},{\"phase\":\"ADMISSION\",\"label\":\"Приём\",\"done\":true,\"current\":false},{\"phase\":\""
+  ]
+ },
+ {
+  "at": "2026-10-06T14:43:11.207Z",
+  "step": "v7-отчёт-для-таблицы",
+  "reportId": "RM-ec19a322-2026-10-06",
+  "submittedAt": "2026-10-06 14:43:03.633+00",
+  "piles": "2 шт / 28 м.п.",
+  "drilling": "2|24",
+  "downtime": "600"
+ },
+ {
+  "at": "2026-10-06T14:44:00.231Z",
+  "step": "v7-итог",
+  "shiftId": "ec19a322-cd9c-472f-85a1-321daa5bdfa3",
+  "shiftState": "CLOSED",
+  "reportRow": "RM-ec19a322-2026-10-06|submitted|2026-10-06 14:43:03.633+00",
+  "piles": "2|28",
+  "drilling": "2|24",
+  "downtime": "600",
+  "apis": [
+   "200 GET /api/auth/me :: {\"user\":{\"id\":\"cmqig86it000v68vnp5xarirx\",\"email\":\"r0mix0n@mail.ru\",\"name\":\"Щеголев Роман Николаевич\",\"role\":\"OPERATOR\",\"isActive\":true}}",
+   "200 GET /api/auth/me :: {\"user\":{\"id\":\"cmqig86it000v68vnp5xarirx\",\"email\":\"r0mix0n@mail.ru\",\"name\":\"Щеголев Роман Николаевич\",\"role\":\"OPERATOR\",\"isActive\":true}}",
+   "200 GET /api/feedback/events?limit=25 :: {\"requestId\":\"52f93d37-1505-433f-84f5-bb2238fb2b0e\",\"events\":[{\"id\":\"cmu8754wv00lb6kw5j38h3loi\",\"level\":\"info\",\"priority\":\"MEDIUM\",\"scope\":\"auth\",\"action\":\"auth.logout\",\"title\":\"Выход выполнен\",\"message\":\"Сессия пользователя была завершена.\",\"audience\":\"OPERAT",
+   "200 GET /api/operator/mobile/state? :: {\"data\":{\"operator\":{\"id\":\"cmqig86it000v68vnp5xarirx\",\"name\":\"Щеголев Роман Николаевич\"},\"phase\":\"CLOSED\",\"progress\":[{\"phase\":\"IDENTITY\",\"label\":\"Допуск\",\"done\":true,\"current\":false},{\"phase\":\"ADMISSION\",\"label\":\"Приём\",\"done\":true,\"current\":false},{\"phase\":\"",
+   "200 GET /api/operator/mobile/state? :: {\"data\":{\"operator\":{\"id\":\"cmqig86it000v68vnp5xarirx\",\"name\":\"Щеголев Роман Николаевич\"},\"phase\":\"CLOSED\",\"progress\":[{\"phase\":\"IDENTITY\",\"label\":\"Допуск\",\"done\":true,\"current\":false},{\"phase\":\"ADMISSION\",\"label\":\"Приём\",\"done\":true,\"current\":false},{\"phase\":\"",
+   "200 GET /api/operator/mobile/state? :: {\"data\":{\"operator\":{\"id\":\"cmqig86it000v68vnp5xarirx\",\"name\":\"Щеголев Роман Николаевич\"},\"phase\":\"CLOSED\",\"progress\":[{\"phase\":\"IDENTITY\",\"label\":\"Допуск\",\"done\":true,\"current\":false},{\"phase\":\"ADMISSION\",\"label\":\"Приём\",\"done\":true,\"current\":false},{\"phase\":\"",
+   "200 GET /api/operator/mobile/state? :: {\"data\":{\"operator\":{\"id\":\"cmqig86it000v68vnp5xarirx\",\"name\":\"Щеголев Роман Николаевич\"},\"phase\":\"CLOSED\",\"progress\":[{\"phase\":\"IDENTITY\",\"label\":\"Допуск\",\"done\":true,\"current\":false},{\"phase\":\"ADMISSION\",\"label\":\"Приём\",\"done\":true,\"current\":false},{\"phase\":\""
+  ]
+ },
+ {
+  "at": "2026-10-06T14:44:00.242Z",
+  "step": "v7-отчёт-для-таблицы",
+  "reportId": "RM-ec19a322-2026-10-06",
+  "submittedAt": "2026-10-06 14:43:03.633+00",
+  "piles": "2 шт / 28 м.п.",
+  "drilling": "2|24",
+  "downtime": "600"
+ },
+ {
+  "at": "2026-10-06T14:44:12.342Z",
+  "step": "NEW-9",
+  "apis": []
+ },
+ {
+  "at": "2026-10-06T15:51:49.076Z",
+  "step": "v7-итог",
+  "shiftId": "ec19a322-cd9c-472f-85a1-321daa5bdfa3",
+  "shiftState": "CLOSED",
+  "reportRow": "RM-ec19a322-2026-10-06|submitted|2026-10-06 14:43:03.633+00",
+  "piles": "2|28",
+  "drilling": "2|24",
+  "downtime": "600",
+  "apis": [
+   "200 GET /api/auth/me :: {\"user\":{\"id\":\"cmqig86it000v68vnp5xarirx\",\"email\":\"r0mix0n@mail.ru\",\"name\":\"Щеголев Роман Николаевич\",\"role\":\"OPERATOR\",\"isActive\":true}}",
+   "200 GET /api/auth/me :: {\"user\":{\"id\":\"cmqig86it000v68vnp5xarirx\",\"email\":\"r0mix0n@mail.ru\",\"name\":\"Щеголев Роман Николаевич\",\"role\":\"OPERATOR\",\"isActive\":true}}",
+   "200 GET /api/feedback/events?limit=25 :: {\"requestId\":\"ea02bc81-8ff4-4bed-8cc2-1b2e4e5403ec\",\"events\":[{\"id\":\"cmu8754wv00lb6kw5j38h3loi\",\"level\":\"info\",\"priority\":\"MEDIUM\",\"scope\":\"auth\",\"action\":\"auth.logout\",\"title\":\"Выход выполнен\",\"message\":\"Сессия пользователя была завершена.\",\"audience\":\"OPERAT",
+   "200 GET /api/operator/mobile/state? :: {\"data\":{\"operator\":{\"id\":\"cmqig86it000v68vnp5xarirx\",\"name\":\"Щеголев Роман Николаевич\"},\"phase\":\"CLOSED\",\"progress\":[{\"phase\":\"IDENTITY\",\"label\":\"Допуск\",\"done\":true,\"current\":false},{\"phase\":\"ADMISSION\",\"label\":\"Приём\",\"done\":true,\"current\":false},{\"phase\":\"",
+   "200 GET /api/operator/mobile/state? :: {\"data\":{\"operator\":{\"id\":\"cmqig86it000v68vnp5xarirx\",\"name\":\"Щеголев Роман Николаевич\"},\"phase\":\"CLOSED\",\"progress\":[{\"phase\":\"IDENTITY\",\"label\":\"Допуск\",\"done\":true,\"current\":false},{\"phase\":\"ADMISSION\",\"label\":\"Приём\",\"done\":true,\"current\":false},{\"phase\":\""
+  ]
+ },
+ {
+  "at": "2026-10-06T15:51:49.088Z",
+  "step": "v7-отчёт-для-таблицы",
+  "reportId": "RM-ec19a322-2026-10-06",
+  "submittedAt": "2026-10-06 14:43:03.633+00",
+  "piles": "2 шт / 28 м.п.",
+  "drilling": "2|24",
+  "downtime": "600"
+ },
+ {
+  "at": "2026-10-06T15:51:56.023Z",
+  "step": "NEW-9",
+  "шаг7": true,
+  "хвост": "Плановое ТО просрочено Срок по наработке пройден. Сообщите диспетчеру: машину надо поставить на ТО. Сначала послесменное обслуживание Пока машина не осмотрена и не обслужена, смену закрыть нельзя. Итог смены Свай забито 2шт·28.0м.п. Лидерное бурение 0шт·0.0м.п. Простой 0 ч Выполнить ЕО после работы Сдача ТБ Техника Ещё",
+  "apis": [
+   "200 GET /api/auth/me :: {\"user\":{\"id\":\"cmot2zgwi000w01mom9873hwy\",\"email\":\"ka@piling.ru\",\"name\":\"Краснов Александр Михайлович\",\"role\":\"OPERATOR\",\"isActive\":true}}",
+   "200 GET /api/auth/me :: {\"user\":{\"id\":\"cmot2zgwi000w01mom9873hwy\",\"email\":\"ka@piling.ru\",\"name\":\"Краснов Александр Михайлович\",\"role\":\"OPERATOR\",\"isActive\":true}}",
+   "200 GET /api/feedback/events?limit=25 :: {\"requestId\":\"df12ffcc-f2d4-4917-bc09-f662b9d6787c\",\"events\":[{\"id\":\"cmuvy8ax30273scw5n3l3vggu\",\"level\":\"warn\",\"priority\":\"MEDIUM\",\"scope\":\"pdf\",\"action\":\"report.single_pdf.sync.failed\",\"title\":\"Ошибка формирования PDF\",\"message\":\"Доступ запрещён\",\"audience\":\"",
+   "200 GET /api/operator/mobile/state? :: {\"data\":{\"operator\":{\"id\":\"cmot2zgwi000w01mom9873hwy\",\"name\":\"Краснов Александр Михайлович\"},\"phase\":\"CLOSING\",\"progress\":[{\"phase\":\"IDENTITY\",\"label\":\"Допуск\",\"done\":true,\"current\":false},{\"phase\":\"ADMISSION\",\"label\":\"Приём\",\"done\":true,\"current\":false},{\"pha",
+   "200 GET /api/operator/mobile/state? :: {\"data\":{\"operator\":{\"id\":\"cmot2zgwi000w01mom9873hwy\",\"name\":\"Краснов Александр Михайлович\"},\"phase\":\"CLOSING\",\"progress\":[{\"phase\":\"IDENTITY\",\"label\":\"Допуск\",\"done\":true,\"current\":false},{\"phase\":\"ADMISSION\",\"label\":\"Приём\",\"done\":true,\"current\":false},{\"pha",
+   "200 GET /api/auth/me :: {\"user\":{\"id\":\"cmot2zgwi000w01mom9873hwy\",\"email\":\"ka@piling.ru\",\"name\":\"Краснов Александр Михайлович\",\"role\":\"OPERATOR\",\"isActive\":true}}",
+   "200 GET /api/auth/me :: {\"user\":{\"id\":\"cmot2zgwi000w01mom9873hwy\",\"email\":\"ka@piling.ru\",\"name\":\"Краснов Александр Михайлович\",\"role\":\"OPERATOR\",\"isActive\":true}}",
+   "200 GET /api/feedback/events?limit=25 :: {\"requestId\":\"df12ffcc-f2d4-4917-bc09-f662b9d6787c\",\"events\":[{\"id\":\"cmuvy8ax30273scw5n3l3vggu\",\"level\":\"warn\",\"priority\":\"MEDIUM\",\"scope\":\"pdf\",\"action\":\"report.single_pdf.sync.failed\",\"title\":\"Ошибка формирования PDF\",\"message\":\"Доступ запрещён\",\"audience\":\"",
+   "200 GET /api/operator/mobile/state? :: {\"data\":{\"operator\":{\"id\":\"cmot2zgwi000w01mom9873hwy\",\"name\":\"Краснов Александр Михайлович\"},\"phase\":\"CLOSING\",\"progress\":[{\"phase\":\"IDENTITY\",\"label\":\"Допуск\",\"done\":true,\"current\":false},{\"phase\":\"ADMISSION\",\"label\":\"Приём\",\"done\":true,\"current\":false},{\"pha",
+   "200 GET /api/operator/mobile/state? :: {\"data\":{\"operator\":{\"id\":\"cmot2zgwi000w01mom9873hwy\",\"name\":\"Краснов Александр Михайлович\"},\"phase\":\"CLOSING\",\"progress\":[{\"phase\":\"IDENTITY\",\"label\":\"Допуск\",\"done\":true,\"current\":false},{\"phase\":\"ADMISSION\",\"label\":\"Приём\",\"done\":true,\"current\":false},{\"pha"
+  ]
+ },
+ {
+  "at": "2026-10-06T15:52:10.455Z",
+  "step": "ka-итог",
+  "kaShiftId": "9f5b221c-e03f-4e8f-b822-2fa81110e159",
+  "kaState": "HANDOVER_PENDING",
+  "reportRow": "RM-9f5b221c-2026-10-06|draft|"
+ },
+ {
+  "at": "2026-10-06T15:52:22.502Z",
+  "step": "D-20260930-001",
+  "before": "PilingTrack 9+ Андреев Петр Юрьевич Смена закрыта После работы Спасибо! Смена успешно завершена Смена закрыта, отчёт отправлен диспетчеру Время работы 230:52:59 Сваи выполнено 0 шт · 0 м.п. Бурение 0 скв · 0 м Простой 0 ч Моточасы 14 266 м/ч Отчёт RM-aefb1c9a-2026-09-27 На главную",
+  "after": "PilingTrack 9+ Андреев Петр Юрьевич Смена закрыта После работы Спасибо! Смена успешно завершена Смена закрыта, отчёт отправлен диспетчеру Время работы 230:53:04 Сваи выполнено 0 шт · 0 м.п. Бурение 0 скв · 0 м Простой 0 ч Моточасы 14 266 м/ч Отчёт RM-aefb1c9a-2026-09-27 На главную",
+  "apis": [
+   "200 GET /api/auth/me :: {\"user\":{\"id\":\"cmot2wpa3000s01mo1p65ywy1\",\"email\":\"apj@piling.ru\",\"name\":\"Андреев Петр Юрьевич\",\"role\":\"OPERATOR\",\"isActive\":true}}",
+   "200 GET /api/auth/me :: {\"user\":{\"id\":\"cmot2wpa3000s01mo1p65ywy1\",\"email\":\"apj@piling.ru\",\"name\":\"Андреев Петр Юрьевич\",\"role\":\"OPERATOR\",\"isActive\":true}}",
+   "200 GET /api/feedback/events?limit=25 :: {\"requestId\":\"1483a4cf-c3de-4c00-9a86-ebfe97b9bff1\",\"events\":[{\"id\":\"cmuj4cle70071wgw53jvw6otq\",\"level\":\"error\",\"priority\":\"HIGH\",\"scope\":\"api\",\"action\":\"api.request_failed\",\"title\":\"Серверная ошибка\",\"message\":\"Запрос GET /api/weather?lat=58.5215&lon=31.271 з",
+   "200 GET /api/operator/mobile/state? :: {\"data\":{\"operator\":{\"id\":\"cmot2wpa3000s01mo1p65ywy1\",\"name\":\"Андреев Петр Юрьевич\"},\"phase\":\"IDENTITY\",\"progress\":[{\"phase\":\"IDENTITY\",\"label\":\"Допуск\",\"done\":false,\"current\":true},{\"phase\":\"ADMISSION\",\"label\":\"Приём\",\"done\":false,\"current\":false},{\"phase\":\"P",
+   "200 GET /api/operator/mobile/state? :: {\"data\":{\"operator\":{\"id\":\"cmot2wpa3000s01mo1p65ywy1\",\"name\":\"Андреев Петр Юрьевич\"},\"phase\":\"IDENTITY\",\"progress\":[{\"phase\":\"IDENTITY\",\"label\":\"Допуск\",\"done\":false,\"current\":true},{\"phase\":\"ADMISSION\",\"label\":\"Приём\",\"done\":false,\"current\":false},{\"phase\":\"P",
+   "200 GET /api/operator/shift :: {\"assignments\":[{\"equipmentId\":\"19aaf71c-5fc3-4566-a1d8-78622347462e\",\"equipmentName\":\"Liebherr LRH 100 №2\",\"model\":\"LRH 100\",\"siteId\":\"cmosf1pn5001g01mkikoaqjft\",\"siteName\":\"ВСМЖ г.Великий Новгород\"}],\"equipment\":{\"id\":\"19aaf71c-5fc3-4566-a1d8-78622347462e\",\"",
+   "200 GET /api/operator/shift :: {\"assignments\":[{\"equipmentId\":\"19aaf71c-5fc3-4566-a1d8-78622347462e\",\"equipmentName\":\"Liebherr LRH 100 №2\",\"model\":\"LRH 100\",\"siteId\":\"cmosf1pn5001g01mkikoaqjft\",\"siteName\":\"ВСМЖ г.Великий Новгород\"}],\"equipment\":{\"id\":\"19aaf71c-5fc3-4566-a1d8-78622347462e\",\"",
+   "200 GET /api/operator/shift :: {\"assignments\":[{\"equipmentId\":\"19aaf71c-5fc3-4566-a1d8-78622347462e\",\"equipmentName\":\"Liebherr LRH 100 №2\",\"model\":\"LRH 100\",\"siteId\":\"cmosf1pn5001g01mkikoaqjft\",\"siteName\":\"ВСМЖ г.Великий Новгород\"}],\"equipment\":{\"id\":\"19aaf71c-5fc3-4566-a1d8-78622347462e\",\""
+  ]
+ },
+ {
+  "at": "2026-10-06T15:52:36.222Z",
+  "step": "D-20261001-001",
+  "before": "На связи 18:52 KOPERNIK JINT-SD20A ВСМЖ г.Великий Новгород · Митрофанов Алексей Геннадьевич ДОПУСК ОТКРЫТ Все документы действуют Средства индивидуальной защиты проверка за сегодня НУЖНА Безопасность при свайных работах И-СМ-04 · ред. 1.0 УЧТЁН Проверка знаний по ОТ действует до 15.10.2026 ЕСТЬ Атте",
+  "after": "На связи 18:52 KOPERNIK JINT-SD20A ВСМЖ г.Великий Новгород · Митрофанов Алексей Геннадьевич Средства защиты проверены. ЕО после работы Что сделать до ухода, чтобы завтра машина завелась и поехала. Постановка ! Машина на ровном основании, мачта опущена на землю норма дефект Осмотр после работы ! Осмотр на деформации и трещины: мачта, стрела, рама норма дефект Течи после смены: двигатель, гидравлика",
+  "apis": [
+   "200 GET /api/auth/me :: {\"user\":{\"id\":\"cmot30g80000y01moqszjpvor\",\"email\":\"mag@piling.ru\",\"name\":\"Митрофанов Алексей Геннадьевич\",\"role\":\"OPERATOR\",\"isActive\":true}}",
+   "200 GET /api/auth/me :: {\"user\":{\"id\":\"cmot30g80000y01moqszjpvor\",\"email\":\"mag@piling.ru\",\"name\":\"Митрофанов Алексей Геннадьевич\",\"role\":\"OPERATOR\",\"isActive\":true}}",
+   "200 GET /api/feedback/events?limit=25 :: {\"requestId\":\"b8819b8f-b475-40af-a32a-896dfbccabfa\",\"events\":[{\"id\":\"cmu8so4b900i7tkw5fo1fcl4y\",\"level\":\"info\",\"priority\":\"MEDIUM\",\"scope\":\"auth\",\"action\":\"auth.logout\",\"title\":\"Выход выполнен\",\"message\":\"Сессия пользователя была завершена.\",\"audience\":\"OPERAT",
+   "200 GET /api/operator/mobile/state? :: {\"data\":{\"operator\":{\"id\":\"cmot30g80000y01moqszjpvor\",\"name\":\"Митрофанов Алексей Геннадьевич\"},\"phase\":\"IDENTITY\",\"progress\":[{\"phase\":\"IDENTITY\",\"label\":\"Допуск\",\"done\":false,\"current\":true},{\"phase\":\"ADMISSION\",\"label\":\"Приём\",\"done\":false,\"current\":false},{",
+   "200 GET /api/operator/mobile/state? :: {\"data\":{\"operator\":{\"id\":\"cmot30g80000y01moqszjpvor\",\"name\":\"Митрофанов Алексей Геннадьевич\"},\"phase\":\"IDENTITY\",\"progress\":[{\"phase\":\"IDENTITY\",\"label\":\"Допуск\",\"done\":false,\"current\":true},{\"phase\":\"ADMISSION\",\"label\":\"Приём\",\"done\":false,\"current\":false},{",
+   "200 GET /api/operator/mobile/state? :: {\"data\":{\"operator\":{\"id\":\"cmot30g80000y01moqszjpvor\",\"name\":\"Митрофанов Алексей Геннадьевич\"},\"phase\":\"IDENTITY\",\"progress\":[{\"phase\":\"IDENTITY\",\"label\":\"Допуск\",\"done\":false,\"current\":true},{\"phase\":\"ADMISSION\",\"label\":\"Приём\",\"done\":false,\"current\":false},{",
+   "200 GET /api/operator/mobile/state? :: {\"data\":{\"operator\":{\"id\":\"cmot30g80000y01moqszjpvor\",\"name\":\"Митрофанов Алексей Геннадьевич\"},\"phase\":\"IDENTITY\",\"progress\":[{\"phase\":\"IDENTITY\",\"label\":\"Допуск\",\"done\":false,\"current\":true},{\"phase\":\"ADMISSION\",\"label\":\"Приём\",\"done\":false,\"current\":false},{",
+   "200 POST /api/operator/mobile/command :: {\"data\":{\"items\":[\"HELMET\",\"VEST\",\"BOOTS\",\"GLOVES\",\"GLASSES\",\"EARMUFFS\"],\"missing\":[]}}",
+   "200 GET /api/operator/mobile/state? :: {\"data\":{\"operator\":{\"id\":\"cmot30g80000y01moqszjpvor\",\"name\":\"Митрофанов Алексей Геннадьевич\"},\"phase\":\"CLOSING\",\"progress\":[{\"phase\":\"IDENTITY\",\"label\":\"Допуск\",\"done\":true,\"current\":false},{\"phase\":\"ADMISSION\",\"label\":\"Приём\",\"done\":true,\"current\":false},{\"p"
+  ]
+ },
+ {
+  "at": "2026-10-06T15:53:19.012Z",
+  "step": "NEW-9",
+  "шаг7": true,
+  "хвост": "аработке пройден. Сообщите диспетчеру: машину надо поставить на ТО. Послесменное обслуживание выполнено Осталось записать итог смены и отправить отчёт диспетчеру. Итог смены Свай забито 2шт·28.0м.п. Лидерное бурение 0шт·0.0м.п. Простой 0 ч Что оставить себе на завтра Закрыть смену и отправить отчёт Сдача ТБ Техника Ещё",
+  "apis": [
+   "200 GET /api/auth/me :: {\"user\":{\"id\":\"cmot2zgwi000w01mom9873hwy\",\"email\":\"ka@piling.ru\",\"name\":\"Краснов Александр Михайлович\",\"role\":\"OPERATOR\",\"isActive\":true}}",
+   "200 GET /api/auth/me :: {\"user\":{\"id\":\"cmot2zgwi000w01mom9873hwy\",\"email\":\"ka@piling.ru\",\"name\":\"Краснов Александр Михайлович\",\"role\":\"OPERATOR\",\"isActive\":true}}",
+   "200 GET /api/feedback/events?limit=25 :: {\"requestId\":\"280b71a3-db8b-4246-9016-125207258701\",\"events\":[{\"id\":\"cmuvy8ax30273scw5n3l3vggu\",\"level\":\"warn\",\"priority\":\"MEDIUM\",\"scope\":\"pdf\",\"action\":\"report.single_pdf.sync.failed\",\"title\":\"Ошибка формирования PDF\",\"message\":\"Доступ запрещён\",\"audience\":\"",
+   "200 GET /api/operator/mobile/state? :: {\"data\":{\"operator\":{\"id\":\"cmot2zgwi000w01mom9873hwy\",\"name\":\"Краснов Александр Михайлович\"},\"phase\":\"CLOSING\",\"progress\":[{\"phase\":\"IDENTITY\",\"label\":\"Допуск\",\"done\":true,\"current\":false},{\"phase\":\"ADMISSION\",\"label\":\"Приём\",\"done\":true,\"current\":false},{\"pha",
+   "200 GET /api/operator/mobile/state? :: {\"data\":{\"operator\":{\"id\":\"cmot2zgwi000w01mom9873hwy\",\"name\":\"Краснов Александр Михайлович\"},\"phase\":\"CLOSING\",\"progress\":[{\"phase\":\"IDENTITY\",\"label\":\"Допуск\",\"done\":true,\"current\":false},{\"phase\":\"ADMISSION\",\"label\":\"Приём\",\"done\":true,\"current\":false},{\"pha",
+   "200 GET /api/auth/me :: {\"user\":{\"id\":\"cmot2zgwi000w01mom9873hwy\",\"email\":\"ka@piling.ru\",\"name\":\"Краснов Александр Михайлович\",\"role\":\"OPERATOR\",\"isActive\":true}}",
+   "200 GET /api/auth/me :: {\"user\":{\"id\":\"cmot2zgwi000w01mom9873hwy\",\"email\":\"ka@piling.ru\",\"name\":\"Краснов Александр Михайлович\",\"role\":\"OPERATOR\",\"isActive\":true}}",
+   "200 GET /api/feedback/events?limit=25 :: {\"requestId\":\"280b71a3-db8b-4246-9016-125207258701\",\"events\":[{\"id\":\"cmuvy8ax30273scw5n3l3vggu\",\"level\":\"warn\",\"priority\":\"MEDIUM\",\"scope\":\"pdf\",\"action\":\"report.single_pdf.sync.failed\",\"title\":\"Ошибка формирования PDF\",\"message\":\"Доступ запрещён\",\"audience\":\"",
+   "200 GET /api/operator/mobile/state? :: {\"data\":{\"operator\":{\"id\":\"cmot2zgwi000w01mom9873hwy\",\"name\":\"Краснов Александр Михайлович\"},\"phase\":\"CLOSING\",\"progress\":[{\"phase\":\"IDENTITY\",\"label\":\"Допуск\",\"done\":true,\"current\":false},{\"phase\":\"ADMISSION\",\"label\":\"Приём\",\"done\":true,\"current\":false},{\"pha",
+   "200 GET /api/operator/mobile/state? :: {\"data\":{\"operator\":{\"id\":\"cmot2zgwi000w01mom9873hwy\",\"name\":\"Краснов Александр Михайлович\"},\"phase\":\"CLOSING\",\"progress\":[{\"phase\":\"IDENTITY\",\"label\":\"Допуск\",\"done\":true,\"current\":false},{\"phase\":\"ADMISSION\",\"label\":\"Приём\",\"done\":true,\"current\":false},{\"pha"
+  ]
+ },
+ {
+  "at": "2026-10-06T15:53:23.163Z",
+  "step": "ka-итог",
+  "kaShiftId": "9f5b221c-e03f-4e8f-b822-2fa81110e159",
+  "kaState": "CLOSED",
+  "reportRow": "RM-9f5b221c-2026-10-06|submitted|2026-10-06 15:53:19.125+00"
+ },
+ {
+  "at": "2026-10-06T16:26:19.945Z",
+  "step": "operator-итог",
+  "shiftId": "673a209d-a9ee-40b8-b88f-e64f1f1ccc5c",
+  "state": "CLOSED",
+  "reportRow": "RM-673a209d-2026-10-06|submitted|2026-10-06 16:26:14.665+00",
+  "piles": "2",
+  "drilling": "12",
+  "downtime": "360",
+  "apis": [
+   "200 GET /api/auth/me :: {\"user\":{\"id\":\"cmq1ylkyt00023wvn47bclk71\",\"email\":\"operator@piling.ru\",\"name\":\"Иванов И.П.\",\"role\":\"OPERATOR\",\"isActive\":true}}",
+   "200 GET /api/feedback/events?limit=25 :: {\"requestId\":\"87dd1b88-a5cb-4e6a-b2bd-4882c46b3ea5\",\"events\":[{\"id\":\"cmu8savop00fdtkw5uvkn6n8l\",\"level\":\"info\",\"priority\":\"MEDIUM\",\"scope\":\"auth\",\"action\":\"auth.logout\",\"title\":\"Выход выполнен\",\"message\":\"Сессия пользователя была завершена.\",\"audience\":\"OPERAT",
+   "200 GET /api/operator/mobile/state? :: {\"data\":{\"operator\":{\"id\":\"cmq1ylkyt00023wvn47bclk71\",\"name\":\"Иванов И.П.\"},\"phase\":\"WORK\",\"progress\":[{\"phase\":\"IDENTITY\",\"label\":\"Допуск\",\"done\":true,\"current\":false},{\"phase\":\"ADMISSION\",\"label\":\"Приём\",\"done\":true,\"current\":false},{\"phase\":\"PRESHIFT_INSPEC",
+   "200 GET /api/operator/mobile/state? :: {\"data\":{\"operator\":{\"id\":\"cmq1ylkyt00023wvn47bclk71\",\"name\":\"Иванов И.П.\"},\"phase\":\"WORK\",\"progress\":[{\"phase\":\"IDENTITY\",\"label\":\"Допуск\",\"done\":true,\"current\":false},{\"phase\":\"ADMISSION\",\"label\":\"Приём\",\"done\":true,\"current\":false},{\"phase\":\"PRESHIFT_INSPEC",
+   "200 POST /api/operator/mobile/command :: {\"data\":{\"ok\":true}}",
+   "200 GET /api/operator/mobile/state? :: {\"data\":{\"operator\":{\"id\":\"cmq1ylkyt00023wvn47bclk71\",\"name\":\"Иванов И.П.\"},\"phase\":\"CLOSING\",\"progress\":[{\"phase\":\"IDENTITY\",\"label\":\"Допуск\",\"done\":true,\"current\":false},{\"phase\":\"ADMISSION\",\"label\":\"Приём\",\"done\":true,\"current\":false},{\"phase\":\"PRESHIFT_INS",
+   "200 POST /api/operator/mobile/command :: {\"data\":{\"executionId\":\"cmuww4ueu005jt4w5z1filces\",\"defects\":0,\"createdDefects\":[]}}",
+   "200 GET /api/operator/mobile/state? :: {\"data\":{\"operator\":{\"id\":\"cmq1ylkyt00023wvn47bclk71\",\"name\":\"Иванов И.П.\"},\"phase\":\"CLOSING\",\"progress\":[{\"phase\":\"IDENTITY\",\"label\":\"Допуск\",\"done\":true,\"current\":false},{\"phase\":\"ADMISSION\",\"label\":\"Приём\",\"done\":true,\"current\":false},{\"phase\":\"PRESHIFT_INS",
+   "200 POST /api/operator/mobile/command :: {\"data\":{\"ok\":true,\"reportId\":\"cmuww0e45005ct4w5l9m3h5zw\"}}",
+   "200 GET /api/operator/mobile/state? :: {\"data\":{\"operator\":{\"id\":\"cmq1ylkyt00023wvn47bclk71\",\"name\":\"Иванов И.П.\"},\"phase\":\"CLOSED\",\"progress\":[{\"phase\":\"IDENTITY\",\"label\":\"Допуск\",\"done\":true,\"current\":false},{\"phase\":\"ADMISSION\",\"label\":\"Приём\",\"done\":true,\"current\":false},{\"phase\":\"PRESHIFT_INSP"
+  ]
+ },
+ {
+  "at": "2026-10-06T16:26:49.656Z",
+  "step": "ivv-приём",
+  "apis": [
+   "200 POST /api/operator/mobile/command :: {\"data\":{\"items\":[\"HELMET\",\"VEST\",\"BOOTS\",\"GLOVES\",\"GLASSES\",\"EARMUFFS\"],\"missing\":[]}}"
+  ]
+ },
+ {
+  "at": "2026-10-06T16:28:36.162Z",
+  "step": "D-20261001-001 (v10): состояние",
+  "показываетСегодня": true,
+  "старыеДанные": true,
+  "хвост": "Работа: сваи, бурение, простой Woltman-PVE 50PR ВСМЖ г.Вышний Волочек 06.10.2026 К работе допущен Подготовка завершена, замечаний по допуску нет. Сваи 2 шт. Бурение 0 м Простой 0 мин Работа Свая Бурение Простой Инцидент Свая с паспортом Подготовка 4 из 4 СИЗ и допуск Выполнено Осмотр машины Выполнено Площадка Выполнено Пуск Выполнено Завершить работу Последние записи 05:34 С 100-35 2 шт. · 20 м Со",
+  "apis": [
+   "200 GET /api/auth/me :: {\"user\":{\"id\":\"cmot2yciw000u01mohcubd6b6\",\"email\":\"ivv@piling.ru\",\"name\":\"Игнатьев Владислав Вениаминович\",\"role\":\"OPERATOR\",\"isActive\":true}}",
+   "200 GET /api/auth/me :: {\"user\":{\"id\":\"cmot2yciw000u01mohcubd6b6\",\"email\":\"ivv@piling.ru\",\"name\":\"Игнатьев Владислав Вениаминович\",\"role\":\"OPERATOR\",\"isActive\":true}}",
+   "200 GET /api/feedback/events?limit=25 :: {\"requestId\":\"5f09d48f-97a9-4f8b-9bf6-e9d9103e11c5\",\"events\":[{\"id\":\"cmu8s2qm100dxtkw5wze51zx8\",\"level\":\"info\",\"priority\":\"MEDIUM\",\"scope\":\"auth\",\"action\":\"auth.logout\",\"title\":\"Выход выполнен\",\"message\":\"Сессия пользователя была завершена.\",\"audience\":\"OPERAT",
+   "200 GET /api/safety/my-clearance :: {\"clearance\":{\"cleared\":true,\"blockers\":[],\"warnings\":[],\"documents\":[{\"typeId\":\"3cb782e3-17ea-40b8-9078-c6ec5a9d856e\",\"typeName\":\"Удостоверение по охране труда\",\"status\":\"ok\",\"expiresAt\":\"2029-09-14T00:00:00.000Z\",\"daysLeft\":1074},{\"typeId\":\"a4d2931f-032f-46f",
+   "200 GET /api/safety/my-clearance :: {\"clearance\":{\"cleared\":true,\"blockers\":[],\"warnings\":[],\"documents\":[{\"typeId\":\"3cb782e3-17ea-40b8-9078-c6ec5a9d856e\",\"typeName\":\"Удостоверение по охране труда\",\"status\":\"ok\",\"expiresAt\":\"2029-09-14T00:00:00.000Z\",\"daysLeft\":1074},{\"typeId\":\"a4d2931f-032f-46f",
+   "200 GET /api/operator/mobile/state? :: {\"data\":{\"operator\":{\"id\":\"cmot2yciw000u01mohcubd6b6\",\"name\":\"Игнатьев Владислав Вениаминович\"},\"phase\":\"WORK\",\"progress\":[{\"phase\":\"IDENTITY\",\"label\":\"Допуск\",\"done\":true,\"current\":false},{\"phase\":\"ADMISSION\",\"label\":\"Приём\",\"done\":true,\"current\":false},{\"pha",
+   "200 GET /api/operator/mobile/state? :: {\"data\":{\"operator\":{\"id\":\"cmot2yciw000u01mohcubd6b6\",\"name\":\"Игнатьев Владислав Вениаминович\"},\"phase\":\"WORK\",\"progress\":[{\"phase\":\"IDENTITY\",\"label\":\"Допуск\",\"done\":true,\"current\":false},{\"phase\":\"ADMISSION\",\"label\":\"Приём\",\"done\":true,\"current\":false},{\"pha"
+  ]
+ },
+ {
+  "at": "2026-10-06T16:28:54.700Z",
+  "step": "D-20261001-001 (v10): привязка записи",
+  "before": 1,
+  "after": 1,
+  "ушлаВСтарую": false,
+  "apis": []
+ },
+ {
+  "at": "2026-10-06T16:29:58.587Z",
+  "step": "D-20261001-001 (v10): состояние",
+  "показываетСегодня": true,
+  "старыеДанные": true,
+  "хвост": "Работа: сваи, бурение, простой Woltman-PVE 50PR ВСМЖ г.Вышний Волочек 06.10.2026 К работе допущен Подготовка завершена, замечаний по допуску нет. Сваи 2 шт. Бурение 0 м Простой 0 мин Работа Свая Бурение Простой Инцидент Свая с паспортом Подготовка 4 из 4 СИЗ и допуск Выполнено Осмотр машины Выполнено Площадка Выполнено Пуск Выполнено Завершить работу Последние записи 05:34 С 100-35 2 шт. · 20 м Со",
+  "apis": [
+   "200 GET /api/auth/me :: {\"user\":{\"id\":\"cmot2yciw000u01mohcubd6b6\",\"email\":\"ivv@piling.ru\",\"name\":\"Игнатьев Владислав Вениаминович\",\"role\":\"OPERATOR\",\"isActive\":true}}",
+   "200 GET /api/auth/me :: {\"user\":{\"id\":\"cmot2yciw000u01mohcubd6b6\",\"email\":\"ivv@piling.ru\",\"name\":\"Игнатьев Владислав Вениаминович\",\"role\":\"OPERATOR\",\"isActive\":true}}",
+   "200 GET /api/feedback/events?limit=25 :: {\"requestId\":\"7ecd3cde-a115-4eaa-adb6-6c5156049cc1\",\"events\":[{\"id\":\"cmu8s2qm100dxtkw5wze51zx8\",\"level\":\"info\",\"priority\":\"MEDIUM\",\"scope\":\"auth\",\"action\":\"auth.logout\",\"title\":\"Выход выполнен\",\"message\":\"Сессия пользователя была завершена.\",\"audience\":\"OPERAT",
+   "200 GET /api/operator/mobile/state? :: {\"data\":{\"operator\":{\"id\":\"cmot2yciw000u01mohcubd6b6\",\"name\":\"Игнатьев Владислав Вениаминович\"},\"phase\":\"WORK\",\"progress\":[{\"phase\":\"IDENTITY\",\"label\":\"Допуск\",\"done\":true,\"current\":false},{\"phase\":\"ADMISSION\",\"label\":\"Приём\",\"done\":true,\"current\":false},{\"pha",
+   "200 GET /api/operator/mobile/state? :: {\"data\":{\"operator\":{\"id\":\"cmot2yciw000u01mohcubd6b6\",\"name\":\"Игнатьев Владислав Вениаминович\"},\"phase\":\"WORK\",\"progress\":[{\"phase\":\"IDENTITY\",\"label\":\"Допуск\",\"done\":true,\"current\":false},{\"phase\":\"ADMISSION\",\"label\":\"Приём\",\"done\":true,\"current\":false},{\"pha",
+   "200 GET /api/safety/my-clearance :: {\"clearance\":{\"cleared\":true,\"blockers\":[],\"warnings\":[],\"documents\":[{\"typeId\":\"3cb782e3-17ea-40b8-9078-c6ec5a9d856e\",\"typeName\":\"Удостоверение по охране труда\",\"status\":\"ok\",\"expiresAt\":\"2029-09-14T00:00:00.000Z\",\"daysLeft\":1074},{\"typeId\":\"a4d2931f-032f-46f",
+   "200 GET /api/safety/my-clearance :: {\"clearance\":{\"cleared\":true,\"blockers\":[],\"warnings\":[],\"documents\":[{\"typeId\":\"3cb782e3-17ea-40b8-9078-c6ec5a9d856e\",\"typeName\":\"Удостоверение по охране труда\",\"status\":\"ok\",\"expiresAt\":\"2029-09-14T00:00:00.000Z\",\"daysLeft\":1074},{\"typeId\":\"a4d2931f-032f-46f",
+   "200 GET /api/operator/mobile/state? :: {\"data\":{\"operator\":{\"id\":\"cmot2yciw000u01mohcubd6b6\",\"name\":\"Игнатьев Владислав Вениаминович\"},\"phase\":\"WORK\",\"progress\":[{\"phase\":\"IDENTITY\",\"label\":\"Допуск\",\"done\":true,\"current\":false},{\"phase\":\"ADMISSION\",\"label\":\"Приём\",\"done\":true,\"current\":false},{\"pha",
+   "200 GET /api/operator/mobile/state? :: {\"data\":{\"operator\":{\"id\":\"cmot2yciw000u01mohcubd6b6\",\"name\":\"Игнатьев Владислав Вениаминович\"},\"phase\":\"WORK\",\"progress\":[{\"phase\":\"IDENTITY\",\"label\":\"Допуск\",\"done\":true,\"current\":false},{\"phase\":\"ADMISSION\",\"label\":\"Приём\",\"done\":true,\"current\":false},{\"pha"
+  ]
+ },
+ {
+  "at": "2026-10-06T16:30:05.213Z",
+  "step": "D-20261001-001 (v10): привязка записи",
+  "before": 1,
+  "after": 2,
+  "ушлаВСтарую": true,
+  "apis": [
+   "200 POST /api/operator/mobile/command :: {\"data\":{\"reportId\":\"cmut7jr6f015dscw5krsnottf\"}}"
+  ]
+ },
+ {
+  "at": "2026-10-06T16:32:02.250Z",
+  "step": "D-20260930-001 (gea)",
+  "before": "PilingTrack 9+ Герасимова ЕА Смена закрыта После работы Спасибо! Смена успешно завершена Смена закрыта, отчёт отправлен диспетчеру Время работы 231:22:30 Сваи выполнено 0 шт · 0 м.п. Бурение 0 скв · 0 м Простой 0 ч Моточасы 12 061 м/ч Отчёт RM-4b13ebb1-2026-09-27 На главную",
+  "after": "PilingTrack 9+ Герасимова ЕА Смена закрыта После работы Спасибо! Смена успешно завершена Смена закрыта, отчёт отправлен диспетчеру Время работы 231:22:35 Сваи выполнено 0 шт · 0 м.п. Бурение 0 скв · 0 м Простой 0 ч Моточасы 12 061 м/ч Отчёт RM-4b13ebb1-2026-09-27 На главную",
+  "apis": [
+   "200 GET /api/auth/me :: {\"user\":{\"id\":\"cmov7gct2001901qqkmjkwg0z\",\"email\":\"gea@piling.ru\",\"name\":\"Герасимова ЕА\",\"role\":\"OPERATOR\",\"isActive\":true}}",
+   "200 GET /api/auth/me :: {\"user\":{\"id\":\"cmov7gct2001901qqkmjkwg0z\",\"email\":\"gea@piling.ru\",\"name\":\"Герасимова ЕА\",\"role\":\"OPERATOR\",\"isActive\":true}}",
+   "200 GET /api/feedback/events?limit=25 :: {\"requestId\":\"d8093aca-22bb-48e0-8b59-4ce521788144\",\"events\":[{\"id\":\"cmuj4fpma007hwgw5b7ljpsud\",\"level\":\"error\",\"priority\":\"HIGH\",\"scope\":\"api\",\"action\":\"api.request_failed\",\"title\":\"Серверная ошибка\",\"message\":\"Запрос GET /api/weather?lat=58.5215&lon=31.271 з",
+   "200 GET /api/operator/mobile/state? :: {\"data\":{\"operator\":{\"id\":\"cmov7gct2001901qqkmjkwg0z\",\"name\":\"Герасимова ЕА\"},\"phase\":\"IDENTITY\",\"progress\":[{\"phase\":\"IDENTITY\",\"label\":\"Допуск\",\"done\":false,\"current\":true},{\"phase\":\"ADMISSION\",\"label\":\"Приём\",\"done\":false,\"current\":false},{\"phase\":\"PRESHIFT",
+   "200 GET /api/operator/mobile/state? :: {\"data\":{\"operator\":{\"id\":\"cmov7gct2001901qqkmjkwg0z\",\"name\":\"Герасимова ЕА\"},\"phase\":\"IDENTITY\",\"progress\":[{\"phase\":\"IDENTITY\",\"label\":\"Допуск\",\"done\":false,\"current\":true},{\"phase\":\"ADMISSION\",\"label\":\"Приём\",\"done\":false,\"current\":false},{\"phase\":\"PRESHIFT",
+   "200 GET /api/operator/shift :: {\"assignments\":[{\"equipmentId\":\"45d42990-9ab5-4b84-9c33-87c06ca1ee2a\",\"equipmentName\":\"КБУРГ-16.02 №2\",\"model\":\"КБУРГ-16\",\"siteId\":\"cmosf1pn5001g01mkikoaqjft\",\"siteName\":\"ВСМЖ г.Великий Новгород\"}],\"equipment\":{\"id\":\"45d42990-9ab5-4b84-9c33-87c06ca1ee2a\",\"name",
+   "200 GET /api/operator/shift :: {\"assignments\":[{\"equipmentId\":\"45d42990-9ab5-4b84-9c33-87c06ca1ee2a\",\"equipmentName\":\"КБУРГ-16.02 №2\",\"model\":\"КБУРГ-16\",\"siteId\":\"cmosf1pn5001g01mkikoaqjft\",\"siteName\":\"ВСМЖ г.Великий Новгород\"}],\"equipment\":{\"id\":\"45d42990-9ab5-4b84-9c33-87c06ca1ee2a\",\"name",
+   "200 GET /api/operator/shift :: {\"assignments\":[{\"equipmentId\":\"45d42990-9ab5-4b84-9c33-87c06ca1ee2a\",\"equipmentName\":\"КБУРГ-16.02 №2\",\"model\":\"КБУРГ-16\",\"siteId\":\"cmosf1pn5001g01mkikoaqjft\",\"siteName\":\"ВСМЖ г.Великий Новгород\"}],\"equipment\":{\"id\":\"45d42990-9ab5-4b84-9c33-87c06ca1ee2a\",\"name"
+  ]
+ },
+ {
+  "at": "2026-10-06T16:32:26.936Z",
+  "step": "D-20260930-003 (v5)",
+  "текст": "Экран доступен только машинисту Смену ведёт машинист, закреплённый за установкой. Записи о выработке и осмотрах подаёт он.",
+  "apis": [
+   "200 GET /api/auth/me :: {\"user\":{\"id\":\"cmot31e3o001001mof00feqbw\",\"email\":\"kn@piling.ru\",\"name\":\"Курнаков Николай\",\"role\":\"ASSISTANT\",\"isActive\":true}}",
+   "200 GET /api/feedback/events?limit=25 :: {\"requestId\":\"a0694052-64e4-4daa-9c8d-209cab0289ac\",\"events\":[{\"id\":\"cmtne2dp9000p24w5hie1phmw\",\"level\":\"info\",\"priority\":\"MEDIUM\",\"scope\":\"auth\",\"action\":\"auth.logout\",\"title\":\"Выход выполнен\",\"message\":\"Сессия пользователя была завершена.\",\"audience\":\"OPERAT",
+   "200 GET /api/assistant/state :: {\"data\":{\"assistant\":{\"id\":\"cmot31e3o001001mof00feqbw\",\"name\":\"Курнаков Николай\"},\"documents\":[{\"typeId\":\"a4d2931f-032f-46f0-963d-50670267f13d\",\"name\":\"Аттестация по промышленной безопасности\",\"required\":true,\"verdict\":\"VALID\",\"number\":\"DEMO-202609-11-01\",\"exp",
+   "200 GET /api/assistant/state :: {\"data\":{\"assistant\":{\"id\":\"cmot31e3o001001mof00feqbw\",\"name\":\"Курнаков Николай\"},\"documents\":[{\"typeId\":\"a4d2931f-032f-46f0-963d-50670267f13d\",\"name\":\"Аттестация по промышленной безопасности\",\"required\":true,\"verdict\":\"VALID\",\"number\":\"DEMO-202609-11-01\",\"exp",
+   "403 GET /api/operator/mobile/state? :: {\"error\":\"Экран доступен только машинисту\"}",
+   "403 GET /api/operator/mobile/state? :: {\"error\":\"Экран доступен только машинисту\"}"
+  ]
+ },
+ {
+  "at": "2026-10-06T16:32:38.682Z",
+  "step": "D-20260930-003 (v7)",
+  "текст": "Оператор Онлайн Синхронизация… Экран доступен только машинисту Смену ведёт машинист, закреплённый за установкой. Записи о выработке и осмотрах подаёт он.",
+  "apis": [
+   "200 POST /api/auth/login :: {\"user\":{\"id\":\"qae400e3443501488b9041183\",\"email\":\"qa-hermes-assistant-2@piling.test\",\"name\":\"QA_HERMES Помощник 2\",\"role\":\"ASSISTANT\",\"tenantId\":\"orion\",\"sessionVersion\":0}}",
+   "403 GET /api/operator/mobile/state? :: {\"error\":\"Экран доступен только машинисту\"}",
+   "403 GET /api/operator/mobile/state? :: {\"error\":\"Экран доступен только машинисту\"}"
+  ]
+ },
+ {
+  "at": "2026-10-06T16:32:46.510Z",
+  "step": "помощники",
+  "email": "helper@piling.ru",
+  "path": "/operator",
+  "экран": "PilingTrack 9 Сидоров К.А. Всё отправлено · очередь на телефоне пуста Рабочее место машиниста Экран доступен только машинисту Смену ведёт машинист, закреплённый за установкой. Записи о выработке и осмотрах подаёт он. Войти другим пользователем"
+ },
+ {
+  "at": "2026-10-06T16:32:53.009Z",
+  "step": "помощники",
+  "email": "qa-hermes-assistant-3@piling.test",
+  "path": "/operator",
+  "экран": "PilingTrack 8 QA_HERMES Помощник 3 Всё отправлено · очередь на телефоне пуста Рабочее место машиниста Экран доступен только машинисту Смену ведёт машинист, закреплённый за установкой. Записи о выработке и осмотрах подаёт он. Войти другим пользователем"
+ },
+ {
+  "at": "2026-10-06T16:32:59.413Z",
+  "step": "помощники",
+  "email": "tr@piling.ru",
+  "path": "/operator/v2",
+  "экран": "PilingTrack 2 Токсубаев Роман Допуск и приёмка Шаг 1 из 5 · 00:03 ! К работе не допущен Токсубаев Роман · документов: 11 · ближайший срок 14.12.2026 › Установка не закреплена — обратитесь к администратору Установка не закреплена Тип смены Смена: дневная (07:00"
+ },
+ {
+  "at": "2026-10-06T16:33:05.989Z",
+  "step": "помощники",
+  "email": "qa-hermes-assistant-4@piling.test",
+  "path": "/operator/v2",
+  "экран": "PilingTrack QA_HERMES Помощник 4 Допуск и приёмка Шаг 1 из 5 · 00:03 ! К работе не допущен QA_HERMES Помощник 4 · документов: 11 · требуют внимания: 11 › Нет документа: Удостоверение по охране труда Нет документа: Аттестация по промышленной безопасности Нет до"
+ },
+ {
+  "at": "2026-10-06T16:33:12.608Z",
+  "step": "помощники",
+  "email": "qa-hermes-assistant-1@piling.test",
+  "path": "/operator/v10",
+  "экран": "Смена Экран доступен только машинисту Смена ТБ Техника Ещё"
+ },
+ {
+  "at": "2026-10-06T16:35:52.393Z",
+  "step": "отчёты-список",
+  "found": {
+   "RM-ec19a322-2026-10-06": true,
+   "RM-9f5b221c-2026-10-06": true,
+   "RM-673a209d-2026-10-06": true
+  },
+  "фрагмент": "PilingTrack Панель диспетчера Дашборд Мониторинг Объекты Отчёты Установки Техготовность Бригады ТБ и допуски Аналитика Настройки 9+ П Петрова Д.В. dispatch@piling.ru Выйти Отчёты смен Журнал забивки Отчёты 3 отчёта Журнал смен, работ, простоев и подтверждений Печать Новый отчёт Отчёты 3 / 268 загружено из отбора Сваи 6 шт. / 76 м.п. сданные · по загруженным 3 из 268 Бурение 3 шт. / 36 м.п. сданные · по загруженным 3 из 268 Простой 16 мин сданные · по загруженным 3 из 268 Фото 0 отчётов с фото · "
+ },
+ {
+  "at": "2026-10-06T16:35:55.656Z",
+  "step": "карточка",
+  "id": "RM-ec19a322-2026-10-06",
+  "естьНомер": false
+ },
+ {
+  "at": "2026-10-06T16:36:04.482Z",
+  "step": "NEW-5",
+  "естьACQA": true,
+  "есть0410": false,
+  "фрагмент": "PilingTrack Панель диспетчера Дашборд Мониторинг Объекты Отчёты Установки Техготовность Бригады ТБ и допуски Аналитика Настройки 9+ П Петрова Д.В. dispatch@piling.ru Выйти Отчёты смен Журнал забивки Журнал забивки свай Свая уходит под землю навсегда — журнал единственное, что от неё остаётся. Принимает сваю мастер, он же отправляет её на добивку. Выгрузить журнал (.xlsx) Не разобранные На добивку Принятые Все Объект Все объекты ВСМЖ г.Великий Новгород ВСМЖ г.Вышний Волочек Забита с по № сваи Сбросить ЖУРНАЛ ЗАБИВКИ СВАЙ ВСМЖ г.Вышний Волочек, ВСМЖ г.Великий Новгород Период забивки: 19.09.2026 — 03.10.2026 Копровая установка Woltman-PVE 50PR, КБУРГ-16.02 №1, Banut 655, КБУРГ-16.02 №2, Koperni"
+ },
+ {
+  "at": "2026-10-06T16:36:06.133Z",
+  "step": "NEW-6",
+  "banutId": "22918355-40dc-4450-bb60-076694690da9"
+ },
+ {
+  "at": "2026-10-06T16:36:14.663Z",
+  "step": "NEW-6",
+  "вБане": "2|28",
+  "фрагмент": "PilingTrack Панель диспетчера Дашборд Мониторинг Объекты Отчёты Установки Техготовность Бригады ТБ и допуски Аналитика Настройки 9+ П Петрова Д.В. dispatch@piling.ru Выйти Установки → Banut 655 Banut 655 Гибрид (забивка + бурение) Banut 655 2011 г.в. ТЕКУЩАЯ РАБОТА БРИГАДА Экипаж Щеголева ОБЪЕКТ ВСМЖ г.Великий Новгород ОПЕРАТОР Щеголев Роман Николаевич ПОМОЩНИКИ QA_HERMES Помощник 2 30 ДНЕЙ АКТИВНОСТИ ОТЧЁТОВ 9 СВАЙ 62 шт. / 784 м.п. БУРЕНИЕ 5 шт. / 49,5 м.п. ПРОСТОЙ 4 ч 10 мин РОТАЦИЯ МАШИНИСТОВ МАШИНИСТ ПЕРИОД СМЕН ОБЪЕКТ ⇄ Щеголев Роман Николаевич 03.08.2026 – 06.10.2026 19 ВСМЖ г.Великий Новгород Иванов И.П. 01.07.2026 1 ВСМЖ г.Вышний Волочек ИСТОРИЯ РАБОТ ДАТА СМЕНА ОБЪЕКТ ОПЕРАТОР СВАЙ БУРЕНИЕ ПРОСТОЙ 06.10.2026 День ВСМЖ г.Великий Новгород Щеголев Роман Николаевич 2 24,0 10 мин Показать всю историю (20) ОТЧЁТ (ПЕЧАТЬ / PDF) С ПО Сегодня 7 дней 30 дней Открыть / печать Скачать PDF "
+ },
+ {
+  "at": "2026-10-06T16:36:25.569Z",
+  "step": "панель",
+  "submittedToday": "3",
+  "фрагмент": "PilingTrack Панель администратора Дашборд Мониторинг Объекты Отчёты Установки Техготовность Бригады ТБ и допуски Аналитика Справочники Пользователи Настройки 9+ Q QA_HERMES Администратор qa-hermes-admin@piling.test Выйти Действую как Администратор Механик Мастер Инженер ОТ Диспетчер Оператор Выберите роль, чтобы посмотреть приложение её глазами: разделы и права станут как у неё. Дашборд Оперативная сводка производства Обновлено в 19:36 Весь период Сегодня 7 дней Период Все объекты ВСМЖ г.Великий Новгород ВСМЖ г.Вышний Волочек Все установки Banut 655 Bauer RTG RM20 Kopernik Jint-SD20A Liebherr LRH 100 №1 Liebherr LRH 100 №2 Woltman-PVE 50PR КБУРГ-16.02 №1 КБУРГ-16.02 №2 Отчёты 3 / 3 машин с о"
+ },
+ {
+  "at": "2026-10-06T16:36:31.091Z",
+  "step": "аналитика",
+  "Краснов": true,
+  "Иванов": true,
+  "Щеголев": true,
+  "фрагмент": "PilingTrack Панель администратора Дашборд Мониторинг Объекты Отчёты Установки Техготовность Бригады ТБ и допуски Аналитика Справочники Пользователи Настройки 9+ Q QA_HERMES Администратор qa-hermes-admin@piling.test Выйти Действую как Администратор Механик Мастер Инженер ОТ Диспетчер Оператор Выберите роль, чтобы посмотреть приложение её глазами: разделы и права станут как у неё. Аналитика Производительность операторов и тренды по объектам Установок 8 активных в парке на сегодня Объектов 2 всего на сегодня, включая закрытые Сваи 99 шт. / 1 280 м.п. м.п. -35% к пред. неделе Бурение 35 шт. / 420 м.п. м.п. -70,2% к пред. неделе Доля простоя в смене, % 6 % +5,4 п.п. к пред. неделе Бригады 3 на см"
+ },
+ {
+  "at": "2026-10-06T16:36:36.740Z",
+  "step": "карточка КБУРГ №1",
+  "фрагмент": "PilingTrack Панель администратора Дашборд Мониторинг Объекты Отчёты Установки Техготовность Бригады ТБ и допуски Аналитика Справочники Пользователи Настройки 9+ Q QA_HERMES Администратор qa-hermes-admin@piling.test Выйти Действую как Администратор Механик Мастер Инженер ОТ Диспетчер Оператор Выберите роль, чтобы посмотреть приложение её глазами: разделы и права станут как у неё. Установки → КБУРГ-16.02 №1 КБУРГ-16.02 №1 Гибрид (забивка + бурение) КБУРГ-16 Редактировать ТЕКУЩАЯ РАБОТА БРИГАДА Экипаж Краснова ОБЪЕКТ ВСМЖ г.Великий Новгород ОПЕРАТОР Краснов Александр Михайлович ПОМОЩНИКИ Сидоров К.А. 30 ДНЕЙ АКТИВНОСТИ ОТЧЁТОВ 12 СВАЙ 91 шт. / 1 146 м.п. БУРЕНИЕ 43 шт. / 513,5 м.п. ПРОСТОЙ 7 ч 10 мин РОТАЦИЯ МАШИНИСТОВ МАШИНИСТ ПЕРИОД СМЕН ОБЪЕКТ ⇄ Краснов Александр Михайлович 05.07.2026 – 06"
+ },
+ {
+  "at": "2026-10-06T16:36:42.174Z",
+  "step": "техготовность и ТО",
+  "фрагмент": "PilingTrack Панель администратора Дашборд Мониторинг Объекты Отчёты Установки Техготовность Бригады ТБ и допуски Аналитика Справочники Пользователи Настройки 9+ Q QA_HERMES Администратор qa-hermes-admin@piling.test Выйти Действую как Администратор Механик Мастер Инженер ОТ Диспетчер Оператор Выберите роль, чтобы посмотреть приложение её глазами: разделы и права станут как у неё. Центр готовности Готовность парка Смены Обслуживание ТО Отчёты Настройки Техническая готовность — Центр готовности Выбранная установка Banut 655 Заводской № — Место базирования ВСМЖ г.Великий Новгород Наработка 99 999 "
+ },
+ {
+  "at": "2026-10-06T16:37:39.017Z",
+  "step": "отчёты-список",
+  "found": {
+   "RM-ec19a322-2026-10-06": true,
+   "RM-9f5b221c-2026-10-06": true,
+   "RM-673a209d-2026-10-06": true
+  },
+  "фрагмент": "PilingTrack Панель диспетчера Дашборд Мониторинг Объекты Отчёты Установки Техготовность Бригады ТБ и допуски Аналитика Настройки 9+ П Петрова Д.В. dispatch@piling.ru Выйти Отчёты смен Журнал забивки Отчёты 3 отчёта Журнал смен, работ, простоев и подтверждений Печать Новый отчёт Отчёты 3 / 268 загружено из отбора Сваи 6 шт. / 76 м.п. сданные · по загруженным 3 из 268 Бурение 3 шт. / 36 м.п. сданные · по загруженным 3 из 268 Простой 16 мин сданные · по загруженным 3 из 268 Фото 0 отчётов с фото · "
+ },
+ {
+  "at": "2026-10-06T16:37:42.438Z",
+  "step": "карточки",
+  "seenIds": [
+   "RM-673a209d-2026-10-06"
+  ]
+ },
+ {
+  "at": "2026-10-06T16:37:52.477Z",
+  "step": "NEW-5",
+  "естьACQA": true,
+  "есть0410": false,
+  "фрагмент": "PilingTrack Панель диспетчера Дашборд Мониторинг Объекты Отчёты Установки Техготовность Бригады ТБ и допуски Аналитика Настройки 9+ П Петрова Д.В. dispatch@piling.ru Выйти Отчёты смен Журнал забивки Журнал забивки свай Свая уходит под землю навсегда — журнал единственное, что от неё остаётся. Принимает сваю мастер, он же отправляет её на добивку. Выгрузить журнал (.xlsx) Не разобранные На добивку Принятые Все Объект Все объекты ВСМЖ г.Великий Новгород ВСМЖ г.Вышний Волочек Забита с по № сваи Сбросить ЖУРНАЛ ЗАБИВКИ СВАЙ ВСМЖ г.Вышний Волочек, ВСМЖ г.Великий Новгород Период забивки: 19.09.2026 — 03.10.2026 Копровая установка Woltman-PVE 50PR, КБУРГ-16.02 №1, Banut 655, КБУРГ-16.02 №2, Koperni"
+ },
+ {
+  "at": "2026-10-06T16:37:52.965Z",
+  "step": "NEW-6",
+  "banutId": "22918355-40dc-4450-bb60-076694690da9"
+ },
+ {
+  "at": "2026-10-06T16:38:01.723Z",
+  "step": "NEW-6",
+  "вБане": "2|28",
+  "фрагмент": "PilingTrack Панель диспетчера Дашборд Мониторинг Объекты Отчёты Установки Техготовность Бригады ТБ и допуски Аналитика Настройки 9+ П Петрова Д.В. dispatch@piling.ru Выйти Установки → Banut 655 Banut 655 Гибрид (забивка + бурение) Banut 655 2011 г.в. ТЕКУЩАЯ РАБОТА БРИГАДА Экипаж Щеголева ОБЪЕКТ ВСМЖ г.Великий Новгород ОПЕРАТОР Щеголев Роман Николаевич ПОМОЩНИКИ QA_HERMES Помощник 2 30 ДНЕЙ АКТИВНОСТИ ОТЧЁТОВ 9 СВАЙ 62 шт. / 784 м.п. БУРЕНИЕ 5 шт. / 49,5 м.п. ПРОСТОЙ 4 ч 10 мин РОТАЦИЯ МАШИНИСТОВ МАШИНИСТ ПЕРИОД СМЕН ОБЪЕКТ ⇄ Щеголев Роман Николаевич 03.08.2026 – 06.10.2026 19 ВСМЖ г.Великий Новгород Иванов И.П. 01.07.2026 1 ВСМЖ г.Вышний Волочек ИСТОРИЯ РАБОТ ДАТА СМЕНА ОБЪЕКТ ОПЕРАТОР СВАЙ БУРЕНИЕ ПРОСТОЙ 06.10.2026 День ВСМЖ г.Великий Новгород Щеголев Роман Николаевич 2 24,0 10 мин Показать всю историю (20) ОТЧЁТ (ПЕЧАТЬ / PDF) С ПО Сегодня 7 дней 30 дней Открыть / печать Скачать PDF "
+ },
+ {
+  "at": "2026-10-06T16:38:09.456Z",
+  "step": "панель",
+  "submittedToday": "3",
+  "фрагмент": "PilingTrack Панель администратора Дашборд Мониторинг Объекты Отчёты Установки Техготовность Бригады ТБ и допуски Аналитика Справочники Пользователи Настройки 9+ Q QA_HERMES Администратор qa-hermes-admin@piling.test Выйти Действую как Администратор Механик Мастер Инженер ОТ Диспетчер Оператор Выберите роль, чтобы посмотреть приложение её глазами: разделы и права станут как у неё. Дашборд Оперативная сводка производства Обновлено в 19:38 Весь период Сегодня 7 дней Период Все объекты ВСМЖ г.Великий Новгород ВСМЖ г.Вышний Волочек Все установки Banut 655 Bauer RTG RM20 Kopernik Jint-SD20A Liebherr LRH 100 №1 Liebherr LRH 100 №2 Woltman-PVE 50PR КБУРГ-16.02 №1 КБУРГ-16.02 №2 Отчёты 3 / 3 машин с о"
+ },
+ {
+  "at": "2026-10-06T16:38:14.827Z",
+  "step": "аналитика",
+  "Краснов": true,
+  "Иванов": true,
+  "Щеголев": true,
+  "фрагмент": "PilingTrack Панель администратора Дашборд Мониторинг Объекты Отчёты Установки Техготовность Бригады ТБ и допуски Аналитика Справочники Пользователи Настройки 9+ Q QA_HERMES Администратор qa-hermes-admin@piling.test Выйти Действую как Администратор Механик Мастер Инженер ОТ Диспетчер Оператор Выберите роль, чтобы посмотреть приложение её глазами: разделы и права станут как у неё. Аналитика Производительность операторов и тренды по объектам Установок 8 активных в парке на сегодня Объектов 2 всего на сегодня, включая закрытые Сваи 99 шт. / 1 280 м.п. м.п. -35% к пред. неделе Бурение 35 шт. / 420 м.п. м.п. -70,2% к пред. неделе Доля простоя в смене, % 6 % +5,4 п.п. к пред. неделе Бригады 3 на см"
+ },
+ {
+  "at": "2026-10-06T16:38:20.526Z",
+  "step": "карточка КБУРГ №1",
+  "фрагмент": "PilingTrack Панель администратора Дашборд Мониторинг Объекты Отчёты Установки Техготовность Бригады ТБ и допуски Аналитика Справочники Пользователи Настройки 9+ Q QA_HERMES Администратор qa-hermes-admin@piling.test Выйти Действую как Администратор Механик Мастер Инженер ОТ Диспетчер Оператор Выберите роль, чтобы посмотреть приложение её глазами: разделы и права станут как у неё. Установки → КБУРГ-16.02 №1 КБУРГ-16.02 №1 Гибрид (забивка + бурение) КБУРГ-16 Редактировать ТЕКУЩАЯ РАБОТА БРИГАДА Экипаж Краснова ОБЪЕКТ ВСМЖ г.Великий Новгород ОПЕРАТОР Краснов Александр Михайлович ПОМОЩНИКИ Сидоров К.А. 30 ДНЕЙ АКТИВНОСТИ ОТЧЁТОВ 12 СВАЙ 91 шт. / 1 146 м.п. БУРЕНИЕ 43 шт. / 513,5 м.п. ПРОСТОЙ 7 ч 10 мин РОТАЦИЯ МАШИНИСТОВ МАШИНИСТ ПЕРИОД СМЕН ОБЪЕКТ ⇄ Краснов Александр Михайлович 05.07.2026 – 06"
+ },
+ {
+  "at": "2026-10-06T16:38:25.804Z",
+  "step": "техготовность и ТО",
+  "фрагмент": "PilingTrack Панель администратора Дашборд Мониторинг Объекты Отчёты Установки Техготовность Бригады ТБ и допуски Аналитика Справочники Пользователи Настройки 9+ Q QA_HERMES Администратор qa-hermes-admin@piling.test Выйти Действую как Администратор Механик Мастер Инженер ОТ Диспетчер Оператор Выберите роль, чтобы посмотреть приложение её глазами: разделы и права станут как у неё. Центр готовности Готовность парка Смены Обслуживание ТО Отчёты Настройки Техническая готовность — Центр готовности Выбранная установка Banut 655 Заводской № — Место базирования ВСМЖ г.Великий Новгород Наработка 99 999 "
+ },
+ {
+  "at": "2026-10-06T16:39:07.767Z",
+  "step": "отчёты-список",
+  "found": {
+   "RM-ec19a322-2026-10-06": true,
+   "RM-9f5b221c-2026-10-06": true,
+   "RM-673a209d-2026-10-06": true
+  },
+  "фрагмент": "PilingTrack Панель диспетчера Дашборд Мониторинг Объекты Отчёты Установки Техготовность Бригады ТБ и допуски Аналитика Настройки 9+ П Петрова Д.В. dispatch@piling.ru Выйти Отчёты смен Журнал забивки Отчёты 3 отчёта Журнал смен, работ, простоев и подтверждений Печать Новый отчёт Отчёты 3 / 268 загружено из отбора Сваи 6 шт. / 76 м.п. сданные · по загруженным 3 из 268 Бурение 3 шт. / 36 м.п. сданные · по загруженным 3 из 268 Простой 16 мин сданные · по загруженным 3 из 268 Фото 0 отчётов с фото · "
+ },
+ {
+  "at": "2026-10-06T16:39:11.220Z",
+  "step": "карточка",
+  "ожидался": "RM-ec19a322-2026-10-06",
+  "найден": "RM-673a209d-2026-10-06"
+ },
+ {
+  "at": "2026-10-06T16:39:59.997Z",
+  "step": "отчёты-список",
+  "found": {
+   "RM-673a209d-2026-10-06": true,
+   "RM-ec19a322-2026-10-06": true,
+   "RM-9f5b221c-2026-10-06": true
+  },
+  "фрагмент": "PilingTrack Панель диспетчера Дашборд Мониторинг Объекты Отчёты Установки Техготовность Бригады ТБ и допуски Аналитика Настройки 9+ П Петрова Д.В. dispatch@piling.ru Выйти Отчёты смен Журнал забивки Отчёты 3 отчёта Журнал смен, работ, простоев и подтверждений Печать Новый отчёт Отчёты 3 / 268 загружено из отбора Сваи 6 шт. / 76 м.п. сданные · по загруженным 3 из 268 Бурение 3 шт. / 36 м.п. сданные · по загруженным 3 из 268 Простой 16 мин сданные · по загруженным 3 из 268 Фото 0 отчётов с фото · "
+ },
+ {
+  "at": "2026-10-06T16:40:10.922Z",
+  "step": "карточка",
+  "ожидался": "RM-673a209d-2026-10-06",
+  "найден": "RM-673a209d-2026-10-06"
+ },
+ {
+  "at": "2026-10-06T16:40:21.817Z",
+  "step": "карточка",
+  "ожидался": "RM-ec19a322-2026-10-06",
+  "найден": "RM-673a209d-2026-10-06"
+ },
+ {
+  "at": "2026-10-06T16:41:01.336Z",
+  "step": "отчёты-список",
+  "found": {
+   "RM-673a209d-2026-10-06": true,
+   "RM-ec19a322-2026-10-06": true,
+   "RM-9f5b221c-2026-10-06": true
+  },
+  "фрагмент": "PilingTrack Панель диспетчера Дашборд Мониторинг Объекты Отчёты Установки Техготовность Бригады ТБ и допуски Аналитика Настройки 9+ П Петрова Д.В. dispatch@piling.ru Выйти Отчёты смен Журнал забивки Отчёты 3 отчёта Журнал смен, работ, простоев и подтверждений Печать Новый отчёт Отчёты 3 / 268 загружено из отбора Сваи 6 шт. / 76 м.п. сданные · по загруженным 3 из 268 Бурение 3 шт. / 36 м.п. сданные · по загруженным 3 из 268 Простой 16 мин сданные · по загруженным 3 из 268 Фото 0 отчётов с фото · "
+ },
+ {
+  "at": "2026-10-06T16:41:12.051Z",
+  "step": "карточка",
+  "ожидался": "RM-673a209d-2026-10-06",
+  "найден": "RM-673a209d-2026-10-06"
+ },
+ {
+  "at": "2026-10-06T16:41:22.734Z",
+  "step": "карточка",
+  "ожидался": "RM-ec19a322-2026-10-06",
+  "найден": "RM-673a209d-2026-10-06"
+ },
+ {
+  "at": "2026-10-06T16:42:22.764Z",
+  "step": "отчёты-список",
+  "found": {
+   "RM-673a209d-2026-10-06": true,
+   "RM-ec19a322-2026-10-06": true,
+   "RM-9f5b221c-2026-10-06": true
+  },
+  "фрагмент": "PilingTrack Панель диспетчера Дашборд Мониторинг Объекты Отчёты Установки Техготовность Бригады ТБ и допуски Аналитика Настройки 9+ П Петрова Д.В. dispatch@piling.ru Выйти Отчёты смен Журнал забивки Отчёты 3 отчёта Журнал смен, работ, простоев и подтверждений Печать Новый отчёт Отчёты 3 / 268 загружено из отбора Сваи 6 шт. / 76 м.п. сданные · по загруженным 3 из 268 Бурение 3 шт. / 36 м.п. сданные · по загруженным 3 из 268 Простой 16 мин сданные · по загруженным 3 из 268 Фото 0 отчётов с фото · "
+ },
+ {
+  "at": "2026-10-06T16:42:33.742Z",
+  "step": "карточка",
+  "ожидался": "RM-673a209d-2026-10-06",
+  "найден": "RM-673a209d-2026-10-06"
+ },
+ {
+  "at": "2026-10-06T16:42:44.682Z",
+  "step": "карточка",
+  "ожидался": "RM-ec19a322-2026-10-06",
+  "найден": "RM-673a209d-2026-10-06"
+ },
+ {
+  "at": "2026-10-06T16:44:17.501Z",
+  "step": "отчёты-список",
+  "found": {
+   "RM-673a209d-2026-10-06": true,
+   "RM-ec19a322-2026-10-06": true,
+   "RM-9f5b221c-2026-10-06": true
+  },
+  "фрагмент": "PilingTrack Панель диспетчера Дашборд Мониторинг Объекты Отчёты Установки Техготовность Бригады ТБ и допуски Аналитика Настройки 9+ П Петрова Д.В. dispatch@piling.ru Выйти Отчёты смен Журнал забивки Отчёты 3 отчёта Журнал смен, работ, простоев и подтверждений Печать Новый отчёт Отчёты 3 / 268 загружено из отбора Сваи 6 шт. / 76 м.п. сданные · по загруженным 3 из 268 Бурение 3 шт. / 36 м.п. сданные · по загруженным 3 из 268 Простой 16 мин сданные · по загруженным 3 из 268 Фото 0 отчётов с фото · "
+ },
+ {
+  "at": "2026-10-06T16:44:28.357Z",
+  "step": "карточка",
+  "ожидался": "RM-673a209d-2026-10-06",
+  "найден": "RM-673a209d-2026-10-06"
+ },
+ {
+  "at": "2026-10-06T16:44:39.292Z",
+  "step": "карточка",
+  "ожидался": "RM-ec19a322-2026-10-06",
+  "найден": "RM-ec19a322-2026-10-06"
+ },
+ {
+  "at": "2026-10-06T16:44:50.286Z",
+  "step": "карточка",
+  "ожидался": "RM-9f5b221c-2026-10-06",
+  "найден": "RM-9f5b221c-2026-10-06"
+ },
+ {
+  "at": "2026-10-06T16:44:51.310Z",
+  "step": "PDF",
+  "файл": "отчёт-2026-10-06.pdf",
+  "начало": "%PDF"
+ },
+ {
+  "at": "2026-10-06T16:45:21.584Z",
+  "step": "отчёты-список",
+  "found": {
+   "RM-673a209d-2026-10-06": true,
+   "RM-ec19a322-2026-10-06": true,
+   "RM-9f5b221c-2026-10-06": true
+  },
+  "фрагмент": "PilingTrack Панель диспетчера Дашборд Мониторинг Объекты Отчёты Установки Техготовность Бригады ТБ и допуски Аналитика Настройки 9+ П Петрова Д.В. dispatch@piling.ru Выйти Отчёты смен Журнал забивки Отчёты 3 отчёта Журнал смен, работ, простоев и подтверждений Печать Новый отчёт Отчёты 3 / 268 загружено из отбора Сваи 6 шт. / 76 м.п. сданные · по загруженным 3 из 268 Бурение 3 шт. / 36 м.п. сданные · по загруженным 3 из 268 Простой 16 мин сданные · по загруженным 3 из 268 Фото 0 отчётов с фото · "
+ },
+ {
+  "at": "2026-10-06T16:45:32.490Z",
+  "step": "карточка",
+  "ожидался": "RM-673a209d-2026-10-06",
+  "найден": "RM-673a209d-2026-10-06"
+ },
+ {
+  "at": "2026-10-06T16:45:43.439Z",
+  "step": "карточка",
+  "ожидался": "RM-ec19a322-2026-10-06",
+  "найден": "RM-ec19a322-2026-10-06"
+ },
+ {
+  "at": "2026-10-06T16:45:54.370Z",
+  "step": "карточка",
+  "ожидался": "RM-9f5b221c-2026-10-06",
+  "найден": "RM-9f5b221c-2026-10-06"
+ },
+ {
+  "at": "2026-10-06T16:45:55.071Z",
+  "step": "PDF",
+  "файл": "отчёт-2026-10-06.pdf",
+  "начало": "%PDF"
+ },
+ {
+  "at": "2026-10-06T16:46:03.861Z",
+  "step": "NEW-5",
+  "естьACQA": true,
+  "есть0410": false,
+  "фрагмент": "PilingTrack Панель диспетчера Дашборд Мониторинг Объекты Отчёты Установки Техготовность Бригады ТБ и допуски Аналитика Настройки 9+ П Петрова Д.В. dispatch@piling.ru Выйти Отчёты смен Журнал забивки Журнал забивки свай Свая уходит под землю навсегда — журнал единственное, что от неё остаётся. Принимает сваю мастер, он же отправляет её на добивку. Выгрузить журнал (.xlsx) Не разобранные На добивку Принятые Все Объект Все объекты ВСМЖ г.Великий Новгород ВСМЖ г.Вышний Волочек Забита с по № сваи Сбросить ЖУРНАЛ ЗАБИВКИ СВАЙ ВСМЖ г.Вышний Волочек, ВСМЖ г.Великий Новгород Период забивки: 19.09.2026 — 03.10.2026 Копровая установка Woltman-PVE 50PR, КБУРГ-16.02 №1, Banut 655, КБУРГ-16.02 №2, Koperni"
+ },
+ {
+  "at": "2026-10-06T16:46:04.313Z",
+  "step": "NEW-6",
+  "banutId": "22918355-40dc-4450-bb60-076694690da9"
+ },
+ {
+  "at": "2026-10-06T16:46:13.069Z",
+  "step": "NEW-6",
+  "вБане": "2|28",
+  "фрагмент": "мотр Завершён 80/100 21.08.2026 ЕО — ежедневный осмотр Завершён 90/100 21.08.2026 ЕО — ежедневный осмотр Завершён 90/100 21.08.2026 ЕО — ежедневный осмотр Завершён 80/100 16.08.2026 ЕО — ежедневный осмотр В процессе — 16.08.2026 ЕО — ежедневный осмотр В процессе — 10.08.2026 ЕО — ежедневный осмотр Завершён 100/100 10.08.2026 ЕО — ежедневный осмотр Завершён 100/100 02.08.2026 ЕО — ежедневный осмотр Завершён 100/100 28.07.2026 ЕО — ежедневный осмотр В процессе — 13.07.2026 ЕО — ежедневный осмотр Завершён 84/100 25.06.2026 ЕО — ежедневный осмотр В процессе — 07.06.2026 ЕО — ежедневный осмотр В процессе — ТЕХНИЧЕСКИЙ ПАСПОРТ ВЕС 70,0 т ВЕС С ОБОРУДОВАНИЕМ 83,5 т МОЩНОСТЬ ДВИГАТЕЛЯ 261 кВт МАКС. ДЛИНА СВАИ 18,0 м МАКС. ГЛУБИНА БУРЕНИЯ 18,0 м ТИП МОЛОТА Junttan HHK7A ЭНЕРГИЯ УДАРА 84,0 кДж ДАТА ПОКУПКИ 01.06.2026 НАРАБОТКА МОТОЧАСОВ 99999 ч СЛЕД. ТО ПО МОТОЧАСАМ 6200 ч ТЕЛЕМАТИКА Телематический бокс не установлен. Подключим когда поставим Teltonika / Galileosky. ФОТО Фото установки (общий вид, шильды, повреждения). До 10 МБ, jpg/png/heic. Добавить фото ДОКУМЕНТЫ Паспорт, ОТС, страховка, акты ТО. Срок действия отслеживается отдельно и подсвечивается, если истекает. Документы не загружены."
+ },
+ {
+  "at": "2026-10-06T16:46:20.819Z",
+  "step": "панель",
+  "submittedToday": "3",
+  "фрагмент": "PilingTrack Панель администратора Дашборд Мониторинг Объекты Отчёты Установки Техготовность Бригады ТБ и допуски Аналитика Справочники Пользователи Настройки 9+ Q QA_HERMES Администратор qa-hermes-admin@piling.test Выйти Действую как Администратор Механик Мастер Инженер ОТ Диспетчер Оператор Выберите роль, чтобы посмотреть приложение её глазами: разделы и права станут как у неё. Дашборд Оперативная сводка производства Обновлено в 19:46 Весь период Сегодня 7 дней Период Все объекты ВСМЖ г.Великий Новгород ВСМЖ г.Вышний Волочек Все установки Banut 655 Bauer RTG RM20 Kopernik Jint-SD20A Liebherr LRH 100 №1 Liebherr LRH 100 №2 Woltman-PVE 50PR КБУРГ-16.02 №1 КБУРГ-16.02 №2 Отчёты 3 / 3 машин с о"
+ },
+ {
+  "at": "2026-10-06T16:46:26.177Z",
+  "step": "аналитика",
+  "Краснов": true,
+  "Иванов": true,
+  "Щеголев": true,
+  "фрагмент": "PilingTrack Панель администратора Дашборд Мониторинг Объекты Отчёты Установки Техготовность Бригады ТБ и допуски Аналитика Справочники Пользователи Настройки 9+ Q QA_HERMES Администратор qa-hermes-admin@piling.test Выйти Действую как Администратор Механик Мастер Инженер ОТ Диспетчер Оператор Выберите роль, чтобы посмотреть приложение её глазами: разделы и права станут как у неё. Аналитика Производительность операторов и тренды по объектам Установок 8 активных в парке на сегодня Объектов 2 всего на сегодня, включая закрытые Сваи 99 шт. / 1 280 м.п. м.п. -35% к пред. неделе Бурение 35 шт. / 420 м.п. м.п. -70,2% к пред. неделе Доля простоя в смене, % 6 % +5,4 п.п. к пред. неделе Бригады 3 на см"
+ },
+ {
+  "at": "2026-10-06T16:46:31.901Z",
+  "step": "карточка КБУРГ №1",
+  "фрагмент": "PilingTrack Панель администратора Дашборд Мониторинг Объекты Отчёты Установки Техготовность Бригады ТБ и допуски Аналитика Справочники Пользователи Настройки 9+ Q QA_HERMES Администратор qa-hermes-admin@piling.test Выйти Действую как Администратор Механик Мастер Инженер ОТ Диспетчер Оператор Выберите роль, чтобы посмотреть приложение её глазами: разделы и права станут как у неё. Установки → КБУРГ-16.02 №1 КБУРГ-16.02 №1 Гибрид (забивка + бурение) КБУРГ-16 Редактировать ТЕКУЩАЯ РАБОТА БРИГАДА Экипаж Краснова ОБЪЕКТ ВСМЖ г.Великий Новгород ОПЕРАТОР Краснов Александр Михайлович ПОМОЩНИКИ Сидоров К.А. 30 ДНЕЙ АКТИВНОСТИ ОТЧЁТОВ 12 СВАЙ 91 шт. / 1 146 м.п. БУРЕНИЕ 43 шт. / 513,5 м.п. ПРОСТОЙ 7 ч 10 мин РОТАЦИЯ МАШИНИСТОВ МАШИНИСТ ПЕРИОД СМЕН ОБЪЕКТ ⇄ Краснов Александр Михайлович 05.07.2026 – 06"
+ },
+ {
+  "at": "2026-10-06T16:46:37.169Z",
+  "step": "техготовность и ТО",
+  "фрагмент": "PilingTrack Панель администратора Дашборд Мониторинг Объекты Отчёты Установки Техготовность Бригады ТБ и допуски Аналитика Справочники Пользователи Настройки 9+ Q QA_HERMES Администратор qa-hermes-admin@piling.test Выйти Действую как Администратор Механик Мастер Инженер ОТ Диспетчер Оператор Выберите роль, чтобы посмотреть приложение её глазами: разделы и права станут как у неё. Центр готовности Готовность парка Смены Обслуживание ТО Отчёты Настройки Техническая готовность — Центр готовности Выбранная установка Banut 655 Заводской № — Место базирования ВСМЖ г.Великий Новгород Наработка 99 999 "
+ },
+ {
+  "at": "2026-10-06T16:46:46.671Z",
+  "step": "v7-итог",
+  "shiftId": "ec19a322-cd9c-472f-85a1-321daa5bdfa3",
+  "shiftState": "CLOSED",
+  "reportRow": "RM-ec19a322-2026-10-06|submitted|2026-10-06 14:43:03.633+00",
+  "piles": "2|28",
+  "drilling": "2|24",
+  "downtime": "600",
+  "apis": [
+   "200 GET /api/auth/me :: {\"user\":{\"id\":\"cmqig86it000v68vnp5xarirx\",\"email\":\"r0mix0n@mail.ru\",\"name\":\"Щеголев Роман Николаевич\",\"role\":\"OPERATOR\",\"isActive\":true}}",
+   "200 GET /api/auth/me :: {\"user\":{\"id\":\"cmqig86it000v68vnp5xarirx\",\"email\":\"r0mix0n@mail.ru\",\"name\":\"Щеголев Роман Николаевич\",\"role\":\"OPERATOR\",\"isActive\":true}}",
+   "200 GET /api/feedback/events?limit=25 :: {\"requestId\":\"2343ac7c-179a-4953-ae0f-9c2d720e0862\",\"events\":[{\"id\":\"cmu8754wv00lb6kw5j38h3loi\",\"level\":\"info\",\"priority\":\"MEDIUM\",\"scope\":\"auth\",\"action\":\"auth.logout\",\"title\":\"Выход выполнен\",\"message\":\"Сессия пользователя была завершена.\",\"audience\":\"OPERAT",
+   "200 GET /api/operator/mobile/state? :: {\"data\":{\"operator\":{\"id\":\"cmqig86it000v68vnp5xarirx\",\"name\":\"Щеголев Роман Николаевич\"},\"phase\":\"CLOSED\",\"progress\":[{\"phase\":\"IDENTITY\",\"label\":\"Допуск\",\"done\":true,\"current\":false},{\"phase\":\"ADMISSION\",\"label\":\"Приём\",\"done\":true,\"current\":false},{\"phase\":\"",
+   "200 GET /api/operator/mobile/state? :: {\"data\":{\"operator\":{\"id\":\"cmqig86it000v68vnp5xarirx\",\"name\":\"Щеголев Роман Николаевич\"},\"phase\":\"CLOSED\",\"progress\":[{\"phase\":\"IDENTITY\",\"label\":\"Допуск\",\"done\":true,\"current\":false},{\"phase\":\"ADMISSION\",\"label\":\"Приём\",\"done\":true,\"current\":false},{\"phase\":\""
+  ]
+ },
+ {
+  "at": "2026-10-06T16:46:46.685Z",
+  "step": "v7-отчёт-для-таблицы",
+  "reportId": "RM-ec19a322-2026-10-06",
+  "submittedAt": "2026-10-06 14:43:03.633+00",
+  "piles": "2 шт / 28 м.п.",
+  "drilling": "2|24",
+  "downtime": "600"
+ },
+ {
+  "at": "2026-10-06T16:46:53.635Z",
+  "step": "NEW-9",
+  "шаг7": false,
+  "хвост": "завершена ✓ ✓ ✓ ✓ ✓ ✓ ✓ Всё отправлено · очередь на телефоне пуста Смена закрыта КБУРГ-16.02 №1 Принято сервером Отчёт отправлен диспетчеру. Можно закрывать приложение. Номер отчёта RM-9f5b221c-2026-10-06 Принят 6 окт. 2026 г., 18:53 Свай забито 2шт·28.0м.п. Лидерное бурение 0шт·0.0м.п. Простой 0 ч Смена ТБ Техника Ещё",
+  "apis": [
+   "200 GET /api/auth/me :: {\"user\":{\"id\":\"cmot2zgwi000w01mom9873hwy\",\"email\":\"ka@piling.ru\",\"name\":\"Краснов Александр Михайлович\",\"role\":\"OPERATOR\",\"isActive\":true}}",
+   "200 GET /api/auth/me :: {\"user\":{\"id\":\"cmot2zgwi000w01mom9873hwy\",\"email\":\"ka@piling.ru\",\"name\":\"Краснов Александр Михайлович\",\"role\":\"OPERATOR\",\"isActive\":true}}",
+   "200 GET /api/feedback/events?limit=25 :: {\"requestId\":\"a97cdefb-3964-4de1-affc-a2dcd8abaea9\",\"events\":[{\"id\":\"cmuvy8ax30273scw5n3l3vggu\",\"level\":\"warn\",\"priority\":\"MEDIUM\",\"scope\":\"pdf\",\"action\":\"report.single_pdf.sync.failed\",\"title\":\"Ошибка формирования PDF\",\"message\":\"Доступ запрещён\",\"audience\":\"",
+   "200 GET /api/operator/mobile/state? :: {\"data\":{\"operator\":{\"id\":\"cmot2zgwi000w01mom9873hwy\",\"name\":\"Краснов Александр Михайлович\"},\"phase\":\"CLOSED\",\"progress\":[{\"phase\":\"IDENTITY\",\"label\":\"Допуск\",\"done\":true,\"current\":false},{\"phase\":\"ADMISSION\",\"label\":\"Приём\",\"done\":true,\"current\":false},{\"phas",
+   "200 GET /api/operator/mobile/state? :: {\"data\":{\"operator\":{\"id\":\"cmot2zgwi000w01mom9873hwy\",\"name\":\"Краснов Александр Михайлович\"},\"phase\":\"CLOSED\",\"progress\":[{\"phase\":\"IDENTITY\",\"label\":\"Допуск\",\"done\":true,\"current\":false},{\"phase\":\"ADMISSION\",\"label\":\"Приём\",\"done\":true,\"current\":false},{\"phas",
+   "200 GET /api/auth/me :: {\"user\":{\"id\":\"cmot2zgwi000w01mom9873hwy\",\"email\":\"ka@piling.ru\",\"name\":\"Краснов Александр Михайлович\",\"role\":\"OPERATOR\",\"isActive\":true}}",
+   "200 GET /api/auth/me :: {\"user\":{\"id\":\"cmot2zgwi000w01mom9873hwy\",\"email\":\"ka@piling.ru\",\"name\":\"Краснов Александр Михайлович\",\"role\":\"OPERATOR\",\"isActive\":true}}",
+   "200 GET /api/feedback/events?limit=25 :: {\"requestId\":\"a97cdefb-3964-4de1-affc-a2dcd8abaea9\",\"events\":[{\"id\":\"cmuvy8ax30273scw5n3l3vggu\",\"level\":\"warn\",\"priority\":\"MEDIUM\",\"scope\":\"pdf\",\"action\":\"report.single_pdf.sync.failed\",\"title\":\"Ошибка формирования PDF\",\"message\":\"Доступ запрещён\",\"audience\":\"",
+   "200 GET /api/operator/mobile/state? :: {\"data\":{\"operator\":{\"id\":\"cmot2zgwi000w01mom9873hwy\",\"name\":\"Краснов Александр Михайлович\"},\"phase\":\"CLOSED\",\"progress\":[{\"phase\":\"IDENTITY\",\"label\":\"Допуск\",\"done\":true,\"current\":false},{\"phase\":\"ADMISSION\",\"label\":\"Приём\",\"done\":true,\"current\":false},{\"phas",
+   "200 GET /api/operator/mobile/state? :: {\"data\":{\"operator\":{\"id\":\"cmot2zgwi000w01mom9873hwy\",\"name\":\"Краснов Александр Михайлович\"},\"phase\":\"CLOSED\",\"progress\":[{\"phase\":\"IDENTITY\",\"label\":\"Допуск\",\"done\":true,\"current\":false},{\"phase\":\"ADMISSION\",\"label\":\"Приём\",\"done\":true,\"current\":false},{\"phas"
+  ]
+ },
+ {
+  "at": "2026-10-06T16:47:05.808Z",
+  "step": "D-20260930-001",
+  "before": "PilingTrack 9+ Андреев Петр Юрьевич Смена закрыта После работы Спасибо! Смена успешно завершена Смена закрыта, отчёт отправлен диспетчеру Время работы 231:47:43 Сваи выполнено 0 шт · 0 м.п. Бурение 0 скв · 0 м Простой 0 ч Моточасы 14 266 м/ч Отчёт RM-aefb1c9a-2026-09-27 На главную",
+  "after": "PilingTrack 9+ Андреев Петр Юрьевич Смена закрыта После работы Спасибо! Смена успешно завершена Смена закрыта, отчёт отправлен диспетчеру Время работы 231:47:47 Сваи выполнено 0 шт · 0 м.п. Бурение 0 скв · 0 м Простой 0 ч Моточасы 14 266 м/ч Отчёт RM-aefb1c9a-2026-09-27 На главную",
+  "apis": [
+   "200 GET /api/auth/me :: {\"user\":{\"id\":\"cmot2wpa3000s01mo1p65ywy1\",\"email\":\"apj@piling.ru\",\"name\":\"Андреев Петр Юрьевич\",\"role\":\"OPERATOR\",\"isActive\":true}}",
+   "200 GET /api/auth/me :: {\"user\":{\"id\":\"cmot2wpa3000s01mo1p65ywy1\",\"email\":\"apj@piling.ru\",\"name\":\"Андреев Петр Юрьевич\",\"role\":\"OPERATOR\",\"isActive\":true}}",
+   "200 GET /api/feedback/events?limit=25 :: {\"requestId\":\"61eaf247-12c6-4c31-a024-cecaddfe7f51\",\"events\":[{\"id\":\"cmuj4cle70071wgw53jvw6otq\",\"level\":\"error\",\"priority\":\"HIGH\",\"scope\":\"api\",\"action\":\"api.request_failed\",\"title\":\"Серверная ошибка\",\"message\":\"Запрос GET /api/weather?lat=58.5215&lon=31.271 з",
+   "200 GET /api/operator/mobile/state? :: {\"data\":{\"operator\":{\"id\":\"cmot2wpa3000s01mo1p65ywy1\",\"name\":\"Андреев Петр Юрьевич\"},\"phase\":\"IDENTITY\",\"progress\":[{\"phase\":\"IDENTITY\",\"label\":\"Допуск\",\"done\":false,\"current\":true},{\"phase\":\"ADMISSION\",\"label\":\"Приём\",\"done\":false,\"current\":false},{\"phase\":\"P",
+   "200 GET /api/operator/mobile/state? :: {\"data\":{\"operator\":{\"id\":\"cmot2wpa3000s01mo1p65ywy1\",\"name\":\"Андреев Петр Юрьевич\"},\"phase\":\"IDENTITY\",\"progress\":[{\"phase\":\"IDENTITY\",\"label\":\"Допуск\",\"done\":false,\"current\":true},{\"phase\":\"ADMISSION\",\"label\":\"Приём\",\"done\":false,\"current\":false},{\"phase\":\"P",
+   "200 GET /api/operator/shift :: {\"assignments\":[{\"equipmentId\":\"19aaf71c-5fc3-4566-a1d8-78622347462e\",\"equipmentName\":\"Liebherr LRH 100 №2\",\"model\":\"LRH 100\",\"siteId\":\"cmosf1pn5001g01mkikoaqjft\",\"siteName\":\"ВСМЖ г.Великий Новгород\"}],\"equipment\":{\"id\":\"19aaf71c-5fc3-4566-a1d8-78622347462e\",\"",
+   "200 GET /api/operator/shift :: {\"assignments\":[{\"equipmentId\":\"19aaf71c-5fc3-4566-a1d8-78622347462e\",\"equipmentName\":\"Liebherr LRH 100 №2\",\"model\":\"LRH 100\",\"siteId\":\"cmosf1pn5001g01mkikoaqjft\",\"siteName\":\"ВСМЖ г.Великий Новгород\"}],\"equipment\":{\"id\":\"19aaf71c-5fc3-4566-a1d8-78622347462e\",\"",
+   "200 GET /api/operator/shift :: {\"assignments\":[{\"equipmentId\":\"19aaf71c-5fc3-4566-a1d8-78622347462e\",\"equipmentName\":\"Liebherr LRH 100 №2\",\"model\":\"LRH 100\",\"siteId\":\"cmosf1pn5001g01mkikoaqjft\",\"siteName\":\"ВСМЖ г.Великий Новгород\"}],\"equipment\":{\"id\":\"19aaf71c-5fc3-4566-a1d8-78622347462e\",\""
+  ]
+ },
+ {
+  "at": "2026-10-06T16:47:12.759Z",
+  "step": "D-20261001-001",
+  "before": "На связи 19:47 KOPERNIK JINT-SD20A ВСМЖ г.Великий Новгород · Митрофанов Алексей Геннадьевич ЕО после работы Что сделать до ухода, чтобы завтра машина завелась и поехала. Постановка ! Машина на ровном основании, мачта опущена на землю норма дефект Осмотр после работы ! Осмотр на деформации и трещины:",
+  "after": "На связи 19:47 KOPERNIK JINT-SD20A ВСМЖ г.Великий Новгород · Митрофанов Алексей Геннадьевич ЕО после работы Что сделать до ухода, чтобы завтра машина завелась и поехала. Постановка ! Машина на ровном основании, мачта опущена на землю норма дефект Осмотр после работы ! Осмотр на деформации и трещины: мачта, стрела, рама норма дефект Течи после смены: двигатель, гидравлика, редукторы На горячей маши",
+  "apis": [
+   "200 GET /api/auth/me :: {\"user\":{\"id\":\"cmot30g80000y01moqszjpvor\",\"email\":\"mag@piling.ru\",\"name\":\"Митрофанов Алексей Геннадьевич\",\"role\":\"OPERATOR\",\"isActive\":true}}",
+   "200 GET /api/auth/me :: {\"user\":{\"id\":\"cmot30g80000y01moqszjpvor\",\"email\":\"mag@piling.ru\",\"name\":\"Митрофанов Алексей Геннадьевич\",\"role\":\"OPERATOR\",\"isActive\":true}}",
+   "200 GET /api/feedback/events?limit=25 :: {\"requestId\":\"5159ebfb-71ca-4aa7-8a02-364ece2f6f4b\",\"events\":[{\"id\":\"cmu8so4b900i7tkw5fo1fcl4y\",\"level\":\"info\",\"priority\":\"MEDIUM\",\"scope\":\"auth\",\"action\":\"auth.logout\",\"title\":\"Выход выполнен\",\"message\":\"Сессия пользователя была завершена.\",\"audience\":\"OPERAT",
+   "200 GET /api/operator/mobile/state? :: {\"data\":{\"operator\":{\"id\":\"cmot30g80000y01moqszjpvor\",\"name\":\"Митрофанов Алексей Геннадьевич\"},\"phase\":\"CLOSING\",\"progress\":[{\"phase\":\"IDENTITY\",\"label\":\"Допуск\",\"done\":true,\"current\":false},{\"phase\":\"ADMISSION\",\"label\":\"Приём\",\"done\":true,\"current\":false},{\"p",
+   "200 GET /api/operator/mobile/state? :: {\"data\":{\"operator\":{\"id\":\"cmot30g80000y01moqszjpvor\",\"name\":\"Митрофанов Алексей Геннадьевич\"},\"phase\":\"CLOSING\",\"progress\":[{\"phase\":\"IDENTITY\",\"label\":\"Допуск\",\"done\":true,\"current\":false},{\"phase\":\"ADMISSION\",\"label\":\"Приём\",\"done\":true,\"current\":false},{\"p",
+   "200 GET /api/operator/mobile/state? :: {\"data\":{\"operator\":{\"id\":\"cmot30g80000y01moqszjpvor\",\"name\":\"Митрофанов Алексей Геннадьевич\"},\"phase\":\"CLOSING\",\"progress\":[{\"phase\":\"IDENTITY\",\"label\":\"Допуск\",\"done\":true,\"current\":false},{\"phase\":\"ADMISSION\",\"label\":\"Приём\",\"done\":true,\"current\":false},{\"p",
+   "200 GET /api/operator/mobile/state? :: {\"data\":{\"operator\":{\"id\":\"cmot30g80000y01moqszjpvor\",\"name\":\"Митрофанов Алексей Геннадьевич\"},\"phase\":\"CLOSING\",\"progress\":[{\"phase\":\"IDENTITY\",\"label\":\"Допуск\",\"done\":true,\"current\":false},{\"phase\":\"ADMISSION\",\"label\":\"Приём\",\"done\":true,\"current\":false},{\"p"
+  ]
+ },
+ {
+  "at": "2026-10-06T16:47:21.964Z",
+  "step": "operator-итог",
+  "shiftId": "673a209d-a9ee-40b8-b88f-e64f1f1ccc5c",
+  "state": "CLOSED",
+  "reportRow": "RM-673a209d-2026-10-06|submitted|2026-10-06 16:26:14.665+00",
+  "piles": "2",
+  "drilling": "12",
+  "downtime": "360",
+  "apis": [
+   "200 GET /api/auth/me :: {\"user\":{\"id\":\"cmq1ylkyt00023wvn47bclk71\",\"email\":\"operator@piling.ru\",\"name\":\"Иванов И.П.\",\"role\":\"OPERATOR\",\"isActive\":true}}",
+   "200 GET /api/auth/me :: {\"user\":{\"id\":\"cmq1ylkyt00023wvn47bclk71\",\"email\":\"operator@piling.ru\",\"name\":\"Иванов И.П.\",\"role\":\"OPERATOR\",\"isActive\":true}}",
+   "200 GET /api/feedback/events?limit=25 :: {\"requestId\":\"ebdb503e-fc54-445c-92bb-bdaeafcc9179\",\"events\":[{\"id\":\"cmu8savop00fdtkw5uvkn6n8l\",\"level\":\"info\",\"priority\":\"MEDIUM\",\"scope\":\"auth\",\"action\":\"auth.logout\",\"title\":\"Выход выполнен\",\"message\":\"Сессия пользователя была завершена.\",\"audience\":\"OPERAT",
+   "200 GET /api/operator/mobile/state? :: {\"data\":{\"operator\":{\"id\":\"cmq1ylkyt00023wvn47bclk71\",\"name\":\"Иванов И.П.\"},\"phase\":\"CLOSED\",\"progress\":[{\"phase\":\"IDENTITY\",\"label\":\"Допуск\",\"done\":true,\"current\":false},{\"phase\":\"ADMISSION\",\"label\":\"Приём\",\"done\":true,\"current\":false},{\"phase\":\"PRESHIFT_INSP",
+   "200 GET /api/operator/mobile/state? :: {\"data\":{\"operator\":{\"id\":\"cmq1ylkyt00023wvn47bclk71\",\"name\":\"Иванов И.П.\"},\"phase\":\"CLOSED\",\"progress\":[{\"phase\":\"IDENTITY\",\"label\":\"Допуск\",\"done\":true,\"current\":false},{\"phase\":\"ADMISSION\",\"label\":\"Приём\",\"done\":true,\"current\":false},{\"phase\":\"PRESHIFT_INSP",
+   "200 GET /api/auth/me :: {\"user\":{\"id\":\"cmq1ylkyt00023wvn47bclk71\",\"email\":\"operator@piling.ru\",\"name\":\"Иванов И.П.\",\"role\":\"OPERATOR\",\"isActive\":true}}",
+   "200 GET /api/auth/me :: {\"user\":{\"id\":\"cmq1ylkyt00023wvn47bclk71\",\"email\":\"operator@piling.ru\",\"name\":\"Иванов И.П.\",\"role\":\"OPERATOR\",\"isActive\":true}}",
+   "200 GET /api/feedback/events?limit=25 :: {\"requestId\":\"ebdb503e-fc54-445c-92bb-bdaeafcc9179\",\"events\":[{\"id\":\"cmu8savop00fdtkw5uvkn6n8l\",\"level\":\"info\",\"priority\":\"MEDIUM\",\"scope\":\"auth\",\"action\":\"auth.logout\",\"title\":\"Выход выполнен\",\"message\":\"Сессия пользователя была завершена.\",\"audience\":\"OPERAT",
+   "200 GET /api/operator/mobile/state? :: {\"data\":{\"operator\":{\"id\":\"cmq1ylkyt00023wvn47bclk71\",\"name\":\"Иванов И.П.\"},\"phase\":\"CLOSED\",\"progress\":[{\"phase\":\"IDENTITY\",\"label\":\"Допуск\",\"done\":true,\"current\":false},{\"phase\":\"ADMISSION\",\"label\":\"Приём\",\"done\":true,\"current\":false},{\"phase\":\"PRESHIFT_INSP",
+   "200 GET /api/operator/mobile/state? :: {\"data\":{\"operator\":{\"id\":\"cmq1ylkyt00023wvn47bclk71\",\"name\":\"Иванов И.П.\"},\"phase\":\"CLOSED\",\"progress\":[{\"phase\":\"IDENTITY\",\"label\":\"Допуск\",\"done\":true,\"current\":false},{\"phase\":\"ADMISSION\",\"label\":\"Приём\",\"done\":true,\"current\":false},{\"phase\":\"PRESHIFT_INSP"
+  ]
+ },
+ {
+  "at": "2026-10-06T16:47:32.011Z",
+  "step": "D-20261001-001 (v10): состояние",
+  "показываетСегодня": true,
+  "старыеДанные": true,
+  "хвост": "Работа: сваи, бурение, простой Woltman-PVE 50PR ВСМЖ г.Вышний Волочек 06.10.2026 К работе допущен Подготовка завершена, замечаний по допуску нет. Сваи 3 шт. Бурение 0 м Простой 0 мин Работа Свая Бурение Простой Инцидент Свая с паспортом Подготовка 4 из 4 СИЗ и допуск Выполнено Осмотр машины Выполнено Площадка Выполнено Пуск Выполнено Завершить работу Последние записи 19:30 С 100-35 1 шт. · 10 м Со",
+  "apis": [
+   "200 GET /api/auth/me :: {\"user\":{\"id\":\"cmot2yciw000u01mohcubd6b6\",\"email\":\"ivv@piling.ru\",\"name\":\"Игнатьев Владислав Вениаминович\",\"role\":\"OPERATOR\",\"isActive\":true}}",
+   "200 GET /api/auth/me :: {\"user\":{\"id\":\"cmot2yciw000u01mohcubd6b6\",\"email\":\"ivv@piling.ru\",\"name\":\"Игнатьев Владислав Вениаминович\",\"role\":\"OPERATOR\",\"isActive\":true}}",
+   "200 GET /api/feedback/events?limit=25 :: {\"requestId\":\"796c1889-1302-4431-9bc6-cf8a1c3ff63c\",\"events\":[{\"id\":\"cmu8s2qm100dxtkw5wze51zx8\",\"level\":\"info\",\"priority\":\"MEDIUM\",\"scope\":\"auth\",\"action\":\"auth.logout\",\"title\":\"Выход выполнен\",\"message\":\"Сессия пользователя была завершена.\",\"audience\":\"OPERAT",
+   "200 GET /api/operator/mobile/state? :: {\"data\":{\"operator\":{\"id\":\"cmot2yciw000u01mohcubd6b6\",\"name\":\"Игнатьев Владислав Вениаминович\"},\"phase\":\"WORK\",\"progress\":[{\"phase\":\"IDENTITY\",\"label\":\"Допуск\",\"done\":true,\"current\":false},{\"phase\":\"ADMISSION\",\"label\":\"Приём\",\"done\":true,\"current\":false},{\"pha",
+   "200 GET /api/operator/mobile/state? :: {\"data\":{\"operator\":{\"id\":\"cmot2yciw000u01mohcubd6b6\",\"name\":\"Игнатьев Владислав Вениаминович\"},\"phase\":\"WORK\",\"progress\":[{\"phase\":\"IDENTITY\",\"label\":\"Допуск\",\"done\":true,\"current\":false},{\"phase\":\"ADMISSION\",\"label\":\"Приём\",\"done\":true,\"current\":false},{\"pha",
+   "200 GET /api/safety/my-clearance :: {\"clearance\":{\"cleared\":true,\"blockers\":[],\"warnings\":[],\"documents\":[{\"typeId\":\"3cb782e3-17ea-40b8-9078-c6ec5a9d856e\",\"typeName\":\"Удостоверение по охране труда\",\"status\":\"ok\",\"expiresAt\":\"2029-09-14T00:00:00.000Z\",\"daysLeft\":1074},{\"typeId\":\"a4d2931f-032f-46f",
+   "200 GET /api/safety/my-clearance :: {\"clearance\":{\"cleared\":true,\"blockers\":[],\"warnings\":[],\"documents\":[{\"typeId\":\"3cb782e3-17ea-40b8-9078-c6ec5a9d856e\",\"typeName\":\"Удостоверение по охране труда\",\"status\":\"ok\",\"expiresAt\":\"2029-09-14T00:00:00.000Z\",\"daysLeft\":1074},{\"typeId\":\"a4d2931f-032f-46f",
+   "200 GET /api/operator/mobile/state? :: {\"data\":{\"operator\":{\"id\":\"cmot2yciw000u01mohcubd6b6\",\"name\":\"Игнатьев Владислав Вениаминович\"},\"phase\":\"WORK\",\"progress\":[{\"phase\":\"IDENTITY\",\"label\":\"Допуск\",\"done\":true,\"current\":false},{\"phase\":\"ADMISSION\",\"label\":\"Приём\",\"done\":true,\"current\":false},{\"pha",
+   "200 GET /api/operator/mobile/state? :: {\"data\":{\"operator\":{\"id\":\"cmot2yciw000u01mohcubd6b6\",\"name\":\"Игнатьев Владислав Вениаминович\"},\"phase\":\"WORK\",\"progress\":[{\"phase\":\"IDENTITY\",\"label\":\"Допуск\",\"done\":true,\"current\":false},{\"phase\":\"ADMISSION\",\"label\":\"Приём\",\"done\":true,\"current\":false},{\"pha"
+  ]
+ },
+ {
+  "at": "2026-10-06T16:47:38.551Z",
+  "step": "D-20261001-001 (v10): привязка записи",
+  "before": 2,
+  "after": 3,
+  "ушлаВСтарую": true,
+  "apis": [
+   "200 POST /api/operator/mobile/command :: {\"data\":{\"reportId\":\"cmut7jr6f015dscw5krsnottf\"}}"
+  ]
+ },
+ {
+  "at": "2026-10-06T16:47:49.531Z",
+  "step": "D-20260930-001 (gea)",
+  "before": "PilingTrack 9+ Герасимова ЕА Смена закрыта После работы Спасибо! Смена успешно завершена Смена закрыта, отчёт отправлен диспетчеру Время работы 231:38:17 Сваи выполнено 0 шт · 0 м.п. Бурение 0 скв · 0 м Простой 0 ч Моточасы 12 061 м/ч Отчёт RM-4b13ebb1-2026-09-27 На главную",
+  "after": "PilingTrack 9+ Герасимова ЕА Смена закрыта После работы Спасибо! Смена успешно завершена Смена закрыта, отчёт отправлен диспетчеру Время работы 231:38:22 Сваи выполнено 0 шт · 0 м.п. Бурение 0 скв · 0 м Простой 0 ч Моточасы 12 061 м/ч Отчёт RM-4b13ebb1-2026-09-27 На главную",
+  "apis": [
+   "200 GET /api/auth/me :: {\"user\":{\"id\":\"cmov7gct2001901qqkmjkwg0z\",\"email\":\"gea@piling.ru\",\"name\":\"Герасимова ЕА\",\"role\":\"OPERATOR\",\"isActive\":true}}",
+   "200 GET /api/auth/me :: {\"user\":{\"id\":\"cmov7gct2001901qqkmjkwg0z\",\"email\":\"gea@piling.ru\",\"name\":\"Герасимова ЕА\",\"role\":\"OPERATOR\",\"isActive\":true}}",
+   "200 GET /api/feedback/events?limit=25 :: {\"requestId\":\"fb4c40a6-741c-49d4-acff-4fbfdb0373cd\",\"events\":[{\"id\":\"cmuj4fpma007hwgw5b7ljpsud\",\"level\":\"error\",\"priority\":\"HIGH\",\"scope\":\"api\",\"action\":\"api.request_failed\",\"title\":\"Серверная ошибка\",\"message\":\"Запрос GET /api/weather?lat=58.5215&lon=31.271 з",
+   "200 GET /api/operator/mobile/state? :: {\"data\":{\"operator\":{\"id\":\"cmov7gct2001901qqkmjkwg0z\",\"name\":\"Герасимова ЕА\"},\"phase\":\"IDENTITY\",\"progress\":[{\"phase\":\"IDENTITY\",\"label\":\"Допуск\",\"done\":false,\"current\":true},{\"phase\":\"ADMISSION\",\"label\":\"Приём\",\"done\":false,\"current\":false},{\"phase\":\"PRESHIFT",
+   "200 GET /api/operator/mobile/state? :: {\"data\":{\"operator\":{\"id\":\"cmov7gct2001901qqkmjkwg0z\",\"name\":\"Герасимова ЕА\"},\"phase\":\"IDENTITY\",\"progress\":[{\"phase\":\"IDENTITY\",\"label\":\"Допуск\",\"done\":false,\"current\":true},{\"phase\":\"ADMISSION\",\"label\":\"Приём\",\"done\":false,\"current\":false},{\"phase\":\"PRESHIFT",
+   "200 GET /api/operator/shift :: {\"assignments\":[{\"equipmentId\":\"45d42990-9ab5-4b84-9c33-87c06ca1ee2a\",\"equipmentName\":\"КБУРГ-16.02 №2\",\"model\":\"КБУРГ-16\",\"siteId\":\"cmosf1pn5001g01mkikoaqjft\",\"siteName\":\"ВСМЖ г.Великий Новгород\"}],\"equipment\":{\"id\":\"45d42990-9ab5-4b84-9c33-87c06ca1ee2a\",\"name",
+   "200 GET /api/operator/shift :: {\"assignments\":[{\"equipmentId\":\"45d42990-9ab5-4b84-9c33-87c06ca1ee2a\",\"equipmentName\":\"КБУРГ-16.02 №2\",\"model\":\"КБУРГ-16\",\"siteId\":\"cmosf1pn5001g01mkikoaqjft\",\"siteName\":\"ВСМЖ г.Великий Новгород\"}],\"equipment\":{\"id\":\"45d42990-9ab5-4b84-9c33-87c06ca1ee2a\",\"name",
+   "200 GET /api/operator/shift :: {\"assignments\":[{\"equipmentId\":\"45d42990-9ab5-4b84-9c33-87c06ca1ee2a\",\"equipmentName\":\"КБУРГ-16.02 №2\",\"model\":\"КБУРГ-16\",\"siteId\":\"cmosf1pn5001g01mkikoaqjft\",\"siteName\":\"ВСМЖ г.Великий Новгород\"}],\"equipment\":{\"id\":\"45d42990-9ab5-4b84-9c33-87c06ca1ee2a\",\"name"
+  ]
+ },
+ {
+  "at": "2026-10-06T16:47:56.333Z",
+  "step": "D-20260930-003 (v5)",
+  "текст": "Экран доступен только машинисту Смену ведёт машинист, закреплённый за установкой. Записи о выработке и осмотрах подаёт он.",
+  "apis": [
+   "200 GET /api/auth/me :: {\"user\":{\"id\":\"cmot31e3o001001mof00feqbw\",\"email\":\"kn@piling.ru\",\"name\":\"Курнаков Николай\",\"role\":\"ASSISTANT\",\"isActive\":true}}",
+   "200 GET /api/feedback/events?limit=25 :: {\"requestId\":\"1868bf40-e3d4-4139-9ca2-5058fdcfbdac\",\"events\":[{\"id\":\"cmtne2dp9000p24w5hie1phmw\",\"level\":\"info\",\"priority\":\"MEDIUM\",\"scope\":\"auth\",\"action\":\"auth.logout\",\"title\":\"Выход выполнен\",\"message\":\"Сессия пользователя была завершена.\",\"audience\":\"OPERAT",
+   "200 GET /api/assistant/state :: {\"data\":{\"assistant\":{\"id\":\"cmot31e3o001001mof00feqbw\",\"name\":\"Курнаков Николай\"},\"documents\":[{\"typeId\":\"a4d2931f-032f-46f0-963d-50670267f13d\",\"name\":\"Аттестация по промышленной безопасности\",\"required\":true,\"verdict\":\"VALID\",\"number\":\"DEMO-202609-11-01\",\"exp",
+   "200 GET /api/assistant/state :: {\"data\":{\"assistant\":{\"id\":\"cmot31e3o001001mof00feqbw\",\"name\":\"Курнаков Николай\"},\"documents\":[{\"typeId\":\"a4d2931f-032f-46f0-963d-50670267f13d\",\"name\":\"Аттестация по промышленной безопасности\",\"required\":true,\"verdict\":\"VALID\",\"number\":\"DEMO-202609-11-01\",\"exp",
+   "403 GET /api/operator/mobile/state? :: {\"error\":\"Экран доступен только машинисту\"}",
+   "403 GET /api/operator/mobile/state? :: {\"error\":\"Экран доступен только машинисту\"}"
+  ]
+ },
+ {
+  "at": "2026-10-06T16:48:03.095Z",
+  "step": "D-20260930-003 (v7)",
+  "текст": "Оператор Онлайн Синхронизация… Экран доступен только машинисту Смену ведёт машинист, закреплённый за установкой. Записи о выработке и осмотрах подаёт он.",
+  "apis": [
+   "200 GET /api/auth/me :: {\"user\":{\"id\":\"qae400e3443501488b9041183\",\"email\":\"qa-hermes-assistant-2@piling.test\",\"name\":\"QA_HERMES Помощник 2\",\"role\":\"ASSISTANT\",\"isActive\":true}}",
+   "200 GET /api/feedback/events?limit=25 :: {\"requestId\":\"17326c16-1a24-435c-977f-7a717ececf86\",\"events\":[],\"summary\":{\"total\":0,\"unread\":0,\"error\":0,\"warn\":0,\"success\":0,\"critical\":0,\"ackPending\":0}}",
+   "200 GET /api/assistant/state :: {\"data\":{\"assistant\":{\"id\":\"qae400e3443501488b9041183\",\"name\":\"QA_HERMES Помощник 2\"},\"documents\":[{\"typeId\":\"a4d2931f-032f-46f0-963d-50670267f13d\",\"name\":\"Аттестация по промышленной безопасности\",\"required\":true,\"verdict\":\"MISSING\",\"number\":\"\",\"expiresAt\":nul",
+   "200 GET /api/assistant/state :: {\"data\":{\"assistant\":{\"id\":\"qae400e3443501488b9041183\",\"name\":\"QA_HERMES Помощник 2\"},\"documents\":[{\"typeId\":\"a4d2931f-032f-46f0-963d-50670267f13d\",\"name\":\"Аттестация по промышленной безопасности\",\"required\":true,\"verdict\":\"MISSING\",\"number\":\"\",\"expiresAt\":nul",
+   "403 GET /api/operator/mobile/state? :: {\"error\":\"Экран доступен только машинисту\"}",
+   "403 GET /api/operator/mobile/state? :: {\"error\":\"Экран доступен только машинисту\"}"
+  ]
+ },
+ {
+  "at": "2026-10-06T16:48:08.903Z",
+  "step": "помощники",
+  "email": "helper@piling.ru",
+  "path": "/operator",
+  "экран": "PilingTrack 9 Сидоров К.А. Всё отправлено · очередь на телефоне пуста Рабочее место машиниста Экран доступен только машинисту Смену ведёт машинист, закреплённый за установкой. Записи о выработке и осмотрах подаёт он. Войти другим пользователем"
+ },
+ {
+  "at": "2026-10-06T16:48:14.379Z",
+  "step": "помощники",
+  "email": "qa-hermes-assistant-3@piling.test",
+  "path": "/operator",
+  "экран": "PilingTrack 8 QA_HERMES Помощник 3 Всё отправлено · очередь на телефоне пуста Рабочее место машиниста Экран доступен только машинисту Смену ведёт машинист, закреплённый за установкой. Записи о выработке и осмотрах подаёт он. Войти другим пользователем"
+ },
+ {
+  "at": "2026-10-06T16:48:19.829Z",
+  "step": "помощники",
+  "email": "tr@piling.ru",
+  "path": "/operator/v2",
+  "экран": "PilingTrack 2 Токсубаев Роман Допуск и приёмка Шаг 1 из 5 · 00:03 ! К работе не допущен Токсубаев Роман · документов: 11 · ближайший срок 14.12.2026 › Установка не закреплена — обратитесь к администратору Установка не закреплена Тип смены Смена: дневная (07:00"
+ },
+ {
+  "at": "2026-10-06T16:48:25.319Z",
+  "step": "помощники",
+  "email": "qa-hermes-assistant-4@piling.test",
+  "path": "/operator/v2",
+  "экран": "PilingTrack QA_HERMES Помощник 4 Допуск и приёмка Шаг 1 из 5 · 00:03 ! К работе не допущен QA_HERMES Помощник 4 · документов: 11 · требуют внимания: 11 › Нет документа: Удостоверение по охране труда Нет документа: Аттестация по промышленной безопасности Нет до"
+ },
+ {
+  "at": "2026-10-06T16:48:30.962Z",
+  "step": "помощники",
+  "email": "qa-hermes-assistant-1@piling.test",
+  "path": "/operator/v10",
+  "экран": "Смена Экран доступен только машинисту Смена ТБ Техника Ещё"
+ },
+ {
+  "at": "2026-10-06T16:49:08.085Z",
+  "step": "NEW-9",
+  "шаг7": true,
+  "ужеЗакрыта": true,
+  "хвост": "завершена ✓ ✓ ✓ ✓ ✓ ✓ ✓ Всё отправлено · очередь на телефоне пуста Смена закрыта КБУРГ-16.02 №1 Принято сервером Отчёт отправлен диспетчеру. Можно закрывать приложение. Номер отчёта RM-9f5b221c-2026-10-06 Принят 6 окт. 2026 г., 18:53 Свай забито 2шт·28.0м.п. Лидерное бурение 0шт·0.0м.п. Простой 0 ч Смена ТБ Техника Ещё",
+  "apis": [
+   "200 GET /api/auth/me :: {\"user\":{\"id\":\"cmot2zgwi000w01mom9873hwy\",\"email\":\"ka@piling.ru\",\"name\":\"Краснов Александр Михайлович\",\"role\":\"OPERATOR\",\"isActive\":true}}",
+   "200 GET /api/auth/me :: {\"user\":{\"id\":\"cmot2zgwi000w01mom9873hwy\",\"email\":\"ka@piling.ru\",\"name\":\"Краснов Александр Михайлович\",\"role\":\"OPERATOR\",\"isActive\":true}}",
+   "200 GET /api/feedback/events?limit=25 :: {\"requestId\":\"fe66653d-949d-4652-996b-b23cc89a2ced\",\"events\":[{\"id\":\"cmuvy8ax30273scw5n3l3vggu\",\"level\":\"warn\",\"priority\":\"MEDIUM\",\"scope\":\"pdf\",\"action\":\"report.single_pdf.sync.failed\",\"title\":\"Ошибка формирования PDF\",\"message\":\"Доступ запрещён\",\"audience\":\"",
+   "200 GET /api/operator/mobile/state? :: {\"data\":{\"operator\":{\"id\":\"cmot2zgwi000w01mom9873hwy\",\"name\":\"Краснов Александр Михайлович\"},\"phase\":\"CLOSED\",\"progress\":[{\"phase\":\"IDENTITY\",\"label\":\"Допуск\",\"done\":true,\"current\":false},{\"phase\":\"ADMISSION\",\"label\":\"Приём\",\"done\":true,\"current\":false},{\"phas",
+   "200 GET /api/operator/mobile/state? :: {\"data\":{\"operator\":{\"id\":\"cmot2zgwi000w01mom9873hwy\",\"name\":\"Краснов Александр Михайлович\"},\"phase\":\"CLOSED\",\"progress\":[{\"phase\":\"IDENTITY\",\"label\":\"Допуск\",\"done\":true,\"current\":false},{\"phase\":\"ADMISSION\",\"label\":\"Приём\",\"done\":true,\"current\":false},{\"phas",
+   "200 GET /api/auth/me :: {\"user\":{\"id\":\"cmot2zgwi000w01mom9873hwy\",\"email\":\"ka@piling.ru\",\"name\":\"Краснов Александр Михайлович\",\"role\":\"OPERATOR\",\"isActive\":true}}",
+   "200 GET /api/auth/me :: {\"user\":{\"id\":\"cmot2zgwi000w01mom9873hwy\",\"email\":\"ka@piling.ru\",\"name\":\"Краснов Александр Михайлович\",\"role\":\"OPERATOR\",\"isActive\":true}}",
+   "200 GET /api/feedback/events?limit=25 :: {\"requestId\":\"fe66653d-949d-4652-996b-b23cc89a2ced\",\"events\":[{\"id\":\"cmuvy8ax30273scw5n3l3vggu\",\"level\":\"warn\",\"priority\":\"MEDIUM\",\"scope\":\"pdf\",\"action\":\"report.single_pdf.sync.failed\",\"title\":\"Ошибка формирования PDF\",\"message\":\"Доступ запрещён\",\"audience\":\"",
+   "200 GET /api/operator/mobile/state? :: {\"data\":{\"operator\":{\"id\":\"cmot2zgwi000w01mom9873hwy\",\"name\":\"Краснов Александр Михайлович\"},\"phase\":\"CLOSED\",\"progress\":[{\"phase\":\"IDENTITY\",\"label\":\"Допуск\",\"done\":true,\"current\":false},{\"phase\":\"ADMISSION\",\"label\":\"Приём\",\"done\":true,\"current\":false},{\"phas",
+   "200 GET /api/operator/mobile/state? :: {\"data\":{\"operator\":{\"id\":\"cmot2zgwi000w01mom9873hwy\",\"name\":\"Краснов Александр Михайлович\"},\"phase\":\"CLOSED\",\"progress\":[{\"phase\":\"IDENTITY\",\"label\":\"Допуск\",\"done\":true,\"current\":false},{\"phase\":\"ADMISSION\",\"label\":\"Приём\",\"done\":true,\"current\":false},{\"phas"
+  ]
+ },
+ {
+  "at": "2026-10-06T16:49:08.607Z",
+  "step": "ka-итог",
+  "kaShiftId": "9f5b221c-e03f-4e8f-b822-2fa81110e159",
+  "kaState": "CLOSED",
+  "reportRow": "RM-9f5b221c-2026-10-06|submitted|2026-10-06 15:53:19.125+00"
+ }
+]
