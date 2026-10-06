@@ -22,7 +22,8 @@ import { QueryErrorBanner } from '@/components/piling/async-ui';
 import { cn } from '@/lib/utils';
 import { formatCountMeters } from '@/lib/format';
 import { useAnalyticsDashboardLayout, buildAnalyticsKpiWidgets } from '@/components/piling/analytics-dashboard/kpi-widgets';
-import { PageLayoutRenderer } from '@/components/piling/layout-editor/page-layout-renderer';
+import { ANALYTICS_DASHBOARD_WIDGETS } from '@/components/piling/analytics-dashboard/kpi-catalog';
+import { PageLayoutRenderer, type RenderablePageWidget } from '@/components/piling/layout-editor/page-layout-renderer';
 import { getTodayInTimezone } from '@/lib/timezone';
 import {
   EmptyState, MaintenanceSummaryTile,
@@ -34,6 +35,19 @@ const TABS = [
   { key: 'trends' as const, label: 'Тренды по объектам', icon: TrendingUp },
   { key: 'kpi' as const, label: 'Надёжность ТО', icon: Wrench },
 ];
+
+// F-R128-6: пока снимок парка в пути, полосы KPI на экране нет — она появлялась
+// через долю секунды и сдвигала вниз заголовок, вкладки и весь контент. Держим
+// её высоту скелетонами по той же раскладке; плитка — min-h-28, как в KpiTile.
+const KPI_SKELETON_WIDGETS: Record<string, RenderablePageWidget> = Object.fromEntries(
+  ANALYTICS_DASHBOARD_WIDGETS
+    .filter((w) => w.zone === 'kpi')
+    .map((w): [string, RenderablePageWidget] => [w.id, {
+      id: w.id,
+      title: w.title,
+      render: () => <Skeleton className="h-full min-h-28 w-full" />,
+    }]),
+);
 
 /** Сдвиг календарного дня «ГГГГ-ММ-ДД» на N дней: полдень UTC, без перевода часов. */
 const shiftDay = (day: string, delta: number): string =>
@@ -236,7 +250,7 @@ export function AdminAnalytics() {
         </div>
       )}
 
-      {fleet && <PageLayoutRenderer template={layout.template} widgets={buildAnalyticsKpiWidgets({
+      {fleet ? <PageLayoutRenderer template={layout.template} widgets={buildAnalyticsKpiWidgets({
         totalEquipment: fleet.totals.totalEquipment,
         sitesCount: sites.length,
         pilesToday: fleet.totals.pilesToday,
@@ -254,7 +268,9 @@ export function AdminAnalytics() {
           drillingCount: overview.kpi.drillingCount,
           downtime: { value: overview.kpi.downtimePct.value, deltaPp: overview.kpi.downtimePct.deltaPp },
         } : undefined,
-      })} />}
+      })} /> : fleetError ? null : (
+        <PageLayoutRenderer template={layout.template} widgets={KPI_SKELETON_WIDGETS} />
+      )}
 
       {/* Overview data states: error (retry) / first-load skeleton / empty period */}
       {overviewError ? (
