@@ -5,10 +5,10 @@
  * Бурение факт) и в «Отчётах» — одни и те же числа, везде в виде «N шт. / M м.п.».
  */
 import { expect, test } from '@playwright/test';
-import { login, matrix } from '../qa/helpers';
+import { login, matrix, must } from '../qa/helpers';
 import { kpiTiles, parseCountMeters, pause, writeRunJson } from './util';
 
-const ADMIN = matrix.roles.find((r) => r.role === 'ADMIN')!.email;
+const ADMIN = must(matrix.roles.find((r) => r.role === 'ADMIN'), 'роль ADMIN').email;
 
 /** Плитки с ожиданием: дашборд рисует скелет, пока грузятся данные. */
 async function tilesWith(page: import('@playwright/test').Page, needed: string[], tries = 25) {
@@ -62,14 +62,14 @@ test('E: «Сваи» и «Бурение» совпадают на дашбор
     rows.push({ name: label, ok: okl, note: `${x} против ${y}` });
     expect.soft(okl, `${label}: ${x} против ${y}`).toBe(true);
   };
-  cmp('сваи шт.: дашборд = объекты', dPiles!.count, sPiles!.count);
-  cmp('сваи шт.: дашборд = отчёты', dPiles!.count, rPiles!.count);
-  cmp('сваи м.п.: дашборд = объекты', dPiles!.meters, sPiles!.meters);
-  cmp('сваи м.п.: дашборд = отчёты', dPiles!.meters, rPiles!.meters);
-  cmp('бурение шт.: дашборд = объекты', dDrill!.count, sDrill!.count);
-  cmp('бурение шт.: дашборд = отчёты', dDrill!.count, rDrill!.count);
-  cmp('бурение м.п.: дашборд = объекты', dDrill!.meters, sDrill!.meters);
-  cmp('бурение м.п.: дашборд = отчёты', dDrill!.meters, rDrill!.meters);
+  cmp('сваи шт.: дашборд = объекты', must(dPiles, 'плитка дашборда «Сваи»').count, must(sPiles, 'плитка объектов «Сваи»').count);
+  cmp('сваи шт.: дашборд = отчёты', must(dPiles, 'плитка дашборда «Сваи»').count, must(rPiles, 'плитка отчётов «Сваи»').count);
+  cmp('сваи м.п.: дашборд = объекты', must(dPiles, 'плитка дашборда «Сваи»').meters, must(sPiles, 'плитка объектов «Сваи»').meters);
+  cmp('сваи м.п.: дашборд = отчёты', must(dPiles, 'плитка дашборда «Сваи»').meters, must(rPiles, 'плитка отчётов «Сваи»').meters);
+  cmp('бурение шт.: дашборд = объекты', must(dDrill, 'плитка дашборда «Бурение»').count, must(sDrill, 'плитка объектов «Бурение»').count);
+  cmp('бурение шт.: дашборд = отчёты', must(dDrill, 'плитка дашборда «Бурение»').count, must(rDrill, 'плитка отчётов «Бурение»').count);
+  cmp('бурение м.п.: дашборд = объекты', must(dDrill, 'плитка дашборда «Бурение»').meters, must(sDrill, 'плитка объектов «Бурение»').meters);
+  cmp('бурение м.п.: дашборд = отчёты', must(dDrill, 'плитка дашборда «Бурение»').meters, must(rDrill, 'плитка отчётов «Бурение»').meters);
 
   writeRunJson('kpi-consistency.json', { generatedAt: new Date().toISOString(), dash, sites, rep, rows });
 });
