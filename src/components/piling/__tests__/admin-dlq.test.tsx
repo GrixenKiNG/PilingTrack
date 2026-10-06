@@ -143,6 +143,27 @@ describe('AdminDlq: подтверждение необратимых дейст
   });
 });
 
+/**
+ * F-R114-3: даты события печатались через `toLocaleString('ru-RU')` без опций и
+ * без пояса — «01.10.2026, 13:00:00» с секундами, каких больше нет нигде в
+ * админке, и по часам браузера. Теперь — «ДД.ММ.ГГГГ, ЧЧ:ММ» по Москве.
+ */
+describe('AdminDlq — формат даты события (F-R114-3)', () => {
+  beforeEach(() => {
+    mocks.authFetch.mockReset();
+    vi.mocked(toast.error).mockReset();
+  });
+
+  it('«Создано» показывается как ДД.ММ.ГГГГ, ЧЧ:ММ без секунд', async () => {
+    mockLoad(makeEntry({ createdAt: '2026-10-01T10:00:00.000Z', updatedAt: '2026-10-01T10:00:00.000Z' }));
+    render(<AdminDlq />);
+
+    const line = await screen.findByText(/Создано: /);
+    expect(line.textContent).toContain('01.10.2026, 13:00');
+    expect(line.textContent).not.toMatch(/\d{2}:\d{2}:\d{2}/);
+  });
+});
+
 describe('AdminDlq: защита от двойного нажатия', () => {
   beforeEach(() => {
     mocks.authFetch.mockReset();

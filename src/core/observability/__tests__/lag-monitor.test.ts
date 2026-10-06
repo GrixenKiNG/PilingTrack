@@ -134,3 +134,10 @@ describe('lag scrape freshness', () => {
     expect(exportPrometheusMetrics({ ...metrics, timestamp: 'invalid' })).toContain('lag_snapshot_timestamp_seconds 0');
   });
 });
+
+it('F6 review7: a second module instance reads the producer lag snapshot', async () => {
+  const produced = await getFreshLagMetrics();
+  vi.resetModules();
+  const consumer = await import('../lag-monitor');
+  expect(consumer.getLagMetrics()).toEqual(produced);
+});

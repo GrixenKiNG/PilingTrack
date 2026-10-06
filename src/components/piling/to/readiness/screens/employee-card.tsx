@@ -319,18 +319,15 @@ export function EmployeeCard({
                   <div className="text-2xs text-muted-foreground">Балл</div>
                   <div className="mt-0.5 font-semibold">{row.knowledge.result ?? '—'}</div>
                 </div>
-                <div className="rounded-md border border-border bg-muted/30 p-2">
-                  <div className="text-2xs text-muted-foreground">Дата проверки</div>
-                  <div className="mt-0.5 font-semibold">{row.lastInstructionAt ? formatRuDate(row.lastInstructionAt) : '—'}</div>
-                </div>
+                {/* Карточки «Дата проверки» здесь нет: расчёт допуска не отдаёт
+                    дату самой проверки знаний. Раньше сюда подставлялась дата
+                    последнего ИНСТРУКТАЖА — другое событие, и по ней принимали
+                    решение о пересдаче. */}
                 <div className="rounded-md border border-border bg-muted/30 p-2">
                   <div className="text-2xs text-muted-foreground">Действительна до</div>
                   <div className="mt-0.5 font-semibold">{row.knowledge.validUntil ? formatRuDate(row.knowledge.validUntil) : '—'}</div>
                 </div>
               </div>
-              <Button variant="outline" className="mt-3" onClick={() => onGoTo('knowledge')}>
-                Назначить повторно
-              </Button>
             </section>
           )}
 

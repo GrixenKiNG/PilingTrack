@@ -65,6 +65,30 @@ describe('LeaderElection', () => {
     vi.useRealTimers();
   });
 
+  it('keeps default owners distinct even with identical HOSTNAME and process PID', async () => {
+    vi.stubEnv('HOSTNAME', '0.0.0.0');
+    const { LeaderElection } = await import('../leader-election');
+    const first = new LeaderElection('outbox-worker');
+    const second = new LeaderElection('outbox-worker');
+    try {
+      await first.start();
+      await second.start();
+      expect(first.isLeader()).toBe(true);
+      expect(second.isLeader()).toBe(false);
+      expect(first.getStats().nodeId).not.toBe(second.getStats().nodeId);
+      await second.stop();
+      expect(await first.getLeader()).toBe(first.getStats().nodeId);
+      await first.stop();
+      await second.start();
+      expect(second.isLeader()).toBe(true);
+      expect(await second.getLeader()).toBe(second.getStats().nodeId);
+    } finally {
+      await first.stop();
+      await second.stop();
+      vi.unstubAllEnvs();
+    }
+  });
+
   it('uses state Redis and atomically renews its own lock', async () => {
     const election = await createElection();
     await election.start();

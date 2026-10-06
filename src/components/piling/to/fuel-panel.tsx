@@ -16,7 +16,7 @@ import { toast } from 'sonner';
 import { authFetch } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { LoadFailure, loadFailureText } from '@/components/piling/to/load-failure';
+import { LoadFailure, loadFailureText, catchText } from '@/components/piling/to/load-failure';
 
 interface FuelEntry {
   id: string;
@@ -127,7 +127,8 @@ export function FuelPanel({ equipmentId }: { equipmentId: string }) {
       resetForm();
       await load(equipmentId);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Не удалось сохранить запись');
+      // Обрыв сети fetch бросает TypeError с английским «Failed to fetch» (F-R112-2).
+      toast.error(catchText(err, 'Не удалось сохранить запись'));
     } finally {
       setSubmitting(false);
     }

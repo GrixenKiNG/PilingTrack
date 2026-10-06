@@ -129,22 +129,33 @@ export async function POST(request: NextRequest) {
     const summary = alert.annotations.summary || alert.annotations.description || alert.labels.alertname || 'Alert';
     const description = alert.annotations.description;
     const message = description && description !== summary ? summary + '\n' + description : summary;
-    // Labels + start identify the same firing episode independent of batch order.
+    // Match Alertmanager reminders (critical1h, others4h); retries within a window dedupe.
+    const repeatMs = alert.labels.severity === 'critical' ? 3600_000 : 4 * 3600_000;
+    const repeatWindow = Math.floor(Date.now() / repeatMs);
     // Missing/invalid start is ambiguous: a new id favors retry over silent loss.
     const identity = typeof alert.startsAt === 'string' && Number.isFinite(Date.parse(alert.startsAt))
-      ? createHash('sha256').update(JSON.stringify([Object.keys(alert.labels).sort().map(key => [key, alert.labels[key]]), alert.startsAt])).digest('hex')
+      ? createHash('sha256').update(JSON.stringify([Object.keys(alert.labels).sort().map(key => [key, alert.labels[key]]), alert.startsAt, repeatWindow])).digest('hex')
       : randomUUID();
     try {
       const delivered = await runWithTenantContext(async () => {
         setRequestTenantId(tenantId);
-        const row = await db.outboxEvent.upsert({
+        let row = await db.outboxEvent.upsert({
           where: { tenantId_dedupeKey: { tenantId, dedupeKey: 'alertmanager:' + identity } },
           create: { type: ALERT_DELIVERY_EVENT, aggregateType: 'Notification', aggregateId: identity,
             tenantId, dedupeKey: 'alertmanager:' + identity, projected: true,
             payload: { severity, message, ...(alert.labels.alertname ? { ruleId: alert.labels.alertname } : {}), notificationKey: 'systemAlerts' } },
           update: {}, select: { id: true, published: true, payload: true, lastError: true },
         });
-        if (row.published) return !row.lastError?.startsWith('Moved to DLQ:');
+        if (row.published && row.lastError?.startsWith('Moved to DLQ:')) {
+          // Preserve the DLQ record; a recovered channel gets a fresh attempt.
+          row = await db.outboxEvent.create({
+            data: { type: ALERT_DELIVERY_EVENT, aggregateType: 'Notification', aggregateId: identity,
+              tenantId, dedupeKey: 'alertmanager:' + identity + ':retry:' + randomUUID(), projected: true,
+              payload: { severity, message, ...(alert.labels.alertname ? { ruleId: alert.labels.alertname } : {}), notificationKey: 'systemAlerts' } },
+            select: { id: true, published: true, payload: true, lastError: true },
+          });
+        }
+        if (row.published) return true;
         if (attempted >= MAX_FORWARDED) return false;
         attempted++;
         await deliverQueuedAlert({ id: row.id, tenantId, data: row.payload });

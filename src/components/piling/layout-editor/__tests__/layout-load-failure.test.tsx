@@ -222,9 +222,29 @@ describe('PageLayoutEditor — обрыв сети при сохранении/�
     await waitFor(() => expect((screen.getAllByRole('checkbox')[1] as HTMLInputElement).checked).toBe(false));
 
     fireEvent.click(screen.getByRole('button', { name: 'Сбросить' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Сбросить раскладку' }));
 
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith(LAYOUT_OFFLINE_MESSAGE));
     expect(calls.filter((call) => call.method === 'DELETE').length).toBe(1);
+  });
+
+  /*
+    R113-3: «Сбросить» удаляет сохранённую раскладку на сервере (DELETE) — одно
+    нажатие без вопроса теряло её бесповоротно. Кнопка теперь открывает окно
+    подтверждения; до согласия запрос не уходит.
+  */
+  it('«Сбросить» спрашивает подтверждение и не удаляет раскладку до согласия (R113-3)', async () => {
+    const calls = scriptedFetch([() => new Response(JSON.stringify(SERVER_PAGE), { status: 200 })]);
+    render(<Harness />);
+    await waitFor(() => expect((screen.getAllByRole('checkbox')[1] as HTMLInputElement).checked).toBe(false));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Сбросить' }));
+
+    expect(await screen.findByRole('alertdialog')).toBeInTheDocument();
+    expect(calls.some((call) => call.method === 'DELETE')).toBe(false);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Отмена' }));
+    expect(calls.some((call) => call.method === 'DELETE')).toBe(false);
   });
 });
 
@@ -324,6 +344,7 @@ describe('PageLayoutEditor — 403 при сохранении/сбросе (F-R
     await waitFor(() => expect((screen.getAllByRole('checkbox')[1] as HTMLInputElement).checked).toBe(false));
 
     fireEvent.click(screen.getByRole('button', { name: 'Сбросить' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Сбросить раскладку' }));
 
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith(LAYOUT_CSRF_MESSAGE));
   });

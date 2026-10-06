@@ -29,7 +29,7 @@
 ## Прод (orionpiling.ru)
 - Один VPS, Docker Compose в `/opt/pilingtrack`, диск 30 ГБ (часто почти полный), 3.8 ГБ ОЗУ + 4 ГБ swap. Один арендатор `orion` (`DEFAULT_TENANT_ID=orion`).
 - Контейнеры: `pilingtrack-app` (Next.js :3000 за Caddy), `-workers` (outbox/projection/PDF), `-postgres` (user `piling`, db `pilingtrack`), `-redis`, `-redis-cache`, `-minio`, `-pgbouncer`, `-grafana`, `-prometheus`. База: `docker compose exec postgres psql -U piling -d pilingtrack`.
-- Выкладка — ТОЛЬКО по команде владельца, через `bash scripts/deploy-prod.sh [сервисы]` (сборка образов на этом ПК, передача на сервер; требует main = origin/main и чистое дерево). Подробности и ручной запасной путь — `docs/runbooks/008-manual-deploy.md`. Перед выкладкой workers — smoke образа (раздел в ранбуке 008).
+- Выкладка — ТОЛЬКО по команде владельца, через `WORKER_GENERATION_EXTERNAL_STOPPED=1 bash scripts/deploy-prod.sh --replace-worker-generation app workers` (флаг первым; внешние исполнители заранее остановлены) (сборка образов на этом ПК, передача на сервер; требует main = origin/main и чистое дерево). Подробности и ручной запасной путь — `docs/runbooks/008-manual-deploy.md`. Перед выкладкой workers — smoke образа (раздел в ранбуке 008).
 - Новая миграция в диапазоне → собрать и `migrate` (иначе тихо «No pending migrations»), проверить `_prisma_migrations`. Деструктивные миграции — сначала проверить данные.
 - У `app`/`workers` нет `env_file`: переменная из `.env` попадает в контейнер, только если перечислена в `environment:` docker-compose.yml. Хостовые скрипты пишут ключи Redis с приставкой `pilingtrack:`.
 - Telegram с VPS заблокирован — идёт через прокси `TELEGRAM_API_BASE` (Cloudflare Worker).

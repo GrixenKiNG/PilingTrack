@@ -150,12 +150,12 @@ describe('getSiteAnalytics — cumulative progress (F-R52)', () => {
     const [strings] = queryRaw.mock.calls[0];
     const sql = (strings as string[]).join('?');
 
-    // Всё между закрытием dt-подзапроса и p_all — это накопительные подзапросы.
-    const allTimeBlock = sql.slice(sql.indexOf(') dt ON'), sql.indexOf(') p_all ON'));
-    expect(allTimeBlock).toContain('SUM(pw.count)');
+    // Unfiltered totals and FILTER period totals share the same aggregate.
+    const allTimeBlock = sql.slice(sql.indexOf('SUM(pw.count)'), sql.indexOf(') p ON'));
+    expect(allTimeBlock).toContain('SUM(pw.count)::int AS total_piles_all');
     expect(allTimeBlock).toContain('r.status = ?');
     expect(queryRaw.mock.calls[0].slice(1)).toContain('submitted');
-    expect(allTimeBlock).not.toContain('r.date');
+    expect(allTimeBlock).toContain('FILTER (WHERE r.date >=');
   });
 });
 
@@ -195,4 +195,14 @@ describe('getSiteAnalytics — tenant isolation (F-ANALYTICS-TENANT-SQL)', () =>
 
     expect(queryRaw).not.toHaveBeenCalled();
   });
+});
+
+
+it('период и весь срок читают PileWork одним агрегатом', async () => {
+  queryRaw.mockReset().mockResolvedValue([]);
+  await getSiteAnalytics({tenantId:'orion',dateFrom:'2026-09-01',dateTo:'2026-09-30'});
+  const sql = queryRaw.mock.calls[0][0].join('?');
+  expect(sql.match(/JOIN "PileWork"/g)).toHaveLength(1);
+  expect(sql).toContain('FILTER (WHERE r.date >=');
+  expect(sql).toContain('total_piles_all');
 });

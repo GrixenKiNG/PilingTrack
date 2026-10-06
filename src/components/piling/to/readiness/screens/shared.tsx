@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { authFetch } from '@/lib/api';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 import { READINESS_READY_THRESHOLD } from '@/modules/readiness';
 import { SELECTABLE_SHIFT_TYPES } from '@/modules/reports/domain/shift-types';
 import { SHIFT_TYPE_LABEL } from '../readiness-labels';
@@ -36,6 +37,9 @@ export async function downloadReadinessExport(dataset: 'fleet' | 'permits' | 're
     throw new Error('Нет связи с сервером. Проверьте подключение и повторите выгрузку.');
   }
   if (!response.ok) throw new Error(await exportFailureMessage(response));
+  // Пустой набор сервер отдаёт как 200 — файл из одной шапки. Не выдаём это за
+  // успех: без сообщения человек решал, что выгрузка сломалась (F-R115-11).
+  const rowCount = response.headers.get('x-export-row-count');
   const url = URL.createObjectURL(await response.blob());
   const anchor = document.createElement('a');
   anchor.href = url;
@@ -43,6 +47,9 @@ export async function downloadReadinessExport(dataset: 'fleet' | 'permits' | 're
     ?? `pilingtrack-readiness-${dataset}.csv`;
   anchor.click();
   URL.revokeObjectURL(url);
+  if (rowCount !== null && Number(rowCount) === 0) {
+    toast.warning('В выгрузке нет строк данных — по выбранному фильтру ничего не найдено.');
+  }
 }
 
 /** Русский текст отказа выгрузки: сессия, права и сбой сервера объясняются по-разному. */

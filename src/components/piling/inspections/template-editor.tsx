@@ -23,7 +23,7 @@ import {
 import { cn } from '@/lib/utils';
 import { QueryErrorBanner } from '@/components/piling/async-ui';
 import { LEVEL_LABEL, type InspectionLevel } from './inspection-labels';
-import { InspectionLoadError, isRetryableLoadError, loadErrorText } from './inspection-api-error';
+import { InspectionLoadError, isRetryableLoadError, loadErrorText, catchText } from './inspection-api-error';
 import {
   BLOCK_LABEL, HAMMER_LABEL, LIMITS, SectionEditor, emptySection, uid,
   type AnswerType, type BlockType, type HammerKind, type SectionDraft,
@@ -181,7 +181,8 @@ export function TemplateEditor({ templateId }: TemplateEditorProps) {
       toast.success(isNew ? 'Шаблон создан' : 'Шаблон обновлён');
       router.push('/admin/checklists');
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Ошибка');
+      // Обрыв сети fetch бросает TypeError с английским «Failed to fetch» (F-R112-2).
+      toast.error(catchText(err, 'Ошибка'));
     } finally {
       setBusy(false);
     }

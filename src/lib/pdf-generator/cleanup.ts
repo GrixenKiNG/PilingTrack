@@ -26,7 +26,9 @@ async function localPdfModified(path: string): Promise<number | null> {
 }
 
 /** Only temporary UUID PDF results; default is read-only. Never scans Media. */
-export async function cleanupTemporaryPdfs(options: { dryRun?: boolean; now?: Date } = {}) {
+export async function cleanupTemporaryPdfs(options: { dryRun?: boolean; now?: Date; signal?: AbortSignal } = {}) {
+  const signal = options.signal;
+  signal?.throwIfAborted();
   const dryRun = options.dryRun ?? true;
   const cutoff = (options.now ?? new Date()).getTime() - RETENTION_MS;
   if (!Number.isFinite(cutoff)) throw new Error('Invalid PDF cleanup time');
@@ -40,10 +42,11 @@ export async function cleanupTemporaryPdfs(options: { dryRun?: boolean; now?: Da
     try {
       let token: string | undefined;
       do {
-        const page = await s3.send(new ListObjectsV2Command({ Bucket, Prefix: TEMPORARY_PDF_PREFIX, ContinuationToken: token }));
+        const page = await s3.send(new ListObjectsV2Command({ Bucket, Prefix: TEMPORARY_PDF_PREFIX, ContinuationToken: token }), { abortSignal: signal });
         for (const object of page.Contents ?? []) {
+          signal?.throwIfAborted();
           if (!object.Key || !isTemporaryPdfKey(object.Key) || !object.LastModified || object.LastModified.getTime() >= cutoff) continue;
-          const meta = await s3.send(new HeadObjectCommand({ Bucket, Key: object.Key }));
+          const meta = await s3.send(new HeadObjectCommand({ Bucket, Key: object.Key }), { abortSignal: signal });
           if (meta.ContentType !== 'application/pdf' || !meta.LastModified || meta.LastModified.getTime() >= cutoff) continue;
           candidates.push({ key: object.Key, modified: meta.LastModified.getTime() });
         }
@@ -52,10 +55,11 @@ export async function cleanupTemporaryPdfs(options: { dryRun?: boolean; now?: Da
       } while (token);
       logger.info('Temporary PDF cleanup plan', { backend: 's3', dryRun, retentionDays: 30, count: candidates.length, keys: candidates.map(row => row.key) });
       if (!dryRun) for (const row of candidates) {
+        signal?.throwIfAborted();
         // Recheck type/age immediately before deleting; refreshed results are preserved.
-        const meta = await s3.send(new HeadObjectCommand({ Bucket, Key: row.key }));
+        const meta = await s3.send(new HeadObjectCommand({ Bucket, Key: row.key }), { abortSignal: signal });
         if (!isTemporaryPdfKey(row.key) || meta.ContentType !== 'application/pdf' || meta.LastModified?.getTime() !== row.modified || row.modified >= cutoff) continue;
-        await s3.send(new DeleteObjectCommand({ Bucket, Key: row.key }));
+        await s3.send(new DeleteObjectCommand({ Bucket, Key: row.key }), { abortSignal: signal });
         deleted++;
       }
     } finally { s3.destroy(); }
@@ -69,6 +73,7 @@ export async function cleanupTemporaryPdfs(options: { dryRun?: boolean; now?: Da
       const expected = join(await realpath(process.cwd()), 'storage', 'pdf-results');
       if (await realpath(root) !== expected) throw new Error('PDF cleanup root escapes temporary storage');
       for (const name of await readdir(root)) {
+        signal?.throwIfAborted();
         const key = TEMPORARY_PDF_PREFIX + name;
         if (!isTemporaryPdfKey(key)) continue;
         const modified = await localPdfModified(join(root, name));
@@ -76,10 +81,12 @@ export async function cleanupTemporaryPdfs(options: { dryRun?: boolean; now?: Da
       }
       logger.info('Temporary PDF cleanup plan', { backend: 'local', dryRun, retentionDays: 30, count: candidates.length, keys: candidates.map(row => row.key) });
       if (!dryRun) for (const row of candidates) {
+        signal?.throwIfAborted();
         if (!isTemporaryPdfKey(row.key)) continue;
         const path = join(root, row.key.slice(TEMPORARY_PDF_PREFIX.length));
         try {
           if (await localPdfModified(path) !== row.modified || row.modified >= cutoff) continue;
+          signal?.throwIfAborted();
           await unlink(path); deleted++;
         } catch (error) { if (!isMissing(error)) throw error; }
       }

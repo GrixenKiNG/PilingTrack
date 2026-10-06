@@ -1,8 +1,11 @@
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ReferenceUiProps } from '../types';
 import { usePilingStore } from '@/lib/store';
 import { SafetyScreen } from '../safety-screen';
+import { KnowledgeScreen } from '../knowledge-screen';
+import { EmployeeCard } from '../employee-card';
+import { SafetyOverviewScreen } from '../safety-overview-screen';
 
 const { authFetch } = vi.hoisted(() => ({ authFetch: vi.fn() }));
 vi.mock('@/lib/api', () => ({ authFetch }));
@@ -104,5 +107,102 @@ describe('SafetyScreen — отказ загрузки объясняется п
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Нет связи с сервером');
     expect(screen.queryByText('Failed to fetch')).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * F-R110-3: плитки «Сдавали проверку» и «Срок вышел» считались от `rows ?? []`
+ * ещё до ответа и при отказе. Экран проверки знаний заявлял «нарушений нет»,
+ * хотя данные не прочитаны. Соседняя плитка «Всего попыток» уже гейтилась
+ * `rows?.length ?? '—'`.
+ */
+describe('KnowledgeScreen — плитки не показывают ложный ноль (F-R110-3)', () => {
+  it('при отказе загрузки все три плитки показывают «—», а не 0', async () => {
+    authFetch.mockRejectedValue(new TypeError('Failed to fetch'));
+    render(<KnowledgeScreen />);
+
+    await screen.findByRole('alert');
+    expect(screen.queryAllByText('0')).toHaveLength(0);
+    expect(screen.getAllByText('—')).toHaveLength(3);
+  });
+});
+
+/**
+ * F-R110-4: во вкладке «Проверка знаний» карточка «Дата проверки» выводила
+ * `row.lastInstructionAt` — дату последнего ИНСТРУКТАЖА. Это другое событие, и
+ * по нему инженер ОТ принимал решение о пересдаче.
+ */
+describe('EmployeeCard — дата инструктажа не выдаётся за дату проверки знаний (F-R110-4)', () => {
+  it('во вкладке «Проверка знаний» нет карточки «Дата проверки» с чужой датой', async () => {
+    authFetch.mockResolvedValue({ ok: true, json: async () => ({ rows: [] }) });
+    render(
+      <EmployeeCard
+        row={{ ...row, lastInstructionAt: '2026-09-01T00:00:00.000Z' }}
+        editable={false}
+        onBack={vi.fn()}
+        onGoTo={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Проверка знаний' }));
+
+    expect(screen.queryByText('Дата проверки')).not.toBeInTheDocument();
+  });
+});
+
+/** Ответ «Обзора ТБ», достаточный, чтобы отрисовались быстрые действия. */
+const overviewFixture = {
+  rows: [],
+  todayByType: {},
+  incidents: { last30: 0, previous30: 0 },
+  totals: {
+    people: 0, cleared: 0, blocked: 0, expiring: 0,
+    knowledgeOverdue: 0, briefingsOverdue: 0, awaitingAcquaintance: 0,
+  },
+  requiredTypesConfigured: true,
+};
+
+const renderOverview = async () => {
+  authFetch.mockImplementation(async (url: string) => (url.includes('/api/safety/clearance')
+    ? { ok: true, json: async () => overviewFixture }
+    : { ok: true, json: async () => ({ rows: [] }) }));
+  render(<SafetyOverviewScreen {...propsFor()} />);
+  await screen.findByText('Быстрые действия');
+};
+
+/**
+ * F-R110-5: кнопки «Назначить проверку знаний» и «Добавить инструкцию» вели на
+ * экраны, которые прямо говорят, что таких действий в системе нет
+ * (`knowledge-screen.tsx`, `instructions-screen.tsx`). Человек жал кнопку и
+ * попадал в список без нужного действия.
+ */
+describe('SafetyOverviewScreen — кнопки-тупики убраны (F-R110-5)', () => {
+  it('нет кнопок «Назначить проверку знаний» и «Добавить инструкцию»', async () => {
+    await renderOverview();
+
+    expect(screen.queryByRole('button', { name: 'Назначить проверку знаний' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Добавить инструкцию' })).not.toBeInTheDocument();
+  });
+
+  it('в карточке сотрудника нет кнопки «Назначить повторно»', async () => {
+    authFetch.mockResolvedValue({ ok: true, json: async () => ({ rows: [] }) });
+    render(<EmployeeCard row={row} editable={false} onBack={vi.fn()} onGoTo={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Проверка знаний' }));
+
+    expect(screen.queryByRole('button', { name: 'Назначить повторно' })).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * F-R110-6: «Сформировать выгрузку» переключала на view='reports', которого в
+ * SAFETY_TABS нет. Вкладка не подсвечивалась, а перезагрузка адреса
+ * `?view=reports` перенаправляла в /admin/to — раздел чужого модуля.
+ */
+describe('SafetyOverviewScreen — «Сформировать выгрузку» убрана (F-R110-6)', () => {
+  it('нет кнопки «Сформировать выгрузку», уводящей в чужой раздел', async () => {
+    await renderOverview();
+
+    expect(screen.queryByRole('button', { name: 'Сформировать выгрузку' })).not.toBeInTheDocument();
   });
 });

@@ -63,6 +63,14 @@ export function UserDocumentTypesDialog({ open, onOpenChange }: {
   const [leadDays, setLeadDays] = useState(String(DEFAULT_LEAD_DAYS));
   const [busy, setBusy] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<TypeRow | null>(null);
+  /** Переключение флага вида (обязателен для смены / отключён) до подтверждения. */
+  const [pendingToggle, setPendingToggle] = useState<{
+    row: TypeRow;
+    patch: Record<string, unknown>;
+    title: string;
+    description: string;
+    confirmLabel: string;
+  } | null>(null);
   /** Черновик правки строки списка; null — ни одна строка не редактируется. */
   const [draft, setDraft] = useState<{ id: string; name: string; months: string; leadDays: string } | null>(null);
 
@@ -242,11 +250,27 @@ export function UserDocumentTypesDialog({ open, onOpenChange }: {
                             документа оператор не начнёт смену. Поэтому переключатель
                             стоит рядом со списком, а не прячется в отдельной форме. */}
                         <Button variant="outline" className="h-11 text-2xs sm:h-8"
-                          onClick={() => void patch(row, { requiredForOperator: !row.requiredForOperator })}>
+                          onClick={() => setPendingToggle({
+                            row,
+                            patch: { requiredForOperator: !row.requiredForOperator },
+                            title: row.requiredForOperator ? 'Снять требование?' : 'Требовать для смены?',
+                            description: row.requiredForOperator
+                              ? `Вид «${row.name}» перестанет быть обязательным: операторы смогут начать смену без него.`
+                              : `Вид «${row.name}» станет обязательным: операторы без действующего документа не начнут смену.`,
+                            confirmLabel: row.requiredForOperator ? 'Не требовать' : 'Требовать для смены',
+                          })}>
                           {row.requiredForOperator ? 'Не требовать' : 'Требовать для смены'}
                         </Button>
                         <Button variant="outline" className="h-11 text-2xs sm:h-8"
-                          onClick={() => void patch(row, { isActive: !row.isActive })}>
+                          onClick={() => setPendingToggle({
+                            row,
+                            patch: { isActive: !row.isActive },
+                            title: row.isActive ? 'Отключить вид документа?' : 'Включить вид документа?',
+                            description: row.isActive
+                              ? `Вид «${row.name}» исчезнет из выбора у документов; уже подшитые документы сохранятся.`
+                              : `Вид «${row.name}» снова появится в выборе у документов.`,
+                            confirmLabel: row.isActive ? 'Отключить' : 'Включить',
+                          })}>
                           {row.isActive ? 'Отключить' : 'Включить'}
                         </Button>
                         {/* Кнопка есть всегда, но у используемого вида сервер ответит
@@ -283,6 +307,19 @@ export function UserDocumentTypesDialog({ open, onOpenChange }: {
         onConfirm={async () => {
           if (pendingDelete) await remove(pendingDelete);
           setPendingDelete(null);
+        }}
+      />
+
+      <ConfirmActionDialog
+        open={pendingToggle !== null}
+        onOpenChange={(next) => !next && setPendingToggle(null)}
+        title={pendingToggle?.title ?? ''}
+        description={pendingToggle?.description ?? ''}
+        confirmLabel={pendingToggle?.confirmLabel ?? ''}
+        onConfirm={async () => {
+          const pending = pendingToggle;
+          setPendingToggle(null);
+          if (pending) await patch(pending.row, pending.patch);
         }}
       />
     </>

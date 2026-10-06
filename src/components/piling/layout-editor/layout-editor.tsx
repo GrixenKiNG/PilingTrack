@@ -15,6 +15,7 @@ import { LayoutInspector } from './layout-inspector';
 import type { RenderBlockContent } from './layout-renderer';
 import type { LayoutBlock, LayoutBlockKind } from './layout-template';
 import { LAYOUT_LOAD_FAILED_MESSAGE, type LayoutController } from './use-layout-template';
+import { ConfirmActionDialog } from '@/components/piling/confirm-action-dialog';
 
 const toolbarButton = 'min-h-11 rounded-lg border border-border bg-card px-3 text-sm font-semibold text-foreground hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-info/30';
 
@@ -57,6 +58,7 @@ export function LayoutEditor({
   const [preview, setPreview] = useState(false);
   const [mobilePanel, setMobilePanel] = useState<'library' | 'inspector' | null>(null);
   const [imageError, setImageError] = useState<string | null>(null);
+  const [confirmReset, setConfirmReset] = useState(false);
   const selectedBlock = controller.draft.blocks.find((block) => block.id === selectedBlockId) ?? null;
 
   const openedRef = useRef(false);
@@ -167,7 +169,7 @@ export function LayoutEditor({
         <button type="button" className={toolbarButton} disabled={!controller.canUndo} onClick={controller.undo}>Отменить</button>
         <button type="button" className={toolbarButton} disabled={!controller.canRedo} onClick={controller.redo}>Повторить</button>
         <button type="button" className={toolbarButton} aria-pressed={preview} onClick={() => setPreview((value) => !value)}>Предпросмотр</button>
-        <button type="button" className={toolbarButton} onClick={() => { void controller.reset(); setSelectedBlockId(null); }}>Сбросить</button>
+        <button type="button" className={toolbarButton} onClick={() => setConfirmReset(true)}>Сбросить</button>
         <button type="button" className="min-h-11 rounded-lg bg-info-strong px-4 text-sm font-semibold text-white hover:bg-info-strong disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-info/30" disabled={controller.loadFailed} onClick={() => void controller.saveDraft()}>Сохранить шаблон</button>
         {!preview && <button type="button" className={`${toolbarButton} lg:hidden`} onClick={() => setMobilePanel('library')}>Блоки</button>}
         {!preview && <button type="button" className={`${toolbarButton} lg:hidden`} onClick={() => setMobilePanel('inspector')}>Свойства</button>}
@@ -210,6 +212,14 @@ export function LayoutEditor({
           </aside>
         )}
       </div>
+      <ConfirmActionDialog
+        open={confirmReset}
+        onOpenChange={setConfirmReset}
+        title="Сбросить шаблон?"
+        description="Сохранённая раскладка будет удалена, вернуть её не получится. Показана будет стандартная раскладка."
+        confirmLabel="Сбросить шаблон"
+        onConfirm={() => { setConfirmReset(false); setSelectedBlockId(null); void controller.reset(); }}
+      />
     </div>
   );
 }

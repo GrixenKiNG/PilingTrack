@@ -225,6 +225,21 @@ describe('редактор шаблона (F-R100-4, F-R100-5)', () => {
       (init as RequestInit | undefined)?.method === 'PUT',
     )).toBe(true));
   });
+
+  it('обрыв сети при сохранении — русский текст, а не «Failed to fetch» (F-R112-2)', async () => {
+    mocks.authFetch.mockImplementation(async (url: string, init?: RequestInit) => {
+      if (init?.method === 'PUT') throw new TypeError('Failed to fetch');
+      return json(templatePayload);
+    });
+    render(<TemplateEditor templateId="tpl-1" />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Сохранить' }));
+
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith('Нет соединения с сервером. Проверьте связь и повторите.'),
+    );
+    expect(toast.error).not.toHaveBeenCalledWith('Failed to fetch');
+  });
 });
 
 describe('редактор шаблона: пределы длины полей как в схеме маршрута (F-R121-3)', () => {
@@ -295,6 +310,41 @@ describe('фото пункта осмотра: сбой чтения галер
     render(<InspectionItemPhotos inspectionId="insp-1" itemId="i1" onCountChange={onCountChange} />);
 
     await waitFor(() => expect(onCountChange).toHaveBeenCalledWith(0));
+  });
+
+  it('обрыв сети при загрузке фото — русский текст, а не «Failed to fetch» (F-R112-2)', async () => {
+    mocks.authFetch.mockImplementation(async (_url: string, init?: RequestInit) => {
+      if (init?.method === 'POST') throw new TypeError('Failed to fetch');
+      return json({ data: [] });
+    });
+    const { container } = render(<InspectionItemPhotos inspectionId="insp-1" itemId="i1" />);
+    await waitFor(() => expect(mocks.authFetch).toHaveBeenCalled());
+
+    const input = container.querySelector('input[type="file"]') as HTMLInputElement;
+    fireEvent.change(input, { target: { files: [new File(['x'], 'p.png', { type: 'image/png' })] } });
+
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith('Нет соединения с сервером. Проверьте связь и повторите.'),
+    );
+    expect(toast.error).not.toHaveBeenCalledWith('Failed to fetch');
+  });
+
+  // F-R115-9: клик по фото при отказе скачивания молча ничего не делал.
+  it('403 при открытии фото объясняется тостом, а не тишиной (F-R115-9)', async () => {
+    mocks.authFetch.mockImplementation(async (url: string) => {
+      if (url === '/api/media?entityType=inspection&entityId=insp-1__i1') {
+        return json({ data: [{ id: 'm1', fileName: 'a.png', contentType: 'image/png', thumbnailKey: 'k' }] });
+      }
+      if (url.startsWith('/api/media/download-batch')) return json({ urls: { m1: 'https://cdn.example/x.jpg' } });
+      return json({ error: 'Доступ запрещён' }, 403);
+    });
+    render(<InspectionItemPhotos inspectionId="insp-1" itemId="i1" />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Открыть фото' }));
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith(
+      'Нет прав на просмотр фото. Смените роль или обратитесь к администратору.',
+    ));
   });
 });
 

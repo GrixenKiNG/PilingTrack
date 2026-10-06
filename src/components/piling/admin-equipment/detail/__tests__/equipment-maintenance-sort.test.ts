@@ -1,5 +1,12 @@
-import { describe, it, expect } from 'vitest';
-import { sortMaintenanceRecords, type MaintenanceRow } from '../equipment-maintenance';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { createElement } from 'react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+
+const authFetchMock = vi.fn();
+vi.mock('@/lib/api', () => ({ authFetch: (...args: unknown[]) => authFetchMock(...args) }));
+vi.mock('sonner', () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
+
+import { EquipmentMaintenance, sortMaintenanceRecords, type MaintenanceRow } from '../equipment-maintenance';
 
 function row(p: Pick<MaintenanceRow, 'id'> & Partial<MaintenanceRow>): MaintenanceRow {
   return {
@@ -51,5 +58,41 @@ describe('sortMaintenanceRecords', () => {
     ];
     sortMaintenanceRecords(input);
     expect(input.map((r) => r.id)).toEqual(['a', 'b']);
+  });
+});
+
+/*
+  R113-4: зелёная галочка «Выполнено» закрывала наряд ТО одним кликом —
+  сдвигался регламент и писалось показание счётчика. Теперь перед закрытием
+  спрашивают, объясняя последствие; до согласия запрос не уходит.
+*/
+describe('EquipmentMaintenance — подтверждение «Выполнено» (R113-4)', () => {
+  const PLANNED = row({ id: 'm1', status: 'PLANNED', title: 'Замена масла' });
+
+  beforeEach(() => {
+    authFetchMock.mockReset();
+    authFetchMock.mockImplementation(async (url: unknown, init?: RequestInit) => {
+      const body = init?.method === 'PUT'
+        ? {}
+        : String(url) === '/api/maintenance/assignees'
+          ? { users: [] }
+          : { records: [PLANNED] };
+      return { ok: true, status: 200, json: async () => body };
+    });
+  });
+
+  it('не закрывает наряд до подтверждения и закрывает после согласия', async () => {
+    render(createElement(EquipmentMaintenance, { equipmentId: 'eq-1' }));
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Отметить «Замена масла» выполненным' }));
+
+    expect(await screen.findByRole('alertdialog')).toBeInTheDocument();
+    expect(authFetchMock.mock.calls.some(([, init]) => (init as RequestInit | undefined)?.method === 'PUT')).toBe(false);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Выполнено' }));
+
+    await waitFor(() =>
+      expect(authFetchMock.mock.calls.some(([, init]) => (init as RequestInit | undefined)?.method === 'PUT')).toBe(true),
+    );
   });
 });

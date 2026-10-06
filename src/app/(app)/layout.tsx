@@ -84,29 +84,38 @@ function OperatorLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen bg-muted">
-      <div className="sticky top-0 z-30 bg-card border-b pt-safe">
-        <div className="flex items-center justify-between px-4 py-3">
-          <div className="flex items-center gap-2.5">
-            <PilingIcon name="equipment-rig" size={34} tone="primary" decorative />
-            <div>
-              <span className="text-sm font-bold text-foreground">PilingTrack</span>
+      {/*
+        Граница оболочки накрывает только её саму — шапку и нижнюю навигацию.
+        Страница (`children`) стоит вне границы: её ошибку ловит маршрутный
+        `(app)/error.tsx` в области содержимого. Пока граница оборачивала
+        раскладку целиком, она перехватывала падение страницы раньше него
+        (F-R117-2).
+      */}
+      <AppErrorBoundary>
+        <div className="sticky top-0 z-30 bg-card border-b pt-safe">
+          <div className="flex items-center justify-between px-4 py-3">
+            <div className="flex items-center gap-2.5">
+              <PilingIcon name="equipment-rig" size={34} tone="primary" decorative />
+              <div>
+                <span className="text-sm font-bold text-foreground">PilingTrack</span>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <FeedbackCenter />
+              <span className="text-xs text-muted-foreground hidden sm:block">{user?.name}</span>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => void logoutClient()}
+                className="h-11 w-11 text-muted-foreground hover:text-destructive-strong"
+                aria-label="Выйти"
+              >
+                <PilingIcon name="logout" size={16} tone="danger" decorative />
+              </Button>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <FeedbackCenter />
-            <span className="text-xs text-muted-foreground hidden sm:block">{user?.name}</span>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => void logoutClient()}
-              className="h-11 w-11 text-muted-foreground hover:text-destructive-strong"
-              aria-label="Выйти"
-            >
-              <PilingIcon name="logout" size={16} tone="danger" decorative />
-            </Button>
-          </div>
         </div>
-      </div>
+      </AppErrorBoundary>
 
       {/*
         main — как в админской оболочке. У операторской его не было вовсе:
@@ -134,7 +143,7 @@ function OperatorLayout({ children }: { children: React.ReactNode }) {
         дублировались: `fixed bottom-0` этой накрывала кнопку модуля, и нажать
         её было невозможно. Экран, у которого своя навигация, свою и рисует.
       */}
-      {!operatorRouteOwnsNavigation(pathname) && nav}
+      {!operatorRouteOwnsNavigation(pathname) && <AppErrorBoundary>{nav}</AppErrorBoundary>}
     </div>
   );
 }
@@ -221,30 +230,39 @@ function AdminLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen bg-muted">
-      <aside className="hidden lg:fixed lg:inset-y-0 lg:flex lg:w-64 lg:flex-col bg-card border-r z-30">
-        {sidebarContent}
-      </aside>
+      {/*
+        Граница оболочки накрывает только её саму — меню и шапку. Страница
+        (`children`) намеренно стоит вне границы: она идёт через маршрутный
+        `(app)/error.tsx`, который рисуется в её области и оставляет меню на
+        месте. Пока граница оборачивала раскладку целиком, она была ближайшей
+        для страницы и до `error.tsx` ошибка не доходила (F-R117-2).
+      */}
+      <AppErrorBoundary>
+        <aside className="hidden lg:fixed lg:inset-y-0 lg:flex lg:w-64 lg:flex-col bg-card border-r z-30">
+          {sidebarContent}
+        </aside>
 
-      <div className="lg:hidden sticky top-0 z-30 bg-card border-b pt-safe">
-        <div className="flex items-center gap-3 px-4 py-3">
-          <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
-            <SheetTrigger asChild>
-              <button aria-label="Открыть меню навигации" className="flex h-11 w-11 items-center justify-center rounded-lg hover:bg-muted">
-                <PilingIcon name="menu" size={20} decorative />
-              </button>
-            </SheetTrigger>
-            <SheetContent side="left" className="w-64 p-0">
-              <SheetTitle className="sr-only">Меню навигации</SheetTitle>
-              {sidebarContent}
-            </SheetContent>
-          </Sheet>
-          <div className="flex items-center gap-2">
-            <FeedbackCenter />
-            <PilingIcon name="equipment-rig" size={30} tone="primary" decorative />
-            <span className="text-sm font-bold text-foreground">PilingTrack</span>
+        <div className="lg:hidden sticky top-0 z-30 bg-card border-b pt-safe">
+          <div className="flex items-center gap-3 px-4 py-3">
+            <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
+              <SheetTrigger asChild>
+                <button aria-label="Открыть меню навигации" className="flex h-11 w-11 items-center justify-center rounded-lg hover:bg-muted">
+                  <PilingIcon name="menu" size={20} decorative />
+                </button>
+              </SheetTrigger>
+              <SheetContent side="left" className="w-64 p-0">
+                <SheetTitle className="sr-only">Меню навигации</SheetTitle>
+                {sidebarContent}
+              </SheetContent>
+            </Sheet>
+            <div className="flex items-center gap-2">
+              <FeedbackCenter />
+              <PilingIcon name="equipment-rig" size={30} tone="primary" decorative />
+              <span className="text-sm font-bold text-foreground">PilingTrack</span>
+            </div>
           </div>
         </div>
-      </div>
+      </AppErrorBoundary>
 
       <main className="min-h-screen bg-background lg:ml-64">
         <ActingAsBanner />
@@ -274,18 +292,10 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
     || currentUser?.role === 'FOREMAN'
     || currentUser?.role === 'SAFETY_ENGINEER'
   ) {
-    return (
-      <AppErrorBoundary>
-        <AdminLayout>{children}</AdminLayout>
-      </AppErrorBoundary>
-    );
+    return <AdminLayout>{children}</AdminLayout>;
   }
 
-  return (
-    <AppErrorBoundary>
-      <OperatorLayout>{children}</OperatorLayout>
-    </AppErrorBoundary>
-  );
+  return <OperatorLayout>{children}</OperatorLayout>;
 }
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {

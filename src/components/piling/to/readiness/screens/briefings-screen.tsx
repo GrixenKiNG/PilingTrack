@@ -28,6 +28,7 @@ import { ROLE_LABELS, type UserRole } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 import { COMPACT_KPI_GRID, ScreenTitle, card } from '../settings/shared-ui';
 import { kpiGridStyle } from '@/components/piling/kpi-tile';
 import { RefKpi } from './shared';
@@ -154,7 +155,15 @@ export function BriefingsScreen(props: ReferenceUiProps) {
     const period = dayRangeToInstants(fromDay, toDay);
     const search = new URLSearchParams({ from: period.from, to: period.to, fromDay, toDay });
     if (kind) search.set('kind', kind);
-    window.open(`/print/briefing-journal?${search.toString()}`, '_blank', 'noopener');
+    // Заблокированное браузером всплывающее окно возвращает null: без проверки
+    // кнопка «Печатная форма» молча ничего не делала (F-R115-13).
+    const opened = window.open('', '_blank');
+    if (!opened) {
+      toast.error('Браузер заблокировал окно печати. Разрешите всплывающие окна и повторите.');
+      return;
+    }
+    opened.opener = null;
+    opened.location.href = `/print/briefing-journal?${search.toString()}`;
   };
 
   const instructions = rows?.filter((row) => row.kind === 'INSTRUCTION') ?? [];

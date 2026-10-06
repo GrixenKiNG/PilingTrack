@@ -10,7 +10,7 @@
 
 import { db } from '@/lib/db';
 import type { EquipmentMetadataInput } from '@/lib/validation-schemas';
-import { addMeterReading } from './meter-reading';
+import { addMeterReading, recordMeterReadingInTx } from './meter-reading';
 
 /** Кто правит карточку — нужно, чтобы наработка попала в журнал от его имени. */
 export interface EquipmentMetadataContext {
@@ -71,6 +71,7 @@ export async function updateEquipmentMetadata(
   equipmentId: string,
   input: Partial<EquipmentMetadataInput>,
   ctx: EquipmentMetadataContext,
+  tx?: typeof db,
 ): Promise<boolean> {
   const data: Record<string, unknown> = {};
   for (const key of METADATA_KEYS) {
@@ -97,18 +98,17 @@ export async function updateEquipmentMetadata(
 
   const wroteMetadata = Object.keys(data).length > 0;
   if (wroteMetadata) {
-    await db.equipment.update({
+    await (tx ?? db).equipment.update({
       where: { id: equipmentId },
       data,
     });
   }
 
   if (recordAsReading) {
-    await addMeterReading(
-      equipmentId,
-      { engineHours: hours as number, note: 'Правка наработки в карточке установки' },
-      { tenantId: ctx.tenantId, recordedById: ctx.actorId ?? null, allowDecrease: ctx.allowDecrease },
-    );
+    const reading = { engineHours: hours as number, note: 'Правка наработки в карточке установки' };
+    const context = { tenantId: ctx.tenantId, recordedById: ctx.actorId ?? null, allowDecrease: ctx.allowDecrease };
+    if (tx) await recordMeterReadingInTx(tx, equipmentId, reading, context);
+    else await addMeterReading(equipmentId, reading, context);
   }
 
   return wroteMetadata || recordAsReading;

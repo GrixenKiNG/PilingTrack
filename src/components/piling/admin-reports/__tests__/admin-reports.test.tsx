@@ -34,12 +34,18 @@ vi.mock('../report-form-dialog', () => ({ ReportFormDialog: () => null }));
 vi.mock('../report-evidence-preview', () => ({ ReportEvidencePreview: () => null }));
 vi.mock('@/components/piling/pdf-preview-dialog', () => ({ PdfPreviewDialog: () => null }));
 vi.mock('@/components/piling/confirm-action-dialog', () => ({
-  ConfirmActionDialog: ({ open, onConfirm }: { open: boolean; onConfirm: () => void }) =>
-    open ? <button type="button" onClick={() => void onConfirm()}>Удалить отчёт</button> : null,
+  ConfirmActionDialog: ({ open, onConfirm, description }: { open: boolean; onConfirm: () => void; description?: string }) =>
+    open ? (
+      <div>
+        <p>{description}</p>
+        <button type="button" onClick={() => void onConfirm()}>Удалить отчёт</button>
+      </div>
+    ) : null,
 }));
 vi.mock('../report-evidence-row', () => ({
-  ReportsHeader: ({ onExport, onExportXlsx }: { onExport?: () => void; onExportXlsx?: () => void }) => (
+  ReportsHeader: ({ onExport, onExportXlsx, exporting }: { onExport?: () => void; onExportXlsx?: () => void; exporting: 'csv' | 'xlsx' | null }) => (
     <div>
+      <span data-testid="export-state">{exporting ?? 'idle'}</span>
       <button type="button" onClick={onExport}>CSV</button>
       <button type="button" onClick={onExportXlsx}>Excel</button>
     </div>
@@ -54,6 +60,7 @@ vi.mock('../report-evidence-row', () => ({
 }));
 
 import { AdminReports } from '../admin-reports';
+import { ReportThumbnail } from '../report-thumbnail';
 
 const report = {
   id: 'r1',
@@ -134,6 +141,52 @@ describe('AdminReports — удаление отчёта (F-R93-7)', () => {
   });
 });
 
+describe('AdminReports — единый формат даты отчёта (F-R114-5)', () => {
+  beforeEach(() => {
+    authFetchMock.mockReset();
+    vi.mocked(toast.error).mockClear();
+    reportsState.current = baseState();
+  });
+
+  it('в подтверждении удаления дата — «ДД.ММ.ГГГГ», а не «1 сент. 2026 г.»', () => {
+    render(<AdminReports />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Удалить' }));
+
+    expect(screen.getByText(/Отчёт от 01\.09\.2026 \(Иван\) будет удалён/)).toBeInTheDocument();
+  });
+});
+
+/**
+ * F-R115-12: на время выгрузки обе кнопки («CSV» и «Excel») одновременно
+ * писали «Готовим…» — было не понять, какой файл готовится. Экран теперь
+ * помнит нажатый формат и до ответа сервера помечает только его.
+ */
+describe('AdminReports — пометка формата выгрузки (F-R115-12)', () => {
+  beforeEach(() => {
+    authFetchMock.mockReset();
+    vi.mocked(toast.error).mockClear();
+    reportsState.current = baseState();
+  });
+
+  it('во время выгрузки помечен только нажатый формат, после ответа — снова пусто', async () => {
+    let resolveFetch: (value: unknown) => void = () => {};
+    authFetchMock.mockImplementation(() => new Promise((resolve) => { resolveFetch = resolve; }));
+
+    render(<AdminReports />);
+    expect(screen.getByTestId('export-state')).toHaveTextContent('idle');
+
+    // Фильтр «Сегодня» задаёт период, который нужен выгрузке.
+    fireEvent.click(screen.getByRole('button', { name: 'Сегодня' }));
+    fireEvent.click(screen.getByRole('button', { name: 'CSV' }));
+
+    await waitFor(() => expect(screen.getByTestId('export-state')).toHaveTextContent('csv'));
+
+    resolveFetch({ ok: false, status: 500, json: async () => ({}) });
+    await waitFor(() => expect(screen.getByTestId('export-state')).toHaveTextContent('idle'));
+  });
+});
+
 describe('AdminReports — выгрузка без сети (F-R93-8)', () => {
   beforeEach(() => {
     authFetchMock.mockReset();
@@ -152,5 +205,115 @@ describe('AdminReports — выгрузка без сети (F-R93-8)', () => {
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith(
       'Нет связи с сервером. Выгрузка не выполнена — повторите при появлении сети.',
     ));
+  });
+});
+
+/**
+ * F-R115-9: клик по миниатюре фото отчёта при отказе скачивания молча ничего не
+ * делал — непонятно, нет прав, файла нет или пропала связь.
+ */
+describe('миниатюра фото отчёта: отказ открытия объясняется (F-R115-9)', () => {
+  beforeEach(() => {
+    authFetchMock.mockReset();
+    vi.mocked(toast.error).mockClear();
+  });
+
+  it('403 при открытии фото — тост, а не тишина', async () => {
+    authFetchMock.mockImplementation(async (url: string) => {
+      if (url.startsWith('/api/media/download-batch')) {
+        return { ok: true, status: 200, json: async () => ({ urls: { m1: 'https://cdn.example/x.jpg' } }) };
+      }
+      return { ok: false, status: 403, json: async () => ({ error: 'Доступ запрещён' }) };
+    });
+    render(<ReportThumbnail reportId="r1" mediaId="m1" />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Открыть фото отчёта' }));
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith(
+      'Нет прав на просмотр фото. Смените роль или обратитесь к администратору.',
+    ));
+  });
+});
+
+/**
+ * F-R115-14: клиент задавал своё имя файла через link.download, а сервер отдавал
+ * другое в Content-Disposition (с датой выгрузки) — один документ ходил под двумя
+ * именами. Теперь имя берётся у сервера, как это делает техготовность.
+ */
+describe('AdminReports — имя файла выгрузки (F-R115-14)', () => {
+  beforeEach(() => {
+    authFetchMock.mockReset();
+    vi.mocked(toast.error).mockClear();
+    vi.mocked(toast.success).mockClear();
+    reportsState.current = baseState();
+  });
+
+  it('имя файла берётся из Content-Disposition сервера', async () => {
+    const urlGlobal = URL as unknown as { createObjectURL?: unknown; revokeObjectURL?: unknown };
+    const originalCreate = urlGlobal.createObjectURL;
+    const originalRevoke = urlGlobal.revokeObjectURL;
+    urlGlobal.createObjectURL = vi.fn(() => 'blob:reports');
+    urlGlobal.revokeObjectURL = vi.fn();
+    authFetchMock.mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: new Headers({ 'content-disposition': 'attachment; filename="pilingtrack-reports-2026-10-03.csv"' }),
+      blob: async () => new Blob(['\uFEFFШапка;Дата\nстрока;01.09.2026\n']),
+    });
+    let downloaded = '';
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
+      downloaded = this.download;
+    });
+    try {
+      render(<AdminReports />);
+      // Фильтр «Сегодня» задаёт период, который нужен выгрузке.
+      fireEvent.click(screen.getByRole('button', { name: 'Сегодня' }));
+      fireEvent.click(screen.getByRole('button', { name: 'CSV' }));
+
+      await waitFor(() => expect(toast.success).toHaveBeenCalled());
+      expect(downloaded).toBe('pilingtrack-reports-2026-10-03.csv');
+    } finally {
+      urlGlobal.createObjectURL = originalCreate;
+      urlGlobal.revokeObjectURL = originalRevoke;
+      click.mockRestore();
+    }
+  });
+});
+
+/**
+ * F-R115-5: пустой период сервер отдавал как 200 (CSV из одной шапки), а экран
+ * показывал зелёное «Выгружено за период…». Теперь пустая выгрузка объясняется,
+ * а пустой файл не сохраняется.
+ */
+describe('AdminReports — пустая выгрузка (F-R115-5)', () => {
+  beforeEach(() => {
+    authFetchMock.mockReset();
+    vi.mocked(toast.error).mockClear();
+    vi.mocked(toast.success).mockClear();
+    reportsState.current = baseState();
+  });
+
+  it('пустой период → сообщение вместо «Выгружено», файл не сохраняется', async () => {
+    authFetchMock.mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: new Headers({ 'content-disposition': 'attachment; filename="pilingtrack-reports-2026-10-03.csv"' }),
+      blob: async () => new Blob(['\uFEFFID отчёта;Дата;Смена\n']),
+    });
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+    try {
+      render(<AdminReports />);
+      // Фильтр «Сегодня» задаёт период, который нужен выгрузке.
+      fireEvent.click(screen.getByRole('button', { name: 'Сегодня' }));
+      fireEvent.click(screen.getByRole('button', { name: 'CSV' }));
+
+      await waitFor(() => expect(toast.error).toHaveBeenCalledWith(
+        'За выбранный период отчётов нет — выгружать нечего. Измените период или фильтры.',
+      ));
+      expect(toast.success).not.toHaveBeenCalled();
+      expect(click).not.toHaveBeenCalled();
+    } finally {
+      click.mockRestore();
+    }
   });
 });

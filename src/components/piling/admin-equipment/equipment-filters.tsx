@@ -56,14 +56,14 @@ export function EquipmentFilters({
     <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-card p-3">
       <span className="text-xs font-medium text-muted-foreground">Фильтры:</span>
 
-      <select className={selectCls} value={value.site} onChange={(e) => set({ site: e.target.value })}>
+      <select className={selectCls} value={value.site} onChange={(e) => set({ site: e.target.value })} aria-label="Фильтр по объекту">
         <option value="">Все объекты</option>
         {sites.map((s) => (
           <option key={s} value={s}>{s}</option>
         ))}
       </select>
 
-      <select className={selectCls} value={value.kind} onChange={(e) => set({ kind: e.target.value })}>
+      <select className={selectCls} value={value.kind} onChange={(e) => set({ kind: e.target.value })} aria-label="Фильтр по типу машины">
         <option value="">Все типы</option>
         {kinds.map((k) => (
           <option key={k.value} value={k.value}>{k.label}</option>
@@ -74,6 +74,7 @@ export function EquipmentFilters({
         className={selectCls}
         value={value.equipmentStatus}
         onChange={(e) => set({ equipmentStatus: e.target.value, status: e.target.value })}
+        aria-label="Фильтр по статусу техники"
       >
         <option value="">Статус техники</option>
         {EQUIPMENT_STATUS_OPTIONS.map((s) => (
@@ -81,14 +82,14 @@ export function EquipmentFilters({
         ))}
       </select>
 
-      <select className={selectCls} value={value.reportStatus} onChange={(e) => set({ reportStatus: e.target.value })}>
+      <select className={selectCls} value={value.reportStatus} onChange={(e) => set({ reportStatus: e.target.value })} aria-label="Фильтр по статусу отчёта">
         <option value="">Статус отчёта</option>
         {REPORT_STATUS_OPTIONS.map((s) => (
           <option key={s.value} value={s.value}>{s.label}</option>
         ))}
       </select>
 
-      <select className={selectCls} value={value.crew} onChange={(e) => set({ crew: e.target.value })}>
+      <select className={selectCls} value={value.crew} onChange={(e) => set({ crew: e.target.value })} aria-label="Фильтр по бригаде">
         <option value="">Все бригады</option>
         {crews.map((c) => (
           <option key={c} value={c}>{c}</option>

@@ -5,6 +5,9 @@
  * standby instances to take over when the leader disappears.
  */
 
+import { randomUUID } from 'node:crypto';
+import { hostname } from 'node:os';
+
 import { getStateRedisClient } from '@/lib/redis-cache';
 import { logger } from '@/lib/logger';
 
@@ -19,7 +22,7 @@ export interface LeaderElectionConfig {
 }
 
 function defaultNodeId(): string {
-  return `${process.env.HOSTNAME || 'unknown'}-${process.pid}`;
+  return `${hostname()}-${process.pid}-${randomUUID()}`;
 }
 
 const RENEW_LEASE = "if redis.call('GET', KEYS[1]) == ARGV[1] then return redis.call('PEXPIRE', KEYS[1], ARGV[2]) end return 0";

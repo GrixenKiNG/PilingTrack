@@ -1,4 +1,5 @@
-import { test, expect } from '@playwright/test';
+import { randomUUID } from 'node:crypto';
+import { test, expect } from './fixtures/disposable.fixture';
 
 test.describe('PilingTrack E2E Tests', () => {
   test('health check endpoint returns ok', async ({ request }) => {
@@ -25,7 +26,7 @@ test.describe('PilingTrack E2E Tests', () => {
   test('login fails with invalid credentials', async ({ request }) => {
     const response = await request.post('/api/auth/login', {
       data: {
-        email: 'invalid@test.com',
+        email: 'codex-invalid-' + randomUUID() + '@example.invalid',
         password: 'wrongpassword',
       },
     });
@@ -52,11 +53,12 @@ test.describe('PilingTrack E2E Tests', () => {
   });
 
   test('rate limiting works on login', async ({ request }) => {
+    const email = 'codex-limit-' + randomUUID() + '@example.invalid';
     // Make 6 failed login attempts (limit is 5)
     for (let i = 0; i < 6; i++) {
       await request.post('/api/auth/login', {
         data: {
-          email: 'ratelimit@test.com',
+          email,
           password: 'wrong',
         },
       });
@@ -65,7 +67,7 @@ test.describe('PilingTrack E2E Tests', () => {
     // 7th attempt should be rate limited
     const response = await request.post('/api/auth/login', {
       data: {
-        email: 'ratelimit@test.com',
+        email,
         password: 'wrong',
       },
     });

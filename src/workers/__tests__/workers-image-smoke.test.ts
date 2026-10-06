@@ -103,7 +103,10 @@ describe('CI и ручная выкладка workers', () => {
     const deploy = fs.readFileSync(path.join(root, '.github/workflows/deploy.yml'), 'utf8');
     const smoke = deploy.indexOf('bash scripts/smoke-workers-image.sh');
     expect(smoke).toBeGreaterThan(deploy.indexOf('docker compose build'));
-    expect(smoke).toBeLessThan(deploy.indexOf('docker compose up -d'));
+    const barrier = deploy.indexOf('bash scripts/replace-worker-generation.sh app workers');
+    expect(barrier).toBeGreaterThan(smoke);
+    expect(deploy).not.toContain('docker compose up -d');
+    expect(deploy).toContain('WORKER_GENERATION_EXTERNAL_STOPPED=1');
     expect(deploy).toContain('docker compose config --images workers');
     expect(deploy).toContain('case \\" \\$SVCS \\" in');
     expect(deploy.slice(smoke).split('\n')[0]).not.toContain('|| true');

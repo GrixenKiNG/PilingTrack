@@ -20,6 +20,7 @@ const mocks = vi.hoisted(() => ({
   mockWeeklyUpsert: vi.fn(),
   mockSiteFindUnique: vi.fn().mockResolvedValue({ tenantId: 'tenant-1' }),
   mockDailyFindMany: vi.fn().mockResolvedValue([]),
+  mockSiteFindMany: vi.fn().mockResolvedValue([]),
 }));
 
 vi.mock('@/lib/db', () => ({
@@ -28,7 +29,8 @@ vi.mock('@/lib/db', () => ({
       findUnique: mocks.mockReportFindUnique,
       findMany: mocks.mockReportFindMany,
     },
-    site: { findUnique: mocks.mockSiteFindUnique },
+    site: { findUnique: mocks.mockSiteFindUnique, findMany: mocks.mockSiteFindMany },
+    tenant: { findMany: vi.fn().mockResolvedValue([{ id: 'tenant-1' }]) },
     siteDailySummary: { upsert: mocks.mockUpsert, findMany: mocks.mockDailyFindMany },
     siteWeeklyTrend: { upsert: mocks.mockWeeklyUpsert },
     reportAnalytics: { upsert: mocks.mockUpsert },
@@ -87,6 +89,19 @@ describe('Projection Worker', () => {
   });
 
   describe('startProjectionWorker', () => {
+    it('hourly recomputation skips a site deleted after listing and updates the next site', async () => {
+      const { startProjectionWorker } = await import('@/modules/reports/application/projections/projection-worker');
+      mocks.mockOutboxFindMany.mockResolvedValue([]);
+      mocks.mockSiteFindMany.mockResolvedValueOnce([{ id: 'site-deleted' }, { id: 'site-live' }]);
+      mocks.mockSiteFindUnique.mockResolvedValueOnce(null).mockResolvedValue({ tenantId: 'tenant-1' });
+      const worker = startProjectionWorker(7_200_000);
+      try {
+        await vi.advanceTimersByTimeAsync(3_600_000);
+        expect(mocks.mockWeeklyUpsert).toHaveBeenCalledWith(expect.objectContaining({
+          create: expect.objectContaining({ siteId: 'site-live', tenantId: 'tenant-1' }),
+        }));
+      } finally { worker.stop(); }
+    });
     it('creates a worker with stop method', async () => {
       const { startProjectionWorker } = await import(
         '@/modules/reports/application/projections/projection-worker'

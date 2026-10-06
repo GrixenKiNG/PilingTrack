@@ -1,9 +1,10 @@
-import { expect, test } from '@playwright/test';
+import { TEST_USERS } from './fixtures/auth.fixture';
+import { expect, test } from './fixtures/disposable.fixture';
 
 test('operator can authenticate and access reports', async ({ request }) => {
   // 1. Login as operator
   const loginRes = await request.post('/api/auth/login', {
-    data: { email: 'operator@piling.ru', password: 'operator123' },
+    data: { email: TEST_USERS.operator.email, password: TEST_USERS.operator.password },
   });
   expect(loginRes.ok()).toBe(true);
   const loginBody = await loginRes.json();

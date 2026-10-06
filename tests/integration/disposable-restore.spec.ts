@@ -49,12 +49,15 @@ describe.skipIf(!enabled)('restore synthetic dump from one consistent snapshot',
       expect(restored.status, restored.stdout + restored.stderr).toBe(0);
       console.info(restored.stdout.trim());
       expect(restored.stdout).toContain('RESTORE OK:');
+      const manifest = JSON.parse(readFileSync(dump + '.manifest.json', 'utf8'));
       for (const table of ['Report', 'Site', 'Equipment', 'Inspection', 'Shift', 'AuditLog']) {
-        expect(restored.stdout).toContain(`${table}: source=2, restored=2, app without tenant=0`);
+        const count = Number(manifest.snapshot.counts[table]);
+        expect(count).toBeGreaterThanOrEqual(2);
+        expect(restored.stdout).toContain(`${table}: source=${count}, restored=${count}, app without tenant=0`);
       }
       const wrongManifest = dump + '.wrong.json';
       const data = JSON.parse(readFileSync(dump + '.manifest.json', 'utf8'));
-      data.snapshot.counts.Report = '3';
+      data.snapshot.counts.Report = String(Number(data.snapshot.counts.Report) + 1);
       writeFileSync(wrongManifest, JSON.stringify(data));
       const mismatch = spawnSync(bash, ['scripts/restore-drill.sh', dump, wrongManifest], { encoding: 'utf8' });
       expect(mismatch.status).toBe(1);

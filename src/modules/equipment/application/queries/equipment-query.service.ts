@@ -504,7 +504,7 @@ export async function listAllEquipment(
   const list = await db.equipment.findMany({
     where,
     select: {
-      id: true, name: true, model: true, qty: true, isActive: true, hammerKind: true, isCombined: true,
+      id: true, name: true, model: true, qty: true, isActive: true, hammerKind: true, isCombined: true, updatedAt: true,
       engineHoursTotal: true, nextMaintenanceAtHours: true, nextMaintenanceDate: true,
       crews: { where: { isActive: true }, select: { id: true } },
     },

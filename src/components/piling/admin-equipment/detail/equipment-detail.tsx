@@ -18,7 +18,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { authFetch } from '@/lib/api';
-import { catchText } from '@/components/piling/admin-crews/crew-messages';
+import { catchText, extractApiError } from '@/components/piling/admin-crews/crew-messages';
 import { cn } from '@/lib/utils';
 import { KIND_LABELS } from '../equipment-form';
 import { EditEquipmentDialog } from '../equipment-dialogs';
@@ -53,9 +53,12 @@ interface Props {
   /** When rendered inside the fleet-center right column (not the full page):
    *  hides the "back" link and trims outer padding. */
   embedded?: boolean;
+  /** Вызывается после успешного сохранения карточки: центр парка перечитывает
+   *  снимок, иначе в списке слева остаётся старое имя (R119 №5). */
+  onSaved?: () => void;
 }
 
-export function EquipmentDetail({ equipmentId, embedded = false }: Props) {
+export function EquipmentDetail({ equipmentId, embedded = false, onSaved }: Props) {
   const canManage = usePilingStore((state) => state.currentUser?.role === 'ADMIN');
   const [details, setDetails] = useState<DetailsResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -81,7 +84,10 @@ export function EquipmentDetail({ equipmentId, embedded = false }: Props) {
   }, [equipmentId]);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- loads data on mount / dependency change; the async loader sets state
+    // Смена установки: показываем скелетон, а не паспорт предыдущей машины
+    // (R119 №13) — до этого loading выставлялся только при монтировании.
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- сброс состояния на смену зависимости; данные затем загрузит refresh
+    setLoading(true);
     void refresh();
   }, [refresh]);
 
@@ -127,13 +133,17 @@ export function EquipmentDetail({ equipmentId, embedded = false }: Props) {
     const res = await authFetch(`/api/equipment/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
+      body: JSON.stringify({ ...payload, expectedUpdatedAt: details?.equipment.updatedAt }),
     });
     if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.error || 'Ошибка сохранения');
+      if (res.status === 409) await refresh();
+      // Preserve E4 conflict refresh and Hermes validation messages.
+      throw new Error(await extractApiError(res, 'Ошибка сохранения'));
     }
     await refresh();
+    // Список парка слева кормится снимком /monitoring/fleet — без этого
+    // переименованная установка остаётся в плитке со старым именем (R119 №5).
+    onSaved?.();
   };
 
   if (loading) {

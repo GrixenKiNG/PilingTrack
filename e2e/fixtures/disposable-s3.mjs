@@ -1,0 +1,7 @@
+import {S3Client, CreateBucketCommand, PutObjectCommand, GetObjectCommand, DeleteObjectCommand} from '@aws-sdk/client-s3';
+import {randomBytes} from 'node:crypto';
+const endpoint=new URL(process.env.S3_ENDPOINT||'http://invalid');
+if(endpoint.hostname!=='127.0.0.1'||endpoint.protocol!=='https:'||process.env.S3_BUCKET!=='codex-photos'||!process.env.S3_ACCESS_KEY_ID?.startsWith('codex'))throw Error('Only own HTTPS S3 fixture');
+const client=new S3Client({endpoint:endpoint.origin,region:process.env.S3_REGION,forcePathStyle:true,credentials:{accessKeyId:process.env.S3_ACCESS_KEY_ID,secretAccessKey:process.env.S3_SECRET_ACCESS_KEY}});
+const Bucket=process.env.S3_BUCKET;const Key='codex-probe-'+randomBytes(6).toString('hex');const Body=randomBytes(32);
+try {await client.send(new CreateBucketCommand({Bucket}));await client.send(new PutObjectCommand({Bucket,Key,Body}));const response=await client.send(new GetObjectCommand({Bucket,Key}));const actual=Buffer.from(await response.Body.transformToByteArray());if(!actual.equals(Body))throw Error('Own S3 round trip mismatch');await client.send(new DeleteObjectCommand({Bucket,Key}));console.log('Real disposable S3 PUT/GET/DELETE verified');}finally{client.destroy()}

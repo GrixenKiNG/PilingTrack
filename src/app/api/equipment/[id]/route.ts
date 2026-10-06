@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireTenantId } from '@/lib/tenant';
 import { requireAuth } from '@/lib/auth';
 import { assertCan } from '@/services/auth/authorization-service';
-import { canDecreaseMeter, getEquipmentByIdOrThrow, updateEquipment, updateEquipmentMetadata, deleteEquipment } from '@/modules/equipment';
-import { equipmentManageSchema } from '@/lib/validation-schemas';
+import { canDecreaseMeter, getEquipmentByIdOrThrow, updateEquipment, deleteEquipment } from '@/modules/equipment';
+import { equipmentUpdateSchema } from '@/lib/validation-schemas';
 import { withApi, withMutation, readJsonBody } from '@/core/api-wrapper';
 import { db } from '@/lib/db';
 import { logger } from '@/lib/logger';
@@ -68,7 +68,7 @@ export const PUT = withMutation(
     const tenantId = requireTenantId(user!);
     const body = await readJsonBody(request);
 
-    const validation = equipmentManageSchema.partial().safeParse(body);
+    const validation = equipmentUpdateSchema.safeParse(body);
     if (!validation.success) {
       return NextResponse.json(
         { error: 'Некорректные данные', details: validation.error.issues.map(e => ({ field: e.path.join('.'), message: e.message })) },
@@ -86,6 +86,9 @@ export const PUT = withMutation(
 
     await updateEquipment({
       equipmentId: id,
+      expectedUpdatedAt: validation.data.expectedUpdatedAt,
+      metadata: validation.data,
+      allowDecrease: canDecreaseMeter(user?.role),
       name: validation.data.name,
       model: validation.data.model,
       qty: validation.data.qty,
@@ -94,14 +97,6 @@ export const PUT = withMutation(
       // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
       userId: user!.id,
       tenantId,
-    });
-
-    await updateEquipmentMetadata(id, validation.data, {
-      tenantId,
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
-      actorId: user!.id,
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
-      allowDecrease: canDecreaseMeter(user!.role),
     });
 
     const equipment = await getEquipmentByIdOrThrow(id, tenantId);

@@ -357,6 +357,10 @@ export const equipmentManageSchema = z.object({
   isActive: z.boolean().default(true),
 }).extend(equipmentMetadataSchema.shape);
 
+export const equipmentUpdateSchema = equipmentManageSchema.partial().extend({
+  expectedUpdatedAt: z.string().datetime(),
+});
+
 export type EquipmentMetadataInput = z.infer<typeof equipmentMetadataSchema>;
 
 export const equipmentIdSchema = z.object({

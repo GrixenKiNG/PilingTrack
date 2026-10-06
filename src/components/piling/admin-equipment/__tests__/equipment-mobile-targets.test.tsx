@@ -8,8 +8,9 @@
  * <button>, видимая дорожка остаётся 40×24 (образец — workspace-settings.tsx).
  * На десктопе (sm и шире) вид не меняется.
  */
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { toast } from 'sonner';
 
 const mocks = vi.hoisted(() => ({ authFetch: vi.fn() }));
 
@@ -22,6 +23,7 @@ import { EquipmentCardBlockContent } from '../equipment-card-block';
 import { EquipmentFilters, EMPTY_FILTERS } from '../equipment-filters';
 import { EquipmentTable } from '../equipment-table';
 import { EquipmentForm, EMPTY_EQUIPMENT_FORM } from '../equipment-form';
+import { useEquipmentList } from '../use-equipment-list';
 import { DEFAULT_EQUIPMENT_CARD_TEMPLATE } from '../equipment-card-template';
 import { HistoryTable, Section, type TimelineRow } from '../detail/equipment-detail-parts';
 import { EquipmentPhotos } from '../detail/equipment-photos';
@@ -211,6 +213,54 @@ describe('форма установки: подписи связаны с пол
   });
 });
 
+describe('фильтры парка: назначение селектов озвучивается (R116 #9)', () => {
+  it('пять селектов имеют доступное имя, а не только выбранное значение', () => {
+    render(
+      <EquipmentFilters
+        sites={['Объект А']}
+        kinds={[{ value: 'PILE_DRIVER', label: 'Копёр' }]}
+        crews={['Бр-1']}
+        value={EMPTY_FILTERS}
+        onChange={() => {}}
+      />,
+    );
+
+    for (const label of [
+      'Фильтр по объекту',
+      'Фильтр по типу машины',
+      'Фильтр по статусу техники',
+      'Фильтр по статусу отчёта',
+      'Фильтр по бригаде',
+    ]) {
+      expect(screen.getByLabelText(label)).toBeInstanceOf(HTMLSelectElement);
+    }
+  });
+});
+
+describe('таблица установок: строку открывают с клавиатуры (R116 #12)', () => {
+  it('строка фокусируема, Enter и Space открывают карточку', () => {
+    const onSelect = vi.fn();
+    render(<EquipmentTable cards={[card()]} selectedId={null} onSelect={onSelect} />);
+
+    const row = screen.getByText('СП-49').closest('tr');
+    if (!row) throw new Error('строка установки не найдена');
+    expect(row).toHaveAttribute('tabindex', '0');
+
+    fireEvent.keyDown(row, { key: 'Enter' });
+    fireEvent.keyDown(row, { key: ' ' });
+
+    expect(onSelect).toHaveBeenCalledTimes(2);
+    expect(onSelect).toHaveBeenCalledWith('eq-1');
+  });
+
+  it('aria-selected отмечает открытую установку', () => {
+    render(<EquipmentTable cards={[card()]} selectedId="eq-1" onSelect={() => {}} />);
+
+    const row = screen.getByText('СП-49').closest('tr');
+    expect(row).toHaveAttribute('aria-selected', 'true');
+  });
+});
+
 describe('форма установки: лимиты полей как в zod-схеме маршрута (R121)', () => {
   it('текстовые поля ограничены по длине из схемы', () => {
     render(<EquipmentForm state={EMPTY_EQUIPMENT_FORM} onChange={() => {}} />);
@@ -237,5 +287,91 @@ describe('форма установки: лимиты полей как в zod-�
     expect(hours).toHaveAttribute('min', '0');
     expect(hours).toHaveAttribute('max', '1000000');
     expect(hours).toHaveAttribute('step', '1');
+  });
+});
+
+/**
+ * F-R115-8: «Скачать PDF» переходил по адресу маршрута и на отказе (403/429/5xx)
+ * открывал страницу с сырым JSON вместо файла. Теперь PDF тянется через
+ * authFetch, а отказ объясняется русским тостом.
+ */
+describe('отчёт по установке: отказ выгрузки PDF объясняется по-русски (F-R115-8)', () => {
+  beforeEach(() => {
+    vi.mocked(toast.error).mockClear();
+  });
+
+  it('403 на «Скачать PDF» → русский текст, без перехода на страницу с ответом', async () => {
+    mocks.authFetch.mockImplementation(async (u: string) => {
+      if (u === '/api/settings') return json({ timezone: 'Europe/Moscow' });
+      return json({ error: 'Доступ запрещён' }, 403);
+    });
+    render(<EquipmentReportExport equipmentId="eq-1" />);
+
+    fireEvent.click(screen.getByRole('button', { name: /Скачать PDF/ }));
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith(
+      'Нет прав на выгрузку отчёта. Обратитесь к администратору.',
+    ));
+  });
+
+  it('обрыв сети при выгрузке → русский текст, а не «Failed to fetch»', async () => {
+    mocks.authFetch.mockImplementation(async (u: string) => {
+      if (u === '/api/settings') return json({ timezone: 'Europe/Moscow' });
+      throw new TypeError('Failed to fetch');
+    });
+    render(<EquipmentReportExport equipmentId="eq-1" />);
+
+    fireEvent.click(screen.getByRole('button', { name: /Скачать PDF/ }));
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith(
+      'Нет связи с сервером. Файл не сформирован — повторите при появлении сети.',
+    ));
+    expect(toast.error).not.toHaveBeenCalledWith('Failed to fetch');
+  });
+});
+
+/**
+ * F-R115-9: клик по фотографии установки при отказе скачивания молча ничего не
+ * делал — непонятно, нет прав, файла нет или пропала связь.
+ */
+describe('фото установки: отказ открытия объясняется по-русски (F-R115-9)', () => {
+  beforeEach(() => {
+    vi.mocked(toast.error).mockClear();
+  });
+
+  it('403 при открытии фото объясняется тостом, а не тишиной', async () => {
+    mocks.authFetch.mockImplementation(async (url: string) => {
+      if (url === '/api/media?entityType=equipment&entityId=eq-1') {
+        return json({ data: [{ id: 'm1', fileName: 'a.png', contentType: 'image/png', thumbnailKey: 'k' }] });
+      }
+      if (url.startsWith('/api/media/download-batch')) return json({ urls: { m1: 'https://cdn.example/x.jpg' } });
+      return json({ error: 'Доступ запрещён' }, 403);
+    });
+    render(<EquipmentPhotos equipmentId="eq-1" />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Открыть фото' }));
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith(
+      'Нет прав на просмотр фото. Смените роль или обратитесь к администратору.',
+    ));
+  });
+});
+
+/*
+  F-R119-7 (повтор R97 №10): создание установки показывало серверный отказ как
+  есть — английское «Unauthorized» на русском экране; 400 нёс построчные
+  `details`, но читалось только общее «Некорректные данные».
+*/
+describe('список установок: отказ создания объясняется по-русски (F-R119-7)', () => {
+  it('401 при создании → «Сессия истекла», а не серверное «Unauthorized»', async () => {
+    mocks.authFetch.mockImplementation(async (_url: string, init?: RequestInit) => {
+      if (init?.method === 'POST') return json({ error: 'Unauthorized' }, 401);
+      return json({ data: [] });
+    });
+    const { result } = renderHook(() => useEquipmentList());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    await expect(result.current.create({ name: 'СГ-1' }))
+      .rejects.toThrow('Сессия истекла — войдите снова.');
   });
 });

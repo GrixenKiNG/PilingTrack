@@ -29,12 +29,33 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { ConfirmActionDialog } from '@/components/piling/confirm-action-dialog';
+import { apiErrorMessage } from '@/lib/api-error-message';
 import type { TelegramConfigDTO } from '@/lib/types';
 import { cn } from '@/lib/utils';
+
+// Формат ID чата: число (у групп и каналов отрицательное) или @имя канала.
+const CHAT_ID_PATTERN = /^-?\d+$|^@[A-Za-z0-9_]{5,}$/;
+
+/**
+ * Текст отказа API для тоста.
+ *
+ * Сервер отвечает `{ error, details }` (400 с полем и причиной, 404), а экран
+ * показывал на любой отказ одну строку «Ошибка сохранения»: админ не знал,
+ * какое поле не принято, и правил наугад (F-R120-4). 404 — запись уже удалена,
+ * общий текст тут сбил бы с толку.
+ */
+async function apiFailureText(res: Response, fallback: string): Promise<string> {
+  if (res.status === 404) return 'Запись не найдена — возможно, её уже удалили, обновите список';
+  const body = await res.json().catch(() => null);
+  return apiErrorMessage(body, fallback);
+}
 
 export function AdminTelegram() {
   const [configs, setConfigs] = useState<TelegramConfigDTO[]>([]);
   const [loading, setLoading] = useState(true);
+  // Текст сбоя чтения списка. Отдельно от `configs`: пустой список после 5xx —
+  // это «неизвестно», а не «ботов нет» (F-R120-7).
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   // Create / edit dialog (mode = 'create' | 'edit')
   const [dialogMode, setDialogMode] = useState<'create' | 'edit' | null>(null);
@@ -102,12 +123,23 @@ export function AdminTelegram() {
     setLoading(true);
     try {
       const res = await authFetch('/api/telegram/configs');
-      if (res.ok) {
-        const data = await res.json();
-        setConfigs(data.configs || []);
+      if (!res.ok) {
+        // Раньше отказ молча оставлял пустой список — админ видел «Нет
+        // конфигураций Telegram», думал, что ботов нет, и заводил дубли.
+        const message = res.status === 403
+          ? 'Нет доступа к настройкам Telegram'
+          : 'Не удалось загрузить конфигурации Telegram';
+        setLoadError(message);
+        toast.error(message);
+        return;
       }
+      const data = await res.json();
+      setConfigs(data.configs || []);
+      setLoadError(null);
     } catch {
-      toast.error('Ошибка загрузки конфигураций');
+      const message = 'Не удалось загрузить конфигурации Telegram';
+      setLoadError(message);
+      toast.error(message);
     } finally {
       setLoading(false);
     }
@@ -126,6 +158,14 @@ export function AdminTelegram() {
       toast.error('Заполните все поля');
       return;
     }
+    // Формат ID чата проверяем до отправки: без этого опечатка или вставленный
+    // «Chat ID: -100…» сохранялись с enabled=true, и алерты о дефектах молча не
+    // доходили (F-R120-5). Серверная схема формат не проверяет — принимает
+    // любую непустую строку.
+    if (!CHAT_ID_PATTERN.test(newChatId.trim())) {
+      toast.error('ID чата — число (например, -1001234567890) или имя канала вида @name');
+      return;
+    }
     setSaving(true);
     try {
       const res = await authFetch('/api/telegram/configs', {
@@ -138,7 +178,10 @@ export function AdminTelegram() {
           chatId: newChatId.trim(),
         }),
       });
-      if (!res.ok) throw new Error('Ошибка сохранения');
+      if (!res.ok) {
+        toast.error(await apiFailureText(res, 'Ошибка сохранения'));
+        return;
+      }
       const data = await res.json();
       if (isEdit) {
         setConfigs((prev) => prev.map((c) => (c.id === editingId ? data.config : c)));
@@ -162,7 +205,10 @@ export function AdminTelegram() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id }),
       });
-      if (!res.ok) throw new Error('Ошибка удаления');
+      if (!res.ok) {
+        toast.error(await apiFailureText(res, 'Ошибка удаления'));
+        return;
+      }
       setConfigs((prev) => prev.filter((c) => c.id !== id));
       toast.success('Конфигурация удалена');
     } catch {
@@ -183,7 +229,10 @@ export function AdminTelegram() {
           enabled: !config.enabled,
         }),
       });
-      if (!res.ok) throw new Error('Ошибка');
+      if (!res.ok) {
+        toast.error(await apiFailureText(res, 'Ошибка переключения'));
+        return;
+      }
       setConfigs((prev) =>
         prev.map((c) =>
           c.id === config.id ? { ...c, enabled: !c.enabled } : c
@@ -231,7 +280,16 @@ export function AdminTelegram() {
       </div>
 
       {/* Configs List */}
-      {configs.length === 0 ? (
+      {loadError && (
+        <div role="alert" className="flex flex-col gap-3 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive-strong sm:flex-row sm:items-center sm:justify-between">
+          <p className="min-w-0 break-words">{loadError}</p>
+          <Button type="button" variant="outline" size="sm" className="shrink-0" onClick={() => void loadData()}>
+            Повторить
+          </Button>
+        </div>
+      )}
+
+      {!loadError && (configs.length === 0 ? (
         <div className="text-center py-16">
           <MessageSquare className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
           <p className="text-sm text-muted-foreground">Нет конфигураций Telegram</p>
@@ -336,7 +394,7 @@ export function AdminTelegram() {
             </motion.div>
           ))}
         </div>
-      )}
+      ))}
 
       {/* Create / Edit Dialog */}
       <Dialog open={dialogMode !== null} onOpenChange={(open) => !open && closeDialog()}>

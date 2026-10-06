@@ -5,6 +5,8 @@ import { db } from '@/lib/db';
 import { ServiceError } from '@/lib/service-error';
 import { EquipmentAggregate } from '../../domain';
 import { getEquipmentRepository } from '../../infrastructure';
+import { fromPrismaToState, toOutboxData } from '../../infrastructure/equipment.prisma.mapper';
+import { updateEquipmentMetadata } from './equipment-metadata';
 import { CreateEquipmentCommand, UpdateEquipmentCommand } from './equipment.command';
 
 export async function createEquipment(cmd: CreateEquipmentCommand) {
@@ -17,6 +19,28 @@ export async function createEquipment(cmd: CreateEquipmentCommand) {
 }
 
 export async function updateEquipment(cmd: UpdateEquipmentCommand) {
+  if (cmd.expectedUpdatedAt) {
+    return db.$transaction(async (tx) => {
+      // Serialize the entire card, including passport and meter writes.
+      await tx.$queryRaw`SELECT id FROM "Equipment" WHERE id = ${cmd.equipmentId} AND "tenantId" = ${cmd.tenantId} FOR UPDATE`;
+      const current = await tx.equipment.findUnique({ where: { id: cmd.equipmentId, tenantId: cmd.tenantId } });
+      if (!current) throw new ServiceError('Установка не найдена', 404);
+      if (current.updatedAt.toISOString() !== cmd.expectedUpdatedAt) {
+        throw new ServiceError('Карточка изменена другим пользователем. Данные обновлены; проверьте их и повторите правку.', 409);
+      }
+      const agg = EquipmentAggregate.reconstitute(fromPrismaToState(current));
+      agg.update({ name: cmd.name, model: cmd.model, qty: cmd.qty, description: cmd.description, isActive: cmd.isActive }, cmd.userId);
+      const state = agg.getState();
+      await tx.equipment.update({
+        where: { id: cmd.equipmentId, tenantId: cmd.tenantId },
+        data: { name: state.name, model: state.model, qty: state.qty, description: state.description, isActive: state.isActive },
+      });
+      await updateEquipmentMetadata(cmd.equipmentId, cmd.metadata ?? {}, { tenantId: cmd.tenantId, actorId: cmd.userId, allowDecrease: cmd.allowDecrease }, tx as typeof db);
+      // Millisecond precision must advance even for two saves in one tick.
+      await tx.equipment.update({ where: { id: cmd.equipmentId, tenantId: cmd.tenantId }, data: { updatedAt: new Date(Math.max(Date.now(), current.updatedAt.getTime() + 1)) } });
+      for (const event of agg.getPendingEvents()) await tx.outboxEvent.create({ data: toOutboxData(event, cmd.tenantId) });
+    });
+  }
   const repo = getEquipmentRepository();
   const agg = await repo.findById(cmd.equipmentId, cmd.tenantId);
   if (!agg) throw new ServiceError('Установка не найдена', 404);

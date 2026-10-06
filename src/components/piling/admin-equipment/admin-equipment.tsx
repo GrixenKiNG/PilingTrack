@@ -201,7 +201,7 @@ export function AdminEquipment() {
                     <PilingIcon name="close" size={16} decorative />
                   </button>
                 </div>
-                <EquipmentDetail equipmentId={selectedId} embedded />
+                <EquipmentDetail equipmentId={selectedId} embedded onSaved={refetch} />
               </div>
             ) : (
               <div className="flex h-full min-h-[200px] flex-col items-center justify-center rounded-xl border border-dashed border-border bg-muted/50 p-8 text-center">

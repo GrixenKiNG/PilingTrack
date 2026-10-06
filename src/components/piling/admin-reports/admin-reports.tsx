@@ -11,7 +11,7 @@ import { can } from '@/services/auth/authorization-service';
 import { authFetch } from '@/lib/api';
 import { catchText } from '@/components/piling/admin-crews/crew-messages';
 import { cn } from '@/lib/utils';
-import { pluralizeRu } from '@/lib/format';
+import { pluralizeRu, formatRuDate } from '@/lib/format';
 import type { ReportDTO } from '@/lib/types';
 import { getReportTotals, addTotals } from './report-totals';
 import { useReportsData } from './use-reports-data';
@@ -36,6 +36,11 @@ const QUICK_FILTERS: Array<{ key: QuickFilter; label: string }> = [
   { key: 'withPhotos', label: 'С фото' },
   { key: 'edited', label: 'Изменены админом' },
 ];
+
+/** Строк данных в CSV: первая строка — шапка, пустые строки не считаем. */
+function countCsvDataRows(text: string): number {
+  return text.split('\n').slice(1).filter((line) => line.trim() !== '').length;
+}
 
 export function AdminReports() {
   const currentUser = usePilingStore(s => s.currentUser);
@@ -63,7 +68,7 @@ export function AdminReports() {
   const [pendingDeleteReport, setPendingDeleteReport] = useState<ReportDTO | null>(null);
   const [quickFilter, setQuickFilter] = useState<QuickFilter>('all');
   const [filterEquipmentId, setFilterEquipmentId] = useState('all');
-  const [exporting, setExporting] = useState(false);
+  const [exporting, setExporting] = useState<'csv' | 'xlsx' | null>(null);
 
   // Export the same filters as the visible list. An unbounded history needs
   // an explicit period because the export endpoint is limited to 92 days.
@@ -81,7 +86,9 @@ export function AdminReports() {
     const dateTo = quickFrom && periodActive && periodTo ? [quickTo, periodTo].sort()[0]
       : quickFrom ? quickTo : periodTo;
     if (dateFrom > dateTo) { toast.error('В выбранном пересечении дат нет отчётов.'); return; }
-    setExporting(true);
+    // Какой именно файл готовится: обе кнопки («CSV» и «Excel») раньше писали
+    // «Готовим…» одновременно, и было не понять, какая выгрузка идёт (F-R115-12).
+    setExporting(format);
     let objectUrl: string | null = null;
     try {
       const params = new URLSearchParams({ dateFrom, dateTo });
@@ -97,10 +104,25 @@ export function AdminReports() {
         throw new Error(body.error || `Сервер ответил ${response.status}`);
       }
 
-      objectUrl = URL.createObjectURL(await response.blob());
+      const blob = await response.blob();
+      // Пустой период сервер отдаёт как 200 — CSV из одной шапки. Не выдаём
+      // это за успешную выгрузку: считаем строки данных (F-R115-5). Число
+      // строк XLSX клиенту не видно, для него ждём заголовок сервера.
+      const rowCountHeader = response.headers.get('x-export-row-count');
+      const dataRows = rowCountHeader !== null ? Number(rowCountHeader)
+        : format === 'csv' ? countCsvDataRows(await blob.text()) : null;
+      if (dataRows === 0) {
+        toast.error('За выбранный период отчётов нет — выгружать нечего. Измените период или фильтры.');
+        return;
+      }
+      objectUrl = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = objectUrl;
-      link.download = `pilingtrack-reports-${dateFrom}_${dateTo}.${format}`;
+      // Имя файла берём у сервера (Content-Disposition), как это делает
+      // техготовность: своё имя с датой периода расходилось с заголовком
+      // сервера, и один документ ходил под двумя разными именами (F-R115-14).
+      link.download = response.headers.get('content-disposition')?.match(/filename="([^"]+)"/)?.[1]
+        ?? `pilingtrack-reports-${dateFrom}_${dateTo}.${format}`;
       link.click();
       toast.success(`Выгружено за период ${dateFrom} — ${dateTo}`);
     } catch (err) {
@@ -113,7 +135,7 @@ export function AdminReports() {
       );
     } finally {
       if (objectUrl) URL.revokeObjectURL(objectUrl);
-      setExporting(false);
+      setExporting(null);
     }
   };
   // The preview pane shows the user-selected report, falling back to the first
@@ -212,7 +234,7 @@ export function AdminReports() {
     window.addEventListener('mouseup', onUp);
   };
 
-  const formatDate = (d: string) => new Date(d).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' });
+  const formatDate = (d: string) => formatRuDate(d);
 
   const formatLastEditor = (report: ReportDTO) => {
     if (!report.lastEditedByName) return report.user?.name ? `Автор: ${report.user.name}` : 'Нет данных';
@@ -446,7 +468,6 @@ export function AdminReports() {
             <ReportEvidencePreview
               report={effectivePreview}
               history={reportHistory}
-              formatDate={formatDate}
               onClose={() => setPreviewReport(null)}
               onEdit={mayManage ? (r) => { setEditReport(r); setShowCreateDialog(true); } : undefined}
               onPreviewPdf={handlePreviewPdf}

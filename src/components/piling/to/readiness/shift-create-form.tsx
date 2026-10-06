@@ -31,6 +31,7 @@ import {
 } from '@/components/piling/forms/creation-form';
 import { getTodayInTimezone } from '@/lib/timezone';
 import { isShiftTypeSelectable } from '@/modules/reports/domain/shift-types';
+import { loadFailureMessage } from './screens/shared';
 
 type ShiftType = 'DAY' | 'NIGHT';
 
@@ -179,7 +180,8 @@ export function ShiftCreateForm({ timezone, backHref }: Props) {
       toast.success('Смена создана');
       router.push(backHref);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Не удалось создать смену');
+      // Обрыв сети fetch бросает TypeError с английским «Failed to fetch» (F-R112-2).
+      toast.error(await loadFailureMessage(error, 'Не удалось создать смену'));
     } finally {
       setBusy(false);
     }

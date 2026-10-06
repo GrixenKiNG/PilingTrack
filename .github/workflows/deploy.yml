@@ -5,17 +5,20 @@ name: Deploy to prod
 on:
   workflow_dispatch:
     inputs:
+      external_workers_stopped:
+        description: 'External standalone/systemd/pm2/other-host workers and their auto-restart have been stopped and verified'
+        required: true
+        default: false
+        type: boolean
       services:
         description: 'Services to redeploy (space-separated)'
         required: false
-        default: 'app'
+        default: 'app workers'
         type: choice
         options:
           - app
           - app workers
-          - app workers ws
           - workers
-          - ws
 
 concurrency:
   group: deploy-prod
@@ -29,6 +32,14 @@ jobs:
     environment: production
 
     steps:
+      - name: Confirm external worker barrier
+        env:
+          CONFIRMED: ${{ inputs.external_workers_stopped }}
+          SERVICES: ${{ inputs.services }}
+        run: |
+          [ "$CONFIRMED" = true ] || { echo '::error::Stop and verify all external workers before deployment'; exit 1; }
+          case "$SERVICES" in app|workers|"app workers") ;; *) echo '::error::Unknown service'; exit 1 ;; esac
+
       - name: Install SSH key
         env:
           SSH_PRIVATE_KEY: ${{ secrets.PROD_SSH_KEY }}
@@ -47,9 +58,15 @@ jobs:
             set -e
             cd /opt/pilingtrack
             BEFORE=\$(git rev-parse HEAD)
+            # Preserve actual running image IDs before build changes :latest.
+            ROLLBACK=\"\$BEFORE-\$(date +%Y%m%d)\"
+            for s in app workers; do
+              old_image=\$(docker inspect --format '{{.Image}}' \"pilingtrack-\$s\")
+              docker tag \"\$old_image\" \"pilingtrack-\$s:\$ROLLBACK\"
+            done
             git pull origin main
             export APP_VERSION=\$(git rev-parse --short HEAD)
-            SVCS=\"$SERVICES\"
+            SVCS=\"app workers\"
             # A new Prisma migration means the 'migrate' image must be rebuilt
             # too — it bakes prisma/migrations at build time, so building only
             # app/workers would run 'migrate deploy' on a stale image and
@@ -81,7 +98,7 @@ jobs:
                 bash scripts/smoke-workers-image.sh \"\$WORKERS_IMAGE\"
                 ;;
             esac
-            docker compose up -d \$SVCS
+            WORKER_GENERATION_EXTERNAL_STOPPED=1 bash scripts/replace-worker-generation.sh app workers
           "
 
       - name: Verify health + deployed SHA
@@ -94,18 +111,11 @@ jobs:
               BODY=$(curl -s https://orionpiling.ru/api/health)
               echo "$BODY"
               ACTUAL=$(echo "$BODY" | grep -o '"version":"[^"]*"' | cut -d'"' -f4)
-              # The gate used to accept any 200 — a stale container (old image
-              # still running) passed "verification" (audit H3/M2). The app
-              # only serves the wrong version when 'app' wasn't in the deploy
-              # set, so only enforce the match when it was rebuilt.
-              case " ${{ inputs.services }} " in
-                *" app "*)
-                  if [ "$ACTUAL" != "$EXPECTED" ]; then
-                    echo "::error::Version mismatch: health reports '$ACTUAL', expected '$EXPECTED' — old container still serving?"
-                    exit 1
-                  fi
-                  ;;
-              esac
+              # All service choices replace app+workers, so always verify app SHA.
+              if [ "$ACTUAL" != "$EXPECTED" ]; then
+                echo "::error::Version mismatch: health reports '$ACTUAL', expected '$EXPECTED'"
+                exit 1
+              fi
               exit 0
             fi
             sleep 3

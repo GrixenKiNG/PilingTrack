@@ -39,6 +39,7 @@ describe('listAllEquipment — operator scope', () => {
     await listAllEquipment('orion');
     const args = findManyMock.mock.calls[0][0];
     expect(args.where).toEqual({ tenantId: 'orion' });
+    expect(args.select.updatedAt).toBe(true);
   });
 
   it('filters by active crew assignment when operatorUserId is provided', async () => {

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { OperationalUserDTO } from '@/lib/types';
 
@@ -148,5 +148,79 @@ describe('AdminUsers', () => {
       expect(await screen.findByRole('button', { name })).toHaveClass('h-11', 'text-2xs', 'sm:h-8');
     }
     expect(screen.getByLabelText('Удалить вид «Медосмотр»')).toHaveClass('h-11', 'w-11', 'sm:h-8', 'sm:w-8');
+  });
+
+  /**
+   * F-R114-4: список печатал год двузначным («21.06.26»), а карточка того же
+   * сотрудника — четыре цифры. На длинной истории «26» и «27» неразличимы.
+   */
+  it('год активности в списке — четыре цифры, как в карточке (F-R114-4)', () => {
+    render(<AdminUsers />);
+
+    expect(screen.queryAllByText(/21\.06\.26,/)).toHaveLength(0);
+    expect(screen.getAllByText(/21\.06\.2026,/).length).toBeGreaterThanOrEqual(1);
+  });
+
+  /**
+   * R113-5: «Заблокировать» отправляла PUT /api/users {isActive:false} одним
+   * кликом. Блокировка повышает sessionVersion и немедленно выкидывает человека
+   * из системы — рядом удаление подтверждение имело, блокировка нет.
+   */
+  it('блокировка спрашивает подтверждение и вызывает toggleActive только после согласия (R113-5)', async () => {
+    const toggleActive = vi.fn();
+    useUsersListMock.mockReturnValue({
+      users: [operationalUser()],
+      loading: false,
+      error: null,
+      retry: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+      remove: vi.fn(),
+      toggleActive,
+    });
+    render(<AdminUsers />);
+
+    // Radix Tabs переключает вкладку по mousedown, не по click.
+    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Доступ' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Заблокировать' }));
+
+    expect(await screen.findByRole('alertdialog')).toBeInTheDocument();
+    expect(toggleActive).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Заблокировать доступ' }));
+
+    expect(toggleActive).toHaveBeenCalledTimes(1);
+  });
+
+  /**
+   * R113-6: «Требовать для смены» и «Отключить» в справочнике видов документов
+   * меняли допуск операторов к смене одним кликом, без вопроса и пояснения.
+   */
+  it('«Требовать для смены» спрашивает подтверждение и шлёт PATCH только после согласия (R113-6)', async () => {
+    authFetchMock.mockImplementation(async (_url: string, init?: RequestInit) => init?.method === 'PATCH'
+      ? { ok: true, json: async () => ({}) }
+      : {
+          ok: true,
+          json: async () => ({
+            types: [{
+              id: 'type-1', name: 'Медосмотр', requiresExpiry: true, defaultValidMonths: 12,
+              leadTimeDays: 30, requiredForOperator: false, isActive: true, documentCount: 0,
+            }],
+          }),
+        });
+    render(<AdminUsers />);
+
+    fireEvent.click(screen.getByRole('button', { name: /Виды документов/ }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Требовать для смены' }));
+
+    const dialog = await screen.findByRole('alertdialog');
+    expect(within(dialog).getByText(/операторы без действующего документа не начнут смену/)).toBeInTheDocument();
+    expect(authFetchMock.mock.calls.some(([, init]) => (init as RequestInit | undefined)?.method === 'PATCH')).toBe(false);
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Требовать для смены' }));
+
+    await waitFor(() =>
+      expect(authFetchMock.mock.calls.some(([, init]) => (init as RequestInit | undefined)?.method === 'PATCH')).toBe(true),
+    );
   });
 });
