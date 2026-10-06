@@ -54,12 +54,23 @@ const GUIDANCE: Record<string, BlockerGuidance> = {
   },
 };
 
+/**
+ * Что нужно для выбора подсказки: ключ правила. У одних записей он в
+ * `condition`, у других — в `code`; остальные поля (`label`, `action`) для
+ * маршрутизации не читаются. Сужаем вход до минимума, чтобы подсказку мог
+ * спросить и `PresentationNotice` (у него `action` бывает null).
+ */
+export interface BlockerKeySource {
+  condition?: string;
+  code?: string;
+}
+
 /** Ключ правила: в части записей он называется `code`, а не `condition`. */
-export function blockerKey(blocker: ReadinessBlockerDto): string | null {
+export function blockerKey(blocker: BlockerKeySource): string | null {
   return blocker.condition ?? blocker.code ?? null;
 }
 
-export function blockerGuidance(blocker: ReadinessBlockerDto): BlockerGuidance | null {
+export function blockerGuidance(blocker: BlockerKeySource): BlockerGuidance | null {
   const key = blockerKey(blocker);
   return key ? GUIDANCE[key] ?? null : null;
 }

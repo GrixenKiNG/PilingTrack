@@ -15,7 +15,7 @@
  * сохраняется как рабочий канал.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act, within } from '@testing-library/react';
 import { toast } from 'sonner';
 
 const mocks = vi.hoisted(() => ({ authFetch: vi.fn() }));
@@ -214,5 +214,133 @@ describe('AdminTelegram: ID чата проверяется до сохране�
 
     await waitFor(() => expect(posts()).toHaveLength(1));
     expect(toast.error).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * F-R112-4: подписи значений канала были английскими — «Chat ID:» и «Token:»
+ * при уже русских подписях формы, и то же вкрапление стояло в предупреждении
+ * об удалении канала.
+ */
+describe('AdminTelegram: русские подписи значений канала (F-R112-4)', () => {
+  beforeEach(() => {
+    mocks.authFetch.mockReset();
+    vi.mocked(toast.error).mockClear();
+  });
+
+  it('в карточке «ID чата:» и «Токен:», а не «Chat ID:»/«Token:»', async () => {
+    mocks.authFetch.mockResolvedValue(json({ configs: [config()] }));
+    render(<AdminTelegram />);
+
+    expect(await screen.findByText('ID чата: -100123')).toBeInTheDocument();
+    expect(screen.getByText('Токен: ••••oken')).toBeInTheDocument();
+    expect(screen.queryByText(/Chat ID/)).toBeNull();
+    expect(screen.queryByText(/Token:/)).toBeNull();
+  });
+
+  it('предупреждение об удалении называет «ID чата», а не «Chat ID»', async () => {
+    mocks.authFetch.mockImplementation((_url: string, init?: RequestInit) =>
+      init?.method === 'DELETE'
+        ? Promise.resolve(json({ ok: true }))
+        : Promise.resolve(json({ configs: [config()] })),
+    );
+    render(<AdminTelegram />);
+    await screen.findAllByRole('button', { name: 'Тест' });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Удалить' }));
+
+    expect(await screen.findByText(/\(ID чата: -100123\)/)).toBeInTheDocument();
+    expect(screen.queryByText(/Chat ID/)).toBeNull();
+  });
+});
+
+/**
+ * F-R126-6: диалог создания/правки канала Telegram не ограничивал высоту — на
+ * коротком экране (открытая клавиатура) обрезался сверху и снизу, крестик
+ * уходил за кадр. Добавлены `max-h-[90vh]` и прокрутка.
+ */
+describe('AdminTelegram: диалог ограничен по высоте (F-R126-6)', () => {
+  beforeEach(() => {
+    mocks.authFetch.mockReset();
+  });
+
+  it('содержимое диалога ограничено 90vh и прокручивается', async () => {
+    mocks.authFetch.mockResolvedValue(json({ configs: [] }));
+    render(<AdminTelegram />);
+    await screen.findByText('Нет конфигураций Telegram');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Добавить' }));
+
+    const dialog = (await screen.findByText('Новая конфигурация Telegram')).closest('[data-slot="dialog-content"]');
+    expect(dialog).toHaveClass('max-h-[90vh]', 'overflow-y-auto');
+  });
+});
+
+/**
+ * F-R128-4: подтверждение удаления канала Telegram не блокировало кнопку —
+ * двойной клик отправлял два DELETE, второй получал 404 и ложный тост об
+ * ошибке. Теперь на время запроса кнопка недоступна, а диалог остаётся открыт
+ * с подписью «Удаление…».
+ */
+describe('AdminTelegram: удаление канала блокирует подтверждение (F-R128-4)', () => {
+  beforeEach(() => {
+    mocks.authFetch.mockReset();
+    vi.mocked(toast.error).mockClear();
+    vi.mocked(toast.success).mockClear();
+  });
+
+  it('кнопка «Удалить» недоступна, пока DELETE не ответил', async () => {
+    let resolveDelete: (r: Response) => void = () => {};
+    mocks.authFetch.mockImplementation((_url: string, init?: RequestInit) =>
+      init?.method === 'DELETE'
+        ? new Promise<Response>((resolve) => { resolveDelete = resolve; })
+        : Promise.resolve(json({ configs: [config()] })),
+    );
+    render(<AdminTelegram />);
+    await screen.findAllByRole('button', { name: 'Тест' });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Удалить' }));
+    const dialog = await screen.findByRole('alertdialog');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Удалить' }));
+
+    expect(await screen.findByRole('button', { name: 'Удаление…' })).toBeDisabled();
+
+    await act(async () => { resolveDelete(json({ ok: true })); });
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Конфигурация удалена'));
+  });
+});
+
+/**
+ * F-R133 №12: истёкшая сессия на экране Telegram выдавалась за сбой чтения, а
+ * при сохранении/удалении — за серверное «Unauthorized». Теперь 401 назван
+ * прямо и одинаково в обоих путях.
+ */
+describe('AdminTelegram: истёкшая сессия (F-R133 №12)', () => {
+  beforeEach(() => {
+    mocks.authFetch.mockReset();
+    vi.mocked(toast.error).mockClear();
+  });
+
+  it('401 при чтении списка → «Сессия истекла — войдите снова.»', async () => {
+    mocks.authFetch.mockResolvedValue(json({ error: 'Unauthorized' }, 401));
+    render(<AdminTelegram />);
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Сессия истекла — войдите снова.');
+    expect(screen.queryByText('Не удалось загрузить конфигурации Telegram')).toBeNull();
+  });
+
+  it('401 при сохранении → русский текст, а не серверное «Unauthorized»', async () => {
+    mocks.authFetch.mockImplementation((_url: string, init?: RequestInit) =>
+      init?.method === 'POST'
+        ? Promise.resolve(json({ error: 'Unauthorized' }, 401))
+        : Promise.resolve(json({ configs: [] })),
+    );
+    render(<AdminTelegram />);
+    await screen.findByText('Нет конфигураций Telegram');
+
+    fillCreateDialog({ label: 'Ночной чат', token: '123:ABC', chatId: '-100123' });
+    submitCreateDialog();
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Сессия истекла — войдите снова.'));
   });
 });

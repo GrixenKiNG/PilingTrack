@@ -346,6 +346,39 @@ describe('pdf-generator', () => {
     expect(period).toContain('ООО «Орион»');
   }, 30_000);
 
+  it('не печатает пустую ячейку, когда имя в шапке — строка из пробелов (F-N1005-PDF-INFO-EMPTY)', async () => {
+    const { generateSinglePdf } = await import('@/lib/pdf-generator');
+
+    const rendered = await capturePdfText(async () => {
+      await generateSinglePdf({
+        ...singleReportWithPiles([{ pileGrade: { name: 'Свая 300', lengthMm: 12000 }, count: 3 }]),
+        site: { name: '   ' },
+        assistantName: '  \n\t ',
+        equipmentName: '\t ',
+      });
+    });
+
+    // Пробельные значения сетки доводятся до «—», а не печатаются пустой ячейкой.
+    // Три пробельных значения шапки (Объект/Помощник/Оборудование) дают ровно три «—»;
+    // других «—» в документе с этими данными нет.
+    expect(rendered.filter((line) => line === '—')).toHaveLength(3);
+    expect(rendered.some((line) => line === '   ' || line === '  \n\t ' || line === '\t ')).toBe(false);
+  }, 30_000);
+
+  it('сохраняет длинное имя в шапке без обрезки (F-N1005-PDF-INFO-EMPTY)', async () => {
+    const { generateSinglePdf } = await import('@/lib/pdf-generator');
+    const siteName = 'ЖК «Северная долина», корпус 7, очередь 3, участок свайных работ у северного фасада';
+
+    const rendered = await capturePdfText(async () => {
+      await generateSinglePdf({
+        ...singleReportWithPiles([{ pileGrade: { name: 'Свая 300', lengthMm: 12000 }, count: 3 }]),
+        site: { name: siteName },
+      });
+    });
+
+    expect(rendered).toContain(siteName);
+  }, 30_000);
+
   it('печатает установку в шапке сводного отчёта только при отборе по установке (F-R44-5)', async () => {
     const { generatePeriodPdf } = await import('@/lib/pdf-generator');
 
@@ -405,4 +438,113 @@ it('I05: period PDF excludes drafts from headline totals and labels their separa
   expect(sent).not.toContain('Черновики — не входят в итоги');
   expect(sent).toContain('Отправленные отчёты');
   expect(sent).toContain('2 шт. / 12 м.п.');
+});
+
+/**
+ * Строки PDF собираются из format.ts и period-row.ts (T-PDF-FORMAT). Здесь
+ * закреплены правила продукта: десятичная запятая и разрядный пробел в числах,
+ * дата в виде ДД.ММ.ГГГГ, «—» вместо пустого значения — и проверено, что в
+ * подшитый документ не попадают «NaN» и машинные даты.
+ */
+describe('pdf-generator — формат строк и итогов периода (T-PDF-FORMAT)', () => {
+  it('числа и метры печатаются по-русски: запятая, разряды пробелом', async () => {
+    const { formatMeters, formatNumber } = await import('@/lib/pdf-generator/format');
+
+    expect(formatNumber(2832)).toBe('2\u00A0832');
+    expect(formatNumber(2.5)).toBe('2,5');
+    expect(formatNumber(0)).toBe('0');
+    expect(formatNumber(null)).toBe('0');
+    expect(formatNumber(undefined)).toBe('0');
+    expect(formatMeters(12)).toBe('12,0');
+    expect(formatMeters(12.5)).toBe('12,5');
+    expect(formatMeters(0.25)).toBe('0,3');
+  });
+
+  it('safeText подставляет «—» вместо пустого значения и сжимает пробелы', async () => {
+    const { safeText } = await import('@/lib/pdf-generator/format');
+
+    expect(safeText(null)).toBe('—');
+    expect(safeText(undefined)).toBe('—');
+    expect(safeText('')).toBe('—');
+    expect(safeText(0)).toBe('0');
+    expect(safeText('  Иван\n\nИванов  ')).toBe('Иван Иванов');
+  });
+
+  it('safeText сохраняет длинное название целиком, не обрезая его', async () => {
+    const { safeText } = await import('@/lib/pdf-generator/format');
+    const name = 'ЖК «Северная долина», корпус 7, очередь 3, участок свайных работ у северного фасада';
+
+    expect(safeText(name)).toBe(name);
+    expect(safeText(`  ${name}\n\n  `)).toBe(name);
+  });
+
+  it('дата отчёта печатается как ДД.ММ.ГГГГ, пустая — как «—»', async () => {
+    const { formatRuDate } = await import('@/lib/pdf-generator/format');
+
+    expect(formatRuDate('2026-04-24')).toBe('24.04.2026');
+    expect(formatRuDate('')).toBe('—');
+  });
+
+  it('служебные подписи: номер, статус, смена, автор правки', async () => {
+    const { editorLabel, shiftLabel, shortId, statusLabel } = await import('@/lib/pdf-generator/format');
+
+    expect(shortId('report-123456')).toBe('REPORT-1');
+    expect(shortId('')).toBe('—');
+    expect(statusLabel('submitted')).toBe('Отправлен');
+    expect(statusLabel('')).toBe('—');
+    expect(shiftLabel('NIGHT')).toBe('Ночная');
+    expect(shiftLabel('')).toBe('—');
+    expect(editorLabel('OPERATOR', 'Иван Иванов')).toBe('Оператор: Иван Иванов');
+    expect(editorLabel('ADMIN', 'Пётр Петров')).toBe('Администратор: Пётр Петров');
+    expect(editorLabel(null, 'Иван Иванов')).toBe('Оператор: Иван Иванов');
+    expect(editorLabel('OPERATOR', null)).toBe('—');
+  });
+
+  it('итоги периода считаются из строк, пустые списки дают 0, а не NaN', async () => {
+    const { sumDowntime, sumDrilling, sumPiles, toPeriodReportRow } = await import(
+      '@/lib/pdf-generator/period-row'
+    );
+
+    expect(sumPiles({ piles: [{ count: 3 }, { count: 2 }] })).toBe(5);
+    expect(sumPiles({})).toBe(0);
+    expect(sumPiles({ piles: null })).toBe(0);
+    expect(sumPiles({ piles: [{ count: null }, { count: undefined }] })).toBe(0);
+    expect(sumDrilling({ drillings: [{ meters: 12 }, { meters: 0.5 }] })).toBe(12.5);
+    expect(sumDrilling({})).toBe(0);
+    expect(sumDowntime({ downtimes: [{ duration: 1.25 }, { duration: 3 }] })).toBe(4.25);
+    expect(sumDowntime({})).toBe(0);
+    expect(toPeriodReportRow(null)).toEqual({});
+    expect(toPeriodReportRow('строка')).toEqual({});
+    expect(sumPiles(toPeriodReportRow(undefined))).toBe(0);
+  });
+
+  it('safeText печатает «—» вместо «NaN»/«Infinity», сохраняя конечные числа (T-PDF-FORMAT)', async () => {
+    const { safeText } = await import('@/lib/pdf-generator/format');
+
+    expect(safeText(NaN)).toBe('—');
+    expect(safeText(Infinity)).toBe('—');
+    expect(safeText(-Infinity)).toBe('—');
+    // Конечный 0 — не пустота: печатается как «0», а не «—».
+    expect(safeText(0)).toBe('0');
+    expect(safeText(12.5)).toBe('12.5');
+  });
+
+  it('safeText оставляет «—» вместо строки из одних пробелов (T-PDF-FORMAT)', async () => {
+    const { safeText } = await import('@/lib/pdf-generator/format');
+
+    expect(safeText('   ')).toBe('—');
+    expect(safeText('\n\t  ')).toBe('—');
+  });
+
+  it('formatRuDate печатает «—» вместо битой даты и не сдвигает валидную (T-PDF-FORMAT)', async () => {
+    const { formatRuDate } = await import('@/lib/pdf-generator/format');
+
+    expect(formatRuDate('abc')).toBe('—');
+    expect(formatRuDate('2026-04')).toBe('—');
+    // Невозможная календарная дата не нормализуется молча в другой месяц.
+    expect(formatRuDate('2026-02-30')).toBe('—');
+    expect(formatRuDate('2026-13-01')).toBe('—');
+    // Валидная дата — в правильном дне независимо от системного пояса.
+    expect(formatRuDate('2026-04-24')).toBe('24.04.2026');
+  });
 });

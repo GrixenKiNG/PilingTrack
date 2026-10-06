@@ -6,6 +6,7 @@ import {
   FileText,
   HardHat,
   Link2Off,
+  Loader2,
   Plus,
   RefreshCw,
   Search,
@@ -29,6 +30,7 @@ import {
   OpsDetailEmpty,
   OpsRiskBadge,
   resolveRisk,
+  useDocumentTitle,
   type OpsColumn,
   type OpsQuickFilter,
 } from '@/components/piling/ops-shell';
@@ -120,6 +122,7 @@ function writeUrlState(state: { quick: UserQuickFilter; search: string; userId: 
 }
 
 export function AdminUsers() {
+  useDocumentTitle('Пользователи');
   const currentUser = usePilingStore((state) => state.currentUser);
   const { users, loading, error, retry, create, update, remove, toggleActive } = useUsersList();
   const initial = useMemo(
@@ -140,8 +143,12 @@ export function AdminUsers() {
     now: new Date(),
   }), [users, quick, search]);
 
+  // Сотрудник показывается в карточке справа только когда выбран явно — кликом
+  // или ссылкой (`?userId=`). Раньше сюда молча подставлялся первый из списка,
+  // и панель выглядела как «выбранный человек», хотя человек его не выбирал;
+  // после удаления активного так же молча подставлялся следующий.
   const active = useMemo(
-    () => filtered.find((user) => user.id === activeId) ?? filtered[0] ?? null,
+    () => (activeId ? filtered.find((user) => user.id === activeId) ?? null : null),
     [filtered, activeId]
   );
 
@@ -240,7 +247,10 @@ export function AdminUsers() {
     },
   ], []);
 
-  if (loading) {
+  // F-R128-2: полноэкранный скелетон только при первой загрузке. Создание,
+  // правка и блокировка пользователя перечитывают список — гасить весь экран
+  // нельзя, иначе список «Пользователи» мигает и выглядит пустым.
+  if (loading && users.length === 0) {
     return (
       <div className="space-y-4 p-4 lg:p-6">
         <Skeleton className="h-8 w-48" />
@@ -322,14 +332,21 @@ export function AdminUsers() {
           )}
           footer={`Показано ${filtered.length} из ${users.length}`}
         />
-        <OpsTable
-          columns={columns}
-          rows={filtered}
-          getRowId={(user) => user.id}
-          activeId={active?.id ?? null}
-          onRowSelect={(user) => selectUser(user.id)}
-          empty={<OpsTableEmpty icon={Users} title="Пользователи не найдены" hint="Измените фильтр или строку поиска." />}
-        />
+        <div className="relative min-w-0">
+          {loading ? (
+            <div className="absolute inset-0 z-10 grid place-items-center bg-card/70">
+              <Loader2 aria-label="Обновление списка пользователей" className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : null}
+          <OpsTable
+            columns={columns}
+            rows={filtered}
+            getRowId={(user) => user.id}
+            activeId={active?.id ?? null}
+            onRowSelect={(user) => selectUser(user.id)}
+            empty={<OpsTableEmpty icon={Users} title="Пользователи не найдены" hint="Измените фильтр или строку поиска." />}
+          />
+        </div>
       </OpsPage>
 
       <UserDocumentTypesDialog open={showTypes} onOpenChange={setShowTypes} />

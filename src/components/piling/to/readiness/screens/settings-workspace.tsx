@@ -18,6 +18,7 @@ import { cn } from '@/lib/utils';
 import { BLOCKER_ACTIONS, BLOCKER_ACTION_LABELS, BLOCKER_LABELS, CRITERION_LABELS, SYSTEM_SAFETY_BLOCKERS, computeReadinessScore, describeRuleSetChanges, normalizeWeights, type BlockerAction, type ReadinessCriterionKey, type ReadinessRuleSet, type ReadinessRulesState } from '@/modules/readiness';
 import { resolveReadinessCapabilities, type ReadinessAbility, type ReadinessRole } from '@/modules/readiness/application/capabilities';
 import { type ReadinessUrlFilters } from '../api/client';
+import { authoritativeFactsForEquipment, buildAuthoritativeReadinessPresentation } from '../authoritative-presentation';
 import { EquipmentPhoto, ReadinessFiltersBar, ReadinessRing, downloadReadinessExport } from './shared';
 import type { ReferenceUiProps, SettingsSection } from './types';
 
@@ -34,6 +35,9 @@ const SETTINGS_ITEMS: Array<{
   { id: 'integrations', label: 'Интеграции', icon: Link2 },
   { id: 'audit', label: 'Аудит', icon: FileBarChart },
 ];
+
+/** Ключи фильтров ленты аудита — те же, что активны в режиме 'audit' панели фильтров. */
+const AUDIT_FILTER_KEYS = ['from', 'to', 'eventType', 'actor'] as const;
 
 async function downloadCsv(filename: string, _rows: Array<Array<string | number | null | undefined>>) {
   const dataset = filename.includes('audit') ? 'audit'
@@ -116,6 +120,7 @@ export function SettingsWorkspace(props: ReferenceUiProps) {
             audit={props.audit}
             bootstrap={props.bootstrap}
             canExport={Boolean(props.bootstrap?.capabilities.entities.audit.export)}
+            activeFilterCount={AUDIT_FILTER_KEYS.filter((key) => Boolean(props.filters[key])).length}
             filtersBar={<ReadinessFiltersBar filters={props.filters} onChange={props.onFiltersChange} mode="audit" />}
             onExport={(events) => downloadCsv('readiness-audit.csv', [['Последовательность', 'Дата', 'Автор', 'Действие', 'Объект', 'Hash'], ...events.map((event) => [event.sequence, event.occurredAt, event.actor.name, auditActionLabel(event.action), `${auditEntityLabel(event.entity.type)}:${event.entity.id}`, event.hash])])}
           />
@@ -185,8 +190,28 @@ function RulesSettings(props: ReferenceUiProps) {
 
   const total = draft.criteria.reduce((sum, criterion) => sum + criterion.weight, 0);
   const rulesUnavailable = !props.rulesAvailable || !props.bootstrap?.capabilities.entities.rules.manage;
-  const previewFacts = props.factsByEquipment[props.selectedId];
+  // Предпросмотр считается по фактам авторитетного снимка выбранной установки:
+  // производные факты строятся без наряда, приёмки и дефектов, и шаг «Приёмка»
+  // в них всегда «ожидает приёмки» — админ подбирал бы веса по заниженному баллу.
+  // Нет пригодного снимка или фактов в нём — балл не выдумываем, показываем
+  // недостаточность. Сбой загрузки — отдельный случай: это отказ чтения, а не
+  // утверждение, что фактов нет, и сообщать о нём надо словами ошибки.
+  const previewFacts = authoritativeFactsForEquipment(props.currentReadiness, props.selectedId);
   const preview = previewFacts ? computeReadinessScore(previewFacts, draft) : null;
+  // База сравнения — авторитетный снимок выбранной установки: его собственный
+  // балл, версия правил и время оценки. Это отдельная, уже принятая система
+  // координат, и балл чернового предпросмотра с ней не отождествляем. Нет
+  // пригодного снимка — сравнивать не с чем, поэтому базу не показываем.
+  const previewSnapshot = props.currentReadiness.find((item) => item.equipmentId === props.selectedId) ?? null;
+  // Причина недоступности предпросмотра — по режиму авторитетного представления
+  // снимка, тем же, что называет «Центр готовности». Отсутствие снимка, снимок
+  // старого формата и снимок с испорченным доказательством (при годных фактах) —
+  // разные причины, и общее «нет авторитетных фактов» называло их неверно.
+  // Сбой чтения остаётся приоритетным отказом, отсутствие установки — приглашение
+  // выбрать.
+  const previewPresentation = buildAuthoritativeReadinessPresentation(previewSnapshot);
+  const previewEmptyLabel = props.authoritativeReadinessError
+    ?? (props.selectedId ? previewPresentation.description : 'Выберите тестовую установку.');
   const previewEquipment = props.equipment.find((item) => item.id === props.selectedId);
   const previewFleet = props.fleetCards.find((item) => item.id === props.selectedId);
   // Список правок показываем от действующей версии к тому, что сейчас в форме,
@@ -528,7 +553,21 @@ function RulesSettings(props: ReferenceUiProps) {
         </aside>
       </div>
       <section className={cn(card, 'mt-2 p-3')}>
-        <h2 className="flex items-center gap-2 font-bold"><ShieldCheck className="h-4 w-4 text-muted-foreground" />Предпросмотр расчёта готовности</h2>
+        <h2 className="flex flex-wrap items-center gap-2 font-bold"><ShieldCheck className="h-4 w-4 text-muted-foreground" />Предпросмотр расчёта готовности <span className="rounded bg-signal/15 px-2 py-0.5 text-3xs font-semibold text-signal-strong">по черновым весам</span></h2>
+        <p className="mt-1 text-2xs leading-relaxed text-muted-foreground">
+          Пересчёт фактов авторитетного снимка по несохранённым весам формы — это предпросмотр, а не авторитетная оценка.
+          {preview && previewSnapshot ? (
+            <> База сравнения — авторитетный снимок этой установки: балл <b className="font-semibold text-foreground">{previewSnapshot.score} из 100</b>
+              {previewSnapshot.ruleSetVersion === 'unpublished'
+                ? <>, правила не опубликованы</>
+                : previewSnapshot.ruleSetVersion
+                  ? <>, правила <b className="font-semibold text-foreground">{previewSnapshot.ruleSetVersion}</b></>
+                  : null}
+              {previewSnapshot.calculatedAt
+                ? <>, оценка от {formatDateTimeInTimezone(previewSnapshot.calculatedAt, props.bootstrap?.tenant.timezone)}</>
+                : null}.</>
+          ) : null}
+        </p>
         <div className="mt-3 grid grid-cols-1 items-start gap-4 xl:grid-cols-[270px_minmax(0,1.5fr)_minmax(0,1fr)_200px]">
           <div className="flex items-center gap-3">
             <EquipmentPhoto cardData={previewFleet} name={previewEquipment?.name ?? ''} className="h-[74px] w-[68px] shrink-0" />
@@ -540,21 +579,25 @@ function RulesSettings(props: ReferenceUiProps) {
           </div>
           <div>
             <div className="mb-2 text-xs font-semibold text-muted-foreground">Расчёт по критериям</div>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-              {draft.criteria.map((criterion) => {
-                const result = preview?.criteria.find((item) => item.key === criterion.key);
-                const ratio = result?.ratio ?? 0;
-                return (
-                  <div key={criterion.key}>
-                    <div title={CRITERION_LABELS[criterion.key].title} className="flex min-h-8 min-w-0 items-end break-words text-3xs font-semibold leading-tight text-muted-foreground">{CRITERION_LABELS[criterion.key].short}</div>
-                    <div className="mt-1 font-mono text-sm font-bold">{result?.earned ?? 0} <span className="text-2xs font-semibold text-muted-foreground">/ {criterion.weight}</span></div>
-                    <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-muted">
-                      <span className={cn('block h-full rounded-full', ratio >= 0.999 ? 'bg-success-strong' : ratio > 0 ? 'bg-signal-strong' : 'bg-destructive-strong')} style={{ width: `${Math.max(ratio * 100, ratio > 0 ? 6 : 3)}%` }} />
+            {preview ? (
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+                {draft.criteria.map((criterion) => {
+                  const result = preview.criteria.find((item) => item.key === criterion.key);
+                  const ratio = result?.ratio ?? 0;
+                  return (
+                    <div key={criterion.key}>
+                      <div title={CRITERION_LABELS[criterion.key].title} className="flex min-h-8 min-w-0 items-end break-words text-3xs font-semibold leading-tight text-muted-foreground">{CRITERION_LABELS[criterion.key].short}</div>
+                      <div className="mt-1 font-mono text-sm font-bold">{result?.earned ?? 0} <span className="text-2xs font-semibold text-muted-foreground">/ {criterion.weight}</span></div>
+                      <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-muted">
+                        <span className={cn('block h-full rounded-full', ratio >= 0.999 ? 'bg-success-strong' : ratio > 0 ? 'bg-signal-strong' : 'bg-destructive-strong')} style={{ width: `${Math.max(ratio * 100, ratio > 0 ? 6 : 3)}%` }} />
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="rounded-lg border border-border p-2.5 text-2xs text-muted-foreground">{previewEmptyLabel}</p>
+            )}
           </div>
           <div>
             <div className="mb-2 text-xs font-semibold text-muted-foreground">Блокеры</div>
@@ -574,7 +617,7 @@ function RulesSettings(props: ReferenceUiProps) {
                 })}
               </ul>
             ) : (
-              <p className="rounded-lg border border-border p-2.5 text-2xs text-muted-foreground">{preview ? 'Ни одно правило не сработало.' : 'Выберите тестовую установку.'}</p>
+              <p className="rounded-lg border border-border p-2.5 text-2xs text-muted-foreground">{preview ? 'Ни одно правило не сработало.' : previewEmptyLabel}</p>
             )}
           </div>
           <div>
@@ -597,7 +640,7 @@ function RulesSettings(props: ReferenceUiProps) {
           <span className={cn('rounded-md px-2.5 py-1 text-xs font-bold', preview?.canStart
             ? 'bg-success/10 text-success-strong'
             : preview ? 'bg-destructive/10 text-destructive-strong' : 'bg-muted text-muted-foreground')}>
-            {preview?.verdictLabel ?? 'выберите установку'}
+            {preview?.verdictLabel ?? (props.selectedId ? 'недостаточно данных' : 'выберите установку')}
           </span>
         </div>
       </section>

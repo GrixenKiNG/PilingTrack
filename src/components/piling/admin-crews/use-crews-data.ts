@@ -55,14 +55,15 @@ export function useCrewsData(): UseCrewsDataReturn {
   const [crewsAttempt, setCrewsAttempt] = useState(0);
   const [referenceError, setReferenceError] = useState<string | null>(null);
   const [loadingReferenceData, setLoadingReferenceData] = useState(false);
-  const referenceDataLoadedRef = useRef(false);
   const referenceDataPromiseRef = useRef<Promise<void> | null>(null);
 
+  /*
+    Справочники перечитываются при каждом открытии формы, а не кэшируются на
+    сеанс страницы: иначе новый машинист или техника не появятся в форме до
+    перезагрузки (R124 №16). Повторные параллельные вызовы схлопывает
+    `referenceDataPromiseRef`.
+  */
   const loadReferenceData = useCallback(async () => {
-    if (referenceDataLoadedRef.current) {
-      return;
-    }
-
     if (referenceDataPromiseRef.current) {
       return referenceDataPromiseRef.current;
     }
@@ -94,10 +95,8 @@ export function useCrewsData(): UseCrewsDataReturn {
       else missing.push('объекты');
 
       if (missing.length === 0) {
-        referenceDataLoadedRef.current = true;
         setReferenceError(null);
       } else {
-        // Не помечаем загруженным: при следующем открытии формы будет новая попытка.
         setReferenceError(`Не загружено: ${missing.join(', ')}. Выбор в форме неполный.`);
       }
 
@@ -188,6 +187,9 @@ export function useCrewsData(): UseCrewsDataReturn {
 
       const data = await res.json();
       setCrews(prev => prev.map(item => item.id === crew.id ? data.crew : item));
+      // Успешное переключение статуса раньше ничем не подтверждалось: непонятно,
+      // прошло оно или нет (R124 №13).
+      toast.success(crew.isActive ? 'Бригада деактивирована' : 'Бригада активирована');
     } catch (err) {
       toast.error(catchText(err, 'Ошибка изменения статуса'));
     }

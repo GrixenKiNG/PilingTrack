@@ -23,11 +23,15 @@ import type {
   SiteDrillingPlanDTO,
 } from '@/lib/types';
 import { cn } from '@/lib/utils';
+import { ConfirmActionDialog } from '@/components/piling/confirm-action-dialog';
 import type { DrillingPlanRow, PilePlanRow, SiteListItem } from '../types';
 import { PilePlanSection } from './pile-plan-section';
 import { DrillingPlanSection } from './drilling-plan-section';
 import { PlanSummary } from './plan-summary';
 import { planWipeRequiresConfirm } from './plan-helpers';
+
+/** Предупреждение о закрытии окна с несохранёнными правками (R132 №3). */
+const CONFIRM_LEAVE = 'Закрыть без сохранения? Введённые данные будут потеряны.';
 
 interface EditSiteDialogProps {
   site: SiteListItem | null;
@@ -63,12 +67,16 @@ export function EditSiteDialog({
   const [pilePlans, setPilePlans] = useState<PilePlanRow[]>([]);
   const [drillingPlans, setDrillingPlans] = useState<DrillingPlanRow[]>([]);
   const [saving, setSaving] = useState(false);
+  const [planWipeConfirmOpen, setPlanWipeConfirmOpen] = useState(false);
   const [detailState, setDetailState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
   const [retryKey, setRetryKey] = useState(0);
   // Сколько строк плана реально лежало в БД на момент открытия — чтобы поймать
   // сохранение, которое молча стёрло бы существующий план (инцидент 2026-07-17).
   const [initialPileRows, setInitialPileRows] = useState(0);
   const [initialDrillingRows, setInitialDrillingRows] = useState(0);
+  // Снимок состояния на момент загрузки планов: по нему видно, есть ли
+  // несохранённые правки, когда окно закрывают (R132 №3).
+  const [baseline, setBaseline] = useState<string | null>(null);
 
   // Hydrate plans from API when dialog opens — they are not part of the
   // SiteListItem and need a separate fetch keyed off the site id.
@@ -80,6 +88,7 @@ export function EditSiteDialog({
     setActive(site.isActive);
     setPilePlans([]);
     setDrillingPlans([]);
+    setBaseline(null);
     setDetailState('loading');
 
     authFetch(`/api/sites/${site.id}`)
@@ -92,26 +101,36 @@ export function EditSiteDialog({
           latitude?: number | null;
           longitude?: number | null;
         };
-        setLatitude(fullSite.latitude == null ? '' : String(fullSite.latitude));
-        setLongitude(fullSite.longitude == null ? '' : String(fullSite.longitude));
-        setPilePlans(
-          (fullSite.pilePlans ?? []).map((p) => ({
-              tempId: p.id,
-              pileGradeId: p.pileGradeId,
-              count: p.count,
-              metersPerUnit: p.metersPerUnit,
-            }))
-        );
-        setDrillingPlans(
-          (fullSite.drillingPlans ?? []).map((p) => ({
-              tempId: p.id,
-              diameter: p.diameter,
-              count: p.count,
-              metersPerUnit: p.metersPerUnit,
-            }))
-        );
-        setInitialPileRows((fullSite.pilePlans ?? []).length);
-        setInitialDrillingRows((fullSite.drillingPlans ?? []).length);
+        const lat = fullSite.latitude == null ? '' : String(fullSite.latitude);
+        const lon = fullSite.longitude == null ? '' : String(fullSite.longitude);
+        const pileRows = (fullSite.pilePlans ?? []).map((p) => ({
+          tempId: p.id,
+          pileGradeId: p.pileGradeId,
+          count: p.count,
+          metersPerUnit: p.metersPerUnit,
+        }));
+        const drillRows = (fullSite.drillingPlans ?? []).map((p) => ({
+          tempId: p.id,
+          diameter: p.diameter,
+          count: p.count,
+          metersPerUnit: p.metersPerUnit,
+        }));
+        setLatitude(lat);
+        setLongitude(lon);
+        setPilePlans(pileRows);
+        setDrillingPlans(drillRows);
+        setInitialPileRows(pileRows.length);
+        setInitialDrillingRows(drillRows.length);
+        // Снимок берётся только после загрузки планов: пустые планы в момент
+        // открытия дали бы ложное «есть правки» (R132 №3).
+        setBaseline(JSON.stringify({
+          name: site.name,
+          active: site.isActive,
+          latitude: lat,
+          longitude: lon,
+          pilePlans: pileRows,
+          drillingPlans: drillRows,
+        }));
         setDetailState('ready');
       })
       .catch(() => setDetailState('error'));
@@ -144,21 +163,8 @@ export function EditSiteDialog({
         ? 'Укажите обе координаты или оставьте оба поля пустыми'
         : null;
 
-  const submit = async () => {
-    if (!site || !name.trim()) {
-      toast.error('Введите название');
-      return;
-    }
-    if (coordinatesError) {
-      toast.error(coordinatesError);
-      return;
-    }
-    if (planWipeRequiresConfirm(initialPileRows, initialDrillingRows, pilePlans, drillingPlans)) {
-      const ok = window.confirm(
-        `Вы сохраняете объект БЕЗ плана: все текущие строки плана (сваи: ${initialPileRows}, бурение: ${initialDrillingRows}) будут удалены, а плановые цифры обнулены.\n\nПродолжить?`,
-      );
-      if (!ok) return;
-    }
+  const save = async () => {
+    if (!site) return;
     setSaving(true);
     try {
       await onSave(site.id, name.trim(), active, pilePlans, drillingPlans, {
@@ -170,9 +176,36 @@ export function EditSiteDialog({
     }
   };
 
+  const submit = async () => {
+    if (!site || !name.trim()) {
+      toast.error('Введите название');
+      return;
+    }
+    if (coordinatesError) {
+      toast.error(coordinatesError);
+      return;
+    }
+    if (planWipeRequiresConfirm(initialPileRows, initialDrillingRows, pilePlans, drillingPlans)) {
+      setPlanWipeConfirmOpen(true);
+      return;
+    }
+    await save();
+  };
+
+  // Несохранённые правки: снимок загруженного состояния против текущего.
+  const dirty = baseline !== null && baseline !== JSON.stringify({
+    name, active, latitude, longitude, pilePlans, drillingPlans,
+  });
+
+  /** Закрытие по Esc/клику вне окна/«Отмена» — с вопросом, если есть правки. */
+  const handleOpenChange = (next: boolean) => {
+    if (!next && dirty && !window.confirm(CONFIRM_LEAVE)) return;
+    onOpenChange(next);
+  };
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent aria-describedby={undefined} className="max-w-lg">
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogContent aria-describedby={undefined} className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Редактировать объект</DialogTitle>
         </DialogHeader>
@@ -197,6 +230,7 @@ export function EditSiteDialog({
                   id={`${uid}-name`}
                   value={name}
                   onChange={(e) => setName(e.target.value)}
+                  maxLength={200}
                   className="h-11"
                   autoFocus
                 />
@@ -272,7 +306,7 @@ export function EditSiteDialog({
           )}
         </ScrollArea>
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+          <Button variant="outline" onClick={() => handleOpenChange(false)}>
             Отмена
           </Button>
           <Button
@@ -284,6 +318,15 @@ export function EditSiteDialog({
           </Button>
         </DialogFooter>
       </DialogContent>
+      <ConfirmActionDialog
+        open={planWipeConfirmOpen}
+        onOpenChange={setPlanWipeConfirmOpen}
+        title="Сохранить объект без плана?"
+        description={`Все текущие строки плана (сваи: ${initialPileRows}, бурение: ${initialDrillingRows}) будут удалены, а плановые цифры обнулены. Это действие нельзя отменить.`}
+        confirmLabel="Сохранить без плана"
+        busy={saving}
+        onConfirm={save}
+      />
     </Dialog>
   );
 }

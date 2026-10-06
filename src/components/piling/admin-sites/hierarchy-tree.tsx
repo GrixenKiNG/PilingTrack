@@ -8,7 +8,7 @@ import {
   FolderTree,
 } from '@/components/piling/icons/unified-icons';
 import { ConfirmActionDialog } from '@/components/piling/confirm-action-dialog';
-import { pluralizeRu } from '@/lib/format';
+import { formatFixed, pluralizeRu } from '@/lib/format';
 import type { SiteFullData } from './types';
 
 interface HierarchyTreeProps {
@@ -231,7 +231,7 @@ export function PlansSummary({ tree }: PlansSummaryProps) {
                     {plan.count} шт × {plan.metersPerUnit} м
                   </span>
                   <span className="font-mono font-semibold text-signal-strong">
-                    {(plan.count * plan.metersPerUnit).toFixed(1)} м
+                    {formatFixed(plan.count * plan.metersPerUnit, 1)} м
                   </span>
                 </div>
               </div>
@@ -243,7 +243,7 @@ export function PlansSummary({ tree }: PlansSummaryProps) {
                   {tree.pilePlans.reduce((s, p) => s + p.count, 0)} свай
                 </span>
                 <span className="font-mono">
-                  {tree.pilePlans.reduce((s, p) => s + p.count * p.metersPerUnit, 0).toFixed(1)} м
+                  {formatFixed(tree.pilePlans.reduce((s, p) => s + p.count * p.metersPerUnit, 0), 1)} м
                 </span>
               </div>
             </div>
@@ -266,7 +266,7 @@ export function PlansSummary({ tree }: PlansSummaryProps) {
                     {plan.count} шт × {plan.metersPerUnit} м
                   </span>
                   <span className="font-mono font-semibold text-info-strong">
-                    {(plan.count * plan.metersPerUnit).toFixed(1)} м
+                    {formatFixed(plan.count * plan.metersPerUnit, 1)} м
                   </span>
                 </div>
               </div>
@@ -274,7 +274,7 @@ export function PlansSummary({ tree }: PlansSummaryProps) {
             <div className="border-t border-info/30 pt-1 flex items-center justify-between text-xs font-semibold">
               <span className="text-info-strong">Итого бурение</span>
               <span className="font-mono text-info-strong">
-                {tree.drillingPlans.reduce((s, p) => s + p.count * p.metersPerUnit, 0).toFixed(1)} м
+                {formatFixed(tree.drillingPlans.reduce((s, p) => s + p.count * p.metersPerUnit, 0), 1)} м
               </span>
             </div>
           </div>

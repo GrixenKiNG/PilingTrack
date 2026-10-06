@@ -1,10 +1,12 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useDocumentTitle } from '@/components/piling/ops-shell';
 import { AlertCircle, AlertTriangle, Archive, Clock, Drill, Filter, HardHat, Plus, Ruler, Save, Search, X } from '@/components/piling/icons/unified-icons';
 import { toast } from 'sonner';
 import { authFetch } from '@/lib/api';
 import { catchText, extractApiError } from '@/components/piling/admin-crews/crew-messages';
+import { normalizeSearch } from '@/components/piling/to/readiness/shared/text-search';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -75,6 +77,7 @@ const KINDS: Array<{ kind: DictionaryKind; title: string; summaryTitle: string; 
 ];
 
 export function AdminDictionaries() {
+  useDocumentTitle('Справочники');
   const [data, setData] = useState<Record<DictionaryKind, RegistryItem[]>>({
     pileGrade: [], drillingType: [], downtimeReason: [],
   });
@@ -192,13 +195,13 @@ export function AdminDictionaries() {
   }, [inspectorTab, selectedId, historyAttempt]);
 
   const filtered = useMemo(() => {
-    const query = search.trim().toLocaleLowerCase('ru');
+    const query = normalizeSearch(search);
     return Object.fromEntries(KINDS.map(({ kind }) => [
       kind,
       data[kind]
         .filter((item) => filter === 'all' || (filter === 'active' ? item.isActive : !item.isActive))
         .filter((item) => !query || [item.name, item.code, item.sectionOrDiameter]
-          .some((value) => value?.toLocaleLowerCase('ru').includes(query))),
+          .some((value) => value ? normalizeSearch(value).includes(query) : false)),
     ])) as Record<DictionaryKind, RegistryItem[]>;
   }, [data, search, filter]);
 
@@ -618,7 +621,7 @@ export function AdminDictionaries() {
       )}
 
       <Dialog open={lengthState !== null} onOpenChange={(open) => !open && setLengthState(null)}>
-        <DialogContent aria-describedby={undefined}>
+        <DialogContent aria-describedby={undefined} className="max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>Длина сваи — {lengthState?.item.name}</DialogTitle></DialogHeader>
           <label className="grid gap-1.5 text-sm font-medium text-foreground">
             Длина, м
@@ -638,7 +641,7 @@ export function AdminDictionaries() {
       </Dialog>
 
       <Dialog open={lengthConfirm !== null} onOpenChange={(open) => !open && setLengthConfirm(null)}>
-        <DialogContent aria-describedby={undefined}>
+        <DialogContent aria-describedby={undefined} className="max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>Пересчитать прошлые отчёты?</DialogTitle></DialogHeader>
           <div className="space-y-3 text-sm text-muted-foreground">
             <p className="text-foreground">
@@ -669,7 +672,7 @@ export function AdminDictionaries() {
       </Dialog>
 
       <Dialog open={confirmDelete !== null} onOpenChange={(open) => !open && setConfirmDelete(null)}>
-        <DialogContent aria-describedby={undefined}>
+        <DialogContent aria-describedby={undefined} className="max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>Удалить навсегда?</DialogTitle></DialogHeader>
           <p className="text-sm text-muted-foreground">Элемент «{confirmDelete?.item.name}» будет удалён без возможности восстановления.</p>
           <DialogFooter>

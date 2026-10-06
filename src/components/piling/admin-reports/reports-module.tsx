@@ -2,6 +2,7 @@
 
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { cn } from '@/lib/utils';
+import { useDocumentTitle } from '@/components/piling/ops-shell';
 import { usePilingStore } from '@/lib/store';
 import { can } from '@/services/auth/authorization-service';
 import { PileJournal } from '@/components/piling/pile-journal';
@@ -26,6 +27,7 @@ import { AdminReports } from './admin-reports';
 type ReportsView = 'shifts' | 'piles';
 
 export function ReportsModule() {
+  useDocumentTitle('Отчёты');
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();

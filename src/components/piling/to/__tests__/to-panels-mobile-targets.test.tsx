@@ -142,3 +142,44 @@ describe('панели ТО: обрыв сети при сохранении —
     expect(toast.error).not.toHaveBeenCalledWith('Failed to fetch');
   });
 });
+
+/**
+ * R135 №9: каждая панель ТО при отказе загрузки показывала и тост, и красный
+ * блок `LoadFailure` с «Повторить» об одном и том же сбое. Тост убран —
+ * причина и повтор остаются в блоке.
+ */
+describe('панели ТО: отказ загрузки не дублируется тостом (R135 №9)', () => {
+  const failOnRead = () =>
+    mocks.authFetch.mockImplementation((_url: string, init?: RequestInit) =>
+      init?.method === 'POST'
+        ? Promise.resolve({ ok: true, status: 200, json: async () => ({}) })
+        : Promise.resolve({ ok: false, status: 500, json: async () => ({}) }));
+
+  beforeEach(() => {
+    vi.mocked(toast.error).mockClear();
+  });
+
+  it('журнал топлива: 500 → блок отказа без тоста', async () => {
+    failOnRead();
+    render(<FuelPanel equipmentId="eq-1" />);
+
+    expect(await screen.findByText('Не удалось загрузить: сервер вернул 500')).toBeInTheDocument();
+    expect(toast.error).not.toHaveBeenCalledWith('Не удалось загрузить журнал топлива');
+  });
+
+  it('журнал наработки: 500 → блок отказа без тоста', async () => {
+    failOnRead();
+    render(<MeterReadingsPanel equipmentId="eq-1" />);
+
+    expect(await screen.findByText('Не удалось загрузить: сервер вернул 500')).toBeInTheDocument();
+    expect(toast.error).not.toHaveBeenCalledWith('Не удалось загрузить показания');
+  });
+
+  it('регламенты ТО: 500 → блок отказа без тоста', async () => {
+    failOnRead();
+    render(<MaintenancePlansPanel equipmentId="eq-1" />);
+
+    expect(await screen.findByText('Не удалось загрузить: сервер вернул 500')).toBeInTheDocument();
+    expect(toast.error).not.toHaveBeenCalledWith('Не удалось загрузить регламенты');
+  });
+});

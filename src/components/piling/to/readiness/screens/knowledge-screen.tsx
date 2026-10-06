@@ -25,6 +25,7 @@ import { cn } from '@/lib/utils';
 import { COMPACT_KPI_GRID, ScreenTitle, card } from '../settings/shared-ui';
 import { kpiGridStyle } from '@/components/piling/kpi-tile';
 import { loadFailureMessage, RefKpi } from './shared';
+import { normalizeSearch } from '../shared/text-search';
 
 interface Attempt {
   entry: BriefingJournalEntry;
@@ -73,9 +74,9 @@ export function KnowledgeScreen() {
     return result;
   }, [rows]);
 
-  const needle = query.trim().toLocaleLowerCase('ru-RU');
+  const needle = normalizeSearch(query);
   const visible = latest.filter(({ entry }) => !needle
-    || entry.userName.toLocaleLowerCase('ru-RU').includes(needle));
+    || normalizeSearch(entry.userName).includes(needle));
   const expired = latest.filter((attempt) => attempt.expired).length;
 
   return (

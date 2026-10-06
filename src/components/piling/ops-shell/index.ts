@@ -14,6 +14,7 @@
  *   OpsRiskBadge / resolveRisk → risk statuses (not decorative)
  */
 export { OpsPage, OpsHeader } from './ops-page';
+export { OpsBreadcrumb, type OpsCrumb } from './breadcrumb';
 export { OpsKpiBar } from './ops-kpi-bar';
 export { OpsFilterBar } from './ops-filter-bar';
 export { OpsTable, OpsTableEmpty } from './ops-table';
@@ -26,4 +27,5 @@ export {
 } from './ops-detail-panel';
 export { OpsRiskBadge, resolveRisk } from './ops-risk-badge';
 export { useEntityHistory, type EntityHistoryState } from './use-entity-history';
+export { useDocumentTitle } from './use-document-title';
 export type { OpsTone, RiskLevel, OpsKpiItem, OpsQuickFilter, OpsColumn } from './types';

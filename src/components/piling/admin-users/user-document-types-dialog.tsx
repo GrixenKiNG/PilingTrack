@@ -36,9 +36,16 @@ const LEAD_DAYS_MIN = 0;
 const LEAD_DAYS_MAX = 365;
 const DEFAULT_LEAD_DAYS = 30;
 
-/** Поля формы → тело запроса: пустой срок — «не задан», пустое предупреждение — 30 дней. */
+/**
+ * Поля формы → тело запроса: пустой срок — «не задан», пустое предупреждение — 30 дней.
+ *
+ * Срок «0» (или отрицательное) тоже уходит как «не задан»: zod-схема маршрута
+ * (`app/api/user-document-types/schema.ts`) требует `int ≥ 1`, а HTML `min={1}`
+ * отправку не блокирует — прежде форма слала заведомо отклоняемый `0` и
+ * получала 400 без имени поля (R121 №9).
+ */
 const limitsBody = (months: string, leadDays: string) => ({
-  defaultValidMonths: months ? Number(months) : null,
+  defaultValidMonths: Number(months) > 0 ? Number(months) : null,
   leadTimeDays: leadDays ? Number(leadDays) : DEFAULT_LEAD_DAYS,
 });
 
@@ -164,7 +171,7 @@ export function UserDocumentTypesDialog({ open, onOpenChange }: {
             <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_110px_130px_auto] sm:items-end">
               <div>
                 <Label htmlFor="dt-name">Название</Label>
-                <Input id="dt-name" value={name} onChange={(event) => setName(event.target.value)}
+                <Input id="dt-name" value={name} maxLength={200} onChange={(event) => setName(event.target.value)}
                   placeholder="Напр. Удостоверение стропальщика" />
               </div>
               <div>
@@ -202,7 +209,7 @@ export function UserDocumentTypesDialog({ open, onOpenChange }: {
                       <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_110px_130px_auto] sm:items-end">
                         <div>
                           <Label htmlFor={`dt-edit-name-${row.id}`}>Название</Label>
-                          <Input id={`dt-edit-name-${row.id}`} value={draft.name}
+                          <Input id={`dt-edit-name-${row.id}`} value={draft.name} maxLength={200}
                             onChange={(event) => setDraft({ ...draft, name: event.target.value })} />
                         </div>
                         <div>

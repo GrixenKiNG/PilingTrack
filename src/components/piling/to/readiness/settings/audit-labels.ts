@@ -15,6 +15,7 @@ import {
   AlertTriangle, Ban, CalendarPlus, CheckCircle2, Download, FileText, KeyRound,
   Lock, Pencil, PlayCircle, Search, Send, ShieldAlert, Upload, UserCog, XCircle,
 } from 'lucide-react';
+import { pluralizeRu } from '@/lib/format';
 
 const ACTION_LABEL: Record<string, string> = {
   'shift.created': 'Смена запланирована',
@@ -115,6 +116,10 @@ const ACTION_MARK: Record<string, AuditActionMark> = {
   'shift.start-blocked': { icon: ShieldAlert, tone: 'danger' },
   'shift.start-waived': { icon: KeyRound, tone: 'warning' },
   'shift.cancelled': { icon: XCircle, tone: 'danger' },
+  // Планировщик закрывает смену сам, если передача так и не пришла. Значка для
+  // кода не было — срабатывала запасная ветка и ночной инцидент рисовался
+  // зелёной галочкой «успешно» (R125 №3).
+  'shift.auto-closed': { icon: XCircle, tone: 'warning' },
   'handover.submitted': { icon: Send, tone: 'info' },
   'handover.resubmitted': { icon: Send, tone: 'info' },
   'handover.accepted': { icon: Lock, tone: 'success' },
@@ -125,6 +130,9 @@ const ACTION_MARK: Record<string, AuditActionMark> = {
   'work-permit.approved-dispatcher': { icon: CheckCircle2, tone: 'success' },
   'work-permit.approved-admin': { icon: CheckCircle2, tone: 'success' },
   'work-permit.revoke': { icon: Ban, tone: 'danger' },
+  // Планировщик помечает наряд истёкшим: допуск потерян. Значка не было, и
+  // истечение рисовалось зелёной галочкой «успешно» (R125 №3).
+  'work-permit.expired': { icon: AlertTriangle, tone: 'danger' },
   'defect.reported': { icon: AlertTriangle, tone: 'danger' },
   'defect.triage': { icon: Search, tone: 'info' },
   'defect.resolve': { icon: CheckCircle2, tone: 'success' },
@@ -156,4 +164,55 @@ export function auditEntityLabel(type: string): string {
 
 export function isCriticalAuditAction(action: string): boolean {
   return CRITICAL_ACTIONS.has(action);
+}
+
+/**
+ * Важность записи для колонки журнала. Раньше колонка «Результат» показывала
+ * «Критично/Успешно» — важность была смешана с исходом: «Наряд согласован
+ * администратором» читалось как «Результат: Критично», а «Наряд-допуск истёк»
+ * — как «Успешно». Но запись журнала всегда уже состоялась, поэтому колонка
+ * говорит именно о важности действия, а не об исходе (R125 №2).
+ */
+export function auditImportanceLabel(action: string): string {
+  return isCriticalAuditAction(action) ? 'Критично' : 'Обычное';
+}
+
+/**
+ * Текст пустого состояния ленты. Раньше и «источник не ответил», и «журнал
+ * пуст», и «фильтр ничего не нашёл» показывали одно «События аудита недоступны
+ * в текущем источнике»: диспетчер читал это как поломку источника и жал
+ * «Повторить» вместо сброса фильтра (R125 №1).
+ */
+export function auditEmptyMessage(sourceAvailable: boolean, filterCount: number, loadedCount: number): string {
+  if (!sourceAvailable) return 'События аудита недоступны в текущем источнике.';
+  if (loadedCount > 0) return 'По запросу ничего не найдено.';
+  return filterCount > 0 ? 'По фильтру ничего не найдено.' : 'В журнале пока нет событий.';
+}
+
+/**
+ * Подпись под лентой. Раньше знаменателем было `verification.eventCount` — длина
+ * ВСЕЙ цепочки, поэтому с фильтром строка читалась как «показано 3 из 5342»,
+ * хотя под фильтр подходило 3 (R125 №5). Теперь знаменатель — загруженное
+ * множество, а общее число журнала показывает плитка «Всего в журнале».
+ */
+export function auditShownMessage(visibleCount: number, loadedCount: number): string {
+  const events = pluralizeRu(loadedCount, ['загруженного события', 'загруженных событий', 'загруженных событий']);
+  return `Показано ${visibleCount} из ${loadedCount} ${events}`;
+}
+
+/**
+ * Причины разрыва цепочки из `verify-chain.ts` — английские коды проверки.
+ * Раньше узел «Целостность журнала» печатал их как есть: «Проверка не пройдена:
+ * PREV_HASH_MISMATCH» (R125 №9). Неизвестный код показываем как есть, чтобы
+ * новая проверка не исчезла молча.
+ */
+const CHAIN_REASON_LABEL: Record<string, string> = {
+  SEQUENCE_GAP: 'разрыв нумерации',
+  PREV_HASH_MISMATCH: 'не совпал хеш предыдущей записи',
+  HASH_MISMATCH: 'не совпал собственный хеш',
+  HEAD_MISMATCH: 'не совпал конец цепочки',
+};
+
+export function auditChainReasonLabel(reason: string): string {
+  return CHAIN_REASON_LABEL[reason] ?? reason;
 }

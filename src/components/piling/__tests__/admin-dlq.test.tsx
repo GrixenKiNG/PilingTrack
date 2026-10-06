@@ -69,12 +69,30 @@ describe('AdminDlq: понятные тексты', () => {
     vi.mocked(toast.error).mockReset();
   });
 
-  it('тип события показывается по-русски, машинный код остаётся рядом', async () => {
+  it('тип события показывается по-русски, машинный код и id — в данных события', async () => {
     mockLoad(makeEntry({ eventType: 'ReportPdfDeliveryRequested' }));
     render(<AdminDlq />);
 
     expect(await screen.findByText('Доставка PDF отчёта')).toBeInTheDocument();
+    // Машинный код, технические id и payload скрыты за кнопкой, а не в списке.
+    expect(screen.queryByText('ReportPdfDeliveryRequested')).not.toBeInTheDocument();
+    expect(screen.queryByText(/aggregateId/)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Показать данные события' }));
+
     expect(screen.getByText('ReportPdfDeliveryRequested')).toBeInTheDocument();
+    expect(screen.getByText('rep_1')).toBeInTheDocument();
+    expect(screen.getByText('out_1')).toBeInTheDocument();
+  });
+
+  it('сбой загрузки объясняется без аббревиатуры DLQ', async () => {
+    mocks.authFetch.mockResolvedValue(json({}, 500));
+    render(<AdminDlq />);
+
+    expect(
+      await screen.findByText('Сервер не смог отдать очередь недоставленных событий. Попробуйте обновить.'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/список DLQ/)).not.toBeInTheDocument();
   });
 
   it('статус «Повтор поставлен в очередь» вместо «Отправлены повторно»', async () => {
@@ -192,5 +210,80 @@ describe('AdminDlq: защита от двойного нажатия', () => {
     await act(async () => {
       resolvePost(json({ ok: true }));
     });
+  });
+});
+
+/**
+ * F-R112-4: обрыв связи `fetch` бросает `TypeError` с английским «Failed to
+ * fetch», а экран печатал `e.message` как есть — при «Повтор»/«Отбросить» без
+ * сети админ видел чужую английскую строку вместо объяснения.
+ */
+describe('AdminDlq: обрыв сети объясняется по-русски (F-R112-4)', () => {
+  beforeEach(() => {
+    mocks.authFetch.mockReset();
+    mocks.confirm.mockReset();
+    mocks.confirm.mockReturnValue(true);
+    window.confirm = mocks.confirm;
+    vi.mocked(toast.error).mockReset();
+  });
+
+  it('обрыв связи при повторе даёт русский текст, а не «Failed to fetch»', async () => {
+    mocks.authFetch.mockImplementation((_url: string, init?: RequestInit) => {
+      if (init?.method === 'POST') return Promise.reject(new TypeError('Failed to fetch'));
+      return Promise.resolve(json({ entries: [makeEntry()], stats }));
+    });
+    render(<AdminDlq />);
+    await screen.findByText('Доставка PDF отчёта');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Повтор' }));
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalled());
+    expect(toast.error).toHaveBeenCalledWith('Нет соединения с сервером. Проверьте связь и повторите.');
+    expect(vi.mocked(toast.error).mock.calls[0][0]).not.toContain('Failed to fetch');
+  });
+});
+
+/**
+ * F-R133 №11: на истёкшей сессии экран показывал «Сервер не смог отдать
+ * очередь недоставленных событий. Попробуйте обновить.» — причина неверная,
+ * совет не работает. Теперь 401 назван прямо.
+ */
+describe('AdminDlq: истёкшая сессия (F-R133 №11)', () => {
+  beforeEach(() => {
+    mocks.authFetch.mockReset();
+  });
+
+  it('401 при загрузке → «Сессия истекла — войдите снова.»', async () => {
+    mocks.authFetch.mockResolvedValue(json({ error: 'Unauthorized' }, 401));
+    render(<AdminDlq />);
+
+    expect(await screen.findByText('Сессия истекла — войдите снова.')).toBeInTheDocument();
+    expect(
+      screen.queryByText('Сервер не смог отдать очередь недоставленных событий. Попробуйте обновить.'),
+    ).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * R135 №14: при сбое загрузки экран рисовал красный баннер ошибки и
+ * одновременно зелёное «Недоставленных событий нет» с галочкой — человек
+ * читал «всё в порядке» рядом с ошибкой. Ветки должны быть взаимоисключающими.
+ */
+describe('AdminDlq: сбой загрузки не выдаёт себя за «событий нет» (R135 №14)', () => {
+  beforeEach(() => {
+    mocks.authFetch.mockReset();
+  });
+
+  it('при 500 нет зелёного «Недоставленных событий нет»', async () => {
+    mocks.authFetch.mockResolvedValue(json({}, 500));
+    render(<AdminDlq />);
+
+    expect(
+      await screen.findByText('Сервер не смог отдать очередь недоставленных событий. Попробуйте обновить.'),
+    ).toBeInTheDocument();
+    // Скелет держится минимум 250 мс (`useMinSkeletonDuration`), а зелёная
+    // ветка рисуется только после него — без паузы проверка прошла бы вслепую.
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 300)); });
+    expect(screen.queryByText('Недоставленных событий нет')).not.toBeInTheDocument();
   });
 });

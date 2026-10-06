@@ -395,3 +395,37 @@ describe('ReportFormDialog — доступные имена полей смен
     expect(screen.getByLabelText('Конец')).toBeInstanceOf(HTMLInputElement);
   });
 });
+
+/**
+ * R121 №4: «Часы» простоя принимали больше суток, а комментарий — длиннее 1000
+ * знаков, хотя zod-схема admin-upsert ограничивает простой `DOWNTIME_MAX_HOURS`
+ * (= 24, lib/downtime-hours.ts), комментарий — 1000. Форма отправляла заведомо
+ * отклоняемый запрос, и в ответ приходило общее «Некорректные данные».
+ * Полям проставлены пределы, а простой длиннее суток отклоняется до отправки.
+ */
+describe('ReportFormDialog — пределы формы простоя (R121 №4)', () => {
+  it('часы ограничены сверху 24, комментарий — 1000 знаками', () => {
+    render(
+      <ReportFormDialog
+        open
+        onClose={vi.fn()}
+        editReport={editReport}
+        loadingReferenceData={false}
+        dictionaryError={null}
+        operators={[]}
+        sites={[]}
+        pileGrades={[{ id: 'g1', name: 'С90.30', isActive: true, lengthMm: 9000 }]}
+        drillingTypes={[]}
+        downtimeReasons={[]}
+        equipment={[]}
+        onSuccess={vi.fn()}
+      />,
+    );
+
+    // Секция простоя скрыта, пока её не раскрыли ссылкой «+ Добавить».
+    fireEvent.click(screen.getByRole('button', { name: '+ Добавить' }));
+
+    expect(screen.getByPlaceholderText('Часы')).toHaveAttribute('max', '24');
+    expect(screen.getByPlaceholderText('Комментарий (необязательно)')).toHaveAttribute('maxLength', '1000');
+  });
+});

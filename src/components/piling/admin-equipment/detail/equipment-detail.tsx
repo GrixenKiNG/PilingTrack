@@ -35,7 +35,7 @@ import {
   HistoryTable, OperatorRotationCard, MaintenanceBlock, PassportGrid,
   formatRelative,
 } from './equipment-detail-parts';
-import { formatCountMeters, formatFixed } from '@/lib/format';
+import { formatCountMeters } from '@/lib/format';
 import { usePilingStore } from '@/lib/store';
 import type { EquipmentDTO, EquipmentKindDTO } from '@/lib/types';
 import {
@@ -180,7 +180,7 @@ export function EquipmentDetail({ equipmentId, embedded = false, onSaved }: Prop
           </Badge>
           {!eq.isActive && (
             <Badge variant="secondary" className="bg-muted text-muted-foreground border-border">
-              Неактивна
+              Списана
             </Badge>
           )}
         </div>
@@ -283,7 +283,7 @@ export function EquipmentDetail({ equipmentId, embedded = false, onSaved }: Prop
                       </div>
                       <div className="flex items-center gap-2 text-xs">
                         <TelematicsStatusBadge status={d.status} />
-                        {d.lastSeenAt && <span className="text-muted-foreground">last seen {formatRelative(d.lastSeenAt)}</span>}
+                        {d.lastSeenAt && <span className="text-muted-foreground">последний раз {formatRelative(d.lastSeenAt)}</span>}
                       </div>
                     </div>
                   ))}
@@ -354,7 +354,7 @@ export function EquipmentDetail({ equipmentId, embedded = false, onSaved }: Prop
 
   return (
     <div className={cn('space-y-5', 'p-4 lg:p-6', 'field-type')}>
-      <BackLink />
+      <BackLink current={eq.name} />
 
       {header}
 
@@ -387,8 +387,8 @@ export function EquipmentDetail({ equipmentId, embedded = false, onSaved }: Prop
       <Section icon={Activity} title="30 дней активности">
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <Metric label="Отчётов" value={details.stats30d.reportCount} />
-          <Metric label="Свай" value={details.stats30d.piles} />
-          <Metric label="Бурение, м" value={formatFixed(details.stats30d.drillingMeters, 1)} />
+          <Metric label="Свай" value={formatCountMeters(details.stats30d.piles, details.stats30d.pileMeters)} />
+          <Metric label="Бурение" value={formatCountMeters(details.stats30d.drillingCount, details.stats30d.drillingMeters)} />
           <Metric label="Простой" value={formatDowntimeHours(details.stats30d.downtimeHours)} />
         </div>
       </Section>
@@ -456,7 +456,7 @@ export function EquipmentDetail({ equipmentId, embedded = false, onSaved }: Prop
                 </div>
                 <div className="flex items-center gap-2 text-xs">
                   <TelematicsStatusBadge status={d.status} />
-                  {d.lastSeenAt && <span className="text-muted-foreground">last seen {formatRelative(d.lastSeenAt)}</span>}
+                  {d.lastSeenAt && <span className="text-muted-foreground">последний раз {formatRelative(d.lastSeenAt)}</span>}
                 </div>
               </div>
             ))}

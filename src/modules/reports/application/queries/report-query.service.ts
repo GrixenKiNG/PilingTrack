@@ -159,7 +159,11 @@ export async function listReportsForReview(
     {
       where,
       include: reportDetailInclude,
-      orderBy: { date: 'desc' },
+      // Тай-брейкер id (F-R140-PAGING): у отчётов за один день порядок внутри
+      // даты был недетерминирован, и «Загрузить ещё» с курсором по id мог
+      // показать строку дважды или пропустить её. Уникальный id делает порядок
+      // полным, поэтому страницы стыкуются без дублей и пропусков.
+      orderBy: [{ date: 'desc' }, { id: 'desc' }],
     }
   );
 

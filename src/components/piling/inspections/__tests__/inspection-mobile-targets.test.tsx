@@ -11,17 +11,19 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const mocks = vi.hoisted(() => ({ authFetch: vi.fn() }));
+const mocks = vi.hoisted(() => ({ authFetch: vi.fn(), loadJson: vi.fn() }));
 
-vi.mock('@/lib/api', () => ({ authFetch: mocks.authFetch }));
+vi.mock('@/lib/api', () => ({ authFetch: mocks.authFetch, loadJson: mocks.loadJson }));
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
-vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }));
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }), useSearchParams: () => new URLSearchParams() }));
 vi.mock('@/lib/store', () => ({
   usePilingStore: (selector: (state: { currentUser: null }) => unknown) => selector({ currentUser: null }),
 }));
 
 import { Status4Control, YesNoControl } from '../inspection-controls';
+import { InspectionItemPhotos } from '../inspection-item-photos';
 import { RunInspection } from '../run-inspection';
+import { StartInspectionForm } from '../start-inspection-form';
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
@@ -116,5 +118,50 @@ describe('экран осмотра: цель нажатия на телефон
 
     expect(screen.getByRole('button', { name: 'Отмена' })).toHaveClass('min-h-11', 'flex-1', 'sm:min-h-0');
     expect(screen.getByRole('button', { name: 'Подтвердить' })).toHaveClass('min-h-11', 'flex-1', 'sm:min-h-0');
+  });
+});
+
+/*
+  F-R136-TOP №2: экран осмотра показывал одну ссылку «← Осмотры» — пути
+  «Осмотры → установка» не было видно.
+*/
+describe('экран осмотра: хлебные крошки (F-R136-TOP, №2)', () => {
+  it('осмотр показывает путь «Осмотры → СП-49»', async () => {
+    await renderInspection([item('i1', 'Двигатель', 'YES_NO')]);
+
+    const crumb = screen.getByRole('navigation', { name: 'Путь к экрану' });
+    expect(within(crumb).getByRole('link', { name: 'Осмотры' })).toHaveAttribute('href', '/inspections');
+    expect(within(crumb).getByText('СП-49')).toBeInTheDocument();
+  });
+});
+
+/*
+  F-R137-TOP №1: «Добавить фото» у пункта осмотра было ≈20px — фото это
+  обязательное доказательство (пункт с photoRequired без фото не закрыть), а
+  на телефоне в перчатке в кнопку было почти не попасть. Галерея установки
+  уже получила 44px в R73.
+*/
+describe('фото пункта осмотра: цель нажатия на телефоне (F-R137-TOP, №1)', () => {
+  it('«Добавить фото» — не ниже 44px на телефоне, прежняя высота на десктопе', async () => {
+    mocks.authFetch.mockResolvedValue(json({ data: [] }));
+    render(<InspectionItemPhotos inspectionId="insp-1" itemId="i1" />);
+
+    const btn = await screen.findByRole('button', { name: 'Добавить фото' });
+    expect(btn).toHaveClass('min-h-11', 'items-center', 'sm:min-h-0');
+  });
+});
+
+/*
+  F-R137-NEXT №18: поле «Моточасы» на запуске ЕО/ТО было 36px (`Input h-9`).
+  Это целевое поле экрана: счётчик наработки вводится до осмотра, а корень
+  `.field-type` лифта 44px не даёт.
+*/
+describe('запуск осмотра: поле «Моточасы» на телефоне (F-R137-NEXT, №18)', () => {
+  it('«Моточасы» — не ниже 44px на телефоне, на десктопе прежние 36px', async () => {
+    mocks.loadJson.mockResolvedValue({ data: [] });
+    mocks.authFetch.mockResolvedValue(json({ templates: [] }));
+    render(<StartInspectionForm />);
+
+    expect(await screen.findByLabelText('Моточасы')).toHaveClass('min-h-11', 'sm:min-h-0');
   });
 });

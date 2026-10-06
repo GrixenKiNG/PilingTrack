@@ -2,6 +2,7 @@
 
 import type { EquipmentOperationalStatus, ReportStatus } from './fleet-types';
 import { EQUIPMENT_STATUS_META, REPORT_STATUS_META } from './equipment-status';
+import { Input } from '@/components/ui/input';
 
 export interface FleetFilterState {
   site: string;
@@ -11,6 +12,8 @@ export interface FleetFilterState {
   equipmentStatus: string;
   reportStatus: string;
   crew: string;
+  /** Текстовый поиск по названию, модели и инвентарному номеру установки. */
+  search: string;
 }
 
 export const EMPTY_FILTERS: FleetFilterState = {
@@ -20,6 +23,7 @@ export const EMPTY_FILTERS: FleetFilterState = {
   equipmentStatus: '',
   reportStatus: '',
   crew: '',
+  search: '',
 };
 
 const EQUIPMENT_STATUS_OPTIONS: { value: EquipmentOperationalStatus; label: string }[] = [
@@ -55,6 +59,14 @@ export function EquipmentFilters({
   return (
     <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-card p-3">
       <span className="text-xs font-medium text-muted-foreground">Фильтры:</span>
+
+      <Input
+        value={value.search}
+        onChange={(e) => set({ search: e.target.value })}
+        placeholder="Поиск по названию, модели, инв. номеру"
+        aria-label="Поиск по названию, модели или инвентарному номеру"
+        className={`${selectCls} min-w-[200px] flex-1`}
+      />
 
       <select className={selectCls} value={value.site} onChange={(e) => set({ site: e.target.value })} aria-label="Фильтр по объекту">
         <option value="">Все объекты</option>

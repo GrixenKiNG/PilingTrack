@@ -69,12 +69,22 @@ export function WorkOrderTable({
             const dueHours = hoursUntilMaintenance(record);
             const selectedRow = record.id === selectedId;
             const badge = statusView(record);
+            const onRowKeyDown = (event: React.KeyboardEvent<HTMLTableRowElement>) => {
+              if (event.target !== event.currentTarget) return;
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                onSelect(record.id);
+              }
+            };
             return (
               <tr
                 key={record.id}
+                tabIndex={0}
+                aria-selected={selectedRow}
                 onClick={() => onSelect(record.id)}
+                onKeyDown={onRowKeyDown}
                 className={cn(
-                  'cursor-pointer align-top transition-colors hover:bg-signal/10/30',
+                  'cursor-pointer align-top transition-colors hover:bg-signal/10/30 focus-visible:outline-none focus-visible:ring-ring/50 focus-visible:ring-[3px]',
                   selectedRow && 'bg-info/10/80 outline outline-1 -outline-offset-1 outline-sky-200',
                 )}
               >
@@ -133,7 +143,10 @@ export function WorkOrderTable({
                     <button
                       type="button"
                       onClick={(event) => { event.stopPropagation(); onDone(record); }}
-                      disabled={busyAction === `${record.id}:DONE` || record.status === 'DONE'}
+                      // Отменённый наряд закрывать нельзя (F-R122-6): сервер статусных
+                      // переходов не проверяет и перевёл бы CANCELLED → DONE со сдвигом
+                      // регламента и записью показания счётчика.
+                      disabled={busyAction === `${record.id}:DONE` || record.status === 'DONE' || record.status === 'CANCELLED'}
                       className="inline-flex h-11 w-11 items-center justify-center rounded border border-border text-success-strong hover:bg-success/10 disabled:cursor-not-allowed disabled:opacity-40"
                       aria-label="Закрыть наряд ТО"
                       title="Закрыть наряд ТО"

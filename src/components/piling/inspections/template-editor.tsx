@@ -31,6 +31,26 @@ import {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
+/**
+ * Не заменил ли шаблон другой администратор?
+ *
+ * Правка на сервере выпускает новую версию деактивацией прежней строки без
+ * проверки версии, поэтому двое админов с одним шаблоном получают две
+ * действующие версии (R123 №2). Перед сохранением перечитываем шаблон: снятая
+ * строка означает, что правку уже выпустил кто-то другой. Сбой чтения — «не
+ * знаем», сохранение не блокируем (его исход покажет сам PUT).
+ */
+async function isTemplateReplaced(id: string): Promise<boolean> {
+  try {
+    const res = await authFetch(`/api/checklist-templates/${id}`);
+    if (!res.ok) return false;
+    const { template } = (await res.json()) as { template?: { isActive?: boolean } };
+    return template?.isActive === false;
+  } catch {
+    return false;
+  }
+}
+
 interface TemplateEditorProps {
   templateId: string; // 'new' or uuid
 }
@@ -47,9 +67,18 @@ export function TemplateEditor({ templateId }: TemplateEditorProps) {
   const [sections, setSections] = useState<SectionDraft[]>([emptySection()]);
   const [loading, setLoading] = useState(!isNew);
   const [busy, setBusy] = useState(false);
+  // Снятая (заменённая) версия неотличима от действующей, поэтому по прямой
+  // ссылке её правят как живую и «Сохранить» выпускает её заново (R123 №4).
+  const [archived, setArchived] = useState(false);
   // Почему шаблон не показан: пустая форма под заголовком «Редактировать
   // шаблон» выглядела как «шаблон пуст», а сохранение затирало живой (R100 №4).
   const [loadError, setLoadError] = useState<InspectionLoadError | null>(null);
+  // Правка шаблона на сервере — это деактивация прежней строки и создание
+  // новой, причём не в одной транзакции (template-commands.ts). Сбой между
+  // шагами оставляет чек-лист без действующей версии, а человек видел только
+  // «Ошибка» и считал шаблон целым (R123 №1). Ещё строка нужна, когда правку
+  // уже выпустил другой администратор: сохранять тогда нельзя (R123 №2).
+  const [saveProblem, setSaveProblem] = useState<'failed' | 'stale' | null>(null);
 
   // Load existing template
   const loadTemplate = useCallback(async () => {
@@ -62,6 +91,7 @@ export function TemplateEditor({ templateId }: TemplateEditorProps) {
       }
       const { template } = await res.json();
       setLoadError(null);
+      setArchived(template.isActive === false);
       setName(template.name ?? '');
       setLevel(template.level as InspectionLevel);
       setBlockType((template.blockType ?? 'BASE') as BlockType);
@@ -165,8 +195,15 @@ export function TemplateEditor({ templateId }: TemplateEditorProps) {
       })),
     };
 
+    setSaveProblem(null);
     setBusy(true);
     try {
+      // Правку уже выпустил другой администратор — не плодим вторую
+      // действующую версию одним шаблоном (R123 №2).
+      if (!isNew && await isTemplateReplaced(templateId)) {
+        setSaveProblem('stale');
+        return;
+      }
       const url = isNew ? '/api/checklist-templates' : `/api/checklist-templates/${templateId}`;
       const method = isNew ? 'POST' : 'PUT';
       const res = await authFetch(url, {
@@ -183,6 +220,9 @@ export function TemplateEditor({ templateId }: TemplateEditorProps) {
     } catch (err) {
       // Обрыв сети fetch бросает TypeError с английским «Failed to fetch» (F-R112-2).
       toast.error(catchText(err, 'Ошибка'));
+      // Правка упала: прежняя версия на сервере уже снята, а новая не создана —
+      // говорим об этом строкой, а не только общим тостом (R123 №1).
+      if (!isNew) setSaveProblem('failed');
     } finally {
       setBusy(false);
     }
@@ -245,6 +285,27 @@ export function TemplateEditor({ templateId }: TemplateEditorProps) {
           Отмена
         </Button>
       </div>
+
+      {/* Сбой правки в форме незаметен: на сервере это деактивация прежней
+          версии и создание новой, поэтому сообщаем, что действующей версии
+          могло не остаться, и отправляем проверять список (R123 №1). Когда
+          версию уже выпустил другой администратор — сохранять нельзя (R123 №2). */}
+      {saveProblem && (
+        <p role="alert" className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive-strong">
+          {saveProblem === 'stale'
+            ? 'Шаблон уже изменён другим администратором — сохранение не отправлено. Откройте список шаблонов и выберите действующую версию.'
+            : 'Сохранение не завершилось: прежняя версия шаблона могла быть снята, а новая не выпущена. Проверьте список шаблонов — возможно, чек-лист больше не действует.'}
+        </p>
+      )}
+
+      {/* Строка снята: по прямой ссылке её раньше правили как живую, и
+          «Сохранить» выпускало снятый чек-лист заново — без пометки
+          «архив» человек не понимал, что открыл старую версию (R123 №4). */}
+      {archived && (
+        <p role="status" className="rounded-md border border-border bg-muted px-3 py-2 text-xs text-muted-foreground">
+          Это снятая версия шаблона (архив) — она больше не действует. Чтобы изменить чек-лист, откройте действующую версию в списке шаблонов; сохранение этой формы будет отклонено как устаревшее.
+        </p>
+      )}
 
       {/* General fields */}
       <div className="rounded-lg border bg-card p-4 space-y-3">

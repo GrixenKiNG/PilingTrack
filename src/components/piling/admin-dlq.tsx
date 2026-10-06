@@ -13,6 +13,7 @@ import {
 } from '@/components/piling/icons/unified-icons';
 import { toast } from 'sonner';
 import { authFetch } from '@/lib/api';
+import { catchText } from '@/components/piling/admin-crews/crew-messages';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -111,8 +112,11 @@ export function AdminDlq() {
         const data = await res.json();
         setEntries(data.entries || []);
         setStats(data.stats || null);
+      } else if (res.status === 401) {
+        // Сессия истекла — «Попробуйте обновить» тут не поможет.
+        setLoadError('Сессия истекла — войдите снова.');
       } else {
-        setLoadError('Сервер не смог отдать список DLQ. Попробуйте обновить.');
+        setLoadError('Сервер не смог отдать очередь недоставленных событий. Попробуйте обновить.');
       }
     } catch {
       setLoadError('Не удалось связаться с сервером. Проверьте сеть и повторите.');
@@ -150,7 +154,7 @@ export function AdminDlq() {
       toast.success(action === 'retry' ? 'Повтор поставлен в очередь' : 'Событие отброшено');
       await load();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Ошибка');
+      toast.error(catchText(e, 'Ошибка'));
     } finally {
       setActingId(null);
     }
@@ -219,13 +223,13 @@ export function AdminDlq() {
             <Skeleton key={i} className="h-20 w-full" />
           ))}
         </div>
-      ) : entries.length === 0 ? (
+      ) : entries.length === 0 && !loadError ? (
         <div className="text-center py-16">
           <CheckCircle2 className="w-12 h-12 text-success/40 mx-auto mb-3" />
           <p className="text-sm text-muted-foreground">Недоставленных событий нет</p>
           <p className="text-xs text-muted-foreground mt-1">Нет событий со статусом «{STATUS_FILTERS.find(f=>f.key===status)?.label}»</p>
         </div>
-      ) : (
+      ) : entries.length === 0 ? null : (
         <div className="space-y-2">
           {entries.map((entry, index) => (
             <motion.div
@@ -240,22 +244,11 @@ export function AdminDlq() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-sm font-medium text-foreground">{eventTypeLabel(entry.eventType)}</span>
-                        <code className="text-3xs bg-muted px-1.5 py-0.5 rounded font-mono text-muted-foreground">{entry.eventType}</code>
                         <Badge variant="secondary" className={STATUS_FILTERS.find(f=>f.key===entry.status)?.color}>
                           {STATUS_FILTERS.find(f=>f.key===entry.status)?.label || entry.status}
                         </Badge>
                         <span className="text-xs text-muted-foreground">попыток: {entry.attempts}</span>
                       </div>
-                      {entry.aggregateId && (
-                        <p className="text-xs text-muted-foreground mt-1 font-mono truncate">
-                          aggregateId: {entry.aggregateId}
-                        </p>
-                      )}
-                      {entry.sourceOutboxId && (
-                        <p className="text-xs text-muted-foreground mt-0.5 font-mono truncate">
-                          outboxId: {entry.sourceOutboxId}
-                        </p>
-                      )}
                       <p className="text-xs text-muted-foreground mt-1">
                         Создано: {formatDate(entry.createdAt)}
                         {entry.updatedAt !== entry.createdAt && (
@@ -278,13 +271,28 @@ export function AdminDlq() {
                           onClick={() => setExpandedId(expandedId === entry.id ? null : entry.id)}
                           className="text-xs text-info-strong hover:underline"
                         >
-                          {expandedId === entry.id ? 'Скрыть payload' : 'Показать payload'}
+                          {expandedId === entry.id ? 'Скрыть данные события' : 'Показать данные события'}
                         </button>
                       </div>
                       {expandedId === entry.id && (
-                        <pre className="mt-2 text-3xs bg-muted border border-border rounded p-2 overflow-x-auto max-h-60">
-                          {JSON.stringify(entry.payload, null, 2)}
-                        </pre>
+                        <div className="mt-2 space-y-1">
+                          <p className="text-xs text-muted-foreground">
+                            Код события: <code className="font-mono">{entry.eventType}</code>
+                          </p>
+                          {entry.aggregateId && (
+                            <p className="text-xs text-muted-foreground">
+                              Объект события: <code className="font-mono">{entry.aggregateId}</code>
+                            </p>
+                          )}
+                          {entry.sourceOutboxId && (
+                            <p className="text-xs text-muted-foreground">
+                              Исходное сообщение: <code className="font-mono">{entry.sourceOutboxId}</code>
+                            </p>
+                          )}
+                          <pre className="text-3xs bg-muted border border-border rounded p-2 overflow-x-auto max-h-60">
+                            {JSON.stringify(entry.payload, null, 2)}
+                          </pre>
+                        </div>
                       )}
                     </div>
                     {entry.status === 'pending' && (

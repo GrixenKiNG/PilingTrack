@@ -1,9 +1,11 @@
 import {
   OUTCOME_LABELS,
   resolveReadinessOutcome,
+  type ReadinessFacts,
   type ReadinessOutcome,
 } from '@/modules/readiness';
 import type {
+  AuthoritativeReadinessFactsDto,
   CurrentReadinessDto,
   ReadinessSnapshotDto,
 } from './api/contracts';
@@ -11,6 +13,14 @@ import type {
 export interface PresentationNotice {
   code: string;
   label: string;
+  /**
+   * Действие блокера: `DENY_START` (запрет), `RETURN_TO_OPERATOR` (возврат
+   * оператору), `REQUIRE_CONFIRMATION` (нужно подтверждение). Экраны красят
+   * блокер по нему: «нет осмотра за сегодня» — незакрытый шаг, а не
+   * критический дефект, и красным, как запрет, его показывать нельзя.
+   * `null` — у снимков без поля; тогда блокер считаем строгим.
+   */
+  action: string | null;
   actionLabel: string | null;
 }
 
@@ -145,6 +155,7 @@ function notices(value: unknown, warning = false): PresentationNotice[] | null {
     result.push({
       code,
       label,
+      action: typeof item.action === 'string' ? item.action : null,
       actionLabel: typeof item.actionLabel === 'string' ? item.actionLabel : null,
     });
   }
@@ -324,4 +335,63 @@ export function buildUnavailableReadinessPresentation(
   snapshot: Snapshot | null,
 ): AuthoritativeReadinessPresentation {
   return unconfirmed('malformed', snapshot);
+}
+
+/**
+ * Факты авторитетного снимка — в контракт расчёта балла (`ReadinessFacts`).
+ *
+ * Поля перечислены поимённо, а не приведением типа: сегодня состав обоих
+ * контрактов совпадает, но снимок неизменяем и переживёт любое расширение
+ * `ReadinessFacts`, а молчаливое совпадение формы этот разрыв скроет.
+ *
+ * `null` — фактов в снимке нет (снимки до появления колонки `facts`, либо
+ * её отсутствие). Балл по таким фактам выдумывать нельзя: вызывающий обязан
+ * показать «недостаточно данных», а не подставить нули или производные факты.
+ */
+export function readinessFactsFromSnapshot(
+  facts: AuthoritativeReadinessFactsDto | null | undefined,
+): ReadinessFacts | null {
+  if (!facts) return null;
+  return {
+    inspectionCompleted: facts.inspectionCompleted,
+    inspectionProgress: facts.inspectionProgress,
+    healthScore: facts.healthScore,
+    meterKnown: facts.meterKnown,
+    permitValid: facts.permitValid,
+    permitExpired: facts.permitExpired,
+    maintenanceConfigured: facts.maintenanceConfigured,
+    maintenanceOverdueHours: facts.maintenanceOverdueHours,
+    maintenanceOverdueDays: facts.maintenanceOverdueDays,
+    accepted: facts.accepted,
+    criticalDefect: facts.criticalDefect,
+    findings: facts.findings,
+  };
+}
+
+/**
+ * Авторитетные факты выбранной установки из её снимка готовности.
+ *
+ * Предпросмотр правил обязан считаться по тем же фактам, по которым сервер
+ * вынес вердикт. Производные факты строятся без наряда, приёмки и дефектов,
+ * поэтому шаг «Приёмка» в них всегда «ожидает приёмки», а балл занижен на её
+ * вес — и админ подбирал бы веса по числу, которого в бою не будет.
+ *
+ * `null` — снимка нет или в нём не записаны факты.
+ *
+ * Факты берём не из любого снимка, а только из того, который признаёт
+ * авторитетный контур: `buildAuthoritativeReadinessPresentation` отвергает
+ * снимок с испорченными `evidence`/`blockers` (`malformed`) или без фактов
+ * (`historical-incomplete`), и «Центр готовности» честно пишет «Авторитетная
+ * оценка недоступна». Снимок с валидными фактами, но повреждённым
+ * доказательством не должен давать балл в предпросмотре — иначе два экрана по
+ * одному снимку отвечают противоположно, и админ подбирает веса по числу,
+ * которому авторитетный экран не верит.
+ */
+export function authoritativeFactsForEquipment(
+  snapshots: readonly CurrentReadinessDto[],
+  equipmentId: string,
+): ReadinessFacts | null {
+  const snapshot = snapshots.find((item) => item.equipmentId === equipmentId) ?? null;
+  if (buildAuthoritativeReadinessPresentation(snapshot).mode !== 'authoritative') return null;
+  return readinessFactsFromSnapshot(snapshot?.facts);
 }

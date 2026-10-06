@@ -26,6 +26,7 @@ import { cn } from '@/lib/utils';
 import { COMPACT_KPI_GRID, ScreenTitle, card } from '../settings/shared-ui';
 import { kpiGridStyle } from '@/components/piling/kpi-tile';
 import { loadFailureMessage, RefKpi } from './shared';
+import { normalizeSearch } from '../shared/text-search';
 import type { ReferenceUiProps } from './types';
 
 interface ControlRow {
@@ -70,10 +71,10 @@ export function DocumentsScreen(props: ReferenceUiProps) {
   // Список не загружен (ещё грузится или запрос упал) — числа по нему
   // неизвестны. Ноль в плитке читался бы как «просрочек нет».
   const notLoaded = rows === null;
-  const needle = query.trim().toLocaleLowerCase('ru-RU');
+  const needle = normalizeSearch(query);
   const visible = (rows ?? []).filter((row) => !needle
-    || row.user.name.toLocaleLowerCase('ru-RU').includes(needle)
-    || row.type.name.toLocaleLowerCase('ru-RU').includes(needle));
+    || normalizeSearch(row.user.name).includes(needle)
+    || normalizeSearch(row.type.name).includes(needle));
 
   return (
     <>

@@ -52,13 +52,26 @@ interface UserDetailProps {
   isSelf: boolean;
   onEdit: () => void;
   onDelete: () => void;
-  onToggle: () => void;
+  onToggle: () => void | Promise<void>;
 }
 
 export function UserDetail({ user, isSelf, onEdit, onDelete, onToggle }: UserDetailProps) {
   const risk = resolveRisk([[!user.isActive, 'critical', 'Заблокирован']], 'Доступ включён');
   const history = useEntityHistory('users', user.id);
   const [confirmBlock, setConfirmBlock] = useState(false);
+  // F-R128-3: блокировка/разблокировка идёт запросом и ещё ждёт перечитывания
+  // списка — без признака занятости второй клик слал второй PUT.
+  const [busy, setBusy] = useState(false);
+
+  const runToggle = async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      await onToggle();
+    } finally {
+      setBusy(false);
+    }
+  };
 
   return (
     <OpsDetailPanel
@@ -130,17 +143,17 @@ export function UserDetail({ user, isSelf, onEdit, onDelete, onToggle }: UserDet
 
         <TabsContent value="access" className="space-y-2">
           <div className="flex flex-wrap gap-2">
-            <Button size="sm" variant="outline" onClick={onEdit} className="h-11 text-xs sm:h-8">
+            <Button size="sm" variant="outline" onClick={onEdit} disabled={busy} className="h-11 text-xs sm:h-8">
               <Pencil className="h-3.5 w-3.5" />Редактировать
             </Button>
             {!isSelf && (
-              <Button size="sm" variant="outline" onClick={() => { if (user.isActive) setConfirmBlock(true); else onToggle(); }} className="h-11 text-xs sm:h-8">
+              <Button size="sm" variant="outline" onClick={() => { if (user.isActive) setConfirmBlock(true); else void runToggle(); }} disabled={busy} className="h-11 text-xs sm:h-8">
                 {user.isActive ? <PowerOff className="h-3.5 w-3.5" /> : <Power className="h-3.5 w-3.5" />}
                 {user.isActive ? 'Заблокировать' : 'Разблокировать'}
               </Button>
             )}
             {!isSelf && user.canHardDelete && (
-              <Button size="sm" variant="outline" onClick={onDelete} className="h-11 text-xs text-destructive-strong hover:bg-destructive/10 sm:h-8">
+              <Button size="sm" variant="outline" onClick={onDelete} disabled={busy} className="h-11 text-xs text-destructive-strong hover:bg-destructive/10 sm:h-8">
                 <Trash2 className="h-3.5 w-3.5" />Удалить
               </Button>
             )}
@@ -162,7 +175,7 @@ export function UserDetail({ user, isSelf, onEdit, onDelete, onToggle }: UserDet
         title="Заблокировать пользователя?"
         description={`${user.name} сразу потеряет доступ и будет выведен из системы.`}
         confirmLabel="Заблокировать доступ"
-        onConfirm={() => { setConfirmBlock(false); onToggle(); }}
+        onConfirm={() => { setConfirmBlock(false); void runToggle(); }}
       />
     </OpsDetailPanel>
   );

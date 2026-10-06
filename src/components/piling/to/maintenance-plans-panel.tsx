@@ -72,7 +72,6 @@ export function MaintenancePlansPanel({ equipmentId }: { equipmentId: string }) 
       if (!res.ok && res.status !== 404) {
         setPlans([]);
         setLoadError(loadFailureText(res.status));
-        toast.error('Не удалось загрузить регламенты');
         return;
       }
       const body = res.ok ? await res.json() as { plans?: Plan[] } : {};
@@ -81,7 +80,6 @@ export function MaintenancePlansPanel({ equipmentId }: { equipmentId: string }) 
     } catch {
       setPlans([]);
       setLoadError(loadFailureText(null));
-      toast.error('Не удалось загрузить регламенты');
     } finally {
       setLoading(false);
     }

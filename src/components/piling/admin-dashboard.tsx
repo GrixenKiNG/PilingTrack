@@ -25,6 +25,7 @@
 import { useAbility } from '@/lib/use-ability';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useDocumentTitle } from '@/components/piling/ops-shell';
 import {
   AlertTriangle, CameraOff, Clock, FileWarning, LayoutGrid,
   PauseCircle, TrendingDown, Truck, Building2, Wrench,
@@ -47,6 +48,20 @@ import {
   type FleetCard, type FleetSnapshot, type MaintRow, type RecentReport,
   type Risk, type SiteOption, type Tone,
 } from './admin-dashboard-bits';
+
+/**
+ * Порядок заполнения пустой системы (F-R127, №1). Показан только когда в
+ * системе нет ни объектов, ни техники: админ после входа видит нули и не
+ * понимает, с чего начать. Порядок выведен из зависимостей форм — марки свай
+ * нужны объекту, объект и оператор — бригаде.
+ */
+const ONBOARDING_STEPS = [
+  { label: 'Справочники', href: '/admin/dictionaries' },
+  { label: 'Объекты', href: '/admin/sites' },
+  { label: 'Установки', href: '/admin/equipment' },
+  { label: 'Пользователи', href: '/admin/users' },
+  { label: 'Бригады', href: '/admin/crews' },
+] as const;
 
 const OPEN_STATUSES = new Set(['PLANNED', 'ASSIGNED', 'IN_PROGRESS', 'ON_HOLD']);
 const REPAIR_TYPES = new Set(['REPAIR', 'FAULT']);
@@ -79,6 +94,7 @@ function rangeFor(mode: PeriodMode, from: string, to: string): { from: string; t
 }
 
 export function AdminDashboard() {
+  useDocumentTitle('Дашборд');
   const canReadMaintenance = useAbility('maintenance.manage');
   // Роль без `equipment.read` (мастер) на этом дашборде — не редкость: `/admin` —
   // её домашний экран, но карточка установки ей закрыта (`admin/equipment/layout.tsx`).
@@ -307,6 +323,13 @@ export function AdminDashboard() {
     stale.recent && 'отчёты',
   ].filter(Boolean).join(', ');
 
+  // F-R127 №1/№2. Пустая система — свежая база до онбординга: аналитика
+  // ответила успешно, но объектов нет, и парк пуст. Тогда нули на плитках —
+  // это «нечего считать», а не измеренный ноль, и нужен первый шаг.
+  const noData = analytics.length === 0 && !loadError;
+  const noFleet = kpis.rigsTotal === 0;
+  const emptySystem = noData && noFleet;
+
   if (showSkeleton) {
     return (
       <div className="space-y-4 p-4 lg:p-5">
@@ -326,12 +349,12 @@ export function AdminDashboard() {
     // (`activeToday` / `expected`), а не число сданных отчётов. «Смен сдано»
     // обещало смены: две смены одной установки дают два отчёта, но одну
     // машину (F-R35-3).
-    'dk-reports': { id: 'dk-reports', title: 'Отчёты', render: () => <KpiTile icon="reports" tone="blue" label="Отчёты" value={`${formatNumber(kpis.shiftsDone)} / ${formatNumber(kpis.reportsExpected)}`} sub="машин с отчётом сегодня" /> },
-    'dk-piles': { id: 'dk-piles', title: 'Сваи', render: () => <KpiTile icon="pile-group" tone="emerald" label="Сваи" value={loadError ? '—' : formatCountMeters(kpis.actualPiles, kpis.actualPileMeters)} sub={loadError ? 'Данные не загрузились' : `план ${formatCountMeters(kpis.plannedPiles, kpis.plannedPileMeters)}`} progress={loadError ? undefined : pileProgress} /> },
-    'dk-drilling': { id: 'dk-drilling', title: 'Бурение', render: () => <KpiTile icon="drilling-auger" tone="teal" label="Бурение" value={loadError ? '—' : formatCountMeters(kpis.actualDrillingCount, kpis.actualDrilling)} sub={loadError ? 'Данные не загрузились' : `план ${formatCountMeters(kpis.plannedDrillingCount, kpis.plannedDrilling)}`} progress={loadError ? undefined : drillingProgress} /> },
-    'dk-downtime': { id: 'dk-downtime', title: 'Простой', render: () => <KpiTile icon="downtime" tone="amber" label="Простой" value={loadError ? '—' : formatDowntimeHours(kpis.downtime)} sub={loadError ? 'Данные не загрузились' : 'за период'} /> },
-    'dk-rigs': { id: 'dk-rigs', title: 'Установки', render: () => <KpiTile icon="equipment-rig" tone="violet" label="Установки" value={kpis.rigsWorking == null ? '—' : `${kpis.rigsWorking} в работе`} sub={kpis.rigsTotal == null ? 'не загрузилось' : `из ${kpis.rigsTotal}`} progress={fleetProgress ?? undefined} /> },
-    'dk-maintenance': { id: 'dk-maintenance', title: 'ТО', render: () => <KpiTile icon="maintenance-due" tone="red" label="ТО" value={canReadMaintenance ? (kpis.toRisk == null ? '—' : `${formatNumber(kpis.toRisk)} риска`) : '—'} sub={canReadMaintenance ? (kpis.toRisk == null || kpis.rigsTotal == null ? 'не загрузилось' : `из ${kpis.rigsTotal} установок`) : 'Недоступно вашей роли'} /> },
+    'dk-reports': { id: 'dk-reports', title: 'Отчёты', render: () => <KpiTile icon="reports" tone="blue" label="Отчёты" value={noFleet ? '—' : `${formatNumber(kpis.shiftsDone)} / ${formatNumber(kpis.reportsExpected)}`} sub={noFleet ? 'нет установок' : 'машин с отчётом сегодня'} /> },
+    'dk-piles': { id: 'dk-piles', title: 'Сваи', render: () => <KpiTile icon="pile-group" tone="emerald" label="Сваи" value={loadError || noData ? '—' : formatCountMeters(kpis.actualPiles, kpis.actualPileMeters)} sub={loadError ? 'Данные не загрузились' : noData ? 'данных пока нет' : `план ${formatCountMeters(kpis.plannedPiles, kpis.plannedPileMeters)}`} progress={loadError || noData ? undefined : pileProgress} /> },
+    'dk-drilling': { id: 'dk-drilling', title: 'Бурение', render: () => <KpiTile icon="drilling-auger" tone="teal" label="Бурение" value={loadError || noData ? '—' : formatCountMeters(kpis.actualDrillingCount, kpis.actualDrilling)} sub={loadError ? 'Данные не загрузились' : noData ? 'данных пока нет' : `план ${formatCountMeters(kpis.plannedDrillingCount, kpis.plannedDrilling)}`} progress={loadError || noData ? undefined : drillingProgress} /> },
+    'dk-downtime': { id: 'dk-downtime', title: 'Простой', render: () => <KpiTile icon="downtime" tone="amber" label="Простой" value={loadError || noData ? '—' : formatDowntimeHours(kpis.downtime)} sub={loadError ? 'Данные не загрузились' : noData ? 'данных пока нет' : 'за период'} /> },
+    'dk-rigs': { id: 'dk-rigs', title: 'Установки', render: () => <KpiTile icon="equipment-rig" tone="violet" label="Установки" value={noFleet || kpis.rigsWorking == null ? '—' : `${kpis.rigsWorking} в работе`} sub={noFleet ? 'нет установок' : kpis.rigsTotal == null ? 'не загрузилось' : `из ${kpis.rigsTotal}`} progress={noFleet ? undefined : fleetProgress ?? undefined} /> },
+    'dk-maintenance': { id: 'dk-maintenance', title: 'ТО', render: () => <KpiTile icon="maintenance-due" tone="red" label="ТО" value={noFleet ? '—' : canReadMaintenance ? (kpis.toRisk == null ? '—' : `${formatNumber(kpis.toRisk)} риска`) : '—'} sub={noFleet ? 'нет установок' : canReadMaintenance ? (kpis.toRisk == null || kpis.rigsTotal == null ? 'не загрузилось' : `из ${kpis.rigsTotal} установок`) : 'Недоступно вашей роли'} /> },
   };
 
   return (
@@ -390,6 +413,7 @@ export function AdminDashboard() {
             onClick={refreshAll}
             className="flex h-9 w-9 items-center justify-center rounded-md border border-border bg-card text-muted-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-info/30"
             aria-label="Обновить дашборд"
+            title="Обновить дашборд"
           >
             <RefreshCw className="h-4 w-4" />
           </button>
@@ -418,6 +442,32 @@ export function AdminDashboard() {
         </div>
       )}
 
+      {/* F-R127 №1: на пустой базе админ видит только нули и не знает, с чего
+          начать. Блок называет порядок заполнения и ведёт в разделы. */}
+      {emptySystem && (
+        <div className="rounded-lg border border-info/30 bg-info/5 p-3">
+          <div className="text-sm font-semibold text-foreground">С чего начать</div>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            Система пока пустая. Заполните разделы по порядку — от справочников к бригадам.
+          </p>
+          <ol className="mt-2 grid gap-1 sm:grid-cols-2">
+            {ONBOARDING_STEPS.map((s, i) => (
+              <li key={s.href}>
+                <button
+                  type="button"
+                  onClick={() => router.push(s.href)}
+                  className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm text-foreground hover:bg-info/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-info/30"
+                >
+                  <span aria-hidden="true" className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-info/10 text-xs font-semibold text-info-strong">{i + 1}</span>
+                  <span className="min-w-0 flex-1">{s.label}</span>
+                  <span aria-hidden="true" className="shrink-0 text-muted-foreground">›</span>
+                </button>
+              </li>
+            ))}
+          </ol>
+        </div>
+      )}
+
       {/* KPI strip — состав/порядок/размер настраиваются в Настройки → Шаблоны плиток */}
       <PageLayoutRenderer template={layout.template} widgets={dashKpiWidgets} />
 
@@ -436,7 +486,14 @@ export function AdminDashboard() {
               /* Сбой аналитики объясняется на месте, только в своём блоке:
                  парк, ТО и риски приходят другими выборками и остаются. */
               <Empty text={loadError} tone="danger" />
-            ) : planRows.length === 0 ? <Empty text="Для выбранного периода нет объектов с планом" /> : (
+            ) : planRows.length === 0 ? (
+              /* F-R127 №3: на пустой базе отбор не при чём — объектов нет вовсе.
+                 Текст винил фильтр и не звал завести объект. */
+              noData && siteFilter === 'all' && rigFilter === 'all'
+                ? <Empty text="В системе пока нет объектов с планом. Заведите первый объект"
+                    action={{ label: 'Новый объект', onClick: () => router.push('/admin/sites') }} />
+                : <Empty text="Для выбранного периода нет объектов с планом" />
+            ) : (
               <div className="grid gap-2 p-3 sm:grid-cols-2">
                 {planRows.map((a) => <PlanTile key={a.siteId} a={a} />)}
               </div>
@@ -449,9 +506,20 @@ export function AdminDashboard() {
             {fleetRows.length === 0 ? (
               (stale.fleet || stale.maint)
                 ? <Empty text="Не удалось загрузить парк установок. Обновите сводку." tone="warning" />
-                : <Empty text="По выбранным фильтрам установок нет" />
+                /* F-R127 №4: пустой парк — «ещё не заводили», а не «отбор не дал».
+                   Ссылка ведёт в раздел, только если он доступен роли. */
+                : noFleet
+                  ? <Empty text="В парке пока нет установок. Добавьте первую"
+                      action={canReadEquipment ? { label: 'Добавить установку', onClick: () => router.push('/admin/equipment') } : undefined} />
+                  : <Empty text="По выбранным фильтрам установок нет" />
             ) : canReadEquipment ? (
-              <div className="grid gap-2 p-3 sm:grid-cols-2">
+              /* F-R126-2: у плитки установки прямые потомки — `div.truncate`
+                 (white-space: nowrap) без min-w-0, поэтому её min-content
+                 ширина = ширина текста. Плитка становилась шире колонки, а
+                 Section с overflow-hidden срезал правый край вместе с бейджем
+                 статуса («Требует ТО», «Ждём отчёт»). [&>*]:min-w-0 — как на
+                 соседней сетке план-факта выше. */
+              <div className="grid gap-2 p-3 sm:grid-cols-2 [&>*]:min-w-0">
                 {fleetRows.map((r) => (
                   <RigTile key={r.id} r={r} status={rigStatus(r)} onOpen={() => router.push(`/admin/equipment/${r.id}`)} />
                 ))}
@@ -475,7 +543,13 @@ export function AdminDashboard() {
 
         <Section icon={AlertTriangle} title="Риски дня" count={visibleRisks.length} dominant>
           {visibleRisks.length === 0 ? (
-            (stale.fleet || stale.maint || stale.recent) ? <Empty text="Часть данных не загрузилась" tone="warning" /> : <Empty text={canReadMaintenance ? "Рисков нет" : "Рисков в доступных данных нет"} tone="success" />
+            (stale.fleet || stale.maint || stale.recent)
+              ? <Empty text="Часть данных не загрузилась" tone="warning" />
+              /* F-R127 №5: пустая база — не «всё в порядке», а «нечего оценивать»:
+                 зелёное «Рисков нет» на нулях читалось как измеренный факт. */
+              : emptySystem
+                ? <Empty text="Данных пока нет — нечего оценивать" />
+                : <Empty text={canReadMaintenance ? "Рисков нет" : "Рисков в доступных данных нет"} tone="success" />
           ) : (
             <div className="divide-y divide-border">
               <RiskGroup title="Критично" risks={groupedRisks.critical} onOpen={(href) => router.push(href)} />

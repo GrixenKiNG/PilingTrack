@@ -21,6 +21,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useDocumentTitle } from '@/components/piling/ops-shell';
 import { cn } from '@/lib/utils';
 import { authFetch } from '@/lib/api';
 import { formatCountMeters, formatHours, formatRelative, formatRuDate } from '@/lib/format';
@@ -75,6 +76,7 @@ function fleetFailureMessage(status: number): string {
 }
 
 export function FleetDashboard() {
+  useDocumentTitle('Мониторинг');
   const [snap, setSnap] = useState<FleetSnapshot | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [siteFilter, setSiteFilter] = useState('');

@@ -11,6 +11,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { useDocumentTitle } from '@/components/piling/ops-shell';
 import {
   AlertTriangle,
   CalendarDays,
@@ -60,12 +61,17 @@ const ALL = '__all__';
 const PAGE_SIZE_OPTIONS = [10, 25, 50] as const;
 
 export function MaintenanceBoard() {
+  useDocumentTitle('Наряды ТО');
   const [records, setRecords] = useState<WorkOrderRow[]>([]);
   const [equipment, setEquipment] = useState<EquipmentDTO[]>([]);
   const [sites, setSites] = useState<SiteOption[]>([]);
   const [crews, setCrews] = useState<CrewAssignment[]>([]);
   const [assignees, setAssignees] = useState<AssigneeOption[]>([]);
   const [filterError, setFilterError] = useState<string | null>(null);
+  // Почему журнал не показан: текст отказа чтения. Раньше на сбое рядом с красным
+  // тостом оставался серый «Нарядов … не найдено» — экран утверждал, что нарядов
+  // нет, хотя список просто не прочитался (F-R122-11).
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [filter, setFilter] = useState<MaintenanceFilter>({});
   const [equipmentFilterId, setEquipmentFilterId] = useState('');
   const [siteFilterId, setSiteFilterId] = useState('');
@@ -98,12 +104,15 @@ export function MaintenanceBoard() {
       // звучали как «не удалось загрузить», и отказ по правам не отличался от сбоя.
       if (!res.ok) {
         if (!quiet) toast.error(maintenanceErrorText(res.status));
+        setLoadError(maintenanceErrorText(res.status));
         return false;
       }
       setRecords(((await res.json()).records ?? []) as WorkOrderRow[]);
+      setLoadError(null);
       return true;
     } catch (err) {
       if (!quiet) toast.error(maintenanceCatchText(err, 'Не удалось загрузить наряды ТО'));
+      setLoadError(maintenanceCatchText(err, 'Не удалось загрузить наряды ТО'));
       return false;
     } finally {
       setLoading(false);
@@ -374,6 +383,15 @@ export function MaintenanceBoard() {
         <section className="overflow-hidden rounded-lg border border-border bg-card">
           {loading ? (
             <div className="px-3 py-10 text-center text-sm text-muted-foreground">Загрузка…</div>
+          ) : loadError && shownRecords.length === 0 ? (
+            // Сбой чтения — не «нарядов нет»: показываем отказ с повтором, иначе
+            // серый текст противоречил красному тосту об ошибке (F-R122-11).
+            <div className="px-3 py-10 text-center text-sm text-muted-foreground">
+              <p>{loadError}</p>
+              <Button size="sm" variant="outline" className="mt-3 min-h-11 sm:min-h-0" onClick={() => void load()}>
+                Повторить
+              </Button>
+            </div>
           ) : shownRecords.length === 0 ? (
             <div className="px-3 py-10 text-center text-sm text-muted-foreground">Нарядов по выбранным фильтрам не найдено.</div>
           ) : (
@@ -390,7 +408,11 @@ export function MaintenanceBoard() {
           )}
         </section>
 
-        <div className="flex items-center justify-between px-1 pb-2 text-xs text-muted-foreground">
+        {/* F-R126-1: на 375 px строка пагинации (блок «Показать по:» + номера
+            страниц по 44 px) не влезала и растягивала страницу до 503 px —
+            единственный экран админки с горизонтальной прокруткой. flex-wrap
+            переносит блоки, gap-2 даёт отступ при переносе. */}
+        <div className="flex flex-wrap items-center justify-between gap-2 px-1 pb-2 text-xs text-muted-foreground">
           <div className="flex items-center gap-2">
             <span>Показать по:</span>
             <Select value={String(pageSize)} onValueChange={(value) => setPageSize(Number(value))}>

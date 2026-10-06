@@ -19,6 +19,7 @@ import type { WorkPermitDto } from '../api/contracts';
 import { CommandDialog } from '../shared/command-dialog';
 import { PermitForm } from '../forms/permit-form';
 import { ProcessRoleStrip, RefKpi, commandFailure, downloadReadinessExport } from './shared';
+import { normalizeSearch } from '../shared/text-search';
 import type { ReferenceUiProps } from './types';
 
 function EvidenceState({ state }: { state: string }) {
@@ -98,6 +99,15 @@ export function PermitsScreen(props: ReferenceUiProps) {
     (журнал ТО грузится по одной), поэтому плитка «Техника» показывала
     «Осмотрено: 0 из 9» при девяти выполненных осмотрах.
   */
+  /*
+    Отказ авторитетного ТЕКУЩЕГО снимка — это «не прочитано», а не «осмотров
+    нет». При нём `currentReadiness` пуст, по нему выходили «Осмотрено: 0 из N»,
+    «Регламент ТО соблюдён: 0 из N» и зелёный pass на плитках, хотя сервер
+    вердикта не вынес (F-N1005-PERMIT-EVIDENCE). Плитки допуска обязаны
+    показать непроверенность; независимо загруженные наряды и решения
+    (ограничения, ожидающие согласования) остаются как есть.
+  */
+  const authoritativeUnknown = props.authoritativeReadinessError !== null;
   const inspectedCount = props.currentReadiness.filter((item) => item.facts?.inspectionCompleted).length;
   const maintenanceOkCount = props.currentReadiness.filter((item) => item.facts
     && item.facts.maintenanceConfigured
@@ -117,8 +127,8 @@ export function PermitsScreen(props: ReferenceUiProps) {
   const filteredPermits = props.permits.filter((permit) => {
     if (permitFilter !== 'ALL' && permit.state !== permitFilter) return false;
     const equipmentName = props.equipment.find((item) => item.id === permit.equipmentId)?.name ?? '';
-    const query = permitQuery.trim().toLocaleLowerCase('ru-RU');
-    return !query || permit.id.toLocaleLowerCase('ru-RU').includes(query) || equipmentName.toLocaleLowerCase('ru-RU').includes(query) || permit.scope.toLocaleLowerCase('ru-RU').includes(query);
+    const query = normalizeSearch(permitQuery);
+    return !query || normalizeSearch(permit.id).includes(query) || normalizeSearch(equipmentName).includes(query) || normalizeSearch(permit.scope).includes(query);
   });
   const runPermitAction = async (permit: WorkPermitDto, action: 'submit' | 'approve' | 'revoke', confirmed = false) => {
     if (!confirmed) { setCommand({permit, action}); setCommandText(''); setCommandError(null); return; }
@@ -226,11 +236,11 @@ export function PermitsScreen(props: ReferenceUiProps) {
                       : 'Документы действуют',
               ],
             },
-            { title: 'Техника', icon: 'equipment-rig' as PilingIconName, state: blocked > 0 ? 'warning' : 'pass', lines: [`Ограничений: ${blocked}`, `Осмотрено: ${inspectedCount} из ${props.equipment.length}`] },
+            { title: 'Техника', icon: 'equipment-rig' as PilingIconName, state: blocked > 0 ? 'warning' : authoritativeUnknown ? 'missing' : 'pass', lines: [`Ограничений: ${blocked}`, authoritativeUnknown ? 'Осмотрено: не проверено — авторитетный снимок недоступен' : `Осмотрено: ${inspectedCount} из ${props.equipment.length}`] },
             { title: 'Место работ', icon: 'site' as PilingIconName, state: props.crews.some((crew) => crew.isActive && crew.site) ? 'pass' : 'missing', lines: [`Объектов: ${new Set(props.crews.flatMap((crew) => crew.site?.id ? [crew.site.id] : [])).size}`,
               // Подтверждения схемы площадки в системе нет — не делаем вид, что есть.
               `Экипажей без объекта: ${props.crews.filter((crew) => crew.isActive && !crew.site).length}`] },
-            { title: 'Документы', icon: 'documents' as PilingIconName, state: pending > 0 ? 'warning' : 'pass', lines: [`Регламент ТО соблюдён: ${maintenanceOkCount} из ${props.equipment.length}`, pending > 0 ? `Ожидают: ${pending}` : 'Решения подтверждены'] },
+            { title: 'Документы', icon: 'documents' as PilingIconName, state: pending > 0 ? 'warning' : authoritativeUnknown ? 'missing' : 'pass', lines: [authoritativeUnknown ? 'Регламент ТО соблюдён: не проверено — авторитетный снимок недоступен' : `Регламент ТО соблюдён: ${maintenanceOkCount} из ${props.equipment.length}`, pending > 0 ? `Ожидают: ${pending}` : 'Решения подтверждены'] },
           ].map((item) => (
             <article key={item.title} className="rounded-lg border border-border p-2">
               <div className="flex items-center gap-2"><span className="grid h-8 w-8 place-items-center rounded-lg bg-info/10 text-info-strong"><PilingIcon name={item.icon} size={12} decorative /></span><div className="min-w-0 flex-1"><h3 className="text-xs font-bold">{item.title}</h3><EvidenceState state={item.state} /></div></div>

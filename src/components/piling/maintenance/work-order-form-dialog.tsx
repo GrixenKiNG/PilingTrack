@@ -99,6 +99,13 @@ function engineHoursError(value: string): string | null {
 interface AssigneeOption { id: string; name: string }
 interface EquipmentOption { id: string; name: string }
 
+/** Моменты загруженной записи как есть (ISO) — чтобы не переписать их днём из поля. */
+interface LoadedMoments {
+  scheduledAt: string | null;
+  startedAt: string | null;
+  completedAt: string | null;
+}
+
 export function WorkOrderFormDialog({
   open, onOpenChange, equipmentId, editingId, initial, onSaved,
 }: WorkOrderFormDialogProps) {
@@ -109,6 +116,13 @@ export function WorkOrderFormDialog({
   const [loadedEquipmentId, setLoadedEquipmentId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(false);
+  // Моменты правящейся записи целиком. В полях дат стоит только день, и без этой
+  // памяти «Сохранить» без единой правки отправляло день вместо момента — время
+  // закрытия/начала терялось (F-R122-1).
+  const [loadedMoments, setLoadedMoments] = useState<LoadedMoments | null>(null);
+  // Сбой чтения правящейся записи: форму показывать нельзя — иначе «Сохранить»
+  // уходит с полями предыдущего открытия (F-R122-2).
+  const [recordLoadFailed, setRecordLoadFailed] = useState(false);
 
   const set = <K extends keyof WorkOrderFormValues>(key: K, value: WorkOrderFormValues[K]) =>
     setForm((p) => ({ ...p, [key]: value }));
@@ -116,6 +130,11 @@ export function WorkOrderFormDialog({
   // Подготовка диалога при открытии: справочники + префилл редактируемой записи.
   const prepare = useCallback(async () => {
     setLoading(true);
+    // Сбрасываем прежние значения при каждом открытии: сбой чтения не должен
+    // оставлять на экране поля предыдущего наряда (F-R122-2).
+    setRecordLoadFailed(false);
+    setForm(EMPTY_FORM);
+    setLoadedMoments(null);
     try {
       const reqs: Promise<void>[] = [];
 
@@ -138,6 +157,11 @@ export function WorkOrderFormDialog({
           const { record } = await res.json();
           setLoadedEquipmentId(record.equipmentId ?? null);
           setEquipmentSel(record.equipmentId ?? equipmentId ?? '');
+          setLoadedMoments({
+            scheduledAt: record.scheduledAt ?? null,
+            startedAt: record.startedAt ?? null,
+            completedAt: record.completedAt ?? null,
+          });
           setForm({
             type: (record.type as MaintenanceType) || 'SCHEDULED',
             status: (record.status as MaintenanceStatus) || 'PLANNED',
@@ -160,10 +184,14 @@ export function WorkOrderFormDialog({
         setForm({ ...EMPTY_FORM, ...initial });
         setEquipmentSel(equipmentId ?? '');
         setLoadedEquipmentId(null);
+        setLoadedMoments(null);
       }
 
       await Promise.all(reqs);
     } catch {
+      // Сбой именно чтения правящейся записи (или обрыв при её загрузке): форму
+      // не рисуем, иначе «Сохранить» уйдёт с чужими полями (F-R122-2).
+      if (editingId) setRecordLoadFailed(true);
       toast.error('Не удалось загрузить данные наряда');
     } finally {
       setLoading(false);
@@ -190,6 +218,12 @@ export function WorkOrderFormDialog({
     }
     setBusy(true);
     try {
+      // Поле даты хранит только день. Если человек его не менял, уходит исходный
+      // момент целиком: иначе «2026-09-25» превращался бы в полночь UTC и
+      // переписывал сохранённое время закрытия (26.09 00:30 МСК → 25.09 03:00) —
+      // тем же моментом потом датировалось показание счётчика (F-R122-1).
+      const moment = (value: string, original: string | null): string | null =>
+        (loadedMoments && value === toInputDate(original) ? original : (value || null));
       const payload = {
         type: form.type,
         status: form.status,
@@ -200,9 +234,9 @@ export function WorkOrderFormDialog({
         workDone: form.workDone.trim() || null,
         partsUsedText: form.partsUsedText.trim() || null,
         assigneeId: form.assigneeId || null,
-        scheduledAt: form.scheduledAt || null,
-        startedAt: form.startedAt || null,
-        completedAt: form.completedAt || null,
+        scheduledAt: moment(form.scheduledAt, loadedMoments?.scheduledAt ?? null),
+        startedAt: moment(form.startedAt, loadedMoments?.startedAt ?? null),
+        completedAt: moment(form.completedAt, loadedMoments?.completedAt ?? null),
         engineHoursAtService: form.engineHoursAtService || null,
         laborHours: form.laborHours || null,
         cost: form.cost || null,
@@ -238,6 +272,15 @@ export function WorkOrderFormDialog({
 
         {loading ? (
           <p className="rounded-lg bg-muted px-3 py-6 text-center text-sm text-muted-foreground">Загрузка…</p>
+        ) : recordLoadFailed ? (
+          // Не показываем форму с чужими/пустыми полями: без прочитанной записи
+          // «Сохранить» переписал бы наряд значениями предыдущего открытия (F-R122-2).
+          <div className="rounded-lg bg-muted px-3 py-6 text-center text-sm text-muted-foreground">
+            <p>Не удалось загрузить наряд для правки</p>
+            <Button size="sm" variant="outline" className="mt-3 min-h-11 sm:min-h-0" onClick={() => void prepare()}>
+              Повторить
+            </Button>
+          </div>
         ) : (
           <div className="space-y-3">
             {!equipmentId && (
@@ -312,24 +355,24 @@ export function WorkOrderFormDialog({
               <Label htmlFor="wo-title">Название *</Label>
               <Input id="wo-title" value={form.title}
                 onChange={(e) => set('title', e.target.value)}
-                placeholder="Напр. Замена масла ГСМ, ТО-2" />
+                placeholder="Напр. Замена масла ГСМ, ТО-2" className="min-h-11 sm:min-h-0" />
             </div>
 
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               <div>
                 <Label htmlFor="wo-scheduled">План</Label>
                 <Input id="wo-scheduled" type="date" value={form.scheduledAt}
-                  onChange={(e) => set('scheduledAt', e.target.value)} />
+                  onChange={(e) => set('scheduledAt', e.target.value)} className="min-h-11 sm:min-h-0" />
               </div>
               <div>
                 <Label htmlFor="wo-started">Начато</Label>
                 <Input id="wo-started" type="date" value={form.startedAt}
-                  onChange={(e) => set('startedAt', e.target.value)} />
+                  onChange={(e) => set('startedAt', e.target.value)} className="min-h-11 sm:min-h-0" />
               </div>
               <div>
                 <Label htmlFor="wo-completed">Выполнено</Label>
                 <Input id="wo-completed" type="date" value={form.completedAt}
-                  onChange={(e) => set('completedAt', e.target.value)} />
+                  onChange={(e) => set('completedAt', e.target.value)} className="min-h-11 sm:min-h-0" />
               </div>
             </div>
 
@@ -337,18 +380,18 @@ export function WorkOrderFormDialog({
               <div>
                 <Label htmlFor="wo-hours">Моточасы</Label>
                 <Input id="wo-hours" type="number" min={0} step={1} value={form.engineHoursAtService}
-                  onChange={(e) => set('engineHoursAtService', e.target.value)} />
+                  onChange={(e) => set('engineHoursAtService', e.target.value)} className="min-h-11 sm:min-h-0" />
                 <p className="mt-1 text-xs text-muted-foreground">Целое число, не меньше 0</p>
               </div>
               <div>
                 <Label htmlFor="wo-labor">Трудоч.</Label>
                 <Input id="wo-labor" type="number" min={0} value={form.laborHours}
-                  onChange={(e) => set('laborHours', e.target.value)} />
+                  onChange={(e) => set('laborHours', e.target.value)} className="min-h-11 sm:min-h-0" />
               </div>
               <div>
                 <Label htmlFor="wo-cost">Стоим., ₽</Label>
                 <Input id="wo-cost" type="number" min={0} value={form.cost}
-                  onChange={(e) => set('cost', e.target.value)} />
+                  onChange={(e) => set('cost', e.target.value)} className="min-h-11 sm:min-h-0" />
               </div>
             </div>
 
@@ -380,7 +423,7 @@ export function WorkOrderFormDialog({
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>Отмена</Button>
-          <Button onClick={submit} disabled={busy || loading} className="bg-signal hover:bg-signal-strong text-white">
+          <Button onClick={submit} disabled={busy || loading || recordLoadFailed} className="bg-signal hover:bg-signal-strong text-white">
             {busy && <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />}
             {editingId ? 'Сохранить' : 'Создать'}
           </Button>

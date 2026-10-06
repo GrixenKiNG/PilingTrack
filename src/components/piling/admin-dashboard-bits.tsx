@@ -9,7 +9,7 @@
 import { type ReactNode } from 'react';
 import { type LucideIcon } from '@/components/piling/icons/unified-icons';
 import { cn } from '@/lib/utils';
-import { formatCountMeters, formatNumber } from '@/lib/format';
+import { formatCountMeters, formatNumber, pluralizeRu } from '@/lib/format';
 import { PilingIcon, type PilingIconName } from '@/components/piling/icons';
 import type { SiteAnalyticsDTO } from '@/lib/types';
 
@@ -109,7 +109,7 @@ export function PlanTile({ a }: { a: SiteAnalyticsDTO }) {
     <div className="space-y-2 rounded-lg border border-border bg-card p-3">
       <div className="flex items-baseline justify-between gap-2">
         <span className="truncate text-sm font-semibold text-foreground">{a.siteName}</span>
-        <span className="shrink-0 text-xs text-muted-foreground">{formatNumber(a.totalReports)} отч.</span>
+        <span className="shrink-0 text-xs text-muted-foreground">{formatNumber(a.totalReports)} {pluralizeRu(a.totalReports, ['отчёт', 'отчёта', 'отчётов'])}</span>
       </div>
       <div>
         <div className="mb-0.5 text-xs text-muted-foreground">Сваи · план {formatCountMeters(a.plannedPiles, a.plannedPileMeters)}</div>
@@ -231,6 +231,23 @@ export function Section({ icon: Icon, title, count, dominant, footerLabel, onFoo
   );
 }
 
-export function Empty({ text, tone = 'muted' }: { text: string; tone?: Tone }) {
-  return <div className={cn('px-3 py-8 text-center text-sm', TONE_TEXT[tone])}>{text}</div>;
+export function Empty({ text, tone = 'muted', action }: {
+  text: string; tone?: Tone; action?: { label: string; onClick: () => void };
+}) {
+  return (
+    <div className={cn('px-3 py-8 text-center text-sm', TONE_TEXT[tone])}>
+      <div>{text}</div>
+      {/* F-R127 №3/№4: пустое состояние на свежей базе зовёт к первому действию
+          («Заведите первый объект», «Добавьте первую»), а не винит отбор. */}
+      {action && (
+        <button
+          type="button"
+          onClick={action.onClick}
+          className="mt-2 text-sm font-medium text-info-strong hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-info/30"
+        >
+          {action.label}
+        </button>
+      )}
+    </div>
+  );
 }

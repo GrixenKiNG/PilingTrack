@@ -4,8 +4,8 @@
  * вызов возвращает null и нажатие молча ничего не делало. Теперь отказ
  * объясняется сообщением.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { toast } from 'sonner';
 import type { ReferenceUiProps } from '../types';
 
@@ -75,4 +75,39 @@ it('opens a blank window first, clears its opener and then navigates without a f
     expect(popup.location.href).toMatch(/^\/print\/briefing-journal\?/);
     expect(toast.error).not.toHaveBeenCalled();
   } finally { open.mockRestore(); }
+});
+
+
+describe('журнал инструктажей: подсчёт сегодняшних событий по часовому поясу тенанта (F-R114-8)', () => {
+  const previousTimezone = process.env.TZ;
+
+  beforeEach(() => {
+    process.env.TZ = 'UTC';
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date('2026-10-03T01:30:00.000Z'));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    if (previousTimezone === undefined) delete process.env.TZ;
+    else process.env.TZ = previousTimezone;
+  });
+
+  it('считает «сегодня» и «вчера» в зоне тенанта, а не браузера', async () => {
+    const rows = [
+      { ...journalRow, id: 'yesterday', recordedAt: '2026-10-02T06:00:00.000Z' },
+      { ...journalRow, id: 'today-1', recordedAt: '2026-10-02T17:00:00.000Z' },
+      { ...journalRow, id: 'today-2', recordedAt: '2026-10-02T18:00:00.000Z' },
+      { ...journalRow, id: 'tomorrow', recordedAt: '2026-10-03T07:00:00.000Z' },
+    ];
+    mocks.authFetch.mockResolvedValue({ ok: true, json: async () => ({ rows, truncated: false }) });
+    render(<BriefingsScreen {...({ bootstrap: { tenant: { timezone: 'America/Los_Angeles' } } } as unknown as ReferenceUiProps)} />);
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(screen.getByText('в сравнении со вчера: +1')).toBeInTheDocument();
+  });
 });

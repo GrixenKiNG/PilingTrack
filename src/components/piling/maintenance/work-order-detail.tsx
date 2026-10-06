@@ -11,7 +11,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Camera, ClipboardCheck, Loader2, UserCog, Wrench } from '@/components/piling/icons/unified-icons';
+import { Camera, ClipboardCheck, Loader2, UserCog, Wrench } from '@/components/piling/icons/unified-icons';
+import { OpsBreadcrumb } from '@/components/piling/ops-shell';
 import { toast } from 'sonner';
 import { authFetch } from '@/lib/api';
 import { formatRuDate } from '@/lib/format';
@@ -283,7 +284,7 @@ export function WorkOrderDetail({ recordId }: { recordId: string }) {
 
   return (
     <div className="mx-auto w-full max-w-3xl px-4 py-6 field-type">
-      <BackLink />
+      <BackLink current={record.title} />
 
       <div className="mt-4 rounded-xl border bg-card p-4">
         <div className="flex flex-wrap items-center gap-2">
@@ -400,19 +401,19 @@ export function WorkOrderDetail({ recordId }: { recordId: string }) {
           </div>
           <div>
             <Label htmlFor="q-started">Начато</Label>
-            <Input id="q-started" type="date" value={quick.startedAt} onChange={(e) => setQ('startedAt', e.target.value)} />
+            <Input id="q-started" type="date" value={quick.startedAt} onChange={(e) => setQ('startedAt', e.target.value)} className="min-h-11 sm:min-h-0" />
           </div>
           <div>
             <Label htmlFor="q-hours">Моточасы</Label>
-            <Input id="q-hours" type="number" min={0} value={quick.engineHoursAtService} onChange={(e) => setQ('engineHoursAtService', e.target.value)} />
+            <Input id="q-hours" type="number" min={0} value={quick.engineHoursAtService} onChange={(e) => setQ('engineHoursAtService', e.target.value)} className="min-h-11 sm:min-h-0" />
           </div>
           <div>
             <Label htmlFor="q-labor">Трудочасы</Label>
-            <Input id="q-labor" type="number" min={0} value={quick.laborHours} onChange={(e) => setQ('laborHours', e.target.value)} />
+            <Input id="q-labor" type="number" min={0} value={quick.laborHours} onChange={(e) => setQ('laborHours', e.target.value)} className="min-h-11 sm:min-h-0" />
           </div>
           <div>
             <Label htmlFor="q-cost">Стоимость, ₽</Label>
-            <Input id="q-cost" type="number" min={0} value={quick.cost} onChange={(e) => setQ('cost', e.target.value)} />
+            <Input id="q-cost" type="number" min={0} value={quick.cost} onChange={(e) => setQ('cost', e.target.value)} className="min-h-11 sm:min-h-0" />
           </div>
         </div>
         <div className="mt-3 space-y-3">
@@ -497,10 +498,13 @@ function PersonRow({ label, name, at, fallback }: {
   );
 }
 
-function BackLink() {
+function BackLink({ current }: { current?: string } = {}) {
   return (
-    <Link href="/admin/maintenance" className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-signal-strong">
-      <ArrowLeft className="w-3 h-3" /> К списку нарядов
-    </Link>
+    <OpsBreadcrumb
+      items={[
+        { label: 'Наряды ТО', href: '/admin/maintenance' },
+        ...(current ? [{ label: current }] : []),
+      ]}
+    />
   );
 }

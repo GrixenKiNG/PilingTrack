@@ -70,7 +70,6 @@ export function FuelPanel({ equipmentId }: { equipmentId: string }) {
         setEntries([]);
         setSummary(null);
         setLoadError(loadFailureText(res.status));
-        toast.error('Не удалось загрузить журнал топлива');
         return;
       }
       const data = res.ok
@@ -83,7 +82,6 @@ export function FuelPanel({ equipmentId }: { equipmentId: string }) {
       setEntries([]);
       setSummary(null);
       setLoadError(loadFailureText(null));
-      toast.error('Не удалось загрузить журнал топлива');
     } finally {
       setLoading(false);
     }

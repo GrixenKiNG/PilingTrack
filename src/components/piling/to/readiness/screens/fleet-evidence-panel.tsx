@@ -8,7 +8,7 @@ import { formatDateTimeInTimezone } from '@/lib/timezone';
 import { cn } from '@/lib/utils';
 import { fetchReadinessDefects } from '../api/client';
 import type { DefectDto } from '../api/contracts';
-import { EquipmentPhoto } from './shared';
+import { EquipmentPhoto, blockerTone, BLOCKER_TONE_CLASS } from './shared';
 import type { ReferenceUiProps } from './types';
 import type { FleetGroup, FleetItem } from './fleet-workspace-model';
 
@@ -38,7 +38,7 @@ export function FleetSourceLink({ href, children }: { href: string; children: Re
 
 export function FleetEvidencePanel({ item, props }: { item: FleetItem; props: ReferenceUiProps }) {
   const [section, setSection] = useState<Section>('basis');
-  const [defectResult, setDefectResult] = useState<{ id: string; data?: DefectDto[]; error?: string } | null>(null);
+  const [defectResult, setDefectResult] = useState<{ key: string; data?: DefectDto[]; error?: string } | null>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const { equipment, presentation, snapshot } = item;
   const detail = props.details[equipment.id];
@@ -47,21 +47,37 @@ export function FleetEvidencePanel({ item, props }: { item: FleetItem; props: Re
   const maintenanceUnavailable = props.outOfRoleSources.includes('Обслуживание и журнал ТО');
   const detailError = props.workspaceIssues.find((issue) => issue.source === `Карточка «${equipment.name}»`);
   const maintenanceError = props.workspaceIssues.find((issue) => issue.source === 'Обслуживание');
+  // Отказ догрузки журнала выбранной установки — отдельный от отказа карточки
+  // источник. Раньше он нигде не показывался, и пустой журнал читался как
+  // «записей нет» (R151 №3).
+  const journalError = props.workspaceIssues.find((issue) => issue.source === `Журнал «${equipment.name}»`);
   const records = props.maintenance.filter((record) => record.equipment?.id === equipment.id);
   const inspectionEvidence = presentation.evidence.find((evidence) => evidence.key === 'inspection');
   const inspection = detail?.latestInspection;
   const date = (value: string | null | undefined) => value && Number.isFinite(Date.parse(value))
     ? formatDateTimeInTimezone(value, timezone) : 'Дата не указана';
 
+  /*
+   * Список дефектов привязан не только к установке и вкладке, но и к снимку
+   * оценки: «Обновить данные» перезагружает модуль, не пересоздавая панель
+   * (её ключ — equipmentId), поэтому без снимка открытый журнал оставался
+   * прежним рядом со свежей оценкой (R151 №8). Идентификатор снимка — готовый
+   * признак завершённого пересчёта: новый снимок даёт новый `snapshotId`, а
+   * на время загрузки снимок не сбрасывается, поэтому на каждый тик `loading`
+   * запрос не повторяется. Ключ результата хранит, к какому снимку относится
+   * ответ: пока снимок иной, прежний список не выдаётся за свежий.
+   */
+  const defectKey = `${equipment.id}:${snapshot?.snapshotId ?? ''}`;
   useEffect(() => {
     if (section !== 'defects') return;
     const controller = new AbortController();
+    const key = `${equipment.id}:${snapshot?.snapshotId ?? ''}`;
     void fetchReadinessDefects(controller.signal, { equipmentId: equipment.id }).then(
-      (data) => { if (!controller.signal.aborted) setDefectResult({ id: equipment.id, data: data.filter((record) => record.equipmentId === equipment.id) }); },
-      (error: unknown) => { if (!controller.signal.aborted) setDefectResult({ id: equipment.id, error: error instanceof Error ? error.message : 'Не удалось загрузить дефекты' }); },
+      (data) => { if (!controller.signal.aborted) setDefectResult({ key, data: data.filter((record) => record.equipmentId === equipment.id) }); },
+      (error: unknown) => { if (!controller.signal.aborted) setDefectResult({ key, error: error instanceof Error ? error.message : 'Не удалось загрузить дефекты' }); },
     );
     return () => controller.abort();
-  }, [equipment.id, section]);
+  }, [equipment.id, section, snapshot?.snapshotId]);
 
   const chooseSection = (next: Section) => {
     setSection(next);
@@ -111,7 +127,12 @@ export function FleetEvidencePanel({ item, props }: { item: FleetItem; props: Re
       {section === 'basis' && <>
         <p className="mt-2 text-sm leading-relaxed">{presentation.description}</p>
         {(presentation.blockers.length > 0 || presentation.warnings.length > 0) && <ul className="mt-3 space-y-2 text-sm">
-          {presentation.blockers.map((notice, index) => <li key={`block-${index}`} className="flex gap-2 rounded-lg bg-destructive/10 p-3"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive-strong" /><span>{notice.label}</span></li>)}
+          {presentation.blockers.map((notice, index) => {
+            // Цвет по действию блокера: возврат оператору — не то же самое, что
+            // запрет пуска (см. блокер «нет осмотра за сегодня»).
+            const tone = BLOCKER_TONE_CLASS[blockerTone(notice.action)];
+            return <li key={`block-${index}`} className={cn('flex gap-2 rounded-lg p-3', tone.box)}><AlertTriangle className={cn('mt-0.5 h-4 w-4 shrink-0', tone.icon)} /><span>{notice.label}{notice.actionLabel && <span className="mt-0.5 block text-xs text-muted-foreground">{notice.actionLabel}</span>}</span></li>;
+          })}
           {presentation.warnings.map((notice, index) => <li key={`warning-${index}`} className="flex gap-2 rounded-lg bg-signal/10 p-3"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-signal-strong" /><span>{notice.label}</span></li>)}
         </ul>}
         <p className="mb-2 mt-4 text-xs font-semibold text-muted-foreground">Факты на момент оценки</p><p className="mb-3 text-xs leading-relaxed text-muted-foreground">Незавершённый пункт не всегда блокирует работу: это зависит от действующих правил оценки.</p>
@@ -173,15 +194,27 @@ export function FleetEvidencePanel({ item, props }: { item: FleetItem; props: Re
           <p className="mt-2">Следующее ТО: {detail.equipment?.nextMaintenanceAtHours?.toLocaleString('ru-RU') ?? 'не задано'} ч</p>
           <p className="mt-2">По дате: {date(detail.equipment?.nextMaintenanceDate)}</p>
         </div>}
-        {maintenanceUnavailable ? <p>Журнал ТО недоступен текущей роли.</p> : maintenanceError ? <p role="alert">{maintenanceError.message}</p> : records.length ? records.map((record) => <article key={record.id} className="rounded-lg border border-border p-3">
-          <p className="font-semibold">{record.title}</p><p className="mt-1">{RECORD_STATUS[record.status] ?? record.status}</p>
-          <p className="mt-1 text-xs text-muted-foreground">Создано: {date(record.createdAt)}</p>
-          <FleetSourceLink href={`/admin/maintenance/${record.id}`}>Открыть эту запись</FleetSourceLink>
-        </article>) : <p className="rounded-lg bg-muted p-3">В загруженном журнале нет записей для этой установки.</p>}
+        {maintenanceUnavailable ? <p>Журнал ТО недоступен текущей роли.</p> : <>
+          {/*
+            Отказ журнала выбранной установки (/api/to/journal) — отдельный
+            источник от «Обслуживания» (props.maintenance). Раньше он стоял в
+            одном тернарном выражении перед записями, поэтому сбой журнала
+            прятал уже полученные записи независимого источника (F-N1005).
+            Ошибки показываются рядом с записями, а пустой ответ не выдаётся
+            за успешно прочитанный.
+          */}
+          {maintenanceError && <p role="alert">{maintenanceError.message}</p>}
+          {journalError && <p role="alert">{journalError.message}</p>}
+          {records.length ? records.map((record) => <article key={record.id} className="rounded-lg border border-border p-3">
+            <p className="font-semibold">{record.title}</p><p className="mt-1">{RECORD_STATUS[record.status] ?? record.status}</p>
+            <p className="mt-1 text-xs text-muted-foreground">Создано: {date(record.createdAt)}</p>
+            <FleetSourceLink href={`/admin/maintenance/${record.id}`}>Открыть эту запись</FleetSourceLink>
+          </article>) : !maintenanceError && !journalError && <p className="rounded-lg bg-muted p-3">В загруженном журнале нет записей для этой установки.</p>}
+        </>}
       </div>}
       {section === 'defects' && <div className="mt-3 space-y-3 text-sm">
         <p className="text-muted-foreground">Дефекты {equipment.name}. Блокирующие условия готовности показываются отдельно в основаниях оценки.</p>
-        {defectResult?.id !== equipment.id ? <p role="status">Загружаем журнал дефектов…</p> : defectResult.error
+        {defectResult?.key !== defectKey ? <p role="status">Загружаем журнал дефектов…</p> : defectResult.error
           ? <div role="alert"><p>{defectResult.error}</p><Button variant="outline" className="mt-2" onClick={() => chooseSection('basis')}>Вернуться к основаниям</Button></div>
           : defectResult.data?.length ? defectResult.data.map((defect) => <article key={defect.id} className="rounded-lg border border-border p-3">
             <p className="font-semibold">{defect.title}</p>

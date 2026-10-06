@@ -13,9 +13,26 @@ describe('readiness center authority boundary', () => {
     'utf8',
   );
 
+  const settings = readFileSync(
+    resolve(process.cwd(), 'src/components/piling/to/readiness/screens/settings-workspace.tsx'),
+    'utf8',
+  );
+
   it('reads the centre source', () => {
     expect(center.length).toBeGreaterThan(1000);
     expect(center).toContain('function ReadinessCentre');
+  });
+
+  /**
+   * F-R141-PREVIEW: предпросмотр правил считался по производным фактам из
+   * журнала (без наряда, приёмки и дефектов), и «Приёмка» в нём всегда была
+   * «ожидает приёмки» — админ подбирал веса по заниженному баллу. Источник
+   * предпросмотра обязан быть авторитетным снимком, а не `factsByEquipment`.
+   */
+  it('считает предпросмотр правил по авторитетному снимку, а не по производным фактам', () => {
+    expect(settings).toContain('authoritativeFactsForEquipment');
+    expect(settings).toContain('props.currentReadiness');
+    expect(settings).not.toContain('props.factsByEquipment');
   });
 
   it('renders decision-bearing center fields from the authoritative presentation', () => {

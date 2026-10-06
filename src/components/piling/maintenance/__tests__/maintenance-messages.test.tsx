@@ -393,3 +393,150 @@ describe('фото наряда ТО: обрыв сети объясняется
     ));
   });
 });
+
+describe('форма наряда ТО: сохранение без правок не переписывает моменты (F-R122-1)', () => {
+  /*
+    «Полное редактирование» заполняло поля дат через `iso.slice(0, 10)` (UTC-день)
+    и всегда отправляло их обратно. Наряд, закрытый 26.09 в 00:30 МСК (в базе
+    2026-09-25T21:30Z), после «Сохранить» без единой правки получал
+    completedAt = 2026-09-25T00:00Z — в карточке «закрыт 25.09 03:00», и тем же
+    моментом датировалась запись показания счётчика. Теперь неизменённое поле
+    отправляет исходный момент целиком.
+  */
+  const CLOSED = '2026-09-25T21:30:00.000Z';
+
+  function mockEdit() {
+    mocks.authFetch.mockImplementation(async (url: string, init?: RequestInit) => {
+      if (url === '/api/maintenance/assignees') return json({ users: [] });
+      if (init?.method === 'PUT') return json({ record: record() });
+      return json({ record: { ...record(), status: 'DONE', startedAt: CLOSED, completedAt: CLOSED } });
+    });
+  }
+
+  const putBody = (): Record<string, unknown> => {
+    const call = mocks.authFetch.mock.calls.find(([, init]) => (init as RequestInit | undefined)?.method === 'PUT');
+    return JSON.parse(String((call?.[1] as RequestInit | undefined)?.body));
+  };
+
+  it('«Сохранить» без правок оставляет исходные startedAt/completedAt', async () => {
+    mockEdit();
+    render(<WorkOrderFormDialog open onOpenChange={() => {}} equipmentId="eq-1" editingId="wo-1" onSaved={() => {}} />);
+
+    await screen.findByLabelText('Название *');
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить' }));
+
+    await waitFor(() => expect(mocks.authFetch.mock.calls.some(([, init]) =>
+      (init as RequestInit | undefined)?.method === 'PUT')).toBe(true));
+    const body = putBody();
+    expect(body.completedAt).toBe(CLOSED);
+    expect(body.startedAt).toBe(CLOSED);
+    // Прежний код отправлял UTC-день «2026-09-25» и терял время закрытия.
+    expect(body.completedAt).not.toBe('2026-09-25');
+  });
+
+  it('изменённая человеком дата уходит как выбранный день', async () => {
+    mockEdit();
+    render(<WorkOrderFormDialog open onOpenChange={() => {}} equipmentId="eq-1" editingId="wo-1" onSaved={() => {}} />);
+
+    await screen.findByLabelText('Название *');
+    fireEvent.change(screen.getByLabelText('Выполнено'), { target: { value: '2026-09-26' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить' }));
+
+    await waitFor(() => expect(mocks.authFetch.mock.calls.some(([, init]) =>
+      (init as RequestInit | undefined)?.method === 'PUT')).toBe(true));
+    expect(putBody().completedAt).toBe('2026-09-26');
+  });
+});
+
+describe('доска нарядов ТО: отменённый наряд нельзя «закрыть» (F-R122-6)', () => {
+  /*
+    Кнопки «Закрыть наряд ТО» и «Закрыть ТО» выключались только при DONE. У
+    отменённого наряда они оставались активны: PUT {status:'DONE'} переводил
+    CANCELLED → DONE, сдвигая регламент и записывая показание счётчика. Карточка
+    наряда кнопок для отменённого не показывает — правило теперь и здесь.
+  */
+  beforeEach(() => {
+    mocks.authFetch.mockImplementation(async (url: string, init?: RequestInit) => {
+      if (url.startsWith('/api/media')) return json({ data: [] });
+      if (init?.method === 'PUT') return json({ record: { ...record(), status: 'CANCELLED' } });
+      return json({ records: [{ ...record(), status: 'CANCELLED' }] });
+    });
+  });
+
+  it('«Закрыть наряд ТО» в журнале и «Закрыть ТО» в панели выключены', async () => {
+    render(<MaintenanceBoard />);
+
+    expect(await screen.findByRole('button', { name: 'Закрыть наряд ТО' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Закрыть ТО' })).toBeDisabled();
+  });
+});
+
+describe('доска нарядов ТО: сбой чтения — отказ, а не «нарядов нет» (F-R122-11)', () => {
+  /*
+    На сбое загрузки рядом с красным тостом оставался серый текст «Нарядов по
+    выбранным фильтрам не найдено.»: журнал не прочитан, а экран утверждал, что
+    нарядов нет. Теперь это блок отказа с кнопкой «Повторить».
+  */
+  it('5xx → блок отказа с повтором вместо строки «не найдено»', async () => {
+    mocks.authFetch.mockResolvedValue(json({ error: 'x' }, 503));
+    render(<MaintenanceBoard />);
+
+    expect(await screen.findByText('Сервер временно недоступен — повторите позже.')).toBeInTheDocument();
+    expect(screen.queryByText('Нарядов по выбранным фильтрам не найдено.')).toBeNull();
+
+    const before = mocks.authFetch.mock.calls
+      .filter(([u]) => String(u).startsWith('/api/maintenance')).length;
+    fireEvent.click(screen.getByRole('button', { name: 'Повторить' }));
+    await waitFor(() =>
+      expect(mocks.authFetch.mock.calls
+        .filter(([u]) => String(u).startsWith('/api/maintenance')).length).toBeGreaterThan(before),
+    );
+  });
+});
+
+describe('фото наряда ТО: сбой чтения галереи — отказ, а не «фото нет» (F-R122-10)', () => {
+  /*
+    Отказ чтения `/api/media?...` отдавал пустой список, и панель показывала
+    «Загрузить первое фото», хотя снимки есть. Теперь это отдельное состояние с
+    повтором.
+  */
+  it('500 → «Не удалось загрузить фото» с повтором, без «Загрузить первое фото»', async () => {
+    mocks.authFetch.mockResolvedValue(json({ error: 'x' }, 500));
+    render(<WorkOrderPhotos recordId="wo-1" />);
+
+    expect(await screen.findByText('Не удалось загрузить фото')).toBeInTheDocument();
+    expect(screen.queryByText('Загрузить первое фото')).toBeNull();
+
+    const before = mocks.authFetch.mock.calls.length;
+    fireEvent.click(screen.getByRole('button', { name: 'Повторить' }));
+    await waitFor(() => expect(mocks.authFetch.mock.calls.length).toBeGreaterThan(before));
+  });
+});
+
+describe('форма наряда ТО: сбой чтения записи не рисует чужую форму (F-R122-2)', () => {
+  /*
+    `throw` при чтении наряда для правки попадал в общий catch: тост был, но форма
+    оставалась с полями предыдущего открытия (или пустой) и «Сохранить» была
+    активна — правка ушла бы на сервер с чужими данными. Теперь формы нет.
+  */
+  it('500 на чтении наряда → отказ с повтором, формы и «Сохранить» нет', async () => {
+    mocks.authFetch.mockImplementation(async (url: string) => {
+      if (url === '/api/maintenance/assignees') return json({ users: [] });
+      return json({ error: 'x' }, 500);
+    });
+    render(<WorkOrderFormDialog open onOpenChange={() => {}} equipmentId="eq-1" editingId="wo-1" onSaved={() => {}} />);
+
+    expect(await screen.findByText('Не удалось загрузить наряд для правки')).toBeInTheDocument();
+    // Форма не нарисована — полей чужого/прошлого наряда нет.
+    expect(screen.queryByLabelText('Название *')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Сохранить' })).toBeDisabled();
+
+    const before = mocks.authFetch.mock.calls
+      .filter(([u]) => u === '/api/maintenance/wo-1').length;
+    fireEvent.click(screen.getByRole('button', { name: 'Повторить' }));
+    await waitFor(() =>
+      expect(mocks.authFetch.mock.calls
+        .filter(([u]) => u === '/api/maintenance/wo-1').length).toBeGreaterThan(before),
+    );
+  });
+});

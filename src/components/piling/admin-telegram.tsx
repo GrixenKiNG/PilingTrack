@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { motion } from 'framer-motion';
 import {
   Send,
@@ -45,6 +45,7 @@ const CHAT_ID_PATTERN = /^-?\d+$|^@[A-Za-z0-9_]{5,}$/;
  * общий текст тут сбил бы с толку.
  */
 async function apiFailureText(res: Response, fallback: string): Promise<string> {
+  if (res.status === 401) return 'Сессия истекла — войдите снова.';
   if (res.status === 404) return 'Запись не найдена — возможно, её уже удалили, обновите список';
   const body = await res.json().catch(() => null);
   return apiErrorMessage(body, fallback);
@@ -67,6 +68,11 @@ export function AdminTelegram() {
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [testingId, setTestingId] = useState<string | null>(null);
   const [pendingDelete, setPendingDelete] = useState<TelegramConfigDTO | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  // Radix закрывает диалог по клику на «Удалить» раньше, чем React применит
+  // setDeleting, — закрытие откладываем через ref, иначе кнопка не успевает
+  // заблокироваться и второй клик шлёт второй DELETE (F-R128-4).
+  const deletingRef = useRef(false);
 
   const openCreate = () => {
     setDialogMode('create');
@@ -126,9 +132,11 @@ export function AdminTelegram() {
       if (!res.ok) {
         // Раньше отказ молча оставлял пустой список — админ видел «Нет
         // конфигураций Telegram», думал, что ботов нет, и заводил дубли.
-        const message = res.status === 403
-          ? 'Нет доступа к настройкам Telegram'
-          : 'Не удалось загрузить конфигурации Telegram';
+        const message = res.status === 401
+          ? 'Сессия истекла — войдите снова.'
+          : res.status === 403
+            ? 'Нет доступа к настройкам Telegram'
+            : 'Не удалось загрузить конфигурации Telegram';
         setLoadError(message);
         toast.error(message);
         return;
@@ -199,6 +207,8 @@ export function AdminTelegram() {
   };
 
   const handleDelete = async (id: string) => {
+    deletingRef.current = true;
+    setDeleting(true);
     try {
       const res = await authFetch('/api/telegram/configs', {
         method: 'DELETE',
@@ -214,6 +224,8 @@ export function AdminTelegram() {
     } catch {
       toast.error('Ошибка удаления');
     } finally {
+      deletingRef.current = false;
+      setDeleting(false);
       setPendingDelete(null);
     }
   };
@@ -325,11 +337,11 @@ export function AdminTelegram() {
                           {config.label}
                         </p>
                         <p className="text-xs text-muted-foreground font-mono mt-0.5">
-                          Chat ID: {config.chatId}
+                          ID чата: {config.chatId}
                         </p>
                         <p className="text-3xs text-muted-foreground font-mono">
                           {config.hasBotToken
-                            ? `Token: ••••${config.botTokenHint}`
+                            ? `Токен: ••••${config.botTokenHint}`
                             : 'Токен не задан — введите заново'}
                         </p>
                       </div>
@@ -398,7 +410,7 @@ export function AdminTelegram() {
 
       {/* Create / Edit Dialog */}
       <Dialog open={dialogMode !== null} onOpenChange={(open) => !open && closeDialog()}>
-        <DialogContent aria-describedby={undefined}>
+        <DialogContent aria-describedby={undefined} className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Bot className="w-4 h-4" />
@@ -459,12 +471,13 @@ export function AdminTelegram() {
 
       <ConfirmActionDialog
         open={Boolean(pendingDelete)}
-        onOpenChange={(open) => { if (!open) setPendingDelete(null); }}
+        onOpenChange={(open) => { if (!open && !deletingRef.current) setPendingDelete(null); }}
         title="Удалить канал уведомлений?"
         description={pendingDelete
-          ? `Канал «${pendingDelete.label}» (Chat ID: ${pendingDelete.chatId}) будет удалён без возможности восстановления.`
+          ? `Канал «${pendingDelete.label}» (ID чата: ${pendingDelete.chatId}) будет удалён без возможности восстановления.`
           : ''}
         confirmLabel="Удалить"
+        busy={deleting}
         onConfirm={() => { if (pendingDelete) void handleDelete(pendingDelete.id); }}
       />
     </div>

@@ -242,6 +242,74 @@ describe('редактор шаблона (F-R100-4, F-R100-5)', () => {
   });
 });
 
+describe('редактор шаблона: сбой сохранения правки (F-R123-1)', () => {
+  it('ошибка при сохранении правки объясняет, что действующая версия могла исчезнуть', async () => {
+    mocks.authFetch.mockImplementation(async (_url: string, init?: RequestInit) => (
+      init?.method === 'PUT' ? json({ error: 'Ошибка БД' }, 500) : json(templatePayload)
+    ));
+    render(<TemplateEditor templateId="tpl-1" />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Сохранить' }));
+
+    // На сервере правка — деактивация прежней версии + создание новой без
+    // транзакции: сбой оставляет чек-лист без действующей версии, и человек
+    // должен узнать об этом не из одного слова «Ошибка».
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('прежняя версия шаблона могла быть снята');
+    expect(alert).toHaveTextContent('Проверьте список шаблонов');
+    // Форма и кнопка на месте: повтор возможен, введённое не потеряно.
+    expect(screen.getByRole('button', { name: 'Сохранить' })).toBeInTheDocument();
+  });
+
+  it('создание нового шаблона сбоем не пугает архивом (строки нет)', async () => {
+    mocks.authFetch.mockResolvedValue(json({ error: 'Ошибка БД' }, 500));
+    render(<TemplateEditor templateId="new" />);
+
+    fireEvent.change(screen.getByLabelText('Название *'), { target: { value: 'ЕО — экскаватор' } });
+    fireEvent.change(screen.getByPlaceholderText('Напр. Двигатель'), { target: { value: 'Двигатель' } });
+    fireEvent.change(screen.getByPlaceholderText('Проверить уровень масла…'), { target: { value: 'Проверить масло' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Создать шаблон' }));
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalled());
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+});
+
+describe('редактор шаблона: защита от одновременной правки (F-R123-2)', () => {
+  // Сервер выпускает версию деактивацией прежней строки и созданием новой без
+  // проверки версии: двое админов с одним шаблоном дают две действующие версии.
+  const templateWith = (isActive: boolean) =>
+    json({ template: { ...templatePayload.template, isActive } });
+
+  it('шаблон уже заменён другим администратором → PUT не уходит, есть объяснение', async () => {
+    mocks.authFetch.mockImplementation(async (_url: string, init?: RequestInit) => (
+      init?.method === 'PUT' ? json(templatePayload) : templateWith(false)
+    ));
+    render(<TemplateEditor templateId="tpl-1" />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Сохранить' }));
+
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('Шаблон уже изменён другим администратором');
+    expect(mocks.authFetch.mock.calls.some(([, init]) =>
+      (init as RequestInit | undefined)?.method === 'PUT',
+    )).toBe(false);
+  });
+
+  it('шаблон ещё действует → правка уходит на сервер (проверка не мешает)', async () => {
+    mocks.authFetch.mockImplementation(async (_url: string, init?: RequestInit) => (
+      init?.method === 'PUT' ? json(templatePayload) : templateWith(true)
+    ));
+    render(<TemplateEditor templateId="tpl-1" />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Сохранить' }));
+
+    await waitFor(() => expect(mocks.authFetch.mock.calls.some(([, init]) =>
+      (init as RequestInit | undefined)?.method === 'PUT',
+    )).toBe(true));
+  });
+});
+
 describe('редактор шаблона: пределы длины полей как в схеме маршрута (F-R121-3)', () => {
   it('у названия, раздела и полей пункта стоит maxLength по схеме', () => {
     render(<TemplateEditor templateId="new" />);
@@ -414,6 +482,91 @@ describe('сохранение и завершение осмотра (F-R100-6,
   });
 });
 
+describe('список шаблонов: деактивация с объяснением последствий (F-R123-7)', () => {
+  const row = {
+    id: 'tpl-1', name: 'ЕО — экскаватор', level: 'EO',
+    blockType: 'BASE', appliesToModel: 'Banut 655', isActive: true,
+  };
+  const listWith = (templates: unknown[]) =>
+    json({ templates });
+
+  it('голый confirm заменён диалогом: последствия видны до нажатия, DELETE не уходит', async () => {
+    mocks.authFetch.mockImplementation(async (_url: string, init?: RequestInit) => (
+      init?.method === 'DELETE' ? json({ ok: true }) : listWith([row])
+    ));
+    render(<TemplateList />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Деактивировать' }));
+
+    // Снятие последнего блока «База» для модели ломает заводку новых осмотров
+    // этих машин — админ узнаёт об этом до подтверждения (R123 №7).
+    expect(screen.getByText('Деактивировать шаблон?')).toBeInTheDocument();
+    expect(screen.getByText(/последний действующий блок «База» для модели «Banut 655»/)).toBeInTheDocument();
+    expect(mocks.authFetch.mock.calls.some(([, init]) => (init as RequestInit | undefined)?.method === 'DELETE')).toBe(false);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Деактивировать шаблон' }));
+
+    await waitFor(() => expect(mocks.authFetch.mock.calls.some(([u, init]) =>
+      (init as RequestInit | undefined)?.method === 'DELETE' && u === '/api/checklist-templates/tpl-1',
+    )).toBe(true));
+  });
+
+  it('есть другая «База» для той же модели → о поломке не предупреждаем', async () => {
+    mocks.authFetch.mockResolvedValue(listWith([row, { ...row, id: 'tpl-2', name: 'ТО1 — экскаватор' }]));
+    render(<TemplateList />);
+
+    fireEvent.click(await screen.findAllByRole('button', { name: 'Деактивировать' })
+      .then((buttons) => buttons[0]));
+
+    expect(screen.getByText('Деактивировать шаблон?')).toBeInTheDocument();
+    expect(screen.queryByText(/последний действующий блок/)).toBeNull();
+  });
+});
+
+describe('список шаблонов: отказ деактивации различается по статусу (F-R123-9)', () => {
+  const row = { id: 'tpl-1', name: 'ЕО — экскаватор', level: 'EO', blockType: 'HAMMER', appliesToModel: null, isActive: true };
+
+  const deactivate = async (status: number) => {
+    mocks.authFetch.mockImplementation(async (_url: string, init?: RequestInit) => (
+      init?.method === 'DELETE' ? json({ error: 'Template not found' }, status) : json({ templates: [row] })
+    ));
+    render(<TemplateList />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Деактивировать' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Деактивировать шаблон' }));
+  };
+
+  it('404 → «уже деактивирован», а не общее «Не удалось»', async () => {
+    await deactivate(404);
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Шаблон уже деактивирован или не найден — обновите список.'));
+    expect(toast.error).not.toHaveBeenCalledWith('Не удалось деактивировать шаблон');
+  });
+
+  it('403 → про права, а не «Не удалось»', async () => {
+    await deactivate(403);
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Нет прав на деактивацию шаблона. Обратитесь к администратору.'));
+    expect(toast.error).not.toHaveBeenCalledWith('Не удалось деактивировать шаблон');
+  });
+});
+
+describe('редактор шаблона: снятая версия помечена (F-R123-4)', () => {
+  it('открытая по прямой ссылке снятая версия названа архивом, а не выдаётся за действующую', async () => {
+    mocks.authFetch.mockResolvedValue(json({ template: { ...templatePayload.template, isActive: false } }));
+    render(<TemplateEditor templateId="tpl-1" />);
+
+    const notice = await screen.findByRole('status');
+    expect(notice).toHaveTextContent('снятая версия шаблона (архив)');
+    expect(notice).toHaveTextContent('откройте действующую версию');
+  });
+
+  it('действующая версия пометки «архив» не получает', async () => {
+    mocks.authFetch.mockResolvedValue(json({ template: { ...templatePayload.template, isActive: true } }));
+    render(<TemplateEditor templateId="tpl-1" />);
+
+    await screen.findByLabelText('Название *');
+    expect(screen.queryByRole('status')).toBeNull();
+  });
+});
+
 describe('inspection-api-error: выбор текста по причине', () => {
   const texts = { forbidden: 'нет прав', notFound: 'не найден', server: 'сбой сервера' };
 
@@ -437,5 +590,32 @@ describe('inspection-api-error: выбор текста по причине', ()
       .toBe('Запрос отклонён проверкой безопасности. Обновите страницу и повторите.');
     expect(await extractApiError(new Response('<html/>', { status: 500 }), 'Ошибка сохранения')).toBe('Ошибка сохранения');
     expect(await extractApiError(json({ error: 'Осмотр уже завершён' }, 409), 'Ошибка')).toBe('Осмотр уже завершён');
+  });
+});
+
+/**
+ * F-R131 №9 и №17. В списке осмотров вид «ЕО» печатался двухбуквенным кодом без
+ * расшифровки, а оценка — «голым» числом «87» без единицы, хотя в контуре
+ * готовности та же величина читается «87/100». До правки оба текста на экране
+ * отсутствовали — тесты падали.
+ */
+describe('список осмотров: расшифровка ЕО и оценка с единицей (F-R131 №9, №17)', () => {
+  const row = {
+    id: 'insp-1',
+    level: 'EO',
+    inspectionDate: '2026-09-30',
+    healthScore: 87,
+    status: 'COMPLETED',
+    equipment: { id: 'eq-1', name: 'СП-49', model: 'PVE 50PR' },
+  };
+
+  it('вид «ЕО» расшифрован, оценка показана как «87/100»', async () => {
+    mocks.authFetch.mockResolvedValue(json({ inspections: [row] }));
+    render(<InspectionsList />);
+
+    expect(await screen.findByText('СП-49')).toBeInTheDocument();
+    expect(screen.getAllByText('ЕО — ежедневный осмотр').length).toBeGreaterThan(0);
+    expect(screen.getByText('87/100')).toBeInTheDocument();
+    expect(screen.queryByText('87')).toBeNull();
   });
 });

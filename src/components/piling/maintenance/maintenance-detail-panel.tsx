@@ -22,6 +22,7 @@ import { TYPE_LABEL } from './maintenance-labels';
 import { statusView, type MaintenanceCrewView, type WorkOrderRow } from './maintenance-board-model';
 import { ActionIcon } from './maintenance-board-bits';
 import { WorkOrderPhotos } from './work-order-photos';
+import { PrintScreenStyles } from '../admin-reports/print-screen';
 
 export function MaintenanceDetailPanel({
   record,
@@ -54,7 +55,10 @@ export function MaintenanceDetailPanel({
   const closeBusy = busyAction === `${record.id}:DONE`;
 
   return (
-    <aside className="min-h-screen border-l border-border bg-card">
+    // print-area: при печати на лист попадает только карточка наряда — без
+    // шапки, меню и обрезки по краю прокрутки (R134, находка 1).
+    <aside className="print-area min-h-screen border-l border-border bg-card">
+      <PrintScreenStyles />
       <div className="flex h-full flex-col">
         <header className="flex items-center justify-between border-b border-border px-5 py-4">
           <div className="min-w-0">
@@ -140,7 +144,9 @@ export function MaintenanceDetailPanel({
           <Button
             size="sm"
             className="h-11 bg-signal px-2 text-white hover:bg-signal-strong sm:h-9"
-            disabled={closeBusy || record.status === 'DONE'}
+            // Отменённый наряд закрыть нельзя (F-R122-6): PUT {status:'DONE'} вернул бы
+            // его из CANCELLED в DONE, сдвинув регламент и записав показание счётчика.
+            disabled={closeBusy || record.status === 'DONE' || record.status === 'CANCELLED'}
             onClick={() => void onClose(record)}
           >
             {closeBusy ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-1 h-4 w-4" />} Закрыть ТО

@@ -9,7 +9,7 @@
  * `data-[size=default]:h-9` самого SelectTrigger (у него выше специфичность).
  * На десктопе (sm и шире) вид не меняется.
  */
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({ authFetch: vi.fn(), loadJson: vi.fn() }));
@@ -20,6 +20,9 @@ vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 import { MaintenanceBoard } from '../maintenance-board';
 import { MaintenanceDetailPanel } from '../maintenance-detail-panel';
 import { WorkOrderDetail } from '../work-order-detail';
+import { WorkOrderFormDialog } from '../work-order-form-dialog';
+import { WorkOrderPhotos } from '../work-order-photos';
+import { WorkOrderTable } from '../work-order-table';
 import { STATUS_LABEL } from '../maintenance-labels';
 import type { WorkOrderRow } from '../maintenance-board-model';
 
@@ -94,6 +97,24 @@ describe('журнал ТО: цель нажатия на телефоне (R73)
   });
 });
 
+describe('журнал ТО: строка пагинации переносится на телефоне (F-R126-1)', () => {
+  beforeEach(() => {
+    mocks.loadJson.mockResolvedValue({});
+    mocks.authFetch.mockResolvedValue(json({ records: [] }));
+  });
+
+  it('блок «Показать по:» и номера страниц переносятся (flex-wrap) — страница не расширяется', async () => {
+    render(<MaintenanceBoard />);
+    await screen.findByText(/Нарядов по выбранным фильтрам не найдено/);
+
+    // Ряд пагинации — родитель блока «Показать по:». До правки он был
+    // `flex … justify-between` без переноса: 375 px экрана против 503 px
+    // содержимого, вся страница уезжала вбок.
+    const pagination = screen.getByText('Показать по:').parentElement?.parentElement;
+    expect(pagination).toHaveClass('flex-wrap', 'gap-2');
+  });
+});
+
 describe('журнал ТО: назначение фильтров озвучивается (R116 #10)', () => {
   beforeEach(() => {
     mocks.loadJson.mockResolvedValue({});
@@ -113,6 +134,34 @@ describe('журнал ТО: назначение фильтров озвучи�
     ]) {
       expect(screen.getByLabelText(label)).toBeInstanceOf(HTMLButtonElement);
     }
+  });
+});
+
+describe('таблица нарядов ТО: выбор с клавиатуры (R116 #14)', () => {
+  it('строка фокусируется и выбирает наряд клавишами Enter и Space', () => {
+    const onSelect = vi.fn();
+    render(
+      <WorkOrderTable
+        records={[record()]}
+        selectedId="wo-1"
+        crewByEquipment={new Map()}
+        busyAction={null}
+        onSelect={onSelect}
+        onEdit={vi.fn()}
+        onDone={vi.fn()}
+        onDelete={vi.fn()}
+      />,
+    );
+
+    const row = screen.getByText('СП-49').closest('tr');
+    if (!row) throw new Error('Строка наряда не найдена');
+    expect(row).toHaveAttribute('tabindex', '0');
+    expect(row).toHaveAttribute('aria-selected', 'true');
+
+    fireEvent.keyDown(row, { key: 'Enter' });
+    fireEvent.keyDown(row, { key: ' ' });
+    expect(onSelect).toHaveBeenCalledTimes(2);
+    expect(onSelect).toHaveBeenCalledWith('wo-1');
   });
 });
 
@@ -154,5 +203,104 @@ describe('карточка наряда ТО: цель нажатия на те�
 
     expect(screen.getByRole('button', { name: 'Полное редактирование' })).toHaveClass('min-h-11', 'sm:min-h-0');
     expect(screen.getByRole('button', { name: /Сохранить/ })).toHaveClass('min-h-11', 'sm:min-h-0');
+  });
+});
+
+describe('журнал ТО: заголовок вкладки браузера (F-R136-TOP, №1)', () => {
+  beforeEach(() => {
+    mocks.loadJson.mockResolvedValue({});
+    mocks.authFetch.mockResolvedValue(json({ records: [] }));
+  });
+
+  it('заголовок вкладки браузера назван по экрану', async () => {
+    render(<MaintenanceBoard />);
+    await screen.findByText(/Нарядов по выбранным фильтрам не найдено/);
+
+    expect(document.title).toBe('Наряды ТО — PilingTrack');
+  });
+});
+
+/*
+  F-R136-TOP №2: карточка наряда ТО показывала одну ссылку «← К списку
+  нарядов» — пути «Наряды ТО → наряд» не было видно.
+*/
+describe('наряд ТО: хлебные крошки (F-R136-TOP, №2)', () => {
+  beforeEach(() => {
+    mocks.authFetch.mockImplementation(async (url: string) => {
+      if (url === '/api/maintenance/assignees') return json({ users: [] });
+      return json({ record: record() });
+    });
+  });
+
+  it('карточка наряда показывает путь «Наряды ТО → ТО-1 СП-49»', async () => {
+    render(<WorkOrderDetail recordId="wo-1" />);
+
+    const crumb = await screen.findByRole('navigation', { name: 'Путь к экрану' });
+    expect(within(crumb).getByRole('link', { name: 'Наряды ТО' })).toHaveAttribute('href', '/admin/maintenance');
+    expect(within(crumb).getByText('ТО-1 СП-49')).toBeInTheDocument();
+  });
+});
+
+/*
+  F-R137-TOP №2: «Добавить фото» в галерее наряда ТО было 28px — фото это
+  обязательное доказательство работ, а на телефоне в перчатке в кнопку было
+  почти не попасть. Соседняя галерея установки уже получила 44px в R73.
+*/
+describe('галерея фото наряда ТО: цель нажатия на телефоне (F-R137-TOP, №2)', () => {
+  beforeEach(() => {
+    mocks.authFetch.mockResolvedValue(json({ data: [] }));
+  });
+
+  it('«Добавить фото» — не ниже 44px на телефоне, прежняя высота на десктопе', async () => {
+    render(<WorkOrderPhotos recordId="wo-1" />);
+
+    const btn = await screen.findByRole('button', { name: 'Добавить фото' });
+    expect(btn).toHaveClass('min-h-11', 'items-center', 'sm:min-h-0');
+  });
+});
+
+/*
+  F-R137-NEXT №4: поля быстрой правки наряда ТО (в т.ч. «Моточасы» — счётчик
+  наработки) были 36px (`Input h-9`). Корень `.field-type` карточки наряда
+  лифта 44px не даёт (он только про шрифт), а моточасы — целевое поле экрана.
+*/
+describe('карточка наряда ТО: поля правки на телефоне (F-R137-NEXT, №4)', () => {
+  beforeEach(() => {
+    mocks.authFetch.mockImplementation(async (url: string) => {
+      if (url === '/api/maintenance/assignees') return json({ users: [] });
+      return json({ record: record() });
+    });
+  });
+
+  it('«Начато», «Моточасы», «Трудочасы», «Стоимость» — не ниже 44px, на десктопе прежние 36px', async () => {
+    render(<WorkOrderDetail recordId="wo-1" />);
+
+    for (const label of ['Начато', 'Моточасы', 'Трудочасы', 'Стоимость, ₽']) {
+      expect(await screen.findByLabelText(label)).toHaveClass('min-h-11', 'sm:min-h-0');
+    }
+  });
+});
+
+/*
+  F-R137-NEXT №6: поля диалога создания/правки наряда (в т.ч. «Моточасы») были
+  36px. Radix выносит `DialogContent` в портал вне `.field-type`, поэтому ни CSS
+  модуля ТО, ни корень карточки их не лифтуют — на телефоне в перчатке в поле
+  трудно попасть.
+*/
+describe('диалог наряда ТО: поля формы на телефоне (F-R137-NEXT, №6)', () => {
+  beforeEach(() => {
+    mocks.authFetch.mockImplementation(async (url: string) => {
+      if (url === '/api/maintenance/assignees') return json({ users: [] });
+      return json({});
+    });
+  });
+
+  it('все поля ввода — не ниже 44px на телефоне, на десктопе прежние 36px', async () => {
+    render(<WorkOrderFormDialog open onOpenChange={() => {}} equipmentId="eq-1" onSaved={() => {}} />);
+
+    await screen.findByLabelText('Название *');
+    for (const label of ['Название *', 'План', 'Начато', 'Выполнено', 'Моточасы', 'Трудоч.', 'Стоим., ₽']) {
+      expect(screen.getByLabelText(label)).toHaveClass('min-h-11', 'sm:min-h-0');
+    }
   });
 });

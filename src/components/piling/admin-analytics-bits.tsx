@@ -79,8 +79,8 @@ function fmtHours(h: number | null): string {
 export function MaintenanceSummaryTile({ kpi }: { kpi: FleetKpiData }) {
   const metrics: { label: string; value: string; tone?: string }[] = [
     { label: 'Готовность парка', value: kpi.availability != null ? formatPercent(kpi.availability * 100) : '—', tone: 'text-success-strong' },
-    { label: 'MTBF', value: fmtHours(kpi.mtbfHours) },
-    { label: 'MTTR', value: fmtHours(kpi.mttrHours) },
+    { label: 'Средняя наработка на отказ (MTBF)', value: fmtHours(kpi.mtbfHours) },
+    { label: 'Среднее время восстановления (MTTR)', value: fmtHours(kpi.mttrHours) },
     { label: 'Выполнение ППР', value: kpi.pmCompliance != null ? formatPercent(kpi.pmCompliance * 100, 0) : '—' },
     { label: 'Отказы за период', value: String(kpi.failureCount), tone: kpi.failureCount > 0 ? 'text-destructive-strong' : undefined },
     { label: 'Ремонт по ТО, ч', value: fmtHours(kpi.downtimeHours) },

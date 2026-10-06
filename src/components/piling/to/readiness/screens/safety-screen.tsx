@@ -29,6 +29,7 @@ import { kpiGridStyle } from '@/components/piling/kpi-tile';
 import { loadFailureMessage, RefKpi } from './shared';
 import { EquipmentPermitMatrix } from './equipment-permit-matrix';
 import { EmployeeCard, type ClearanceRow } from './employee-card';
+import { normalizeSearch } from '../shared/text-search';
 import { usePilingStore } from '@/lib/store';
 import { resolveEffectiveRole } from '@/lib/types';
 import { can } from '@/services/auth/authorization-service';
@@ -110,13 +111,13 @@ export function SafetyScreen(props: ReferenceUiProps) {
   // eslint-disable-next-line react-hooks/set-state-in-effect -- loads data on mount; the async loader sets state
   useEffect(() => { void load(); }, [load]);
 
-  const needle = query.trim().toLocaleLowerCase('ru-RU');
+  const needle = normalizeSearch(query);
   const visible = useMemo(() => {
     const rows = data?.rows ?? [];
     return rows
       .filter((row) => !needle
-        || row.name.toLocaleLowerCase('ru-RU').includes(needle)
-        || (ROLE_LABELS[row.role as UserRole] ?? row.role).toLocaleLowerCase('ru-RU').includes(needle))
+        || normalizeSearch(row.name).includes(needle)
+        || normalizeSearch(ROLE_LABELS[row.role as UserRole] ?? row.role).includes(needle))
       .slice()
       .sort((left, right) => severity(left) - severity(right) || left.name.localeCompare(right.name, 'ru-RU'));
   }, [data, needle]);

@@ -192,3 +192,179 @@ describe('useReportsData — справочники формы', () => {
     expect(result.current.pileGrades).toHaveLength(1);
   });
 });
+
+/**
+ * F-R133 №8: чтение списка отчётов на истёкшей сессии показывало
+ * «Не удалось загрузить отчёты. Сервер вернул ошибку.» — причина названа
+ * неверно, сбой не на сервере. Теперь 401 отличается от 5xx.
+ */
+describe('useReportsData — 401 против 5xx (F-R133 №8)', () => {
+  beforeEach(() => {
+    authFetchMock.mockReset();
+  });
+
+  it('401 → текст про истёкшую сессию, а не «Сервер вернул ошибку»', async () => {
+    authFetchMock.mockImplementation((url: string) => {
+      if (url.startsWith('/api/reports')) {
+        return Promise.resolve({ ok: false, status: 401, json: async () => ({ error: 'Unauthorized' }) });
+      }
+      return Promise.resolve(okJson({ sites: [], users: [] }));
+    });
+
+    const { result } = renderHook(() => useReportsData());
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.error).toBe('Сессия истекла — войдите снова.');
+    expect(result.current.errorForbidden).toBe(false);
+  });
+});
+
+/**
+ * R135 №5: сбой чтения списка показывался дважды — тостом «Ошибка загрузки
+ * отчётов» и красным баннером с «Повторить». Тост убран: причина и повтор
+ * остаются в баннере.
+ */
+describe('useReportsData — сбой чтения не дублируется тостом (R135 №5)', () => {
+  beforeEach(() => {
+    authFetchMock.mockReset();
+    vi.mocked(toast.error).mockClear();
+  });
+
+  it('500 на списке → error есть, тоста «Ошибка загрузки отчётов» нет', async () => {
+    authFetchMock.mockImplementation((url: string) => {
+      if (url.startsWith('/api/reports')) {
+        return Promise.resolve({ ok: false, status: 500, json: async () => ({}) });
+      }
+      return Promise.resolve(okJson({ sites: [], users: [] }));
+    });
+
+    const { result } = renderHook(() => useReportsData());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    expect(result.current.error).toBe('Не удалось загрузить отчёты. Сервер вернул ошибку.');
+    expect(toast.error).not.toHaveBeenCalledWith('Ошибка загрузки отчётов');
+  });
+});
+
+/**
+ * F-N1004-REPORT-RACE (R150 №1/2/4/5): «Загрузить ещё» не была привязана к
+ * отбору — поздний ответ догрузки дописывал строки и перетирал hasMore/nextCursor
+ * уже заменённого списка, а два вызова в одном тике (защита опиралась на
+ * состояние `loadingMore`, которое обновляется лишь на следующем рендере)
+ * дублировали запрос с одним и тем же курсором.
+ */
+describe('useReportsData — догрузка не смешивает отборы (F-N1004-REPORT-RACE)', () => {
+  beforeEach(() => {
+    authFetchMock.mockReset();
+    vi.mocked(toast.error).mockClear();
+  });
+
+  function deferred<T>() {
+    let resolve!: (value: T) => void;
+    let reject!: (reason?: unknown) => void;
+    const promise = new Promise<T>((res, rej) => {
+      resolve = res;
+      reject = rej;
+    });
+    return { promise, resolve, reject };
+  }
+
+  it('поздний ответ старой догрузки не примешивается к новому отбору и не перетирает курсор', async () => {
+    const main: ReturnType<typeof deferred<unknown>>[] = [];
+    const cursorUrls: string[] = [];
+    let cursor = deferred<unknown>();
+
+    authFetchMock.mockImplementation((url: string) => {
+      const u = String(url);
+      if (u.includes('cursor=')) {
+        cursorUrls.push(u);
+        return cursor.promise;
+      }
+      if (u.startsWith('/api/reports')) {
+        const d = deferred<unknown>();
+        main.push(d);
+        return d.promise;
+      }
+      return Promise.resolve(okJson({ sites: [], users: [] }));
+    });
+
+    const { result } = renderHook(() => useReportsData());
+    await waitFor(() => expect(main).toHaveLength(1));
+    await act(async () => {
+      main[0].resolve(okJson({ reports: [{ id: 'r1' }], hasMore: true, nextCursor: 'c1' }));
+    });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    // «Загрузить ещё» при старом отборе — ответ задерживаем.
+    let staleLoad!: Promise<void>;
+    await act(async () => {
+      staleLoad = result.current.loadMoreReports();
+      await Promise.resolve();
+    });
+    expect(cursorUrls).toHaveLength(1);
+    expect(cursorUrls[0]).toContain('cursor=c1');
+
+    // Смена отбора: основной список перезагружается и приходит РАНЬШЕ догрузки.
+    await act(async () => {
+      result.current.setFilterSiteId('site-2');
+    });
+    await waitFor(() => expect(main).toHaveLength(2));
+    await act(async () => {
+      main[1].resolve(okJson({ reports: [{ id: 'r2' }], hasMore: true, nextCursor: 'c2' }));
+    });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.reports).toEqual([{ id: 'r2' }]);
+
+    // Устаревший ответ догрузки приходит последним — строки старого отбора
+    // должны быть отброшены, курсор нового отбора не тронут.
+    cursor.resolve(okJson({ reports: [{ id: 'old1' }], hasMore: true, nextCursor: 'cOld' }));
+    await act(async () => {
+      await staleLoad;
+    });
+    expect(result.current.reports).toEqual([{ id: 'r2' }]);
+
+    // Новая догрузка после смены отбора работает и идёт по НОВОМУ курсу.
+    cursor = deferred<unknown>();
+    let nextLoad!: Promise<void>;
+    await act(async () => {
+      nextLoad = result.current.loadMoreReports();
+      await Promise.resolve();
+    });
+    expect(cursorUrls[1]).toContain('cursor=c2');
+    cursor.resolve(okJson({ reports: [{ id: 'r3' }], hasMore: false, nextCursor: null }));
+    await act(async () => {
+      await nextLoad;
+    });
+    expect(result.current.reports).toEqual([{ id: 'r2' }, { id: 'r3' }]);
+  });
+
+  it('два вызова в одном тике не дублируют запрос', async () => {
+    let cursorCalls = 0;
+    const cursor = deferred<unknown>();
+    authFetchMock.mockImplementation((url: string) => {
+      const u = String(url);
+      if (u.includes('cursor=')) {
+        cursorCalls += 1;
+        return cursor.promise;
+      }
+      if (u.startsWith('/api/reports')) {
+        return Promise.resolve(okJson({ reports: [{ id: 'r1' }], hasMore: true, nextCursor: 'c1' }));
+      }
+      return Promise.resolve(okJson({ sites: [], users: [] }));
+    });
+
+    const { result } = renderHook(() => useReportsData());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    await act(async () => {
+      const first = result.current.loadMoreReports();
+      const second = result.current.loadMoreReports();
+      await Promise.resolve();
+      cursor.resolve(okJson({ reports: [{ id: 'r2' }], hasMore: false, nextCursor: null }));
+      await Promise.all([first, second]);
+    });
+
+    expect(cursorCalls).toBe(1);
+    expect(result.current.reports).toEqual([{ id: 'r1' }, { id: 'r2' }]);
+  });
+});

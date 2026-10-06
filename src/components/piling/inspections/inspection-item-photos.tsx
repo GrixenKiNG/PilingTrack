@@ -258,7 +258,7 @@ export function InspectionItemPhotos({ inspectionId, itemId, onCountChange }: Pr
         type="button"
         onClick={() => inputRef.current?.click()}
         disabled={busy}
-        className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-signal-strong disabled:opacity-50"
+        className="inline-flex min-h-11 items-center gap-1 text-xs text-muted-foreground hover:text-signal-strong disabled:opacity-50 sm:min-h-0"
       >
         {busy
           ? <Loader2 className="w-3.5 h-3.5 animate-spin" />

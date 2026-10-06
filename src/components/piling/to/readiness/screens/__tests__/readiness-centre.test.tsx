@@ -5,6 +5,7 @@ import { DEFAULT_READINESS_RULES } from '@/modules/readiness';
 import { ReadinessCentre } from '../readiness-centre';
 import { PermitsScreen } from '../permits-screen';
 import { ReportsScreen } from '../reports-screen';
+import type { CurrentReadinessDto } from '../../api/contracts';
 import { SettingsWorkspace } from '../settings-workspace';
 import { bootstrapEnvelope } from '../../api/__tests__/fixtures';
 
@@ -177,5 +178,211 @@ describe('Экспорт справочника и журнала аудита �
 
     await act(async () => { finish(); });
     expect(await screen.findByRole('button', { name: 'Экспорт журнала' })).toBeEnabled();
+  });
+});
+
+/** Снимок готовности установки — минимум полей, которые читает экран отчётов. */
+const readinessRow = (equipmentId: string, score: number): CurrentReadinessDto => ({
+  snapshotId: `snap-${equipmentId}`,
+  equipmentId,
+  status: 'READY',
+  verdict: 'ALLOWED',
+  score,
+  calculatedAt: '2026-10-01T06:00:00.000Z',
+  blockers: [],
+  warnings: null,
+  evidence: null,
+  facts: null,
+  triggerType: null,
+  ruleSetVersion: null,
+});
+
+/**
+ * R129 #6: «Готовность парка» печаталась сырым числом — «87.5%» точкой, тогда
+ * как в отчёте техготовности десятичная часть показана запятой.
+ */
+describe('Отчёты: готовность парка с запятой (R129 #6)', () => {
+  it('десятичная часть процента печатается по-русски', () => {
+    render(<ReportsScreen {...propsFor({
+      equipment: [
+        { id: 'eq-1', name: 'Свая-1', model: 'X', hammerKind: 'HYDRAULIC', isCombined: false, isActive: true, crewCount: 0 },
+        { id: 'eq-2', name: 'Свая-2', model: 'X', hammerKind: 'HYDRAULIC', isCombined: false, isActive: true, crewCount: 0 },
+      ],
+      currentReadiness: [readinessRow('eq-1', 85), readinessRow('eq-2', 90)],
+    })} />);
+
+    expect(screen.getAllByText('87,5%').length).toBeGreaterThan(0);
+    expect(screen.queryByText('87.5%')).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * R141 №2: любой активный блокер звался «критическим замечанием» и красился
+ * красным. Для блокера «нет осмотра за сегодня» (действие `RETURN_TO_OPERATOR`)
+ * это незакрытый шаг, а не критический дефект. Панель нейтральна, тон — по
+ * действию блокера, и запрет пуска (`DENY_START`) отличается от возврата.
+ */
+describe('Центр готовности: блокер показан по действию, а не всё «критическим» (R141 №2)', () => {
+  const snapshotWithBlocker = (action: string, label: string, actionLabel: string): CurrentReadinessDto => ({
+    snapshotId: 'snap-eq-1', equipmentId: 'eq-1', status: 'BLOCKED', verdict: 'RETURN_TO_OPERATOR', score: 60,
+    calculatedAt: '2026-10-01T06:00:00.000Z', ruleSetVersion: 'v1', triggerType: null,
+    blockers: [{ condition: 'INSPECTION_BELOW_80', action, label, actionLabel }],
+    warnings: [],
+    facts: { inspectionCompleted: false, inspectionProgress: 0, healthScore: 50, meterKnown: true,
+      permitValid: null, permitExpired: false, maintenanceConfigured: true,
+      maintenanceOverdueHours: 0, maintenanceOverdueDays: 0, accepted: true, criticalDefect: false, findings: 0 },
+    evidence: { equipmentId: 'eq-1', inspectionId: null, permitId: null, maintenanceRecordIds: [], evaluatedAt: '2026-10-01T06:00:00.000Z' },
+  });
+
+  it('возврат оператору — не «критическое»: нейтральный заголовок и рекомендация без «критических замечаний»', () => {
+    render(<ReadinessCentre {...propsFor({ currentReadiness: [snapshotWithBlocker('RETURN_TO_OPERATOR', 'Нет осмотра за сегодня', 'Вернуть оператору')] })} />);
+
+    expect(screen.getByText('Что держит допуск')).toBeInTheDocument();
+    expect(screen.getByText('Нет осмотра за сегодня')).toBeInTheDocument();
+    expect(screen.getAllByText('Вернуть оператору').length).toBeGreaterThan(0);
+    expect(screen.queryByText('Критическое замечание')).not.toBeInTheDocument();
+    expect(screen.queryByText('Критическое')).not.toBeInTheDocument();
+    expect(screen.getByText('Рекомендация: закрыть условие допуска — требуется действие ответственного.')).toBeInTheDocument();
+  });
+
+  it('запрет пуска (DENY_START) остаётся критическим и в тексте, и в плашке', () => {
+    render(<ReadinessCentre {...propsFor({ currentReadiness: [snapshotWithBlocker('DENY_START', 'Критический дефект', 'Запретить запуск')] })} />);
+
+    expect(screen.getByText('Критический дефект')).toBeInTheDocument();
+    expect(screen.getByText('Критическое')).toBeInTheDocument();
+    expect(screen.getByText('Рекомендация: устранить блокирующие условия для допуска к работе.')).toBeInTheDocument();
+  });
+});
+
+/**
+ * F-N1004-BLOCKER-LABELS (остаток MR-CHECK-1004 №3): плитка «Замечания и
+ * дефекты» считала ЛЮБОЙ блокер «Критическими», а блок называл их
+ * «Критические блокеры». Возврат оператору (`RETURN_TO_OPERATOR`) и
+ * «нужно подтверждение» (`REQUIRE_CONFIRMATION`) — не критический дефект;
+ * счётчики и цвет теперь идут по действию блокера, как плашка «Что держит
+ * допуск». Все условия допуска остаются блокерами, обычные замечания —
+ * отдельным числом.
+ */
+describe('Центр готовности: счётчики блокеров по действию, а не все «критические» (F-N1004-BLOCKER-LABELS)', () => {
+  const snapshotWithActions = (
+    blockers: Array<{ condition: string; action: string; label: string; actionLabel: string }>,
+  ): CurrentReadinessDto => ({
+    snapshotId: 'snap-eq-1', equipmentId: 'eq-1', status: 'BLOCKED', verdict: 'RETURN_TO_OPERATOR', score: 60,
+    calculatedAt: '2026-10-01T06:00:00.000Z', ruleSetVersion: 'v1', triggerType: null,
+    blockers,
+    warnings: [],
+    facts: { inspectionCompleted: false, inspectionProgress: 0, healthScore: 50, meterKnown: true,
+      permitValid: null, permitExpired: false, maintenanceConfigured: true,
+      maintenanceOverdueHours: 0, maintenanceOverdueDays: 0, accepted: true, criticalDefect: false, findings: 3 },
+    evidence: { equipmentId: 'eq-1', inspectionId: null, permitId: null, maintenanceRecordIds: [], evaluatedAt: '2026-10-01T06:00:00.000Z' },
+  });
+
+  /** Значение строки плитки по её подписи-термину (столбец «caption»). */
+  const tileValue = (caption: string) => screen.getByText(caption, { selector: 'dt' }).nextElementSibling;
+
+  it('один возврат оператору — не критический счётчик, а «Требует решения»', () => {
+    render(<ReadinessCentre {...propsFor({ currentReadiness: [snapshotWithActions([
+      { condition: 'INSPECTION_BELOW_80', action: 'RETURN_TO_OPERATOR', label: 'Нет осмотра за сегодня', actionLabel: 'Вернуть оператору' },
+    ])] })} />);
+
+    expect(tileValue('Критические')).toHaveTextContent('0');
+    expect(tileValue('Требует решения')).toHaveTextContent('1');
+    expect(tileValue('Обычные')).toHaveTextContent('3');
+    expect(screen.getByText('Критические блокеры').querySelector('b')).toHaveTextContent('0');
+
+    // Плитка больше не красная: возврат — не запрет пуска.
+    const pill = screen.getByText('Есть');
+    expect(pill.className).toContain('text-warning-strong');
+    expect(pill.className).not.toContain('text-destructive-strong');
+  });
+
+  it('одно подтверждение — «Требует подтверждения», критических нет', () => {
+    render(<ReadinessCentre {...propsFor({ currentReadiness: [snapshotWithActions([
+      { condition: 'ACCEPTANCE_UNCONFIRMED', action: 'REQUIRE_CONFIRMATION', label: 'Приёмка не подтверждена', actionLabel: 'Подтвердить' },
+    ])] })} />);
+
+    expect(tileValue('Критические')).toHaveTextContent('0');
+    expect(tileValue('Требует подтверждения')).toHaveTextContent('1');
+    expect(screen.queryByText('Требует решения', { selector: 'dt' })).not.toBeInTheDocument();
+  });
+
+  it('смешанные действия показаны верными количествами и названиями', () => {
+    render(<ReadinessCentre {...propsFor({ currentReadiness: [snapshotWithActions([
+      { condition: 'CRITICAL_DEFECT', action: 'DENY_START', label: 'Критический дефект', actionLabel: 'Запретить запуск' },
+      { condition: 'INSPECTION_BELOW_80', action: 'RETURN_TO_OPERATOR', label: 'Нет осмотра за сегодня', actionLabel: 'Вернуть оператору' },
+    ])] })} />);
+
+    expect(tileValue('Критические')).toHaveTextContent('1');
+    expect(tileValue('Требует решения')).toHaveTextContent('1');
+    expect(screen.getByText('Критические блокеры').querySelector('b')).toHaveTextContent('1');
+
+    const pill = screen.getByText('Есть');
+    expect(pill.className).toContain('text-destructive-strong');
+  });
+
+  it('неизвестное действие считается строгим запретом (критическим)', () => {
+    render(<ReadinessCentre {...propsFor({ currentReadiness: [snapshotWithActions([
+      { condition: 'NEW_RULE', action: 'SOMETHING_NEW', label: 'Новое условие из правил', actionLabel: 'Разобраться' },
+    ])] })} />);
+
+    expect(tileValue('Критические')).toHaveTextContent('1');
+    expect(screen.queryByText('Требует решения', { selector: 'dt' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Требует подтверждения', { selector: 'dt' })).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * R141 №4: у причины блокировки на доске не было адреса — кто снимает и куда
+ * идти; `actionLabel` («Вернуть оператору») описывает реакцию системы, а не
+ * действие человека. Рядом с причиной показываем маршрутизацию из
+ * существующего `blockerGuidance` и кнопку перехода на нужную вкладку; код,
+ * которого нет в карте, остаётся видимым без выдуманной подсказки.
+ */
+describe('Центр готовности: у причины есть адресат и переход (R141 №4)', () => {
+  const blockedSnapshot = (condition: string, label: string): CurrentReadinessDto => ({
+    snapshotId: 'snap-eq-1', equipmentId: 'eq-1', status: 'BLOCKED', verdict: 'RETURN_TO_OPERATOR', score: 60,
+    calculatedAt: '2026-10-01T06:00:00.000Z', ruleSetVersion: 'v1', triggerType: null,
+    blockers: [{ condition, action: 'RETURN_TO_OPERATOR', label, actionLabel: 'Вернуть оператору' }],
+    warnings: [],
+    facts: { inspectionCompleted: false, inspectionProgress: 0, healthScore: 50, meterKnown: true,
+      permitValid: null, permitExpired: false, maintenanceConfigured: true,
+      maintenanceOverdueHours: 0, maintenanceOverdueDays: 0, accepted: true, criticalDefect: false, findings: 0 },
+    evidence: { equipmentId: 'eq-1', inspectionId: null, permitId: null, maintenanceRecordIds: [], evaluatedAt: '2026-10-01T06:00:00.000Z' },
+  });
+
+  it('известный блокер: кто снимает, куда идти, и кнопка ведёт на нужную вкладку', () => {
+    const onViewChange = vi.fn();
+    render(<ReadinessCentre {...propsFor({
+      currentReadiness: [blockedSnapshot('INSPECTION_BELOW_80', 'Нет осмотра за сегодня')],
+      onViewChange,
+    })} />);
+
+    expect(screen.getByText('оператор')).toBeInTheDocument();
+    expect(screen.getByText('вкладка «Смены» → провести осмотр за сегодня')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /Перейти к снятию/ }));
+    expect(onViewChange).toHaveBeenCalledWith('shifts');
+  });
+
+  it('неизвестный блокер остаётся видимым, но без выдуманной подсказки и кнопки', () => {
+    render(<ReadinessCentre {...propsFor({
+      currentReadiness: [blockedSnapshot('UNKNOWN_CODE', 'Новая причина из правил')],
+    })} />);
+
+    expect(screen.getByText('Новая причина из правил')).toBeInTheDocument();
+    expect(screen.queryByText('Снимает')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Перейти к снятию/ })).not.toBeInTheDocument();
+  });
+
+  it('вкладка, закрытая роли, не обещает переход — подсказка остаётся видимой', () => {
+    const base = bootstrapEnvelope().data;
+    const bootstrap = { ...base, capabilities: { ...base.capabilities, screens: { ...base.capabilities.screens, shifts: false } } };
+    render(<ReadinessCentre {...propsFor({
+      currentReadiness: [blockedSnapshot('INSPECTION_BELOW_80', 'Нет осмотра за сегодня')],
+      bootstrap,
+    })} />);
+
+    expect(screen.getByText('вкладка «Смены» → провести осмотр за сегодня')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Перейти к снятию/ })).not.toBeInTheDocument();
   });
 });

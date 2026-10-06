@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { useDocumentTitle } from '@/components/piling/ops-shell';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useFleet } from './use-fleet';
@@ -18,6 +19,7 @@ import { PilingIcon } from '@/components/piling/icons';
 import { usePilingStore } from '@/lib/store';
 
 export function AdminEquipment() {
+  useDocumentTitle('Установки');
   const canManage = usePilingStore((state) => state.currentUser?.role === 'ADMIN');
   const { snapshot, loading, error, refetch } = useFleet();
   // Display + KPI come from the single snapshot source; create still posts to

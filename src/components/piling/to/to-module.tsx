@@ -3,6 +3,7 @@
 import { usePilingStore } from '@/lib/store';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
+import { useDocumentTitle } from '@/components/piling/ops-shell';
 import type { FleetCard, FleetSnapshot } from '@/components/piling/admin-equipment/fleet-types';
 import { authFetch } from '@/lib/api';
 import {
@@ -53,7 +54,10 @@ import {
   type ReadinessEvidence,
   type ReadinessStatus,
 } from './readiness-model';
-import { buildAuthoritativeReadinessPresentation } from './readiness/authoritative-presentation';
+import {
+  buildAuthoritativeReadinessPresentation,
+  buildUnavailableReadinessPresentation,
+} from './readiness/authoritative-presentation';
 import type { EquipmentOption } from './to-module-bits';
 import type { JournalRecord } from './to-stats';
 // Та же матрица прав, по которой откажет сервер. Модуль чистый — ни базы,
@@ -125,6 +129,13 @@ export const TECH_READINESS_PRODUCTION_SHELL_ENABLED =
   process.env.NEXT_PUBLIC_TECH_READINESS_PRODUCTION_SHELL !== 'false';
 
 /**
+ * Отказ чтения журнала дефектов. Отдельное состояние, а не только строка в
+ * общем баннере: счётчик критических дефектов решает допуск установки, и ноль в
+ * нём при отказе читался бы как «замечаний нет» (F-N1005-DEFECTS-UNKNOWN).
+ */
+const DEFECTS_UNAVAILABLE_MESSAGE = 'Не удалось загрузить журнал дефектов.';
+
+/**
  * Какой модуль показывает оболочка. Данные и экраны у них общие, разные —
  * набор вкладок, адрес и то, куда попадаешь без `?view=`.
  */
@@ -141,7 +152,7 @@ const SURFACE_ROUTE: Record<ModuleSurface, string> = {
 };
 
 const SURFACE_LABEL: Record<ModuleSurface, string> = {
-  readiness: 'Центр технической готовности',
+  readiness: 'Техническая готовность',
   safety: 'ТБ и допуски',
 };
 
@@ -168,16 +179,6 @@ const parseView = (value: string | null, surface: ModuleSurface): ReferenceView 
 
 const parseSettingsSection = (value: string | null): SettingsSection =>
   value && SETTINGS_IDS.has(value as SettingsSection) ? value as SettingsSection : 'rules';
-
-async function readOptionalJson<T>(url: string): Promise<T | null> {
-  try {
-    const response = await authFetch(url);
-    if (!response.ok) return null;
-    return await response.json() as T;
-  } catch {
-    return null;
-  }
-}
 
 interface WorkspaceIssue {
   source: string;
@@ -269,6 +270,7 @@ async function readReadinessPartial<T>(
 }
 
 export function ToModule({ surface = 'readiness' }: { surface?: ModuleSurface } = {}) {
+  useDocumentTitle(SURFACE_LABEL[surface]);
   const workspaceRequest = useRef<AbortController | null>(null);
   // Раздел назван в адресе — значит выбран человеком, и подменять его нельзя.
   const viewPinnedByUrl = useRef(false);
@@ -286,6 +288,12 @@ export function ToModule({ surface = 'readiness' }: { surface?: ModuleSurface } 
   const [equipmentId, setEquipmentId] = useState('');
   const [journals, setJournals] = useState<Record<string, JournalRecord[]>>({});
   const [journalLoaded, setJournalLoaded] = useState<Record<string, boolean>>({});
+  // Какие источники выбранной установки уже спрашивали (журнал/карточка).
+  // Отдельно от «загружено»: отказ — это тоже попытка, и без такой отметки
+  // эффект догрузки зациклился бы на повторных запросах к упавшему источнику.
+  const [loadAttempts, setLoadAttempts] = useState<
+    Record<string, { journal: boolean; card: boolean }>
+  >({});
   const [crews, setCrews] = useState<CrewSummary[]>([]);
   const [maintenance, setMaintenance] = useState<MaintenanceSummary[]>([]);
   const [fleetCards, setFleetCards] = useState<FleetCard[]>([]);
@@ -308,16 +316,31 @@ export function ToModule({ surface = 'readiness' }: { surface?: ModuleSurface } 
   const [shifts, setShifts] = useState<ReadinessShiftDto[]>([]);
   const [permits, setPermits] = useState<WorkPermitDto[]>([]);
   const [defects, setDefects] = useState<DefectDto[]>([]);
+  // Отказ чтения дефектов — отдельный источник (F-N1005-DEFECTS-UNKNOWN).
+  // Пустой `defects` при этом значит «не прочитано», а не «замечаний нет»:
+  // счётчик критических дефектов влияет на допуск установки.
+  const [defectsError, setDefectsError] = useState<string | null>(null);
   const [currentReadiness, setCurrentReadiness] = useState<CurrentReadinessDto[]>([]);
   const [readinessHistory, setReadinessHistory] = useState<ReadinessSnapshotDto[]>([]);
   const [authoritativeReadinessError, setAuthoritativeReadinessError] = useState<string | null>(null);
+  // Ошибка истории — отдельный источник. Раньше она сливалась с ошибкой
+  // текущего снимка, и падение только истории (её читают лишь отчёты) гасило
+  // готовность всего парка и центра: снимки были на месте, а экран показывал
+  // «оценка недоступна». Держим их порознь: история видна у отчётов, парк и
+  // центр судят только по текущему снимку.
+  const [readinessHistoryError, setReadinessHistoryError] = useState<string | null>(null);
   const [audit, setAudit] = useState<ReadinessAuditEnvelope | null>(null);
   const [readinessFilters, setReadinessFilters] = useState<ReadinessUrlFilters>({});
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    viewPinnedByUrl.current = params.get('view') !== null;
-    const requestedView = parseView(params.get('view'), surface);
+    // Прежнее имя параметра раздела — `tab`. Форма «Создать смену» возвращала
+    // на `/admin/to?tab=shifts`, а модуль читал только `?view=` — «Назад»,
+    // «Отмена» и возврат после сохранения открывали домашнюю «Готовность».
+    // Читаем `tab` как синоним, чтобы старые ссылки вели в названный раздел.
+    const requestedViewParam = params.get('view') ?? params.get('tab');
+    viewPinnedByUrl.current = requestedViewParam !== null;
+    const requestedView = parseView(requestedViewParam, surface);
     // Раздел чужого модуля в адресе — не ошибка, а старая ссылка: наряды и
     // журнал инструктажей годами открывались как `/admin/to?view=...`, и такие
     // адреса лежат в закладках, письмах и уведомлениях. Уводим туда, где
@@ -372,6 +395,8 @@ export function ToModule({ surface = 'readiness' }: { surface?: ModuleSurface } 
     setWorkspaceIssues([]);
     setOutOfRoleSources([]);
     setAuthoritativeReadinessError(null);
+    setReadinessHistoryError(null);
+    setDefectsError(null);
     setRulesAvailable(false);
     try {
       let readinessBootstrap = await fetchReadinessBootstrap({ signal: controller.signal });
@@ -480,17 +505,26 @@ export function ToModule({ surface = 'readiness' }: { surface?: ModuleSurface } 
       setShifts(shiftsResult.data);
       setPermits(permitsResult.data);
       setDefects(defectsResult.data);
+      setDefectsError(defectsResult.failed ? DEFECTS_UNAVAILABLE_MESSAGE : null);
       setCurrentReadiness(currentResult.data);
       setReadinessHistory(historyResult.data);
-      setAuthoritativeReadinessError(currentResult.error ?? historyResult.error);
+      setAuthoritativeReadinessError(currentResult.error);
+      setReadinessHistoryError(historyResult.error);
       setAudit(auditResult.data);
+      // Дефекты выведены из общего ИЛИ (F-N1005-DEFECTS-UNKNOWN): у отказа
+      // журнала замечаний теперь свой источник с именем, а его состояние
+      // (defectsError) экраны показывают прочерком, а не нулём.
       const readinessPartialFailure =
-        shiftsResult.failed || permitsResult.failed || defectsResult.failed || auditResult.failed;
+        shiftsResult.failed || permitsResult.failed || auditResult.failed;
       const initialIssues = [
         crewResult.issue,
         maintenanceResult.issue,
         fleetResult.issue,
         readinessRulesResult.issue,
+        ...(defectsResult.failed ? [{
+          source: 'Дефекты',
+          message: DEFECTS_UNAVAILABLE_MESSAGE,
+        } satisfies WorkspaceIssue] : []),
         ...(readinessPartialFailure ? [{
           source: 'Техготовность',
           message: 'Не удалось загрузить часть данных техготовности. Обновите страницу.',
@@ -539,6 +573,10 @@ export function ToModule({ surface = 'readiness' }: { surface?: ModuleSurface } 
       setDetails(primaryDetail.data ? { [primaryEquipment.id]: primaryDetail.data } : {});
       setJournals({ [primaryEquipment.id]: primaryJournal.data?.records ?? [] });
       setJournalLoaded({ [primaryEquipment.id]: primaryJournal.data != null });
+      // Первичный путь уже спросил (или осознанно не стал спрашивать) оба
+      // источника выбранной установки — отмечаем, чтобы эффект догрузки не
+      // повторил упавший запрос и не задвоил сообщение об ошибке.
+      setLoadAttempts({ [primaryEquipment.id]: { journal: true, card: true } });
       setLoading(false);
 
     } catch (error) {
@@ -577,29 +615,59 @@ export function ToModule({ surface = 'readiness' }: { surface?: ModuleSurface } 
   // Догрузка журнала и карточки при выборе установки. Права те же, что и при
   // первой загрузке: без них экран снова спрашивал бы у мастера то, что ему
   // не положено, и получал 403 — а пустой журнал читался бы как «записей нет».
+  //
+  // Источники считаем порознь (R151 №2/№5): раньше «удалась любая половина»
+  // закрывала обе, и упавшая карточка при живом журнале больше не
+  // перезапрашивалась. Удачу и отказ тоже разводим: `journalLoaded` ставится
+  // по полученным данным, а не по факту запроса, — иначе 500/403 на журнале
+  // читался бы как «журнал пуст». Отметка «спрашивали» не даёт эффекту
+  // зациклиться на отказе: новый запрос — только после действия пользователя,
+  // а полная перезагрузка сбрасывает отметки.
   useEffect(() => {
     const actor = bootstrap?.actor;
-    if (!equipmentId || !actor || journalLoaded[equipmentId] || details[equipmentId]) return;
+    if (!equipmentId || !actor) return;
     if (resolveEffectiveRole(actor.role, actor.actingAs) === 'OPERATOR') return;
     const mayReadJournal = can(actor, 'maintenance.manage');
     const mayReadCard = can(actor, 'equipment.read');
-    if (!mayReadJournal && !mayReadCard) return;
+    const attempted = loadAttempts[equipmentId] ?? { journal: false, card: false };
+    const needJournal = mayReadJournal && journalLoaded[equipmentId] !== true && !attempted.journal;
+    const needCard = mayReadCard && details[equipmentId] === undefined && !attempted.card;
+    if (!needJournal && !needCard) return;
+    const name = equipment.find((item) => item.id === equipmentId)?.name ?? equipmentId;
     let active = true;
     void Promise.all([
-      mayReadJournal
-        ? readOptionalJson<{ records?: JournalRecord[] }>(`/api/to/journal?equipmentId=${encodeURIComponent(equipmentId)}`)
-        : Promise.resolve(null),
-      mayReadCard
-        ? readOptionalJson<EquipmentDetailSnapshot>(`/api/equipment/${encodeURIComponent(equipmentId)}/details`)
-        : Promise.resolve(null),
+      needJournal
+        ? readOptionalJsonWithIssue<{ records?: JournalRecord[] }>(
+            `/api/to/journal?equipmentId=${encodeURIComponent(equipmentId)}`,
+            `Журнал «${name}»`,
+          )
+        : Promise.resolve({ data: null, issue: null }),
+      needCard
+        ? readOptionalJsonWithIssue<EquipmentDetailSnapshot>(
+            `/api/equipment/${encodeURIComponent(equipmentId)}/details`,
+            `Карточка «${name}»`,
+          )
+        : Promise.resolve({ data: null, issue: null }),
     ]).then(([journal, detail]) => {
       if (!active) return;
-      setJournals((previous) => ({ ...previous, [equipmentId]: journal?.records ?? [] }));
-      setJournalLoaded((previous) => ({ ...previous, [equipmentId]: true }));
-      if (detail) setDetails((previous) => ({ ...previous, [equipmentId]: detail }));
+      setLoadAttempts((previous) => ({
+        ...previous,
+        [equipmentId]: { journal: true, card: true },
+      }));
+      if (needJournal) {
+        setJournals((previous) => ({ ...previous, [equipmentId]: journal.data?.records ?? [] }));
+        setJournalLoaded((previous) => ({ ...previous, [equipmentId]: journal.data != null }));
+      }
+      const nextDetail = detail.data;
+      if (needCard && nextDetail) {
+        setDetails((previous) => ({ ...previous, [equipmentId]: nextDetail }));
+      }
+      const issues = [journal.issue, detail.issue]
+        .filter((issue): issue is WorkspaceIssue => issue !== null);
+      if (issues.length > 0) setWorkspaceIssues((previous) => [...previous, ...issues]);
     });
     return () => { active = false; };
-  }, [bootstrap?.actor, details, equipmentId, journalLoaded]);
+  }, [bootstrap?.actor, details, equipment, equipmentId, journalLoaded, loadAttempts]);
 
   const readinessByEquipment = useMemo(() => {
     // Карточка парка собирается из авторитетного снимка целиком.
@@ -626,9 +694,17 @@ export function ToModule({ surface = 'readiness' }: { surface?: ModuleSurface } 
         journals[item.id] ?? [],
         journalLoaded[item.id] === true,
       );
-      if (!snapshot) return [item.id, derived] as const;
 
-      const presentation = buildAuthoritativeReadinessPresentation(snapshot);
+      // Отказ авторитетного чтения не заменяем производной оценкой: журнал
+      // может быть полон и дать зелёный READY, хотя сервер вердикта не вынес
+      // (R151 №4). Как в парке и центре, показываем «не подтверждено».
+      const presentation = authoritativeReadinessError
+        ? buildUnavailableReadinessPresentation(snapshot ?? null)
+        : snapshot
+          ? buildAuthoritativeReadinessPresentation(snapshot)
+          : null;
+      if (!presentation) return [item.id, derived] as const;
+
       if (presentation.status === 'UNCONFIRMED') {
         return [item.id, {
           ...derived,
@@ -659,7 +735,7 @@ export function ToModule({ surface = 'readiness' }: { surface?: ModuleSurface } 
       } satisfies EquipmentReadiness] as const;
     });
     return Object.fromEntries(entries) as Record<string, EquipmentReadiness>;
-  }, [currentReadiness, equipment, journalLoaded, journals]);
+  }, [authoritativeReadinessError, currentReadiness, equipment, journalLoaded, journals]);
 
   const factsByEquipment = useMemo(() => Object.fromEntries(
     equipment.map((item) => [
@@ -753,8 +829,10 @@ export function ToModule({ surface = 'readiness' }: { surface?: ModuleSurface } 
       shifts={shifts}
       permits={permits}
       defects={defects}
+      defectsError={defectsError}
       currentReadiness={currentReadiness}
       authoritativeReadinessError={authoritativeReadinessError}
+      readinessHistoryError={readinessHistoryError}
       readinessHistory={readinessHistory}
       audit={audit}
       filters={readinessFilters}
