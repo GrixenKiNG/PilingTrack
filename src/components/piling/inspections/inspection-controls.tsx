@@ -73,7 +73,10 @@ export function DoneControl({ value, onChange, disabled }: { value: string; onCh
         checked={checked}
         disabled={disabled}
         onChange={(e) => onChange(e.target.checked ? 'DONE' : 'NOT_DONE')}
-        className="h-4 w-4 rounded border-border accent-signal"
+        // R137 №16: сырой input без расширенной области попадания — 16px.
+        // `hit-target` (globals.css) растит зону невидимым слоем до 24px (44px
+        // на сенсорном вводе), как в общем `ui/checkbox.tsx`.
+        className="hit-target h-4 w-4 rounded border-border accent-signal"
       />
       <span className="text-sm text-foreground">{checked ? 'Выполнено' : 'Не выполнено'}</span>
     </label>
@@ -93,7 +96,9 @@ export function MeasureControl({
         disabled={disabled}
         onChange={(e) => onChange(e.target.value)}
         placeholder="Значение"
-        className="w-28"
+        // R137 №17: поле измерения было 36px (Input h-9), корень `.field-type`
+        // лифта 44px не даёт — поднимаем на телефоне, на десктопе прежняя высота.
+        className="w-28 min-h-11 sm:min-h-0"
       />
       {unit && <span className="text-sm text-muted-foreground">{unit}</span>}
       {norm && <span className="text-xs text-muted-foreground">норма: {norm}</span>}

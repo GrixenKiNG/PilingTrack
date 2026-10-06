@@ -183,3 +183,19 @@ describe('панели ТО: отказ загрузки не дублирует
     expect(toast.error).not.toHaveBeenCalledWith('Не удалось загрузить регламенты');
   });
 });
+
+/**
+ * R137 №13: переключатель «По моточасам / По календарю» в форме регламента был
+ * ≈26px — палец легко попадал в соседний вариант, хотя это выбор, чем вообще
+ * меряется регламент ТО. На телефоне — 44px, на десктопе высота прежняя.
+ */
+describe('форма регламента ТО: переключатель триггера на телефоне (R137 №13)', () => {
+  it('«По моточасам»/«По календарю» — не ниже 44px, на десктопе прежняя высота', () => {
+    render(<MaintenancePlansPanel equipmentId="eq-1" />);
+
+    fireEvent.click(screen.getByRole('button', { name: /Добавить регламент/ }));
+
+    expect(screen.getByRole('button', { name: 'По моточасам' })).toHaveClass('min-h-11', 'text-xs', 'sm:min-h-0');
+    expect(screen.getByRole('button', { name: 'По календарю' })).toHaveClass('min-h-11', 'text-xs', 'sm:min-h-0');
+  });
+});
