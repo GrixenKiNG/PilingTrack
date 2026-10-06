@@ -182,8 +182,10 @@ export function AdminUsers() {
       cell: (user) => (
         <div className="min-w-0">
           <div className="truncate font-medium text-foreground">{user.name}</div>
-          <div className="mt-0.5 truncate text-2xs text-muted-foreground">{user.email}</div>
-          {user.phone && <div className="truncate text-3xs text-muted-foreground">{user.phone}</div>}
+          {/* F-R126-12: на телефоне почта и телефон обрезались многоточием — контакт
+              нельзя было дочитать. На узком экране переносим, с sm обрезка прежняя. */}
+          <div className="mt-0.5 text-2xs text-muted-foreground break-words sm:truncate">{user.email}</div>
+          {user.phone && <div className="text-3xs text-muted-foreground break-words sm:truncate">{user.phone}</div>}
         </div>
       ),
     },
