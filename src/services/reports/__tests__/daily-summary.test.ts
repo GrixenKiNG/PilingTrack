@@ -212,6 +212,60 @@ describe('handleReportForAnalytics', () => {
 
     expect(analyticsUpsertMock).not.toHaveBeenCalled();
   });
+
+  /*
+    J1 (W28-CODEX-J-TESTPLAN): при неразрешимом siteId/userId/tenantId обработчик
+    сейчас молча `return`-ит (кейс выше), а outbox-publisher всё равно клеймит
+    строку `published=true` (dispatch-then-claim) — ретрая и DLQ нет, проекция
+    теряется молча. После правки Codex неразрешимый идентификатор должен бросать,
+    чтобы сработал ретрай/DLQ. Тест красный до правки (см. комментарий с it.fails).
+  */
+  it.fails('J1: ждёт правки Codex; после правки заменить на it(...) — неразрешимый tenant бросает', async () => {
+    findUniqueMock.mockResolvedValue({ siteId: 'site_A', userId: 'user-1', tenantId: null });
+
+    await expect(
+      emitDomainEvent({
+        id: 'evt-j1-1',
+        type: REPORT_DOMAIN_EVENT_TYPES.REPORT_SUBMITTED,
+        aggregateId: 'report-uuid-j1',
+        aggregateType: 'Report',
+        occurredAt: new Date().toISOString(),
+        siteId: 'site_A',
+        userId: 'user-1',
+        data: {},
+      }),
+    ).rejects.toThrow();
+
+    expect(analyticsUpsertMock).not.toHaveBeenCalled();
+  });
+
+  /*
+    J4 (W28-CODEX-J-TESTPLAN): на ReportUpdated аналитика не подписана, поэтому
+    статус проекции меняют лишь ReportCreated/ReportSubmitted. Если ReportSubmitted
+    не дошёл (J1/J2), строка ReportAnalytics навсегда остаётся `draft` при живом
+    Report.status = submitted (наблюдалось на RM-3190cede). После правки Codex
+    ReportUpdated должен зеркалить статус отчёта в проекцию. Красный до правки.
+  */
+  it.fails('J4: ждёт правки Codex; после правки заменить на it(...) — ReportUpdated зеркалит статус', async () => {
+    findUniqueMock.mockResolvedValue({
+      siteId: 'site_A', userId: 'user-1', tenantId: 'tenant-a', status: 'submitted',
+    });
+
+    await emitDomainEvent({
+      id: 'evt-j4-1',
+      type: REPORT_DOMAIN_EVENT_TYPES.REPORT_UPDATED,
+      aggregateId: 'report-uuid-j4',
+      aggregateType: 'Report',
+      occurredAt: new Date().toISOString(),
+      siteId: 'site_A',
+      userId: 'user-1',
+      tenantId: 'tenant-a',
+      data: {},
+    });
+
+    expect(analyticsUpsertMock).toHaveBeenCalled();
+    expect(analyticsUpsertMock.mock.calls[0][0].update.status).toBe('submitted');
+  });
 });
 
 describe('recomputeSiteDailySummary', () => {
