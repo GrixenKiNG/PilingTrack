@@ -15,14 +15,10 @@ function Value({ label, value, icon }: { label: string; value: React.ReactNode; 
     <div className="flex min-w-0 items-center gap-2">
       {icon && <span className="shrink-0 text-muted-foreground">{icon}</span>}
       <span className="min-w-0">
-        {/* Размер в em масштабировался вместе с плиткой, но при её обычных
-            11–12px давал 7.15px — нечитаемо в цеху. Нижняя граница 10px
-            через max() сохраняет масштабирование на крупных плитках.
-            opacity-55 убрана: с ней подпись давала контраст 2.06. */}
-        <span
-          className="block font-medium uppercase tracking-wide text-muted-foreground"
-          style={{ fontSize: 'max(10px, 0.65em)' }}
-        >
+        {/* F-R126-7: инлайн-стиль `fontSize: max(10px, 0.65em)` мешал лифту
+            текста через `.field-type` (globals.css). Заменяем на `text-2xs`,
+            который на телефоне/планшете поднимается до 13px. */}
+        <span className="block font-medium uppercase tracking-wide text-muted-foreground text-2xs">
           {label}
         </span>
         <span className="block truncate font-semibold">{value}</span>
