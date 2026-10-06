@@ -1,0 +1,1090 @@
+<title>PilingTrack 2029</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Tektur:wght@500;700&family=Golos+Text:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Слой за слоем, как геологический разрез: тезис → архитектура → 9 модулей с экранами → ноу-хау → дорожная карта. */
+:root{
+  --ground:#E8EBE6; --paper:#F7F8F4; --sunk:#DDE2DB; --ink:#14181A; --ink2:#48545A; --ink3:#77838A; --line:#C7CEC8;
+  --signal:#CC520F; --signal-ink:#A3400A; --signal-soft:#F5DCCB; --on-signal:#FFFFFF;
+  --twin:#0A7482; --twin-soft:#CDE6E8;
+  --ok:#2C7A43; --ok-soft:#D3EADA; --warn:#A87404; --warn-soft:#F2E4C0; --bad:#B5302A; --bad-soft:#F2D2CE;
+  --bezel:#1A1F22; --screen:#FBFCF9; --screen2:#EEF1EC;
+  --soil0:#B9AE98; --soil1:#D8C28D; --soil2:#B08F6B; --soil3:#8F6E55; --soil4:#8E9496; --sky:#F7F8F4;
+  --f-display:"Tektur","Bahnschrift","Arial Narrow",sans-serif;
+  --f-body:"Golos Text","Segoe UI",system-ui,sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,Consolas,monospace;
+  --r:6px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --ground:#0D1113; --paper:#151A1D; --sunk:#1C2327; --ink:#E5EAE6; --ink2:#A2ADB0; --ink3:#748087; --line:#2A3338;
+  --signal:#EE7A39; --signal-ink:#F59A66; --signal-soft:#3A2416; --on-signal:#160B04;
+  --twin:#3CBECA; --twin-soft:#11343A;
+  --ok:#5BC279; --ok-soft:#163120; --warn:#DFB240; --warn-soft:#382D11; --bad:#EE6A5D; --bad-soft:#3D1B18;
+  --bezel:#040708; --screen:#0F1417; --screen2:#182024;
+  --soil0:#4A4539; --soil1:#6E6246; --soil2:#5C4A38; --soil3:#4B3B2F; --soil4:#474C4E; --sky:#151A1D;
+  color-scheme:dark}}
+:root[data-theme="dark"]{
+  --ground:#0D1113; --paper:#151A1D; --sunk:#1C2327; --ink:#E5EAE6; --ink2:#A2ADB0; --ink3:#748087; --line:#2A3338;
+  --signal:#EE7A39; --signal-ink:#F59A66; --signal-soft:#3A2416; --on-signal:#160B04;
+  --twin:#3CBECA; --twin-soft:#11343A;
+  --ok:#5BC279; --ok-soft:#163120; --warn:#DFB240; --warn-soft:#382D11; --bad:#EE6A5D; --bad-soft:#3D1B18;
+  --bezel:#040708; --screen:#0F1417; --screen2:#182024;
+  --soil0:#4A4539; --soil1:#6E6246; --soil2:#5C4A38; --soil3:#4B3B2F; --soil4:#474C4E; --sky:#151A1D;
+  color-scheme:dark}
+
+*{box-sizing:border-box}
+body{background:var(--ground);color:var(--ink);font:400 15px/1.55 var(--f-body);-webkit-font-smoothing:antialiased}
+a{color:var(--twin)}
+a:focus-visible,button:focus-visible{outline:2px solid var(--signal);outline-offset:2px}
+.wrap{max-width:1240px;margin:0 auto;padding-inline:20px}
+h1,h2,h3{font-family:var(--f-display);font-weight:700;line-height:1.08;text-wrap:balance;margin:0}
+h2{font-size:clamp(26px,3.4vw,40px);letter-spacing:-.01em}
+h3{font-size:20px}
+p{margin:0}
+.eyebrow{font:600 11px/1 var(--f-mono);letter-spacing:.14em;text-transform:uppercase;color:var(--ink3)}
+.num{font-variant-numeric:tabular-nums}
+
+/* верхняя полоса */
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:color-mix(in srgb,var(--ground) 88%,transparent);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+.top .wrap{display:flex;align-items:center;gap:18px;min-height:52px;flex-wrap:wrap}
+.brand{font:700 17px/1 var(--f-display);letter-spacing:.02em;display:flex;align-items:center;gap:8px;white-space:nowrap}
+.brand i{display:inline-block;width:10px;height:22px;background:var(--signal);transform:skewX(-12deg)}
+.brand small{font:600 11px var(--f-mono);color:var(--ink3);letter-spacing:.08em}
+.top nav{display:flex;gap:4px;overflow-x:auto;flex:1;min-width:0;scrollbar-width:none}
+.top nav a{color:var(--ink2);text-decoration:none;font-size:13px;padding:6px 10px;border-radius:4px;white-space:nowrap}
+.top nav a:hover{background:var(--sunk);color:var(--ink)}
+
+/* герой */
+.hero{padding-block:48px 28px}
+.hero .wrap{display:grid;grid-template-columns:1.05fr .95fr;gap:40px;align-items:center}
+.hero h1{font-size:clamp(34px,5.2vw,64px);letter-spacing:-.02em}
+.hero h1 em{font-style:normal;color:var(--signal)}
+.hero .lede{font-size:18px;color:var(--ink2);max-width:58ch;margin-top:18px}
+.hero .facts{display:flex;flex-wrap:wrap;gap:8px;margin-top:22px}
+.tag{display:inline-flex;align-items:center;gap:6px;font:500 12px/1 var(--f-body);padding:6px 9px;border-radius:4px;border:1px solid var(--line);background:var(--paper);color:var(--ink2)}
+.tag b{font-weight:600;color:var(--ink)}
+.section-cut{position:relative;background:var(--paper);border:1px solid var(--line);border-radius:var(--r);padding:14px;min-width:0}
+.section-cut svg{display:block;width:100%;height:auto}
+.cut-read{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
+.cut-read div{border-top:2px solid var(--line);padding-top:6px}
+.cut-read div.hot{border-color:var(--signal)}
+.cut-read span{display:block;font:600 10px var(--f-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--ink3)}
+.cut-read b{font:700 24px/1.1 var(--f-display);font-variant-numeric:tabular-nums}
+.cut-read small{font-size:12px;color:var(--ink3)}
+
+/* блоки страницы */
+section.block{padding-block:56px}
+.block-head{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.3fr);gap:32px;align-items:end;margin-bottom:28px}
+.block-head p{color:var(--ink2);max-width:62ch}
+.rule{border:0;border-top:1px solid var(--line);margin:0}
+
+/* сейчас → 2029 */
+.shift{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.shift div{background:var(--paper);padding:16px}
+.shift .from{font-size:13px;color:var(--ink3);text-decoration:line-through;text-decoration-color:color-mix(in srgb,var(--ink3) 50%,transparent)}
+.shift .to{font:600 16px/1.3 var(--f-body);margin-top:6px}
+.shift .why{font-size:13px;color:var(--ink2);margin-top:6px}
+
+/* архитектура */
+.arch{display:grid;gap:8px}
+.layer{display:grid;grid-template-columns:200px minmax(0,1fr);gap:16px;align-items:stretch}
+.layer .ln{background:var(--paper);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px}
+.layer .ln b{font:700 15px/1.2 var(--f-display);display:block}
+.layer .ln small{color:var(--ink3);font-size:12px}
+.layer .cells{display:flex;flex-wrap:wrap;gap:6px;align-content:center;padding:8px;border:1px dashed var(--line);border-radius:var(--r)}
+.cell{font-size:13px;padding:7px 10px;border-radius:4px;background:var(--paper);border:1px solid var(--line)}
+.cell.new{border-color:var(--signal);background:var(--signal-soft);color:var(--ink)}
+.cell.twin{border-color:var(--twin);background:var(--twin-soft)}
+.arch-legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--ink2);margin-top:12px}
+.arch-legend span::before{content:"";display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px;border:1px solid var(--line);background:var(--paper)}
+.arch-legend .n::before{background:var(--signal-soft);border-color:var(--signal)}
+.arch-legend .t::before{background:var(--twin-soft);border-color:var(--twin)}
+
+/* указатель модулей */
+.mod-index{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}
+.mod-index a{display:grid;grid-template-columns:44px minmax(0,1fr);gap:10px;align-items:center;text-decoration:none;color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:var(--r);padding:10px 12px}
+.mod-index a:hover{border-color:var(--signal)}
+.mod-index .n{font:700 22px/1 var(--f-display);color:var(--signal)}
+.mod-index b{display:block;font-weight:600;font-size:14px}
+.mod-index small{color:var(--ink3);font-size:12px}
+
+/* модуль */
+.module{padding-block:44px;border-top:1px solid var(--line);scroll-margin-top:60px}
+.module-grid{display:grid;grid-template-columns:330px minmax(0,1fr);gap:32px;align-items:start}
+.m-side{position:sticky;top:72px;display:grid;gap:16px}
+.m-num{font:700 64px/0.9 var(--f-display);color:var(--signal);letter-spacing:-.03em}
+.m-side h2{font-size:28px}
+.m-side .goal{color:var(--ink2)}
+.kv{display:grid;gap:10px}
+.kv div{border-left:2px solid var(--line);padding-left:10px}
+.kv div.k-now{border-color:var(--ink3)}
+.kv div.k-new{border-color:var(--signal)}
+.kv div.k-know{border-color:var(--twin)}
+.kv span{font:600 10px var(--f-mono);letter-spacing:.12em;text-transform:uppercase;color:var(--ink3);display:block;margin-bottom:2px}
+.kv p{font-size:13.5px}
+.refs{font-size:12.5px;color:var(--ink2);display:grid;gap:4px}
+.refs a{text-decoration:none;border-bottom:1px solid color-mix(in srgb,var(--twin) 40%,transparent)}
+.subs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px}
+.sub{min-width:0;display:grid;gap:10px;align-content:start}
+.sub.wide{grid-column:1/-1}
+.sub-cap{display:grid;gap:4px}
+.sub-cap h3{font-size:16px;font-family:var(--f-body);font-weight:700;display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}
+.sub-cap h3 .id{font:600 12px var(--f-mono);color:var(--ink3)}
+.sub-cap p{font-size:13.5px;color:var(--ink2)}
+.mat{font:600 10px/1 var(--f-mono);letter-spacing:.08em;text-transform:uppercase;padding:4px 6px;border-radius:3px;white-space:nowrap}
+.mat.m0{background:var(--ok-soft);color:var(--ok)}
+.mat.m1{background:var(--twin-soft);color:var(--twin)}
+.mat.m2{background:var(--warn-soft);color:var(--warn)}
+.mat.m3{background:var(--signal-soft);color:var(--signal-ink)}
+
+/* ===== макеты экранов ===== */
+.stage{background:repeating-linear-gradient(135deg,var(--sunk) 0 1px,transparent 1px 9px),var(--paper);border:1px solid var(--line);border-radius:var(--r);padding:18px;display:flex;justify-content:center;align-items:flex-start;min-width:0;position:relative}
+.stage::after{content:"пример данных";position:absolute;right:8px;bottom:6px;font:500 9.5px var(--f-mono);letter-spacing:.08em;color:var(--ink3);text-transform:uppercase}
+.phone{width:272px;max-width:100%;background:var(--bezel);border-radius:30px;padding:9px;box-shadow:0 14px 30px -18px rgba(0,0,0,.5)}
+.phone .scr{background:var(--screen);border-radius:22px;overflow:hidden;font-size:12px;color:var(--ink)}
+.ph-stat{display:flex;justify-content:space-between;font:600 10px var(--f-mono);padding:8px 14px 4px;color:var(--ink2)}
+.ph-bar{display:flex;justify-content:space-between;align-items:center;padding:6px 12px 8px;border-bottom:1px solid var(--line)}
+.ph-bar b{font:700 13px var(--f-display)}
+.ph-bar span{font-size:10.5px;color:var(--ink3)}
+.ph-body{padding:10px 12px 14px;display:grid;gap:8px}
+.desk{width:100%;background:var(--bezel);border-radius:10px;padding:0 0 6px;box-shadow:0 14px 30px -18px rgba(0,0,0,.5);min-width:0}
+.dk-top{display:flex;align-items:center;gap:5px;padding:7px 10px}
+.dk-top i{width:8px;height:8px;border-radius:50%;background:#5a6165}
+.dk-top span{font:500 10.5px var(--f-mono);color:#9aa3a7;margin-left:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dk-scr{background:var(--screen);margin:0 6px;border-radius:5px;overflow:hidden;display:grid;grid-template-columns:44px minmax(0,1fr);font-size:12px;color:var(--ink);min-height:240px}
+.dk-nav{background:var(--screen2);display:flex;flex-direction:column;align-items:center;gap:9px;padding-top:12px}
+.dk-nav i{width:18px;height:18px;border-radius:4px;background:var(--line)}
+.dk-nav i.on{background:var(--signal)}
+.dk-main{padding:12px;min-width:0;overflow-x:auto;display:grid;gap:10px;align-content:start}
+.dk-h{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.dk-h b{font:700 14px var(--f-display)}
+.row2{display:grid;grid-template-columns:minmax(0,1fr) 170px;gap:10px}
+.row3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.row4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.card{background:var(--screen2);border-radius:6px;padding:8px 10px;min-width:0}
+.card.line{background:transparent;border:1px solid var(--line)}
+.kpi span{display:block;font-size:10px;color:var(--ink3)}
+.kpi b{font:700 18px/1.15 var(--f-display);font-variant-numeric:tabular-nums}
+.kpi small{font-size:10px;color:var(--ink3)}
+.chip{display:inline-flex;align-items:center;gap:4px;font:600 10.5px/1 var(--f-body);padding:4px 7px;border-radius:999px;white-space:nowrap}
+.chip.ok{background:var(--ok-soft);color:var(--ok)}
+.chip.warn{background:var(--warn-soft);color:var(--warn)}
+.chip.bad{background:var(--bad-soft);color:var(--bad)}
+.chip.sig{background:var(--signal-soft);color:var(--signal-ink)}
+.chip.twin{background:var(--twin-soft);color:var(--twin)}
+.chip.mute{background:var(--screen2);color:var(--ink2)}
+.b{font:600 12px var(--f-body);border:0;border-radius:8px;padding:9px 10px;cursor:default;background:var(--screen2);color:var(--ink)}
+.b.sig{background:var(--signal);color:var(--on-signal)}
+.b.ok{background:var(--ok);color:var(--screen)}
+.b.warn{background:var(--warn-soft);color:var(--warn)}
+.b.ghost{background:transparent;border:1px solid var(--line)}
+.b.big{font:700 15px var(--f-display);padding:14px;width:100%;border-radius:12px}
+.btns{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.lamp{display:flex;gap:10px;align-items:center;padding:10px;border-radius:12px}
+.lamp.ok{background:var(--ok-soft)}
+.lamp .dot{width:22px;height:22px;border-radius:50%;background:var(--ok);box-shadow:0 0 0 5px color-mix(in srgb,var(--ok) 25%,transparent);flex:none}
+.lamp b{display:block;font:700 13px var(--f-display)}
+.lamp small{font-size:10.5px;color:var(--ink2)}
+.ck{list-style:none;margin:0;padding:0;display:grid}
+.ck li{display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-bottom:1px solid var(--line)}
+.ck li:last-child{border-bottom:0}
+.ck em{font-style:normal;font-weight:600}
+.ck em.ok{color:var(--ok)} .ck em.warn{color:var(--warn)} .ck em.bad{color:var(--bad)} .ck em.sig{color:var(--signal-ink)} .ck em.twin{color:var(--twin)}
+.ai{border:1px solid var(--twin);border-radius:10px;padding:8px;display:grid;gap:6px;background:color-mix(in srgb,var(--twin-soft) 45%,var(--screen))}
+.ai-h{font:600 10px var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--twin)}
+.big3{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;text-align:center}
+.big3 div{background:var(--screen2);border-radius:8px;padding:6px 2px}
+.big3 span{display:block;font-size:9.5px;color:var(--ink3)}
+.big3 b{font:700 19px/1.1 var(--f-display);font-variant-numeric:tabular-nums}
+.big3 .hot{background:var(--signal-soft)} .big3 .hot b{color:var(--signal-ink)}
+.msg{border-radius:12px;padding:8px 10px;max-width:92%;font-size:12px}
+.msg.me{background:var(--signal-soft);justify-self:end;border-bottom-right-radius:3px}
+.msg.it{background:var(--screen2);border-bottom-left-radius:3px}
+.tbl{width:100%;border-collapse:collapse;font-size:11px}
+.tbl th{font:600 9.5px var(--f-mono);letter-spacing:.06em;text-transform:uppercase;color:var(--ink3);text-align:left;padding:5px 6px;border-bottom:1px solid var(--line)}
+.tbl td{padding:5px 6px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums;vertical-align:top}
+.tbl td.r,.tbl th.r{text-align:right}
+.code{font:400 10px/1.5 var(--f-mono);background:var(--screen2);border-radius:6px;padding:8px;white-space:pre;overflow-x:auto;color:var(--ink2)}
+.code .k{color:var(--twin)} .code .v{color:var(--signal-ink)}
+.mini{font-size:10.5px;color:var(--ink3)}
+.svgbox svg{display:block;width:100%;height:auto}
+.tl{display:grid;gap:0;position:relative}
+.tl div{display:grid;grid-template-columns:14px minmax(0,1fr) auto;gap:8px;align-items:start;padding:5px 0}
+.tl i{width:10px;height:10px;border-radius:50%;background:var(--ok);margin-top:3px;box-shadow:0 0 0 3px var(--screen)}
+.tl i.p{background:var(--line)} .tl i.s{background:var(--signal)}
+.tl code{font:400 9.5px var(--f-mono);color:var(--ink3)}
+.bar{height:8px;border-radius:4px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;background:var(--ok)}
+.pulse{animation:pulse 1.6s ease-in-out infinite}
+@keyframes pulse{50%{opacity:.35}}
+
+/* уровни, радар, таблицы */
+.lv3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;margin-bottom:16px}
+.lv3 div{background:var(--paper);padding:14px 16px}
+.lv3 b{font:700 16px var(--f-display)}
+.lv3 p{font-size:13.5px;color:var(--ink2);margin-top:4px}
+.xtbl{overflow-x:auto;border:1px solid var(--line);border-radius:var(--r);background:var(--paper)}
+.mx{width:100%;border-collapse:collapse;font-size:13.5px;min-width:640px}
+.mx th{font:600 10.5px var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--ink3);text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);background:var(--sunk)}
+.mx td{padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+.mx tr:last-child td{border-bottom:0}
+.mx td:first-child{font-weight:600}
+.lv,.dc,.pr{font-style:normal;font:600 11px/1 var(--f-mono);padding:3px 6px;border-radius:3px;white-space:nowrap}
+.lv.r{background:var(--sunk);color:var(--ink2)} .lv.s{background:var(--twin-soft);color:var(--twin)} .lv.t{background:var(--signal-soft);color:var(--signal-ink)}
+.dc.k{background:var(--ok-soft);color:var(--ok)} .dc.i{background:var(--twin-soft);color:var(--twin)} .dc.x{background:var(--warn-soft);color:var(--warn)} .dc.r{background:var(--sunk);color:var(--ink3);text-decoration:line-through}
+.pr.h{background:var(--bad-soft);color:var(--bad)} .pr.m{background:var(--warn-soft);color:var(--warn)}
+.radar{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.rq{background:var(--paper);border:1px solid var(--line);border-top:4px solid var(--line);border-radius:var(--r);padding:14px;display:grid;gap:10px;align-content:start}
+.rq h3{font-size:15px}
+.rq p{display:grid;gap:2px;font-size:13.5px}
+.rq span{font:500 11px var(--f-mono);color:var(--ink3)}
+.rq.adopt{border-top-color:var(--ok)} .rq.trial{border-top-color:var(--twin)} .rq.assess{border-top-color:var(--warn)} .rq.hold{border-top-color:var(--ink3)}
+
+/* ноу-хау */
+.know{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.kh{background:var(--paper);border:1px solid var(--line);border-radius:var(--r);padding:16px;display:grid;gap:8px;align-content:start}
+.kh .n{font:700 13px var(--f-mono);color:var(--signal)}
+.kh h3{font-size:17px}
+.kh p{font-size:13.5px;color:var(--ink2)}
+.kh .vs{font-size:12px;color:var(--ink3);border-top:1px solid var(--line);padding-top:8px}
+
+/* дорожная карта */
+.road{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:0;border-top:3px solid var(--ink)}
+.stage-r{padding:16px 16px 0 0;display:grid;gap:10px;align-content:start;position:relative}
+.stage-r::before{content:"";position:absolute;top:-9px;left:0;width:15px;height:15px;border-radius:50%;background:var(--ground);border:3px solid var(--ink)}
+.stage-r.last::before{border-color:var(--signal)}
+.stage-r .when{font:600 12px var(--f-mono);color:var(--ink3);margin-top:8px}
+.stage-r h3{font-size:19px}
+.stage-r ul{margin:0;padding-left:18px;font-size:13.5px;color:var(--ink2);display:grid;gap:4px}
+.stage-r .gate{font-size:12.5px;background:var(--paper);border:1px solid var(--line);border-radius:4px;padding:8px}
+.stage-r .gate b{color:var(--ink)}
+.principles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:28px}
+.principles div{border-top:2px solid var(--ink);padding-top:10px}
+.principles b{font-family:var(--f-display);font-size:16px;display:block;margin-bottom:4px}
+.principles p{font-size:13.5px;color:var(--ink2)}
+footer{padding-block:36px 56px;color:var(--ink3);font-size:12.5px;border-top:1px solid var(--line)}
+footer .src{columns:2;column-gap:32px}
+footer .src a{display:block;margin-bottom:4px;break-inside:avoid}
+
+@media (max-width:1000px){
+  .hero .wrap,.block-head,.module-grid{grid-template-columns:1fr}
+  .m-side{position:static}
+  .shift,.know,.road,.radar{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .road{border-top:0}
+  .stage-r{border-top:3px solid var(--ink);margin-top:14px}
+  .mod-index{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media (max-width:640px){
+  .wrap{padding-inline:16px}
+  .subs,.shift,.know,.road,.principles,.mod-index,.radar,.lv3{grid-template-columns:1fr}
+  .layer{grid-template-columns:1fr}
+  .row2,.row4{grid-template-columns:1fr 1fr}
+  .row2 > :first-child{grid-column:1/-1}
+  footer .src{columns:1}
+  .stage{padding:12px}
+}
+@media (prefers-reduced-motion:reduce){.pulse{animation:none}}
+</style>
+
+<header class="top">
+  <div class="wrap">
+    <div class="brand"><i></i>PilingTrack <small>2029</small></div>
+    <nav aria-label="Разделы">
+      <a href="#vision">Видение</a><a href="#arch">Архитектура</a><a href="#modules">Модули</a><a href="#levels">Уровни</a><a href="#radar">Радар</a><a href="#ai">ИИ</a><a href="#knowhow">Ноу-хау</a><a href="#keep">Что сохраняем</a><a href="#risks">Риски</a><a href="#road">Дорожная карта</a><a href="#sources">Источники</a>
+    </nav>
+  </div>
+</header>
+
+<section class="hero" id="vision">
+  <div class="wrap">
+    <div>
+      <div class="eyebrow">Концепция новой версии · горизонт 2027–2029</div>
+      <h1 style="margin-top:12px">Каждая свая — <em>цифровой объект</em>. От проекта до акта без ручного ввода.</h1>
+      <p class="lede">Сегодня PilingTrack записывает то, что машинист ввёл руками. Версия 2029 сама слышит молот, знает координату сваи, считает отказ и собирает исполнительную документацию. Человек подтверждает и принимает решения.</p>
+      <div class="facts">
+        <span class="tag"><b>10</b> модулей</span>
+        <span class="tag"><b>33</b> экрана-подмодуля</span>
+        <span class="tag"><b>8</b> ноу-хау</span>
+        <span class="tag">основа — текущий код: <b>15</b> модулей, <b>83</b> таблицы</span>
+      </div>
+    </div>
+    <figure class="section-cut" style="margin:0">
+      <svg id="cut" viewBox="0 0 520 430" role="img" aria-label="Разрез грунта: свая погружена на 11,4 м, отказ 3,8 мм на удар">
+        <rect x="0" y="0" width="520" height="80" fill="var(--sky)"/>
+        <g id="layers"></g>
+        <g id="ruler" font-family="JetBrains Mono, monospace" font-size="10" fill="var(--ink3)"></g>
+        <line x1="268" y1="6" x2="268" y2="80" stroke="var(--ink2)" stroke-width="5"/>
+        <rect x="252" y="4" width="32" height="8" fill="var(--ink2)"/>
+        <g id="pileG">
+          <rect id="hammer" x="248" y="-6" width="40" height="34" rx="2" fill="var(--signal)"/>
+          <rect x="257" y="28" width="22" height="300" fill="var(--ink)" opacity=".86"/>
+          <path d="M257 328 L268 342 L279 328 Z" fill="var(--ink)" opacity=".86"/>
+        </g>
+        <line id="designLine" x1="200" x2="336" stroke="var(--twin)" stroke-width="1.5" stroke-dasharray="5 4"/>
+        <text id="designTxt" x="340" font-family="JetBrains Mono, monospace" font-size="10" fill="var(--twin)">проект 12,0 м</text>
+        <g id="gps"><circle cx="268" cy="80" r="16" fill="none" stroke="var(--twin)" stroke-width="1.2"/><circle cx="268" cy="80" r="28" fill="none" stroke="var(--twin)" stroke-width=".8" opacity=".6"/></g>
+        <g font-family="Golos Text, sans-serif" font-size="11" fill="var(--ink2)" id="soilNames"></g>
+      </svg>
+      <div class="cut-read">
+        <div><span>Глубина</span><b id="rDepth" class="num">11,40 м</b><small>GNSS + датчик троса</small></div>
+        <div><span>Удары</span><b id="rBlows" class="num">1 171</b><small>счёт по звуку молота</small></div>
+        <div class="hot"><span>Отказ</span><b id="rRef" class="num">3,8 мм</b><small>расчётный ≤ 5,0 мм</small></div>
+      </div>
+    </figure>
+  </div>
+</section>
+
+<section class="block" style="padding-top:20px">
+  <div class="wrap">
+    <div class="block-head">
+      <div><div class="eyebrow">Главный сдвиг</div><h2 style="margin-top:8px">Четыре перехода, на которых строится версия 2029</h2></div>
+      <p>Каждый переход опирается на то, что уже есть в коде. Мы не начинаем с нуля. Мы убираем ручной ввод там, где данные можно получить от датчика, телефона или модели.</p>
+    </div>
+    <div class="shift">
+      <div><div class="from">Машинист пишет число ударов</div><div class="to">Телефон в кабине слышит молот и считает сам</div><div class="why">Ошибки ручного журнала исчезают. Машинист только подтверждает сваю.</div></div>
+      <div><div class="from">Отчёт за смену</div><div class="to">Паспорт каждой сваи с цепочкой событий</div><div class="why">Таблица PilePassport уже есть. В 2029 она становится главным объектом системы.</div></div>
+      <div><div class="from">Бумажная исполнительная документация</div><div class="to">ИД в XML по схемам Минстроя с подписью УКЭП</div><div class="why">Минстрой разрешил вести ИД в электронном виде без бумажного дубля.</div></div>
+      <div><div class="from">Отчёт о прошлом</div><div class="to">Прогноз: отказ, сроки, поломки, погода</div><div class="why">Система предупреждает за часы и дни. Решение остаётся за человеком.</div></div>
+    </div>
+  </div>
+</section>
+
+<section class="block" id="arch">
+  <div class="wrap">
+    <div class="block-head">
+      <div><div class="eyebrow">Архитектура</div><h2 style="margin-top:8px">Пять слоёв: от установки до заказчика</h2></div>
+      <p>Данные рождаются на установке. Они проходят через телефон машиниста, попадают в ядро событий и становятся цифровым двойником. ИИ-агенты читают двойник и дают советы. Внешний контур получает готовые документы.</p>
+    </div>
+    <div class="arch">
+      <div class="layer"><div class="ln"><b>5. Внешний контур</b><small>заказчик, технадзор, государство</small></div><div class="cells"><span class="cell new">Портал заказчика</span><span class="cell new">ИД в XML + УКЭП</span><span class="cell">Telegram</span><span class="cell new">MAX</span><span class="cell new">1С: КС-2/КС-3</span><span class="cell new">ИСУП / ГИСОГД</span><span class="cell new">Открытый API</span></div></div>
+      <div class="layer"><div class="ln"><b>4. ИИ-агенты</b><small>советуют, не приказывают</small></div><div class="cells"><span class="cell new">ИИ-диспетчер</span><span class="cell new">Прогноз отказа</span><span class="cell new">Предиктивное ТО</span><span class="cell new">Фото-проверка осмотра</span><span class="cell new">Помощник «спросите данные»</span><span class="cell new">Утренняя сводка</span></div></div>
+      <div class="layer"><div class="ln"><b>3. Цифровая тень → двойник</b><small>одна модель площадки</small></div><div class="cells"><span class="cell twin">Свайное поле как построено</span><span class="cell twin">Геология по сваям</span><span class="cell twin">Паспорт сваи</span><span class="cell twin">Двойник установки</span><span class="cell">Аналитика (проекции)</span></div></div>
+      <div class="layer"><div class="ln"><b>2. Ядро событий</b><small>то, что уже работает</small></div><div class="cells"><span class="cell">Outbox и проекции</span><span class="cell">Допуск-светофор</span><span class="cell">ТО (CMMS)</span><span class="cell">ТБ: наряды, инструктажи</span><span class="cell">RLS по организации</span><span class="cell">Цепочка аудита</span></div></div>
+      <div class="layer"><div class="ln"><b>1. Борт установки</b><small>телефон + датчики</small></div><div class="cells"><span class="cell">Офлайн-очередь</span><span class="cell new">Акустический счётчик ударов</span><span class="cell new">GNSS RTK на мачте</span><span class="cell new">CAN/J1939 двигателя</span><span class="cell new">Камера зоны опасности</span><span class="cell new">Голос без сети</span></div></div>
+    </div>
+    <div class="arch-legend"><span>есть в PilingTrack сейчас</span><span class="n">новое в версии 2029</span><span class="t">слой цифрового двойника</span></div>
+  </div>
+</section>
+
+<section class="block" id="modules" style="padding-bottom:12px">
+  <div class="wrap">
+    <div class="block-head">
+      <div><div class="eyebrow">Модули</div><h2 style="margin-top:8px">10 модулей, 33 подмодуля. Каждый показан экраном.</h2></div>
+      <div>
+        <p>Метка над экраном показывает зрелость идеи. Это честная оценка, а не обещание.</p>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px"><span class="mat m0">Есть основа в коде</span><span class="mat m1">Работает в мире</span><span class="mat m2">Прототип в мире</span><span class="mat m3">Ноу-хау PilingTrack</span></div>
+      </div>
+    </div>
+    <div class="mod-index" id="modIndex"></div>
+  </div>
+</section>
+
+<div id="modulesOut"></div>
+
+<section class="block" id="levels">
+  <div class="wrap">
+    <div class="block-head">
+      <div><div class="eyebrow">Честные уровни</div><h2 style="margin-top:8px">Запись, тень, двойник: где мы сейчас</h2></div>
+      <p>Телеметрия ещё не делает систему цифровым двойником. Мы называем вещи по уровню, которого они реально достигли.</p>
+    </div>
+    <div class="lv3">
+      <div><b>Цифровая запись</b><p>Данные вводит человек. Пример: отчёт смены сегодня.</p></div>
+      <div><b>Цифровая тень</b><p>Машина и датчики передают данные сами. Система показывает состояние.</p></div>
+      <div><b>Цифровой двойник</b><p>Модель объекта предсказывает его поведение и связана с ним в обе стороны.</p></div>
+    </div>
+    <div class="xtbl"><table class="mx">
+      <thead><tr><th>Возможность</th><th>Сейчас (10.2026)</th><th>2027</th><th>2028</th><th>2029</th></tr></thead>
+      <tbody>
+      <tr><td>Установка</td><td><i class="lv r">запись</i></td><td><i class="lv r">запись</i> + счёт ударов</td><td><i class="lv s">тень</i> телематика на 3 машинах</td><td><i class="lv s">тень</i> весь парк</td></tr>
+      <tr><td>Свайное поле</td><td><i class="lv r">запись</i></td><td><i class="lv s">тень</i> GNSS на мачте</td><td><i class="lv s">тень</i> + дрон</td><td><i class="lv t">двойник</i> прогноз отказа</td></tr>
+      <tr><td>Паспорт сваи</td><td><i class="lv r">запись</i> таблица есть</td><td>цепочка хешей, XML</td><td>автоданные: удары, координата</td><td>УКЭП, приёмка онлайн</td></tr>
+      <tr><td>Предиктивное ТО</td><td>ступень 1: правила</td><td>ступень 2: статистика</td><td>ступень 3: аномалии</td><td>ступень 4: остаточный ресурс</td></tr>
+      <tr><td>Голос</td><td>—</td><td>простой и дефект голосом</td><td>вся смена голосом</td><td>диалог с Copilot</td></tr>
+      <tr><td>Компьютерное зрение</td><td>—</td><td>фото-проверка осмотра</td><td>камера зоны: только предупреждение</td><td>камера зоны: блокировка</td></tr>
+      <tr><td>ТИМ / BIM</td><td>—</td><td>импорт координат свай</td><td>исполнительная схема из факта</td><td>обмен с моделью заказчика</td></tr>
+      <tr><td>Автономия</td><td>—</td><td>—</td><td>советы ИИ-диспетчера</td><td>полуавтоматическая навигация</td></tr>
+      </tbody></table></div>
+  </div>
+</section>
+
+<section class="block" id="radar">
+  <div class="wrap">
+    <div class="block-head">
+      <div><div class="eyebrow">Радар технологий</div><h2 style="margin-top:8px">Что берём, что пробуем, что откладываем</h2></div>
+      <p>L1 — работает в промышленности. L2 — рынок формируется. L3 — прототипы и пилоты. L4 — ставка на 2027–2029. Цена: ₽ — до 100 тыс., ₽₽ — до 1 млн, ₽₽₽ — больше.</p>
+    </div>
+    <div class="radar">
+      <div class="rq adopt"><h3>ADOPT · берём</h3>
+        <p><b>Офлайн-очередь и идемпотентность</b><span>L1 · ₽ · есть, расширяем до 72 ч</span></p>
+        <p><b>Outbox и проекции</b><span>L1 · есть · ADR 0002</span></p>
+        <p><b>ИД в XML по схемам Минстроя</b><span>L1 · ₽₽ · 2027</span></p>
+        <p><b>Распознавание речи на телефоне</b><span>L1 · ₽ · 2027</span></p>
+        <p><b>Прогноз сдачи статистикой</b><span>L1 · ₽ · 2027</span></p>
+      </div>
+      <div class="rq trial"><h3>TRIAL · пробуем на пилоте</h3>
+        <p><b>Акустический счёт ударов</b><span>L3 · ₽ · 3 установки, 2027</span></p>
+        <p><b>GNSS RTK на мачте</b><span>L1 в мире · ₽₽ · 1 установка</span></p>
+        <p><b>Фото-проверка осмотра</b><span>L2 · ₽ · 2027</span></p>
+        <p><b>Copilot с источниками (RAG)</b><span>L2 · ₽₽ · 2027–2028</span></p>
+        <p><b>Правила с условиями и версиями</b><span>L1 · ₽ · основа есть</span></p>
+      </div>
+      <div class="rq assess"><h3>ASSESS · изучаем</h3>
+        <p><b>Телематика CAN/J1939 через шлюз</b><span>L1 в мире · ₽₽₽ · нужно оборудование</span></p>
+        <p><b>Камера зоны опасности</b><span>L2–L3 · ₽₽₽ · риск ложных остановок</span></p>
+        <p><b>Предиктивное ТО ступени 3–4</b><span>L2 · ₽₽ · нужны данные</span></p>
+        <p><b>Дрон и фотограмметрия</b><span>L1 · ₽₽ · через подрядчика</span></p>
+        <p><b>ИИ-диспетчер</b><span>L3 · ₽₽ · после прогноза сдачи</span></p>
+      </div>
+      <div class="rq hold"><h3>HOLD · не сейчас</h3>
+        <p><b>Блокчейн</b><span>цепочка хешей в Postgres даёт то же</span></p>
+        <p><b>Микросервисы и Kafka</b><span>один VPS, outbox хватает</span></p>
+        <p><b>Отдельная база временных рядов</b><span>до появления телеметрии</span></p>
+        <p><b>Event Sourcing целиком</b><span>сложность без выгоды</span></p>
+        <p><b>Автономная забивка, AR-очки</b><span>L3 · только после 2029</span></p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="block" id="ai">
+  <div class="wrap">
+    <div class="block-head">
+      <div><div class="eyebrow">ИИ без шума</div><h2 style="margin-top:8px">Каждая ИИ-функция решает одну задачу производства</h2></div>
+      <p>Схема для каждой функции: проблема → данные → модель → действие → контроль человека → показатель. Нет показателя — функцию не делаем.</p>
+    </div>
+    <div class="xtbl"><table class="mx">
+      <thead><tr><th>Функция</th><th>Проблема</th><th>Данные</th><th>Модель</th><th>Действие</th><th>Контроль человека</th><th>Показатель</th></tr></thead>
+      <tbody>
+      <tr><td>Счёт ударов</td><td>ошибки ручного журнала</td><td>звук, глубина</td><td>классификатор на телефоне</td><td>заполняет журнал</td><td>машинист подтверждает сваю</td><td>расхождение &lt; 2 %</td></tr>
+      <tr><td>Голосовой ввод</td><td>ввод в перчатках</td><td>речь</td><td>речь → поля</td><td>черновик события</td><td>«Верно» / «Исправить»</td><td>простой записан &lt; 10 с</td></tr>
+      <tr><td>Фото-проверка осмотра</td><td>пропущенные течи</td><td>снимки осмотра</td><td>модель зрения</td><td>вопрос машинисту</td><td>машинист, затем механик</td><td>дефекты найдены до поломки</td></tr>
+      <tr><td>Прогноз отказа сваи</td><td>валун и излом видны поздно</td><td>журнал свай, геология</td><td>статистика по соседям</td><td>сигнал аномалии</td><td>инженер назначает испытание</td><td>доля подтверждённых сигналов</td></tr>
+      <tr><td>Предиктивное ТО</td><td>внезапные поломки</td><td>моточасы, наряды, телеметрия</td><td>правила → базовая линия → аномалии</td><td>черновик наряда</td><td>механик подписывает</td><td>−30 % внеплановых простоев</td></tr>
+      <tr><td>Copilot по машине</td><td>долгий поиск причины</td><td>руководства, наряды, телеметрия</td><td>поиск по источникам (RAG)</td><td>причины и безопасные шаги</td><td>не снимает блокировки</td><td>время диагностики</td></tr>
+      <tr><td>Прогноз сдачи</td><td>сроки «на глаз»</td><td>выработка, погода, ремонты</td><td>Монте-Карло, не LLM</td><td>даты P50 и P80</td><td>решает диспетчер</td><td>ошибка &lt; 3 дней за 2 недели</td></tr>
+      </tbody></table></div>
+  </div>
+</section>
+
+<section class="block" id="knowhow">
+  <div class="wrap">
+    <div class="block-head">
+      <div><div class="eyebrow">Ноу-хау</div><h2 style="margin-top:8px">Восемь решений, которых нет у готовых систем</h2></div>
+      <p>Мировые системы (Liebherr PDE, Bauer, Leica, Pile Dynamics) работают с одной установкой и своим железом. PilingTrack знает весь парк, все бригады и всю площадку. Наше преимущество — связь между этими данными.</p>
+    </div>
+    <div class="know" id="knowOut"></div>
+  </div>
+</section>
+
+<section class="block" id="keep">
+  <div class="wrap">
+    <div class="block-head">
+      <div><div class="eyebrow">Не ломать работающее</div><h2 style="margin-top:8px">Что сохраняем, улучшаем, заменяем, убираем</h2></div>
+      <p>Версия 2029 растёт из текущего кода. Переписывать с нуля не нужно.</p>
+    </div>
+    <div class="xtbl"><table class="mx">
+      <thead><tr><th>Часть</th><th>Решение</th><th>Почему</th></tr></thead>
+      <tbody>
+      <tr><td>Outbox и проекции</td><td><i class="dc k">KEEP</i></td><td>Работает, хватает масштаба. ADR 0002.</td></tr>
+      <tr><td>RLS и цепочка аудита</td><td><i class="dc k">KEEP</i></td><td>Основа доверия к паспорту сваи. Починить запись AuditLog: она стоит с 28.09.</td></tr>
+      <tr><td>Модуль ТО (CMMS)</td><td><i class="dc i">IMPROVE</i></td><td>Ступени предиктивного ТО строятся поверх нарядов и моточасов.</td></tr>
+      <tr><td>Допуск-светофор</td><td><i class="dc i">IMPROVE</i></td><td>Критический отказ уже сильнее процента. Добавить прогноз и связь «отказ → дефект → наряд».</td></tr>
+      <tr><td>Офлайн-очередь машиниста</td><td><i class="dc i">IMPROVE</i></td><td>До 72 часов, фото в очереди, явные конфликты.</td></tr>
+      <tr><td>Шесть версий экрана машиниста (v1, v2, v5, v7, v10, next)</td><td><i class="dc x">REPLACE</i></td><td>Дефекты v2 и v5 повторяются. Оставить один экран по итогам operator-next.</td></tr>
+      <tr><td>Telegram</td><td><i class="dc k">KEEP</i> + MAX</td><td>Отдельный адаптер. MAX — рядом, не вместо.</td></tr>
+      <tr><td>Телеметрия (спит)</td><td><i class="dc k">KEEP</i></td><td>Включится с оборудованием. Удалять нельзя.</td></tr>
+      <tr><td>Миграция services → modules</td><td><i class="dc k">KEEP как есть</i></td><td>Остановлена сознательно. Доделывать отдельным рефакторингом не нужно.</td></tr>
+      <tr><td>WebSocket</td><td><i class="dc r">REMOVED</i></td><td>Удалён 26.09: событий не получал, опроса хватает.</td></tr>
+      </tbody></table></div>
+  </div>
+</section>
+
+<section class="block" id="risks">
+  <div class="wrap">
+    <div class="block-head">
+      <div><div class="eyebrow">Red team</div><h2 style="margin-top:8px">Почему эта концепция может провалиться</h2></div>
+      <p>Мы проверили концепцию глазами скептика-CTO, машиниста, механика, диспетчера, специалиста по безопасности, SRE, финансового директора и конкурента. Ниже главные риски и защита от них.</p>
+    </div>
+    <div class="xtbl"><table class="mx">
+      <thead><tr><th>Риск</th><th>Кто увидел</th><th>Вероятность</th><th>Защита</th></tr></thead>
+      <tbody>
+      <tr><td>Слишком много модулей для одной компании и одного VPS</td><td>CTO, финдиректор</td><td><i class="pr h">высокая</i></td><td>Этапы с проверкой на объекте. Тяжёлая инфраструктура — в HOLD.</td></tr>
+      <tr><td>Данных для ИИ нет</td><td>CTO</td><td><i class="pr h">высокая</i></td><td>Сначала правила и статистика. Модели — только когда есть данные.</td></tr>
+      <tr><td>Сегодняшняя смена ломается</td><td>машинист</td><td><i class="pr h">высокая</i></td><td>Этап 0: сначала дефекты v1, v2, v5.</td></tr>
+      <tr><td>Фото и PDF заполнят диск 30 ГБ</td><td>SRE</td><td><i class="pr h">высокая</i></td><td>Фото в объектном хранилище, временные PDF — 30 дней (решение 02.10).</td></tr>
+      <tr><td>Камера остановит работу ложной тревогой</td><td>машинист, диспетчер</td><td><i class="pr m">средняя</i></td><td>3 месяца только предупреждение. Блокировка — после проверки точности.</td></tr>
+      <tr><td>Машинисты не примут счётчик и голос</td><td>машинист</td><td><i class="pr m">средняя</i></td><td>Пилот на 3 установках. Ручной ввод остаётся.</td></tr>
+      <tr><td>Поток уведомлений</td><td>диспетчер</td><td><i class="pr m">средняя</i></td><td>Уровни P0–P3, P3 без звука, повтор не шлётся.</td></tr>
+      <tr><td>Зависимость от зарубежных ИИ-моделей</td><td>безопасность</td><td><i class="pr m">средняя</i></td><td>Сменные адаптеры, модели в РФ, работа без ИИ остаётся.</td></tr>
+      <tr><td>Подделка или подмена данных телеметрии</td><td>безопасность</td><td><i class="pr m">средняя</i></td><td>Ключ на каждом устройстве, подпись событий, проверка в журнале.</td></tr>
+      <tr><td>Экраны легко скопировать</td><td>конкурент</td><td><i class="pr h">высокая</i></td><td>Ценность — в данных: эталоны «установка × грунт», паспорта, граф знаний.</td></tr>
+      </tbody></table></div>
+  </div>
+</section>
+
+<section class="block" id="road">
+  <div class="wrap">
+    <div class="block-head">
+      <div><div class="eyebrow">Дорожная карта</div><h2 style="margin-top:8px">Этап 0, три этапа и горизонт</h2></div>
+      <p>Каждый этап даёт пользу сам по себе. Следующий этап начинается, только когда предыдущий прошёл проверку на объекте.</p>
+    </div>
+    <div class="road">
+      <div class="stage-r"><div class="when">IV кв. 2026 · сейчас</div><h3>0. Починить смену</h3><ul><li>v1: «Завершить работу» ведёт к сдаче</li><li>v2 и v5: старая смена не держит новую</li><li>Запись AuditLog с 28.09</li><li>Один экран машиниста вместо шести</li></ul><div class="gate"><b>Проверка:</b> полный обход — все 7 бригад сдали отчёт, сверка без расхождений.</div></div>
+      <div class="stage-r"><div class="when">IV кв. 2026 — II кв. 2027</div><h3>Данные без ручного ввода</h3><ul><li>Акустический счётчик ударов</li><li>Голосовой ввод простоя</li><li>Автопростой по тишине молота</li><li>Паспорт сваи с цепочкой хешей</li><li>Журнал забивки в XML</li></ul><div class="gate"><b>Проверка:</b> 3 установки месяц работают со счётчиком. Расхождение с ручным журналом — меньше 2 %.</div></div>
+      <div class="stage-r"><div class="when">III кв. 2027 — II кв. 2028</div><h3>Площадка в цифре</h3><ul><li>GNSS-навигация на точку сваи</li><li>Двойник свайного поля</li><li>Съёмка дроном и сверка</li><li>Прогноз отказа по соседям</li><li>Помощник «спросите данные»</li></ul><div class="gate"><b>Проверка:</b> отклонение свай от проекта на объекте-пилоте — меньше 5 см у 95 % свай.</div></div>
+      <div class="stage-r"><div class="when">III кв. 2028 — 2029</div><h3>Предсказание</h3><ul><li>Предиктивное ТО по телематике</li><li>ИИ-диспетчер с советами</li><li>Камера зоны опасности</li><li>Портал заказчика и КС-2</li><li>ИД в XML с подписью УКЭП</li></ul><div class="gate"><b>Проверка:</b> внеплановые простои по поломкам — минус 30 % к 2026 году.</div></div>
+      <div class="stage-r last"><div class="when">2029 и далее</div><h3>Горизонт</h3><ul><li>Полуавтоматическая забивка по координатам, как Built Robotics RPD 35</li><li>Двойник, готовый для роботов</li><li>Обмен данными с заводами свай</li></ul><div class="gate"><b>Условие:</b> только после зрелости этапов 1–3 и отдельного решения владельца.</div></div>
+    </div>
+    <div class="principles">
+      <div><b>Сначала офлайн</b><p>Площадка часто без сети. Каждая функция работает 72 часа без связи и досылает данные потом.</p></div>
+      <div><b>ИИ советует, человек решает</b><p>Ни один агент не меняет данные сам. Каждый совет показывает причину и кнопки «Принять» и «Отклонить».</p></div>
+      <div><b>Данные в России</b><p>Серверы и модели — в РФ (152-ФЗ). Внешние сервисы — только через заменяемые адаптеры.</p></div>
+    </div>
+  </div>
+</section>
+
+<footer id="sources">
+  <div class="wrap" style="display:grid;gap:14px">
+    <div class="eyebrow">Источники и мировые аналоги</div>
+    <div class="src">
+      <a href="https://www.builtrobotics.com/solutions/solar-piling" target="_blank" rel="noopener">Built Robotics — автономная забивка RPD 35</a>
+      <a href="https://hexagon.com/resources/customer-success-stories/construction-diary-the-pile-driver-operator" target="_blank" rel="noopener">Hexagon / Leica — навигация копра по GNSS</a>
+      <a href="https://www.akasakatec.com/en/products/software/smartpile/" target="_blank" rel="noopener">AKT SmartPile — RTK-GNSS и запись свай</a>
+      <a href="https://carlsonsw.com/product/carlson-pdgrade/" target="_blank" rel="noopener">Carlson PDGrade — 3D-позиционирование для свай</a>
+      <a href="https://www.pile.com/products/saximeter-sax-q/" target="_blank" rel="noopener">Pile Dynamics SAX-Q — счёт ударов по звуку</a>
+      <a href="https://www.pile.com/products/pda/" target="_blank" rel="noopener">Pile Dynamics PDA — испытания с передачей в реальном времени</a>
+      <a href="https://www.liebherr.com/en-int/deep-foundation/technology/assistent-systems/process-data-recording-5389748" target="_blank" rel="noopener">Liebherr PDE — запись данных процесса</a>
+      <a href="https://www.liebherr.com/en-us/group/magazine/digitalisation-from-ego-to-ecosystem/digitalisation-from-ego-to-ecosystem-3877675" target="_blank" rel="noopener">Liebherr — MyJobsite и цифровая экосистема</a>
+      <a href="https://arxiv.org/pdf/2509.20705" target="_blank" rel="noopener">BIM2RDT — двойник площадки для роботов (arXiv)</a>
+      <a href="https://www.autodesk.com/blogs/construction/2026-ai-trends-25-experts-share-insights/" target="_blank" rel="noopener">Autodesk — тренды ИИ в строительстве 2026</a>
+      <a href="https://www.allplan.com/blog/from-ai-design-to-autonomous-construction-how-predictive-data-centric-workflows-and-ai-agents-are-reshaping-aec/" target="_blank" rel="noopener">Allplan — ИИ-агенты и прогноз в AEC</a>
+      <a href="https://xpedeon.com/blog/top-9-construction-technology-trends-for-2026/" target="_blank" rel="noopener">Xpedeon — 9 технологических трендов 2026</a>
+      <a href="https://sroportal.ru/news/minstroj-ustanovil-poryadok-vedeniya-ispolnitelnoj-dokumentacii-v-elektronnom-vide/" target="_blank" rel="noopener">Минстрой — порядок ведения ИД в электронном виде</a>
+      <a href="https://academy.tsus.ru/novyj-gost-r-70108-2025-i-xml-shemy-kak-izmenilas-ispolnitelnaya-dokumentacziya-v-stroitelstve/" target="_blank" rel="noopener">ГОСТ Р 70108-2025 и XML-схемы ИД</a>
+      <a href="https://erzrf.ru/news/opublikovano-25-xml-skhem-dlya-proyektirovaniya-i-stroitelstva" target="_blank" rel="noopener">ЕРЗ.РФ — 25 XML-схем Минстроя</a>
+    </div>
+    <p>Все экраны — концепция. Числа на экранах — пример данных, не показатели «Ориона». Октябрь 2026.</p>
+  </div>
+</footer>
+
+<script>
+(function(){
+/* ---------- герой: разрез грунта ---------- */
+const PX = 25, G0 = 80; // 1 м = 25 px, поверхность на y=80
+const soils = [
+  {to:1.5, c:'--soil0', n:'насыпной грунт'},
+  {to:5.0, c:'--soil1', n:'песок средней крупности'},
+  {to:8.5, c:'--soil2', n:'суглинок тугопластичный'},
+  {to:10.6,c:'--soil3', n:'глина полутвёрдая'},
+  {to:14.0,c:'--soil4', n:'гравийный грунт'}
+];
+const svgNS='http://www.w3.org/2000/svg';
+const mk=(t,a)=>{const e=document.createElementNS(svgNS,t);for(const k in a)e.setAttribute(k,a[k]);return e};
+const L=document.getElementById('layers'), R=document.getElementById('ruler'), N=document.getElementById('soilNames');
+let from=0;
+soils.forEach(s=>{
+  L.appendChild(mk('rect',{x:0,y:G0+from*PX,width:520,height:(s.to-from)*PX,fill:`var(${s.c})`}));
+  const t=mk('text',{x:60,y:G0+((from+s.to)/2)*PX+4}); t.textContent=s.n; N.appendChild(t);
+  from=s.to;
+});
+for(let m=0;m<=14;m+=2){
+  R.appendChild(mk('line',{x1:0,x2:12,y1:G0+m*PX,y2:G0+m*PX,stroke:'var(--ink3)'}));
+  const t=mk('text',{x:16,y:G0+m*PX+4}); t.textContent=m+' м'; R.appendChild(t);
+}
+const dl=document.getElementById('designLine'), dt=document.getElementById('designTxt');
+dl.setAttribute('y1',G0+12*PX); dl.setAttribute('y2',G0+12*PX); dt.setAttribute('y',G0+12*PX+4);
+// удары на 1 м по глубине (как в подмодуле 1.3)
+const bpm=[20,28,36,48,64,80,96,118,150,190,236,262];
+function blowsAt(d){let s=0;for(let i=0;i<bpm.length;i++){const seg=Math.min(Math.max(d-i,0),1);s+=seg*bpm[i]}return Math.round(s)}
+const pileG=document.getElementById('pileG');
+const rD=document.getElementById('rDepth'), rB=document.getElementById('rBlows'), rR=document.getElementById('rRef');
+const fmt=(n,d)=>n.toLocaleString('ru-RU',{minimumFractionDigits:d,maximumFractionDigits:d});
+const FINAL=11.4;
+function draw(d){
+  // острие сваи на отметке 342 при сдвиге 0 → поверхность (80) соответствует глубине 0: сдвиг = 80-342 + d*PX
+  pileG.setAttribute('transform',`translate(0 ${(G0-342)+d*PX})`);
+  rD.textContent=fmt(d,2)+' м'; rB.textContent=fmt(blowsAt(d),0);
+  const i=Math.min(Math.floor(d),bpm.length-1); rR.textContent=fmt(1000/bpm[i],1)+' мм';
+}
+draw(FINAL);
+const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+if(!reduce){
+  let t0=null; const DUR=9000, HOLD=3500;
+  const hammer=document.getElementById('hammer');
+  function step(ts){
+    if(t0===null)t0=ts;
+    const e=(ts-t0)%(DUR+HOLD);
+    const p=Math.min(e/DUR,1);
+    const d= 0.6 + (FINAL-0.6)*(1-Math.pow(1-p,2.2));
+    draw(p>=1?FINAL:d);
+    hammer.setAttribute('y', p<1 ? (-6 - (Math.sin(ts/90)>0.6?5:0)) : -6);
+    requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+}
+
+/* ---------- помощники макетов ---------- */
+const ph=(title,body,o={})=>`<div class="phone"><div class="scr"><div class="ph-stat"><span>07:42</span><span>${o.net||'RTK ● LTE'}</span></div><div class="ph-bar"><b>${title}</b>${o.right?`<span>${o.right}</span>`:''}</div><div class="ph-body">${body}</div></div></div>`;
+const dk=(url,body,navOn=1)=>`<div class="desk"><div class="dk-top"><i></i><i></i><i></i><span>pilingtrack.ru/${url}</span></div><div class="dk-scr"><div class="dk-nav">${[0,1,2,3,4,5].map(i=>`<i class="${i===navOn?'on':''}"></i>`).join('')}</div><div class="dk-main">${body}</div></div></div>`;
+const chip=(t,k='mute')=>`<span class="chip ${k}">${t}</span>`;
+const kpi=(l,v,s='')=>`<div class="card kpi"><span>${l}</span><b>${v}</b>${s?`<small>${s}</small>`:''}</div>`;
+const svg=(vb,inner,label)=>`<div class="svgbox"><svg viewBox="${vb}" role="img" aria-label="${label}">${inner}</svg></div>`;
+let seed=7; const rnd=()=>{seed=(seed*16807)%2147483647;return (seed-1)/2147483646};
+
+/* ---------- экраны ---------- */
+const S={};
+S['1.1']=()=>ph('Смена · КБУРГ-16 №2',`
+<div class="lamp ok"><span class="dot"></span><div><b>Допуск: работа разрешена</b><small>4 условия выполнены · 07:38</small></div></div>
+<ul class="ck"><li><span>Осмотр ЕО</span><em class="ok">18 из 18</em></li><li><span>Фото-проверка ИИ</span><em class="warn">1 вопрос</em></li><li><span>Инструктаж сегодня</span><em class="ok">пройден</em></li><li><span>Удостоверение</span><em class="ok">до 12.2027</em></li><li><span>Ветер</span><em class="ok">7 м/с</em></li></ul>
+<div class="ai"><div class="ai-h">ИИ проверил 6 снимков</div>
+${svg('0 0 220 70',`<rect width="220" height="70" rx="6" fill="var(--ink2)"/><rect x="40" y="26" width="120" height="16" rx="8" fill="var(--ink3)"/><rect x="150" y="22" width="30" height="24" rx="3" fill="var(--soil4)"/><ellipse cx="128" cy="47" rx="9" ry="5" fill="var(--soil3)"/><rect x="112" y="34" width="34" height="24" fill="none" stroke="var(--signal)" stroke-width="2" stroke-dasharray="4 3"/>`,'Снимок цилиндра с отмеченным подтёком')}
+<p>Снимок 4: подтёк масла у цилиндра наклона мачты. Уверенность 0,81.</p>
+<div class="btns"><button class="b ghost">Это не течь</button><button class="b warn">Записать дефект</button></div></div>
+<button class="b big sig">Начать смену</button>`,{right:'смена 1'});
+
+S['1.2']=()=>ph('Навигация · П-214',`
+${svg('0 0 240 210',`
+<rect width="240" height="210" fill="var(--screen2)" rx="10"/>
+${[90,64,38].map(r=>`<circle cx="120" cy="105" r="${r}" fill="none" stroke="var(--line)"/>`).join('')}
+<circle cx="120" cy="105" r="22" fill="var(--ok-soft)" stroke="var(--ok)" stroke-dasharray="4 3"/>
+<line x1="120" y1="10" x2="120" y2="200" stroke="var(--line)"/><line x1="25" y1="105" x2="215" y2="105" stroke="var(--line)"/>
+<circle cx="120" cy="105" r="4" fill="var(--twin)"/>
+<line x1="131" y1="94" x2="123" y2="102" stroke="var(--signal)" stroke-width="2" marker-end="url(#ah)"/>
+<defs><marker id="ah" markerWidth="6" markerHeight="6" refX="3" refY="3" orient="auto"><path d="M0 0L6 3L0 6Z" fill="var(--signal)"/></marker></defs>
+<circle cx="134" cy="91" r="8" fill="var(--signal)"/><circle cx="134" cy="91" r="13" fill="none" stroke="var(--signal)" class="pulse"/>
+<text x="8" y="18" font-size="10" fill="var(--ink3)" font-family="JetBrains Mono">допуск ±5 см</text>
+<text x="150" y="200" font-size="10" fill="var(--ink3)" font-family="JetBrains Mono">масштаб 10 см</text>`,'Мишень: острие сваи в 4 см от проектной точки')}
+<div class="big3"><div><span>Смещение</span><b>4 см</b></div><div><span>Наклон мачты</span><b>0,3°</b></div><div><span>Отметка</span><b>−0,02</b></div></div>
+<span class="chip ok" style="justify-self:center">В допуске — можно бить</span>
+<p class="mini">Куст 7, ряд Г. Следующая свая П-215: 1,2 м на север.</p>`,{net:'RTK fix ● 14 спутн.'});
+
+S['1.3']=()=>{
+  const rows=bpm.slice(0,12).map((b,i)=>{const w=Math.min(b/280*150,150);const y=8+i*13;return `<text x="0" y="${y+8}" font-size="8.5" fill="var(--ink3)" font-family="JetBrains Mono">${i}–${i+1}</text><rect x="34" y="${y}" width="${(i===11?0.4:1)*w}" height="9" rx="2" fill="${b>=200?'var(--signal)':'var(--ink3)'}"/>`}).join('');
+  return ph('Забивка · П-214',`
+<div class="big3"><div><span>Удары</span><b>1 171</b></div><div><span>Глубина, м</span><b>11,40</b></div><div class="hot"><span>Отказ, мм</span><b>3,8</b></div></div>
+<span class="chip twin" style="justify-self:start"><span class="pulse">●</span> Микрофон слышит молот: 38 уд/мин</span>
+${svg('0 0 220 170',`${rows}<line x1="${34+200/280*150}" y1="4" x2="${34+200/280*150}" y2="166" stroke="var(--twin)" stroke-dasharray="4 3"/><text x="${38+200/280*150}" y="14" font-size="8.5" fill="var(--twin)" font-family="JetBrains Mono">5 мм</text>`,'Удары на каждый метр погружения')}
+<p class="mini">Ударов на 1 м. Пунктир — расчётный отказ 5 мм/удар.</p>
+<div class="card" style="background:var(--warn-soft)"><b>Отказ достигнут на 11,4 м.</b> Проект — 12,0 м. Недобив 0,6 м. Решение принимает инженер.</div>
+<div class="btns"><button class="b ghost">Бить дальше</button><button class="b sig">Позвать инженера</button></div>`,{right:'куст 7'});
+};
+
+S['1.4']=()=>ph('Голосовой ввод',`
+<div class="msg me">«Простой. Ждём бетононасос, минут сорок»</div>
+<div class="ai"><div class="ai-h">Понял так</div>
+<ul class="ck"><li><span>Событие</span><em>Простой</em></li><li><span>Причина</span><em class="sig">Ожидание техники</em></li><li><span>Начало</span><em>10:12</em></li><li><span>План</span><em>40 мин</em></li></ul>
+<div class="btns"><button class="b ghost">Исправить</button><button class="b ok">Верно</button></div></div>
+${svg('0 0 220 90',`<circle cx="110" cy="45" r="34" fill="var(--signal)"/><circle cx="110" cy="45" r="42" fill="none" stroke="var(--signal)" opacity=".4" class="pulse"/><rect x="103" y="28" width="14" height="24" rx="7" fill="var(--on-signal)"/><path d="M98 46a12 12 0 0 0 24 0" fill="none" stroke="var(--on-signal)" stroke-width="2.5"/><line x1="110" y1="58" x2="110" y2="64" stroke="var(--on-signal)" stroke-width="2.5"/>`,'Большая кнопка микрофона')}
+<p class="mini" style="text-align:center">Держите кнопку и говорите. Работает в перчатках и без сети: речь распознаётся на телефоне.</p>`,{net:'нет сети ● очередь 3'});
+
+S['2.1']=()=>{
+  seed=11; let cells=''; const cols=16, rows=7;
+  const st=[];
+  for(let r=0;r<rows;r++)for(let c=0;c<cols;c++){
+    const idx=r*cols+c; let k='plan';
+    if(idx<70)k='ok'; if(idx===12||idx===37||idx===55)k='warn'; if(idx===44)k='bad'; if(idx===70||idx===71)k='work';
+    const x=24+c*30+(r%2?12:0), y=22+r*30;
+    const f={ok:'var(--ok)',warn:'var(--warn)',bad:'var(--bad)',work:'var(--signal)',plan:'none'}[k];
+    cells+=`<circle cx="${x}" cy="${y}" r="9" fill="${f}" stroke="${k==='plan'?'var(--ink3)':f}" stroke-width="1.4" ${k==='work'?'class="pulse"':''}/>`;
+  }
+  return dk('sites/severny/field/k7',`
+<div class="dk-h"><b>Объект «Северный» · куст 7 · как построено</b><span>${chip('70 из 112','ok')} ${chip('отклонений 3','warn')} ${chip('недобив 1','bad')}</span></div>
+<div class="row2"><div class="card line">${svg('0 0 510 230',`<rect width="510" height="230" fill="none"/>${cells}<rect x="350" y="98" width="120" height="44" rx="5" fill="var(--screen)" stroke="var(--line)"/><text x="358" y="114" font-size="10" font-weight="700" fill="var(--ink)">П-169 · недобив</text><text x="358" y="128" font-size="9" fill="var(--ink2)">10,1 м из 12,0 м</text><text x="358" y="138" font-size="9" fill="var(--bad)">нужно решение инженера</text>`,'План куста: 112 свай, цвет показывает статус')}</div>
+<div style="display:grid;gap:6px;align-content:start">${kpi('Забито сегодня','18','план 20')}${kpi('Среднее отклонение','2,1 см','допуск 5 см')}<div class="card mini"><span style="color:var(--ok)">●</span> забита &nbsp;<span style="color:var(--warn)">●</span> отклонение<br><span style="color:var(--bad)">●</span> недобив &nbsp;<span style="color:var(--signal)">●</span> в работе &nbsp;○ план</div></div></div>`,1);
+};
+
+S['2.2']=()=>{
+  const piles=['П-215','П-216','П-217','П-218','П-219','П-220'];
+  const pred=[11.8,11.9,11.7,11.6,11.8,12.0], act=[11.6,12.0,11.5,11.7,7.2,null];
+  let g='';
+  piles.forEach((p,i)=>{
+    const x=40+i*76; let f=0;
+    soils.forEach((s,j)=>{const jitter=(i*0.13*(j%2?1:-1)); const to=Math.min(s.to+jitter,14); g+=`<rect x="${x}" y="${20+f*13}" width="44" height="${(to-f)*13}" fill="var(${s.c})"/>`; f=to;});
+    g+=`<line x1="${x-4}" x2="${x+48}" y1="${20+pred[i]*13}" y2="${20+pred[i]*13}" stroke="var(--twin)" stroke-width="2" stroke-dasharray="4 3"/>`;
+    if(act[i]!==null) g+=`<rect x="${x+16}" y="20" width="12" height="${act[i]*13}" fill="${i===4?'var(--bad)':'var(--ink)'}" opacity=".85"/>`;
+    else g+=`<rect x="${x+16}" y="20" width="12" height="${3*13}" fill="var(--signal)" class="pulse"/>`;
+    g+=`<text x="${x+22}" y="14" text-anchor="middle" font-size="10" font-weight="700" fill="var(--ink)">${p}</text>`;
+  });
+  for(let m=0;m<=14;m+=2) g+=`<text x="4" y="${24+m*13}" font-size="9" fill="var(--ink3)" font-family="JetBrains Mono">${m}</text>`;
+  return dk('sites/severny/geology',`
+<div class="dk-h"><b>Геология и прогноз отказа</b><span>${chip('модель обучена на 412 сваях','twin')}</span></div>
+<div class="card line">${svg('0 0 500 210',g,'Разрез по шести сваям: прогноз и факт глубины')}</div>
+<div class="ai"><div class="ai-h">Аномалия</div><p><b>П-219: отказ на 7,2 м, прогноз 11,8 м.</b> Соседние сваи ушли на 11,5–12,0 м. Возможен валун или излом сваи. Рекомендация: динамическое испытание до забивки П-220.</p></div>
+<p class="mini">Пунктир — прогноз глубины отказа. Столбик — факт.</p>`,1);
+};
+
+S['2.3']=()=>{
+  seed=5; let dots='';
+  for(let r=0;r<6;r++)for(let c=0;c<14;c++){
+    const x=30+c*33+rnd()*3, y=26+r*30+rnd()*3; const bad=(r===2&&c===5)||(r===4&&c===10)||(r===1&&c===12);
+    dots+=`<circle cx="${x}" cy="${y}" r="6" fill="var(--ink2)"/><circle cx="${x}" cy="${y}" r="10" fill="none" stroke="${bad?'var(--bad)':'var(--twin)'}" stroke-width="${bad?2:1}"/>`;
+    if(bad) dots+=`<text x="${x+13}" y="${y-8}" font-size="9" fill="var(--bad)" font-weight="700">${r===2?'+9 см':r===4?'нет в журнале':'+7 см'}</text>`;
+  }
+  return dk('sites/severny/drone/2026-10-05',`
+<div class="dk-h"><b>Съёмка дроном · 05.10 · ортофотоплан</b><span>${chip('точность 2 см','twin')}</span></div>
+<div class="card line" style="background:var(--soil1)">${svg('0 0 500 200',`<rect width="500" height="200" fill="var(--soil1)"/><path d="M0 170 Q120 150 250 175 T500 160 V200 H0Z" fill="var(--soil2)" opacity=".7"/><rect x="380" y="150" width="70" height="30" fill="var(--soil3)" opacity=".6"/>${dots}`,'Ортофотоплан с найденными оголовками свай')}</div>
+<div class="row3">${kpi('Найдено оголовков','84')}${kpi('Совпало с журналом','81')}${kpi('Расхождений','3','2 смещения, 1 лишняя')}</div>`,1);
+};
+
+S['3.1']=()=>dk('piles/P-214',`
+<div class="dk-h"><b>Паспорт сваи П-214</b><span>${chip('цепочка цела ✓','ok')} ${chip('принята','ok')}</span></div>
+<div class="row2"><div class="tl">
+<div><i></i><span><b>Проект</b> · точка X 512 304,18 · Y 2 208 911,40 · длина 12,0 м</span><code>#3f9a…</code></div>
+<div><i></i><span><b>Свая</b> · С120.35-8 · партия 1042 · завод ЖБИ-3</span><code>#b21c…</code></div>
+<div><i></i><span><b>Допуск смены</b> · КБУРГ-16 №2 · машинист Т.Н. · 07:38</span><code>#77e0…</code></div>
+<div><i></i><span><b>Навигация</b> · смещение 4 см · наклон 0,3°</span><code>#c4d1…</code></div>
+<div><i class="s"></i><span><b>Забивка</b> · 1 171 удар · 11,40 м · отказ 3,8 мм</span><code>#e805…</code></div>
+<div><i></i><span><b>Решение инженера</b> · недобив 0,6 м принят</span><code>#0a6f…</code></div>
+<div><i></i><span><b>Технадзор</b> · принято пакетом 24 сваи</span><code>#5d33…</code></div>
+<div><i class="p"></i><span><b>Акт КС-2</b> · ждёт закрытия месяца</span><code>—</code></div>
+</div>
+<div style="display:grid;gap:6px;align-content:start">
+${svg('0 0 100 100',(()=>{seed=3;let q='<rect width="100" height="100" fill="var(--screen)"/>';for(let i=0;i<10;i++)for(let j=0;j<10;j++){const corner=(i<3&&j<3)||(i>6&&j<3)||(i<3&&j>6);if(corner||rnd()>.52)q+=`<rect x="${5+i*9}" y="${5+j*9}" width="9" height="9" fill="var(--ink)"/>`}return q})(),'QR-код паспорта сваи')}
+<p class="mini">QR на оголовке. Технадзор сканирует и видит паспорт.</p></div></div>`,2);
+
+S['3.2']=()=>dk('docs/executive',`
+<div class="dk-h"><b>Исполнительная документация · октябрь</b><span>${chip('XML по схемам Минстроя','twin')}</span></div>
+<table class="tbl"><tr><th>Документ</th><th>Формат</th><th>Подпись</th></tr>
+<tr><td>Журнал забивки свай, куст 7</td><td>XML</td><td>${chip('УКЭП прораба ✓','ok')}</td></tr>
+<tr><td>Акт освидетельствования скрытых работ №58</td><td>XML + PDF</td><td>${chip('ждёт технадзор','warn')}</td></tr>
+<tr><td>Общий журнал работ, раздел 3</td><td>XML</td><td>${chip('собирается сам','twin')}</td></tr>
+<tr><td>Исполнительная схема куста 7</td><td>DXF + PDF</td><td>${chip('черновик','mute')}</td></tr></table>
+<div class="code"><span class="k">&lt;Свая</span> номер=<span class="v">"П-214"</span><span class="k">&gt;</span>
+  <span class="k">&lt;ГлубинаПогружения</span> ед=<span class="v">"м"</span><span class="k">&gt;</span>11.40<span class="k">&lt;/…&gt;</span>
+  <span class="k">&lt;ОтказФакт</span> ед=<span class="v">"мм"</span><span class="k">&gt;</span>3.8<span class="k">&lt;/…&gt;</span>
+  <span class="k">&lt;ХешПаспорта&gt;</span>e805…<span class="k">&lt;/…&gt;</span>
+<span class="k">&lt;/Свая&gt;</span></div>
+<p class="mini">Каждая строка XML ссылается на паспорт сваи. Бумажный дубль не нужен.</p>`,2);
+
+S['3.3']=()=>ph('Технадзор · куст 7',`
+<div class="card"><b>24 сваи ждут приёмки</b><br><span class="mini">21 без замечаний · 2 отклонения · 1 недобив</span></div>
+<ul class="ck"><li><span>П-191 … П-213</span><em class="ok">21 ✓</em></li><li><span>П-180 · смещение 6 см</span><em class="warn">фото</em></li><li><span>П-185 · смещение 5,5 см</span><em class="warn">фото</em></li><li><span>П-169 · недобив 1,9 м</span><em class="bad">ПДА</em></li></ul>
+<div class="msg it"><b>Замечание к П-180:</b> сместить ростверк по оси Г на 6 см. Согласовано с проектом.</div>
+<button class="b big ok">Принять 21 сваю пакетом</button>
+<p class="mini" style="text-align:center">Подпись УКЭП с телефона. Запись уходит в паспорт каждой сваи.</p>`,{right:'ООО «Заказчик»'});
+
+S['4.1']=()=>{
+  const rigs=[[90,70,'ok','КБУРГ-16 №2'],[180,120,'ok','SD-20C'],[300,60,'warn','ПВЭ-50ПР'],[380,150,'bad','Junttan PMx22'],[240,180,'mute','СП-49']];
+  const col={ok:'var(--ok)',warn:'var(--warn)',bad:'var(--bad)',mute:'var(--ink3)'};
+  return dk('dispatch/map',`
+<div class="dk-h"><b>Диспетчерская · сейчас 10:24</b><span>${chip('в работе 2','ok')} ${chip('простой 1','warn')} ${chip('ремонт 1','bad')}</span></div>
+<div class="row2"><div class="card line">${svg('0 0 460 230',`<rect width="460" height="230" fill="var(--screen2)"/><path d="M0 140 C100 120 160 200 260 160 S400 90 460 110" stroke="var(--line)" stroke-width="10" fill="none"/><path d="M200 0 C210 80 170 140 230 230" stroke="var(--line)" stroke-width="6" fill="none"/><rect x="60" y="40" width="160" height="110" rx="8" fill="none" stroke="var(--twin)" stroke-dasharray="5 4"/><text x="66" y="36" font-size="10" fill="var(--twin)">Объект «Северный»</text><rect x="270" y="30" width="150" height="150" rx="8" fill="none" stroke="var(--twin)" stroke-dasharray="5 4"/><text x="276" y="26" font-size="10" fill="var(--twin)">Объект «Порт»</text>${rigs.map(r=>`<circle cx="${r[0]}" cy="${r[1]}" r="9" fill="${col[r[2]]}"/><text x="${r[0]+13}" y="${r[1]+4}" font-size="10" fill="var(--ink)" font-weight="600">${r[3]}</text>`).join('')}`,'Карта двух объектов и пяти установок')}</div>
+<ul class="ck" style="font-size:11px"><li><span>КБУРГ-16 №2</span><em class="ok">18 свай</em></li><li><span>SD-20C</span><em class="ok">бурит</em></li><li><span>ПВЭ-50ПР</span><em class="warn">ждёт бетон 12 мин</em></li><li><span>Junttan PMx22</span><em class="bad">наряд ТО-117</em></li><li><span>СП-49</span><em>без смены</em></li></ul></div>`,3);
+};
+
+S['4.2']=()=>dk('dispatch/advisor',`
+<div class="dk-h"><b>ИИ-диспетчер · советы на сегодня</b><span>${chip('3 совета','twin')}</span></div>
+<div class="ai"><div class="ai-h">Совет 1 · влияние: +38 свай к пятнице</div><p><b>Перевести SD-20C с «Порта» на куст 7 «Северного» с 14:00.</b> На «Порту» буровые работы опережают план на 2 дня. Куст 7 отстаёт на 1,5 дня.</p><div style="display:flex;gap:6px;flex-wrap:wrap"><button class="b ok">Принять</button><button class="b ghost">Отклонить</button><button class="b ghost">Почему?</button></div></div>
+<div class="ai"><div class="ai-h">Совет 2 · риск простоя 40 мин</div><p><b>Заказать бетон для ПВЭ-50ПР на 11:30, а не на 12:00.</b> За неделю бетон опаздывал 4 раза из 5.</p><div style="display:flex;gap:6px"><button class="b ok">Принять</button><button class="b ghost">Отклонить</button></div></div>
+<p class="mini">Агент не меняет наряды сам. Каждое решение принимает диспетчер и попадает в журнал.</p>`,3);
+
+S['4.3']=()=>{
+  const W=460,H=170; const x=d=>20+d*(W-40)/30; const y=v=>H-20-v*(H-40)/112;
+  const plan=Array.from({length:31},(_,d)=>`${x(d)},${y(Math.min(112,112*Math.pow(d/26,1.1)))}`).join(' ');
+  const fact=Array.from({length:19},(_,d)=>`${x(d)},${y(70*Math.pow(d/18,1.15))}`).join(' ');
+  const p50=Array.from({length:13},(_,i)=>{const d=18+i;return `${x(d)},${y(Math.min(112,70+(d-18)*3.7))}`}).join(' ');
+  const bandTop=Array.from({length:13},(_,i)=>{const d=18+i;return `${x(d)},${y(Math.min(112,70+(d-18)*4.6))}`});
+  const bandBot=Array.from({length:13},(_,i)=>{const d=30-i;return `${x(d)},${y(Math.min(112,70+(d-18)*2.9))}`});
+  return dk('dispatch/forecast',`
+<div class="dk-h"><b>Прогноз сдачи · куст 7 · 112 свай</b><span>${chip('P50 — 24 окт','twin')} ${chip('P80 — 29 окт','warn')}</span></div>
+<div class="card line">${svg(`0 0 ${W} ${H}`,`
+${[0,28,56,84,112].map(v=>`<line x1="20" x2="${W-20}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)"/><text x="${W-18}" y="${y(v)+3}" font-size="8.5" fill="var(--ink3)">${v}</text>`).join('')}
+<polygon points="${bandTop.join(' ')} ${bandBot.join(' ')}" fill="var(--twin-soft)"/>
+<polyline points="${plan}" fill="none" stroke="var(--ink3)" stroke-dasharray="4 3"/>
+<polyline points="${fact}" fill="none" stroke="var(--ink)" stroke-width="2.2"/>
+<polyline points="${p50}" fill="none" stroke="var(--twin)" stroke-width="2"/>
+<circle cx="${x(18)}" cy="${y(70)}" r="4" fill="var(--signal)"/><text x="${x(18)-4}" y="${y(70)-8}" font-size="9" text-anchor="end" fill="var(--ink)">сегодня: 70</text>
+<text x="${x(26)}" y="${y(112)-6}" font-size="9" fill="var(--ink3)" text-anchor="middle">план 26 окт</text>`,'Кривая освоения: факт, план и диапазон прогноза')}</div>
+<p class="mini">Прогноз — 10 000 прогонов по реальной выработке, погоде и ремонтам. Серая полоса — 80 % вероятных исходов.</p>`,3);
+};
+
+S['4.4']=()=>{
+  const wind=[6,7,9,11,13,16,17,15,12,9,7,6,8,10,12,14,13,11,9,8,7,6,7,9];
+  const bars=wind.map((w,i)=>`<rect x="${20+i*18}" y="${130-w*6}" width="13" height="${w*6}" rx="2" fill="${w>=15?'var(--bad)':w>=12?'var(--warn)':'var(--twin)'}"/>`).join('');
+  return dk('dispatch/weather',`
+<div class="dk-h"><b>Погода и окна работы · 72 ч</b><span>${chip('правило: ветер ≥ 15 м/с — стоп','bad')}</span></div>
+<div class="card line">${svg('0 0 460 150',`${bars}<line x1="16" x2="452" y1="${130-15*6}" y2="${130-15*6}" stroke="var(--bad)" stroke-dasharray="5 4"/><text x="452" y="${126-15*6}" text-anchor="end" font-size="9" fill="var(--bad)">15 м/с</text>${['сегодня','','','завтра','','','','послезавтра'].map((t,i)=>t?`<text x="${20+i*54}" y="146" font-size="9" fill="var(--ink3)">${t}</text>`:'').join('')}`,'Порывы ветра по часам и порог остановки')}</div>
+<div class="ai"><div class="ai-h">Совет</div><p>Окно сегодня 14:00–20:00 закрыто: порывы 16–17 м/с. Предложение: смена с 20:00 до 02:00 на КБУРГ-16 №2. Прогноз — 11 свай.</p></div>`,3);
+};
+
+S['5.1']=()=>dk('fleet/kburg-16-2',`
+<div class="dk-h"><b>Двойник установки · КБУРГ-16 №2</b><span>${chip('моточасы 6 412','mute')} ${chip('здоровье 86 %','ok')}</span></div>
+<div class="row2"><div class="card line">${svg('0 0 300 220',`
+<rect x="30" y="170" width="150" height="26" rx="6" fill="var(--ink3)"/><circle cx="50" cy="200" r="10" fill="var(--ink2)"/><circle cx="160" cy="200" r="10" fill="var(--ink2)"/>
+<rect x="60" y="130" width="90" height="40" rx="4" fill="var(--ink2)"/><rect x="164" y="16" width="10" height="160" fill="var(--ink2)"/><rect x="156" y="40" width="26" height="30" rx="3" fill="var(--warn)"/>
+<line x1="150" y1="140" x2="166" y2="90" stroke="var(--ink3)" stroke-width="6"/>
+${[[169,55,'warn','Молот · 71 %'],[100,150,'ok','Двигатель · 94 %'],[158,115,'bad','Цилиндр наклона · 58 %'],[105,183,'ok','Ходовая · 90 %']].map(p=>`<circle cx="${p[0]}" cy="${p[1]}" r="6" fill="var(--${p[2]})" stroke="var(--screen)" stroke-width="2"/><line x1="${p[0]+6}" y1="${p[1]}" x2="200" y2="${p[1]}" stroke="var(--line)"/><text x="204" y="${p[1]+4}" font-size="10" fill="var(--ink)">${p[3]}</text>`).join('')}`,'Схема установки с состоянием узлов')}</div>
+<div style="display:grid;gap:6px;align-content:start">${kpi('До ТО-2','138 м/ч')}${kpi('Масло гидравлики','71 °C','норма до 80')}${kpi('Удары молота','2,1 млн','ресурс 3 млн')}</div></div>`,4);
+
+S['5.2']=()=>{
+  const pts=Array.from({length:30},(_,i)=>{const v=58+i*0.35+Math.sin(i*1.3)*2.2;return [20+i*10,150-(v-50)*3]});
+  const fc=Array.from({length:13},(_,i)=>{const d=29+i;const v=58+d*0.42;return [20+d*10,150-(v-50)*3]});
+  return dk('maintenance/predict',`
+<div class="dk-h"><b>Предиктивное ТО · цилиндр наклона мачты</b><span>${chip('риск отказа 34 % за 7 дней','bad')}</span></div>
+<div class="card line">${svg('0 0 460 170',`<line x1="20" x2="440" y1="${150-(80-50)*3}" y2="${150-(80-50)*3}" stroke="var(--bad)" stroke-dasharray="5 4"/><text x="440" y="${146-(80-50)*3}" text-anchor="end" font-size="9" fill="var(--bad)">порог 80 °C</text><polyline points="${pts.map(p=>p.join(',')).join(' ')}" fill="none" stroke="var(--ink)" stroke-width="2"/><polyline points="${fc.map(p=>p.join(',')).join(' ')}" fill="none" stroke="var(--twin)" stroke-width="2" stroke-dasharray="5 3"/><circle cx="${fc[12][0]}" cy="${fc[12][1]}" r="4" fill="var(--bad)"/><text x="${fc[12][0]-6}" y="${fc[12][1]-8}" font-size="9" text-anchor="end" fill="var(--ink)">≈ 42 моточаса</text><text x="20" y="166" font-size="9" fill="var(--ink3)">температура масла в цилиндре под нагрузкой, 30 смен</text>`,'Рост температуры и прогноз выхода за порог')}</div>
+<div class="ai"><div class="ai-h">Совет по ТО</div><p>Заменить уплотнения цилиндра в окно непогоды в четверг. Запчасти есть на складе (2 шт.). Наряд готов — нужна подпись механика.</p><div style="display:flex;gap:6px"><button class="b sig">Создать наряд ТО</button><button class="b ghost">Позже</button></div></div>`,4);
+};
+
+S['5.3']=()=>{
+  const d=[['КБУРГ-16 №2',3.1,9.9],['SD-20C',4.4,14.1],['ПВЭ-50ПР',2.6,8.3],['Junttan PMx22',3.6,11.5]];
+  return dk('fleet/fuel-co2',`
+<div class="dk-h"><b>Топливо и углерод · сентябрь</b><span>${chip('−8 % к августу','ok')}</span></div>
+<table class="tbl"><tr><th>Установка</th><th>л на 1 м сваи</th><th class="r">кг CO₂ на сваю</th></tr>
+${d.map(r=>`<tr><td>${r[0]}</td><td><div class="bar" style="width:${r[1]/5*100}%"><i style="width:100%;background:${r[1]>4?'var(--warn)':'var(--twin)'}"></i></div><span class="mini">${String(r[1]).replace('.',',')}</span></td><td class="r">${String(r[2]).replace('.',',')}</td></tr>`).join('')}</table>
+<p class="mini">Расход берётся из FuelLog и CAN-шины. Углерод — по коэффициенту для дизеля 2,68 кг CO₂ на литр. Отчёт годится для «зелёных» тендеров.</p>`,4);
+};
+
+S['6.1']=()=>dk('safety/zone/kburg-16-2',`
+<div class="dk-h"><b>Зона опасности · камера над кабиной</b><span>${chip('удар заблокирован','bad')}</span></div>
+<div class="row2"><div class="card line" style="background:var(--soil1)">${svg('0 0 300 200',`<rect width="300" height="200" fill="var(--soil1)"/><circle cx="150" cy="100" r="88" fill="var(--bad-soft)" stroke="var(--bad)" stroke-dasharray="6 4"/><circle cx="150" cy="100" r="48" fill="none" stroke="var(--warn)" stroke-dasharray="4 4"/><rect x="128" y="80" width="44" height="40" rx="4" fill="var(--ink2)"/><rect x="146" y="60" width="8" height="24" fill="var(--ink)"/><circle cx="214" cy="146" r="7" fill="var(--signal)"/><rect x="200" y="132" width="28" height="28" fill="none" stroke="var(--bad)" stroke-width="2"/><text x="232" y="150" font-size="10" font-weight="700" fill="var(--bad)">человек · 7 м</text><text x="8" y="16" font-size="10" fill="var(--ink2)">радиус 1,5 высоты мачты = 24 м</text>`,'Вид сверху: человек в опасной зоне')}</div>
+<ul class="ck" style="font-size:11px"><li><span>10:41:07</span><em class="bad">человек в зоне</em></li><li><span>10:41:07</span><em class="bad">молот: стоп</em></li><li><span>10:41:09</span><em>сигнал на каску</em></li><li><span>10:40:12</span><em class="warn">без каски</em></li><li><span>09:58:30</span><em class="ok">зона чиста</em></li></ul></div>
+<p class="mini">Распознавание идёт на камере, без облака. Видео не хранится — только кадр события.</p>`,5);
+
+S['6.2']=()=>ph('Наряд-допуск №214',`
+<div class="card"><b>Работы вблизи ЛЭП</b><br><span class="mini">Куст 9 · 06.10 · 08:00–20:00</span></div>
+<ul class="ck"><li><span>Выдал: прораб</span><em class="ok">подписал</em></li><li><span>Согласовал: инженер ОТ</span><em class="ok">подписал</em></li><li><span>Машинист</span><em class="sig">ваша подпись</em></li></ul>
+<div class="ai"><div class="ai-h">Инструктаж · 90 секунд</div><p>Минимальная дистанция до провода 10 кВ — 2 м. Стрелу не поднимать выше отметки на мачте.</p><p><b>Вопрос 2 из 3:</b> что делать, если стрела коснулась провода?</p><div style="display:grid;gap:4px"><button class="b ghost" style="text-align:left">Выйти из кабины и отбежать</button><button class="b ok" style="text-align:left">Остаться в кабине и позвать помощь</button></div></div>
+<button class="b big sig">Подписать по лицу</button>`,{right:'ТБ'});
+
+S['6.3']=()=>{
+  const types=['Зона молота','Падение груза','Без СИЗ','Техника рядом','Электричество'];
+  seed=21; let cells='';
+  types.forEach((t,r)=>{cells+=`<text x="0" y="${22+r*24}" font-size="9.5" fill="var(--ink2)">${t}</text>`;
+    for(let h=0;h<12;h++){const v=(r===0&&(h===8||h===9))?1:(r===2&&h<3)?.7:rnd()*.45;cells+=`<rect x="${100+h*28}" y="${10+r*24}" width="24" height="18" rx="3" fill="var(--bad)" opacity="${(0.08+v*.9).toFixed(2)}"/>`}});
+  ['07','09','11','13','15','17'].forEach((h,i)=>cells+=`<text x="${100+i*56}" y="136" font-size="9" fill="var(--ink3)">${h}:00</text>`);
+  return dk('safety/near-miss',`
+<div class="dk-h"><b>Почти-происшествия · 90 дней</b><span>${chip('47 событий','warn')}</span></div>
+<div class="card line">${svg('0 0 440 142',cells,'Тепловая карта почти-происшествий по часам и типам')}</div>
+<div class="ai"><div class="ai-h">Закономерность</div><p>Зона молота: 70 % событий в 15:00–17:00. В это время бетон приходит на площадку, и водители идут к копру. Предложение: отдельный проход для бетоновоза с 15:00.</p></div>`,5);
+};
+
+S['7.1']=()=>dk('assistant',`
+<div class="dk-h"><b>Помощник · спросите данные</b><span>${chip('только чтение','mute')}</span></div>
+<div style="display:grid;gap:8px">
+<div class="msg me">Почему бригада 3 в сентябре забила меньше, чем в августе?</div>
+<div class="msg it"><b>Выработка упала на 22 %: 412 → 321 свая.</b><br>Три причины:<br>1. Ремонт Junttan PMx22 — 5 смен (−64 сваи).<br>2. Глина на кусте 4: отказ на 2 м глубже, +18 % времени на сваю.<br>3. Ветер ≥ 15 м/с — 2 смены.
+${svg('0 0 300 70',`${[['ремонт',64,'var(--bad)'],['грунт',19,'var(--warn)'],['ветер',8,'var(--twin)']].map((r,i)=>`<text x="0" y="${16+i*20}" font-size="10" fill="var(--ink2)">${r[0]}</text><rect x="56" y="${7+i*20}" width="${r[1]*3.4}" height="12" rx="2" fill="${r[2]}"/><text x="${62+r[1]*3.4}" y="${16+i*20}" font-size="10" fill="var(--ink)">−${r[1]}</text>`).join('')}`,'Вклад причин в падение выработки')}
+<span class="mini">Источник: 38 отчётов, 2 наряда ТО, журнал погоды. Открыть каждый →</span></div>
+</div>`,0);
+
+S['7.2']=()=>dk('analytics/benchmarks',`
+<div class="dk-h"><b>Эталоны выработки · м сваи за час работы</b><span>${chip('по 2 140 сваям','twin')}</span></div>
+<table class="tbl"><tr><th>Установка</th><th class="r">Песок</th><th class="r">Суглинок</th><th class="r">Глина</th><th class="r">Гравий</th></tr>
+<tr><td>КБУРГ-16 №2</td><td class="r">38,4</td><td class="r">29,1</td><td class="r" style="color:var(--ok);font-weight:700">24,0</td><td class="r">15,2</td></tr>
+<tr><td>Junttan PMx22</td><td class="r" style="color:var(--ok);font-weight:700">44,9</td><td class="r">31,6</td><td class="r">21,3</td><td class="r">16,8</td></tr>
+<tr><td>ПВЭ-50ПР</td><td class="r">41,0</td><td class="r" style="color:var(--bad);font-weight:700">18,2</td><td class="r">—</td><td class="r">—</td></tr>
+<tr><td>СП-49</td><td class="r">30,7</td><td class="r">26,4</td><td class="r">19,9</td><td class="r" style="color:var(--bad);font-weight:700">9,6</td></tr></table>
+<p class="mini">Зелёный — лучший в грунте. Красный — ниже эталона более чем на 30 %. Таблица подсказывает, какую установку ставить на какой куст.</p>`,0);
+
+S['7.3']=()=>ph('MAX · ОРИОН сводка',`
+<div class="msg it"><b>Утро 06.10 · вчера по «Ориону»</b><br><br>
+🟢 Свай: 64 (план 60)<br>🟡 Простой: 3 ч 10 мин, главное — бетон (1 ч 40 мин)<br>🔴 Junttan PMx22 в ремонте, выход — четверг<br><br>
+<b>Сегодня важно:</b><br>1. Ветер 16–17 м/с с 14:00. Ночная смена предложена.<br>2. П-219 — аномалия отказа. Нужно испытание.<br>3. Удостоверение машиниста СП-49 истекает через 9 дней.<br><br><span class="mini">Подробно → pilingtrack.ru/brief</span></div>
+<div class="btns"><button class="b ghost">Спросить</button><button class="b sig">Открыть</button></div>`,{net:'LTE',right:'07:00'});
+
+S['8.1']=()=>dk('economics/severny',`
+<div class="dk-h"><b>Экономика объекта «Северный» · сейчас</b><span>${chip('маржа 23 %','ok')}</span></div>
+<div class="row4">${kpi('Себестоимость 1 м','1 842 ₽','план 1 950')}${kpi('Выручка за 1 м','2 400 ₽')}${kpi('Освоено','8,6 млн ₽','из 21,5')}${kpi('Простой в деньгах','312 тыс ₽','за месяц')}</div>
+<div class="card line">${svg('0 0 460 110',(()=>{const parts=[['Свая',780,'var(--ink2)'],['Техника',512,'var(--twin)'],['Люди',318,'var(--signal)'],['Топливо',142,'var(--warn)'],['Простой',90,'var(--bad)']];let x=10,o='';parts.forEach(p=>{const w=p[1]/1842*440;o+=`<rect x="${x}" y="22" width="${w-2}" height="34" fill="${p[2]}"/><text x="${x+3}" y="72" font-size="9.5" fill="var(--ink2)">${p[0]}</text><text x="${x+3}" y="86" font-size="9.5" fill="var(--ink)" font-weight="700">${p[1]} ₽</text>`;x+=w});return o+'<text x="10" y="14" font-size="9.5" fill="var(--ink3)">из чего складывается 1 м сваи</text>'})(),'Структура себестоимости метра сваи')}</div>`,0);
+
+S['8.2']=()=>dk('economics/ks2/2026-10',`
+<div class="dk-h"><b>КС-2 за октябрь · черновик собран сам</b><span>${chip('из 482 принятых свай','twin')}</span></div>
+<table class="tbl"><tr><th>№</th><th>Работа</th><th class="r">Ед.</th><th class="r">Кол-во</th><th class="r">Сумма, ₽</th></tr>
+<tr><td>1</td><td>Погружение свай С120.35 дизель-молотом</td><td class="r">м</td><td class="r">4 386</td><td class="r">10 526 400</td></tr>
+<tr><td>2</td><td>Лидерное бурение Ø 300</td><td class="r">м</td><td class="r">1 120</td><td class="r">1 008 000</td></tr>
+<tr><td>3</td><td>Динамические испытания</td><td class="r">шт</td><td class="r">6</td><td class="r">168 000</td></tr>
+<tr><td></td><td><b>Итого</b></td><td></td><td></td><td class="r"><b>11 702 400</b></td></tr></table>
+<div style="display:flex;gap:6px;flex-wrap:wrap"><button class="b sig">Отправить в 1С</button><button class="b ghost">Сверить с технадзором</button>${chip('каждая строка → паспорта свай','mute')}</div>`,0);
+
+S['8.3']=()=>dk('client/severny',`
+<div class="dk-h"><b>Портал заказчика · «Северный»</b><span>${chip('только просмотр','mute')}</span></div>
+<div class="row2"><div style="display:grid;gap:8px">
+<div class="row3">${kpi('Готово','482 сваи','из 640')}${kpi('Прогноз','12 ноя','P80 — 18 ноя')}${kpi('Приняты','458','24 ждут')}</div>
+<div class="card"><b>Неделя 41:</b> забито 96 свай, 1 аномалия (П-219, назначено испытание). Отклонение от графика — 1,5 дня.</div></div>
+<div class="card line" style="display:grid;place-items:center">${svg('0 0 120 120',`<circle cx="60" cy="60" r="46" fill="none" stroke="var(--line)" stroke-width="12"/><circle cx="60" cy="60" r="46" fill="none" stroke="var(--ok)" stroke-width="12" stroke-dasharray="${2*Math.PI*46*482/640} 999" transform="rotate(-90 60 60)" stroke-linecap="round"/><text x="60" y="64" text-anchor="middle" font-size="18" font-weight="700" fill="var(--ink)" font-family="Tektur, sans-serif">75 %</text>`,'Готовность объекта 75 процентов')}</div></div>`,0);
+
+S['9.1']=()=>ph('Связь и данные',`
+<div class="lamp ok" style="background:var(--warn-soft)"><span class="dot" style="background:var(--warn);box-shadow:0 0 0 5px color-mix(in srgb,var(--warn) 25%,transparent)"></span><div><b>Без сети 31 ч</b><small>Работа не остановлена</small></div></div>
+<ul class="ck"><li><span>События в очереди</span><em>214</em></li><li><span>Фото в очереди</span><em>38 · 92 МБ</em></li><li><span>Конфликтов</span><em class="ok">0</em></li><li><span>Допуск офлайн действует</span><em class="ok">ещё 41 ч</em></li><li><span>Подпись событий</span><em class="ok">ключ устройства</em></li></ul>
+${svg('0 0 220 60',`<rect x="4" y="16" width="56" height="30" rx="6" fill="var(--screen2)" stroke="var(--line)"/><text x="32" y="35" text-anchor="middle" font-size="9" fill="var(--ink)">телефон</text><rect x="160" y="16" width="56" height="30" rx="6" fill="var(--screen2)" stroke="var(--line)"/><text x="188" y="35" text-anchor="middle" font-size="9" fill="var(--ink)">сервер</text><line x1="62" y1="31" x2="158" y2="31" stroke="var(--warn)" stroke-dasharray="4 4"/><text x="110" y="24" text-anchor="middle" font-size="9" fill="var(--warn)">ждёт связь</text>`,'Телефон ждёт связь с сервером')}
+<p class="mini">Связь вернётся — данные уйдут сами, по порядку. Каждое событие подписано ключом телефона.</p>`,{net:'нет сети'});
+
+S['9.2']=()=>{
+  const nodes=[['1С: Бухгалтерия',-150,-70],['ИСУП / ГИСОГД',0,-88],['УКЭП',150,-70],['Liebherr PDE',-170,20],['ISO 15143-3 телематика',170,20],['Telegram / MAX',-110,88],['Открытый API',110,88]];
+  return dk('settings/integrations',`
+<div class="dk-h"><b>Интеграции</b><span>${chip('7 адаптеров','twin')}</span></div>
+<div class="card line">${svg('0 0 460 220',`<g transform="translate(230 110)">${nodes.map(n=>`<line x1="0" y1="0" x2="${n[1]}" y2="${n[2]}" stroke="var(--line)" stroke-width="1.5"/>`).join('')}<circle r="34" fill="var(--signal)"/><text y="4" text-anchor="middle" font-size="11" font-weight="700" fill="var(--on-signal)" font-family="Tektur, sans-serif">PilingTrack</text>${nodes.map(n=>`<rect x="${n[1]-62}" y="${n[2]-12}" width="124" height="24" rx="12" fill="var(--screen)" stroke="var(--twin)"/><text x="${n[1]}" y="${n[2]+4}" text-anchor="middle" font-size="9.5" fill="var(--ink)">${n[0]}</text>`).join('')}</g>`,'Схема интеграций вокруг PilingTrack')}</div>
+<p class="mini">Каждая внешняя система подключается через свой адаптер. Адаптер можно заменить, не трогая ядро.</p>`,5);
+};
+
+S['9.3']=()=>dk('settings/trust',`
+<div class="dk-h"><b>Доверие и защита</b><span>${chip('всё в РФ','ok')}</span></div>
+<ul class="ck"><li><span>Вход по ключу доступа (passkey) или по лицу</span><em class="ok">вместо паролей</em></li><li><span>Изоляция данных организаций (RLS)</span><em class="ok">есть сейчас</em></li><li><span>Цепочка аудита с хешами</span><em class="ok">есть сейчас</em></li><li><span>Ключ подписи на каждом телефоне</span><em class="ok">есть основа</em></li><li><span>ИИ-модели на своих серверах</span><em class="sig">2028</em></li><li><span>Резервные копии вне площадки</span><em class="ok">есть сейчас</em></li><li><span>Хранение данных — 152-ФЗ</span><em class="ok">соответствует</em></li></ul>
+<p class="mini">Агенты ИИ получают только чтение. Запись — только через команду с подтверждением человека.</p>`,5);
+
+S['4.5']=()=>ph('Уведомления',`
+<div class="card" style="background:var(--bad-soft)"><span class="chip bad">P0 · критично</span><br><b>Человек в зоне молота, КБУРГ-16 №2.</b> Удар остановлен.<br><span class="mini">Звук и вибрация · дубль в MAX всем на объекте</span></div>
+<div class="card" style="background:var(--signal-soft)"><span class="chip sig">P1 · нужно действие</span><br><b>Наряд ТО-117 ждёт подписи механика.</b> Срок — 12:00.<br><span class="mini">Только механику и мастеру</span></div>
+<div class="card" style="background:var(--warn-soft)"><span class="chip warn">P2 · предупреждение</span><br>Ветер 16–17 м/с с 14:00. Предложена ночная смена.<br><span class="mini">Диспетчеру · без звука ночью</span></div>
+<div class="card"><span class="chip mute">P3 · информация</span><br>Сводка за вчера готова.<br><span class="mini">В утреннюю сводку · без звука</span></div>
+<p class="mini" style="text-align:center">Одно событие — одно уведомление. Повтор не шлётся, пока событие не изменилось.</p>`,{right:'диспетчер'});
+
+S['10.1']=()=>dk('copilot/banut-655',`
+<div class="dk-h"><b>Copilot · Banut 655</b><span>${chip('ответ только со ссылкой на источник','twin')}</span></div>
+<div class="msg me">Почему растёт температура гидравлического масла?</div>
+<div class="msg it" style="max-width:100%"><b>За 30 смен масло стало теплее на 8 °C: 71 → 79 °C под нагрузкой.</b> Давление и обороты в норме. Нагрузка выше обычной: куст 4, глина, на 18 % больше ударов на сваю.<br><br>
+<b>Вероятные причины:</b><br>1. Загрязнён радиатор. Последняя очистка — 410 моточасов назад, норма производителя — 250. <span class="chip mute">Руководство Banut 655, §7.3, с. 84</span> <span class="chip mute">Наряд ТО-98</span><br>
+2. Износ уплотнений цилиндра наклона: ремонт 12.08, течь повторилась. <span class="chip mute">Дефект Д-112</span><br><br>
+<b>Безопасные действия:</b> снизить частоту ударов до 40 в минуту и очистить радиатор в ближайшее окно непогоды.</div>
+<div style="display:flex;gap:6px;flex-wrap:wrap"><button class="b sig">Создать наряд «очистка радиатора»</button><button class="b ghost">Показать телеметрию</button></div>
+<p class="mini">Copilot не снимает блокировки и не меняет допуск. Решение принимает механик.</p>`,4);
+
+S['10.2']=()=>{
+  const cols=[[['Banut 655','ink']],[['Двигатель','mute'],['Гидравлика','sig'],['Молот','mute'],['Ходовая','mute']],[['Насос','mute'],['Радиатор','sig'],['Цилиндр наклона','warn']],[['Датчик t° масла','twin'],['Перегрев','bad'],['Течь','warn']],[['Очистка радиатора','ok'],['Руководство §7.3','twin'],['Уплотнения, 2 шт.','mute']]];
+  const col={ink:'var(--ink2)',mute:'var(--line)',sig:'var(--signal)',warn:'var(--warn)',twin:'var(--twin)',bad:'var(--bad)',ok:'var(--ok)'};
+  const pos=[];let g='';
+  cols.forEach((c,i)=>c.forEach((n,j)=>{const x=10+i*100,y=110-(c.length-1)*26+j*52;pos.push([i,j,x,y,n]);}));
+  const at=(i,j)=>pos.find(p=>p[0]===i&&p[1]===j);
+  const links=[[0,0,1,0],[0,0,1,1],[0,0,1,2],[0,0,1,3],[1,1,2,0],[1,1,2,1],[1,1,2,2],[2,1,3,0],[3,0,3,1],[2,1,3,1],[2,2,3,2],[3,1,4,0],[3,1,4,1],[3,2,4,2]];
+  links.forEach(l=>{const a=at(l[0],l[1]),b=at(l[2],l[3]);g+=`<line x1="${a[2]+84}" y1="${a[3]}" x2="${b[2]}" y2="${b[3]}" stroke="var(--line)" stroke-width="1.4"/>`});
+  pos.forEach(p=>{const c=col[p[4][1]];g+=`<rect x="${p[2]}" y="${p[3]-12}" width="84" height="24" rx="5" fill="var(--screen)" stroke="${c}" stroke-width="1.6"/><text x="${p[2]+42}" y="${p[3]+4}" text-anchor="middle" font-size="9" fill="var(--ink)">${p[4][0]}</text>`});
+  ['Машина','Узел','Компонент','Датчик · неисправность','Ремонт · источник'].forEach((t,i)=>g+=`<text x="${52+i*100}" y="12" text-anchor="middle" font-size="8.5" fill="var(--ink3)" font-family="JetBrains Mono">${t}</text>`);
+  return dk('knowledge/graph/banut-655',`
+<div class="dk-h"><b>Граф знаний машины</b><span>${chip('412 связей','twin')}</span></div>
+<div class="card line">${svg('0 0 500 220',g,'Граф: машина, узлы, компоненты, датчики, неисправности, ремонты и руководства')}</div>
+<p class="mini">Каждая связь подтверждена документом: нарядом, дефектом, страницей руководства или телеметрией. Модернизированный узел (например, чужой молот на Banut) — отдельный компонент со своими правилами.</p>`,4);
+};
+
+S['10.3']=()=>dk('settings/rules/hydraulic-leak',`
+<div class="dk-h"><b>Правило «Течь гидравлики» · версия 4</b><span>${chip('действует с 01.11','ok')} ${chip('история: 4 версии','mute')}</span></div>
+<div class="row2"><div style="display:grid;gap:8px">
+<div class="card line"><span class="mini">ЕСЛИ</span><br>в осмотре пункт «Гидравлика: течь» = <b>Отказ</b><br><span class="mini">И машина имеет возможность</span> <b>«гидромолот»</b></div>
+<div class="card line"><span class="mini">ТО</span><br>1. Фото обязательно.<br>2. Описание обязательно.<br>3. Создать дефект и черновик наряда ТО.<br>4. Течь «сильная» → <b style="color:var(--bad)">работа запрещена</b>, независимо от процента готовности.</div>
+<div class="card line"><span class="mini">ЕСЛИ телеметрия</span> t° масла &gt; 80 °C дольше 10 мин → P2 механику. &gt; 90 °C → P0 и остановка молота.</div></div>
+<table class="tbl"><tr><th>Версия</th><th>Кто</th><th>Что</th></tr><tr><td>4</td><td>Инженер ОТ</td><td>+ запрет при «сильной»</td></tr><tr><td>3</td><td>Механик</td><td>+ наряд ТО</td></tr><tr><td>2</td><td>Механик</td><td>+ фото</td></tr><tr><td>1</td><td>Админ</td><td>создано</td></tr></table></div>
+<p class="mini">Правило опирается на возможности машины («гидромолот», «бурение»), а не на её название. Новая установка получает нужные проверки сама.</p>`,5);
+
+/* ---------- модули ---------- */
+const M=[
+ {n:'01',id:'m1',t:'Кабина машиниста',s:'телефон, голос, GNSS, звук молота',
+  goal:'Машинист работает руками и голосом. Числа приходят от датчиков. Ручной ввод — только подтверждение.',
+  now:'Контур смены из 7 фаз, допуск-светофор, осмотр ЕО, офлайн-очередь с досылкой.',
+  next:'Счёт ударов по звуку, навигация на точку сваи, голосовой ввод, фото-проверка осмотра.',
+  know:'Акустический отказомер в обычном телефоне: без отдельного прибора и без вмешательства в установку.',
+  refs:[['Pile Dynamics SAX-Q — счёт по звуку','https://www.pile.com/products/saximeter-sax-q/'],['Leica — навигация копра','https://hexagon.com/resources/customer-success-stories/construction-diary-the-pile-driver-operator'],['AKT SmartPile — RTK-GNSS','https://www.akasakatec.com/en/products/software/smartpile/']],
+  subs:[['1.1','Смена за три касания','Допуск, осмотр и инструктаж на одном экране. ИИ смотрит снимки осмотра и задаёт вопрос, если видит течь или трещину.','m0'],
+        ['1.2','Навигация на точку сваи','GNSS RTK на мачте ведёт острие на проектную точку. Мишень показывает смещение в сантиметрах.','m1'],
+        ['1.3','Автожурнал забивки','Телефон слышит каждый удар. Глубина приходит от GNSS и датчика троса. Отказ считается сам.','m3'],
+        ['1.4','Голосовой ввод','Машинист говорит фразу. Система превращает её в событие и просит подтвердить.','m2']]},
+ {n:'02',id:'m2',t:'Цифровой двойник площадки',s:'поле, геология, дрон',
+  goal:'Одна живая модель площадки: где сваи по проекту, где по факту и что под ними.',
+  now:'Иерархия поле → куст → пикет, план свай и бурения, журнал забивки по СП 45.13330.',
+  next:'План «как построено» в цвете, прогноз отказа по геологии, сверка с ортофотопланом дрона.',
+  know:'Прогноз глубины отказа по соседним сваям. Аномалия — сигнал о валуне или изломе ещё до испытаний.',
+  refs:[['Liebherr — MyJobsite','https://www.liebherr.com/en-us/group/magazine/digitalisation-from-ego-to-ecosystem/digitalisation-from-ego-to-ecosystem-3877675'],['BIM2RDT — двойник для роботов','https://arxiv.org/pdf/2509.20705']],
+  subs:[['2.1','Свайное поле как построено','Каждая свая — точка с цветом статуса. Недобив и отклонения видны сразу.','m0'],
+        ['2.2','Геология и прогноз отказа','Модель учится на каждой забитой свае и предсказывает глубину отказа для следующей.','m3'],
+        ['2.3','Сверка с дроном','Дрон снимает поле. Система находит оголовки и сверяет их с журналом.','m1']],wide:['2.1','2.2','2.3']},
+ {n:'03',id:'m3',t:'Паспорт сваи и ИД',s:'цепочка событий, XML, УКЭП',
+  goal:'Каждая свая имеет неизменяемый паспорт. Исполнительная документация собирается из паспортов.',
+  now:'Таблицы PilePassport и PileDrivingSet, цепочка аудита TenantAuditChain, PDF отчётов.',
+  next:'Паспорт с хешем каждого события, QR на оголовке, ИД в XML по схемам Минстроя, подпись УКЭП.',
+  know:'Паспорт сваи на цепочке хешей: подделать задним числом нельзя, технадзор проверяет за секунды.',
+  refs:[['Минстрой — ИД в электронном виде','https://sroportal.ru/news/minstroj-ustanovil-poryadok-vedeniya-ispolnitelnoj-dokumentacii-v-elektronnom-vide/'],['ГОСТ Р 70108-2025','https://academy.tsus.ru/novyj-gost-r-70108-2025-i-xml-shemy-kak-izmenilas-ispolnitelnaya-dokumentacziya-v-stroitelstve/'],['PDA — испытания онлайн','https://www.pile.com/products/pda/']],
+  subs:[['3.1','Паспорт сваи','Вся жизнь сваи от проекта до акта. У каждого события есть хеш.','m3'],
+        ['3.2','ИД в XML','Журнал забивки, акты скрытых работ и ОЖР собираются из паспортов в XML.','m1'],
+        ['3.3','Приёмка технадзором','Технадзор принимает сваи пакетом с телефона и подписывает УКЭП.','m2']],wide:['3.1','3.2']},
+ {n:'04',id:'m4',t:'Диспетчерская',s:'карта, советы ИИ, прогноз, погода',
+  goal:'Диспетчер видит весь парк и получает советы. Решение всегда за ним.',
+  now:'Мониторинг парка, главная панель с плитками, правило ветра ≥ 15 м/с, сводка в Telegram.',
+  next:'Живая карта, ИИ-диспетчер, вероятностный прогноз сдачи, окна погоды на 72 часа.',
+  know:'ИИ-диспетчер с правом совета: каждый совет показывает влияние в сваях и причину.',
+  refs:[['Autodesk — ИИ-агенты 2026','https://www.autodesk.com/blogs/construction/2026-ai-trends-25-experts-share-insights/'],['Allplan — предиктивные процессы','https://www.allplan.com/blog/from-ai-design-to-autonomous-construction-how-predictive-data-centric-workflows-and-ai-agents-are-reshaping-aec/']],
+  subs:[['4.1','Живая карта техники','Все установки на карте. Цвет — состояние. Список справа — что делает каждая.','m0'],
+        ['4.2','ИИ-диспетчер','Агент ищет, где техника простаивает, а где не хватает. Предлагает перевод.','m2'],
+        ['4.3','Прогноз сдачи','Не одна дата, а диапазон: P50 и P80. Считается по реальной выработке.','m2'],
+        ['4.4','Погода и окна работы','Прогноз ветра по часам и правило остановки. Система предлагает перенести смену.','m0'],
+        ['4.5','Уведомления P0–P3','Четыре уровня важности. P0 — звук и дубль в мессенджер всем на объекте. P3 — без звука, в сводку. Каждой роли — только своё.','m0']],wide:['4.1','4.2','4.3','4.4']},
+ {n:'05',id:'m5',t:'Техника и ТО',s:'двойник установки, предиктивное ТО, топливо',
+  goal:'Ремонт по состоянию, а не по поломке.',
+  now:'Модуль ТО (CMMS): наряды, планы, моточасы, дефекты, журнал топлива. Телеметрия ждёт подключения.',
+  next:'Цифровая тень установки, предиктивное ТО по ступеням, расход и углерод на сваю.',
+  know:'Счётчик ударов молота из подмодуля 1.3 становится ресурсным счётчиком молота. Датчик не нужен.',
+  refs:[['Liebherr PDE — данные процесса','https://www.liebherr.com/en-int/deep-foundation/technology/assistent-systems/process-data-recording-5389748']],
+  subs:[['5.1','Цифровая тень установки','Схема установки с состоянием узлов, ресурсом молота и до ТО. Это тень, а не двойник: данные идут от машины к системе. Двойником она станет, когда модель начнёт предсказывать поведение узлов.','m1'],
+        ['5.2','Предиктивное ТО','Путь в 5 ступеней: правила → базовая статистика → аномалии → остаточный ресурс → обучение на всём парке. Экран показывает ступень 3. До подключения телематики работает только ступень 1: правила по моточасам и дефектам.','m2'],
+        ['5.3','Топливо и углерод','Литры на метр сваи и CO₂ на сваю. Для экономии и для тендеров.','m0']],wide:['5.1','5.2','5.3']},
+ {n:'06',id:'m6',t:'Охрана труда',s:'камера зоны, наряды, почти-происшествия',
+  goal:'Опасность замечает система раньше человека.',
+  now:'Отдельный модуль ТБ: инструктажи, наряды-допуски, СИЗ, происшествия, журнал инструктажей.',
+  next:'Камера зоны опасности с блокировкой удара, микро-инструктаж перед нарядом, анализ почти-происшествий.',
+  know:'Связь камеры и молота: человек в зоне — удар не начинается.',
+  refs:[['Xpedeon — тренды 2026','https://xpedeon.com/blog/top-9-construction-technology-trends-for-2026/'],['Epicflow — CV на площадке','https://www.epicflow.com/blog/key-technology-trends-in-the-construction-industry/']],
+  subs:[['6.1','Зона опасности','Камера над кабиной видит человека в радиусе мачты и останавливает молот.','m2'],
+        ['6.2','Наряд и инструктаж','Короткий урок и три вопроса прямо перед подписью наряда.','m0'],
+        ['6.3','Почти-происшествия','Тепловая карта событий. ИИ ищет закономерность и предлагает меру.','m2']],wide:['6.1','6.3']},
+ {n:'07',id:'m7',t:'Аналитика и помощник',s:'вопросы на русском, эталоны, сводка',
+  goal:'Руководитель задаёт вопрос словами и получает ответ с источниками.',
+  now:'Аналитика по проекциям, отчёты, дневные и недельные сводки, выгрузка Excel.',
+  next:'Помощник «спросите данные», эталоны выработки по грунтам, утренняя сводка в MAX и Telegram.',
+  know:'Эталоны выработки «установка × грунт» из своих данных — основа для планирования и тендеров.',
+  refs:[['Autodesk — ИИ 2026','https://www.autodesk.com/blogs/construction/2026-ai-trends-25-experts-share-insights/']],
+  subs:[['7.1','Спросите данные','Вопрос на русском. Ответ с числами, графиком и ссылками на отчёты.','m1'],
+        ['7.2','Эталоны выработки','Скорость каждой установки в каждом грунте. Видно лучших и отстающих.','m3'],
+        ['7.3','Утренняя сводка','В 07:00 руководитель получает итоги вчера и три главных дела на сегодня.','m0']],wide:['7.1','7.2']},
+ {n:'08',id:'m8',t:'Экономика объекта',s:'себестоимость, КС-2, портал заказчика',
+  goal:'Деньги объекта видны каждый день, а не в конце месяца.',
+  now:'Нет. Есть данные: сваи, марки, часы, простой, топливо.',
+  next:'Себестоимость метра в реальном времени, черновик КС-2 из принятых свай, портал заказчика.',
+  know:'Связь «паспорт сваи → строка КС-2»: каждый рубль в акте подтверждён сваей.',
+  refs:[],
+  subs:[['8.1','Себестоимость в реальном времени','Из чего складывается метр сваи и сколько стоит простой.','m3'],
+        ['8.2','КС-2 из паспортов','Акт собирается из принятых свай и уходит в 1С.','m2'],
+        ['8.3','Портал заказчика','Заказчик видит готовность, прогноз и недельный отчёт. Без звонков.','m1']],wide:['8.1','8.2','8.3']},
+ {n:'09',id:'m9',t:'Платформа',s:'офлайн, интеграции, доверие',
+  goal:'Система работает без сети, дружит с внешними сервисами и хранит данные в России.',
+  now:'Офлайн-очередь, outbox, RLS, цепочка аудита, ключи устройств, резервные копии в R2.',
+  next:'72 часа без сети, адаптеры 1С / ИСУП / УКЭП / MAX, вход по passkey, ИИ на своих серверах.',
+  know:'Офлайн-допуск: телефон хранит подписанное право работать, пока нет связи.',
+  refs:[['Built Robotics — горизонт автономии','https://www.builtrobotics.com/solutions/solar-piling']],
+  subs:[['9.1','Офлайн сначала','Смена идёт без сети. Данные досылаются по порядку, когда связь вернётся.','m0'],
+        ['9.2','Интеграции','Ядро и адаптеры. Внешнюю систему можно заменить без переделки ядра.','m1'],
+        ['9.3','Доверие и защита','Passkey вместо паролей, изоляция данных, подпись событий, данные в РФ.','m0']],wide:['9.2','9.3']},
+ {n:'10',id:'m10',t:'База знаний и Copilot',s:'руководства, граф машины, правила',
+  goal:'Опыт компании и документация производителя работают на смену. Ответ всегда со ссылкой на источник.',
+  now:'Чек-листы (ChecklistTemplate), наборы правил допуска (ReadinessRuleSet), журнал дефектов и нарядов ТО. Руководств производителей в системе нет.',
+  next:'Руководства и схемы с поиском, граф знаний каждой машины, Copilot по машине, правила и чек-листы с условиями и версиями.',
+  know:'Нет источника — нет ответа. Copilot ссылается на страницу руководства, наряд, дефект или телеметрию и не снимает блокировки.',
+  refs:[['Autodesk — ИИ-агенты на данных проекта','https://www.autodesk.com/blogs/construction/2026-ai-trends-25-experts-share-insights/']],
+  subs:[['10.1','Copilot по машине','Вопрос механика или машиниста. Ответ собирает телеметрию, ремонты и руководство, даёт причины и безопасные действия.','m2'],
+        ['10.2','Граф знаний машины','Машина → узел → компонент → датчик → неисправность → ремонт → руководство. Из справочника техники получается инженерная модель.','m2'],
+        ['10.3','Правила и чек-листы с условиями','Условия по возможностям машины, обязательные доказательства, версии и журнал изменений. Критический отказ запрещает работу сильнее любого процента.','m0']],wide:['10.1','10.2','10.3']}
+];
+const MAT={m0:'Есть основа в коде',m1:'Работает в мире',m2:'Прототип в мире',m3:'Ноу-хау PilingTrack'};
+
+document.getElementById('modIndex').innerHTML=M.map(m=>`<a href="#${m.id}"><span class="n">${m.n}</span><span><b>${m.t}</b><small>${m.subs.length} ${m.subs.length>4?'подмодулей':'подмодуля'} · ${m.s}</small></span></a>`).join('');
+
+document.getElementById('modulesOut').innerHTML=M.map(m=>`
+<section class="module" id="${m.id}"><div class="wrap"><div class="module-grid">
+<aside class="m-side"><div class="m-num">${m.n}</div><h2>${m.t}</h2><p class="goal">${m.goal}</p>
+<div class="kv"><div class="k-now"><span>Есть сейчас</span><p>${m.now}</p></div><div class="k-new"><span>Версия 2029</span><p>${m.next}</p></div><div class="k-know"><span>Ноу-хау</span><p>${m.know}</p></div></div>
+${m.refs.length?`<div class="refs"><span class="eyebrow">Мировые аналоги</span>${m.refs.map(r=>`<a href="${r[1]}" target="_blank" rel="noopener">${r[0]}</a>`).join('')}</div>`:''}
+</aside>
+<div class="subs">${m.subs.map(s=>`<article class="sub ${(m.wide||[]).includes(s[0])?'wide':''}"><div class="sub-cap"><h3><span class="id">${s[0]}</span>${s[1]} <span class="mat ${s[3]}">${MAT[s[3]]}</span></h3><p>${s[2]}</p></div><div class="stage">${S[s[0]]()}</div></article>`).join('')}</div>
+</div></div></section>`).join('');
+
+/* ---------- ноу-хау ---------- */
+const K=[
+ ['Акустический отказомер','Телефон в кабине слышит удары молота и считает отказ по глубине. Прибор не нужен.','Pile Dynamics SAX-Q делает это отдельным устройством для одной сваи.'],
+ ['Паспорт на цепочке хешей','Каждое событие сваи подписано и связано с предыдущим. Исправить задним числом нельзя.','В готовых системах журнал — это файл, который можно переписать.'],
+ ['Прогноз отказа по соседям','Модель видит, на какой глубине отказали соседние сваи, и ловит аномалию сразу.','Обычно аномалию находят на испытаниях, через недели.'],
+ ['Автопростой','Молот молчит, GNSS не двигается — простой записан сам. Машинист только называет причину.','Сейчас простой вводят руками в конце смены, по памяти.'],
+ ['Допуск-светофор с прогнозом','Допуск уже есть. В 2029 он заранее говорит: «удостоверение истекает через 9 дней».','Конкуренты проверяют допуск только по бумаге.'],
+ ['Совет вместо приказа','ИИ-диспетчер показывает влияние в сваях и причину. Каждое решение — за человеком и в журнале.','Многие системы ИИ решают молча, и ошибку не видно.'],
+ ['Эталоны «установка × грунт»','Своя база скорости каждой установки в каждом грунте. Основа для планирования и цены в тендере.','У производителей — данные по одной своей машине.'],
+ ['Свая → строка КС-2','Каждый рубль в акте подтверждён паспортом сваи. Спор с заказчиком решается за минуту.','Обычно КС-2 считают в Excel отдельно от журнала.']
+];
+document.getElementById('knowOut').innerHTML=K.map((k,i)=>`<div class="kh"><span class="n">НХ-${i+1}</span><h3>${k[0]}</h3><p>${k[1]}</p><div class="vs">${k[2]}</div></div>`).join('');
+})();
+</script>
