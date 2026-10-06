@@ -184,17 +184,24 @@ test('D: выгрузки CSV/XLSX/PDF — файлы, запятые, итог�
     await compare('XLSX: бурение м.п. против плитки', () => xDrillM, () => tilesDrillMeters);
 
     // ===== PDF =====
+    // Кнопка «Скачать» тянет PDF через authFetch (fetch + blob), а не ссылкой
+    // <a href=".../single-pdf" download>: ловим сам ответ single-pdf и читаем тело.
     const row = page.locator('div.grid.gap-3.px-3.py-3', { hasText: siteName }).first();
     await row.getByRole('button', { name: 'Показать в правой панели' }).click();
-    const link = page.locator('a[href*="single-pdf"][download]').first();
-    await expect(link, 'ссылка «Скачать» PDF в панели').toBeVisible({ timeout: 30_000 });
-    const [pdfDownload] = await Promise.all([page.waitForEvent('download'), link.click()]);
+    const panel = page.locator('aside', { hasText: 'Доказательства смены' }).first();
+    const downloadButton = panel.getByRole('button', { name: 'Скачать', exact: true });
+    await expect(downloadButton, 'кнопка «Скачать» PDF в панели').toBeVisible({ timeout: 30_000 });
+    const [pdfResp] = await Promise.all([
+      page.waitForResponse((r) => r.url().includes('/api/reports/single-pdf') && r.request().method() === 'GET', { timeout: 120_000 }),
+      downloadButton.click(),
+    ]);
+    const pdfBuf = Buffer.from(await pdfResp.body());
     const pdfPath = path.join(OUT_DIR, `report-${RUN_SUF}.pdf`);
-    await pdfDownload.saveAs(pdfPath);
-    const pdfBuf = fs.readFileSync(pdfPath);
-    const pdfOk = pdfBuf.length > 1000 && pdfBuf.subarray(0, 5).toString('latin1').startsWith('%PDF');
-    checks.push({ name: 'PDF скачан', ok: pdfOk, note: `${pdfBuf.length} байт, начало: ${pdfBuf.subarray(0, 5).toString('latin1')}` });
-    expect.soft(pdfOk, `PDF не пуст и начинается с %PDF (${pdfBuf.length} байт)`).toBe(true);
+    fs.writeFileSync(pdfPath, pdfBuf);
+    const pdfHead = pdfBuf.subarray(0, 5).toString('latin1');
+    const pdfOk = pdfResp.status() === 200 && pdfBuf.length > 1000 && pdfHead.startsWith('%PDF');
+    checks.push({ name: 'PDF скачан', ok: pdfOk, note: `HTTP ${pdfResp.status()}, ${pdfBuf.length} байт, начало: ${pdfHead}` });
+    expect.soft(pdfOk, `PDF не пуст и начинается с %PDF (HTTP ${pdfResp.status()}, ${pdfBuf.length} байт)`).toBe(true);
   } finally {
     if (reportId) await api(page).delete('/api/reports/delete', { data: { reportId } }).catch(() => undefined);
     if (siteId) {
