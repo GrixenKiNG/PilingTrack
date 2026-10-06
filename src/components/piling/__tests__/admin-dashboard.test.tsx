@@ -61,7 +61,7 @@ describe('AdminDashboard: сбой аналитики не уносит весь
     mockFetch(json({ error: 'failure' }, status));
     // Парк не пуст: иначе плитки парка честно показывают «нет установок» (F-R127),
     // а проверяется именно независимость живой метрики парка от сбоя аналитики.
-    const base = mocks.authFetch.getMockImplementation()!;
+    const base = mocks.authFetch.getMockImplementation() as (url: string) => Promise<Response>;
     mocks.authFetch.mockImplementation((url: string) => url.startsWith('/api/monitoring/fleet')
       ? Promise.resolve(json({ ...fleet, totals: { ...fleet.totals, totalEquipment: 1 } }))
       : base(url));
