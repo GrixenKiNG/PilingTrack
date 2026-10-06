@@ -153,7 +153,7 @@ export function OverviewTiles({
         title="Текущее состояние"
         rows={[
           ['Статус', eq.isActive ? 'В эксплуатации' : 'Списана'],
-          ['Моточасы', eq.engineHoursTotal != null ? `${formatFixed(Number(eq.engineHoursTotal), 0)} ч` : '—'],
+          ['Моточасы', eq.engineHoursTotal != null ? `${formatFixed(Number(eq.engineHoursTotal), 0)} м/ч` : '—'],
           ['Телематика', devicesCount > 0 ? `${devicesCount} устройств` : 'не подключена'],
           ['Последний отчёт', formatRuDate(timeline[0]?.date)],
         ]}
@@ -171,7 +171,7 @@ export function OverviewTiles({
         title="ТО и обслуживание"
         rows={[
           ['Ближайшее ТО', formatRuDate(eq.nextMaintenanceDate)],
-          ['Моточасы ТО', eq.nextMaintenanceAtHours != null ? `${formatFixed(Number(eq.nextMaintenanceAtHours), 0)} ч` : '—'],
+          ['Моточасы ТО', eq.nextMaintenanceAtHours != null ? `${formatFixed(Number(eq.nextMaintenanceAtHours), 0)} м/ч` : '—'],
           ['Простои за 30 дней', stats.downtimeHours > 0 ? 'есть простой' : 'нет'],
         ]}
       />

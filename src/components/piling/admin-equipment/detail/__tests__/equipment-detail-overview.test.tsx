@@ -124,6 +124,21 @@ describe('OverviewTiles — даты обзора (F-R114-1)', () => {
 });
 
 /*
+  F-R129-14: карточка установки подписывала наработку «ч», а модуль ТО ту же
+  величину — «м/ч» (PRODUCT.md:52). Один показатель в двух единицах.
+*/
+describe('OverviewTiles — единица моточасов (F-R129-14)', () => {
+  it('«Моточасы» и «Моточасы ТО» подписаны «м/ч», как в модуле ТО', () => {
+    render(<OverviewTiles eq={equipment()} crew={null} stats={stats} timeline={[]} devicesCount={0} />);
+
+    expect(screen.getByText('1 200 м/ч')).toBeInTheDocument();
+    expect(screen.getByText('1 500 м/ч')).toBeInTheDocument();
+    expect(screen.queryByText('1 200 ч')).toBeNull();
+    expect(screen.queryByText('1 500 ч')).toBeNull();
+  });
+});
+
+/*
   R119 №13: при переключении установок правая панель до ответа `/details`
   показывала паспорт, статус и имя ПРЕДЫДУЩЕЙ машины — loading выставлялся
   только при монтировании, а смена `equipmentId` его не поднимала.

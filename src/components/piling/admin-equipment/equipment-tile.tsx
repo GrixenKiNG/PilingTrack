@@ -105,7 +105,7 @@ export function EquipmentTile({
           )}
           <span className="flex items-center gap-1 font-mono">
             <Clock className="h-3 w-3" />
-            {num(card.engineHoursTotal)} ч
+            {num(card.engineHoursTotal)} м/ч
           </span>
         </div>
 

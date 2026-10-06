@@ -105,6 +105,17 @@ describe('плитка установки: цель нажатия на теле
       expect(screen.getByRole('link', { name: label })).toHaveClass('min-h-11', 'py-1.5', 'text-xs', 'sm:min-h-0');
     }
   });
+
+  /*
+    F-R129-15: плитка парка подписывала наработку «ч», а модуль ТО ту же
+    величину — «м/ч» (PRODUCT.md:52). Один показатель в двух единицах.
+  */
+  it('наработка подписана «м/ч», разряды сохраняются', () => {
+    render(<EquipmentTile card={card({ engineHoursTotal: 5701 })} selected={false} onSelect={() => {}} />);
+
+    expect(screen.getByText('5 701 м/ч')).toBeInTheDocument();
+    expect(screen.queryByText('5 701 ч')).toBeNull();
+  });
 });
 
 describe('фильтры, сортировка и сброс фильтров (R73)', () => {
