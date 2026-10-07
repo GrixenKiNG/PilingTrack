@@ -54,10 +54,18 @@ recordMeter отклонял число меньше максимума журн
 
 RED backend exit 1: 5 failed / 11 passed; RED общий осмотр (фильтр) exit 1: 2 failed / 3 skipped; RED v5 (фильтр) exit 1: 1 failed / 12 skipped. Первоначальная v5-фикстура не содержала operator и падала до проверки; исправлена, затем RED подтверждён на исходном runtime. GREEN связанных 14 файлов exit 0: 177 passed / 0 skipped; финальный UI-прогон exit 0: 18 passed / 0 skipped. Tsc сначала exit 2 из-за nullable assignment в тестовой фикстуре; исправлено, финальный exit 0. Scoped ESLint exit 0, 0 warnings. GitNexus impact/detect-changes exit 1, UNKNOWN; разрешённый поиск связей выполнен.
 
+Коммит I7: `04df4c6a`.
+
+## I8 — простой 3 → 6 минут
+
+Причина — округление, а не двойной SQL-учёт: сервис превращал 0,05 ч в 0,1 ч через toFixed(1), затем дашборд показывал 6 мин. Теперь сервис сохраняет точные часы; минуты округляются только при отображении. Проверены 0,05 ч → 3 мин и сумма дробных простоев нескольких объектов. SQL и границы организации не менялись.
+
+RED exit 1: 2 failed / 8 passed / 0 skipped; GREEN exit 0: 34 passed / 0 skipped, 3 файла. Tsc и scoped ESLint exit 0. GitNexus impact/detect-changes exit 1, UNKNOWN; разрешённый поиск связей выполнен.
+
 ## Подготовка и ограничения проверок
 
 `npm run db:generate`: exit 1, отсутствует DATABASE_URL_POSTGRES. Сгенерирован клиент из настоящей схемы без соединения с БД: `npx --no-install prisma generate --config output/codex-t11/prisma-generate.config.ts`, exit 0; конфигурация содержит только путь к schema.prisma. `node scripts/patch-postgres-client.js`: exit 0. Зависимости не устанавливались, node_modules — ссылка на уже установленные пакеты. Файлы .env не читались, не создавались и не менялись; адреса БД не подставлялись.
 
 ## Остальные пункты
 
-I8, I5 — ожидают выполнения по порядку. Текущая редакция отчёта промежуточная.
+I5 — ожидает выполнения. Текущая редакция отчёта промежуточная.
