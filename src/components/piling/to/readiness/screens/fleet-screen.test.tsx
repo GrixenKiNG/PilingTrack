@@ -6,6 +6,7 @@ import type { ReferenceUiProps } from './types';
 import { bootstrapEnvelope } from '../api/__tests__/fixtures';
 import { formatDateTimeInTimezone } from '@/lib/timezone';
 import { FleetScreen } from './fleet-screen';
+import { ReportsScreen } from './reports-screen';
 import { buildFleetItems, countFleetGroups, DEFAULT_FLEET_VIEW, filterFleetItems, readFleetViewState, writeFleetViewState } from './fleet-workspace-model';
 import type { MaintenanceSummary } from '../../readiness-design-views';
 
@@ -93,6 +94,22 @@ describe('Fleet readiness integrity', () => {
 });
 
 describe('Fleet evidence interactions', () => {
+  it('shows an inactive machine as unconfirmed without its historical READY score', () => {
+    render(<FleetScreen {...propsFor({
+      equipment: [{...equipment('rig-1', 'PVE 50PR'), isActive: false}],
+      currentReadiness: [snapshot('rig-1', {equipmentActive: false, score: 96})],
+    })} />);
+    expect(screen.getByRole('button', {name: /Не подтверждено 1/})).toBeInTheDocument();
+    expect(screen.getByText('Выведена из работы')).toBeInTheDocument();
+    expect(screen.queryByText('Готова к работе')).not.toBeInTheDocument();
+    expect(screen.queryByText('96')).not.toBeInTheDocument();
+    expect(screen.queryByText('96/100')).not.toBeInTheDocument();
+    const row = screen.getByRole('button', {name: 'Выбрать PVE 50PR'}).closest('tr');
+    if (!row) throw new Error('Строка установки отсутствует');
+    expect(within(row).getByText('Не подтверждено')).toBeInTheDocument();
+    expect(screen.getByText(/Балл: не подтверждён/)).toBeInTheDocument();
+  });
+
   it('shows empty documents inside the selected-machine panel without navigation', () => {
     render(<FleetScreen {...propsFor()} />);
     fireEvent.click(screen.getByRole('button', { name: 'Документы' }));
@@ -215,6 +232,45 @@ describe('Fleet evidence interactions', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Документы' }));
     expect(screen.getByText('Недостаточно прав для загрузки данных.')).toBeInTheDocument();
     expect(screen.queryByText(/Подробности установки ещё не получены/)).not.toBeInTheDocument();
+  });
+});
+
+describe('J9 current readiness in reports', () => {
+  const reportProps = (currentReadiness: CurrentReadinessDto[]) => propsFor({
+    equipment: [{...equipment('rig-1', 'PVE 50PR'), isActive: false}, equipment('rig-2', 'Рабочая установка')],
+    currentReadiness,
+    shifts: [], readinessHistory: [], audit: null, filters: {},
+    readinessByEquipment: {'rig-1': {
+      equipmentId: 'rig-1', status: 'READY', canOperate: true, score: 75,
+      reason: 'Производная оценка', nextAction: '', nextActionHref: '', evidence: [],
+      latestInspection: null, activeRecord: null,
+    }},
+  });
+
+  it('excludes an inactive current snapshot from the aggregate and row without a legacy score fallback', () => {
+    render(<ReportsScreen {...reportProps([
+      snapshot('rig-1', {equipmentActive: false, score: 96}),
+      snapshot('rig-2', {equipmentActive: true, score: 80}),
+    ])} />);
+    const kpi = screen.getByText('Готовность парка').parentElement?.parentElement;
+    if (!kpi) throw new Error('Плитка готовности отсутствует');
+    expect(within(kpi).getByText('80%')).toBeInTheDocument();
+    const row = screen.getByText('PVE 50PR').parentElement;
+    if (!row) throw new Error('Строка установки отсутствует');
+    expect(within(row).getByText('—')).toBeInTheDocument();
+    expect(within(row).queryByText('96%')).not.toBeInTheDocument();
+    expect(within(row).queryByText('75%')).not.toBeInTheDocument();
+  });
+
+  it('keeps the current aggregate unknown when only inactive snapshots exist despite a green legacy state', () => {
+    render(<ReportsScreen {...reportProps([
+      snapshot('rig-1', {equipmentActive: false, score: 96}),
+    ])} />);
+    const kpi = screen.getByText('Готовность парка').parentElement?.parentElement;
+    if (!kpi) throw new Error('Плитка готовности отсутствует');
+    expect(within(kpi).getByText('—')).toBeInTheDocument();
+    expect(within(kpi).queryByText('96%')).not.toBeInTheDocument();
+    expect(within(kpi).queryByText('100%')).not.toBeInTheDocument();
   });
 });
 

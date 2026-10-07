@@ -1,6 +1,52 @@
 import { TEST_USERS } from './fixtures/auth.fixture';
 import { test, expect } from './fixtures/disposable.fixture';
 import { login } from './page-objects/login.page';
+import { randomUUID } from 'node:crypto';
+import { Client } from 'pg';
+
+test('J9 inactive equipment preserves history without a current ready verdict', async ({ page }) => {
+  test.skip(!process.env.INTEGRATION_DATABASE_URL_OWNER, 'Requires owned disposable PostgreSQL');
+  const url = new URL(process.env.INTEGRATION_DATABASE_URL_OWNER || 'http://invalid');
+  if (url.hostname !== '127.0.0.1' || url.pathname !== '/codex_test'
+    || !/^codex-pg-[a-f0-9]{12}$/.test(process.env.INTEGRATION_DB_CONTAINER || '')) throw new Error('Owned stand required');
+  const db = new Client({ connectionString: url.toString() });
+  const id = randomUUID();
+  const name = 'J9 inactive ' + id;
+  const snapshotId = randomUUID();
+  const ruleSetId = randomUUID();
+  const at = '2026-08-10T12:00:00.000Z';
+  const facts = { inspectionCompleted: true, inspectionProgress: 1, healthScore: 100,
+    meterKnown: true, permitValid: true, permitExpired: false, maintenanceConfigured: true,
+    maintenanceOverdueHours: 0, maintenanceOverdueDays: 0, accepted: true, criticalDefect: false, findings: 0 };
+  await db.connect();
+  try {
+    await db.query('INSERT INTO "Equipment" (id,"tenantId",name,"isActive","updatedAt") VALUES ($1,$2,$3,false,now())', [id, 'codex-e1-a', name]);
+    await db.query('INSERT INTO "ReadinessRuleSet" (id,"tenantId",status,version,criteria,blockers,"updatedAt") VALUES ($1,$2,$3,$4,$5,$6,now())', [ruleSetId, 'codex-e1-a', 'ARCHIVED', 'j9-fixture', '{}', '[]']);
+    await db.query('INSERT INTO "ReadinessScoreSnapshot" (id,"tenantId","equipmentId","ruleSetVersion","triggerType","triggerId",status,verdict,score,blockers,warnings,evidence,facts,"factsHash","calculatedAt","ruleSetId") VALUES ($1,$2,$3,$4,$5,$1,$6,$7,75,$8,$8,$9,$10,$11,$12,$13)',
+      [snapshotId, 'codex-e1-a', id, 'j9-fixture', 'INSPECTION_COMPLETED', 'READY', 'ALLOWED', '[]',
+        JSON.stringify({ equipmentId: id, inspectionId: null, permitId: null, maintenanceRecordIds: [], evaluatedAt: at }),
+        JSON.stringify(facts), Buffer.alloc(32, 1), at, ruleSetId]);
+    await db.query('INSERT INTO "CurrentReadiness" ("tenantId","equipmentId","snapshotId",status,verdict,score,"calculatedAt","updatedAt") VALUES ($1,$2,$3,$4,$5,75,$6,now())', ['codex-e1-a', id, snapshotId, 'READY', 'ALLOWED', at]);
+    await login(page, TEST_USERS.admin.email, TEST_USERS.admin.password);
+    const current = await page.request.get('/api/readiness/current?equipmentId=' + id);
+    expect(current.status()).toBe(200);
+    expect((await current.json()).data[0]).toMatchObject({ equipmentActive: false, snapshotId, calculatedAt: at });
+    await page.goto('/admin/to?view=fleet&equipmentId=' + id);
+    await expect(page.getByRole('table', { name: /Готовность установок/ })).toBeVisible();
+    await expect(page.getByRole('row').filter({ hasText: 'Codex Woltman A' })).toBeVisible();
+    // The current bootstrap already limits this screen to active equipment.
+    // The inactive DTO remains explicitly flagged for other current readers.
+    await expect(page.getByRole('row').filter({ hasText: name })).toHaveCount(0);
+    const history = await page.request.get('/api/readiness/history?equipmentId=' + id);
+    expect(history.status()).toBe(200);
+    expect((await history.json()).data).toContainEqual(expect.objectContaining({ id: snapshotId, status: 'READY', score: 75, calculatedAt: at }));
+    expect((await db.query('SELECT score,status,"calculatedAt" FROM "ReadinessScoreSnapshot" WHERE id=$1', [snapshotId])).rows[0])
+      .toMatchObject({ score: 75, status: 'READY', calculatedAt: new Date(at) });
+  } finally {
+    // Immutable fixture history remains until the owned stand is removed.
+    await db.end();
+  }
+});
 
 /**
  * E2E — Проведение ТО (осмотра) end-to-end.

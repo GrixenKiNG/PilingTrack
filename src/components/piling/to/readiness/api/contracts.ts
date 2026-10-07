@@ -274,6 +274,7 @@ const authoritativeSnapshotBaseSchema = z.object({
 
 export const currentReadinessDtoSchema = authoritativeSnapshotBaseSchema.extend({
   snapshotId: z.string().min(1),
+  equipmentActive: z.boolean().optional(),
 }).strict();
 
 export const readinessSnapshotDtoSchema = authoritativeSnapshotBaseSchema.extend({

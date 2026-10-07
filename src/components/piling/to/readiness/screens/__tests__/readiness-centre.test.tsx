@@ -197,6 +197,25 @@ const readinessRow = (equipmentId: string, score: number): CurrentReadinessDto =
   ruleSetVersion: null,
 });
 
+describe('J9 inactive current facts', () => {
+  it('does not present historical acceptance as a completed dispatcher step', () => {
+    render(<ReadinessCentre {...propsFor({
+      currentReadiness: [{
+        ...readinessRow('eq-1', 96), equipmentActive: false,
+        facts: {inspectionCompleted: true, inspectionProgress: 1, healthScore: 96,
+          meterKnown: true, permitValid: true, permitExpired: false,
+          maintenanceConfigured: true, maintenanceOverdueHours: 0, maintenanceOverdueDays: 0,
+          accepted: true, criticalDefect: false, findings: 0},
+      }],
+    })} />);
+    expect(screen.getAllByText('Выведена из работы').length).toBeGreaterThan(0);
+    const dispatcher = screen.getByRole('heading', {name: 'Диспетчер'}).closest('article');
+    if (!dispatcher) throw new Error('Карточка диспетчера отсутствует');
+    expect(within(dispatcher).getByText('0/3 шагов')).toBeInTheDocument();
+    expect(within(dispatcher).queryByText('1/3 шагов')).not.toBeInTheDocument();
+  });
+});
+
 /**
  * R129 #6: «Готовность парка» печаталась сырым числом — «87.5%» точкой, тогда
  * как в отчёте техготовности десятичная часть показана запятой.

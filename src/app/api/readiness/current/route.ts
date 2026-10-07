@@ -26,11 +26,17 @@ async function handleGet(request: NextRequest) {
         where: { tenantId: context.tenantId, id: { in: current.map((item) => item.snapshotId) } },
       });
       const byId = new Map(snapshots.map((item) => [item.id, item]));
+      const equipment = await tx.equipment.findMany({
+        where: { tenantId: context.tenantId, id: { in: current.map((item) => item.equipmentId) } },
+        select: { id: true, isActive: true },
+      });
+      const activity = new Map(equipment.map((item) => [item.id, item.isActive]));
       return current.map((item) => {
         const snapshot = byId.get(item.snapshotId);
         return {
           equipmentId: item.equipmentId,
           snapshotId: item.snapshotId,
+          equipmentActive: activity.get(item.equipmentId) ?? false,
           status: item.status,
           // Снимки до 2026-08-13 вердикта не содержат — отдаём null, экран
           // в этом случае откатывается на двоичный статус.

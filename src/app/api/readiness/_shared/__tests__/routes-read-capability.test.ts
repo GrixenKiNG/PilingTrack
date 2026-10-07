@@ -3,6 +3,7 @@ import {NextRequest, NextResponse} from 'next/server';
 
 const mocks = vi.hoisted(() => ({
   resolveReadinessRequestContext: vi.fn(),
+  withReadinessRequestTransaction: vi.fn(),
 }));
 
 // Маршруты оборачивают обработчик в withApi. Проверяем сам обработчик: обёртка
@@ -24,7 +25,7 @@ vi.mock('../../_shared/request-context', () => ({
 
 // Считывающие команды не должны трогать БД на запрещённом пути.
 vi.mock('@/modules/readiness/infrastructure/tenant-transaction', () => ({
-  withReadinessRequestTransaction: vi.fn(),
+  withReadinessRequestTransaction: mocks.withReadinessRequestTransaction,
   withReadinessSerializableTransaction: vi.fn(),
 }));
 
@@ -34,6 +35,7 @@ import {GET as shiftsListGet} from '../../shifts/route';
 import {GET as shiftByIdGet} from '../../shifts/[id]/route';
 import {GET as handoverByIdGet} from '../../handovers/[id]/route';
 import {GET as permitByIdGet} from '../../work-permits/[id]/route';
+import {GET as currentGet} from '../../current/route';
 
 const FORBIDDEN_MESSAGE = 'Нет доступа к контуру технической готовности';
 
@@ -77,11 +79,56 @@ describe('readiness read endpoints require the readiness.read capability', () =>
   it('work permit by id rejects a context without readiness.read with 403', () => expectForbidden(() =>
     permitByIdGet(request('http://localhost/api/readiness/work-permits/some-id'), routeParams)));
 
+  it('current readiness rejects a context without readiness.read with 403', () => expectForbidden(() =>
+    currentGet(request('http://localhost/api/readiness/current'))));
+
   it('never starts a read transaction for a forbidden request', async () => {
     await shiftsListGet(request('http://localhost/api/readiness/shifts'));
     const {withReadinessRequestTransaction} = await import(
       '@/modules/readiness/infrastructure/tenant-transaction'
     );
     expect(withReadinessRequestTransaction).not.toHaveBeenCalled();
+  });
+});
+
+describe('current readiness equipment activity', () => {
+  it('returns source activity without altering stored verdicts or historical snapshots', async () => {
+    const calculatedAt = new Date('2026-08-10T12:00:00.000Z');
+    const current = ['inactive', 'active', 'missing-equipment'].map((equipmentId) => ({
+      equipmentId, snapshotId: `snapshot-${equipmentId}`, status: 'READY', verdict: 'ALLOW',
+      score: 96, calculatedAt,
+    }));
+    const snapshots = current.map((item) => ({
+      id: item.snapshotId, status: 'READY', score: 96, calculatedAt,
+      blockers: [], warnings: [], evidence: {equipmentId: item.equipmentId},
+      facts: {accepted: true}, triggerType: 'INSPECTION_COMPLETED', ruleSetVersion: 'v1',
+    }));
+    const savedSnapshots = structuredClone(snapshots);
+    const tx = {
+      currentReadiness: {findMany: vi.fn().mockResolvedValue(current)},
+      readinessScoreSnapshot: {findMany: vi.fn().mockResolvedValue(snapshots)},
+      equipment: {findMany: vi.fn().mockResolvedValue([
+        {id: 'inactive', isActive: false}, {id: 'active', isActive: true},
+      ])},
+    };
+    mocks.resolveReadinessRequestContext.mockResolvedValue({
+      context: {...withoutReadCapability, capabilities: new Set(['readiness.read'])},
+    });
+    mocks.withReadinessRequestTransaction.mockImplementation(
+      async (_tenantId: string, callback: (transaction: typeof tx) => Promise<unknown>) => callback(tx),
+    );
+    const response = await currentGet(request('http://localhost/api/readiness/current'));
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.data).toEqual([
+      expect.objectContaining({equipmentId: 'inactive', equipmentActive: false, status: 'READY', score: 96}),
+      expect.objectContaining({equipmentId: 'active', equipmentActive: true, status: 'READY', score: 96}),
+      expect.objectContaining({equipmentId: 'missing-equipment', equipmentActive: false, status: 'READY', score: 96}),
+    ]);
+    expect(tx.equipment.findMany).toHaveBeenCalledWith({
+      where: {tenantId: 'tenant-session', id: {in: ['inactive', 'active', 'missing-equipment']}},
+      select: {id: true, isActive: true},
+    });
+    expect(snapshots).toEqual(savedSnapshots);
   });
 });
