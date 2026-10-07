@@ -12,7 +12,9 @@ import {
 } from '@/modules/operator-mobile/contracts';
 import {PilePassportForm} from '../screens/pile-passport-form';
 import type {ProductionEntryInput} from '../api';
-import {downtimeInterval, formatIntervalMinutes, hhmm} from '../downtime-interval';
+import {
+  DOWNTIME_QUICK_HOURS, downtimeHoursProblem, formatDowntimeHoursOnly, parseDowntimeHours,
+} from '@/lib/downtime-hours';
 import {Banner, Button, Card, CardBody, Field, Pair, Pick, Title} from './v7-ui';
 
 /**
@@ -154,19 +156,19 @@ export function ProductionFlow({state, busy, kind, onSubmit, onBack}: {
   const pickLabel = kind === 'DOWNTIME' ? 'Выберите причину простоя'
     : kind === 'DRILLING' ? 'Выберите тип бурения' : 'Выберите марку сваи';
   const [amount, setAmount] = useState('');
-  const [startedHm, setStartedHm] = useState('');
-  const [endedHm, setEndedHm] = useState('');
+  const [hoursText, setHoursText] = useState('');
   const [meters, setMeters] = useState('');
   const [comment, setComment] = useState('');
 
   const value = Number(amount);
   const metersValue = Number(meters);
-  // Простой считается по интервалу, а не по числу в поле: подпись под полями
-  // и то, что уйдёт на сервер, — одна и та же величина.
-  const interval = kind === 'DOWNTIME' ? downtimeInterval(startedHm, endedHm) : null;
+  // Простой — только часы, без привязки ко времени работы в программе
+  // (решение владельца 07.10.2026): подпись под полем и то, что уйдёт на
+  // сервер, — одна и та же величина.
+  const downtimeHours = kind === 'DOWNTIME' ? parseDowntimeHours(hoursText) : null;
   const ready = Boolean(id) && (
     kind === 'DOWNTIME'
-      ? interval !== null
+      ? downtimeHours !== null
       : Number.isFinite(value) && value > 0
         && (kind !== 'DRILLING' || (Number.isFinite(metersValue) && metersValue > 0))
   );
@@ -180,10 +182,9 @@ export function ProductionFlow({state, busy, kind, onSubmit, onBack}: {
       onSubmit({kind: 'DRILLING', typeId: id, count: value, metersPerUnit: metersValue});
       return;
     }
-    if (!interval) return;
+    if (downtimeHours === null) return;
     onSubmit({
-      kind: 'DOWNTIME', reasonId: id,
-      startedAt: interval.startedAt, endedAt: interval.endedAt,
+      kind: 'DOWNTIME', reasonId: id, hours: downtimeHours,
       ...(comment ? {comment} : {}),
     });
   };
@@ -249,19 +250,22 @@ export function ProductionFlow({state, busy, kind, onSubmit, onBack}: {
           <CardBody>
             {kind === 'DOWNTIME' ? (
               <>
-                <Field label="Простой начался">
-                  <input type="time" value={startedHm}
-                    onChange={(event) => setStartedHm(event.target.value)} />
+                <Field label="Простой, часов">
+                  <input type="number" inputMode="decimal" step="0.25" min="0.25" max="24"
+                    placeholder="Например: 1,5" value={hoursText}
+                    onChange={(event) => setHoursText(event.target.value)} />
                 </Field>
-                <Field label="Закончился">
-                  <input type="time" value={endedHm}
-                    onChange={(event) => setEndedHm(event.target.value)} />
-                </Field>
-                <Button tone="ghost" onClick={() => setEndedHm(hhmm(new Date()))}>
-                  Закончился сейчас
-                </Button>
-                {interval ? (
-                  <Pair label="Простой" value={formatIntervalMinutes(interval.minutes)} />
+                {/* Только часы: быстрый выбор тоже в часах. */}
+                <div className="picks">
+                  {DOWNTIME_QUICK_HOURS.map((hours) => (
+                    <Pick key={hours} on={hoursText === String(hours)} onClick={() => setHoursText(String(hours))}>
+                      {formatDowntimeHoursOnly(hours)}
+                    </Pick>
+                  ))}
+                </div>
+                {downtimeHoursProblem(hoursText) ? <div className="note">{downtimeHoursProblem(hoursText)}</div> : null}
+                {downtimeHours !== null ? (
+                  <Pair label="Простой" value={formatDowntimeHoursOnly(downtimeHours)} />
                 ) : null}
               </>
             ) : (

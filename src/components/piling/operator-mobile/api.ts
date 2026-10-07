@@ -454,7 +454,8 @@ export type ProductionEntryInput =
   | {kind: 'PILES'; pileGradeId: string; count: number; comment?: string}
   | {kind: 'PILE_PASSPORT'; pileGradeId: string; passport: PilePassportInput}
   | {kind: 'DRILLING'; typeId: string; count: number; metersPerUnit: number}
-  | {kind: 'DOWNTIME'; reasonId: string; startedAt: string; endedAt: string; comment?: string};
+  // Простой — часы (решение владельца 07.10.2026), без привязки ко времени работы.
+  | {kind: 'DOWNTIME'; reasonId: string; hours: number; comment?: string};
 
 type Command =
   | {command: 'acknowledge-briefing'}

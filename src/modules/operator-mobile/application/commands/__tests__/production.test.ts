@@ -234,7 +234,7 @@ describe('logProduction — след записи выработки в исто
   живёт здесь, а не там. Простой не запрещён: им машинист объясняет остановку,
   и последний отрезок обычно вносится уже при сдаче.
 */
-describe('logProduction — после завершения работы принимается только простой', () => {
+describe('logProduction — после завершения работы выработка и простой принимаются до сдачи смены', () => {
   const finishTx = {
     shift: {findFirst: vi.fn()},
     report: {findFirst: vi.fn(), upsert: vi.fn(), findUnique: vi.fn(), findUniqueOrThrow: vi.fn()},
@@ -280,13 +280,17 @@ describe('logProduction — после завершения работы при�
     );
   });
 
-  it.each(['PILES', 'DRILLING'] as const)('отказывает в выработке %s с понятным текстом', async (kind) => {
-    await expect(logProduction({
-      ...base, clientCommandId: 'cmd-1', entry: workEntries[kind],
-    })).rejects.toThrow(/Работа по смене завершена/);
+  // Решение владельца 07.10.2026: «оператор может после работы занести
+  // выполненные работы и простой». Раньше после «Завершить работу» сваи и
+  // бурение отвергались, а пропущенное вносил мастер.
+  it.each(['PILES', 'DRILLING'] as const)('после «Завершить работу» выработка %s не отвергается как «работа завершена»', async (kind) => {
+    // Дальше охраны состояния смены идут проверки допуска, и на этом
+    // урезанном клиенте транзакции они могут упасть своей ошибкой. Важно одно:
+    // отказ НЕ из-за того, что работа завершена или смена не начата.
+    const failure = await logProduction({...base, clientCommandId: 'cmd-1', entry: workEntries[kind]})
+      .then(() => null, (error: unknown) => error as Error);
 
-    expect(finishTx.pileWork.create).not.toHaveBeenCalled();
-    expect(finishTx.leaderDrilling.create).not.toHaveBeenCalled();
+    expect(failure?.message ?? '').not.toMatch(/Работа по смене завершена|Смена закрыта|Смена ещё не начата/);
   });
 
   it('в смену, которая ещё не начата, отвечает про приём установки, а не про завершение', async () => {
@@ -295,6 +299,54 @@ describe('logProduction — после завершения работы при�
     await expect(logProduction({
       ...base, clientCommandId: 'cmd-1', entry: workEntries.PILES,
     })).rejects.toThrow(/Смена ещё не начата/);
+  });
+
+  // Решение владельца 07.10.2026: простой — только часы, без привязки ко
+  // времени работы в программе; вносить его можно и после работы.
+  describe('простой в часах', () => {
+    const hoursEntry = (hours: number) => ({
+      kind: 'DOWNTIME' as const, reasonId: 'reason-1', hours,
+    });
+
+    beforeEach(() => {
+      finishTx.reportDowntime.findUnique.mockResolvedValue(null);
+      finishTx.reportDowntime.findMany.mockResolvedValue([]);
+      finishTx.downtimeReason.findFirst.mockResolvedValue({id: 'reason-1', name: 'Ожидание механика'});
+      finishTx.reportDowntime.create.mockResolvedValue({});
+    });
+
+    it('записывает ровно введённые часы, без начала и конца и без сверки со временем', async () => {
+      await expect(logProduction({
+        ...base, clientCommandId: 'cmd-h-1', entry: hoursEntry(1.5),
+      })).resolves.toEqual({reportId: 'report-1'});
+
+      const [{data}] = finishTx.reportDowntime.create.mock.calls[0];
+      expect(data).toMatchObject({
+        duration: 1.5, durationSeconds: 5400, kind: 'DOWNTIME', status: 'CLOSED', reasonId: 'reason-1',
+      });
+      expect(data.startedAt).toBeUndefined();
+      expect(data.endedAt).toBeUndefined();
+      // Пересечение с другими простоями и начало смены не сверяются.
+      expect(finishTx.reportDowntime.findMany).not.toHaveBeenCalled();
+    });
+
+    it.each([0.25, 0.5, 1, 2.75, 24])('принимает %s ч', async (hours) => {
+      await expect(logProduction({
+        ...base, clientCommandId: 'cmd-h-ok', entry: hoursEntry(hours),
+      })).resolves.toEqual({reportId: 'report-1'});
+    });
+
+    it.each([
+      [0.1, /в часах: от 0,25 ч/],
+      [0, /в часах: от 0,25 ч/],
+      [25, /длиннее суток/],
+      [1.3, /шагом в четверть часа/],
+    ])('отказывает в %s ч понятным текстом', async (hours, message) => {
+      await expect(logProduction({
+        ...base, clientCommandId: 'cmd-h-bad', entry: hoursEntry(hours),
+      })).rejects.toThrow(message);
+      expect(finishTx.reportDowntime.create).not.toHaveBeenCalled();
+    });
   });
 
   it('простой после завершения работы записывается', async () => {

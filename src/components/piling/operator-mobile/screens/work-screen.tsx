@@ -2,11 +2,12 @@
 
 import {OperatorWorkOverview} from '../operator-work-overview';
 import {useState, type ReactNode} from 'react';
-import {formatDowntimeHours} from '@/lib/downtime-hours';
 import type {OperatorMobileState} from '@/modules/operator-mobile/contracts';
 import {cn} from '@/lib/utils';
 import type {ProductionEntryInput} from '../api';
-import {downtimeInterval, formatIntervalMinutes, hhmm} from '../downtime-interval';
+import {
+  DOWNTIME_QUICK_HOURS, downtimeHoursProblem, formatDowntimeHoursOnly, parseDowntimeHours,
+} from '@/lib/downtime-hours';
 import {BigButton, ErrorNote, Fact, Panel, PanelTitle, Screen, VolumeFact} from '../ui';
 import {PermitPanel, WarningsPanel} from '../warnings-panel';
 import {EntriesList} from './entries-list';
@@ -73,8 +74,7 @@ export function WorkScreen({state, onLog, onFinish, onOpenSafety, busy, error, e
   const [reference, setReference] = useState('');
   const [count, setCount] = useState('');
   const [metersPerUnit, setMetersPerUnit] = useState('');
-  const [startedHm, setStartedHm] = useState('');
-  const [endedHm, setEndedHm] = useState('');
+  const [hoursText, setHoursText] = useState('');
   const [comment, setComment] = useState('');
   // Завершение работы обратного хода не имеет: смена уходит в сдачу, и
   // записать сваю после этого уже нельзя. Кнопка стоит вплотную к «Записать»,
@@ -107,8 +107,7 @@ export function WorkScreen({state, onLog, onFinish, onOpenSafety, busy, error, e
     setReference('');
     setCount('');
     setMetersPerUnit('');
-    setStartedHm('');
-    setEndedHm('');
+    setHoursText('');
     setComment('');
   };
 
@@ -132,10 +131,10 @@ export function WorkScreen({state, onLog, onFinish, onOpenSafety, busy, error, e
       ? state.dictionaries.drillingTypes
       : state.dictionaries.downtimeReasons;
 
-  // Интервал пересчитывается на каждый ввод: подпись под полями обязана
-  // отвечать тому, что уйдёт на сервер, иначе «30 мин» на экране и час в
-  // отчёте разойдутся ровно так, как это было до перехода на интервал.
-  const interval = tab === 'DOWNTIME' ? downtimeInterval(startedHm, endedHm) : null;
+  // Простой — только часы (решение владельца 07.10.2026): без начала и конца и
+  // без привязки ко времени работы в программе. Подпись под полем обязана
+  // отвечать тому, что уйдёт на сервер.
+  const downtimeHours = tab === 'DOWNTIME' ? parseDowntimeHours(hoursText) : null;
 
   const grade = state.dictionaries.pileGrades.find((item) => item.id === reference);
   const pileMeters = grade?.lengthMm ? (Number(count || 0) * grade.lengthMm) / 1000 : 0;
@@ -153,7 +152,7 @@ export function WorkScreen({state, onLog, onFinish, onOpenSafety, busy, error, e
   const ready = !forbidden && Boolean(reference) && (
     tab === 'PILES' ? Number(count) > 0
       : tab === 'DRILLING' ? Number(count) > 0 && Number(metersPerUnit) > 0
-        : interval !== null
+        : downtimeHours !== null
   );
 
   // Форма очищается только после того, как сервер подтвердил запись. Раньше
@@ -167,7 +166,7 @@ export function WorkScreen({state, onLog, onFinish, onOpenSafety, busy, error, e
         ? {kind: 'DRILLING', typeId: reference, count: Number(count), metersPerUnit: Number(metersPerUnit)}
         : {
           kind: 'DOWNTIME', reasonId: reference,
-          startedAt: interval?.startedAt ?? '', endedAt: interval?.endedAt ?? '',
+          hours: downtimeHours ?? 0,
           comment: comment || undefined,
         };
 
@@ -176,8 +175,7 @@ export function WorkScreen({state, onLog, onFinish, onOpenSafety, busy, error, e
 
     setCount('');
     setMetersPerUnit('');
-    setStartedHm('');
-    setEndedHm('');
+    setHoursText('');
     setComment('');
   };
 
@@ -239,7 +237,7 @@ export function WorkScreen({state, onLog, onFinish, onOpenSafety, busy, error, e
               </p>
               <p className="text-2xs text-muted-foreground">
                 За смену: {state.production.piles.count} свай, {state.production.drilling.count} скважин,
-                {' '}простой {formatDowntimeHours(state.production.downtimeHours)}. Дальше — ЕО после работы.
+                {' '}простой {formatDowntimeHoursOnly(state.production.downtimeHours)}. Дальше — ЕО после работы.
               </p>
               <BigButton tone="danger" onClick={onFinish} disabled={busy}>
                 Да, работа завершена
@@ -271,7 +269,7 @@ export function WorkScreen({state, onLog, onFinish, onOpenSafety, busy, error, e
           />
           {/* Без .toFixed(1): часы целые, и «0,0 ч» подсказывало бы, что
               бывает 0,3. Ранее записанные дробные показываем как есть. */}
-          <Fact label="Простой" value={formatDowntimeHours(state.production.downtimeHours)} />
+          <Fact label="Простой" value={formatDowntimeHoursOnly(state.production.downtimeHours)} />
           {/*
             Ветер показываем вместе с тем, когда его измерили: работа
             прекращается при 15 м/с, и цифра без времени не даёт понять,
@@ -384,36 +382,35 @@ export function WorkScreen({state, onLog, onFinish, onOpenSafety, busy, error, e
 
           {tab === 'DOWNTIME' ? (
             <div className="space-y-2">
-              <div className="grid grid-cols-2 gap-2">
-                <label className="block">
-                  <span className="text-2xs font-medium text-muted-foreground">Простой начался</span>
-                  <input
-                    type="time" value={startedHm}
-                    onChange={(event) => setStartedHm(event.target.value)}
-                    className="mt-1 h-12 w-full rounded-md border bg-card px-3 text-base tabular-nums shadow-xs"
-                  />
-                </label>
-                <label className="block">
-                  <span className="text-2xs font-medium text-muted-foreground">Закончился</span>
-                  <input
-                    type="time" value={endedHm}
-                    onChange={(event) => setEndedHm(event.target.value)}
-                    className="mt-1 h-12 w-full rounded-md border bg-card px-3 text-base tabular-nums shadow-xs"
-                  />
-                </label>
+              <label className="block">
+                <span className="text-2xs font-medium text-muted-foreground">Простой, часов</span>
+                <input
+                  type="number" inputMode="decimal" step="0.25" min="0.25" max="24"
+                  placeholder="Например: 1,5"
+                  value={hoursText}
+                  onChange={(event) => setHoursText(event.target.value)}
+                  className="mt-1 h-12 w-full rounded-md border bg-card px-3 text-lg font-semibold tabular-nums shadow-xs"
+                />
+              </label>
+              {/* Только часы: быстрый выбор тоже в часах. */}
+              <div className="grid grid-cols-4 gap-2">
+                {DOWNTIME_QUICK_HOURS.map((hours) => (
+                  <button
+                    key={hours} type="button"
+                    onClick={() => setHoursText(String(hours))}
+                    className="h-12 rounded-md border bg-card text-base font-semibold"
+                  >
+                    {formatDowntimeHoursOnly(hours)}
+                  </button>
+                ))}
               </div>
-              {/* Самый частый случай: машина только что пошла. */}
-              <button
-                type="button"
-                onClick={() => setEndedHm(hhmm(new Date()))}
-                className="h-9 rounded-md border px-3 text-sm font-medium"
-              >
-                Закончился сейчас
-              </button>
-              {interval ? (
+              {downtimeHours !== null ? (
                 <p className="rounded-md bg-info/10 px-3 py-2 text-sm font-medium text-info-strong">
-                  Простой: {formatIntervalMinutes(interval.minutes)}
+                  Простой: {formatDowntimeHoursOnly(downtimeHours)}
                 </p>
+              ) : null}
+              {downtimeHoursProblem(hoursText) ? (
+                <p className="text-sm font-medium text-destructive">{downtimeHoursProblem(hoursText)}</p>
               ) : null}
             </div>
           ) : null}

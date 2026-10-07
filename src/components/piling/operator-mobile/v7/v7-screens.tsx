@@ -13,7 +13,7 @@ import {
   DEFECT_SEVERITY_FIELD_LABELS, DEFECT_STATUS_FIELD_LABELS, isAlarmingSeverity,
 } from '@/modules/operator-mobile/domain/defect-labels';
 import {formatNumber, formatRuDate} from '@/lib/format';
-import {formatDowntimeHours} from '@/lib/downtime-hours';
+import {formatDowntimeHoursOnly} from '@/lib/downtime-hours';
 import {Banner, Button, Card, CardBody, Chip, Empty, Metric, Pair, Row, type Tone} from './v7-ui';
 
 /**
@@ -347,7 +347,7 @@ function ProductionCard({state}: {state: OperatorMobileState}) {
         <div className="metrics">
           <Metric value={production.piles.count} label="свай" extra={`${formatNumber(production.piles.meters)} м.п.`} />
           <Metric value={production.drilling.count} label="скважин" extra={`${formatNumber(production.drilling.meters)} м.п.`} />
-          <Metric value={formatDowntimeHours(production.downtimeHours)} label="простой" />
+          <Metric value={formatDowntimeHoursOnly(production.downtimeHours)} label="простой" />
         </div>
       </CardBody>
     </Card>
@@ -402,7 +402,7 @@ export function TasksScreen({state, onEntry}: {
             <div className="metrics">
               <Metric value={state.assignment.sitePiles.count} label="свай" extra={`${formatNumber(state.assignment.sitePiles.meters)} м.п.`} />
               <Metric value={state.assignment.siteDrilling.count} label="скважин" extra={`${formatNumber(state.assignment.siteDrilling.meters)} м.п.`} />
-              <Metric value={formatDowntimeHours(state.assignment.siteDowntimeHours)} label="простой" />
+              <Metric value={formatDowntimeHoursOnly(state.assignment.siteDowntimeHours)} label="простой" />
             </div>
           </CardBody>
         </Card>
@@ -429,7 +429,7 @@ export function JournalScreen({state}: {state: OperatorMobileState}) {
             chip={(
               <Chip tone={entry.kind === 'DOWNTIME' ? 'warn' : 'info'}>
                 {entry.kind === 'DOWNTIME'
-                  ? formatDowntimeHours(entry.value)
+                  ? formatDowntimeHoursOnly(entry.value)
                   : `${formatNumber(entry.value)} ${ENTRY_UNIT[entry.kind] ?? ''}`}
               </Chip>
             )}

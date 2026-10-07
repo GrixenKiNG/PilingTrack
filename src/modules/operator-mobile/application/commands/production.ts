@@ -9,7 +9,9 @@ import type {Prisma} from '@/generated/postgres-client/client';
 import {withReadinessTenantTransaction} from '@/modules/readiness/server';
 // eslint-disable-next-line no-restricted-imports -- legacy cross-layer import pending the parked services<->modules migration (CLAUDE.md); behavior-neutral
 import {writeReportAuditRow} from '@/services/reports/audit-service';
-import {DOWNTIME_MAX_HOURS, downtimeHoursBetween} from '@/lib/downtime-hours';
+import {
+  DOWNTIME_MAX_HOURS, DOWNTIME_STEP_HOURS, downtimeHoursBetween, isWholeDowntimeStep,
+} from '@/lib/downtime-hours';
 import {validatePassport} from '../../domain/pile-passport';
 import {safetyChecklistPeriod} from '../../domain/safety-checklist-period';
 import {findDowntimeConflict} from '../../domain/downtime-interval';
@@ -70,7 +72,14 @@ export type ProductionEntry =
    */
   | {kind: 'PILE_PASSPORT'; pileGradeId: string; passport: PilePassportEntry}
   | {kind: 'DRILLING'; typeId: string; count: number; metersPerUnit: number}
-  | {kind: 'DOWNTIME'; reasonId: string; startedAt: string; endedAt: string; comment?: string};
+  /**
+   * Простой. С экрана машиниста приходит ЧАСАМИ (`hours`) — решение владельца
+   * 07.10.2026: запись не привязана ко времени работы в программе, машинист
+   * вносит её и после работы. Начало и конец (`startedAt`/`endedAt`) остались
+   * для очереди офлайна на устройствах и для старых клиентов: запись, поставленная
+   * в очередь до этой правки, обязана дойти.
+   */
+  | {kind: 'DOWNTIME'; reasonId: string; hours?: number; startedAt?: string; endedAt?: string; comment?: string};
 
 /**
  * Запись выработки по ходу смены, а не одним отчётом в конце.
@@ -114,25 +123,22 @@ export async function logProduction(input: {
     const shift = await requireOpenShift(tx, input.tenantId, input.shiftId, input.operatorId);
     const crew = await requireCrew(tx, input.tenantId, input.operatorId, shift.equipmentId);
 
-    // Работа кончилась — выработка больше не пишется. Это тоже сервер, а не
-    // только экран.
+    // ВЫРАБОТКУ МОЖНО ВНЕСТИ И ПОСЛЕ «ЗАВЕРШИТЬ РАБОТУ» — ДО СДАЧИ СМЕНЫ
+    // (решение владельца 07.10.2026: «оператор может после работы занести
+    // выполненные работы и простой»).
     //
-    // `finishWork` переводит смену в HANDOVER_PENDING, и на экране кнопки
-    // выработки исчезают. Прямой запрос к API их не спрашивал: после
-    // «Завершить работу» сваи продолжали записываться в уже сдаваемую смену.
-    // `requireOpenShift` пропускает HANDOVER_PENDING сознательно — в этом
-    // состоянии ещё сдают ЕО после работы и закрывают смену, — поэтому
-    // правило стоит здесь, а не там.
+    // Раньше запись выработки в `HANDOVER_PENDING` отвергалась: пропущенную
+    // запись обязан был вносить мастер в журнале забивки. Машинист, который не
+    // трогает телефон за работой, а вносит всё по окончании, упирался в этот
+    // отказ. Теперь выработка и простой принимаются, пока смена не сдана;
+    // запрещены только смена, которой ещё нет (не принята установка), и
+    // закрытая — её отсекает `requireOpenShift` выше.
     //
-    // Простой не запрещаем: им машинист объясняет остановку, и последний
-    // отрезок простоя обычно вносится уже при сдаче. Тот же довод, что у
-    // погодного запрета ниже.
-    //
-    // Отложенная отправка не страдает: очередь офлайна строго по порядку, а
-    // `finishWork` в неё не попадает вовсе (нужен живой ответ сервера), так
-    // что записи, сделанные до завершения, уходят раньше него. Повтор уже
-    // принятой команды отсекается выше по clientCommandId и сюда не доходит.
-    if (shift.state !== 'STARTED' && input.entry.kind !== 'DOWNTIME') {
+    // Остальные запреты выработки (критический дефект, документы, СИЗ,
+    // происшествие) работают по-прежнему: они про машину, а не про время.
+    // Отложенная отправка не страдает: очередь офлайна идёт по порядку, а
+    // повтор уже принятой команды отсекается выше по clientCommandId.
+    if (shift.state !== 'STARTED' && shift.state !== 'HANDOVER_PENDING' && input.entry.kind !== 'DOWNTIME') {
       /*
         Два разных состояния — два разных сообщения.
 
@@ -149,7 +155,7 @@ export async function logProduction(input: {
         409,
         notStarted
           ? 'Смена ещё не начата: примите установку на экране приёма, и запись выработки откроется.'
-          : 'Работа по смене завершена — выработку больше не записать. '
+          : 'Смена закрыта — выработку больше не записать. '
             + 'Если запись пропущена, её вносит мастер в журнале забивки.',
       );
     }
@@ -399,7 +405,44 @@ export async function logProduction(input: {
         },
       });
       auditDiff = {'Выработка': {old: null, new: `бурение: +${entry.count * entry.metersPerUnit} м.п.`}};
+    } else if (typeof entry.hours === 'number') {
+      // ПРОСТОЙ В ЧАСАХ (решение владельца 07.10.2026). Никакой привязки ко
+      // времени: ни «не позже сейчас», ни «не раньше начала смены», ни
+      // пересечения с другими простоями — машинист называет, сколько часов
+      // машина стояла, и сервер это фиксирует в отчёте. Длительность — ровно то
+      // число, которое он ввёл: ни округления, ни пересчёта.
+      const hours = entry.hours;
+      if (!Number.isFinite(hours) || hours < DOWNTIME_STEP_HOURS) {
+        throw new OperatorCommandError(400, `Простой записывается в часах: от ${String(DOWNTIME_STEP_HOURS).replace('.', ',')} ч.`);
+      }
+      if (hours > DOWNTIME_MAX_HOURS) {
+        throw new OperatorCommandError(400, `Простой длиннее суток (${Math.round(hours)} ч). Проверьте часы.`);
+      }
+      if (!isWholeDowntimeStep(hours)) {
+        throw new OperatorCommandError(400, 'Укажите часы с шагом в четверть часа: 0,25 / 0,5 / 1 / 1,5 …');
+      }
+
+      const reason = await requireDowntimeReason(tx, input.tenantId, entry.reasonId);
+      await tx.reportDowntime.create({
+        data: {
+          reportId,
+          tenantId: input.tenantId,
+          shiftId: input.shiftId,
+          clientCommandId: input.clientCommandId,
+          reasonId: entry.reasonId,
+          duration: hours,
+          durationSeconds: Math.round(hours * 3600),
+          kind: 'DOWNTIME',
+          status: 'CLOSED',
+          comment: entry.comment ?? null,
+          occurredAt: now,
+        },
+      });
+      auditDiff = {'Выработка': {old: null, new: `простой: ${hours} ч (${reason.name})`}};
     } else {
+      if (!entry.startedAt || !entry.endedAt) {
+        throw new OperatorCommandError(400, 'Укажите, сколько часов стояла машина');
+      }
       const startedAt = new Date(entry.startedAt);
       const endedAt = new Date(entry.endedAt);
       if (Number.isNaN(startedAt.getTime()) || Number.isNaN(endedAt.getTime())) {

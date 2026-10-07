@@ -26,13 +26,14 @@ export function OperatorWorkOverview({state, variant, busy, onAction, onFinish, 
     ...(['PRESHIFT_INSPECTION', 'SITE_READY', 'EO_BEFORE'] as const).map((stage, i) => ({label: ['Осмотр машины', 'Площадка', 'Пуск'][i], done: state.checklists.some(c => c.stage === stage && c.done)})),
   ];
   const ready = state.phase === 'WORK' && state.permit.allowed && preparation.every(s => s.done);
-  const minutes = Math.round(state.production.downtimeHours * 60);
+  // Простой — только часы (решение владельца 07.10.2026).
+  const downtimeHours = Math.round(state.production.downtimeHours * 100) / 100;
   const entries = [...state.entries].sort((a,b)=>b.occurredAt.localeCompare(a.occurredAt));
   const status = <div className={`oc-status ${ready ? 'oc-ok' : 'oc-attention'}`}><PilingIcon name={ready ? 'check' : 'risk'} size={26} decorative /><div><strong>{ready ? 'К работе допущен' : 'Требуется проверка допуска'}</strong><span>{ready ? 'Подготовка завершена, замечаний по допуску нет.' : state.permit.blocks.map(b=>b.title).join(' · ') || 'Обязательные проверки ещё не завершены.'}</span></div></div>;
   const stats = <div className="oc-stats">{[
     {icon: 'pile-driving', label: 'Сваи', value: formatNumber(state.production.piles.count,0), unit: 'шт.', tone: 'pile'},
     {icon: 'drilling-auger', label: 'Бурение', value: formatNumber(state.production.drilling.meters,1), unit: 'м', tone: 'drill'},
-    {icon: 'downtime', label: 'Простой', value: formatNumber(minutes,0), unit: 'мин', tone: 'pause'},
+    {icon: 'downtime', label: 'Простой', value: String(downtimeHours).replace('.', ','), unit: 'ч', tone: 'pause'},
   ].map(m=><div className={`oc-stat oc-${m.tone}`} key={m.label}>{m.tone === 'pause' ? <Clock className="oc-symbol oc-clock" size={40} aria-hidden /> : <PilingIcon name={m.icon as PilingIconName} size={30} decorative />}<div><span>{m.label}</span><strong>{m.value}</strong><small>{m.unit}</small></div></div>)}</div>;
   const action = (kind: WorkAction, label: string, icon: PilingIconName, cls: string) => <button type="button" className={`oc-action ${cls}`} disabled={busy || (kind !== 'DOWNTIME' && !ready)} onClick={()=>onAction(kind)}>{kind === 'DOWNTIME' ? <Clock className="oc-symbol" size={32} aria-hidden /> : <PilingIcon name={icon} size={26} decorative />}<span>{label}</span></button>;
   const finish = <button type="button" className="oc-action oc-finish" disabled={busy} onClick={onFinish}><Flag className="oc-symbol" size={30} aria-hidden /><span>Завершить работу</span></button>;

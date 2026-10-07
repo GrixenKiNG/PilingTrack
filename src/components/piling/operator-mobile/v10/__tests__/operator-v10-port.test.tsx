@@ -40,7 +40,7 @@ vi.mock('@/components/piling/operator-mobile/use-offline-queue', () => ({
 vi.mock('../../operator-concept.css', () => ({}));
 
 import {ApiError} from '@/components/piling/operator-mobile/api';
-import {downtimeWindowProblem, OperatorV10App, ppeOutcome} from '../operator-v10-app';
+import {OperatorV10App, ppeOutcome} from '../operator-v10-app';
 
 /* ------------------------------------------------------------- состояние --- */
 
@@ -202,50 +202,61 @@ describe('v10: итог подтверждения СИЗ', () => {
   });
 });
 
-/* --------------------------------------- 2. окно простоя до отправки --- */
+/* ------------------------------------------------ 2. простой в часах --- */
 
 /**
- * D-20260927-004: окно смены проверял только сервер, и отказ «Простой не может
- * начаться раньше смены…» приходил уже после «Записать». Границы обязаны быть
- * видны до отправки, а текст — тот же, что у сервера.
+ * Решение владельца 07.10.2026: простой — только часы, без привязки ко времени
+ * работы в программе. Окно смены и «не позже сейчас» больше не проверяются.
  */
-describe('v10: окно простоя до отправки', () => {
-  const now = new Date(2026, 8, 27, 5, 30, 0);
-  const shiftStart = new Date(2026, 8, 27, 4, 44, 0).toISOString();
-
-  it('называет начало смены, когда простой начинается раньше', () => {
-    expect(downtimeWindowProblem('03:00', '05:30', shiftStart, now))
-      .toBe('Простой не может начаться раньше смены — смена начата в 04:44.');
-  });
-
-  it('пропускает простой в окне смены', () => {
-    expect(downtimeWindowProblem('04:50', '05:30', shiftStart, now)).toBeNull();
-  });
-
-  it('не придирается к расхождению часов в пять минут', () => {
-    expect(downtimeWindowProblem('04:40', '05:30', shiftStart, now)).toBeNull();
-  });
-
-  it('молчит, пока смены нет или поля пусты', () => {
-    expect(downtimeWindowProblem('03:00', '05:30', null, now)).toBeNull();
-    expect(downtimeWindowProblem('', '', shiftStart, now)).toBeNull();
-  });
-
-  it('пишет отказ под полями и держит «Записать» до исправления времени', async () => {
+describe('v10: простой в часах', () => {
+  const openDowntimeForm = async () => {
     api.fetchState.mockResolvedValue(workState());
-    const {container} = render(<OperatorV10App />);
-
+    const view = render(<OperatorV10App />);
     fireEvent.click(await screen.findByRole('button', {name: 'Дальше: Работа: сваи, бурение, простой'}));
     fireEvent.click(screen.getByRole('button', {name: 'Простой'}));
     fireEvent.change(screen.getByRole('combobox'), {target: {value: 'r1'}});
-    const [start, end] = container.querySelectorAll('input[type="time"]');
-    fireEvent.change(start, {target: {value: '05:00'}});
-    fireEvent.change(end, {target: {value: '06:00'}});
+    return view;
+  };
 
-    expect(await screen.findByText('Простой не может начаться раньше смены — смена начата в 07:20.'))
-      .toBeInTheDocument();
+  it('вместо времени начала и конца — одно поле «Простой, часов»', async () => {
+    const {container} = await openDowntimeForm();
+
+    expect(container.querySelectorAll('input[type="time"]')).toHaveLength(0);
+    expect(screen.getByLabelText('Простой, часов')).toBeInTheDocument();
+    expect(screen.queryByText('Закончился сейчас')).toBeNull();
+  });
+
+  it('держит «Записать», пока часы не введены или записаны не по шагу четверти часа', async () => {
+    await openDowntimeForm();
+    const field = screen.getByLabelText('Простой, часов');
+
+    expect(screen.getByRole('button', {name: 'Записать'})).toBeDisabled();
+    fireEvent.change(field, {target: {value: '1.3'}});
+    expect(await screen.findByText(/с шагом в четверть часа/)).toBeInTheDocument();
     expect(screen.getByRole('button', {name: 'Записать'})).toBeDisabled();
     expect(api.sendCommand).not.toHaveBeenCalled();
+  });
+
+  it('отправляет введённые часы без начала и конца', async () => {
+    api.sendCommand.mockResolvedValue({ok: true});
+    await openDowntimeForm();
+
+    fireEvent.change(screen.getByLabelText('Простой, часов'), {target: {value: '1.5'}});
+    fireEvent.click(screen.getByRole('button', {name: 'Записать'}));
+
+    await waitFor(() => expect(api.sendCommand).toHaveBeenCalledTimes(1));
+    const [command] = api.sendCommand.mock.calls[0];
+    expect(command).toMatchObject({command: 'log-production', entry: {kind: 'DOWNTIME', reasonId: 'r1', hours: 1.5}});
+    expect(command.entry.startedAt).toBeUndefined();
+    expect(command.entry.endedAt).toBeUndefined();
+  });
+
+  it('кнопки быстрого выбора — в часах, а не в минутах', async () => {
+    await openDowntimeForm();
+
+    fireEvent.click(screen.getByRole('button', {name: '2 ч'}));
+    expect((screen.getByLabelText('Простой, часов') as HTMLInputElement).value).toBe('2');
+    expect(screen.queryByRole('button', {name: /мин/})).toBeNull();
   });
 });
 

@@ -128,20 +128,18 @@ describe('v10: порядок смены', () => {
 describe('v10: отказ сервера виден, введённое не пропадает', () => {
   it('простой отвергнут — красная полоса с причиной, поля на месте', async () => {
     api.fetchState.mockResolvedValue(makeState('WORK', ['PRESHIFT_INSPECTION', 'SITE_READY', 'EO_BEFORE']));
-    api.sendCommand.mockRejectedValue(new ApiError(400, 'Простой не может начаться раньше смены — смена начата в 07:20.'));
-    const {container} = render(<OperatorV10App />);
+    api.sendCommand.mockRejectedValue(new ApiError(400, 'Простой длиннее суток (25 ч). Проверьте часы.'));
+    render(<OperatorV10App />);
 
     fireEvent.click(await screen.findByRole('button', {name: 'Дальше: Работа: сваи, бурение, простой'}));
     fireEvent.click(screen.getByRole('button', {name: 'Простой'}));
     fireEvent.change(screen.getByRole('combobox'), {target: {value: 'r1'}});
-    const [start, end] = container.querySelectorAll('input[type="time"]');
-    fireEvent.change(start, {target: {value: '06:30'}});
-    fireEvent.change(end, {target: {value: '07:00'}});
+    fireEvent.change(screen.getByLabelText('Простой, часов'), {target: {value: '1.5'}});
     fireEvent.click(screen.getByRole('button', {name: 'Записать'}));
 
-    expect(await screen.findByText(/Не записано: Простой не может начаться раньше смены/)).toBeInTheDocument();
+    expect(await screen.findByText(/Не записано: Простой длиннее суток/)).toBeInTheDocument();
     expect(screen.getByRole('combobox')).toHaveValue('r1');
-    expect(container.querySelectorAll('input[type="time"]')[0]).toHaveValue('06:30');
+    expect(screen.getByLabelText('Простой, часов')).toHaveValue(1.5);
   });
 });
 

@@ -10,7 +10,9 @@
 
 import { useState, type ReactNode } from 'react';
 import { StepButton } from './ui';
-import { downtimeInterval, formatIntervalMinutes, hhmm } from '../operator-mobile/downtime-interval';
+import {
+  DOWNTIME_QUICK_HOURS, downtimeHoursProblem, formatDowntimeHoursOnly, parseDowntimeHours,
+} from '@/lib/downtime-hours';
 
 /*
   Справочники приходят из снимка рабочего места — того же, что кормит все
@@ -203,22 +205,26 @@ export function DrillingSheet({ open, types, busy, onClose, onAdd }: {
   );
 }
 
-/** Зафиксировать простой: причина и продолжительность в часах. */
+/**
+ * Зафиксировать простой: причина и продолжительность в часах.
+ *
+ * Только часы, без привязки ко времени работы в программе (решение владельца
+ * 07.10.2026): машинист может внести простой и после работы.
+ */
 export function DowntimeSheet({ open, reasons, busy, onClose, onAdd }: {
   open: boolean;
   reasons: DowntimeReason[];
   busy: boolean;
   onClose: () => void;
-  onAdd: (reasonId: string, startedAt: string, endedAt: string, comment: string) => void;
+  onAdd: (reasonId: string, hours: number, comment: string) => void;
 }) {
   const [reasonId, setReasonId] = useState('');
-  const [startedHm, setStartedHm] = useState('');
-  const [endedHm, setEndedHm] = useState('');
+  const [hoursText, setHoursText] = useState('');
   const [comment, setComment] = useState('');
 
-  // Хук обязан вызываться до любого раннего возврата, поэтому интервал
-  // считается здесь, а не после проверки `open`.
-  const interval = downtimeInterval(startedHm, endedHm);
+  // Хук обязан вызываться до любого раннего возврата, поэтому часы
+  // разбираются здесь, а не после проверки `open`.
+  const hours = parseDowntimeHours(hoursText);
   if (!open) return null;
 
   return (
@@ -228,8 +234,8 @@ export function DowntimeSheet({ open, reasons, busy, onClose, onAdd }: {
       footer={
         <StepButton
           label="Записать простой"
-          onClick={() => interval && onAdd(reasonId, interval.startedAt, interval.endedAt, comment.trim())}
-          disabled={!reasonId || !interval}
+          onClick={() => hours !== null && onAdd(reasonId, hours, comment.trim())}
+          disabled={!reasonId || hours === null}
           busy={busy}
         />
       }
@@ -242,30 +248,30 @@ export function DowntimeSheet({ open, reasons, busy, onClose, onAdd }: {
         </select>
       </Field>
 
-      {/* Начало и конец вместо шага в полчаса: шаг округлял двадцать минут до
-          получаса, а получас — до часа на сервере, и в отчёт уходило втрое
-          больше простоя, чем было. */}
-      <Field label="Простой начался" htmlFor="downtime-start">
-        <input id="downtime-start" type="time" value={startedHm}
-          onChange={(event) => setStartedHm(event.target.value)}
+      <Field label="Простой, часов" htmlFor="downtime-hours">
+        <input id="downtime-hours" type="number" inputMode="decimal" step="0.25" min="0.25" max="24"
+          placeholder="Например: 1,5" value={hoursText}
+          onChange={(event) => setHoursText(event.target.value)}
           className={`${control} tabular-nums`} />
       </Field>
 
-      <Field label="Закончился" htmlFor="downtime-end">
-        <div className="flex items-stretch gap-2">
-          <input id="downtime-end" type="time" value={endedHm}
-            onChange={(event) => setEndedHm(event.target.value)}
-            className={`${control} tabular-nums`} />
-          <button type="button" onClick={() => setEndedHm(hhmm(new Date()))}
-            className="h-14 shrink-0 rounded-lg border border-border bg-card px-4 text-base font-semibold">
-            Сейчас
+      {/* Только часы: быстрый выбор тоже в часах. */}
+      <div className="grid grid-cols-4 gap-2">
+        {DOWNTIME_QUICK_HOURS.map((quick) => (
+          <button key={quick} type="button" onClick={() => setHoursText(String(quick))}
+            className="h-14 rounded-lg border border-border bg-card text-base font-semibold">
+            {formatDowntimeHoursOnly(quick)}
           </button>
-        </div>
-      </Field>
+        ))}
+      </div>
 
-      {interval ? (
+      {downtimeHoursProblem(hoursText) ? (
+        <p className="text-base font-semibold text-destructive">{downtimeHoursProblem(hoursText)}</p>
+      ) : null}
+
+      {hours !== null ? (
         <p className="rounded-lg bg-info/10 px-3 py-2 text-base font-semibold text-info-strong">
-          Простой: {formatIntervalMinutes(interval.minutes)}
+          Простой: {formatDowntimeHoursOnly(hours)}
         </p>
       ) : null}
 

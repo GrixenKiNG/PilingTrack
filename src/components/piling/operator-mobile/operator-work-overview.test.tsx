@@ -18,10 +18,12 @@ function show(value = state, busy = false) {
 }
 
 describe('рабочий обзор оператора', () => {
-  it('показывает метры бурения и переводит часы простоя в минуты', () => {
+  it('показывает метры бурения и простой в часах, а не в минутах', () => {
     show();
     expect(screen.getByText('24')).toBeInTheDocument();
-    expect(screen.getByText('15')).toBeInTheDocument();
+    expect(screen.getByText('0,25')).toBeInTheDocument();
+    expect(screen.getByText('ч')).toBeInTheDocument();
+    expect(screen.queryByText('мин')).not.toBeInTheDocument();
     expect(screen.getByText('К работе допущен')).toBeInTheDocument();
   });
   it('не объявляет готовность только по разрешению сервера при незавершённом осмотре', () => {

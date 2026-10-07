@@ -2,7 +2,7 @@
 
 import {useState} from 'react';
 import type {ProductionEntryView} from '@/modules/operator-mobile/contracts';
-import {formatDowntimeHours} from '@/lib/downtime-hours';
+import {formatDowntimeHoursOnly} from '@/lib/downtime-hours';
 import {BigButton, Panel, PanelTitle} from '../ui';
 
 const KIND_UNIT: Record<ProductionEntryView['kind'], string> = {
@@ -71,7 +71,7 @@ export function EntriesList({entries, busy, onCorrect}: {
               <span className="min-w-0 truncate text-sm font-medium">{entry.label}</span>
               <span className="shrink-0 font-mono text-sm font-semibold tabular-nums">
                 {entry.kind === 'DOWNTIME'
-                  ? formatDowntimeHours(entry.value)
+                  ? formatDowntimeHoursOnly(entry.value)
                   : `${entry.value} ${KIND_UNIT[entry.kind]}`}
                 {entry.meters !== null ? ` · ${entry.meters.toFixed(1)} м.п.` : ''}
               </span>

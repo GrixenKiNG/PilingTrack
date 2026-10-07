@@ -2,7 +2,9 @@
 
 import {OperatorWorkOverview, type WorkAction} from '../operator-work-overview';
 import {useCallback, useEffect, useRef, useState} from 'react';
-import {DOWNTIME_MAX_HOURS, formatDowntimeHours} from '@/lib/downtime-hours';
+import {
+  DOWNTIME_QUICK_HOURS, downtimeHoursProblem, formatDowntimeHoursOnly, parseDowntimeHours,
+} from '@/lib/downtime-hours';
 import type {
   ChecklistAnswer, ChecklistStage, DocumentVerdict, IncidentCategory, IncidentSign,
   OperatorMobileState,
@@ -22,7 +24,6 @@ import {ApiError, QueuedOffline, currentPosition, fetchState, newCommandId, send
 import {OfflineQueueBanner} from '../offline-queue-banner';
 import {useOfflineQueue} from '../use-offline-queue';
 import type {ProductionEntryInput} from '../api';
-import {downtimeInterval, formatIntervalMinutes, hhmm} from '@/components/piling/operator-mobile/downtime-interval';
 import {PilePassportForm} from '../screens/pile-passport-form';
 import {formatNumber} from '@/lib/format';
 import {
@@ -366,38 +367,6 @@ function ScreenAccept({state, busy, onAccept, go}: {
 }
 
 /** Допуск на расхождение часов телефона и сервера — тот же, что у сервера. */
-const CLOCK_SKEW_MIN = 5;
-
-/**
- * ОКНО ПРОСТОЯ ВИДНО ДО ОТПРАВКИ (D-20260927-004). Раньше границы проверял
- * только сервер, и отказ «Простой не может начаться раньше смены…» приходил уже
- * после нажатия «Записать». Оператор тратил цикл «отправил — получил ошибку», а
- * при слабой связи мог решить, что простой записан. Границы здесь те же, что у
- * сервера (domain/downtime-interval): начало не раньше старта смены с допуском
- * пять минут на расхождение часов, длительность не больше DOWNTIME_MAX_HOURS.
- * Тексты повторяют серверные дословно — об одном запрете не должно быть двух
- * разных формулировок.
- */
-export function downtimeWindowProblem(
-  startValue: string, endValue: string,
-  shiftStartedAt: string | null | undefined,
-  now: Date = new Date(),
-): string | null {
-  const interval = downtimeInterval(startValue, endValue, now);
-  if (!interval || !shiftStartedAt) return null;
-  const startedAt = new Date(interval.startedAt).getTime();
-  const shiftStart = new Date(shiftStartedAt).getTime();
-
-  // Начало раньше смены — то, из-за чего и приходил серверный отказ.
-  if (startedAt < shiftStart - CLOCK_SKEW_MIN * 60_000) {
-    return `Простой не может начаться раньше смены — смена начата в ${hhmm(new Date(shiftStart))}.`;
-  }
-  if (interval.minutes > DOWNTIME_MAX_HOURS * 60) {
-    return `Простой длиннее суток (${Math.round(interval.minutes / 60)} ч). Проверьте время.`;
-  }
-  return null;
-}
-
 /**
  * Запись выработки прямо здесь (решение владельца 18.09.2026).
  *
@@ -408,22 +377,18 @@ export function downtimeWindowProblem(
  * Поля те же, что и в рабочем экране /operator, и уходят той же командой
  * log-production: сервер один, и правила приёмки записи тоже одни.
  */
-function ProductionForm({state, busy, onLog, initialKind = 'PILES', downtimeOnly = false}: {
+function ProductionForm({state, busy, onLog, initialKind = 'PILES'}: {
   initialKind?: WorkAction;
   state: OperatorMobileState;
   busy: boolean;
   /** true — сервер принял запись (или она легла в очередь); только тогда форма очищается. */
   onLog: (entry: ProductionEntryInput) => Promise<boolean>;
-  /** После «Завершить работу» сервер принимает только простой — и форма предлагает только его. */
-  downtimeOnly?: boolean;
 }) {
-  const [kind, setKind] = useState<WorkAction>(downtimeOnly ? 'DOWNTIME' : initialKind);
+  const [kind, setKind] = useState<WorkAction>(initialKind);
   const [optionId, setOptionId] = useState('');
   const [count, setCount] = useState('');
   const [meters, setMeters] = useState('');
-  const [startedHm, setStartedHm] = useState('');
-  const [endedHm, setEndedHm] = useState('');
-
+  const [hoursText, setHoursText] = useState('');
 
   const options = kind === 'PILES' || kind === 'PASSPORT' ? state.dictionaries.pileGrades
     : kind === 'DRILLING' ? state.dictionaries.drillingTypes
@@ -434,25 +399,20 @@ function ProductionForm({state, busy, onLog, initialKind = 'PILES', downtimeOnly
     setOptionId('');
     setCount('');
     setMeters('');
-    setStartedHm('');
-    setEndedHm('');
+    setHoursText('');
   };
 
   const amount = Number(count.replace(',', '.'));
   const perUnit = Number(meters.replace(',', '.'));
-  // Простой задаётся интервалом: подпись под полями и то, что уйдёт на
-  // сервер, — одна и та же величина (см. downtime-interval).
-  const interval = kind === 'DOWNTIME' ? downtimeInterval(startedHm, endedHm) : null;
-  // Границы окна смены — те же, что проверит сервер: раньше отправки и рядом с
-  // полем, а не только отказом после запроса (D-20260927-004).
-  const windowProblem = kind === 'DOWNTIME'
-    ? downtimeWindowProblem(startedHm, endedHm, state.shift?.startedAt ?? null)
-    : null;
+  // Простой — только часы, без привязки ко времени работы в программе
+  // (решение владельца 07.10.2026): подпись под полем и то, что уйдёт на
+  // сервер, — одна и та же величина.
+  const downtimeHours = kind === 'DOWNTIME' ? parseDowntimeHours(hoursText) : null;
   // Запрет закрывает выработку и не трогает простой — domain/production-permit.ts.
   const forbidden = kind !== 'DOWNTIME' && !state.permit.allowed;
   const ready = !forbidden && optionId !== '' && (
     kind === 'DOWNTIME'
-      ? interval !== null && windowProblem === null
+      ? downtimeHours !== null
       : Number.isFinite(amount) && amount > 0
         && (kind !== 'DRILLING' || (Number.isFinite(perUnit) && perUnit > 0))
   );
@@ -467,25 +427,18 @@ function ProductionForm({state, busy, onLog, initialKind = 'PILES', downtimeOnly
     if (kind === 'PILES') accepted = await onLog({kind: 'PILES', pileGradeId: optionId, count: Math.round(amount)});
     else if (kind === 'DRILLING') {
       accepted = await onLog({kind: 'DRILLING', typeId: optionId, count: Math.round(amount), metersPerUnit: perUnit});
-    } else if (interval) {
-      accepted = await onLog({
-        kind: 'DOWNTIME', reasonId: optionId,
-        startedAt: interval.startedAt, endedAt: interval.endedAt,
-      });
+    } else if (downtimeHours !== null) {
+      accepted = await onLog({kind: 'DOWNTIME', reasonId: optionId, hours: downtimeHours});
     }
     if (!accepted) return;
     setOptionId('');
     setCount('');
     setMeters('');
-    setStartedHm('');
-    setEndedHm('');
+    setHoursText('');
   };
 
   return (
     <Card title="Записать выработку">
-      {downtimeOnly ? (
-        <p className="ov10-hint">Работа завершена: сваи и бурение больше не записываются, простой — можно.</p>
-      ) : (
       <div className="ov10-chips on-work">
         <button type="button" className={kind === 'PILES' ? 'on' : ''}
           aria-pressed={kind === 'PILES'} onClick={() => switchKind('PILES')}>Свая</button>
@@ -496,7 +449,6 @@ function ProductionForm({state, busy, onLog, initialKind = 'PILES', downtimeOnly
         <button type="button" className={kind === 'DOWNTIME' ? 'on' : ''}
           aria-pressed={kind === 'DOWNTIME'} onClick={() => switchKind('DOWNTIME')}>Простой</button>
       </div>
-      )}
 
       {/* Паспорт — журнал забивки на одну сваю по СП 45.13330: номер, залоги,
           отказ, отметки головы. Форма общая со всеми модулями: требование к
@@ -531,20 +483,21 @@ function ProductionForm({state, busy, onLog, initialKind = 'PILES', downtimeOnly
       {kind === 'DOWNTIME' ? (
         <>
           <label className="ov10-field">
-            <span className="lab">Простой начался</span>
-            <input type="time" value={startedHm}
-              onChange={(event) => setStartedHm(event.target.value)} />
+            <span className="lab">Простой, часов</span>
+            <input type="number" inputMode="decimal" step="0.25" min="0.25" max="24"
+              placeholder="Например: 1,5" value={hoursText}
+              onChange={(event) => setHoursText(event.target.value)} />
           </label>
-          <label className="ov10-field">
-            <span className="lab">Закончился</span>
-            <input type="time" value={endedHm}
-              onChange={(event) => setEndedHm(event.target.value)} />
-          </label>
-          <button type="button" className="ov10-rowbtn"
-            onClick={() => setEndedHm(hhmm(new Date()))}>Закончился сейчас</button>
-          {windowProblem ? <p className="ov10-hint">{windowProblem}</p> : null}
-          {interval ? (
-            <p className="ov10-hint">Простой: {formatIntervalMinutes(interval.minutes)}</p>
+          {/* Только часы: быстрый выбор тоже в часах. */}
+          <div className="ov10-chips">
+            {DOWNTIME_QUICK_HOURS.map((hours) => (
+              <button key={hours} type="button"
+                onClick={() => setHoursText(String(hours))}>{formatDowntimeHoursOnly(hours)}</button>
+            ))}
+          </div>
+          {downtimeHoursProblem(hoursText) ? <p className="ov10-hint">{downtimeHoursProblem(hoursText)}</p> : null}
+          {downtimeHours !== null ? (
+            <p className="ov10-hint">Простой: {formatDowntimeHoursOnly(downtimeHours)}</p>
           ) : null}
         </>
       ) : (
@@ -582,12 +535,12 @@ function ScreenWork({state, busy, onLog, go}: {
   const [entry, setEntry] = useState<WorkAction | null>(null);
   // До своей очереди работа не открывается: сервер отверг бы любую запись.
   if (stepIndex(state.phase) < stepIndex('WORK')) return <NotYet state={state} go={go} />;
-  // После «Завершить работу» — только простой: последний отрезок остановки
-  // обычно вносят уже при сдаче.
+  // После «Завершить работу» выработка и простой принимаются до сдачи смены
+  // (решение владельца 07.10.2026: оператор вносит выполненное и после работы).
   if (state.phase !== 'WORK') {
     return (
       <>
-        <ProductionForm state={state} busy={busy} onLog={onLog} downtimeOnly />
+        <ProductionForm state={state} busy={busy} onLog={onLog} />
         <button type="button" className="ov10-btn ghost" onClick={() => go('step')}>К ЕО после работы и закрытию</button>
       </>
     );
@@ -774,7 +727,7 @@ function ScreenClosing({state, busy, onFinish, onClose, go, unsent, onFlush}: {
    *
    * Раньше кнопка на экране работы только открывала этот экран: на сервер
    * «работа завершена» не уходило вовсе, и смена оставалась в работе.
-   * После завершения сваи и бурение больше не принимаются — поэтому второе
+   * Завершение переводит смену к ЕО после работы и сдаче — поэтому второе
    * нажатие, а не одно.
    */
   if (state.phase === 'WORK') {
@@ -785,8 +738,8 @@ function ScreenClosing({state, busy, onFinish, onClose, go, unsent, onFlush}: {
           <Row icon="warning" tone={state.defects.length > 0 ? 'warn' : 'ok'} title="Дефекты"
             note={String(state.defects.length)} />
         </Card>
-        <Banner tone="warn" title="После «Завершить работу» сваи и бурение записать будет нельзя">
-          {' '}— только простой. Дальше: ЕО после работы и закрытие смены.
+        <Banner tone="warn" title="После «Завершить работу» — ЕО после работы и закрытие смены">
+          {' '}Сваи, бурение и простой можно дописать до сдачи смены.
         </Banner>
         {confirmFinish ? (
           <>
@@ -893,7 +846,7 @@ function ScreenReport({state}: {state: OperatorMobileState}) {
           note={`${formatNumber(state.production.piles.meters, 0)} м.п.`} />
         <Metric label="Бурение" value={formatNumber(state.production.drilling.count, 0)}
           note={`${formatNumber(state.production.drilling.meters, 0)} м.п.`} />
-        <Metric label="Простой" value={formatDowntimeHours(state.production.downtimeHours)} />
+        <Metric label="Простой" value={formatDowntimeHoursOnly(state.production.downtimeHours)} />
       </div>
       <Card title="Состояние модуля">
         {queue.map((item) => (

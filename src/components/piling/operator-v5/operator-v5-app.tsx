@@ -3,7 +3,9 @@
 import {useCallback, useEffect, useMemo, useState} from 'react';
 import {PilingIcon, type PilingIconName} from '@/components/piling/icons';
 import {OperatorWorkOverview} from '../operator-mobile/operator-work-overview';
-import {formatDowntimeHours} from '@/lib/downtime-hours';
+import {
+  DOWNTIME_QUICK_HOURS, downtimeHoursProblem, formatDowntimeHoursOnly, parseDowntimeHours,
+} from '@/lib/downtime-hours';
 import type {
   ChecklistStage, ChecklistView, IncidentCategory, IncidentSign,
   OperatorAnswer, OperatorMobileState,
@@ -22,7 +24,6 @@ import {
 } from '../operator-mobile/api';
 import {OfflineQueueBanner} from '../operator-mobile/offline-queue-banner';
 import {useOfflineQueue} from '../operator-mobile/use-offline-queue';
-import {downtimeInterval, formatIntervalMinutes, hhmm} from '../operator-mobile/downtime-interval';
 
 /**
  * Рабочее место машиниста по макету v5 — на живых данных.
@@ -608,8 +609,7 @@ export function WorkScreen({state, busy, onLog, onFinish, onOpenSafety, onIncide
   const [optionId, setOptionId] = useState('');
   const [count, setCount] = useState('');
   const [meters, setMeters] = useState('');
-  const [startedHm, setStartedHm] = useState('');
-  const [endedHm, setEndedHm] = useState('');
+  const [hoursText, setHoursText] = useState('');
 
   const options = kind === 'PILES' || kind === 'PASSPORT' ? state.dictionaries.pileGrades
     : kind === 'DRILLING' ? state.dictionaries.drillingTypes
@@ -625,14 +625,15 @@ export function WorkScreen({state, busy, onLog, onFinish, onOpenSafety, onIncide
 
   const amount = Number(count.replace(',', '.'));
   const perUnit = Number(meters.replace(',', '.'));
-  // Простой задаётся интервалом: подпись под полями и то, что уйдёт на
-  // сервер, — одна и та же величина (см. downtime-interval).
-  const interval = kind === 'DOWNTIME' ? downtimeInterval(startedHm, endedHm) : null;
+  // Простой — только часы, без привязки ко времени работы в программе
+  // (решение владельца 07.10.2026): подпись под полем и то, что уйдёт на
+  // сервер, — одна и та же величина.
+  const downtimeHours = kind === 'DOWNTIME' ? parseDowntimeHours(hoursText) : null;
   // Запрет закрывает выработку и не трогает простой — domain/production-permit.ts.
   const forbidden = kind !== 'DOWNTIME' && !state.permit.allowed;
   const ready = !forbidden && optionId !== '' && (
     kind === 'DOWNTIME'
-      ? interval !== null
+      ? downtimeHours !== null
       : Number.isFinite(amount) && amount > 0
         && (kind !== 'DRILLING' || (Number.isFinite(perUnit) && perUnit > 0))
   );
@@ -642,8 +643,7 @@ export function WorkScreen({state, busy, onLog, onFinish, onOpenSafety, onIncide
     setOptionId('');
     setCount('');
     setMeters('');
-    setStartedHm('');
-    setEndedHm('');
+    setHoursText('');
   };
 
   // Форма чистится только после подтверждения сервером: отказ 400/409 не
@@ -655,19 +655,15 @@ export function WorkScreen({state, busy, onLog, onFinish, onOpenSafety, onIncide
       saved = await onLog({kind: 'PILES', pileGradeId: optionId, count: Math.round(amount)});
     } else if (kind === 'DRILLING') {
       saved = await onLog({kind: 'DRILLING', typeId: optionId, count: Math.round(amount), metersPerUnit: perUnit});
-    } else if (interval) {
-      saved = await onLog({
-        kind: 'DOWNTIME', reasonId: optionId,
-        startedAt: interval.startedAt, endedAt: interval.endedAt,
-      });
+    } else if (downtimeHours !== null) {
+      saved = await onLog({kind: 'DOWNTIME', reasonId: optionId, hours: downtimeHours});
     }
     if (!saved) return;
 
     setOptionId('');
     setCount('');
     setMeters('');
-    setStartedHm('');
-    setEndedHm('');
+    setHoursText('');
   };
 
   if (!formOpen) return <div className="scr"><OperatorWorkOverview state={state} variant="v5" busy={busy}
@@ -691,7 +687,7 @@ export function WorkScreen({state, busy, onLog, onFinish, onOpenSafety, onIncide
         </div>
         <div className="tile">
           <span className="k">Простой</span>
-          <span className="v">{formatDowntimeHours(state.production.downtimeHours)}</span>
+          <span className="v">{formatDowntimeHoursOnly(state.production.downtimeHours)}</span>
         </div>
       </div>
 
@@ -756,16 +752,18 @@ export function WorkScreen({state, busy, onLog, onFinish, onOpenSafety, onIncide
 
         {kind === 'DOWNTIME' ? (
           <>
-            <span className="lbl">Простой начался</span>
-            <input type="time" value={startedHm}
-              onChange={(event) => setStartedHm(event.target.value)} />
-            <span className="lbl">Закончился</span>
-            <input type="time" value={endedHm}
-              onChange={(event) => setEndedHm(event.target.value)} />
-            <button type="button" className="ov5-rowbtn"
-              onClick={() => setEndedHm(hhmm(new Date()))}>Закончился сейчас</button>
-            {interval ? (
-              <p className="ov5-hint">Простой: {formatIntervalMinutes(interval.minutes)}</p>
+            <span className="lbl">Простой, часов</span>
+            <input type="number" inputMode="decimal" step="0.25" min="0.25" max="24"
+              placeholder="Например: 1,5" value={hoursText}
+              onChange={(event) => setHoursText(event.target.value)} />
+            {/* Только часы: быстрый выбор тоже в часах. */}
+            {DOWNTIME_QUICK_HOURS.map((hours) => (
+              <button key={hours} type="button" className="ov5-rowbtn"
+                onClick={() => setHoursText(String(hours))}>{formatDowntimeHoursOnly(hours)}</button>
+            ))}
+            {downtimeHoursProblem(hoursText) ? <p className="ov5-hint">{downtimeHoursProblem(hoursText)}</p> : null}
+            {downtimeHours !== null ? (
+              <p className="ov5-hint">Простой: {formatDowntimeHoursOnly(downtimeHours)}</p>
             ) : null}
           </>
         ) : (
@@ -830,7 +828,7 @@ export function CloseScreen({state, busy, onClose, unsent, onFlush}: {
       </div>
       <div className="tile">
         <span className="k">Простой</span>
-        <span className="v">{formatDowntimeHours(state.production.downtimeHours)}</span>
+        <span className="v">{formatDowntimeHoursOnly(state.production.downtimeHours)}</span>
       </div>
     </div>
   );

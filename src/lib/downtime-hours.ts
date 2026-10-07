@@ -39,6 +39,58 @@
 export const DOWNTIME_MAX_HOURS = 24;
 
 /**
+ * Простой машиниста вводится ЧАСАМИ (решение владельца 07.10.2026).
+ *
+ * Владелец: «простой только в часах, никаких 5–10 минут; не привязывать запись
+ * простоя ко времени нахождения в программе: оператор может после работы
+ * занести выполненные работы и простой, поставит время, а мы фиксируем его в
+ * отчёте». Поэтому для записи с экрана машиниста нужны не начало и конец (они
+ * проверялись по «сейчас» и по началу смены), а одно число часов. Шаг —
+ * четверть часа: короче остановка не считается простоем, а дробь вроде 1,3
+ * заставила бы выбирать, в какую сторону её округлять (см. шапку файла: именно
+ * от скрытого округления отказались 19.09.2026).
+ */
+export const DOWNTIME_STEP_HOURS = 0.25;
+
+/** Число часов кратно шагу (четверть часа). */
+export function isWholeDowntimeStep(hours: number): boolean {
+  const steps = hours / DOWNTIME_STEP_HOURS;
+  return Number.isFinite(steps) && Math.abs(steps - Math.round(steps)) < 1e-9;
+}
+
+/**
+ * Часы из текста поля: «1,5», «1.5», «2». `null` — пусто, не число, не кратно
+ * четверти часа, меньше четверти или больше суток.
+ */
+export function parseDowntimeHours(value: string): number | null {
+  const text = value.trim().replace(',', '.');
+  if (text === '' || !/^\d+(\.\d+)?$/.test(text)) return null;
+  const hours = Number(text);
+  if (hours < DOWNTIME_STEP_HOURS || hours > DOWNTIME_MAX_HOURS) return null;
+  return isWholeDowntimeStep(hours) ? hours : null;
+}
+
+/** Кнопки быстрого выбора на экранах машиниста: только часы. */
+export const DOWNTIME_QUICK_HOURS = [0.5, 1, 2, 4] as const;
+
+/**
+ * Что не так с введёнными часами — одна фраза под полем. `null`: поле пустое
+ * (ещё не вводили) или значение допустимо.
+ */
+export function downtimeHoursProblem(value: string): string | null {
+  if (value.trim() === '') return null;
+  if (parseDowntimeHours(value) !== null) return null;
+  return 'Часы простоя: от 0,25 до 24, с шагом в четверть часа — например, 1 или 2,5.';
+}
+
+/** Часы для показа: «1,5 ч», «2 ч». Только часы, без минут. */
+export function formatDowntimeHoursOnly(hours: number | null | undefined): string {
+  if (hours == null || !Number.isFinite(hours) || hours <= 0) return '0 ч';
+  const text = String(Math.round(hours * 100) / 100).replace('.', ',');
+  return `${text} ч`;
+}
+
+/**
  * Длительность интервала в часах — без округления.
  *
  * Конец раньше начала означает переход через полночь: ночная смена начинается

@@ -69,7 +69,7 @@ describe('updateEquipmentMetadata — наработка (владелец 07.10
   });
 
   it('очистка поля («наработка неизвестна») пишется напрямую и показанием не является', async () => {
-    const wrote = await updateEquipmentMetadata('eq-1', { engineHoursTotal: null }, ctx);
+    const wrote = await updateEquipmentMetadata('eq-1', { engineHoursTotal: null } as never, ctx);
 
     expect(wrote).toBe(true);
     expect(addReadingMock).not.toHaveBeenCalled();

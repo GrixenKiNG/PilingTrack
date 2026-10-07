@@ -1,7 +1,7 @@
 'use client';
 
 import {useState, type ReactNode} from 'react';
-import {formatDowntimeHours} from '@/lib/downtime-hours';
+import {formatDowntimeHoursOnly} from '@/lib/downtime-hours';
 import {pluralizeRu} from '@/lib/format';
 import type {OperatorMobileState} from '@/modules/operator-mobile/contracts';
 import {formatDateTimeInTimezone} from '@/lib/timezone';
@@ -132,7 +132,7 @@ export function ClosingScreen({state, onOpenService, onClose, busy, error, error
             count={state.production.drilling.count}
             meters={state.production.drilling.meters}
           />
-          <Fact label="Простой" value={formatDowntimeHours(state.production.downtimeHours)} />
+          <Fact label="Простой" value={formatDowntimeHoursOnly(state.production.downtimeHours)} />
         </div>
         {/*
           Остатка топлива здесь намеренно нет. Поле `fuelPercent` — это остаток
@@ -225,7 +225,7 @@ export function ClosedScreen({state, tabs, error = null, errorDetails}: {
           count={state.production.drilling.count}
           meters={state.production.drilling.meters}
         />
-        <Fact label="Простой" value={formatDowntimeHours(state.production.downtimeHours)} />
+        <Fact label="Простой" value={formatDowntimeHoursOnly(state.production.downtimeHours)} />
       </Panel>
     </Screen>
   );

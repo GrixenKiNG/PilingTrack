@@ -37,7 +37,7 @@
  */
 
 import {OperatorWorkOverview} from '../operator-mobile/operator-work-overview';
-import { formatDowntimeHours } from '@/lib/downtime-hours';
+import { formatDowntimeHoursOnly } from '@/lib/downtime-hours';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { usePilingStore } from '@/lib/store';
@@ -1018,7 +1018,7 @@ export function OperatorShiftV2() {
                     <ValueRow
                       label={row.label}
                       value={row.kind === 'DOWNTIME'
-                        ? formatDowntimeHours(row.value)
+                        ? formatDowntimeHoursOnly(row.value)
                         : `${row.value} ${row.kind === 'PILES' ? 'шт' : 'скв'}`
                           + (row.meters != null ? ` · ${formatNumber(row.meters)} м` : '')}
                       tone={row.kind === 'DOWNTIME' ? 'warn' : undefined}
@@ -1096,9 +1096,9 @@ export function OperatorShiftV2() {
           reasons={reasons}
           busy={busy}
           onClose={() => setDowntimeOpen(false)}
-          onAdd={(reasonId, startedAt, endedAt, comment) => void (async () => {
+          onAdd={(reasonId, hours, comment) => void (async () => {
             if (await logProduction({
-              kind: 'DOWNTIME', reasonId, startedAt, endedAt, comment: comment || undefined,
+              kind: 'DOWNTIME', reasonId, hours, comment: comment || undefined,
             })) {
               setDowntimeOpen(false);
               toast.success('Простой записан');
@@ -1173,7 +1173,7 @@ export function OperatorShiftV2() {
               value={`${totalDrilling} скв · ${formatNumber(production?.drilling.meters ?? 0)} м`} />
           </li>
           <li>
-            <ValueRow label="Простой" value={formatDowntimeHours(totalDowntime)}
+            <ValueRow label="Простой" value={formatDowntimeHoursOnly(totalDowntime)}
               tone={totalDowntime > 0 ? 'warn' : undefined} />
           </li>
           <li>
@@ -1240,7 +1240,7 @@ export function OperatorShiftV2() {
           <ValueRow label="Бурение"
             value={`${totalDrilling} скв · ${formatNumber(production?.drilling.meters ?? 0)} м`} />
         </li>
-        <li><ValueRow label="Простой" value={formatDowntimeHours(totalDowntime)} /></li>
+        <li><ValueRow label="Простой" value={formatDowntimeHoursOnly(totalDowntime)} /></li>
         {facts.meterCurrent != null && (
           <li><ValueRow label="Моточасы" value={`${formatNumber(facts.meterCurrent)} м/ч`} /></li>
         )}

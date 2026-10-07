@@ -118,14 +118,20 @@ const commandSchema = z.discriminatedUnion('command', [
       z.object({
         kind: z.literal('DOWNTIME'),
         reasonId: z.string().min(1),
-        // Простой — ИНТЕРВАЛ: начало и конец, длительность считает сервер
-        // (правило и причина — lib/downtime-hours). Метки времени
-        // ставит телефон по своим часам, поэтому границы проверяются в
-        // команде, а не здесь: схема отвечает за форму, команда — за смысл.
-        startedAt: z.string().datetime({offset: true}),
-        endedAt: z.string().datetime({offset: true}),
+        // Простой с экрана машиниста — ЧАСЫ (решение владельца 07.10.2026):
+        // без привязки ко времени работы в программе. Шаг и границы проверяет
+        // команда, схема отвечает за форму.
+        hours: z.number().min(0.25).max(24).optional(),
+        // Прежняя форма — интервал. Оставлена для очереди офлайна на
+        // устройствах и старых клиентов: запись, поставленная до этой правки,
+        // обязана дойти. Метки ставит телефон, границы проверяет команда.
+        startedAt: z.string().datetime({offset: true}).optional(),
+        endedAt: z.string().datetime({offset: true}).optional(),
         comment: z.string().max(500).optional(),
-      }),
+      }).refine(
+        (value) => value.hours !== undefined || (value.startedAt !== undefined && value.endedAt !== undefined),
+        {message: 'Укажите часы простоя'},
+      ),
     ]),
   }),
   z.object({
