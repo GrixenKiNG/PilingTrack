@@ -62,7 +62,7 @@ const ROLE_FLOW = [
     steps: [
       { key: 'D_READINESS', title: 'Проверить готовность', hint: 'Откройте «Центр готовности» и убедитесь, что по установке есть свежая авторитетная оценка — она создаётся сама после действий оператора и механика.', target: { view: 'readiness' }, ability: 'readiness.read', owner: 'Диспетчер' },
       { key: 'D_ACCEPT', title: 'Принять и назначить технику', hint: 'Во вкладке «Смены» нажмите «Допустить смену к работе» — это и есть предсменный допуск техники.', target: { view: 'shifts' }, ability: 'readiness.shift.authorize', owner: 'Диспетчер' },
-      { key: 'D_SHIFT', title: 'Открыть смену', hint: 'Смену заводит оператор или администратор. Диспетчер может допустить её к работе, но не создать.', target: { view: 'shifts' }, ability: 'readiness.shift.manage', executor: 'оператор' },
+      { key: 'D_SHIFT', title: 'Проверить, что смена открыта', hint: 'Выполняет оператор — вы только проверяете.', target: { view: 'shifts' }, ability: 'readiness.shift.manage', executor: 'оператор' },
     ] as RoleStepHint[],
   },
   {
@@ -129,6 +129,7 @@ function buildRoleFlowProgress(
   facts: AuthoritativeReadinessFactsDto | null,
   openMaintenanceCount: number | null,
   rulesPublished: boolean,
+  shiftOpen: boolean,
 ): RoleFlowProgress[] {
   const stageDone = (key: PresentationStage['key']) =>
     presentation.stages.find((stage) => stage.key === key)?.state === 'pass';
@@ -147,11 +148,13 @@ function buildRoleFlowProgress(
   const dispatcherSteps: RoleFlowStep[] = [
     { key: 'D_READINESS', done: presentation.mode === 'authoritative' },
     { key: 'D_ACCEPT', done: Boolean(facts?.accepted) },
-    // Смену заводит оператор или администратор — у диспетчера этого права нет.
-    // Раньше шаг загорался тем же запуском смены, что и «Принять и назначить
-    // технику»: диспетчер видел выполненным чужое действие, да ещё и дважды.
-    // Своим шагом он его не считает — исполнитель подписан в ROLE_FLOW.
-    { key: 'D_SHIFT', done: false },
+    // W71: смену заводит оператор или администратор — у диспетчера этого права
+    // нет, шаг подписан исполнителем в ROLE_FLOW. Раньше он был вечно
+    // `done: false`, и «3 из 3» диспетчер не набирал никогда. Считаем факт,
+    // который диспетчер действительно проверяет: смена открыта — тем же
+    // правилом, что и состояние установки «в работе» (`STARTED` /
+    // `HANDOVER_PENDING`), а не выдуманным «шагом» системы.
+    { key: 'D_SHIFT', done: shiftOpen },
   ];
   const dispatcher = dispatcherSteps.filter((step) => step.done).length;
 
@@ -689,11 +692,20 @@ export function ReadinessCentre(props: ReferenceUiProps) {
   // `undefined` (журнал не загружен) — это не ноль: шаг «нет данных».
   const journalRecords = props.journals[selected.id];
   const openMaintenanceCount = journalRecords === undefined ? null : journalRecords.filter(isOpenRecord).length;
+  /**
+   * Смена открыта по загруженному снимку смен — тот же признак, которым
+   * «в работе» считается установка (`STARTED` или `HANDOVER_PENDING`).
+   * Шаг диспетчера «Проверить, что смена открыта» загорается по нему: сам он
+   * смену не заводит, но обязан убедиться, что она открыта.
+   */
+  const shiftOpen = props.shifts.some((shift) => shift.equipmentId === selected.id
+    && (shift.state === 'STARTED' || shift.state === 'HANDOVER_PENDING'));
   const roleProgress = buildRoleFlowProgress(
     presentation,
     facts,
     openMaintenanceCount,
     props.rulesState.publishedInDb,
+    shiftOpen,
   );
   /*
     ДОПУСК И ХОД ПРОЦЕДУРЫ — РАЗНЫЕ УТВЕРЖДЕНИЯ.
