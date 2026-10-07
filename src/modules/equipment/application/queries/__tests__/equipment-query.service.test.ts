@@ -7,27 +7,48 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-const { findManyMock, findManyRecMock, findUniqueRecMock, equipmentUniqueMock, reportFindManyMock, analyticsFindManyMock, inspectionFirstMock } = vi.hoisted(() => ({
+const {
+  findManyMock, findManyRecMock, findUniqueRecMock, equipmentUniqueMock, equipmentCountMock,
+  reportFindManyMock, analyticsFindManyMock, inspectionFirstMock,
+  meterReadingFindManyMock, meterReadingFirstMock, fuelLogFindManyMock, fuelLogFirstMock, planFindManyMock,
+} = vi.hoisted(() => ({
   findManyMock: vi.fn(),
   findManyRecMock: vi.fn(),
   findUniqueRecMock: vi.fn(),
   equipmentUniqueMock: vi.fn(),
+  equipmentCountMock: vi.fn(),
   reportFindManyMock: vi.fn(),
   analyticsFindManyMock: vi.fn(),
   inspectionFirstMock: vi.fn(),
+  meterReadingFindManyMock: vi.fn(),
+  meterReadingFirstMock: vi.fn(),
+  fuelLogFindManyMock: vi.fn(),
+  fuelLogFirstMock: vi.fn(),
+  planFindManyMock: vi.fn(),
 }));
 
 vi.mock('@/lib/db', () => ({
   db: {
-    equipment: { findMany: findManyMock, findUnique: equipmentUniqueMock },
+    equipment: { findMany: findManyMock, findUnique: equipmentUniqueMock, count: equipmentCountMock },
     report: { findMany: reportFindManyMock },
     reportAnalytics: { findMany: analyticsFindManyMock },
     inspection: { findFirst: inspectionFirstMock },
     maintenanceRecord: { findMany: findManyRecMock, findUnique: findUniqueRecMock },
+    meterReading: { findMany: meterReadingFindManyMock, findFirst: meterReadingFirstMock },
+    fuelLog: { findMany: fuelLogFindManyMock, findFirst: fuelLogFirstMock },
+    maintenancePlan: { findMany: planFindManyMock },
   },
 }));
 
-import { listAllEquipment } from '../equipment-query.service';
+import {
+  listAllEquipment,
+  listMeterReadings,
+  listFuelLog,
+  getFuelSummary,
+  listMaintenance,
+  listMaintenancePlans,
+  getFleetKpiData,
+} from '../equipment-query.service';
 
 describe('listAllEquipment — operator scope', () => {
   beforeEach(() => {
@@ -261,5 +282,73 @@ describe('getEquipmentDetails — complete 30-day stats with existing history ca
     const details = await getEquipmentDetails('equipment-1', 'orion');
     expect(details.stats30d).toEqual({ reportCount: 1, piles: 0, pileMeters: 0, drillingCount: 0, drillingMeters: 0, downtimeHours: 0 });
     expect(details.timeline[0]).toMatchObject({ piles: 0, drillingMeters: 0, downtimeHours: 0 });
+  });
+});
+
+/**
+ * W52: fail-closed гварды тенанта (`if (!tenantId) throw`) в листингах
+ * equipment-query не выполнялись ни одним тестом, хотя это IDOR-защита:
+ * пустой tenantId не должен молча снимать фильтр организации.
+ */
+describe('equipment-query — tenant fail-closed guards (W52)', () => {
+  beforeEach(() => {
+    meterReadingFindManyMock.mockReset().mockResolvedValue([]);
+    meterReadingFirstMock.mockReset().mockResolvedValue(null);
+    fuelLogFindManyMock.mockReset().mockResolvedValue([]);
+    fuelLogFirstMock.mockReset().mockResolvedValue(null);
+    planFindManyMock.mockReset().mockResolvedValue([]);
+    equipmentCountMock.mockReset().mockResolvedValue(0);
+    findManyRecMock.mockReset().mockResolvedValue([]);
+    equipmentUniqueMock.mockReset().mockResolvedValue(null);
+  });
+
+  it.each([
+    ['listMeterReadings', () => listMeterReadings('eq-1', ''), meterReadingFindManyMock],
+    ['listFuelLog', () => listFuelLog('eq-1', ''), fuelLogFindManyMock],
+    ['getFuelSummary', () => getFuelSummary('eq-1', '', new Date('2026-10-01'), new Date('2026-10-07')), equipmentUniqueMock],
+    ['listMaintenancePlans', () => listMaintenancePlans(''), planFindManyMock],
+    ['getFleetKpiData', () => getFleetKpiData('', new Date('2026-10-01'), new Date('2026-10-07')), findManyRecMock],
+  ])('%s: пустой tenantId → ServiceError, запрос к базе не выполнен', async (_name, call, dbSpy) => {
+    await expect(call()).rejects.toThrow('Не определена организация пользователя');
+    expect(dbSpy).not.toHaveBeenCalled();
+  });
+
+  /**
+   * Дефект, вскрытый этим тестом (не чиним — вне задачи): в отличие от
+   * остальных листингов, `listMaintenance` не имеет гварда `if (!tenantId)`,
+   * хотя назван в задаче W52. С пустым tenantId он уходит в базу.
+   */
+  it.fails('listMaintenance: пустой tenantId → отказ (гварда нет — дефект)', async () => {
+    await expect(listMaintenance('eq-1', '')).rejects.toThrow('Не определена организация пользователя');
+    expect(findManyRecMock).not.toHaveBeenCalled();
+  });
+
+  it('listMeterReadings: непустой tenantId фильтрует по нему и передаёт лимит', async () => {
+    await listMeterReadings('eq-1', 'orion', 10);
+    expect(meterReadingFindManyMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: { equipmentId: 'eq-1', tenantId: 'orion' },
+      take: 10,
+    }));
+  });
+
+  it('listFuelLog: непустой tenantId фильтрует по нему', async () => {
+    await listFuelLog('eq-1', 'orion');
+    expect(fuelLogFindManyMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: { equipmentId: 'eq-1', tenantId: 'orion' },
+    }));
+  });
+
+  it('listMaintenance: непустой tenantId фильтрует по нему', async () => {
+    await listMaintenance('eq-1', 'orion');
+    expect(findManyRecMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: { equipmentId: 'eq-1', tenantId: 'orion' },
+    }));
+  });
+
+  it('listMaintenancePlans: непустой tenantId фильтрует по нему', async () => {
+    await listMaintenancePlans('orion');
+    expect(planFindManyMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: { tenantId: 'orion' },
+    }));
   });
 });

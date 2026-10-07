@@ -20,7 +20,7 @@ import { PileJournal } from '../index';
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
 
-function pileRow(): PilePassportRow {
+function pileRow(over: Partial<PilePassportRow> = {}): PilePassportRow {
   return {
     id: 'pile-1',
     pileWorkId: 'work-1',
@@ -66,6 +66,7 @@ function pileRow(): PilePassportRow {
     acceptedByName: null,
     redriveReadyAt: null,
     suggestion: null,
+    ...over,
   };
 }
 
@@ -353,5 +354,86 @@ describe('журнал забивки: подписи плиток титула 
     expect(screen.getByText('Паспортов не разобрано')).toBeInTheDocument();
     expect(screen.getByText('Свай без паспорта')).toBeInTheDocument();
     expect(screen.getByText(/из них в черновиках/)).toBeInTheDocument();
+  });
+});
+
+/**
+ * W52: `decide()` не имел покрытия целиком — ни гвард «решение живёт в
+ * паспорте» (`if (!row.passportId) return`), ни адрес
+ * `/api/pile-passports/<passportId>/decide` (раньше — по `row.id`).
+ */
+describe('журнал забивки: решение по свае уходит в паспорт (W52)', () => {
+  beforeEach(() => {
+    mocks.authFetch.mockReset();
+  });
+
+  const decideUrls = () => mocks.authFetch.mock.calls
+    .map(([url]) => String(url))
+    .filter((url) => url.includes('/decide'));
+
+  /** Журнал отдаёт одну строку; запросы решения считаем отдельно. */
+  function renderWithRow(row: PilePassportRow) {
+    mocks.authFetch.mockImplementation((url: string) => {
+      if (url.startsWith('/api/sites/all')) return Promise.resolve(json({ sites: [] }));
+      if (url.includes('/decide')) return Promise.resolve(json({ ok: true }));
+      return Promise.resolve(json({ data: [row], header, truncated: false }));
+    });
+  }
+
+  it('строка без passportId — решение не уходит на сервер (гвард)', async () => {
+    renderWithRow(pileRow({ passportId: null, hasPassport: true }));
+    render(<PileJournal />);
+
+    fireEvent.click(await screen.findByText('С-130'));
+    fireEvent.click(await screen.findByRole('button', { name: 'Принять сваю' }));
+
+    expect(decideUrls()).toHaveLength(0);
+  });
+
+  it('решение по строке с паспортом уходит на /decide паспорта, а не по row.id', async () => {
+    renderWithRow(pileRow({ id: 'row-9', passportId: 'passport-7' }));
+    render(<PileJournal />);
+
+    fireEvent.click(await screen.findByText('С-130'));
+    fireEvent.click(await screen.findByRole('button', { name: 'Принять сваю' }));
+
+    await waitFor(() => expect(decideUrls()).toHaveLength(1));
+    const [url, init] = mocks.authFetch.mock.calls.find(([u]) => String(u).includes('/decide')) as [string, RequestInit];
+    expect(url).toBe('/api/pile-passports/passport-7/decide');
+    expect(init.method).toBe('POST');
+  });
+});
+
+/**
+ * W52: успешная ветка выгрузки (ветки отказа уже покрыты F-R107-3) —
+ * файл сохраняется через object URL и подтверждается зелёным тостом.
+ */
+describe('журнал забивки: успешная выгрузка (W52)', () => {
+  const createObjectURL = vi.fn(() => 'blob:mock');
+  const revokeObjectURL = vi.fn();
+
+  beforeEach(() => {
+    mocks.authFetch.mockReset();
+    vi.mocked(toast.success).mockClear();
+    URL.createObjectURL = createObjectURL as unknown as typeof URL.createObjectURL;
+    URL.revokeObjectURL = revokeObjectURL as unknown as typeof URL.revokeObjectURL;
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+  });
+
+  it('непустая выборка → файл выгружается, тост «Журнал выгружен»', async () => {
+    await renderJournal();
+    mocks.authFetch.mockImplementation((url: string) => {
+      if (url.startsWith('/api/sites/all')) return Promise.resolve(json({ sites: [] }));
+      if (url.startsWith('/api/pile-passports/export')) {
+        return Promise.resolve(new Response('xlsx', { status: 200 }));
+      }
+      return Promise.resolve(json({ data: [pileRow()], header, truncated: false }));
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /Выгрузить журнал/ }));
+
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Журнал выгружен'));
+    expect(createObjectURL).toHaveBeenCalledTimes(1);
+    expect(revokeObjectURL).toHaveBeenCalledWith('blob:mock');
   });
 });
