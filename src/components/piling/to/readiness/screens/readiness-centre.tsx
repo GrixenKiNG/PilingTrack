@@ -9,7 +9,7 @@ import { formatDateTimeInTimezone } from '@/lib/timezone';
 import { cn } from '@/lib/utils';
 import { buildHandoverJournal, handoverRoleLabel, type HandoverEventKind, type HandoverJournalEvent } from '../handover-journal';
 import { isOpenRecord } from '../../to-stats';
-import type { AuthoritativeReadinessFactsDto, ReadinessAbility, ReadinessShiftDto } from '../api/contracts';
+import type { AuthoritativeReadinessFactsDto, ReadinessAbility } from '../api/contracts';
 import { buildAuthoritativeReadinessPresentation, buildUnavailableReadinessPresentation, type AuthoritativeReadinessPresentation, type PresentationEvidence, type PresentationNotice, type PresentationStage } from '../authoritative-presentation';
 import { EquipmentPhoto, ReadinessRing, STAGE_CTA, muted, blockerTone, type BlockerTone, BLOCKER_TONE_CLASS, BLOCKER_TONE_LABEL } from './shared';
 import { blockerGuidance } from './blocker-guidance';
@@ -30,6 +30,12 @@ interface RoleStepHint {
   target: {href?: string; view?: ReferenceView};
   ability?: ReadinessAbility;
   owner?: string;
+  /**
+   * Шаг выполняет другая роль. У такого шага нет кнопки «сделать» для смотрящего:
+   * вместо неё подсказка называет исполнителя. `owner` остаётся владельцем этапа
+   * для подсветки карточки в цепочке, `executor` — тем, кто закрывает работу.
+   */
+  executor?: string;
 }
 
 const ROLE_FLOW = [
@@ -37,35 +43,32 @@ const ROLE_FLOW = [
     label: 'Оператор',
     icon: 'inspection' as const,
     lucide: User,
-    tasks: ['Провести осмотр', 'Зафиксировать моточасы', 'Передать диспетчеру'],
     border: 'border-success/25',
     header: 'border-success/25 bg-success/10 text-success-strong',
     steps: [
       { key: 'INSPECTION', title: 'Провести осмотр', hint: 'Откройте вкладку «Смены» и нажмите «Провести осмотр». Осмотр засчитывается только за сегодня.', target: { view: 'shifts' }, ability: 'readiness.inspection.manage' },
       { key: 'ENGINE_HOURS', title: 'Зафиксировать моточасы', hint: 'На экране машиниста нажмите «Снять моточасы» и введите показание счётчика.', target: { view: 'shifts' } },
-      { key: 'PERMIT', title: 'Допуск', hint: 'Наряд-допуск оформляет инженер ОТ (или механик) во вкладке «Наряд-допуски». Если допуск правилами не требуется, шаг закрыт сам.', target: { view: 'permits' }, ability: 'readiness.permit.edit' },
-      { key: 'MAINTENANCE', title: 'Техническое обслуживание', hint: 'Обслуживание закрывает механик во вкладке «Обслуживание ТО».', target: { view: 'maintenance' }, ability: 'readiness.maintenance.manage' },
-      { key: 'ACCEPTANCE', title: 'Приёмка', hint: 'Смену допускает к работе тот, кто выходит в смену: нажмите «Допустить смену к работе» во вкладке «Смены».', target: { view: 'shifts' }, ability: 'readiness.shift.authorize' },
+      { key: 'PERMIT', title: 'Допуск', hint: 'Наряд-допуск оформляет инженер ОТ (или механик) во вкладке «Наряд-допуски». Если допуск правилами не требуется, шаг закрыт сам.', target: { view: 'permits' }, ability: 'readiness.permit.edit', executor: 'инженер по охране труда' },
+      { key: 'MAINTENANCE', title: 'Техническое обслуживание', hint: 'Обслуживание закрывает механик во вкладке «Обслуживание ТО».', target: { view: 'maintenance' }, ability: 'readiness.maintenance.manage', executor: 'механик' },
+      { key: 'ACCEPTANCE', title: 'Приёмка', hint: 'Смену допускает к работе тот, кто выходит в смену: нажмите «Допустить смену к работе» во вкладке «Смены».', target: { view: 'shifts' }, ability: 'readiness.shift.authorize', executor: 'диспетчер' },
     ] as RoleStepHint[],
   },
   {
     label: 'Диспетчер',
     icon: 'dispatcher' as const,
     lucide: User,
-    tasks: ['Проверить готовность', 'Принять и назначить технику', 'Открыть смену'],
     border: 'border-info/25',
     header: 'border-info/25 bg-info/10 text-info-strong',
     steps: [
       { key: 'D_READINESS', title: 'Проверить готовность', hint: 'Откройте «Центр готовности» и убедитесь, что по установке есть свежая авторитетная оценка — она создаётся сама после действий оператора и механика.', target: { view: 'readiness' }, ability: 'readiness.read', owner: 'Диспетчер' },
       { key: 'D_ACCEPT', title: 'Принять и назначить технику', hint: 'Во вкладке «Смены» нажмите «Допустить смену к работе» — это и есть предсменный допуск техники.', target: { view: 'shifts' }, ability: 'readiness.shift.authorize', owner: 'Диспетчер' },
-      { key: 'D_SHIFT', title: 'Открыть смену', hint: 'Смену заводит оператор или администратор. Диспетчер может допустить её к работе, но не создать.', target: { view: 'shifts' }, ability: 'readiness.shift.manage', owner: 'Оператор' },
+      { key: 'D_SHIFT', title: 'Открыть смену', hint: 'Смену заводит оператор или администратор. Диспетчер может допустить её к работе, но не создать.', target: { view: 'shifts' }, ability: 'readiness.shift.manage', executor: 'оператор' },
     ] as RoleStepHint[],
   },
   {
     label: 'Механик',
     icon: 'repair' as const,
     lucide: Wrench,
-    tasks: ['Устранить дефекты', 'Провести обслуживание', 'Подтвердить работы'],
     border: 'border-signal/25',
     header: 'border-signal/25 bg-signal/10 text-signal-strong',
     steps: [
@@ -78,7 +81,6 @@ const ROLE_FLOW = [
     label: 'Администратор',
     icon: 'reports' as const,
     lucide: ShieldCheck,
-    tasks: ['Контролировать допуски', 'Настроить правила и чек-листы', 'Анализировать показатели'],
     border: 'border-border',
     header: 'border-border bg-muted text-foreground',
     steps: [
@@ -92,6 +94,11 @@ const ROLE_FLOW = [
 export interface RoleFlowStep {
   key: string;
   done: boolean;
+  /**
+   * `false` — факт шага не прочитан (нет источника: журнал не загружен), а не
+   * «не выполнено». Такой шаг ни «выполнен», ни «осталось» — «нет данных».
+   */
+  known?: boolean;
 }
 
 export interface RoleFlowProgress {
@@ -112,12 +119,15 @@ export interface RoleFlowProgress {
  *
  * У оператора шкала намеренно пятишаговая: это тот же чек-лист смены, что и в
  * левой колонке, — два счётчика на одном экране обязаны совпадать.
+ *
+ * `openMaintenanceCount === null` значит «журнал заявок не прочитан» — зритель
+ * без права `maintenance.manage` его не грузит; тогда шаг не считается ни
+ * выполненным, ни оставшимся.
  */
 function buildRoleFlowProgress(
   presentation: AuthoritativeReadinessPresentation,
   facts: AuthoritativeReadinessFactsDto | null,
-  shift: ReadinessShiftDto | null,
-  openMaintenanceCount: number,
+  openMaintenanceCount: number | null,
   rulesPublished: boolean,
 ): RoleFlowProgress[] {
   const stageDone = (key: PresentationStage['key']) =>
@@ -137,14 +147,21 @@ function buildRoleFlowProgress(
   const dispatcherSteps: RoleFlowStep[] = [
     { key: 'D_READINESS', done: presentation.mode === 'authoritative' },
     { key: 'D_ACCEPT', done: Boolean(facts?.accepted) },
-    { key: 'D_SHIFT', done: shift?.state === 'STARTED' || shift?.state === 'HANDOVER_PENDING' || shift?.state === 'CLOSED' },
+    // Смену заводит оператор или администратор — у диспетчера этого права нет.
+    // Раньше шаг загорался тем же запуском смены, что и «Принять и назначить
+    // технику»: диспетчер видел выполненным чужое действие, да ещё и дважды.
+    // Своим шагом он его не считает — исполнитель подписан в ROLE_FLOW.
+    { key: 'D_SHIFT', done: false },
   ];
   const dispatcher = dispatcherSteps.filter((step) => step.done).length;
 
   const mechanicSteps: RoleFlowStep[] = [
     { key: 'M_DEFECTS', done: facts ? !facts.criticalDefect : false },
     { key: 'M_MAINTENANCE', done: stageDone('MAINTENANCE') },
-    { key: 'M_CONFIRM', done: openMaintenanceCount === 0 },
+    // Журнал заявок отдают только с правом `maintenance.manage`. Без него
+    // пустой `journals` — это «не прочитано», а не «заявок нет»: иначе шаг
+    // ложно «выполнен» у того, кому журнал вообще не загружают.
+    { key: 'M_CONFIRM', done: openMaintenanceCount === 0, known: openMaintenanceCount !== null },
   ];
   const mechanic = mechanicSteps.filter((step) => step.done).length;
 
@@ -188,22 +205,35 @@ function RoleStepsPanel({ roleIndex, progress, onViewChange, abilities }: {
 }) {
   const role = ROLE_FLOW[roleIndex];
   const steps = progress[roleIndex]?.steps ?? [];
-  const firstPending = steps.findIndex((step) => !step.done);
+  // «Сделайте это сейчас» ставим только на шаг, который смотрящий реально может
+  // закрыть: чужой шаг (есть исполнитель) и шаг без данных не подсвечиваем.
+  const firstPending = steps.findIndex((step, index) =>
+    !step.done && step.known !== false && !role.steps[index]?.executor);
   return (
     <section aria-label={`Что делать сейчас: ${role.label}`} className="mt-2 rounded-lg border border-border bg-card p-3 shadow-sm">
       <h2 className="text-sm font-extrabold">Что делать сейчас: {role.label}</h2>
       <ul className="mt-2 space-y-2">
         {role.steps.map((step, index) => {
           const done = steps[index]?.done ?? false;
+          const known = steps[index]?.known !== false;
           const now = index === firstPending;
           const hasTarget = Boolean(step.target.view || step.target.href);
-          const allowed = !step.ability || abilities.includes(step.ability);
-          const ownerRole = stepOwner(step);
+          // Чужой шаг: его закрывает другая роль — кнопки «сделать» у него нет.
+          const foreign = Boolean(step.executor);
+          const allowed = !foreign && (!step.ability || abilities.includes(step.ability));
+          const performedBy = step.executor ?? stepOwner(step);
+          const pill = done
+            ? { text: 'Выполнено', cls: 'bg-success/10 text-success-strong' }
+            : !known
+              ? { text: 'Нет данных', cls: 'bg-muted text-muted-foreground' }
+              : now
+                ? { text: 'Сейчас', cls: 'bg-signal text-white' }
+                : { text: 'Впереди', cls: 'bg-muted text-muted-foreground' };
           return (
             <li key={step.key} className={cn('rounded-lg border p-2.5', now ? 'border-signal ring-2 ring-signal/30' : 'border-border')}>
               <div className="flex flex-wrap items-center gap-2">
-                <span className={cn('rounded px-2 py-0.5 text-3xs font-bold', done ? 'bg-success/10 text-success-strong' : now ? 'bg-signal text-white' : 'bg-muted text-muted-foreground')}>
-                  {done ? 'Выполнено' : now ? 'Сейчас' : 'Впереди'}
+                <span className={cn('rounded px-2 py-0.5 text-3xs font-bold', pill.cls)}>
+                  {pill.text}
                 </span>
                 <span className="text-xs font-bold">{step.title}</span>
                 {now && <span className="ml-auto text-3xs font-bold text-signal-strong">Сделайте это сейчас</span>}
@@ -224,8 +254,8 @@ function RoleStepsPanel({ roleIndex, progress, onViewChange, abilities }: {
                     Перейти<ChevronRight className="h-3.5 w-3.5" />
                   </button>
                 )
-              ) : ownerRole ? (
-                <p className="mt-2 text-2xs text-muted-foreground">Этот шаг выполняет {ownerRole}</p>
+              ) : performedBy ? (
+                <p className="mt-2 text-2xs text-muted-foreground">Выполняет {performedBy}</p>
               ) : null}
             </li>
           );
@@ -278,7 +308,7 @@ function RoleFlowFooter({ progress, owner, onViewChange, abilities }: {
                   </header>
                   <div className="flex flex-1 items-center gap-2 px-3 py-2">
                     <div className="min-w-0 flex-1 space-y-1 text-2xs leading-[1.35] text-muted-foreground">
-                      {role.tasks.map((task) => <div key={task} className="flex gap-1.5"><span className="text-muted-foreground">•</span><span>{task}</span></div>)}
+                      {role.steps.map((step) => <div key={step.key} className="flex gap-1.5"><span className="text-muted-foreground">•</span><span>{step.title}</span></div>)}
                     </div>
                     {roleProgress && (
                       <div className="shrink-0 rounded-[10px] border border-border px-2.5 py-1.5 text-center text-2xs">
@@ -315,6 +345,7 @@ function StageLink({target, label, onViewChange, children}: {
   // и в сетке цепочки кружки шагов с однострочной подписью съезжали на 8px
   // ниже кружков со «Техническое обслуживание» — ряд переставал быть линией.
   const shared = 'flex min-h-11 flex-col items-center justify-start rounded-lg px-2 py-1 text-center transition hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring';
+  if (!target.href && !target.view) return <div className={shared}>{children}</div>;
   return target.href
     ? <Link href={target.href} className={shared} aria-label={`${label}: открыть`}>{children}</Link>
     : <button type="button" onClick={() => target.view && onViewChange(target.view)} className={shared} aria-label={`${label}: открыть`}>{children}</button>;
@@ -343,6 +374,13 @@ const STAGE_OWNER: Record<PresentationStage['key'], string> = {
   MAINTENANCE: 'Механик',
   ACCEPTANCE: 'Диспетчер',
 };
+
+/**
+ * Моточасы снимает осмотр перед работой, а карточка установки закрыта ролям без
+ * права `equipment.read`. Вместо ссылки в тупик такому зрителю показываем, где
+ * шаг закрывается: `W66`.
+ */
+const ENGINE_HOURS_NOTE = 'Моточасы снимаются в осмотре перед работой';
 
 /** Иконка события журнала передачи. Кружок в ленте вместо безымянной точки. */
 const HANDOVER_ICON: Record<HandoverEventKind, typeof Send> = {
@@ -399,6 +437,8 @@ interface ReadinessMetricTile {
   rows: Array<{ caption: string; value: string }>;
   href?: string;
   view?: ReferenceView;
+  /** Строка вместо кнопки, когда адреса нет: например, моточасы без карточки установки. */
+  note?: string;
 }
 
 /**
@@ -416,6 +456,7 @@ function buildReadinessMetricTiles(
   engineHoursTotal: number | null | undefined,
   detail: EquipmentDetailSnapshot | undefined,
   inspectionHref: string | null,
+  mayOpenEquipmentCard: boolean,
 ): ReadinessMetricTile[] {
   const inspectionStage = presentation.stages.find((stage) => stage.key === 'INSPECTION');
   const maintenanceStage = presentation.stages.find((stage) => stage.key === 'MAINTENANCE');
@@ -467,7 +508,10 @@ function buildReadinessMetricTiles(
         caption: 'Текущие моточасы',
         value: engineHoursTotal != null ? `${engineHoursTotal.toLocaleString('ru-RU')} м/ч` : '—',
       }],
-      href: `/admin/equipment/${equipmentId}`,
+      // Карточка установки закрыта роли без `equipment.read` — вместо ссылки в
+      // тупик показываем, где моточасы на самом деле снимаются.
+      href: mayOpenEquipmentCard ? `/admin/equipment/${equipmentId}` : undefined,
+      note: mayOpenEquipmentCard ? undefined : ENGINE_HOURS_NOTE,
     },
     {
       key: 'findings',
@@ -605,6 +649,9 @@ export function ReadinessCentre(props: ReferenceUiProps) {
   // бралась сырая `reference` (inspectionId) и подставлялась в /inspections/{id};
   // для чек-листа машиниста это чужой тип сущности — открывался 404.
   const inspectionHref = presentation.evidence.find((item) => item.key === 'inspection')?.links?.[0]?.href ?? null;
+  // Карточка установки — админский экран: роли без `equipment.read` он закрыт,
+  // и ссылка на него привела бы на «Нет доступа».
+  const mayOpenEquipmentCard = props.bootstrap?.capabilities.entities.equipment.read ?? false;
   /**
    * Куда ведёт шаг чек-листа. Осмотр и моточасы живут в других модулях,
    * остальные шаги — вкладки этого же контура. Раньше строки показывали
@@ -612,7 +659,9 @@ export function ReadinessCentre(props: ReferenceUiProps) {
    */
   const stageTargets: Record<PresentationStage['key'], {href?: string; view?: ReferenceView}> = {
     INSPECTION: {href: inspectionHref ?? '/inspections'},
-    ENGINE_HOURS: {href: `/admin/equipment/${selected.id}`},
+    // Карточка установки открыта не всем: у роли без `equipment.read` ссылка
+    // ведёт на «Нет доступа». Такому зрителю моточасы объясняем словами.
+    ENGINE_HOURS: mayOpenEquipmentCard ? {href: `/admin/equipment/${selected.id}`} : {},
     PERMIT: {view: 'permits'},
     MAINTENANCE: {view: 'maintenance'},
     ACCEPTANCE: {view: 'shifts'},
@@ -634,15 +683,15 @@ export function ReadinessCentre(props: ReferenceUiProps) {
   const nextTarget = nextStage ? stageTargets[nextStage.key] : null;
   const stageOwner = nextStage ? STAGE_OWNER[nextStage.key] : null;
   const metricTiles = buildReadinessMetricTiles(
-    facts, presentation, selected.id, selected.engineHoursTotal, detail, inspectionHref,
+    facts, presentation, selected.id, selected.engineHoursTotal, detail, inspectionHref, mayOpenEquipmentCard,
   );
-  // Смена и открытые заявки по выбранной установке — вход для счётчиков ролей.
-  const currentShift = props.shifts.find((item) => item.equipmentId === selected.id) ?? null;
-  const openMaintenanceCount = (props.journals[selected.id] ?? []).filter(isOpenRecord).length;
+  // Открытые заявки по выбранной установке — вход для счётчика механика.
+  // `undefined` (журнал не загружен) — это не ноль: шаг «нет данных».
+  const journalRecords = props.journals[selected.id];
+  const openMaintenanceCount = journalRecords === undefined ? null : journalRecords.filter(isOpenRecord).length;
   const roleProgress = buildRoleFlowProgress(
     presentation,
     facts,
-    currentShift,
     openMaintenanceCount,
     props.rulesState.publishedInDb,
   );
@@ -815,7 +864,7 @@ export function ReadinessCentre(props: ReferenceUiProps) {
                 <ClipboardCheck className="h-7 w-7" />
               </span>
             </div>
-            {nextStage && nextTarget ? (
+            {nextStage && (nextTarget?.href || nextTarget?.view) ? (
               nextTarget.href ? (
                 <Button asChild className="mt-3 h-10 w-full bg-signal text-white hover:bg-signal-strong">
                   <Link href={nextTarget.href}>
@@ -831,6 +880,10 @@ export function ReadinessCentre(props: ReferenceUiProps) {
                   {STAGE_CTA[nextStage.key]} <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
               )
+            ) : nextStage ? (
+              <p className="mt-3 rounded-md bg-muted/60 px-3 py-2 text-xs text-muted-foreground">
+                {nextStage.key === 'ENGINE_HOURS' ? ENGINE_HOURS_NOTE : presentation.nextAction}
+              </p>
             ) : (
               <p className="mt-3 rounded-md bg-success/10 px-3 py-2 text-xs font-semibold text-success-strong">
                 Все шаги контура закрыты
@@ -844,6 +897,9 @@ export function ReadinessCentre(props: ReferenceUiProps) {
             {presentation.stages.map((stage, index) => {
               const target = stageTargets[stage.key];
               const current = nextStage?.key === stage.key;
+              // Шаг без адреса — не ссылка и не кнопка: например, моточасы у роли
+              // без `equipment.read`. Строку показываем, но переходить некуда.
+              const navigable = Boolean(target.href || target.view);
               const body = (
                 <>
                   {/*
@@ -868,17 +924,22 @@ export function ReadinessCentre(props: ReferenceUiProps) {
                     >
                       {stage.value}
                     </div>
+                    {!navigable && stage.key === 'ENGINE_HOURS' && (
+                      <div className="text-2xs text-muted-foreground">{ENGINE_HOURS_NOTE}</div>
+                    )}
                   </div>
                   <span className={cn('shrink-0 rounded px-2 py-1 text-2xs font-semibold', STAGE_PILL[stage.state].cls)}>
                     {STAGE_PILL[stage.state].label}
                   </span>
-                  <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                  {navigable && <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />}
                 </>
               );
               const shared = 'flex w-full min-h-11 items-center gap-3 py-2.5 text-left transition hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring';
-              return target.href
-                ? <Link key={stage.key} href={target.href} className={shared} aria-label={`${stage.label}: открыть`}>{body}</Link>
-                : <button key={stage.key} type="button" onClick={() => target.view && props.onViewChange(target.view)} className={shared} aria-label={`${stage.label}: открыть`}>{body}</button>;
+              return navigable
+                ? target.href
+                  ? <Link key={stage.key} href={target.href} className={shared} aria-label={`${stage.label}: открыть`}>{body}</Link>
+                  : <button key={stage.key} type="button" onClick={() => target.view && props.onViewChange(target.view)} className={shared} aria-label={`${stage.label}: открыть`}>{body}</button>
+                : <div key={stage.key} className="flex w-full min-h-11 items-center gap-3 py-2.5 text-left">{body}</div>;
             })}
           </div>
           {/*
@@ -1091,7 +1152,7 @@ export function ReadinessCentre(props: ReferenceUiProps) {
                       <Button asChild variant="outline" className="mt-3 h-9 w-full">
                         <Link href={tile.href}><ArrowRight className="h-4 w-4" />Открыть</Link>
                       </Button>
-                    ) : (
+                    ) : tile.view ? (
                       <Button
                         type="button"
                         variant="outline"
@@ -1100,7 +1161,9 @@ export function ReadinessCentre(props: ReferenceUiProps) {
                       >
                         <ArrowRight className="h-4 w-4" />Открыть
                       </Button>
-                    )}
+                    ) : tile.note ? (
+                      <p className="mt-3 text-2xs leading-relaxed text-muted-foreground">{tile.note}</p>
+                    ) : null}
                   </div>
                 );
               })}

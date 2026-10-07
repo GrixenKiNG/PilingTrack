@@ -5,7 +5,7 @@ import { DEFAULT_READINESS_RULES } from '@/modules/readiness';
 import { ReadinessCentre } from '../readiness-centre';
 import { PermitsScreen } from '../permits-screen';
 import { ReportsScreen } from '../reports-screen';
-import type { CurrentReadinessDto, ReadinessAbility } from '../../api/contracts';
+import type { CurrentReadinessDto, ReadinessAbility, ReadinessShiftDto } from '../../api/contracts';
 import { SettingsWorkspace } from '../settings-workspace';
 import { bootstrapEnvelope } from '../../api/__tests__/fixtures';
 
@@ -443,11 +443,112 @@ describe('Роли: подсказка «что делать сейчас» (W61
     expect(onViewChange).toHaveBeenCalledWith('shifts');
   });
 
-  it('шаг без права не обещает кнопку — видно, кто его выполняет', () => {
+  it('чужой шаг не обещает кнопку — видно, кто его выполняет', () => {
     render(<ReadinessCentre {...propsFor({ bootstrap: bootstrapWith(['readiness.read']) })} />);
     openRole('Оператор');
 
-    expect(screen.getByText('Этот шаг выполняет Администратор')).toBeInTheDocument();
+    expect(screen.getByText('Выполняет инженер по охране труда')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Допуск: перейти' })).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * W66: у шага должен быть свой проверяемый факт и понятный адрес. Оператору
+ * карточка установки закрыта (нет `equipment.read`) и потому не даёт ссылку в
+ * тупик; журнал заявок отдают только с `maintenance.manage`, поэтому без него
+ * шаг механика «нет данных», а не «выполнено»; «Открыть смену» диспетчеру не
+ * под силу — этот шаг помечен исполнителем и не загорается чужим событием.
+ */
+describe('Шаги ролей: тупики и ложные «выполнено» (W66)', () => {
+  const open = (label: string) =>
+    fireEvent.click(screen.getByRole('button', { name: `${label}: что делать сейчас` }));
+
+  const bootstrapWithEquipmentRead = (read: boolean) => {
+    const base = bootstrapEnvelope().data;
+    return { ...base, capabilities: { ...base.capabilities, entities: { ...base.capabilities.entities, equipment: { read } } } };
+  };
+
+  const snapshot = (accepted: boolean): CurrentReadinessDto => ({
+    snapshotId: 'snap-eq-1', equipmentId: 'eq-1', status: 'READY', verdict: 'ALLOWED', score: 90,
+    calculatedAt: '2026-10-01T06:00:00.000Z', ruleSetVersion: 'v1', triggerType: null,
+    blockers: [], warnings: [],
+    facts: { inspectionCompleted: true, inspectionProgress: 1, healthScore: 90, meterKnown: true, permitValid: true,
+      permitExpired: false, maintenanceConfigured: true, maintenanceOverdueHours: 0, maintenanceOverdueDays: 0,
+      accepted, criticalDefect: false, findings: 0 },
+    evidence: { equipmentId: 'eq-1', inspectionId: null, permitId: null, maintenanceRecordIds: [], evaluatedAt: '2026-10-01T06:00:00.000Z' },
+  });
+
+  const startedShift = (): ReadinessShiftDto => ({
+    id: 'sh1', equipmentId: 'eq-1', type: 'DAY', state: 'STARTED', productionDate: '2026-10-01',
+    timezone: 'Europe/Moscow', plannedStartAt: null, plannedEndAt: null, requestedAt: null,
+    declinedAt: null, declineReason: null, startedAt: '2026-10-01T06:00:00.000Z', closedAt: null,
+    version: 1, handovers: [],
+  });
+
+  it('без права equipment.read шаг «Моточасы» не ссылается на карточку установки', () => {
+    render(<ReadinessCentre {...propsFor({ bootstrap: bootstrapWithEquipmentRead(false) })} />);
+
+    expect(screen.queryByRole('link', { name: 'Моточасы: открыть' })).not.toBeInTheDocument();
+    expect(screen.getAllByText('Моточасы снимаются в осмотре перед работой').length).toBeGreaterThan(0);
+  });
+
+  it('с правом equipment.read шаг «Моточасы» ведёт в карточку установки', () => {
+    render(<ReadinessCentre {...propsFor({ bootstrap: bootstrapWithEquipmentRead(true) })} />);
+
+    const links = screen.getAllByRole('link', { name: 'Моточасы: открыть' });
+    expect(links[0]).toHaveAttribute('href', '/admin/equipment/eq-1');
+  });
+
+  it('карточка оператора перечисляет те же 5 шагов, что считает счётчик', () => {
+    render(<ReadinessCentre {...propsFor()} />);
+    const card = screen.getByRole('button', { name: 'Оператор: что делать сейчас' });
+
+    expect(within(card).getByText('0/5 шагов')).toBeInTheDocument();
+    for (const title of ['Провести осмотр', 'Зафиксировать моточасы', 'Допуск', 'Техническое обслуживание', 'Приёмка']) {
+      expect(within(card).getByText(title)).toBeInTheDocument();
+    }
+  });
+
+  it('чужие шаги оператора подписаны исполнителем и без кнопки «сделать»', () => {
+    render(<ReadinessCentre {...propsFor({ bootstrap: bootstrapWithEquipmentRead(true) })} />);
+    open('Оператор');
+
+    expect(screen.getByText('Выполняет инженер по охране труда')).toBeInTheDocument();
+    expect(screen.getByText('Выполняет механик')).toBeInTheDocument();
+    expect(screen.getByText('Выполняет диспетчер')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Приёмка: перейти' })).not.toBeInTheDocument();
+  });
+
+  it('диспетчер: «Открыть смену» не загорается запуском смены и подписан исполнителем', () => {
+    render(<ReadinessCentre {...propsFor({
+      currentReadiness: [snapshot(true)],
+      shifts: [startedShift()],
+    })} />);
+    open('Диспетчер');
+    const panel = screen.getByRole('region', { name: 'Что делать сейчас: Диспетчер' });
+    const items = within(panel).getAllByRole('listitem');
+
+    expect(within(items[1]).getByText('Выполнено')).toBeInTheDocument();
+    expect(within(items[2]).queryByText('Выполнено')).not.toBeInTheDocument();
+    expect(within(items[2]).getByText('Выполняет оператор')).toBeInTheDocument();
+  });
+
+  it('механик: без загруженного журнала «Подтвердить работы» — «нет данных», а не «выполнено»', () => {
+    render(<ReadinessCentre {...propsFor({ journals: {} })} />);
+    open('Механик');
+    const panel = screen.getByRole('region', { name: 'Что делать сейчас: Механик' });
+    const items = within(panel).getAllByRole('listitem');
+
+    expect(within(items[2]).getByText('Нет данных')).toBeInTheDocument();
+    expect(within(items[2]).queryByText('Выполнено')).not.toBeInTheDocument();
+  });
+
+  it('механик: с загруженным пустым журналом «Подтвердить работы» — выполнено', () => {
+    render(<ReadinessCentre {...propsFor({ journals: { 'eq-1': [] } })} />);
+    open('Механик');
+    const panel = screen.getByRole('region', { name: 'Что делать сейчас: Механик' });
+    const items = within(panel).getAllByRole('listitem');
+
+    expect(within(items[2]).getByText('Выполнено')).toBeInTheDocument();
   });
 });
