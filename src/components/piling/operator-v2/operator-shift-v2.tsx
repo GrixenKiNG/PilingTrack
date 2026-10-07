@@ -38,7 +38,7 @@
 
 import {OperatorWorkOverview} from '../operator-mobile/operator-work-overview';
 import { formatDowntimeHoursOnly } from '@/lib/downtime-hours';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { usePilingStore } from '@/lib/store';
 import { cn } from '@/lib/utils';
@@ -71,7 +71,7 @@ import { ChecklistScreen } from '@/components/piling/operator-mobile/screens/che
 import { knownAnswers } from '@/components/piling/operator-mobile/safety/known-answers';
 import { V2_STEP_STAGE, V2_STEP_TITLE, resolveV2State, stepCaption } from './shift-flow';
 import { StepBar } from '../operator-mobile/step-bar';
-import { v2FinishShift, v2NextStep } from './step-bar-model';
+import { finishShift, nextStep } from '../operator-mobile/shift-next-step';
 
 /**
  * Строка состояния документа в карточке допуска.
@@ -303,6 +303,32 @@ export function OperatorShiftV2() {
   const [mobile, setMobile] = useState<OperatorMobileState | null>(null);
   const [mobileError, setMobileError] = useState<string | null>(null);
   const [safetyStep, setSafetyStep] = useState<'PPE' | 'BRIEFING' | 'KNOWLEDGE' | null>(null);
+  const screenRef = useRef<HTMLDivElement>(null);
+  const [nextFocus, setNextFocus] = useState<{target: 'accept' | 'checklist' | 'close'; count: number} | null>(null);
+  const [nextNotice, setNextNotice] = useState<string | null>(null);
+  useEffect(() => {
+    if (!nextFocus || !screenRef.current) return;
+    const buttons = Array.from(screenRef.current.querySelectorAll<HTMLButtonElement>('button'));
+    let target: HTMLButtonElement | undefined;
+    if (nextFocus.target === 'checklist') {
+      const sections = buttons.filter((button) => button.hasAttribute('aria-expanded'));
+      target = sections.find((button) => {
+        const count = button.textContent?.match(/(\d+)\s*\/\s*(\d+)/);
+        return count && Number(count[1]) < Number(count[2]);
+      });
+      if (target?.getAttribute('aria-expanded') === 'false') target.click();
+      if (!target) target = buttons.find((button) => button.textContent?.trim() === 'Завершить')
+        ?? buttons.find((button) => button.textContent?.trim() === 'Обновить');
+    } else if (nextFocus.target === 'close') {
+      target = buttons.find((button) => button.textContent?.trim() === 'Отправить сейчас')
+        ?? buttons.find((button) => button.textContent?.trim() === 'Закрыть смену и отправить отчёт');
+    } else {
+      target = buttons.find((button) => button.textContent?.trim() === 'Принять установку' && !button.disabled)
+        ?? screenRef.current.querySelector<HTMLButtonElement>('[data-v2-equipment-choices] button') ?? undefined;
+    }
+    target?.scrollIntoView?.({block: 'center', behavior: 'smooth'});
+    target?.focus();
+  }, [nextFocus]);
 
   /*
     Очередь устройства читает и сам экран, а не только оболочка шага (F-R43-1):
@@ -739,25 +765,59 @@ export function OperatorShiftV2() {
     && editingProductionShiftId === (mobile?.shift?.id ?? facts.shift?.id);
   /*
     Нижняя панель шагов — «Главная», «Следующий шаг», «Завершить смену»
-    (решение владельца 07.10.2026). Шаг и подписи — по порядку экранов v2
-    (step-bar-model); здесь только переходы этого модуля.
+    (решение владельца 07.10.2026). Следующее действие считает общий nextStep;
+    здесь только переходы и фокус на действии, если его экран уже открыт.
   */
   const goHome = () => {
+    setNextNotice(null);
     setEditingProductionShiftId(null);
     setPileOpen(false); setPassportOpen(false); setDrillingOpen(false); setDowntimeOpen(false);
     setSafetyStep(null); setTab('shift');
   };
-  const stepBar = (
-    <StepBar
-      step={v2NextStep(step)}
-      finish={v2FinishShift(step)}
-      busy={busy}
-      onHome={goHome}
-      onNext={goHome}
-      onGoClosing={goHome}
-      onFinishWork={() => { goHome(); setFinishing(true); }}
-    />
-  );
+  const next = mobile ? nextStep(mobile) : null;
+  const focusNext = (target: 'accept' | 'checklist' | 'close') => {
+    setNextFocus((previous) => ({target, count: (previous?.count ?? 0) + 1}));
+  };
+  const goNext = () => {
+    if (!next) return;
+    goHome();
+    switch (next.action.kind) {
+      case 'ADMISSION': setSafetyStep(next.action.open); break;
+      case 'WAIT_ADMISSION':
+        setNextNotice('Обновляем допуск…');
+        void Promise.all([load(), loadMobile()]).then(() => setNextNotice('Проверьте состояние допуска. Если шаги выполнены, дождитесь подтверждения допуска.'));
+        break;
+      case 'ACCEPT_EQUIPMENT': focusNext('accept'); break;
+      case 'CHECKLIST':
+      case 'SERVICE_AFTER': focusNext('checklist'); break;
+      case 'LOG_WORK': setPileOpen(true); break;
+      case 'CLOSE_SHIFT': focusNext('close'); break;
+      default: break;
+    }
+  };
+  const stepBar = next && mobile ? (
+    <>
+      {nextNotice ? <p role="status" className="p-3 text-sm text-muted-foreground">{nextNotice}</p> : null}
+      <StepBar
+        step={next}
+        finish={finishShift(mobile)}
+        busy={busy}
+        onHome={goHome}
+        onNext={goNext}
+        onGoClosing={goHome}
+        onFinishWork={() => {
+          const shiftId = mobile.shift?.id;
+          if (!shiftId) return;
+          setBusy(true);
+          void sendCommand({command: 'finish-work', shiftId}).then(async () => {
+            goHome(); setFinishing(true);
+            await Promise.all([load(), loadMobile()]);
+          }).catch((error) => toast.error(error instanceof Error ? error.message : 'Не удалось завершить работу'))
+            .finally(() => setBusy(false));
+        }}
+      />
+    </>
+  ) : <p className="p-3 text-sm text-muted-foreground">{mobileError ?? 'Читаем следующий шаг смены…'}</p>;
   const equipment = facts.equipment;
   const photo = getEquipmentPhoto(equipment?.model);
   // Секундомер приёмки в подписи виден до пуска: после него он теряет смысл,
@@ -781,7 +841,7 @@ export function OperatorShiftV2() {
     // Приёмка уже открытой смены (передача от прошлой) — кнопка внизу.
     const canAct = cleared && Boolean(facts.shift);
     return (
-      <StepShell bar={stepBar}
+      <StepShell bar={stepBar} screenRef={screenRef}
         title={tab === 'safety' ? 'Техника безопасности' : V2_STEP_TITLE.acceptance}
         subtitle={stepLabel}
         tone={cleared ? 'green' : 'blue'}
@@ -897,6 +957,7 @@ export function OperatorShiftV2() {
         {!facts.shift && facts.assignments.length > 0 && (
           <>
             <p className="text-base font-medium text-foreground">На какой установке работаете</p>
+            <div data-v2-equipment-choices>
             <RowList>
               {facts.assignments.map((assignment) => (
                 <li key={assignment.equipmentId}>
@@ -909,6 +970,7 @@ export function OperatorShiftV2() {
                 </li>
               ))}
             </RowList>
+            </div>
           </>
         )}
 
@@ -941,7 +1003,7 @@ export function OperatorShiftV2() {
     const list = mobile?.checklists.find((item) => item.stage === catalogStage) ?? null;
     if (!mobile || !list) {
       return (
-        <StepShell bar={stepBar} title={V2_STEP_TITLE[step]} subtitle={stepLabel}>
+        <StepShell bar={stepBar} screenRef={screenRef} title={V2_STEP_TITLE[step]} subtitle={stepLabel}>
           <p className="text-base text-muted-foreground">
             {mobileError ?? 'Читаем список осмотра…'}
           </p>
@@ -956,7 +1018,7 @@ export function OperatorShiftV2() {
       );
     }
     return (
-      <StepShell bar={stepBar} title={V2_STEP_TITLE[step]} subtitle={stepLabel}>
+      <StepShell bar={stepBar} screenRef={screenRef} title={V2_STEP_TITLE[step]} subtitle={stepLabel}>
         <ChecklistScreen
           key={`${mobile.shift?.id}:${mobile.assignment?.equipmentId}:${list.stage}`}
           checklist={list}
@@ -976,7 +1038,7 @@ export function OperatorShiftV2() {
   if (step === 'work' || editingProduction) {
     return (
       <>
-        <StepShell bar={stepBar}
+        <StepShell bar={stepBar} screenRef={screenRef}
           title={tab === 'shift' ? V2_STEP_TITLE.work
             : tab === 'safety' ? 'Техника безопасности'
               : tab === 'equipment' ? 'Техника' : 'Ещё'}
@@ -1160,7 +1222,7 @@ export function OperatorShiftV2() {
     const submitted = mobile?.receipt != null;
     const unsent = queued.length;
     return (
-      <StepShell bar={stepBar}
+      <StepShell bar={stepBar} screenRef={screenRef}
         title={V2_STEP_TITLE.report}
         subtitle={stepLabel}
         footer={
@@ -1240,7 +1302,7 @@ export function OperatorShiftV2() {
 
   // ---------- 8. Смена закрыта ----------
   return (
-    <StepShell bar={stepBar}
+    <StepShell bar={stepBar} screenRef={screenRef}
       title={V2_STEP_TITLE.closed}
       subtitle={stepLabel}
       tone="purple"

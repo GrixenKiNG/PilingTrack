@@ -72,6 +72,154 @@ const facts = {
 
 const closeButton = () => screen.findByRole('button', {name: 'Закрыть смену и отправить отчёт'});
 
+describe('T12: следующий шаг v2 выполняет общий переход', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    api.queued = [];
+    api.sendCommand.mockResolvedValue({ok: true});
+    authFetch.mockResolvedValue({ok: true, json: async () => ({...facts,
+      clearance: {...facts.clearance, warnings: []},
+    })});
+  });
+
+  it('из допуска открывает именно непроверенные СИЗ, не принимает установку', async () => {
+    const base = workStateFixture();
+    api.fetchState.mockResolvedValue(workStateFixture({phase: 'IDENTITY', identity: {
+      ...base.identity, ppe: {...base.identity.ppe, confirmed: false},
+    }}));
+    render(<OperatorShiftV2 />);
+    fireEvent.click(await screen.findByRole('button', {name: 'Следующий шаг: СИЗ'}));
+    expect(await screen.findByRole('button', {name: /Комплект в порядке/})).toBeInTheDocument();
+    expect(api.sendCommand).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['PRESHIFT_INSPECTION', 'PRESHIFT_INSPECTION', 'Предсменный осмотр'],
+    ['SITE_READY', 'SITE_READY', 'Осмотр площадки'],
+    ['STARTUP', 'EO_BEFORE', 'Пуск и ЕО перед работой'],
+    ['CLOSING', 'EO_AFTER', 'ЕО после работы'],
+  ] as const)('в фазе %s раскрывает осмотр, не отвечает за оператора', async (phase, stage, title) => {
+    api.fetchState.mockResolvedValue(workStateFixture({phase, checklists: [{
+      stage, title, purpose: 'Проверить машину', version: 'test-1', done: false, period: null,
+      sections: [{id: 'cab', title: 'Кабина', items: [{id: 'glass', text: 'Стёкла и зеркала', severity: 'NOTE'}]}],
+    }]}));
+    render(<OperatorShiftV2 />);
+    fireEvent.click(await screen.findByRole('button', {name: `Следующий шаг: ${title}`}));
+    await waitFor(() => expect(screen.getByRole('button', {name: /Кабина/, expanded: true})).toHaveFocus());
+    expect(screen.getByText('Стёкла и зеркала')).toBeInTheDocument();
+    expect(api.sendCommand).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', {name: `Следующий шаг: ${title}`}));
+    expect(screen.getByRole('button', {name: /Кабина/, expanded: true})).toHaveFocus();
+  });
+
+  it('из работы без записей открывает форму свай, не записывает выработку', async () => {
+    api.fetchState.mockResolvedValue(workStateFixture({dictionaries: {
+      pileGrades: [{id: 'grade-1', name: 'С 20-35', lengthMm: 6000}], drillingTypes: [], downtimeReasons: [],
+    }}));
+    render(<OperatorShiftV2 />);
+    fireEvent.click(await screen.findByRole('button', {name: 'Ещё'}));
+    fireEvent.click(screen.getByRole('button', {name: 'Следующий шаг: Записать выработку'}));
+    expect(await screen.findByLabelText('Марка сваи')).toBeInTheDocument();
+    expect(api.sendCommand).not.toHaveBeenCalled();
+  });
+
+  it('сохраняет введённые моточасы и ведёт к завершению заполненного осмотра без отправки', async () => {
+    api.fetchState.mockResolvedValue(workStateFixture({phase: 'STARTUP', checklists: [{
+      stage: 'EO_BEFORE', title: 'ЕО перед работой', purpose: 'Проверить машину', version: 'test-1', done: false, period: null,
+      sections: [{id: 'cab', title: 'Кабина', items: [{id: 'meter', text: 'Моточасы сняты', severity: 'NOTE',
+        measure: {key: 'engineHours', label: 'Моточасы', unit: 'м/ч'},
+      }]}],
+    }]}));
+    render(<OperatorShiftV2 />);
+    const next = await screen.findByRole('button', {name: 'Следующий шаг: Пуск и ЕО перед работой'});
+    fireEvent.click(next);
+    fireEvent.click(screen.getByRole('button', {name: 'Норма'}));
+    fireEvent.change(screen.getByRole('spinbutton'), {target: {value: '3001'}});
+    fireEvent.click(next);
+    expect(screen.getByRole('spinbutton')).toHaveValue(3001);
+    await waitFor(() => expect(screen.getByRole('button', {name: 'Завершить'})).toHaveFocus());
+    expect(api.sendCommand).not.toHaveBeenCalled();
+  });
+
+  it('при записанной выработке просит подтверждение общего завершения работы', async () => {
+    const base = workStateFixture();
+    let current: OperatorMobileState = {...base, entries: [{
+      id: 'pile-1', kind: 'PILES', label: 'С 20-35', value: 2, meters: 12,
+      occurredAt: '2026-10-07T08:00:00Z', corrections: [],
+    }]};
+    api.fetchState.mockImplementation(async () => current);
+    api.sendCommand.mockImplementation(async ({command}) => {
+      if (command === 'finish-work') current = {...current, phase: 'CLOSING', checklists: [{
+        stage: 'EO_AFTER', title: 'ЕО после работы', purpose: 'Проверить машину', version: 'test-1',
+        done: false, period: null, sections: [{id: 'cab', title: 'Кабина', items: [{id: 'glass', text: 'Стёкла и зеркала', severity: 'NOTE'}]}],
+      }]};
+      return {ok: true};
+    });
+    render(<OperatorShiftV2 />);
+    fireEvent.click(await screen.findByRole('button', {name: 'Следующий шаг: Завершить работу'}));
+    expect(screen.getByRole('button', {name: 'Да, завершить'})).toBeInTheDocument();
+    expect(api.sendCommand).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', {name: 'Да, завершить'}));
+    await waitFor(() => expect(api.sendCommand).toHaveBeenCalledWith({command: 'finish-work', shiftId: 'shift-1'}));
+    expect(await screen.findByRole('button', {name: 'Следующий шаг: ЕО после работы'})).toBeInTheDocument();
+    expect(api.sendCommand).toHaveBeenCalledTimes(1);
+  });
+
+  it('на приёмке ведёт к выбору установки и затем к приёмке без открытия смены', async () => {
+    api.fetchState.mockResolvedValue(workStateFixture({phase: 'ADMISSION', shift: null}));
+    authFetch.mockResolvedValue({ok: true, json: async () => ({...facts, shift: null,
+      clearance: {...facts.clearance, warnings: []}, assignments: [{equipmentId: 'eq-1', equipmentName: 'LRH 100', siteId: 'site-1'}],
+    })});
+    render(<OperatorShiftV2 />);
+    fireEvent.click(await screen.findByRole('button', {name: 'Следующий шаг: Принять установку'}));
+    const choice = screen.getByRole('button', {name: /LRH 100/, pressed: false});
+    await waitFor(() => expect(choice).toHaveFocus());
+    fireEvent.click(choice);
+    fireEvent.click(screen.getByRole('button', {name: 'Следующий шаг: Принять установку'}));
+    await waitFor(() => expect(screen.getByRole('button', {name: 'Принять установку'})).toHaveFocus());
+    expect(api.sendCommand).not.toHaveBeenCalled();
+  });
+
+  it('при ожидании допуска показывает обновление и не открывает смену', async () => {
+    api.fetchState.mockResolvedValue(workStateFixture({phase: 'IDENTITY'}));
+    render(<OperatorShiftV2 />);
+    fireEvent.click(await screen.findByRole('button', {name: 'Следующий шаг: Допуск'}));
+    expect(await screen.findByText(/Проверьте состояние допуска/)).toBeInTheDocument();
+    expect(api.fetchState).toHaveBeenCalledTimes(2);
+    expect(api.sendCommand).not.toHaveBeenCalled();
+  });
+
+  it('при ошибке обновления допуска не сообщает об успешном обновлении', async () => {
+    api.fetchState.mockResolvedValueOnce(workStateFixture({phase: 'IDENTITY'}))
+      .mockRejectedValueOnce(new Error('Не удалось загрузить допуск'));
+    render(<OperatorShiftV2 />);
+    fireEvent.click(await screen.findByRole('button', {name: 'Следующий шаг: Допуск'}));
+    expect(await screen.findByText(/Проверьте состояние допуска/)).toBeInTheDocument();
+    expect(screen.queryByText(/Допуск обновлён/)).not.toBeInTheDocument();
+    expect(api.fetchState).toHaveBeenCalledTimes(2);
+    expect(api.sendCommand).not.toHaveBeenCalled();
+  });
+
+  it('на отчёте фокусирует сдачу, не отправляя отчёт автоматически', async () => {
+    api.fetchState.mockResolvedValue(mobileState);
+    render(<OperatorShiftV2 />);
+    fireEvent.click(await screen.findByRole('button', {name: 'Следующий шаг: Закрыть смену'}));
+    await waitFor(() => expect(screen.getByRole('button', {name: 'Закрыть смену и отправить отчёт'})).toHaveFocus());
+    expect(api.sendCommand).not.toHaveBeenCalled();
+  });
+
+  it('при несданной очереди ведёт к отправке записей и сохраняет запрет сдачи', async () => {
+    api.fetchState.mockResolvedValue(mobileState);
+    api.queued = [{clientCommandId: 'cmd-1', state: 'PENDING', label: 'Свая', command: {command: 'log-production'}, queuedAt: new Date().toISOString(), attempts: 1, lastError: null}];
+    render(<OperatorShiftV2 />);
+    fireEvent.click(await screen.findByRole('button', {name: 'Следующий шаг: Закрыть смену'}));
+    await waitFor(() => expect(screen.getByRole('button', {name: 'Отправить сейчас'})).toHaveFocus());
+    expect(await closeButton()).toBeDisabled();
+    expect(api.sendCommand).not.toHaveBeenCalled();
+    expect(api.flush).not.toHaveBeenCalled();
+  });
+});
+
 describe('закрытие смены v2 одной командой (D-20260927-005)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
