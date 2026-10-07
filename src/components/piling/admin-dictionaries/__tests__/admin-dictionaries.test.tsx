@@ -303,3 +303,51 @@ describe('AdminDictionaries: диалоги ограничены по высот
     expect(document.title).toBe('Справочники — PilingTrack');
   });
 });
+
+/**
+ * W64-DECIMAL-INPUT: в русской раскладке длину набирают запятой. Раньше
+ * `Number('1,5')` давал NaN, и поле молча не сохранялось; значение из панели
+ * сведений, показанное через toLocaleString («1 000,00»), роняло `Number(...)`
+ * на пробеле-разделителе тысяч и отбивало сохранение тостом.
+ */
+describe('AdminDictionaries: числа с запятой (W64)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    authFetch.mockResolvedValue(jsonResponse(registry));
+  });
+
+  it('длина марки, набранная с запятой, сохраняется как 15,5 м', async () => {
+    render(<AdminDictionaries />);
+    await screen.findByText('СВ 120-35');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Добавить марку сваи' }));
+    fireEvent.change(screen.getByLabelText('Название'), { target: { value: 'СВ 150-50' } });
+    fireEvent.change(screen.getByLabelText('Длина, м'), { target: { value: '15,5' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить' }));
+
+    await waitFor(() => expect(authFetch).toHaveBeenCalledWith(
+      '/api/dictionary/manage', expect.objectContaining({ method: 'POST' })));
+    const post = authFetch.mock.calls.find((call) => call[1]?.method === 'POST');
+    expect(JSON.parse(post?.[1]?.body as string)).toMatchObject({
+      type: 'pileGrade', name: 'СВ 150-50', lengthMm: 15500,
+    });
+  });
+
+  it('длина с пробелом-разделителем тысяч читается, а не отклоняется', async () => {
+    render(<AdminDictionaries />);
+    const row = await screen.findByRole('row', { name: /СВ 120-35/ });
+    fireEvent.click(row);
+
+    fireEvent.change(screen.getByDisplayValue('12,00'), { target: { value: '1\u00a0200,5' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить' }));
+    // Марка используется → сначала подтверждение пересчёта прошлых отчётов.
+    fireEvent.click(await screen.findByRole('button', { name: 'Изменить длину' }));
+
+    await waitFor(() => expect(authFetch).toHaveBeenCalledWith(
+      '/api/dictionary/manage', expect.objectContaining({ method: 'PATCH' })));
+    const patch = authFetch.mock.calls.find((call) => call[1]?.method === 'PATCH');
+    expect(JSON.parse(patch?.[1]?.body as string)).toMatchObject({
+      type: 'pileGrade', id: 'g1', lengthMm: 1200500, confirmRecalculate: true,
+    });
+  });
+});

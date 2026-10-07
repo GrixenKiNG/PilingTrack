@@ -23,6 +23,7 @@ import type {
   SiteDrillingPlanDTO,
 } from '@/lib/types';
 import { cn } from '@/lib/utils';
+import { parseDecimalInput } from '@/lib/parse-decimal';
 import { ConfirmActionDialog } from '@/components/piling/confirm-action-dialog';
 import type { DrillingPlanRow, PilePlanRow, SiteListItem } from '../types';
 import { PilePlanSection } from './pile-plan-section';
@@ -145,10 +146,9 @@ export function EditSiteDialog({
    * точки, и отказывать из-за этого было бы придиркой.
    */
   const parseCoordinate = (raw: string, limit: number): number | null | undefined => {
-    const text = raw.trim().replace(',', '.');
-    if (text === '') return null;
-    const value = Number(text);
-    if (!Number.isFinite(value) || Math.abs(value) > limit) return undefined;
+    if (raw.trim() === '') return null;
+    const value = parseDecimalInput(raw);
+    if (value === null || Math.abs(value) > limit) return undefined;
     return value;
   };
 

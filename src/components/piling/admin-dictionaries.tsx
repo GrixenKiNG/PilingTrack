@@ -5,6 +5,7 @@ import { useDocumentTitle } from '@/components/piling/ops-shell';
 import { AlertCircle, AlertTriangle, Archive, Clock, Drill, Filter, HardHat, Plus, Ruler, Save, Search, X } from '@/components/piling/icons/unified-icons';
 import { toast } from 'sonner';
 import { authFetch } from '@/lib/api';
+import { parseDecimalInput } from '@/lib/parse-decimal';
 import { catchText, extractApiError } from '@/components/piling/admin-crews/crew-messages';
 import { normalizeSearch } from '@/components/piling/to/readiness/shared/text-search';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -260,8 +261,8 @@ export function AdminDictionaries() {
         return;
       }
       if (lengthRaw) {
-        const metres = Number(lengthRaw.replace(',', '.'));
-        if (!Number.isFinite(metres) || metres <= 0) { toast.error('Введите положительную длину в метрах'); return; }
+        const metres = parseDecimalInput(lengthRaw);
+        if (metres === null || metres <= 0) { toast.error('Введите положительную длину в метрах'); return; }
         const lengthMm = Math.round(metres * 1000);
         if (lengthMm !== selectedItem.lengthMm) payload.lengthMm = lengthMm;
         if (!confirmed && lengthChangesHistory(selectedItem, lengthMm)) {
@@ -385,8 +386,8 @@ export function AdminDictionaries() {
 
   const saveLength = async (confirmed = false) => {
     if (!lengthState) return;
-    const metres = Number(lengthState.value.replace(',', '.'));
-    if (!Number.isFinite(metres) || metres <= 0) {
+    const metres = parseDecimalInput(lengthState.value);
+    if (metres === null || metres <= 0) {
       toast.error('Введите положительную длину в метрах');
       return;
     }

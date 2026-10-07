@@ -3,6 +3,7 @@ import { Loader2 } from '@/components/piling/icons/unified-icons';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { parseDecimalInput } from '@/lib/parse-decimal';
 import type { DictionaryKind, RegistryItem } from './dictionary-table';
 
 /*
@@ -39,9 +40,9 @@ export function DictionaryForm({ mode, kind, item, saving, onClose, onSubmit }: 
   const [sectionOrDiameter, setSectionOrDiameter] = useState(item?.sectionOrDiameter || '');
   const [notes, setNotes] = useState(item?.notes || '');
   const isPileCreate = mode === 'create' && kind === 'pileGrade';
-  const parsedLength = Number(lengthMetres.replace(',', '.'));
+  const parsedLength = parseDecimalInput(lengthMetres);
   const lengthValid = !isPileCreate
-    || (lengthMetres.trim() !== '' && parsedLength > 0 && Math.round(parsedLength * 1000) <= MAX_LENGTH_MM);
+    || (parsedLength !== null && parsedLength > 0 && Math.round(parsedLength * 1000) <= MAX_LENGTH_MM);
   const valid = name.trim().length > 0 && lengthValid;
 
   const submit = () => {
@@ -50,7 +51,7 @@ export function DictionaryForm({ mode, kind, item, saving, onClose, onSubmit }: 
       name: name.trim(),
       ...(isPileCreate ? {
         code: code.trim() || name.trim(),
-        lengthMm: Math.round(parsedLength * 1000),
+        lengthMm: Math.round((parsedLength ?? 0) * 1000),
         sectionOrDiameter: sectionOrDiameter.trim(),
         notes: notes.trim(),
       } : {}),

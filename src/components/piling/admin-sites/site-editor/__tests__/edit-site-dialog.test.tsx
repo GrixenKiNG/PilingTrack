@@ -163,3 +163,33 @@ describe('EditSiteDialog — защита несохранённых право�
     vi.unstubAllGlobals();
   });
 });
+
+/**
+ * W64-DECIMAL-INPUT: координаты — текстовые поля (inputMode="decimal"), в
+ * русской раскладке их набирают запятой. Раньше разбор был самодельным; теперь
+ * он идёт через общий parseDecimalInput, и «57,5833» доходит до сохранения числом.
+ */
+describe('EditSiteDialog: координаты с запятой (W64)', () => {
+  it('«57,5833» и «34,5667» сохраняются как числа', async () => {
+    const onSave = vi.fn().mockResolvedValue(undefined);
+    authFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ site: {} }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      }),
+    );
+    render(<EditSiteDialog
+      site={{ id: 's1', name: 'Объект 1', isActive: true, plannedPiles: 1, plannedDrilling: 1 }}
+      open onOpenChange={vi.fn()} loadingPileGrades={false} pileGrades={[]} onSave={onSave}
+    />);
+
+    fireEvent.change(await screen.findByLabelText('Широта'), { target: { value: '57,5833' } });
+    fireEvent.change(screen.getByLabelText('Долгота'), { target: { value: '34,5667' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить' }));
+
+    await waitFor(() => expect(onSave).toHaveBeenCalledWith(
+      's1', 'Объект 1', true, expect.any(Array), expect.any(Array),
+      { latitude: 57.5833, longitude: 34.5667 },
+    ));
+  });
+});
