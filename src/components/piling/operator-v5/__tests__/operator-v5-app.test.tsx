@@ -31,6 +31,93 @@ import {ApiError, QueuedOffline} from '@/components/piling/operator-mobile/api';
 import {CloseScreen, OperatorV5App, WorkScreen} from '../operator-v5-app';
 import {workStateFixture} from '../../operator-mobile/__tests__/fixtures';
 
+describe('T12: следующий шаг v5 открывает действие и фокусирует его', () => {
+  function open(value: Partial<OperatorMobileState>) {
+    api.fetchState.mockReset().mockResolvedValue(workStateFixture({
+      operator: {id: 'me', name: 'Машинист'}, options: [], receipt: null, ...value,
+    }));
+    api.sendCommand.mockReset().mockResolvedValue(undefined);
+    return render(<OperatorV5App />);
+  }
+
+  it('приёмка фокусирует принятие машины, включая повторное нажатие, без отправки команды', async () => {
+    open({phase: 'ADMISSION', shift: null, options: [{crewId: 'crew-1', equipmentId: 'eq-1', equipmentName: 'Установка', siteName: 'Объект'}]});
+    const next = await screen.findByRole('button', {name: 'Следующий шаг: Принять установку'});
+    const accept = screen.getByRole('button', {name: 'Принять машину'});
+    fireEvent.click(next);
+    expect(accept).toHaveFocus();
+    next.focus();
+    fireEvent.click(next);
+    expect(accept).toHaveFocus();
+    expect(api.sendCommand).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    {phase: 'PRESHIFT_INSPECTION', stage: 'PRESHIFT_INSPECTION', title: 'Предсменный осмотр'},
+    {phase: 'SITE_READY', stage: 'SITE_READY', title: 'Осмотр площадки'},
+    {phase: 'STARTUP', stage: 'EO_BEFORE', title: 'Пуск и ЕО перед работой'},
+    {phase: 'CLOSING', stage: 'EO_AFTER', title: 'ЕО после работы'},
+  ])('$phase ведёт к незаполненному пункту, затем к замеру, не сдавая список', async ({phase, stage, title}) => {
+    open({phase, checklists: [{stage, title, purpose: '', version: '1', done: false, period: null,
+      sections: [{id: 'meter', title: 'Счётчик', items: [{id: 'hours', text: 'Снять показание', severity: 'NOTE',
+        measure: {key: 'engineHours', label: 'Моточасы', unit: 'м/ч'}}]}]}]} as Partial<OperatorMobileState>);
+    const next = await screen.findByRole('button', {name: `Следующий шаг: ${title}`});
+    fireEvent.click(next);
+    expect(screen.getByRole('button', {name: 'Норма'})).toHaveFocus();
+    fireEvent.click(screen.getByRole('button', {name: 'Норма'}));
+    fireEvent.click(next);
+    expect(screen.getByRole('textbox')).toHaveFocus();
+    fireEvent.change(screen.getByRole('textbox'), {target: {value: '99'}});
+    fireEvent.click(screen.getByRole('checkbox', {name: 'Счётчик заменён'}));
+    fireEvent.click(next);
+    expect(screen.getByRole('button', {name: 'Завершить'})).toHaveFocus();
+    expect(screen.getByRole('textbox')).toHaveValue('99');
+    expect(screen.getByRole('checkbox', {name: 'Счётчик заменён'})).toBeChecked();
+    expect(api.sendCommand).not.toHaveBeenCalled();
+  });
+
+  it('сдача возвращается из вкладки работы и фокусирует закрытие, не закрывая смену', async () => {
+    open({phase: 'CLOSING', checklists: [{stage: 'EO_AFTER', done: true, period: null}] as OperatorMobileState['checklists']});
+    const next = await screen.findByRole('button', {name: 'Следующий шаг: Закрыть смену'});
+    fireEvent.click(screen.getByRole('button', {name: 'Работа'}));
+    fireEvent.click(next);
+    expect(screen.getByRole('button', {name: 'Закрыть смену'})).toHaveFocus();
+    next.focus();
+    fireEvent.click(next);
+    expect(screen.getByRole('button', {name: 'Закрыть смену'})).toHaveFocus();
+    expect(api.sendCommand).not.toHaveBeenCalled();
+  });
+
+  it('повторное нажатие на открытом шаге СИЗ фокусирует выбор, не подтверждая его', async () => {
+    const identity = workStateFixture().identity;
+    open({phase: 'IDENTITY', identity: {...identity, ppe: {...identity.ppe, confirmed: false}}});
+    const next = await screen.findByRole('button', {name: 'Следующий шаг: СИЗ'});
+    fireEvent.click(next);
+    await screen.findByText('Средства защиты');
+    next.focus();
+    fireEvent.click(next);
+    expect(screen.getByRole('button', {name: /Каска/})).toHaveFocus();
+    expect(api.sendCommand).not.toHaveBeenCalled();
+  });
+
+  it('выработка получает фокус без потери уже введённого количества', async () => {
+    open({phase: 'WORK', entries: [], dictionaries: {
+      pileGrades: [{id: 'grade-1', name: 'С 20-35', lengthMm: 6000}], drillingTypes: [], downtimeReasons: [],
+    }});
+    const next = await screen.findByRole('button', {name: 'Следующий шаг: Записать выработку'});
+    fireEvent.click(next);
+    expect(screen.getByRole('button', {name: 'Добавить сваю'})).toHaveFocus();
+    fireEvent.click(screen.getByRole('button', {name: 'Добавить сваю'}));
+    fireEvent.change(screen.getByRole('combobox'), {target: {value: 'grade-1'}});
+    fireEvent.change(screen.getByRole('textbox'), {target: {value: '12'}});
+    next.focus();
+    fireEvent.click(next);
+    expect(screen.getByRole('combobox')).toHaveFocus();
+    expect(screen.getByRole('textbox')).toHaveValue('12');
+    expect(api.sendCommand).not.toHaveBeenCalled();
+  });
+});
+
 describe('v5: вердикты осмотра и подтверждение замечаний (I5)', () => {
   async function openInspection(photoOnIssue = false, meter = false) {
     api.fetchState.mockReset();
