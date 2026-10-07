@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import { AlertCircle, AlertTriangle, ArrowRight, CheckCircle2, ChevronRight, ClipboardCheck, FileText, Gauge, HardHat, History, Search, Send, ShieldCheck, User, Wrench } from '@/components/piling/icons/unified-icons';
 import { card } from '../settings/shared-ui';
@@ -8,11 +9,28 @@ import { formatDateTimeInTimezone } from '@/lib/timezone';
 import { cn } from '@/lib/utils';
 import { buildHandoverJournal, handoverRoleLabel, type HandoverEventKind, type HandoverJournalEvent } from '../handover-journal';
 import { isOpenRecord } from '../../to-stats';
-import type { AuthoritativeReadinessFactsDto, ReadinessShiftDto } from '../api/contracts';
+import type { AuthoritativeReadinessFactsDto, ReadinessAbility, ReadinessShiftDto } from '../api/contracts';
 import { buildAuthoritativeReadinessPresentation, buildUnavailableReadinessPresentation, type AuthoritativeReadinessPresentation, type PresentationEvidence, type PresentationNotice, type PresentationStage } from '../authoritative-presentation';
 import { EquipmentPhoto, ReadinessRing, STAGE_CTA, muted, blockerTone, type BlockerTone, BLOCKER_TONE_CLASS, BLOCKER_TONE_LABEL } from './shared';
 import { blockerGuidance } from './blocker-guidance';
 import type { EquipmentDetailSnapshot, ReferenceUiProps, ReferenceView } from './types';
+
+/**
+ * Один шаг роли в подсказке «что делать сейчас».
+ *
+ * Тексты и адреса — из раздела «Предложение» отчёта W60: одна фраза — одно
+ * действие, один термин на понятие. `ability` — право готовности, которым шаг
+ * закрывается; у кого этого права нет, тому вместо кнопки показывается, кто
+ * шаг выполняет (`STAGE_OWNER` для этапов чек-листа, `owner` — для остальных).
+ */
+interface RoleStepHint {
+  key: string;
+  title: string;
+  hint: string;
+  target: {href?: string; view?: ReferenceView};
+  ability?: ReadinessAbility;
+  owner?: string;
+}
 
 const ROLE_FLOW = [
   {
@@ -22,6 +40,13 @@ const ROLE_FLOW = [
     tasks: ['Провести осмотр', 'Зафиксировать моточасы', 'Передать диспетчеру'],
     border: 'border-success/25',
     header: 'border-success/25 bg-success/10 text-success-strong',
+    steps: [
+      { key: 'INSPECTION', title: 'Провести осмотр', hint: 'Откройте вкладку «Смены» и нажмите «Провести осмотр». Осмотр засчитывается только за сегодня.', target: { view: 'shifts' }, ability: 'readiness.inspection.manage' },
+      { key: 'ENGINE_HOURS', title: 'Зафиксировать моточасы', hint: 'На экране машиниста нажмите «Снять моточасы» и введите показание счётчика.', target: { view: 'shifts' } },
+      { key: 'PERMIT', title: 'Допуск', hint: 'Наряд-допуск оформляет инженер ОТ (или механик) во вкладке «Наряд-допуски». Если допуск правилами не требуется, шаг закрыт сам.', target: { view: 'permits' }, ability: 'readiness.permit.edit' },
+      { key: 'MAINTENANCE', title: 'Техническое обслуживание', hint: 'Обслуживание закрывает механик во вкладке «Обслуживание ТО».', target: { view: 'maintenance' }, ability: 'readiness.maintenance.manage' },
+      { key: 'ACCEPTANCE', title: 'Приёмка', hint: 'Смену допускает к работе тот, кто выходит в смену: нажмите «Допустить смену к работе» во вкладке «Смены».', target: { view: 'shifts' }, ability: 'readiness.shift.authorize' },
+    ] as RoleStepHint[],
   },
   {
     label: 'Диспетчер',
@@ -30,6 +55,11 @@ const ROLE_FLOW = [
     tasks: ['Проверить готовность', 'Принять и назначить технику', 'Открыть смену'],
     border: 'border-info/25',
     header: 'border-info/25 bg-info/10 text-info-strong',
+    steps: [
+      { key: 'D_READINESS', title: 'Проверить готовность', hint: 'Откройте «Центр готовности» и убедитесь, что по установке есть свежая авторитетная оценка — она создаётся сама после действий оператора и механика.', target: { view: 'readiness' }, ability: 'readiness.read', owner: 'Диспетчер' },
+      { key: 'D_ACCEPT', title: 'Принять и назначить технику', hint: 'Во вкладке «Смены» нажмите «Допустить смену к работе» — это и есть предсменный допуск техники.', target: { view: 'shifts' }, ability: 'readiness.shift.authorize', owner: 'Диспетчер' },
+      { key: 'D_SHIFT', title: 'Открыть смену', hint: 'Смену заводит оператор или администратор. Диспетчер может допустить её к работе, но не создать.', target: { view: 'shifts' }, ability: 'readiness.shift.manage', owner: 'Оператор' },
+    ] as RoleStepHint[],
   },
   {
     label: 'Механик',
@@ -38,6 +68,11 @@ const ROLE_FLOW = [
     tasks: ['Устранить дефекты', 'Провести обслуживание', 'Подтвердить работы'],
     border: 'border-signal/25',
     header: 'border-signal/25 bg-signal/10 text-signal-strong',
+    steps: [
+      { key: 'M_DEFECTS', title: 'Устранить дефекты', hint: 'Откройте вкладку «Обслуживание ТО» → «Замечания и дефекты», возьмите дефект в работу и закройте его.', target: { view: 'maintenance' }, ability: 'readiness.defect.manage', owner: 'Механик' },
+      { key: 'M_MAINTENANCE', title: 'Провести обслуживание', hint: 'Во вкладке «Обслуживание ТО» закройте наряд ТО: заполните работы и подтвердите их.', target: { view: 'maintenance' }, ability: 'readiness.maintenance.manage', owner: 'Механик' },
+      { key: 'M_CONFIRM', title: 'Подтвердить работы', hint: 'Закройте все открытые наряды по установке — пока есть незакрытая заявка, шаг не закрыт.', target: { view: 'maintenance' }, ability: 'readiness.maintenance.manage', owner: 'Механик' },
+    ] as RoleStepHint[],
   },
   {
     label: 'Администратор',
@@ -46,13 +81,25 @@ const ROLE_FLOW = [
     tasks: ['Контролировать допуски', 'Настроить правила и чек-листы', 'Анализировать показатели'],
     border: 'border-border',
     header: 'border-border bg-muted text-foreground',
+    steps: [
+      { key: 'A_PERMIT', title: 'Контролировать допуски', hint: 'Откройте вкладку «Наряд-допуски» и проверьте, что наряд оформлен, согласован и не просрочен.', target: { view: 'permits' }, ability: 'readiness.permit.edit', owner: 'Администратор' },
+      { key: 'A_RULES', title: 'Настроить правила и чек-листы', hint: 'Откройте «Настройки» → «Правила готовности» и опубликуйте набор правил.', target: { view: 'settings' }, ability: 'readiness.rules.manage', owner: 'Администратор' },
+      { key: 'A_ANALYTICS', title: 'Анализировать показатели', hint: 'Снимок оценки создаётся автоматически. Историю оценок смотрите на вкладке «Отчёты».', target: { view: 'reports' }, ability: 'readiness.read', owner: 'Администратор' },
+    ] as RoleStepHint[],
   },
 ];
+
+export interface RoleFlowStep {
+  key: string;
+  done: boolean;
+}
 
 export interface RoleFlowProgress {
   done: number;
   total: number;
   state: string;
+  /** Тот же счёт, разложенный по шагам роли — источник состояний для подсказки. */
+  steps: RoleFlowStep[];
 }
 
 /**
@@ -79,78 +126,181 @@ function buildRoleFlowProgress(
   const label = (done: number, total: number) =>
     done === 0 ? 'Ожидает' : done === total ? 'Готово' : 'В работе';
 
-  const operatorDone = presentation.stages.filter((stage) => stage.state === 'pass').length;
+  // Шаги оператора — это этапы авторитетного снимка: подсказка показывает те же
+  // пять строк, что и чек-лист смены, и не заводит второго источника.
+  const operatorSteps: RoleFlowStep[] = presentation.stages.map((stage) => ({
+    key: stage.key,
+    done: stage.state === 'pass',
+  }));
+  const operatorDone = operatorSteps.filter((step) => step.done).length;
 
-  const dispatcher = [
-    presentation.mode === 'authoritative',
-    Boolean(facts?.accepted),
-    shift?.state === 'STARTED' || shift?.state === 'HANDOVER_PENDING' || shift?.state === 'CLOSED',
-  ].filter(Boolean).length;
+  const dispatcherSteps: RoleFlowStep[] = [
+    { key: 'D_READINESS', done: presentation.mode === 'authoritative' },
+    { key: 'D_ACCEPT', done: Boolean(facts?.accepted) },
+    { key: 'D_SHIFT', done: shift?.state === 'STARTED' || shift?.state === 'HANDOVER_PENDING' || shift?.state === 'CLOSED' },
+  ];
+  const dispatcher = dispatcherSteps.filter((step) => step.done).length;
 
-  const mechanic = [
-    facts ? !facts.criticalDefect : false,
-    stageDone('MAINTENANCE'),
-    openMaintenanceCount === 0,
-  ].filter(Boolean).length;
+  const mechanicSteps: RoleFlowStep[] = [
+    { key: 'M_DEFECTS', done: facts ? !facts.criticalDefect : false },
+    { key: 'M_MAINTENANCE', done: stageDone('MAINTENANCE') },
+    { key: 'M_CONFIRM', done: openMaintenanceCount === 0 },
+  ];
+  const mechanic = mechanicSteps.filter((step) => step.done).length;
 
-  const admin = [
-    stageDone('PERMIT'),
-    rulesPublished,
-    presentation.calculatedAt !== null,
-  ].filter(Boolean).length;
+  const adminSteps: RoleFlowStep[] = [
+    { key: 'A_PERMIT', done: stageDone('PERMIT') },
+    { key: 'A_RULES', done: rulesPublished },
+    { key: 'A_ANALYTICS', done: presentation.calculatedAt !== null },
+  ];
+  const admin = adminSteps.filter((step) => step.done).length;
 
   return [
-    { done: operatorDone, total: presentation.stages.length, state: label(operatorDone, presentation.stages.length) },
-    { done: dispatcher, total: 3, state: label(dispatcher, 3) },
-    { done: mechanic, total: 3, state: label(mechanic, 3) },
-    { done: admin, total: 3, state: admin === 3 ? 'В мониторинге' : label(admin, 3) },
+    { done: operatorDone, total: presentation.stages.length, state: label(operatorDone, presentation.stages.length), steps: operatorSteps },
+    { done: dispatcher, total: 3, state: label(dispatcher, 3), steps: dispatcherSteps },
+    { done: mechanic, total: 3, state: label(mechanic, 3), steps: mechanicSteps },
+    { done: admin, total: 3, state: admin === 3 ? 'В мониторинге' : label(admin, 3), steps: adminSteps },
   ];
 }
 
-function RoleFlowFooter({ progress, owner }: { progress: RoleFlowProgress[]; owner: string | null }) {
+/**
+ * Кто выполняет шаг, если у смотрящего нет на него права. У этапов чек-листа
+ * ответ берётся из единственного источника — `STAGE_OWNER` (тот же, что
+ * подсвечивает карточку роли в цепочке); у остальных шагов он записан рядом.
+ */
+function stepOwner(step: RoleStepHint): string | null {
+  return (STAGE_OWNER as Record<string, string>)[step.key] ?? step.owner ?? null;
+}
+
+/**
+ * Подсказка «что делать сейчас» по нажатию на карточку роли.
+ *
+ * Состояния шагов — из того же `roleProgress`, что рисует цепочку: второго
+ * источника нет. Первый невыполненный шаг подсвечен и подписан «Сделайте это
+ * сейчас»; у шага, на который у смотрящего нет права, вместо кнопки — строка
+ * «Этот шаг выполняет <роль>».
+ */
+function RoleStepsPanel({ roleIndex, progress, onViewChange, abilities }: {
+  roleIndex: number;
+  progress: RoleFlowProgress[];
+  onViewChange: (view: ReferenceView) => void;
+  abilities: readonly ReadinessAbility[];
+}) {
+  const role = ROLE_FLOW[roleIndex];
+  const steps = progress[roleIndex]?.steps ?? [];
+  const firstPending = steps.findIndex((step) => !step.done);
   return (
-    <section aria-label="Роли процесса технической готовности" className="mt-2 grid grid-cols-1 items-stretch gap-2 sm:grid-cols-2 2xl:grid-cols-[1fr_24px_1fr_24px_1fr_24px_1fr] 2xl:gap-0">
-      {ROLE_FLOW.map((role, index) => {
-        const RoleIcon = role.lucide;
-        const roleProgress = progress[index];
-        // Роль, на которой стоит процесс: без этой отметки лента показывала
-        // четыре равнозначные карточки, и кто именно держит ход — не читалось.
-        const holding = owner === role.label;
-        return (
-          <div key={role.label} className="contents">
-            <article className={cn(
-              'flex flex-col overflow-hidden rounded-lg border bg-card shadow-sm',
-              holding ? 'border-signal ring-2 ring-signal/30' : role.border,
-            )}>
-              <header className={cn('flex items-center gap-2 border-b px-3 py-1.5', role.header)}>
-                <RoleIcon className="h-4 w-4" />
-                <h2 className="text-sm font-extrabold">{role.label}</h2>
-                {holding && (
-                  <span className="ml-auto rounded bg-signal px-2 py-0.5 text-3xs font-bold text-white">
-                    Сейчас ход
-                  </span>
-                )}
-              </header>
-              <div className="flex flex-1 items-center gap-2 px-3 py-2">
-                <div className="min-w-0 flex-1 space-y-1 text-2xs leading-[1.35] text-muted-foreground">
-                  {role.tasks.map((task) => <div key={task} className="flex gap-1.5"><span className="text-muted-foreground">•</span><span>{task}</span></div>)}
-                </div>
-                {roleProgress && (
-                  <div className="shrink-0 rounded-[10px] border border-border px-2.5 py-1.5 text-center text-2xs">
-                    <div className="text-muted-foreground">{roleProgress.state}</div>
-                    <div className="font-bold tabular-nums">{roleProgress.done}/{roleProgress.total} шагов</div>
-                  </div>
-                )}
-                {/* The handoff uses the approved PNG directly in this footer. */}
-                { }
-                <img src={`/icons/pilingtrack/${role.icon}.png`} alt="" className="h-[34px] w-[34px] shrink-0 object-contain" />
+    <section aria-label={`Что делать сейчас: ${role.label}`} className="mt-2 rounded-lg border border-border bg-card p-3 shadow-sm">
+      <h2 className="text-sm font-extrabold">Что делать сейчас: {role.label}</h2>
+      <ul className="mt-2 space-y-2">
+        {role.steps.map((step, index) => {
+          const done = steps[index]?.done ?? false;
+          const now = index === firstPending;
+          const hasTarget = Boolean(step.target.view || step.target.href);
+          const allowed = !step.ability || abilities.includes(step.ability);
+          const ownerRole = stepOwner(step);
+          return (
+            <li key={step.key} className={cn('rounded-lg border p-2.5', now ? 'border-signal ring-2 ring-signal/30' : 'border-border')}>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className={cn('rounded px-2 py-0.5 text-3xs font-bold', done ? 'bg-success/10 text-success-strong' : now ? 'bg-signal text-white' : 'bg-muted text-muted-foreground')}>
+                  {done ? 'Выполнено' : now ? 'Сейчас' : 'Впереди'}
+                </span>
+                <span className="text-xs font-bold">{step.title}</span>
+                {now && <span className="ml-auto text-3xs font-bold text-signal-strong">Сделайте это сейчас</span>}
               </div>
-            </article>
-            {index < ROLE_FLOW.length - 1 && <div className="hidden items-center justify-center text-xl text-muted-foreground 2xl:flex">→</div>}
-          </div>
-        );
-      })}
+              <p className="mt-1 text-2xs leading-relaxed text-muted-foreground">{step.hint}</p>
+              {allowed && hasTarget ? (
+                step.target.href ? (
+                  <Link href={step.target.href} aria-label={`${step.title}: перейти`} className="mt-2 inline-flex items-center gap-1 text-2xs font-semibold text-signal-strong">
+                    Перейти<ChevronRight className="h-3.5 w-3.5" />
+                  </Link>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => step.target.view && onViewChange(step.target.view)}
+                    aria-label={`${step.title}: перейти`}
+                    className="mt-2 inline-flex items-center gap-1 text-2xs font-semibold text-signal-strong"
+                  >
+                    Перейти<ChevronRight className="h-3.5 w-3.5" />
+                  </button>
+                )
+              ) : ownerRole ? (
+                <p className="mt-2 text-2xs text-muted-foreground">Этот шаг выполняет {ownerRole}</p>
+              ) : null}
+            </li>
+          );
+        })}
+      </ul>
     </section>
+  );
+}
+
+function RoleFlowFooter({ progress, owner, onViewChange, abilities }: {
+  progress: RoleFlowProgress[];
+  owner: string | null;
+  onViewChange: (view: ReferenceView) => void;
+  abilities: readonly ReadinessAbility[];
+}) {
+  const [openRole, setOpenRole] = useState<number | null>(null);
+  return (
+    <>
+      <section aria-label="Роли процесса технической готовности" className="mt-2 grid grid-cols-1 items-stretch gap-2 sm:grid-cols-2 2xl:grid-cols-[1fr_24px_1fr_24px_1fr_24px_1fr] 2xl:gap-0">
+        {ROLE_FLOW.map((role, index) => {
+          const RoleIcon = role.lucide;
+          const roleProgress = progress[index];
+          // Роль, на которой стоит процесс: без этой отметки лента показывала
+          // четыре равнозначные карточки, и кто именно держит ход — не читалось.
+          const holding = owner === role.label;
+          const open = openRole === index;
+          return (
+            <div key={role.label} className="contents">
+              <article className={cn(
+                'flex flex-col overflow-hidden rounded-lg border bg-card shadow-sm',
+                holding ? 'border-signal ring-2 ring-signal/30' : role.border,
+              )}>
+                {/* Карточка роли теперь открывает подсказку «что делать сейчас». */}
+                <button
+                  type="button"
+                  onClick={() => setOpenRole(open ? null : index)}
+                  aria-expanded={open}
+                  aria-label={`${role.label}: что делать сейчас`}
+                  className="flex flex-1 flex-col text-left transition hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <header className={cn('flex items-center gap-2 border-b px-3 py-1.5', role.header)}>
+                    <RoleIcon className="h-4 w-4" />
+                    <h2 className="text-sm font-extrabold">{role.label}</h2>
+                    {holding && (
+                      <span className="ml-auto rounded bg-signal px-2 py-0.5 text-3xs font-bold text-white">
+                        Сейчас ход
+                      </span>
+                    )}
+                    <ChevronRight className={cn('h-4 w-4', holding ? '' : 'ml-auto', open && 'rotate-90')} />
+                  </header>
+                  <div className="flex flex-1 items-center gap-2 px-3 py-2">
+                    <div className="min-w-0 flex-1 space-y-1 text-2xs leading-[1.35] text-muted-foreground">
+                      {role.tasks.map((task) => <div key={task} className="flex gap-1.5"><span className="text-muted-foreground">•</span><span>{task}</span></div>)}
+                    </div>
+                    {roleProgress && (
+                      <div className="shrink-0 rounded-[10px] border border-border px-2.5 py-1.5 text-center text-2xs">
+                        <div className="text-muted-foreground">{roleProgress.state}</div>
+                        <div className="font-bold tabular-nums">{roleProgress.done}/{roleProgress.total} шагов</div>
+                      </div>
+                    )}
+                    {/* The handoff uses the approved PNG directly in this footer. */}
+                    { }
+                    <img src={`/icons/pilingtrack/${role.icon}.png`} alt="" className="h-[34px] w-[34px] shrink-0 object-contain" />
+                  </div>
+                </button>
+              </article>
+              {index < ROLE_FLOW.length - 1 && <div className="hidden items-center justify-center text-xl text-muted-foreground 2xl:flex">→</div>}
+            </div>
+          );
+        })}
+      </section>
+      {openRole !== null && (
+        <RoleStepsPanel roleIndex={openRole} progress={progress} onViewChange={onViewChange} abilities={abilities} />
+      )}
+    </>
   );
 }
 
@@ -1121,7 +1271,7 @@ export function ReadinessCentre(props: ReferenceUiProps) {
         </section>
         </aside>
       </div>
-      <RoleFlowFooter progress={roleProgress} owner={stageOwner} />
+      <RoleFlowFooter progress={roleProgress} owner={stageOwner} onViewChange={props.onViewChange} abilities={props.bootstrap?.capabilities.abilities ?? []} />
     </div>
   );
 }

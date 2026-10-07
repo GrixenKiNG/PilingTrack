@@ -1,11 +1,11 @@
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { ReferenceUiProps } from '../types';
 import { DEFAULT_READINESS_RULES } from '@/modules/readiness';
 import { ReadinessCentre } from '../readiness-centre';
 import { PermitsScreen } from '../permits-screen';
 import { ReportsScreen } from '../reports-screen';
-import type { CurrentReadinessDto } from '../../api/contracts';
+import type { CurrentReadinessDto, ReadinessAbility } from '../../api/contracts';
 import { SettingsWorkspace } from '../settings-workspace';
 import { bootstrapEnvelope } from '../../api/__tests__/fixtures';
 
@@ -384,5 +384,70 @@ describe('Центр готовности: у причины есть адрес
 
     expect(screen.getByText('вкладка «Смены» → провести осмотр за сегодня')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Перейти к снятию/ })).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * W60 собрал тексты и адреса шагов ролей; W61 рисует саму подсказку «что делать
+ * сейчас» по нажатию на карточку роли. Состояния шагов берутся из того же
+ * снимка (`roleProgress`), что и цепочка; право шага — из полномочий смотрящего.
+ */
+describe('Роли: подсказка «что делать сейчас» (W61)', () => {
+  const bootstrapWith = (abilities: ReadinessAbility[]) => {
+    const base = bootstrapEnvelope().data;
+    return { ...base, capabilities: { ...base.capabilities, abilities } };
+  };
+
+  const openRole = (label: string) =>
+    fireEvent.click(screen.getByRole('button', { name: `${label}: что делать сейчас` }));
+
+  it('нажатие на карточку роли открывает панель подсказки', () => {
+    render(<ReadinessCentre {...propsFor()} />);
+
+    expect(screen.queryByRole('region', { name: 'Что делать сейчас: Оператор' })).not.toBeInTheDocument();
+    openRole('Оператор');
+    expect(screen.getByRole('region', { name: 'Что делать сейчас: Оператор' })).toBeInTheDocument();
+  });
+
+  it.each([['Оператор', 5], ['Диспетчер', 3], ['Механик', 3], ['Администратор', 3]])(
+    'у роли «%s» — %i шагов',
+    (label, count) => {
+      render(<ReadinessCentre {...propsFor()} />);
+      openRole(label);
+      const panel = screen.getByRole('region', { name: `Что делать сейчас: ${label}` });
+      expect(within(panel).getAllByRole('listitem')).toHaveLength(count);
+    },
+  );
+
+  it('первый невыполненный шаг подсвечен и подписан «Сделайте это сейчас»', () => {
+    render(<ReadinessCentre {...propsFor()} />);
+    openRole('Оператор');
+    const panel = screen.getByRole('region', { name: 'Что делать сейчас: Оператор' });
+    const items = within(panel).getAllByRole('listitem');
+
+    expect(within(items[0]).getByText('Сделайте это сейчас')).toBeInTheDocument();
+    expect(items[0].className).toContain('ring-signal');
+    expect(within(items[1]).queryByText('Сделайте это сейчас')).not.toBeInTheDocument();
+    expect(within(items[1]).getByText('Впереди')).toBeInTheDocument();
+  });
+
+  it('кнопка шага ведёт по адресу из W60', () => {
+    const onViewChange = vi.fn();
+    render(<ReadinessCentre {...propsFor({
+      onViewChange,
+      bootstrap: bootstrapWith(['readiness.read', 'readiness.inspection.manage']),
+    })} />);
+    openRole('Оператор');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Провести осмотр: перейти' }));
+    expect(onViewChange).toHaveBeenCalledWith('shifts');
+  });
+
+  it('шаг без права не обещает кнопку — видно, кто его выполняет', () => {
+    render(<ReadinessCentre {...propsFor({ bootstrap: bootstrapWith(['readiness.read']) })} />);
+    openRole('Оператор');
+
+    expect(screen.getByText('Этот шаг выполняет Администратор')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Допуск: перейти' })).not.toBeInTheDocument();
   });
 });
