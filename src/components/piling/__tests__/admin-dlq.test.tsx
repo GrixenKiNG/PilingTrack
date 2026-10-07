@@ -19,7 +19,7 @@ vi.mock('framer-motion', () => ({
   motion: { div: ({ children, initial: _initial, animate: _animate, transition: _transition, ...props }: any) => <div {...props}>{children}</div> },
 }));
 
-import { AdminDlq } from '../admin-dlq';
+import { AdminDlq, hintForError } from '../admin-dlq';
 
 interface TestEntry {
   id: string;
@@ -32,6 +32,7 @@ interface TestEntry {
   createdAt: string;
   updatedAt: string;
   status: 'pending' | 'resolved' | 'discarded';
+  report: { reportId: string; siteName: string } | null;
 }
 
 const makeEntry = (over: Partial<TestEntry> = {}): TestEntry => ({
@@ -45,6 +46,7 @@ const makeEntry = (over: Partial<TestEntry> = {}): TestEntry => ({
   createdAt: '2026-10-01T10:00:00.000Z',
   updatedAt: '2026-10-01T10:00:00.000Z',
   status: 'pending',
+  report: null,
   ...over,
 });
 
@@ -318,5 +320,116 @@ describe('AdminDlq: смена отбора гасит прежнюю стати
     expect(screen.queryByText('Доставка PDF отчёта')).toBeNull();
 
     await act(async () => { resolveSecond(json({ entries: [], stats })); });
+  });
+});
+
+/**
+ * W51-DLQ-CARD-READABLE: карточка dead-letter должна быть понятна владельцу —
+ * показать номер отчёта (Report.reportId) и объект, перевести причину сбоя на
+ * русский и предупредить, что для части причин «Повтор» бесполезен
+ * (W49-DLQ-OPERATIONS, находки 1–3).
+ */
+describe('hintForError: русская расшифровка причины (W51)', () => {
+  it('нет обработчика → повтор не поможет', () => {
+    const hint = hintForError('No handlers for domain event ReportSubmitted (aggregateId=RM-1)');
+    expect(hint.text).toBe(
+      'У события нет обработчика. Повтор не поможет — нужна правка кода или регистрации обработчиков.',
+    );
+    expect(hint.retryHelps).toBe(false);
+  });
+
+  it('не хватает объекта/автора/организации → повтор не поможет', () => {
+    const hint = hintForError(
+      'ReportAnalytics projection: не удалось определить userId для события ReportSubmitted (aggregateId=RM-1)',
+    );
+    expect(hint.text).toBe('У отчёта не хватает объекта, автора или организации. Повтор не поможет.');
+    expect(hint.retryHelps).toBe(false);
+  });
+
+  it('сбой базы или сети → повтор может помочь', () => {
+    for (const raw of [
+      'Invalid prisma.report.findUnique() invocation',
+      'Invalid `prisma.report.findUnique()` invocation',
+      'Timed out fetching a new connection from the pool',
+      'connect ECONNREFUSED 127.0.0.1:5432',
+    ]) {
+      const hint = hintForError(raw);
+      expect(hint.text).toBe('Сбой базы или сети. Повтор может помочь.');
+      expect(hint.retryHelps).toBe(true);
+    }
+  });
+
+  it('неизвестный текст → «Причина не опознана»', () => {
+    const hint = hintForError('Something odd happened');
+    expect(hint.text).toBe('Причина не опознана');
+    expect(hint.retryHelps).toBe(true);
+  });
+});
+
+describe('AdminDlq: номер отчёта в карточке (W51)', () => {
+  beforeEach(() => {
+    mocks.authFetch.mockReset();
+  });
+
+  it('показывает номер отчёта и объект, когда отчёт есть', async () => {
+    mockLoad(makeEntry({ report: { reportId: 'RM-123', siteName: 'Объект «Север»' } }));
+    render(<AdminDlq />);
+
+    expect(await screen.findByText('RM-123')).toBeInTheDocument();
+    expect(screen.getByText('· Объект: Объект «Север»')).toBeInTheDocument();
+  });
+
+  it('пишет «отчёт удалён», когда строка отчёта не найдена', async () => {
+    mockLoad(makeEntry({ aggregateId: 'RM-gone', report: null }));
+    render(<AdminDlq />);
+
+    expect(await screen.findByText('отчёт удалён')).toBeInTheDocument();
+  });
+});
+
+describe('AdminDlq: предупреждение у «Повтор» (W51)', () => {
+  beforeEach(() => {
+    mocks.authFetch.mockReset();
+    mocks.confirm.mockReset();
+    window.confirm = mocks.confirm;
+  });
+
+  it('подпись-предупреждение для причины «нет обработчика»', async () => {
+    mockLoad(makeEntry({ errorMessage: 'No handlers for domain event ReportSubmitted (aggregateId=RM-1)' }));
+    render(<AdminDlq />);
+
+    expect(await screen.findByText('Повтор не поможет, событие снова упадёт')).toBeInTheDocument();
+  });
+
+  it('подпись-предупреждение для причины «не хватает данных отчёта»', async () => {
+    mockLoad(
+      makeEntry({
+        errorMessage:
+          'ReportAnalytics projection: не удалось определить tenantId для события ReportSubmitted (aggregateId=RM-1)',
+      }),
+    );
+    render(<AdminDlq />);
+
+    expect(await screen.findByText('Повтор не поможет, событие снова упадёт')).toBeInTheDocument();
+  });
+
+  it('сбой базы или сети предупреждения не получает', async () => {
+    mockLoad(makeEntry({ errorMessage: 'connect ECONNREFUSED 127.0.0.1:5432' }));
+    render(<AdminDlq />);
+
+    expect(await screen.findByText('Сбой базы или сети. Повтор может помочь.')).toBeInTheDocument();
+    expect(screen.queryByText('Повтор не поможет, событие снова упадёт')).not.toBeInTheDocument();
+  });
+
+  it('подтверждение перед повтором сообщает, что повтор не поможет, и отмена не шлёт запрос', async () => {
+    mockLoad(makeEntry({ errorMessage: 'No handlers for domain event ReportSubmitted (aggregateId=RM-1)' }));
+    mocks.confirm.mockReturnValue(false);
+    render(<AdminDlq />);
+    await screen.findByText('Повтор не поможет, событие снова упадёт');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Повтор' }));
+
+    expect(mocks.confirm).toHaveBeenCalledWith(expect.stringContaining('Повтор не поможет'));
+    expect(mocks.authFetch.mock.calls.some(([, init]) => isPost(init as RequestInit))).toBe(false);
   });
 });

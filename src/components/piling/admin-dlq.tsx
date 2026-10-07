@@ -34,6 +34,12 @@ interface DlqEntry {
   createdAt: string;
   updatedAt: string;
   status: 'pending' | 'resolved' | 'discarded';
+  /**
+   * Отчёт, которому принадлежит событие: номер (`Report.reportId`, вид RM-…) и
+   * объект (`Site.name`). Сервер подтягивает их к странице одним запросом.
+   * `null` — отчёт удалён либо у события нет отчёта.
+   */
+  report: { reportId: string; siteName: string } | null;
 }
 
 interface DlqStats {
@@ -77,11 +83,67 @@ function eventTypeLabel(eventType: string): string {
 }
 
 /**
+ * Русские расшифровки по тексту ошибки. Владельцу непонятны английские
+ * сообщения (`No handlers for domain event …`, `Invalid prisma.…`), а от
+ * причины зависит, поможет ли «Повтор» (W49-DLQ-OPERATIONS, находки 2 и 3).
+ *
+ * `retryHelps: false` — причина неустранима повтором: событие снова упадёт
+ * с тем же результатом, помогает правка данных/кода или «Отбросить».
+ */
+export interface ErrorHint {
+  /** Русское объяснение причины. */
+  text: string;
+  /** false — повтор заведомо не поможет, событие снова упадёт. */
+  retryHelps: boolean;
+}
+
+const ERROR_HINTS: Array<{ match: (message: string) => boolean; hint: ErrorHint }> = [
+  {
+    match: (m) => m.includes('No handlers for domain event'),
+    hint: {
+      text: 'У события нет обработчика. Повтор не поможет — нужна правка кода или регистрации обработчиков.',
+      retryHelps: false,
+    },
+  },
+  {
+    match: (m) => m.includes('не удалось определить'),
+    hint: {
+      text: 'У отчёта не хватает объекта, автора или организации. Повтор не поможет.',
+      retryHelps: false,
+    },
+  },
+  {
+    match: (m) =>
+      (m.includes('Invalid') && m.includes('prisma')) ||
+      m.includes('Timed out') ||
+      m.includes('ECONNREFUSED'),
+    hint: {
+      text: 'Сбой базы или сети. Повтор может помочь.',
+      retryHelps: true,
+    },
+  },
+];
+
+/** Причина не из словаря — показываем её как есть мелким шрифтом. */
+const UNRECOGNIZED_HINT: ErrorHint = { text: 'Причина не опознана', retryHelps: true };
+
+export function hintForError(errorMessage: string): ErrorHint {
+  return ERROR_HINTS.find((entry) => entry.match(errorMessage))?.hint ?? UNRECOGNIZED_HINT;
+}
+
+/**
  * Повтор у события доставки снова отправляет сообщение или PDF отчёта в
  * Telegram (dedupeKey намеренно не переносится), поэтому подтверждение должно
  * предупреждать об этом, а не просто «повторить?».
+ *
+ * Отдельно — неустранимые повтором причины (нет обработчика / нет данных для
+ * проекции): админ должен знать, что кнопка не поможет, до нажатия, а не после
+ * нового круга «повтор → снова упало» (W49-DLQ-OPERATIONS, находка 3).
  */
-function retryConfirmMessage(eventType: string): string {
+export function retryConfirmMessage(eventType: string, errorMessage = ''): string {
+  if (!hintForError(errorMessage).retryHelps) {
+    return 'Повтор не поможет, событие снова упадёт. Всё равно поставить повтор?';
+  }
   if (eventType === 'ReportPdfDeliveryRequested') {
     return 'Повторить событие? PDF отчёта уйдёт в Telegram заново — проверьте, что доставка не задублируется.';
   }
@@ -134,7 +196,7 @@ export function AdminDlq() {
     // Защита от двойного нажатия: пока предыдущее действие не завершилось,
     // повторный клик (в т.ч. по второй кнопке) ничего не делает.
     if (actingId) return;
-    if (action === 'retry' && !window.confirm(retryConfirmMessage(entry.eventType))) {
+    if (action === 'retry' && !window.confirm(retryConfirmMessage(entry.eventType, entry.errorMessage))) {
       return;
     }
     if (action === 'discard' && !window.confirm('Отбросить событие? Оно будет исключено из обработки без возможности восстановления.')) {
@@ -237,7 +299,9 @@ export function AdminDlq() {
         </div>
       ) : entries.length === 0 ? null : (
         <div className="space-y-2">
-          {entries.map((entry, index) => (
+          {entries.map((entry, index) => {
+            const hint = hintForError(entry.errorMessage);
+            return (
             <motion.div
               key={entry.id}
               initial={{ opacity: 0, y: 6 }}
@@ -256,12 +320,23 @@ export function AdminDlq() {
                         <span className="text-xs text-muted-foreground">попыток: {entry.attempts}</span>
                       </div>
                       <p className="text-xs text-muted-foreground mt-1">
+                        {entry.report ? (
+                          <>
+                            Отчёт: <code className="font-mono text-foreground">{entry.report.reportId}</code>
+                            <span className="ml-2">· Объект: {entry.report.siteName}</span>
+                          </>
+                        ) : entry.aggregateId ? (
+                          'отчёт удалён'
+                        ) : null}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
                         Создано: {formatDate(entry.createdAt)}
                         {entry.updatedAt !== entry.createdAt && (
                           <span className="ml-2">· Обновлено: {formatDate(entry.updatedAt)}</span>
                         )}
                       </p>
-                      <p className={cn('text-sm text-destructive-strong mt-2', expandedErrorId !== entry.id && 'line-clamp-2')}>
+                      <p className="text-sm text-foreground mt-2">{hint.text}</p>
+                      <p className={cn('text-3xs text-destructive-strong mt-0.5', expandedErrorId !== entry.id && 'line-clamp-2')}>
                         {entry.errorMessage}
                       </p>
                       <div className="flex items-center gap-3 flex-wrap mt-1">
@@ -303,6 +378,11 @@ export function AdminDlq() {
                     </div>
                     {entry.status === 'pending' && (
                       <div className="flex flex-col gap-1.5 shrink-0">
+                        {!hint.retryHelps && (
+                          <span className="text-3xs text-destructive-strong max-w-[12rem] text-right">
+                            Повтор не поможет, событие снова упадёт
+                          </span>
+                        )}
                         <Button
                           size="sm"
                           variant="outline"
@@ -329,7 +409,8 @@ export function AdminDlq() {
                 </CardContent>
               </Card>
             </motion.div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

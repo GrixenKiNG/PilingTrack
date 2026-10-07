@@ -10,8 +10,42 @@ import {
   discardDlqEntry,
 } from '@/core/outbox/dead-letter-queue';
 import { db } from '@/lib/db';
+import { requireTenantId } from '@/lib/tenant';
 
 export const runtime = 'nodejs';
+
+/**
+ * Дополнить записи очереди отчётом: номером (`Report.reportId`, вид RM-…) и
+ * объектом (`Site.name`). Без этого владелец видит только машинный
+ * `aggregateId` и не понимает, о каком отчёте речь (W49-DLQ-OPERATIONS, п.1).
+ *
+ * Ответ агрегата — это уже номер отчёта, и по нему ищем строку отчёта: один
+ * `findMany` на всю страницу по набору id, иначе на лимите 200 вышло бы 200
+ * отдельных запросов (N+1). Организация — строгим равенством: фильтр
+ * `tenantId IS NULL OR ...` вернул бы отчёты всех организаций. Не нашли строку
+ * (`report: null`) — значит отчёт удалён; карточка так и подпишет.
+ */
+async function attachReportInfo<T extends { aggregateId: string | null }>(
+  entries: T[],
+  tenantId: string,
+): Promise<Array<T & { report: { reportId: string; siteName: string } | null }>> {
+  const ids = [...new Set(entries.map((e) => e.aggregateId).filter((id): id is string => Boolean(id)))];
+  const reports = ids.length
+    ? await db.report.findMany({
+        where: { reportId: { in: ids }, tenantId },
+        select: { reportId: true, site: { select: { name: true } } },
+      })
+    : [];
+  const byId = new Map(reports.map((r) => [r.reportId, r]));
+
+  return entries.map((entry) => {
+    const report = entry.aggregateId ? byId.get(entry.aggregateId) : undefined;
+    return {
+      ...entry,
+      report: report ? { reportId: report.reportId, siteName: report.site.name } : null,
+    };
+  });
+}
 
 export const GET = withApi(
   async (request: NextRequest) => {
@@ -19,6 +53,8 @@ export const GET = withApi(
     if (error) return error;
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     assertCan(user!, 'dlq.manage');
+
+    const tenantId = requireTenantId(user);
 
     const status = request.nextUrl.searchParams.get('status') ?? 'pending';
     // Нечисло давало NaN и 500 от Prisma, отрицательное — выборку с конца.
@@ -29,7 +65,7 @@ export const GET = withApi(
 
     if (status === 'pending') {
       const entries = await getPendingDlqEntries(limit);
-      return NextResponse.json({ entries, stats });
+      return NextResponse.json({ entries: await attachReportInfo(entries, tenantId), stats });
     }
 
     // For resolved/discarded/all statuses, use raw query
@@ -40,18 +76,21 @@ export const GET = withApi(
       take: limit,
     });
     return NextResponse.json({
-      entries: rows.map((r) => ({
-        id: r.id,
-        eventType: r.eventType,
-        aggregateId: r.aggregateId,
-        payload: r.payload,
-        errorMessage: r.errorMessage,
-        attempts: r.attempts,
-        sourceOutboxId: r.sourceOutboxId,
-        createdAt: r.createdAt,
-        updatedAt: r.updatedAt,
-        status: r.status,
-      })),
+      entries: await attachReportInfo(
+        rows.map((r) => ({
+          id: r.id,
+          eventType: r.eventType,
+          aggregateId: r.aggregateId,
+          payload: r.payload,
+          errorMessage: r.errorMessage,
+          attempts: r.attempts,
+          sourceOutboxId: r.sourceOutboxId,
+          createdAt: r.createdAt,
+          updatedAt: r.updatedAt,
+          status: r.status,
+        })),
+        tenantId,
+      ),
       stats,
     });
   },
