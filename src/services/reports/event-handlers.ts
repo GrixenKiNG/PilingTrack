@@ -74,13 +74,23 @@ async function handleReportForAnalytics(event: ReportDomainEvent) {
     }
     // Организация обязательна. Строка проекции без неё невидима для тенантных
     // запросов (сломанная аналитика), а для запроса с пустым тенантом —
-    // видна всем. Раньше здесь писался `tenantId || null`; лучше пропуск
-    // проекции с записью в лог, как для siteId/userId выше.
+    // видна всем. Раньше здесь писался `tenantId || null`.
+    //
+    // J1: неразрешённые siteId/userId/tenantId — не «пропуск», а ошибка.
+    // Молчаливый return означал тихую потерю: outbox-публикатор всё равно
+    // клеймит строку `published=true` (dispatch-then-claim), ретрая и DLQ нет,
+    // и проекции у события не будет уже никогда. Бросаем — outbox повторит, а
+    // после исчерпания попыток отправит событие в dead-letter (механизм уже
+    // есть в outbox-publisher.ts и здесь не меняется).
     if (!siteId || !userId || !tenantId) {
-      logger.warn('ReportAnalytics skipped: cannot resolve siteId/userId/tenantId', {
-        eventType: event.type, aggregateId: event.aggregateId,
-      });
-      return;
+      const missing = [
+        !siteId ? 'siteId' : null,
+        !userId ? 'userId' : null,
+        !tenantId ? 'tenantId' : null,
+      ].filter(Boolean).join(', ');
+      throw new Error(
+        `ReportAnalytics projection: не удалось определить ${missing} для события ${event.type} (aggregateId=${event.aggregateId})`,
+      );
     }
 
     await db.reportAnalytics.upsert({

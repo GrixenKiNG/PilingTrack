@@ -191,36 +191,37 @@ describe('handleReportForAnalytics', () => {
   });
 
   /*
-    Проекция без организации раньше писалась с `tenantId: null`: строка
-    становилась невидимой для всех тенантных запросов (сломанная аналитика),
-    а для запроса с пустым тенантом — видна всем организациям. Запись без
-    организации не создаём и сообщаем в лог, как для siteId/userId.
+    J1 (W28-CODEX-J-TESTPLAN): при неразрешимом siteId/userId/tenantId
+    обработчик раньше молча `return`-ил, а outbox-publisher всё равно клеймил
+    строку `published=true` (dispatch-then-claim) — ретрая и DLQ не было, и
+    проекция терялась молча. Теперь неразрешённый идентификатор бросает, чтобы
+    сработал ретрай/DLQ. Этот тест стоял на молчаливом пропуске — переписан.
   */
-  it('пропускает проекцию, когда организацию определить нечем', async () => {
+  it('бросает, когда организацию определить нечем (ретрай/DLQ, а не тихий пропуск)', async () => {
     findUniqueMock.mockResolvedValue({ siteId: 'site_A', userId: 'user-1', tenantId: null });
 
-    await emitDomainEvent({
-      id: 'evt-2',
-      type: REPORT_DOMAIN_EVENT_TYPES.REPORT_SUBMITTED,
-      aggregateId: 'report-uuid-2',
-      aggregateType: 'Report',
-      occurredAt: new Date().toISOString(),
-      siteId: 'site_A',
-      userId: 'user-1',
-      data: {},
-    });
+    await expect(
+      emitDomainEvent({
+        id: 'evt-2',
+        type: REPORT_DOMAIN_EVENT_TYPES.REPORT_SUBMITTED,
+        aggregateId: 'report-uuid-2',
+        aggregateType: 'Report',
+        occurredAt: new Date().toISOString(),
+        siteId: 'site_A',
+        userId: 'user-1',
+        data: {},
+      }),
+    ).rejects.toThrow();
 
     expect(analyticsUpsertMock).not.toHaveBeenCalled();
   });
 
   /*
     J1 (W28-CODEX-J-TESTPLAN): при неразрешимом siteId/userId/tenantId обработчик
-    сейчас молча `return`-ит (кейс выше), а outbox-publisher всё равно клеймит
-    строку `published=true` (dispatch-then-claim) — ретрая и DLQ нет, проекция
-    теряется молча. После правки Codex неразрешимый идентификатор должен бросать,
-    чтобы сработал ретрай/DLQ. Тест красный до правки (см. комментарий с it.fails).
+    теперь бросает, а outbox-publisher повторит и при исчерпании попыток отправит
+    событие в dead-letter. До правки тест фиксировал тихий успех.
   */
-  it.fails('J1: ждёт правки Codex; после правки заменить на it(...) — неразрешимый tenant бросает', async () => {
+  it('J1: неразрешимый tenant бросает, проекция не пишется', async () => {
     findUniqueMock.mockResolvedValue({ siteId: 'site_A', userId: 'user-1', tenantId: null });
 
     await expect(

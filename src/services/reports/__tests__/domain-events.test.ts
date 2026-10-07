@@ -24,7 +24,7 @@ import { emitDomainEvent, getHandlerCount } from '../domain-events';
 import { REPORT_DOMAIN_EVENT_TYPES } from '@/modules/reports/domain';
 
 describe('шина доменных событий: нет подписчиков (J2)', () => {
-  it.fails('J2: ждёт правки Codex; после правки заменить на it(...) — пустой реестр не доставка', async () => {
+  it('J2: пустой реестр — не доставка, событие отчёта уходит на повтор', async () => {
     // Реестр обработчиков — модуль-синглтон; в этом файле event-handlers не
     // импортируется, поэтому подписчиков быть не должно.
     expect(getHandlerCount(REPORT_DOMAIN_EVENT_TYPES.REPORT_SUBMITTED)).toBe(0);
