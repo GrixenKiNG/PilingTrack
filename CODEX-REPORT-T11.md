@@ -26,10 +26,18 @@ GitNexus: impact logProduction/OperatorV5App/OperatorV10App/OperatorMachineHeade
 
 RED exit 1: 2 failed / 2 passed / 0 skipped. GREEN exit 0: 53 passed / 0 skipped в 5 связанных файлах; scoped ESLint exit 0 (0 warnings); tsc exit 0. GitNexus impact недоступен (exit 1, UNKNOWN), применён разрешённый поиск связей.
 
+Коммит I1: `88b40806`.
+
+## I3 — доступ к странице v2
+
+Страница читает текущего пользователя из существующего store, до его определения не открывает рабочее место; роли кроме OPERATOR видят «Экран доступен только машинисту». API, авторизация и защищённые файлы не менялись. Новый соседний тестовый файл допустим по исключению AGENTS для проверки доступа: пять заданных ролей, OPERATOR и неопределённый пользователь.
+
+RED exit 1: 6 failed / 1 passed / 0 skipped; GREEN exit 0: 27 passed / 0 skipped (4 файла вместе с v2). Tsc и scoped ESLint exit 0, 0 warnings. GitNexus impact/detect-changes exit 1, UNKNOWN; разрешённый поиск связей выполнен.
+
 ## Подготовка и ограничения проверок
 
 `npm run db:generate`: exit 1, отсутствует DATABASE_URL_POSTGRES. Сгенерирован клиент из настоящей схемы без соединения с БД: `npx --no-install prisma generate --config output/codex-t11/prisma-generate.config.ts`, exit 0; конфигурация содержит только путь к schema.prisma. `node scripts/patch-postgres-client.js`: exit 0. Зависимости не устанавливались, node_modules — ссылка на уже установленные пакеты. Файлы .env не читались, не создавались и не менялись; адреса БД не подставлялись.
 
 ## Остальные пункты
 
-I3, I6, I7, I8, I5 — ожидают выполнения по порядку. Текущая редакция отчёта промежуточная.
+I6, I7, I8, I5 — ожидают выполнения по порядку. Текущая редакция отчёта промежуточная.
