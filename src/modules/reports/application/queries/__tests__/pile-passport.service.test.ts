@@ -262,11 +262,36 @@ describe('listPilePassports — итоги по всему периоду (W21)'
   it('в запросе итогов организация — строгим равенством, без всех тенантов', async () => {
     await listPilePassports({ tenantId: 'tenant-a' });
 
-    // Аргументы тега $queryRaw: строки запроса + вставленные значения (в т.ч.
-    // вложенный Prisma.sql с условиями). Организация — параметр, не литерал.
-    const args = JSON.stringify(pileTotalsQuery.mock.calls[0]);
-    expect(args).toContain('tenant-a');
-    expect(args).not.toContain('IS NULL OR');
+    const [strings, ...values] = pileTotalsQuery.mock.calls[0] as [TemplateStringsArray, ...unknown[]];
+    const sql = strings.join('?');
+    // Организация — параметр и строгое равенство, не литерал и не «IS NULL OR».
+    expect(sql).toContain('pw."tenantId" = ?');
+    expect(sql).not.toMatch(/tenantId"s+IS NULL OR/);
+    expect(values).toContain('tenant-a');
+  });
+
+  // Баг $4 под Turbopack (апрель 2026, /api/reports/pdf): вложенные фрагменты
+  // Prisma.sql неверно нумеруют параметры, запрос падает 22P02. Итоги журнала
+  // обязаны получать только скаляры (строка, число, null, Date).
+  it('запрос итогов принимает только скалярные параметры, без вложенных Prisma.sql', async () => {
+    await listPilePassports({
+      tenantId: 'tenant-a',
+      siteId: 'site-1',
+      acceptance: 'PENDING',
+      pileNumber: 'C-1',
+      dateFrom: '2026-10-01',
+      dateTo: '2026-10-07',
+      timezone: 'Europe/Moscow',
+    });
+
+    const [, ...values] = pileTotalsQuery.mock.calls[0] as [TemplateStringsArray, ...unknown[]];
+    for (const value of values) {
+      const scalar = value === null
+        || typeof value === 'string'
+        || typeof value === 'number'
+        || value instanceof Date;
+      expect(scalar, `параметр ${JSON.stringify(value)} — не скаляр`).toBe(true);
+    }
   });
 });
 

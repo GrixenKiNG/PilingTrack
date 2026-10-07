@@ -1,5 +1,4 @@
 import { db } from '@/lib/db';
-import { Prisma } from '@/generated/postgres-client';
 import { SUBMITTED_REPORT_STATUS } from '@/lib/report-status';
 import type {
   PileAcceptanceValue,
@@ -43,30 +42,18 @@ export async function pileJournalTotals(
   acceptance: PileAcceptanceValue | undefined,
   bounds: { gte?: Date; lt?: Date } | null,
 ): Promise<PileJournalTotals> {
-  const conditions: Prisma.Sql[] = [Prisma.sql`pw."tenantId" = ${input.tenantId}`];
-  if (input.siteId) conditions.push(Prisma.sql`r."siteId" = ${input.siteId}`);
+  // Только скалярные параметры, без вложенных фрагментов Prisma.sql: вложенные
+  // фрагменты неверно нумеруют позиционные параметры под Turbopack (баг $4,
+  // /api/reports/pdf, апрель 2026; см. site-analytics-service.ts). Необязательные
+  // фильтры — «параметр IS NULL OR условие», как в getSiteAnalytics.
+  // Организация — строгим равенством (никакого `tenantId IS NULL OR ...`).
+  const siteId = input.siteId ?? null;
+  const acceptanceValue = acceptance ?? null;
   // Решение и номер сваи — в паспорте; сваи без паспорта под эти фильтры не идут.
-  if (acceptance) conditions.push(Prisma.sql`p."acceptance"::text = ${acceptance}`);
-  if (input.pileNumber) {
-    conditions.push(Prisma.sql`p."pileNumber" ILIKE ${`%${escapeLikePattern(input.pileNumber)}%`} ESCAPE '\\'`);
-  }
+  const pileLike = input.pileNumber ? `%${escapeLikePattern(input.pileNumber)}%` : null;
   // Дата забивки — момент работы; строку без `occurredAt` ставим по `receivedAt`.
-  if (bounds) {
-    const occurred: Prisma.Sql[] = [];
-    const received: Prisma.Sql[] = [];
-    if (bounds.gte) {
-      occurred.push(Prisma.sql`pw."occurredAt" >= ${bounds.gte}`);
-      received.push(Prisma.sql`pw."receivedAt" >= ${bounds.gte}`);
-    }
-    if (bounds.lt) {
-      occurred.push(Prisma.sql`pw."occurredAt" < ${bounds.lt}`);
-      received.push(Prisma.sql`pw."receivedAt" < ${bounds.lt}`);
-    }
-    conditions.push(Prisma.sql`(
-      (pw."occurredAt" IS NOT NULL AND ${Prisma.join(occurred, ' AND ')})
-      OR (pw."occurredAt" IS NULL AND ${Prisma.join(received, ' AND ')})
-    )`);
-  }
+  const gte = bounds?.gte ?? null;
+  const lt = bounds?.lt ?? null;
 
   const [totals] = await db.$queryRaw<RawPileJournalTotals[]>`
     SELECT
@@ -80,7 +67,18 @@ export async function pileJournalTotals(
     FROM "PileWork" pw
     LEFT JOIN "Report" r ON r.id = pw."reportId"
     LEFT JOIN "PilePassport" p ON p."pileWorkId" = pw.id
-    WHERE ${Prisma.join(conditions, ' AND ')}
+    WHERE pw."tenantId" = ${input.tenantId}
+      AND (${siteId}::text IS NULL OR r."siteId" = ${siteId}::text)
+      AND (${acceptanceValue}::text IS NULL OR p."acceptance"::text = ${acceptanceValue}::text)
+      AND (${pileLike}::text IS NULL OR p."pileNumber" ILIKE ${pileLike}::text ESCAPE '\')
+      AND (
+        (pw."occurredAt" IS NOT NULL
+          AND (${gte}::timestamptz IS NULL OR pw."occurredAt" >= ${gte}::timestamptz)
+          AND (${lt}::timestamptz IS NULL OR pw."occurredAt" < ${lt}::timestamptz))
+        OR (pw."occurredAt" IS NULL
+          AND (${gte}::timestamptz IS NULL OR pw."receivedAt" >= ${gte}::timestamptz)
+          AND (${lt}::timestamptz IS NULL OR pw."receivedAt" < ${lt}::timestamptz))
+      )
   `;
   return totals;
 }
