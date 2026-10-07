@@ -64,6 +64,8 @@ const tx = {
   operatorChecklistAnswerRecord: {create: vi.fn()},
   operatorShiftEvidence: {findFirst: vi.fn(), findUnique: vi.fn(), create: vi.fn()},
   equipmentDefect: {findFirst: vi.fn(), create: vi.fn()},
+  meterReading: {findFirst: vi.fn(), create: vi.fn()},
+  equipment: {findFirst: vi.fn(), update: vi.fn()},
   $executeRaw: vi.fn(),
 };
 
@@ -105,6 +107,33 @@ beforeEach(() => {
   ]);
   tx.equipmentDefect.findFirst.mockResolvedValue(null);
   tx.equipmentDefect.create.mockResolvedValue({id: 'defect-1'});
+  tx.meterReading.findFirst.mockResolvedValue({engineHours: 3000});
+  tx.meterReading.create.mockResolvedValue({id: 'meter-1'});
+  tx.equipment.findFirst.mockResolvedValue({engineHoursTotal: 3000});
+  tx.equipment.update.mockResolvedValue({});
+});
+
+describe('submitChecklist — пометка замены счётчика', () => {
+  it.each(['Счётчик заменён', 'Счётчик заменён; Установлен новый прибор'])('передаёт явную пометку %s в журнал', async (note) => {
+    await submitChecklist({...input, answers: [{itemId: 'meter-after', answer: 'OK', measures: {engineHours: 99}, note}]});
+    expect(tx.meterReading.create).toHaveBeenCalledWith({data: expect.objectContaining({
+      engineHours: 99, note: `${note}; ЕО до работы`,
+    })});
+    expect(tx.equipment.update).toHaveBeenCalledWith(expect.objectContaining({data: {engineHoursTotal: 99}}));
+  });
+
+  it.each(['Проверил показание', 'Счётчик заменён ли?'])('обычное примечание %s не разрешает уменьшить показание', async (note) => {
+    await expect(submitChecklist({...input, answers: [{itemId: 'meter-after', answer: 'OK', measures: {engineHours: 99}, note}]})).rejects.toMatchObject({status: 400});
+    expect(tx.meterReading.create).not.toHaveBeenCalled();
+  });
+
+  it('пометка другого пункта не подтверждает замену счётчика', async () => {
+    await expect(submitChecklist({...input, answers: [
+      {itemId: 'meter-after', answer: 'OK', measures: {engineHours: 99}},
+      {itemId: 'glass', answer: 'OK', note: 'Счётчик заменён'},
+    ]})).rejects.toMatchObject({status: 400});
+    expect(tx.meterReading.create).not.toHaveBeenCalled();
+  });
 });
 
 describe('submitChecklist — advisory-замки на ключи дефектов', () => {

@@ -15,6 +15,7 @@ export type {
 export {checklistItems} from './domain/checklist-types';
 export type {ChecklistAnswer, ChecklistProblem} from './domain/checklist-run';
 export {measureRequired} from './domain/checklist-run';
+export const ENGINE_HOURS_REPLACEMENT_NOTE = 'Счётчик заменён';
 export type {DocumentCheck, DocumentVerdict} from './domain/operator-admission';
 export type {OperatorPhase} from './domain/shift-phases';
 export type {WarningCode, WarningLevel, WorkWarning} from './domain/work-warnings';

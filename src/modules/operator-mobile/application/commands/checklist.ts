@@ -16,6 +16,7 @@ import {selectChecklistItems} from '../../domain/shift-conditions';
 import {missingPrerequisites} from '../../domain/shift-phases';
 import {OperatorCommandError, requireCrew, requireOpenShift, recordEvidence, requireConfirmedImages, recordMeter} from './shared';
 import type {Tx} from './shared';
+import {ENGINE_HOURS_REPLACEMENT_NOTE} from '../../contracts';
 
 /**
  * Шаблон чек-листа в базе существует ради целостности ссылок и снимка версии.
@@ -232,12 +233,16 @@ export async function submitChecklist(input: {
     // иначе механик никогда не узнает, что масло доливают третью смену подряд.
     const meter = findMeasure(input.answers, 'engineHours');
     if (meter !== null) {
+      const meterNote = input.answers.find((answer) => Number.isFinite(answer.measures?.engineHours))?.note?.trim();
+      const meterReplaced = meterNote === ENGINE_HOURS_REPLACEMENT_NOTE
+        || meterNote?.startsWith(`${ENGINE_HOURS_REPLACEMENT_NOTE}; `) === true;
       await recordMeter(tx, {
         tenantId: input.tenantId,
         equipmentId: input.equipmentId,
         engineHours: Math.round(meter),
         operatorId: input.operatorId,
-        note: definition.title,
+        note: meterNote ? `${meterNote}; ${definition.title}` : definition.title,
+        meterReplaced,
         now,
       });
     }

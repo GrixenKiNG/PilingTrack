@@ -14,6 +14,7 @@ import {
   INCIDENT_CATEGORIES, INCIDENT_CATEGORY_LABELS, INCIDENT_DESCRIPTION_MIN,
   INCIDENT_SIGN_LABELS, INCIDENT_SIGNS, PHASE_LABELS, PPE_ITEMS, SAFETY_BRIEFING,
   measureRequired,
+  ENGINE_HOURS_REPLACEMENT_NOTE,
 } from '@/modules/operator-mobile/contracts';
 import {KnowledgeScreen} from '../operator-mobile/screens/knowledge-screen';
 import {PilePassportForm} from '../operator-mobile/screens/pile-passport-form';
@@ -383,13 +384,15 @@ function AcceptScreen({state, busy, onAccept}: {
 }
 
 /** D/E. Чек-лист этапа — экраны D1–D4 и E1 макета. */
-function ChecklistScreen({checklist, answers, measures, busy, lastMeter, onAnswer, onMeasure, onSubmit}: {
+function ChecklistScreen({checklist, answers, measures, busy, lastMeter, meterReplaced, onMeterReplacement, onAnswer, onMeasure, onSubmit}: {
   checklist: ChecklistView;
   answers: Record<string, OperatorAnswer>;
   measures: Record<string, string>;
   busy: boolean;
   /** Последнее показание счётчика — подсказка у поля моточасов. */
   lastMeter: {engineHours: number; recordedAt: string} | null;
+  meterReplaced: boolean;
+  onMeterReplacement: (replaced: boolean) => void;
   onAnswer: (itemId: string, answer: OperatorAnswer) => void;
   onMeasure: (key: string, value: string) => void;
   onSubmit: () => void;
@@ -453,15 +456,21 @@ function ChecklistScreen({checklist, answers, measures, busy, lastMeter, onAnswe
                   onChange={(event) => onMeasure(item.measure?.key ?? '', event.target.value)}
                 />
                 {/* Прошлое показание счётчика — рядом с полем, а не на экране
-                    приёмки, который к этому моменту давно закрыт. Счётчик не
-                    крутится назад, и человек, видящий вчерашнее число, ловит
-                    свою опечатку сам — до того, как сервер откажет. Поле при
+                    приёмки, который к этому моменту давно закрыт. Без отметки
+                    замены меньшее число отклоняется: человек может заметить
+                    опечатку или подтвердить замену до отправки. Поле при
                     этом не заполняем: подставленное отправят не глядя. */}
                 {item.measure?.key === 'engineHours' && lastMeter ? (
                   <span className="m">
                     было {formatNumber(lastMeter.engineHours, 0)} м/ч
                     {' '}на {dateRu(lastMeter.recordedAt)}
                   </span>
+                ) : null}
+                {item.measure?.key === 'engineHours' ? (
+                  <label className="m">
+                    <input type="checkbox" checked={meterReplaced} onChange={(event) => onMeterReplacement(event.target.checked)} />
+                    Счётчик заменён
+                  </label>
                 ) : null}
               </div>
             ))}
@@ -920,6 +929,7 @@ export function OperatorV5App() {
   const [answers, setAnswers] = useState<Record<string, OperatorAnswer>>({});
   /** Числовые замеры текущего списка: моточасы, остаток топлива, доливы. */
   const [measures, setMeasures] = useState<Record<string, string>>({});
+  const [meterReplacement, setMeterReplacement] = useState<{shiftId: string; stage: ChecklistStage} | null>(null);
   const [commandId, setCommandId] = useState(newCommandId);
   const [online, setOnline] = useState(true);
 
@@ -1080,14 +1090,16 @@ export function OperatorV5App() {
           : undefined,
         // Сервер требует описание к неисправности. Экран макета отдельного
         // поля не предусматривает, поэтому пишем честный источник ответа.
-        note: answers[item.id] === 'FAULT' ? 'Отмечено машинистом на осмотре' : undefined,
+        note: [item.measure?.key === 'engineHours' && meterReplacement?.shiftId === shiftId && meterReplacement.stage === stage ? ENGINE_HOURS_REPLACEMENT_NOTE : '',
+          answers[item.id] === 'FAULT' ? 'Отмечено машинистом на осмотре' : ''].filter(Boolean).join('; ') || undefined,
       })),
     }), `${checklist.title}: принято.`);
     setMeasures({});
     setAnswers({});
+    setMeterReplacement(null);
     // Периодический список сдан — возвращаемся туда, откуда его открыли.
     setSafetyStage(null);
-  }, [answers, checklist, commandId, measures, run, stage, state]);
+  }, [answers, checklist, commandId, measures, meterReplacement, run, stage, state]);
 
   const reportIncident = useCallback((input: {
     category: IncidentCategory; signs: IncidentSign[]; injured: boolean; description: string;
@@ -1347,6 +1359,8 @@ export function OperatorV5App() {
           checklist={checklist}
           answers={answers}
           measures={measures}
+          meterReplaced={meterReplacement?.shiftId === shiftId && meterReplacement?.stage === stage}
+          onMeterReplacement={(replaced) => setMeterReplacement(replaced && shiftId && stage ? {shiftId, stage} : null)}
           busy={busy}
           lastMeter={state.assignment?.lastMeter ?? null}
           onAnswer={(itemId, answer) => setAnswers((current) => ({...current, [itemId]: answer}))}

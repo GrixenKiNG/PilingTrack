@@ -14,6 +14,7 @@ import {type ChecklistAnswer} from '../../domain/checklist-run';
 import {checkOperatorDocuments} from '../../domain/operator-admission';
 import {BRIEFING_DOCUMENT_TYPE, KNOWLEDGE_DOCUMENT_TYPE} from '../../domain/operator-credentials';
 import {productionRefusal, productionBlocks} from '../../domain/production-permit';
+import {ENGINE_HOURS_REPLACEMENT_NOTE} from '../../contracts';
 
 
 export class OperatorCommandError extends Error {
@@ -164,6 +165,7 @@ export function requireDowntimeReason(tx: Tx, tenantId: string, id: string) {
 export async function recordMeter(tx: Tx, input: {
   tenantId: string; equipmentId: string; engineHours: number;
   operatorId: string; note: string; now: Date;
+  meterReplaced?: boolean;
 }) {
   /*
     СРАВНИВАЕМ С ОБОИМИ ИСТОЧНИКАМИ НАРАБОТКИ, А НЕ ТОЛЬКО С ЖУРНАЛОМ.
@@ -176,7 +178,8 @@ export async function recordMeter(tx: Tx, input: {
     машины уменьшилась на глазах, а вместе с ней поехали планы ТО, которые от
     неё считаются.
 
-    Берём максимум из двух: счётчик не крутится назад ни по одному из них.
+    Берём максимум из двух. Исключение — явно подтверждённая замена счётчика;
+    её сохраняем пометкой в журнале (решение владельца 07.10.2026).
   */
   const [previous, equipment] = await Promise.all([
     tx.meterReading.findFirst({
@@ -194,14 +197,18 @@ export async function recordMeter(tx: Tx, input: {
     .filter((value): value is number => typeof value === 'number');
   const floor = known.length > 0 ? Math.max(...known) : null;
 
-  // Счётчик моточасов не крутится назад. Меньшее значение — опечатка, и
-  // принять её значит испортить и наработку, и планы ТО, которые от неё зависят.
-  if (floor !== null && input.engineHours < floor) {
+  if (floor !== null && input.engineHours < floor && !input.meterReplaced) {
     throw new OperatorCommandError(
       400,
-      `Моточасы меньше известной наработки (${floor}). Проверьте цифру.`,
+      `Моточасы меньше известной наработки (${floor}). Проверьте цифру или отметьте «Счётчик заменён», если установлен новый прибор.`,
     );
   }
+
+  const note = input.meterReplaced
+    && input.note !== ENGINE_HOURS_REPLACEMENT_NOTE
+    && !input.note.startsWith(`${ENGINE_HOURS_REPLACEMENT_NOTE}; `)
+    ? `${ENGINE_HOURS_REPLACEMENT_NOTE}; ${input.note}`
+    : input.note;
 
   await tx.meterReading.create({
     data: {
@@ -211,7 +218,7 @@ export async function recordMeter(tx: Tx, input: {
       engineHours: input.engineHours,
       source: 'MANUAL',
       recordedById: input.operatorId,
-      note: input.note,
+      note,
     },
   });
   await tx.equipment.update({

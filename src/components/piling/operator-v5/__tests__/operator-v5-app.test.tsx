@@ -30,6 +30,27 @@ import {ApiError, QueuedOffline} from '@/components/piling/operator-mobile/api';
 import {CloseScreen, OperatorV5App, WorkScreen} from '../operator-v5-app';
 import {workStateFixture} from '../../operator-mobile/__tests__/fixtures';
 
+describe('v5: явная замена счётчика моточасов', () => {
+  it('посылает новое меньшее показание с пометкой, не отмечая неисправность', async () => {
+    api.fetchState.mockReset();
+    api.sendCommand.mockReset().mockResolvedValue(undefined);
+    api.fetchState.mockResolvedValue(workStateFixture({phase: 'CLOSING',
+      operator: {id: 'me', name: 'Машинист'},
+      assignment: {...working.assignment!, lastMeter: {engineHours: 3000, recordedAt: '2026-09-19T15:00:00.000Z'}},
+      checklists: [{stage: 'EO_AFTER', title: 'ЕО после работы', purpose: '', version: '1', done: false, period: null,
+        sections: [{id: 'meter', title: 'Счётчик', items: [{id: 'hours', text: 'Снять показание', severity: 'NOTE', measure: {key: 'engineHours', label: 'Моточасы', unit: 'м/ч'}}]}]}],
+    }));
+    render(<OperatorV5App />);
+    fireEvent.click(await screen.findByRole('button', {name: /^норма$/i}));
+    fireEvent.change(screen.getByRole('textbox'), {target: {value: '99'}});
+    fireEvent.click(screen.getByRole('checkbox', {name: 'Счётчик заменён'}));
+    fireEvent.click(screen.getByRole('button', {name: 'Завершить'}));
+    await waitFor(() => expect(api.sendCommand).toHaveBeenCalledWith(expect.objectContaining({
+      command: 'submit-checklist', answers: [expect.objectContaining({itemId: 'hours', answer: 'OK', note: 'Счётчик заменён', measures: {engineHours: 99}})],
+    })));
+  });
+});
+
 /** Обещание, которым тест сам решает, когда закончится перечитывание экрана. */
 function deferred<T>() {
   let resolve!: (value: T) => void;
