@@ -1,8 +1,8 @@
 import { db } from '@/lib/db';
 import { Prisma } from '@/generated/postgres-client';
 import { SUBMITTED_REPORT_STATUS } from '@/lib/report-status';
-import type { PileAcceptanceValue } from '@/modules/operator-mobile/domain/pile-passport';
 import type {
+  PileAcceptanceValue,
   PileJournalFilters,
   PileJournalHeader,
   PileJournalTotals,

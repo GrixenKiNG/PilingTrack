@@ -9,4 +9,4 @@ src/modules/layout/domain/surfaces.ts|@/components/piling/analytics-dashboard/kp
 src/modules/layout/domain/surfaces.ts|@/components/piling/main-dashboard/kpi-catalog|modules/ may not import from components/
 src/modules/layout/domain/surfaces.ts|@/components/piling/monitoring/equipment-tile-template|modules/ may not import from components/
 src/modules/monitoring/application/template-service.ts|@/components/piling/monitoring/equipment-tile-template|modules/ may not import from components/
-src/modules/reports/application/queries/pile-passport.service.ts|@/modules/operator-mobile/domain/pile-passport|modules/reports may not import from modules/operator-mobile (cross-module)
+src/modules/reports/application/queries/pile-journal-types.ts|@/modules/operator-mobile/domain/pile-passport|modules/reports may not import from modules/operator-mobile (cross-module)

@@ -1,5 +1,26 @@
 import { zonedDayStartUtc } from '@/lib/timezone';
-import type { PileAcceptanceValue } from '@/modules/operator-mobile/domain/pile-passport';
+import {
+  actualRefusalMm,
+  drivingComplete,
+  journalRefusalMm,
+  redriveReadyAt,
+  setRefusalMm,
+  suggestAcceptance,
+  type DrivingSet,
+  type PileAcceptanceValue,
+} from '@/modules/operator-mobile/domain/pile-passport';
+
+// Единственная точка, где журнал забивки берёт правила из operator-mobile
+// (граница слоёв: одно grandfathered-нарушение, как было в одном файле до W46).
+export {
+  actualRefusalMm,
+  drivingComplete,
+  journalRefusalMm,
+  redriveReadyAt,
+  setRefusalMm,
+  suggestAcceptance,
+};
+export type { DrivingSet, PileAcceptanceValue };
 
 /**
  * Журнал забивки свай.

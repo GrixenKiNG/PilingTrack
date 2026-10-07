@@ -1,7 +1,7 @@
 import { getSettings } from '@/modules/settings';
-import type { PileAcceptanceValue } from '@/modules/operator-mobile/domain/pile-passport';
 import {
   PILE_JOURNAL_EXPORT_LIMIT,
+  type PileAcceptanceValue,
   type PileJournalFilters,
   type PilePassportRow,
 } from './pile-journal-types';
