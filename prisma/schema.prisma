@@ -2205,6 +2205,10 @@ model PileWork {
   @@index([pileGradeId])
   @@unique([tenantId, clientCommandId])
   @@index([tenantId, shiftId, occurredAt])
+  @@index([tenantId, occurredAt])
+  // Журнал датирует старые строки без occurredAt по receivedAt. Частичный
+  // PileWork_tenantId_receivedAt_null_occurredAt_idx задан SQL-миграцией:
+  // (tenantId, receivedAt) WHERE occurredAt IS NULL; не заменять полным индексом.
   @@index([correctsId])
 }
 

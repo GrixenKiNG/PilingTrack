@@ -62,7 +62,8 @@ exit0. Browser Chromium на собственном Postgres: 1 passed/0 skipped
 - npm run test:unit: exit1, 3729 passed/250 skipped/2 failed (3981 tests,
   386 files): два неизменённых filesystem scanner теста превысили 5 секунд.
   Повтор этих двух файлов: exit0, 42 passed/0 skipped. Полный повтор с
-  --maxWorkers=2 ещё выполняется; итог будет записан ниже.
+  --maxWorkers=2: exit0, 3731 passed/250 skipped/3981 tests, 372 passed/
+  14 skipped files, 512.47s. Таймауты и исходники тестов не ослаблены.
 - npx playwright test --list: exit0, 297 tests/29 files; добавлен один
   сценарий × три проекта, существующие specs не удалены.
 - npm run build: exit0 на собственном codex-pg и Redis; финальный исходный
@@ -79,3 +80,46 @@ exit0. Browser Chromium на собственном Postgres: 1 passed/0 skipped
 Reports 6/4, Centre 1/1; тесты API 49/2, presentation 30/1,
 Fleet+Reports 56/0, Centre 20/1, browser 46/0. Удалённых файлов/экспортов нет.
 Перестройка проекции/правка боевых данных для J9 не требуется.
+Коммит J9: a49bf84d.
+
+## J8 — индексы периода журнала
+
+Добавлены (tenantId, occurredAt) и частичный (tenantId, receivedAt) WHERE
+occurredAt IS NULL. Два отдельных migration.sql по одному CREATE INDEX
+CONCURRENTLY сохраняют autocommit; это одно логическое изменение J8.
+Существующий shiftId-индекс и запросы приложения не меняются. Частичный
+индекс описан в schema комментарием, поскольку задан SQL-миграцией.
+
+На собственном codex-pg-054a44aa2472 (Postgres16, порт58804) сначала RED:
+exit1, 1 failed/1 pattern-skipped. Каталог индексов был пуст для этих имён;
+проверки реальных ID/итогов listPilePassports уже проходили. Созданы только
+собственные tenant fixtures: 120000 строк (100000+20000), 1000 дней, оба
+источника времени, два объекта. AuditLog не создаётся и не удаляется.
+
+Prisma migrate deploy --config prisma.integration.config.ts: exit0,
+обе concurrent миграции успешно применены через штатный migration runner.
+GREEN: exit0, 1 passed/1 pattern-skipped; 200 строк/свай без объекта,
+100 с объектом, по половине occurredAt/fallback. Все четыре EXPLAIN
+используют оба новых индекса. Сортировка сохраняется; Seq Scan для малого
+объёма/широкого периода не запрещается. enable_seqscan не менялся.
+
+Локальный замер до→после (мс): список 19.854→0.340, агрегат23.377→0.545;
+с объектом13.334→0.549 и13.231→0.534. После — Bitmap Heap Scan, 200 строк,
+113 shared-hit blocks для PileWork вместо обхода десятков тысяч лишних строк.
+Это иллюстрация fixture, не SLA/оценка боевой БД. Полные EXPLAIN JSON:
+output/codex-t10/j8-plans-before.json и j8-plans-after.json. План списка
+выбирает ID, не измеряет все связанные Prisma presentation SELECTs;
+реальное приложение отдельно проверено по ID/агрегатам.
+
+tsc exit0; полный lint exit0/0 warnings; полный unit — неизменённый итог J9
+3731 passed/250 skipped, runtime queries не редактировались. После первого
+GREEN добавлен guard same local owner/app codex_test target; финальный повтор
+exit0, 1 passed/1 pattern-skipped, 11.63s. GitNexus impact/detect-changes exit1 UNKNOWN, разрешённый
+rg fallback: readers listPilePassports/pileJournalTotals, writers производят
+те же данные, схема меняется только индексами; independent review без замечаний.
+
+Строки J8: schema +4, интеграционный тест +154, две migration.sql +4 каждая,
+runbook017 +124. Удалённых файлов/экспортов нет. Ни общая локальная, ни боевая
+БД не открывались. На бою индексы ещё нужно применить владельцу; runbook017
+содержит проверки объёма, свободного места, длинных транзакций и валидности.
+Удаление невалидного индекса при сбое — отдельное решение владельца.
