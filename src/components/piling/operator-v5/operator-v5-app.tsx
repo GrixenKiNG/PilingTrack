@@ -355,10 +355,16 @@ function AcceptScreen({state, busy, onAccept}: {
         <div className="card" key={option.equipmentId}>
           <span className="lbl">{option.equipmentName}</span>
           <p>{option.siteName}</p>
+          {state.blockedShift?.equipmentId === option.equipmentId ? (
+            <p className="note warn">
+              Другой машинист не сдал смену за {dateRu(state.blockedShift.productionDate)}.
+              {' '}Обратитесь к диспетчеру, чтобы он организовал сдачу смены. После её закрытия можно принять машину.
+            </p>
+          ) : null}
           <button
             className="b"
             type="button"
-            disabled={busy}
+            disabled={busy || state.blockedShift?.equipmentId === option.equipmentId}
             onClick={() => onAccept(option.equipmentId)}
           >
             Принять машину

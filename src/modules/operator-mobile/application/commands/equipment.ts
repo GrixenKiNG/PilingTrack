@@ -10,7 +10,7 @@ import type {ShiftCondition} from '../../domain/checklist-types';
 import {resolveShiftConditions} from '../../domain/shift-conditions';
 import type {ReadWeather} from '../../domain/view-contracts';
 import {shiftWindow} from '../../domain/shift-window';
-import {OperatorCommandError, requireCrew, productionDateOf, recordEvidence} from './shared';
+import {OperatorCommandError, requireCrew, requireOpenShift, productionDateOf, recordEvidence} from './shared';
 
 /**
  * Приём установки: оператор подтверждает машину и объект.
@@ -51,6 +51,7 @@ export async function acceptEquipment(input: {
       },
       select: {id: true, state: true, productionDate: true, plannedStartAt: true, plannedEndAt: true},
     });
+    if (active) await requireOpenShift(tx, input.tenantId, active.id, input.operatorId);
     if (active && active.productionDate.getTime() !== productionDate.getTime()) {
       throw new OperatorCommandError(
         409,

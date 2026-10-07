@@ -326,7 +326,11 @@ export async function queryOperatorMobileState(input: {
     ? dictionaries.pileGrades.filter((grade) => plannedGradeIds.has(grade.id))
     : dictionaries.pileGrades;
 
-  const [{countByGrade: sitePilesByGrade, ...sitePiles}, siteDrilling, siteDowntime, lastFuel, lastMeter, shift, openDefects] = await Promise.all([
+  const shiftSelect = {
+    id: true, state: true, startedAt: true, closedAt: true, productionDate: true, timezone: true,
+    starter: {select: {id: true, role: true}},
+  } as const;
+  const [{countByGrade: sitePilesByGrade, ...sitePiles}, siteDrilling, siteDowntime, lastFuel, lastMeter, activeShift, openDefects] = await Promise.all([
     sitePileVolume(tenantId, siteId, dictionaries.pileGrades),
     db.leaderDrilling.aggregate({
       _sum: {count: true, meters: true},
@@ -351,19 +355,15 @@ export async function queryOperatorMobileState(input: {
     }),
     // Сначала — открытая смена этой машины на любую дату. База допускает
     // только одну такую (Shift_one_active_per_equipment_key), и если она за
-    // вчера, оператор обязан её увидеть и сдать. Открытой нет — берём
-    // сегодняшнюю в любом состоянии, кроме отменённой.
+    // вчера, её владелец должен увидеть дату и вручную сдать смену.
     db.shift.findFirst({
       where: {
         tenantId,
         equipmentId,
-        OR: [
-          {state: {in: ['STARTED', 'HANDOVER_PENDING']}},
-          {productionDate, state: {notIn: ['CANCELLED']}},
-        ],
+        state: {in: ['STARTED', 'HANDOVER_PENDING']},
       },
       orderBy: [{startedAt: {sort: 'desc', nulls: 'last'}}, {updatedAt: 'desc'}],
-      select: {id: true, state: true, startedAt: true, closedAt: true, productionDate: true, timezone: true},
+      select: shiftSelect,
     }),
     db.equipmentDefect.findMany({
       where: {tenantId, equipmentId, status: {in: ['OPEN', 'IN_WORK']}},
@@ -375,6 +375,23 @@ export async function queryOperatorMobileState(input: {
       take: 10,
     }),
   ]);
+
+  const candidate = activeShift ?? await db.shift.findFirst({
+    where: {tenantId, equipmentId, productionDate, state: {notIn: ['CANCELLED']}},
+    orderBy: [{startedAt: {sort: 'desc', nulls: 'last'}}, {updatedAt: 'desc'}],
+    select: shiftSelect,
+  });
+  // Закрепление установки не передаёт старую смену новому машинисту.
+  // Проверяем то же владение, что requireOpenShift, ДО чтения её содержимого.
+  const otherStarter = candidate?.starter?.role === 'OPERATOR' && candidate.starter.id !== operatorId;
+  const reportOwner = candidate && !otherStarter
+    ? await db.report.findFirst({where: {tenantId, shiftId: candidate.id}, select: {userId: true}})
+    : null;
+  const foreignShift = otherStarter || (reportOwner != null && reportOwner.userId !== operatorId);
+  const shift = foreignShift ? null : candidate;
+  const blockedShift = foreignShift && activeShift
+    ? {equipmentId, productionDate: activeShift.productionDate.toISOString().slice(0, 10)}
+    : undefined;
 
   const coordinates = input.latitude != null && input.longitude != null
     ? {latitude: input.latitude, longitude: input.longitude}
@@ -642,6 +659,7 @@ export async function queryOperatorMobileState(input: {
         state: shift.state,
       }
       : null,
+    ...(blockedShift ? {blockedShift} : {}),
     /*
       Квитанция — то, что сервер записал об отчёте этой смены.
 

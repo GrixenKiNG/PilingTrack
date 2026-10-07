@@ -28,6 +28,7 @@ vi.mock('@/components/piling/operator-mobile/api', () => ({
 
 import {ApiError, QueuedOffline} from '@/components/piling/operator-mobile/api';
 import {CloseScreen, OperatorV5App, WorkScreen} from '../operator-v5-app';
+import {workStateFixture} from '../../operator-mobile/__tests__/fixtures';
 
 /** Обещание, которым тест сам решает, когда закончится перечитывание экрана. */
 function deferred<T>() {
@@ -117,6 +118,24 @@ const working = {
   entries: [],
   warnings: [],
 } as unknown as OperatorMobileState;
+
+describe('приёмка v5 при чужой незакрытой смене', () => {
+  it('показывает дату и обращение к диспетчеру вместо чужого ЕО и не принимает машину', async () => {
+    api.fetchState.mockResolvedValue({
+      ...workStateFixture, phase: 'ADMISSION', shift: null,
+      options: [{crewId: 'crew-1', equipmentId: 'eq-1', equipmentName: 'Установка', siteName: 'Объект'}],
+      blockedShift: {equipmentId: 'eq-1', productionDate: '2026-09-27'},
+    });
+    render(<OperatorV5App />);
+    const accept = await screen.findByRole('button', {name: 'Принять машину'});
+    expect(accept).toBeDisabled();
+    expect(screen.getByText(/Другой машинист не сдал смену за 27.09.2026/)).toBeInTheDocument();
+    expect(screen.getByText(/Обратитесь к диспетчеру/)).toBeInTheDocument();
+    fireEvent.click(accept);
+    expect(api.sendCommand).not.toHaveBeenCalled();
+    expect(screen.queryByText(/Осталось отметить/)).not.toBeInTheDocument();
+  });
+});
 
 /** Экран работы без формы. */
 function renderWork(onLog: (entry: unknown) => Promise<boolean>) {

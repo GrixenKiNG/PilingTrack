@@ -1,4 +1,9 @@
-import {describe, expect, it} from 'vitest';
+import {describe, expect, it, vi} from 'vitest';
+const readiness = vi.hoisted(() => ({transaction: vi.fn(), snapshot: vi.fn()}));
+vi.mock('@/modules/readiness/server', () => ({
+  withReadinessTenantTransaction: readiness.transaction, requestReadinessSnapshot: readiness.snapshot,
+}));
+import {acceptEquipment} from '../../application/commands/equipment';
 import {listBriefingJournal} from '../../application/briefing-journal-query';
 import {dayRangeToInstants} from '../briefing-journal-view';
 import {getChecklist} from '../checklist-catalog';
@@ -565,5 +570,61 @@ describe('смена одного машиниста (сменщиков нет)
     const shift = await requireOpenShift(fakeTx({id: 'disp', role: 'DISPATCHER'}, null), 't', 's1', 'op-b');
     expect(shift).not.toHaveProperty('starter');
     expect(shift.equipmentId).toBe('eq1');
+  });
+});
+
+describe('приём установки не присваивает чужую активную смену', () => {
+  function acceptance(starter: {id: string; role: string}, userId: string | null, day = '2026-10-07', state = 'STARTED') {
+    const active = {id: 's1', state, equipmentId: 'eq1', productionDate: new Date(day),
+      type: 'DAY', starter, plannedStartAt: null, plannedEndAt: null};
+    const tx = {
+      $executeRaw: vi.fn(async () => 0),
+      crew: {findFirst: vi.fn(async () => ({siteId: 'site1'}))},
+      user: {findFirst: vi.fn(async () => ({timezone: 'Europe/Moscow'}))},
+      shift: {findFirst: vi.fn(async (): Promise<typeof active | null> => active), update: vi.fn(), create: vi.fn()},
+      report: {findFirst: vi.fn(async () => userId ? {userId} : null)},
+      site: {findFirst: vi.fn(async () => null)},
+      operatorShiftEvidence: {findUnique: vi.fn(async () => null), create: vi.fn()},
+    };
+    readiness.transaction.mockImplementation(async (_tenant, action) => action(tx));
+    const run = () => acceptEquipment({tenantId: 't', operatorId: 'me', equipmentId: 'eq1',
+      shiftType: 'DAY', clientCommandId: 'cmd1', now: new Date('2026-10-07T08:00:00Z')});
+    return {tx, run};
+  }
+
+  it.each([
+    ['2026-10-07', 'STARTED'], ['2026-09-27', 'STARTED'],
+    ['2026-10-07', 'HANDOVER_PENDING'], ['2026-09-27', 'HANDOVER_PENDING'],
+  ])('отказывает до записи данных при чужом запуске за %s (%s)', async (day, state) => {
+    const {tx, run} = acceptance({id: 'other', role: 'OPERATOR'}, null, day, state);
+    await expect(run()).rejects.toMatchObject({status: 403, message: 'Эту смену ведёт другой машинист'});
+    expect(tx.shift.update).not.toHaveBeenCalled();
+    expect(tx.shift.create).not.toHaveBeenCalled();
+    expect(tx.operatorShiftEvidence.create).not.toHaveBeenCalled();
+  });
+
+  it('чужой отчёт запрещает повторную приёмку после запуска диспетчером', async () => {
+    const {tx, run} = acceptance({id: 'admin', role: 'DISPATCHER'}, 'other');
+    await expect(run()).rejects.toMatchObject({status: 403});
+    expect(tx.operatorShiftEvidence.create).not.toHaveBeenCalled();
+  });
+
+  it.each(['ADMIN', 'DISPATCHER', 'OPERATOR'])('свой запуск или запуск через %s без чужого отчёта разрешён', async (role) => {
+    const {run} = acceptance({id: role === 'OPERATOR' ? 'me' : 'admin', role}, null);
+    await expect(run()).resolves.toEqual({shiftId: 's1'});
+  });
+
+  it('собственную старую смену нужно вручную сдать до открытия сегодняшней', async () => {
+    const {run} = acceptance({id: 'me', role: 'OPERATOR'}, 'me', '2026-09-27');
+    await expect(run()).rejects.toMatchObject({status: 409});
+  });
+
+  it('после закрытия чужой смены создаёт новую, а не принимает закрытую', async () => {
+    const {tx, run} = acceptance({id: 'other', role: 'OPERATOR'}, 'other');
+    tx.shift.findFirst.mockResolvedValue(null);
+    const result = await run();
+    expect(result.shiftId).not.toBe('s1');
+    expect(tx.shift.create).toHaveBeenCalledWith(expect.objectContaining({data: expect.objectContaining({startedById: 'me'})}));
+    expect(tx.shift.findFirst).toHaveBeenNthCalledWith(2, expect.objectContaining({where: expect.objectContaining({state: {in: ['PLANNED', 'PENDING_ACCEPTANCE']}})}));
   });
 });
