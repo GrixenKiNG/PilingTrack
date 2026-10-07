@@ -241,13 +241,13 @@ describe('handleReportForAnalytics', () => {
   });
 
   /*
-    J4 (W28-CODEX-J-TESTPLAN): на ReportUpdated аналитика не подписана, поэтому
-    статус проекции меняют лишь ReportCreated/ReportSubmitted. Если ReportSubmitted
+    J4 (W28-CODEX-J-TESTPLAN): на ReportUpdated аналитика раньше не подписана, поэтому
+    статус проекции меняли лишь ReportCreated/ReportSubmitted. Если ReportSubmitted
     не дошёл (J1/J2), строка ReportAnalytics навсегда остаётся `draft` при живом
-    Report.status = submitted (наблюдалось на RM-3190cede). После правки Codex
-    ReportUpdated должен зеркалить статус отчёта в проекцию. Красный до правки.
+    Report.status = submitted (наблюдалось на RM-3190cede). Теперь ReportUpdated
+    зеркалит статус отчёта в проекцию (источник — строка Report).
   */
-  it.fails('J4: ждёт правки Codex; после правки заменить на it(...) — ReportUpdated зеркалит статус', async () => {
+  it('J4: ReportUpdated зеркалит статус отчёта в проекцию', async () => {
     findUniqueMock.mockResolvedValue({
       siteId: 'site_A', userId: 'user-1', tenantId: 'tenant-a', status: 'submitted',
     });

@@ -29,6 +29,12 @@ import { db } from '@/lib/db';
 export function registerAnalyticsEventHandler() {
   on(REPORT_DOMAIN_EVENT_TYPES.REPORT_CREATED, handleReportForAnalytics);
   on(REPORT_DOMAIN_EVENT_TYPES.REPORT_SUBMITTED, handleReportForAnalytics);
+  // J4: правка отчёта тоже должна обновлять статус проекции. Без этого статус
+  // меняли только ReportCreated (draft) и ReportSubmitted (submitted):
+  // потерянный ReportSubmitted оставлял строку `draft` навсегда, хотя сам
+  // Report уже `submitted` (наблюдалось на RM-3190cede). Обработчик берёт
+  // статус из строки Report (источник истины), а не из типа события.
+  on(REPORT_DOMAIN_EVENT_TYPES.REPORT_UPDATED, handleReportForAnalytics);
   // SiteDailySummary used to be maintained incrementally from item-level
   // events (PILE_WORK_ADDED / DRILLING_ADDED / DOWNTIME_ADDED). That had two
   // bugs: (1) `siteId || ''` fallback wrote rows with an empty key when an
@@ -57,21 +63,21 @@ async function handleReportForAnalytics(event: ReportDomainEvent) {
     // also the uuid form (every query joins r.reportId = ra.reportId),
     // so we write event.aggregateId directly.
     //
-    // Older emit sites sometimes lacked siteId/userId/tenantId; fall back
-    // to a Report lookup by reportId to fill the gaps. Skip if Report is
-    // missing entirely (replay of a deleted aggregate).
-    let siteId = event.siteId;
-    let userId = event.userId;
-    let tenantId = event.tenantId;
-    if (!siteId || !userId || !tenantId) {
-      const report = await db.report.findUnique({
-        where: { reportId: event.aggregateId },
-        select: { siteId: true, userId: true, tenantId: true },
-      });
-      siteId = siteId || report?.siteId;
-      userId = userId || report?.userId;
-      tenantId = tenantId || report?.tenantId || undefined;
-    }
+    // Older emit sites sometimes lacked siteId/userId/tenantId; the Report
+    // lookup by reportId fills the gaps. The row is read unconditionally now
+    // (J4) because it also carries the source-of-truth status.
+    // J4: строку отчёта читаем ВСЕГДА — status проекции обязан отражать
+    // ТЕКУЩИЙ статус источника, а не тип события. Заодно закрываем прежний
+    // фолбэк недостающих siteId/userId/tenantId. События могут прийти не по
+    // порядку, и без чтения источника `ReportUpdated` (или потерянный
+    // `ReportSubmitted`) не мог подтянуть статус.
+    const report = await db.report.findUnique({
+      where: { reportId: event.aggregateId },
+      select: { siteId: true, userId: true, tenantId: true, status: true },
+    });
+    const siteId = event.siteId || report?.siteId;
+    const userId = event.userId || report?.userId;
+    const tenantId = event.tenantId || report?.tenantId || undefined;
     // Организация обязательна. Строка проекции без неё невидима для тенантных
     // запросов (сломанная аналитика), а для запроса с пустым тенантом —
     // видна всем. Раньше здесь писался `tenantId || null`.
@@ -93,6 +99,15 @@ async function handleReportForAnalytics(event: ReportDomainEvent) {
       );
     }
 
+    // Статус — из источника: ReportAnalytics.status зеркалит Report.status
+    // (то же правило, что и в rebuild.ts). Если строки отчёта нет, а событие
+    // само несёт идентификаторы, сохраняем ПРЕЖНЕЕ поведение (статус по типу
+    // события): отдельной правки W41 под этот крайний случай в ветке нет,
+    // менять его не поручено.
+    const status =
+      report?.status ||
+      (event.type === REPORT_DOMAIN_EVENT_TYPES.REPORT_SUBMITTED ? 'submitted' : 'draft');
+
     await db.reportAnalytics.upsert({
       where: { reportId: event.aggregateId },
       create: {
@@ -100,14 +115,14 @@ async function handleReportForAnalytics(event: ReportDomainEvent) {
         siteId,
         userId,
         tenantId,
-        status: event.type === REPORT_DOMAIN_EVENT_TYPES.REPORT_SUBMITTED ? 'submitted' : 'draft',
+        status,
         totalPiles: (event.data.totalPiles as number) || 0,
         totalDrilling: (event.data.totalDrilling as number) || 0,
         totalDowntime: (event.data.totalDowntime as number) || 0,
         lastEventAt: new Date(event.occurredAt),
       },
       update: {
-        status: event.type === REPORT_DOMAIN_EVENT_TYPES.REPORT_SUBMITTED ? 'submitted' : undefined,
+        status,
         totalPiles: (event.data.totalPiles as number) !== undefined
           ? event.data.totalPiles as number
           : undefined,
