@@ -118,6 +118,7 @@ export function SettingsWorkspace(props: ReferenceUiProps) {
         {props.settingsSection === 'audit' && (
           <AuditSettings
             audit={props.audit}
+            auditFailed={props.auditFailed}
             bootstrap={props.bootstrap}
             canExport={Boolean(props.bootstrap?.capabilities.entities.audit.export)}
             activeFilterCount={AUDIT_FILTER_KEYS.filter((key) => Boolean(props.filters[key])).length}

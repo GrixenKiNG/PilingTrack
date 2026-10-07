@@ -28,7 +28,11 @@ export const ASSISTANT_HOME_ROUTE = '/assistant';
  */
 export function roleHomeRoute(role: string): string {
   if (role === 'ADMIN' || role === 'DISPATCHER' || role === 'FOREMAN') return '/admin';
-  if (role === 'MECHANIC' || role === 'SAFETY_ENGINEER') return '/admin/to';
+  // Инженер ОТ закрывает лично допуски, инструктажи и разбор происшествий —
+  // его модуль «ТБ и допуски» стоит у роли первым в меню. Центр технической
+  // готовности (`/admin/to`, дом механика) у него второй и чужой как первый экран.
+  if (role === 'SAFETY_ENGINEER') return '/admin/safety';
+  if (role === 'MECHANIC') return '/admin/to';
   // Помощник смену не ведёт — рабочее место машиниста отвечает ему отказом.
   // Его место — свой допуск: инструктаж, проверка знаний и документы.
   if (role === 'ASSISTANT') return ASSISTANT_HOME_ROUTE;

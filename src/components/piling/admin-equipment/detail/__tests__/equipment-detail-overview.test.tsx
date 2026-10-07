@@ -124,6 +124,21 @@ describe('OverviewTiles — даты обзора (F-R114-1)', () => {
 });
 
 /*
+  F-R129-14: карточка установки подписывала наработку «ч», а модуль ТО ту же
+  величину — «м/ч» (PRODUCT.md:52). Один показатель в двух единицах.
+*/
+describe('OverviewTiles — единица моточасов (F-R129-14)', () => {
+  it('«Моточасы» и «Моточасы ТО» подписаны «м/ч», как в модуле ТО', () => {
+    render(<OverviewTiles eq={equipment()} crew={null} stats={stats} timeline={[]} devicesCount={0} />);
+
+    expect(screen.getByText('1 200 м/ч')).toBeInTheDocument();
+    expect(screen.getByText('1 500 м/ч')).toBeInTheDocument();
+    expect(screen.queryByText('1 200 ч')).toBeNull();
+    expect(screen.queryByText('1 500 ч')).toBeNull();
+  });
+});
+
+/*
   R119 №13: при переключении установок правая панель до ответа `/details`
   показывала паспорт, статус и имя ПРЕДЫДУЩЕЙ машины — loading выставлялся
   только при монтировании, а смена `equipmentId` его не поднимала.
@@ -417,5 +432,83 @@ describe('EquipmentDetail — единицы статистики на полн�
 
     expect(screen.getByText('10 шт. / 100 м.п.')).toBeInTheDocument();
     expect(screen.getByText('2 шт. / 12,5 м.п.')).toBeInTheDocument();
+  });
+});
+
+/*
+  F-R138 №7: строка «Моточасы ТО» показывала `nextMaintenanceAtHours` —
+  порог, при котором нужно ТО, а не текущую наработку. Метка рядом с
+  «Моточасы: 1200 м/ч» читалась как ещё одно показание счётчика.
+  Теперь строка подписана «ТО при наработке» — видно, что это порог.
+*/
+describe('OverviewTiles — подпись порога ТО (F-R138, №7)', () => {
+  it('порог наработки подписан «ТО при наработке», а не «Моточасы ТО»', () => {
+    render(<OverviewTiles eq={equipment()} crew={null} stats={stats} timeline={[]} devicesCount={0} />);
+
+    expect(screen.getByText('ТО при наработке')).toBeInTheDocument();
+    expect(screen.queryByText('Моточасы ТО')).toBeNull();
+    // Значение-порог по-прежнему показано («м/ч»), просто под честной меткой.
+    expect(screen.getByText('1 500 м/ч')).toBeInTheDocument();
+  });
+});
+
+/*
+  F-R138 №15: при одном телематическом устройстве плитка писала «1 устройств» —
+  неверное согласование числительного. Теперь через pluralizeRu.
+*/
+describe('OverviewTiles — согласование «устройство» (F-R138, №15)', () => {
+  function devices(n: number) {
+    render(<OverviewTiles eq={equipment()} crew={null} stats={stats} timeline={[]} devicesCount={n} />);
+  }
+
+  it('одно устройство — «1 устройство»', () => {
+    devices(1);
+    expect(screen.getByText('1 устройство')).toBeInTheDocument();
+    expect(screen.queryByText('1 устройств')).toBeNull();
+  });
+
+  it('два устройства — «2 устройства»', () => {
+    devices(2);
+    expect(screen.getByText('2 устройства')).toBeInTheDocument();
+  });
+
+  it('пять устройств — «5 устройств»', () => {
+    devices(5);
+    expect(screen.getByText('5 устройств')).toBeInTheDocument();
+  });
+});
+
+/*
+  F-R138 №16: отсутствующая модель в карточке называлась тремя способами —
+  «Модель не указана» в герое, прочерк «—» в плитке и полное отсутствие строки
+  в шапке. Теперь пустое поле везде — прочерк.
+*/
+describe('EquipmentDetail — пустая модель (F-R138, №16)', () => {
+  beforeEach(() => {
+    mocks.authFetch.mockReset();
+    usePilingStore.setState({ currentUser: { role: 'ADMIN' } as never });
+  });
+
+  it('в герое и шапке модель без значения показана прочерком', async () => {
+    mocks.authFetch.mockImplementation(async () => json(detailsResponse('eq-1', 'СГ-1')));
+
+    render(<EquipmentDetail equipmentId="eq-1" embedded />);
+    await screen.findAllByText('СГ-1');
+
+    expect(screen.queryByText('Модель не указана')).toBeNull();
+    // Герой, шапка и плитка «Модель» — три прочерка на пустое поле.
+    expect(screen.getAllByText('—').length).toBeGreaterThanOrEqual(3);
+  });
+
+  it('заполненная модель по-прежнему печатается как есть', async () => {
+    mocks.authFetch.mockImplementation(async () => json({
+      ...detailsResponse('eq-1', 'СГ-1'),
+      equipment: { id: 'eq-1', name: 'СГ-1', kind: 'PILE_DRIVER', isActive: true, model: 'JUNTTAN PM20', inventoryNumber: null },
+    }));
+
+    render(<EquipmentDetail equipmentId="eq-1" embedded />);
+    await screen.findAllByText('СГ-1');
+
+    expect(screen.getAllByText('JUNTTAN PM20').length).toBeGreaterThan(0);
   });
 });

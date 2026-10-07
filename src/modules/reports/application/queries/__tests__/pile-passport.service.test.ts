@@ -1,16 +1,18 @@
 /**
- * Дата забивки в журнале — календарный день тенанта, а не UTC (F-R17-1).
+ * Журнал забивки строится из записей выработки (PileWork), а не из одних
+ * паспортов (W14): сваи, записанные «пачкой» (count > 1, без паспорта), обязаны
+ * быть видны — иначе журнал теряет почти всю фактическую забивку. Паспорт
+ * подключается к строке по `pileWorkId` только ради замеров и решения.
  *
- * `drivenAt` — момент времени: свая, забитая в 00:30 МСК 26.09, в UTC ещё
- * 25.09. Журнал забивки распечатывают и подшивают, поэтому день в нём обязан
- * совпадать с фактическим, а не отставать на сутки.
+ * Здесь же — печать дня забивки в поясе тенанта, а не UTC (F-R17-1).
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 type Sheet = { name: string; rows: (string | number | null)[][] };
 
-const { pileFindMany, pileUpdateMany, userFindMany, getSettings, sheets } = vi.hoisted(() => ({
-  pileFindMany: vi.fn(),
+const { pileWorkFindMany, pileTotalsQuery, pileUpdateMany, userFindMany, getSettings, sheets } = vi.hoisted(() => ({
+  pileWorkFindMany: vi.fn(),
+  pileTotalsQuery: vi.fn(),
   pileUpdateMany: vi.fn(),
   userFindMany: vi.fn(),
   getSettings: vi.fn(),
@@ -19,8 +21,10 @@ const { pileFindMany, pileUpdateMany, userFindMany, getSettings, sheets } = vi.h
 
 vi.mock('@/lib/db', () => ({
   db: {
-    pilePassport: { findMany: pileFindMany, updateMany: pileUpdateMany },
+    pileWork: { findMany: pileWorkFindMany },
+    pilePassport: { updateMany: pileUpdateMany },
     user: { findMany: userFindMany },
+    $queryRaw: pileTotalsQuery,
   },
 }));
 
@@ -33,49 +37,15 @@ vi.mock('@/lib/xlsx-writer', () => ({
   },
 }));
 
-import { decidePilePassport, exportPileJournalXlsx } from '../pile-passport.service';
+import { decidePilePassport, exportPileJournalXlsx, listPilePassports, pileJournalHeader, PILE_JOURNAL_LIMIT, PILE_JOURNAL_EXPORT_LIMIT } from '../pile-passport.service';
 
-/** Паспорт, забитый 26.09 в 00:30 МСК (в UTC это ещё 25.09). */
-const atMoscowMidnight = {
-  id: 'p1',
-  pileNumber: 'СВ-1',
-  drivenAt: new Date('2026-09-25T21:30:00.000Z'),
-  recordedByForeman: false,
-  designHeadLevelM: null,
-  actualHeadLevelM: null,
-  drivenDepthM: null,
-  followerUsed: false,
-  redriven: false,
-  headCutOff: false,
-  refusalSetPenetrationMm: null,
-  refusalSetBlows: null,
-  designRefusalMm: null,
-  totalBlows: null,
-  blowsLastMeter: null,
-  planDeviationMm: null,
-  tiltPercent: null,
-  hammerType: null,
-  hammerEnergyKj: null,
-  dropHeightM: null,
-  note: null,
-  acceptance: 'PENDING',
-  acceptanceNote: null,
-  acceptedAt: null,
-  acceptedById: null,
-  sets: [],
-  pileWork: { pileGrade: null, picket: null, report: null },
-};
-
-const sheet = (name: string): Sheet => {
-  const found = sheets.current.find((item) => item.name === name);
-  if (!found) throw new Error(`листа «${name}» нет в выгрузке`);
-  return found;
-};
-
-/** Паспорт с отчётом ночной смены — чтобы графа «Смена» была чем заполнена. */
-const nightShift = {
-  ...atMoscowMidnight,
-  pileWork: {
+/** Строка выработки: одна запись = одна строка журнала. */
+function work(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'w1',
+    count: 1,
+    occurredAt: new Date('2026-09-25T21:30:00.000Z'),
+    receivedAt: new Date('2026-09-25T21:30:00.000Z'),
     pileGrade: null,
     picket: null,
     report: {
@@ -83,25 +53,245 @@ const nightShift = {
       user: { name: 'Иванов' },
       equipment: { name: 'СО-1' },
       crew: null,
-      shiftType: 'NIGHT',
+      shiftType: 'DAY',
+      status: 'submitted',
     },
-  },
+    passport: null,
+    ...overrides,
+  };
+}
+
+/** Паспорт: замеры и решение по свае. */
+function passport(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'p1',
+    pileNumber: 'СВ-1',
+    recordedByForeman: false,
+    designHeadLevelM: null,
+    actualHeadLevelM: null,
+    drivenDepthM: null,
+    followerUsed: false,
+    redriven: false,
+    headCutOff: false,
+    refusalSetPenetrationMm: null,
+    refusalSetBlows: null,
+    designRefusalMm: null,
+    totalBlows: null,
+    blowsLastMeter: null,
+    planDeviationMm: null,
+    tiltPercent: null,
+    hammerType: null,
+    hammerEnergyKj: null,
+    dropHeightM: null,
+    note: null,
+    acceptance: 'PENDING',
+    acceptanceNote: null,
+    acceptedAt: null,
+    acceptedById: null,
+    sets: [],
+    ...overrides,
+  };
+}
+
+const sheet = (name: string): Sheet => {
+  const found = sheets.current.find((item) => item.name === name);
+  if (!found) throw new Error(`листа «${name}» нет в выгрузке`);
+  return found;
 };
 
-describe('exportPileJournalXlsx — день тенанта', () => {
-  beforeEach(() => {
-    sheets.current = [];
-    pileFindMany.mockReset();
-    pileFindMany.mockResolvedValue([atMoscowMidnight]);
-    userFindMany.mockReset();
-    userFindMany.mockResolvedValue([]);
-    getSettings.mockReset();
-    getSettings.mockResolvedValue({
-      timezone: 'Europe/Moscow',
-      companyName: 'ООО «ОРИОН-Строй»',
-      inn: '7701234567',
-    });
+function defaultMocks() {
+  sheets.current = [];
+  pileWorkFindMany.mockReset();
+  pileWorkFindMany.mockResolvedValue([work()]);
+  pileTotalsQuery.mockReset();
+  pileTotalsQuery.mockResolvedValue([totals()]);
+  userFindMany.mockReset();
+  userFindMany.mockResolvedValue([]);
+  getSettings.mockReset();
+  getSettings.mockResolvedValue({
+    timezone: 'Europe/Moscow',
+    companyName: 'ООО «ОРИОН-Строй»',
+    inn: '7701234567',
   });
+}
+
+/** Строка агрегата периода — то, что вернёт один запрос итогов. */
+function totals(overrides: Record<string, unknown> = {}) {
+  return {
+    piles: 1,
+    draftPiles: 0,
+    withoutPassportPiles: 1,
+    accepted: 0,
+    needsRedrive: 0,
+    pending: 0,
+    rows: 1,
+    ...overrides,
+  };
+}
+
+// ---------------------------------------------------------------- строки
+
+describe('listPilePassports — строки из выработки (W14)', () => {
+  beforeEach(defaultMocks);
+
+  it('свая, записанная пачкой (count 2) без паспорта, есть в журнале', async () => {
+    pileWorkFindMany.mockResolvedValue([work({ count: 2, passport: null })]);
+
+    const { rows } = await listPilePassports({ tenantId: 'orion' });
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      pileWorkId: 'w1',
+      passportId: null,
+      hasPassport: false,
+      acceptance: null,
+      count: 2,
+    });
+    expect(rows[0].sets).toEqual([]);
+  });
+
+  it('отрицательная запись (поправка) видна со знаком', async () => {
+    pileWorkFindMany.mockResolvedValue([work({ count: -4 })]);
+
+    const { rows } = await listPilePassports({ tenantId: 'orion' });
+
+    expect(rows[0].count).toBe(-4);
+  });
+
+  it('свая с паспортом PENDING: замеры и решение на месте', async () => {
+    pileWorkFindMany.mockResolvedValue([
+      work({
+        passport: passport({
+          acceptance: 'PENDING',
+          designRefusalMm: 20,
+          sets: [
+            { ordinal: 1, blows: 10, penetrationMm: 30, dropHeightM: null },
+            { ordinal: 2, blows: 10, penetrationMm: 24, dropHeightM: null },
+            { ordinal: 3, blows: 10, penetrationMm: 18, dropHeightM: null },
+          ],
+        }),
+      }),
+    ]);
+
+    const { rows } = await listPilePassports({ tenantId: 'orion' });
+
+    expect(rows[0]).toMatchObject({
+      passportId: 'p1',
+      hasPassport: true,
+      pileNumber: 'СВ-1',
+      acceptance: 'PENDING',
+      count: 1,
+    });
+    expect(rows[0].sets).toHaveLength(3);
+    expect(rows[0].refusalMm).not.toBeNull();
+  });
+
+  it('отчёт-черновик помечен как черновик', async () => {
+    pileWorkFindMany.mockResolvedValue([work({ report: { ...work().report, status: 'draft' } })]);
+
+    const { rows } = await listPilePassports({ tenantId: 'orion' });
+
+    expect(rows[0].isDraft).toBe(true);
+  });
+
+  it('организация — строгим равенством: выборка только по своему тенанту', async () => {
+    await listPilePassports({ tenantId: 'tenant-a' });
+
+    const where = pileWorkFindMany.mock.calls[0][0].where as Record<string, unknown>;
+    expect(where.tenantId).toBe('tenant-a');
+  });
+
+  it('фильтр по решению ищет только среди паспортов', async () => {
+    await listPilePassports({ tenantId: 'orion', acceptance: 'PENDING' });
+
+    const where = pileWorkFindMany.mock.calls[0][0].where as { passport?: { acceptance?: string } };
+    expect(where.passport?.acceptance).toBe('PENDING');
+  });
+});
+
+// ---------------------------------------------------------------- итоги периода (W21)
+
+describe('listPilePassports — итоги по всему периоду (W21)', () => {
+  beforeEach(defaultMocks);
+
+  it('при усечении итоги считаются по всему периоду, а не по показанным строкам', async () => {
+    // 501 строка → срез: титул обязан описать весь период, а не первые 500.
+    pileWorkFindMany.mockResolvedValue(
+      Array.from({ length: PILE_JOURNAL_LIMIT + 1 }, (_, i) => work({ id: `w${i}` })),
+    );
+    pileTotalsQuery.mockResolvedValue([totals({
+      piles: 1234,
+      withoutPassportPiles: 1200,
+      accepted: 5,
+      needsRedrive: 2,
+      pending: 3,
+      rows: 900,
+    })]);
+
+    const { rows, truncated, totals: sum } = await listPilePassports({ tenantId: 'orion' });
+    const header = pileJournalHeader(rows, sum);
+
+    expect(truncated).toBe(true);
+    expect(rows).toHaveLength(PILE_JOURNAL_LIMIT);
+    // Итоги — периода (агрегат), а не показанной страницы.
+    expect(header.pilesTotal).toBe(1234);
+    expect(header.accepted).toBe(5);
+    expect(header.needsRedrive).toBe(2);
+    expect(header.pending).toBe(3);
+    expect(header.rowsTotal).toBe(900);
+  });
+
+  it('«Свай без паспорта» — отдельная сумма, не смешана с плитками паспортов', async () => {
+    pileTotalsQuery.mockResolvedValue([totals({
+      piles: 3025,
+      withoutPassportPiles: 3015,
+      accepted: 1,
+      needsRedrive: 1,
+      pending: 8,
+      rows: 280,
+    })]);
+
+    const { rows, totals: sum } = await listPilePassports({ tenantId: 'orion' });
+    const header = pileJournalHeader(rows, sum);
+
+    expect(header.pilesTotal).toBe(3025);
+    expect(header.withoutPassportPiles).toBe(3015);
+    expect(header.accepted).toBe(1);
+  });
+
+  it('в запросе итогов организация — строгим равенством, без всех тенантов', async () => {
+    await listPilePassports({ tenantId: 'tenant-a' });
+
+    // Аргументы тега $queryRaw: строки запроса + вставленные значения (в т.ч.
+    // вложенный Prisma.sql с условиями). Организация — параметр, не литерал.
+    const args = JSON.stringify(pileTotalsQuery.mock.calls[0]);
+    expect(args).toContain('tenant-a');
+    expect(args).not.toContain('IS NULL OR');
+  });
+});
+
+describe('exportPileJournalXlsx — полная выгрузка (W21)', () => {
+  beforeEach(defaultMocks);
+
+  it('в файл попадает больше 500 строк: у выгрузки отдельный предел', async () => {
+    pileWorkFindMany.mockResolvedValue(
+      Array.from({ length: 600 }, (_, i) => work({ id: `w${i}` })),
+    );
+    pileTotalsQuery.mockResolvedValue([totals({ piles: 600, withoutPassportPiles: 600, rows: 600 })]);
+
+    await exportPileJournalXlsx({ tenantId: 'orion' });
+
+    // Все 600 строк свай в листе, а не экранные 500.
+    expect(sheet('Журнал забивки').rows.length).toBeGreaterThan(600);
+    // Выборка идёт до предела выгрузки, а не до 500.
+    expect(pileWorkFindMany.mock.calls[0][0].take).toBe(PILE_JOURNAL_EXPORT_LIMIT + 1);
+  });
+});
+
+// ---------------------------------------------------------------- выгрузка
+
+describe('exportPileJournalXlsx — день тенанта', () => {
+  beforeEach(defaultMocks);
 
   it('дату забивки 25.09 21:30 UTC печатает как 26.09.2026 по Москве', async () => {
     await exportPileJournalXlsx({ tenantId: 'orion' });
@@ -115,15 +305,15 @@ describe('exportPileJournalXlsx — день тенанта', () => {
   it('период «26.09» считает по Москве: 25.09 21:30 UTC — внутри, 26.09 21:30 UTC — уже нет', async () => {
     await exportPileJournalXlsx({ tenantId: 'orion', dateFrom: '2026-09-26', dateTo: '2026-09-26' });
 
-    const where = pileFindMany.mock.calls[0][0].where as { drivenAt: { gte: Date; lt: Date } };
+    const where = pileWorkFindMany.mock.calls[0][0].where as { OR: { occurredAt: { gte: Date; lt: Date } }[] };
     // Полночь 26.09 и полуночь 27.09 по Москве (UTC+3) в UTC.
-    expect(where.drivenAt.gte.toISOString()).toBe('2026-09-25T21:00:00.000Z');
-    expect(where.drivenAt.lt.toISOString()).toBe('2026-09-26T21:00:00.000Z');
+    expect(where.OR[0].occurredAt.gte.toISOString()).toBe('2026-09-25T21:00:00.000Z');
+    expect(where.OR[0].occurredAt.lt.toISOString()).toBe('2026-09-26T21:00:00.000Z');
 
     const night = new Date('2026-09-25T21:30:00.000Z'); // 26.09 00:30 МСК
     const nextNight = new Date('2026-09-26T21:30:00.000Z'); // 27.09 00:30 МСК
-    expect(night >= where.drivenAt.gte && night < where.drivenAt.lt).toBe(true);
-    expect(nextNight < where.drivenAt.lt).toBe(false);
+    expect(night >= where.OR[0].occurredAt.gte && night < where.OR[0].occurredAt.lt).toBe(true);
+    expect(nextNight < where.OR[0].occurredAt.lt).toBe(false);
   });
 
   it('дату выгрузки печатает в поясе тенанта, а не UTC (F-R37-1)', async () => {
@@ -141,29 +331,17 @@ describe('exportPileJournalXlsx — день тенанта', () => {
     getSettings.mockResolvedValue({ timezone: 'America/New_York' });
 
     await exportPileJournalXlsx({ tenantId: 'orion', dateFrom: '2026-07-01', dateTo: '2026-07-01' });
-    const summer = pileFindMany.mock.calls[0][0].where as { drivenAt: { gte: Date; lt: Date } };
-    expect(summer.drivenAt.gte.toISOString()).toBe('2026-07-01T04:00:00.000Z'); // EDT, UTC-4
+    const summer = pileWorkFindMany.mock.calls[0][0].where as { OR: { occurredAt: { gte: Date } }[] };
+    expect(summer.OR[0].occurredAt.gte.toISOString()).toBe('2026-07-01T04:00:00.000Z'); // EDT, UTC-4
 
     await exportPileJournalXlsx({ tenantId: 'orion', dateFrom: '2026-01-15', dateTo: '2026-01-15' });
-    const winter = pileFindMany.mock.calls[1][0].where as { drivenAt: { gte: Date; lt: Date } };
-    expect(winter.drivenAt.gte.toISOString()).toBe('2026-01-15T05:00:00.000Z'); // EST, UTC-5
+    const winter = pileWorkFindMany.mock.calls[1][0].where as { OR: { occurredAt: { gte: Date } }[] };
+    expect(winter.OR[0].occurredAt.gte.toISOString()).toBe('2026-01-15T05:00:00.000Z'); // EST, UTC-5
   });
 });
 
 describe('exportPileJournalXlsx — организация и подписи (F-R44-1)', () => {
-  beforeEach(() => {
-    sheets.current = [];
-    pileFindMany.mockReset();
-    pileFindMany.mockResolvedValue([atMoscowMidnight]);
-    userFindMany.mockReset();
-    userFindMany.mockResolvedValue([]);
-    getSettings.mockReset();
-    getSettings.mockResolvedValue({
-      timezone: 'Europe/Moscow',
-      companyName: 'ООО «ОРИОН-Строй»',
-      inn: '7701234567',
-    });
-  });
+  beforeEach(defaultMocks);
 
   it('печатает название организации и ИНН из настроек тенанта', async () => {
     await exportPileJournalXlsx({ tenantId: 'orion' });
@@ -209,17 +387,12 @@ describe('exportPileJournalXlsx — организация и подписи (F-
 });
 
 describe('exportPileJournalXlsx — графа «Смена» (F-R44-1)', () => {
-  beforeEach(() => {
-    sheets.current = [];
-    pileFindMany.mockReset();
-    userFindMany.mockReset();
-    userFindMany.mockResolvedValue([]);
-    getSettings.mockReset();
-    getSettings.mockResolvedValue({ timezone: 'Europe/Moscow', companyName: '', inn: '' });
-  });
+  beforeEach(defaultMocks);
 
   it('печатает смену сваи из отчёта', async () => {
-    pileFindMany.mockResolvedValue([nightShift]);
+    pileWorkFindMany.mockResolvedValue([
+      work({ report: { ...work().report, shiftType: 'NIGHT' }, passport: passport() }),
+    ]);
 
     await exportPileJournalXlsx({ tenantId: 'orion' });
 
@@ -228,12 +401,38 @@ describe('exportPileJournalXlsx — графа «Смена» (F-R44-1)', () => 
     expect(rows[1][2]).toBe('Ночная');
   });
 
-  it('без отчёта ячейка смены пуста, а не выдана за дневную', async () => {
-    pileFindMany.mockResolvedValue([atMoscowMidnight]);
+  it('без смены ячейка пуста, а не выдана за дневную', async () => {
+    pileWorkFindMany.mockResolvedValue([work({ report: { ...work().report, shiftType: null } })]);
 
     await exportPileJournalXlsx({ tenantId: 'orion' });
 
     expect(sheet('Журнал забивки').rows[1][2]).toBe('');
+  });
+});
+
+describe('exportPileJournalXlsx — пометки строк (W14)', () => {
+  beforeEach(defaultMocks);
+
+  const col = (name: string): number => sheet('Журнал забивки').rows[0].indexOf(name);
+
+  it('свая без паспорта подшита с пометкой «без паспорта»', async () => {
+    pileWorkFindMany.mockResolvedValue([work({ count: 2, passport: null })]);
+
+    await exportPileJournalXlsx({ tenantId: 'orion' });
+
+    const row = sheet('Журнал забивки').rows[1];
+    expect(row[col('Пометка')]).toBe('без паспорта');
+    expect(row[col('Количество, шт')]).toBe(2);
+  });
+
+  it('строка черновика помечена «черновик»', async () => {
+    pileWorkFindMany.mockResolvedValue([
+      work({ report: { ...work().report, status: 'draft' }, passport: passport() }),
+    ]);
+
+    await exportPileJournalXlsx({ tenantId: 'orion' });
+
+    expect(sheet('Журнал забивки').rows[1][col('Пометка')]).toBe('черновик');
   });
 });
 
@@ -249,5 +448,32 @@ describe('D4: сервис требует основание добивки', ()
     expect(pileUpdateMany).toHaveBeenLastCalledWith(expect.objectContaining({ data: expect.objectContaining({ acceptanceNote: 'Достичь проектного отказа' }) }));
     await decidePilePassport({ tenantId: 'tenant-a', passportId: 'p1', actorId: 'u1', acceptance: 'ACCEPTED' });
     expect(pileUpdateMany).toHaveBeenLastCalledWith(expect.objectContaining({ data: expect.objectContaining({ acceptance: 'ACCEPTED', acceptanceNote: null }) }));
+  });
+});
+
+// ---------------------------------------------------------------- поиск по номеру (W30)
+
+describe('listPilePassports — поиск по номеру экранирует метасимволы LIKE (W30)', () => {
+  beforeEach(defaultMocks);
+
+  it('номер «C_1%» не превращается в шаблон — в списке и в итогах одинаково', async () => {
+    await listPilePassports({ tenantId: 'orion', pileNumber: 'C_1%' });
+
+    // Список (Prisma contains) — `%`/`_` экранированы, а не работают как шаблон.
+    const where = pileWorkFindMany.mock.calls[0][0].where as { passport?: { pileNumber?: { contains?: string } } };
+    expect(where.passport?.pileNumber?.contains).toBe('C\\_1\\%');
+
+    // Итоги (raw ILIKE) — то же экранирование и явный ESCAPE, иначе титул
+    // журнала разошёлся бы со строками под ним на одном и том же поиске.
+    const json = JSON.stringify(pileTotalsQuery.mock.calls[0]);
+    expect(json).toContain(JSON.stringify('%C\\_1\\%%'));
+    expect(json).toContain('ESCAPE');
+  });
+
+  it('обычный номер без метасимволов не обрастает экранированием', async () => {
+    await listPilePassports({ tenantId: 'orion', pileNumber: 'СВ-1' });
+
+    const where = pileWorkFindMany.mock.calls[0][0].where as { passport?: { pileNumber?: { contains?: string } } };
+    expect(where.passport?.pileNumber?.contains).toBe('СВ-1');
   });
 });

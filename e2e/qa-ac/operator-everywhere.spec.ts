@@ -120,8 +120,7 @@ test('журнал забивки: NEW-5 — реальные сваи 04.10 п�
   const есть0410 = /QA_HERMES QA-20261004/.test(txt);
   record({ step: 'NEW-5', естьACQA, есть0410, фрагмент: txt.replace(/\s+/g, ' ').slice(0, 700) });
   // Ожидание: сваи отчётов 04.10 (QA_HERMES QA-20261004-0300, «80») видны в журнале.
-  // Подтверждено (см. запись NEW-5): в журнале только AC-QA-строки — тест помечен fail.
-  test.fail(true, 'NEW-5: журнал забивки показывает только AC-QA-строки, реальных свай 04.10 нет');
+  // Журнал строится из записей выработки (W14), поэтому «пачки» 04.10 на месте.
   expect(txt, 'ОЖИДАЛОСЬ: сваи отчётов 04.10 в журнале забивки; получилось: только AC-QA-строки').toMatch(/QA_HERMES QA-20261004|8cdc3ef8|97cf60c1|38354c90/i);
 });
 
@@ -137,10 +136,24 @@ test('карточка Banut 655: NEW-6 — сваи за 04.10 в таблиц�
   const txt = await dump(page, 'everywhere-06-банут');
   const db0410 = db(`SELECT COALESCE(SUM(count),0) || '|' || COALESCE(SUM(count*14),0) FROM "PileWork" WHERE "shiftId"='38354c90-8e45-4e5c-a3bb-aa67ab520da9' AND "pileGradeId" IS NOT NULL`);
   record({ step: 'NEW-6', вБане: db0410, фрагмент: txt.replace(/\s+/g, ' ').slice(-1200) });
-  // Ожидание: в таблице смен карточки за 04.10 — «2 шт / 28 м.п.» (в базе 2|28).
-  // Подтверждено (см. запись NEW-6): карточка показывает 0,0 — тест помечен fail.
-  test.fail(true, 'NEW-6: карточка Banut 655 за 04.10 показывает 0,0 свай (в базе 2 шт / 28 м.п.)');
-  expect(txt, 'ОЖИДАЛОСЬ: за 04.10 в карточке Banut 2 шт / 28 м.п.; получилось «0,0 свай»').toMatch(/04\.10[^]{0,160}(2\s*шт|28\s*м)/i);
+
+  // Строку 04.10 видно только в развёрнутой истории.
+  const expand = page.getByRole('button', { name: /Показать всю историю/ });
+  if (await expand.count()) { await tap(page, expand.first(), 'развернуть историю'); await page.waitForTimeout(600); }
+
+  // Читаем колонку «Свай» строки 04.10 по заголовку колонки, а не по позиции:
+  // прошлый обход принял за сваи соседнюю колонку «Бурение» с «0,0».
+  const history = page.locator('table').filter({ has: page.getByRole('columnheader', { name: 'Свай', exact: true }) }).first();
+  const headers = (await history.locator('thead th').allInnerTexts()).map((h) => h.trim().toUpperCase());
+  const colIdx = headers.indexOf('СВАЙ');
+  expect(colIdx, 'в таблице истории карточки есть колонка «Свай»').toBeGreaterThanOrEqual(0);
+  const rows0410 = history.locator('tbody tr').filter({ hasText: '04.10.2026' });
+  await expect(rows0410, 'в истории карточки есть строка 04.10.2026').toHaveCount(1);
+  const cell = (await rows0410.first().locator('td').nth(colIdx).innerText()).trim();
+  record({ step: 'NEW-6', колонкаСвай: cell, строка: (await rows0410.first().innerText()).replace(/\s+/g, ' ') });
+  // В базе за 04.10 — 2 сваи (`2|28`). Карточка показывает в колонке «Свай» 2,
+  // а «0,0» стоит в колонке «Бурение» — дефекта нет.
+  expect(cell, 'за 04.10 в колонке «Свай» карточки Banut 655 — 2 (не «0,0» из «Бурения»)').toBe('2');
 });
 
 test('главная панель и аналитика: числа дня и отчёты операторов', async ({ page }) => {

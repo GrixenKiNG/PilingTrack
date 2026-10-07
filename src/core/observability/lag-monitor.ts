@@ -12,6 +12,9 @@
  *   - projection_pending_count: number of events not yet projected
  *   - lag_snapshot_timestamp_seconds: last successful collection time
  *   - worker_is_leader: 1 if this instance is the leader, 0 otherwise
+ *   - report_analytics_status_mismatch_total: reports whose status differs
+ *     from their ReportAnalytics row
+ *   - report_analytics_missing_total: reports with no ReportAnalytics row
  *
  * Alerts:
  *   - outbox_lag > 60s → warn
@@ -26,7 +29,9 @@
  */
 
 import { logger } from '@/lib/logger';
+import { ServiceError } from '@/lib/service-error';
 import { getOutboxLeaderElection, getProjectionLeaderElection } from '@/core/infrastructure/leader-election';
+import { forEachTenant } from '@/lib/tenant-iteration';
 
 function shouldLogLagMonitorLifecycle(): boolean {
   return process.env.LOG_WORKER_LIFECYCLE === 'true';
@@ -47,6 +52,8 @@ export interface LagMetrics {
   isOutboxLeader: boolean;
   isProjectionLeader: boolean;
   dlqPendingCount: number;
+  reportAnalyticsStatusMismatchCount: number;
+  reportAnalyticsMissingCount: number;
   timestamp: string;
 }
 
@@ -142,6 +149,59 @@ async function getDlqPendingCount(): Promise<number> {
 }
 
 /**
+ * Сверка статуса отчёта и его строки аналитики (J5).
+ *
+ * `ReportAnalytics.status` по замыслу зеркалит `Report.status`, но пишут витрину
+ * только обработчики событий: при потерянном или пропущенном `ReportSubmitted`
+ * строка молча остаётся в старом статусе, и на экранах такого дрейфа проекции не
+ * видно — единственный сигнал это метрика мониторинга. Один запрос считает по
+ * организации и расхождения статусов, и отчёты без строки аналитики. Организация
+ * — строгим равенством, пустая = отказ (как в getReportsByPeriodRaw).
+ */
+export async function countReportAnalyticsStatusMismatch(
+  tenantId: string
+): Promise<{ statusMismatch: number; missingAnalytics: number }> {
+  if (typeof tenantId !== 'string' || tenantId.trim().length === 0) {
+    throw new ServiceError('Не определена организация пользователя', 403);
+  }
+
+  const db = await getDbClient();
+  // ReportAnalytics.reportId UNIQUE, поэтому LEFT JOIN даёт ровно одну строку на
+  // отчёт; `a."reportId" IS NULL` — отчёт, для которого строки аналитики нет.
+  const rows = await db.$queryRaw<Array<{ statusMismatch: number; missingAnalytics: number }>>`
+    SELECT
+      count(*) FILTER (WHERE a."reportId" IS NOT NULL AND r."status" <> a."status")::int AS "statusMismatch",
+      count(*) FILTER (WHERE a."reportId" IS NULL)::int AS "missingAnalytics"
+    FROM "Report" r
+    LEFT JOIN "ReportAnalytics" a ON a."reportId" = r."reportId"
+    WHERE r."tenantId" = ${tenantId}
+  `;
+
+  return rows[0] ?? { statusMismatch: 0, missingAnalytics: 0 };
+}
+
+/**
+ * Сверка по всем действующим организациям (RLS fail-closed: без контекста
+ * запрос вернул бы ноль строк — потому и через forEachTenant). В метрику идёт
+ * сумма. Сбой сверки не должен ронять остальные метрики, поэтому свои ошибки
+ * гасим здесь и отдаём нули — тот же приём, что у getDlqPendingCount.
+ */
+async function getReportAnalyticsDrift(): Promise<{ mismatch: number; missing: number }> {
+  try {
+    const perTenant = await forEachTenant((tenantId) => countReportAnalyticsStatusMismatch(tenantId));
+    return perTenant.reduce(
+      (acc, row) => ({ mismatch: acc.mismatch + row.statusMismatch, missing: acc.missing + row.missingAnalytics }),
+      { mismatch: 0, missing: 0 }
+    );
+  } catch (err) {
+    logger.warn('Lag monitor: report/analytics reconciliation failed', {
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return { mismatch: 0, missing: 0 };
+  }
+}
+
+/**
  * Estimate publish rate (events/sec) based on published events in last 5 minutes.
  */
 async function getPublishRate(db: Awaited<ReturnType<typeof getDbClient>>): Promise<number> {
@@ -231,12 +291,13 @@ function evaluateAlerts(metrics: LagMetrics): LagAlert[] {
 
 async function collectLagMetrics(): Promise<LagMetrics> {
   const db = await getDbClient();
-  const [lagInfo, pendingCount, publishRate, dlqCount, projectionInfo] = await Promise.all([
+  const [lagInfo, pendingCount, publishRate, dlqCount, projectionInfo, drift] = await Promise.all([
     getOutboxLag(db),
     getPendingCount(db),
     getPublishRate(db),
     getDlqPendingCount(),
     getProjectionLag(db),
+    getReportAnalyticsDrift(),
   ]);
 
   const outboxElection = getOutboxLeaderElection();
@@ -253,6 +314,8 @@ async function collectLagMetrics(): Promise<LagMetrics> {
     isOutboxLeader: outboxElection.isLeader(),
     isProjectionLeader: projectionElection.isLeader(),
     dlqPendingCount: dlqCount,
+    reportAnalyticsStatusMismatchCount: drift.mismatch,
+    reportAnalyticsMissingCount: drift.missing,
     timestamp: new Date().toISOString(),
   };
 
@@ -301,6 +364,14 @@ export function exportPrometheusMetrics(metrics: LagMetrics | null): string {
     '# HELP dlq_pending_count Number of events in Dead Letter Queue',
     '# TYPE dlq_pending_count gauge',
     `dlq_pending_count ${metrics.dlqPendingCount}`,
+    '',
+    '# HELP report_analytics_status_mismatch_total Reports whose status differs from their ReportAnalytics row',
+    '# TYPE report_analytics_status_mismatch_total gauge',
+    `report_analytics_status_mismatch_total ${metrics.reportAnalyticsStatusMismatchCount}`,
+    '',
+    '# HELP report_analytics_missing_total Reports without a ReportAnalytics row',
+    '# TYPE report_analytics_missing_total gauge',
+    `report_analytics_missing_total ${metrics.reportAnalyticsMissingCount}`,
     '',
     '# HELP outbox_leader Is this instance the outbox leader (1=yes, 0=no)',
     '# TYPE outbox_leader gauge',

@@ -2,13 +2,12 @@
 
 import { FleetDashboard } from '@/components/piling/monitoring/fleet-dashboard';
 import { EquipmentAnalytics } from '@/components/piling/equipment-analytics';
-import { usePilingStore } from '@/lib/store';
+import { useAbility } from '@/lib/use-ability';
 
 export default function MonitoringPage() {
-  const role = usePilingStore((s) => s.currentUser?.role);
-  // Аналитика за период требует права analytics.read — есть только у
-  // администратора и диспетчера. Операторам показываем только живой статус.
-  const canSeeAnalytics = role === 'ADMIN' || role === 'DISPATCHER';
+  // Аналитика за период требует права analytics.read. Право выдано админу,
+  // диспетчеру и мастеру — блок проверяем по праву, а не по собственной роли.
+  const canSeeAnalytics = useAbility('analytics.read');
 
   return (
     <>

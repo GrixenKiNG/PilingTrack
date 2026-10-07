@@ -110,3 +110,38 @@ describe('BriefingJournalPrint — понятные тексты отказа (R
     expect(alert).toHaveTextContent('Недостаточно прав для просмотра журнала инструктажей');
   });
 });
+
+/**
+ * R134 №7, №22. Печатная форма журнала: автоматическая нумерация листов
+ * через CSS @page counters и разрешение переноса кода инструкции.
+ */
+describe('BriefingJournalPrint — стили печати (R134 №7, №22)', () => {
+  beforeEach(() => {
+    vi.stubGlobal('fetch', vi.fn(async (input: unknown) => (
+      String(input).includes('/api/briefings/journal')
+        ? jsonResponse(200, { rows: [], truncated: false })
+        : jsonResponse(200, { companyName: 'ООО «Орион»', inn: '7712345678', timezone: 'Europe/Moscow' })
+    )));
+  });
+
+  it('внедряет стили печати с @page счётчиками и исправлением journal-code', async () => {
+    render(<BriefingJournalPrint />);
+    await screen.findByText('Лист ___ из ___'); // ждём загрузку
+
+    // В компоненте стили внедряются через dangerouslySetInnerHTML без атрибута,
+    // поэтому ищем по содержимому.
+    const allStyles = Array.from(document.querySelectorAll('style'));
+    const journalStyle = allStyles.find((s) => s.textContent?.includes('counter(page)'));
+    expect(journalStyle).not.toBeNull();
+
+    const css = journalStyle?.textContent ?? '';
+    // №7: счётчики страниц в @page @bottom-center
+    expect(css).toContain('@page');
+    expect(css).toContain('counter(page)');
+    expect(css).toContain('counter(pages)');
+    expect(css).toContain('Лист');
+    // №22: переопределение white-space для .journal-code
+    expect(css).toContain('.journal-code');
+    expect(css).toContain('white-space: normal');
+  });
+});

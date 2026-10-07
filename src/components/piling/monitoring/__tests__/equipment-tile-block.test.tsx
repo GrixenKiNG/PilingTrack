@@ -130,3 +130,32 @@ describe('EquipmentTileBlockContent — фото', () => {
     expect(screen.queryByAltText('Фото установки')).not.toBeInTheDocument();
   });
 });
+
+/*
+  F-R129-16: плитка мониторинга подписывала наработку «ч», а модуль ТО ту же
+  величину — «м/ч» (PRODUCT.md:52). Один показатель в двух единицах.
+*/
+describe('EquipmentTileBlockContent — единица моточасов (F-R129-16)', () => {
+  function metric(dataKey: EquipmentTileBlock['dataKey']): EquipmentTileBlock {
+    return {
+      ...structuredClone(DEFAULT_EQUIPMENT_TILE_TEMPLATE.blocks[3]),
+      id: `metric-${dataKey}`,
+      dataKey,
+    };
+  }
+
+  it('«Моточасы» подписаны «м/ч»', () => {
+    render(<EquipmentTileBlockContent block={metric('engineHours')} card={card} assetStorage={assetStorage} />);
+
+    expect(screen.getByText('100 м/ч')).toBeInTheDocument();
+    expect(screen.queryByText('100 ч')).toBeNull();
+  });
+
+  it('«Ближайшее ТО» подписано «м/ч»', () => {
+    // card: engineHoursTotal 100, nextMaintenanceAtHours 200 → остаток 100.
+    render(<EquipmentTileBlockContent block={metric('maintenance')} card={card} assetStorage={assetStorage} />);
+
+    expect(screen.getByText('100 м/ч')).toBeInTheDocument();
+    expect(screen.queryByText('100 ч')).toBeNull();
+  });
+});

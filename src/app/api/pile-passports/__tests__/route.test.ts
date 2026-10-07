@@ -7,7 +7,7 @@
  * title that journal «25.09» while the rows under it and the file say «26.09».
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { NextRequest } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 
 const { requireAuthMock, assertCanMock, getSettingsMock, listPilePassportsMock } = vi.hoisted(() => ({
   requireAuthMock: vi.fn(),
@@ -29,6 +29,8 @@ vi.mock('@/modules/reports/application/queries/pile-passport.service', async () 
 });
 
 import { GET } from '../route';
+import { can } from '@/services/auth/authorization-service';
+import { ServiceError } from '@/lib/service-error';
 
 const admin = { id: 'admin-a', role: 'ADMIN', tenantId: 'tenant-a' };
 
@@ -36,7 +38,7 @@ function req(qs = ''): NextRequest {
   return new NextRequest(`http://localhost/api/pile-passports?${qs}`);
 }
 
-/** Only the fields pileJournalHeader reads; the query itself is stubbed. */
+/** Строка выработки: только поля, которые читает pileJournalHeader (запрос заглушён). */
 const row = (drivenAt: string) => ({
   drivenAt,
   siteName: 'Объект А',
@@ -45,21 +47,34 @@ const row = (drivenAt: string) => ({
   hammerEnergyKj: 40,
   designRefusalMm: 2,
   acceptance: 'PENDING',
+  count: 1,
   suggestion: null,
 });
+
+/** Итоги периода — титул берёт счётчики отсюда, не из показанных строк (W21). */
+const totals = {
+  piles: 1,
+  draftPiles: 0,
+  withoutPassportPiles: 1,
+  accepted: 0,
+  needsRedrive: 0,
+  pending: 1,
+  rows: 1,
+};
 
 describe('GET /api/pile-passports — период в поясе тенанта', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     requireAuthMock.mockResolvedValue({ user: admin, error: null });
     getSettingsMock.mockResolvedValue({ timezone: 'Europe/Moscow' });
-    listPilePassportsMock.mockResolvedValue({ rows: [], truncated: false });
+    listPilePassportsMock.mockResolvedValue({ rows: [], truncated: false, totals });
   });
 
   it('дату забивки 25.09 21:30 UTC печатает как 26.09.2026 по Москве, а не UTC-днём', async () => {
     listPilePassportsMock.mockResolvedValue({
       rows: [row('2026-09-25T21:30:00.000Z')],
       truncated: false,
+      totals,
     });
 
     const response = await GET(req());
@@ -76,6 +91,7 @@ describe('GET /api/pile-passports — период в поясе тенанта'
     listPilePassportsMock.mockResolvedValue({
       rows: [row('2026-09-25T14:30:00.000Z')],
       truncated: false,
+      totals,
     });
 
     const response = await GET(req());
@@ -84,5 +100,73 @@ describe('GET /api/pile-passports — период в поясе тенанта'
     expect(getSettingsMock).toHaveBeenCalledWith('tenant-a');
     expect(body.header.dateFrom).toBe('26.09.2026');
     expect(body.header.dateTo).toBe('26.09.2026');
+  });
+});
+
+/**
+ * Права и организация (W25, W31).
+ *
+ * Маршрут обязан проверять `piles.manage` ДО чтения данных и брать
+ * организацию из сессии, а не из query. Тесты закрепляют это на уровне
+ * поведения: без права сервис журнала не вызывается вовсе, а роль из query
+ * не подменяет тенант пользователя. `assertCan` здесь считает право по
+ * настоящей матрице (`can`), а не заглушкой-пустышкой.
+ */
+describe('GET /api/pile-passports — права и организация', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    requireAuthMock.mockResolvedValue({ user: admin, error: null });
+    getSettingsMock.mockResolvedValue({ timezone: 'Europe/Moscow' });
+    listPilePassportsMock.mockResolvedValue({ rows: [], truncated: false, totals });
+    assertCanMock.mockImplementation((user: { role: string; actingAs?: string | null }, ability: string) => {
+      if (!can(user, ability as Parameters<typeof can>[1])) {
+        throw new ServiceError('Доступ запрещён', 403);
+      }
+    });
+  });
+
+  it.each(['OPERATOR', 'ASSISTANT', 'MECHANIC'])(
+    'роль %s без права piles.manage → 403, журнал не читается',
+    async (role) => {
+      requireAuthMock.mockResolvedValue({ user: { id: `${role}-1`, role, tenantId: 'tenant-a' }, error: null });
+
+      const response = await GET(req());
+
+      expect(response.status).toBe(403);
+      expect(listPilePassportsMock).not.toHaveBeenCalled();
+      expect(getSettingsMock).not.toHaveBeenCalled();
+    },
+  );
+
+  it('нет сессии → 401, журнал не читается', async () => {
+    requireAuthMock.mockResolvedValue({
+      user: null,
+      error: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }),
+    });
+
+    const response = await GET(req());
+
+    expect(response.status).toBe(401);
+    expect(listPilePassportsMock).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['ADMIN', 'admin-a'],
+    ['DISPATCHER', 'disp-a'],
+  ])('роль %s с правом piles.manage → 200', async (role, id) => {
+    requireAuthMock.mockResolvedValue({ user: { id, role, tenantId: 'tenant-a' }, error: null });
+
+    const response = await GET(req());
+
+    expect(response.status).toBe(200);
+    expect(listPilePassportsMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('в сервис уходит организация сессии, а tenantId из query игнорируется', async () => {
+    const response = await GET(req('tenantId=tenant-b'));
+
+    expect(response.status).toBe(200);
+    expect(listPilePassportsMock).toHaveBeenCalledWith(expect.objectContaining({ tenantId: 'tenant-a' }));
+    expect(getSettingsMock).toHaveBeenCalledWith('tenant-a');
   });
 });

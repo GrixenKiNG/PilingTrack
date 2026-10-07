@@ -91,3 +91,21 @@ describe('WorkspaceSettings: цель нажатия на телефоне', () 
     expect(edit).toHaveClass('min-h-11', 'sm:min-h-0');
   });
 });
+
+/**
+ * W7-SETTINGS-TITLE: вкладка «Настройки» называлась заголовком корневого
+ * layout («PilingTrack - Управление свайными работами»), потому что экран не
+ * вызывал useDocumentTitle. Соседние экраны /admin/* ставят его так же.
+ */
+describe('WorkspaceSettings: заголовок вкладки браузера', () => {
+  it('назван по экрану', async () => {
+    mocks.authFetch.mockReset();
+    mocks.authFetch.mockImplementation(async (url: string) => {
+      if (url === '/api/settings') return json({ companyName: 'Орион', timezone: 'Europe/Moscow', notifications: {} });
+      return json({ users: [], nextCursor: null });
+    });
+    render(<WorkspaceSettings />);
+
+    await waitFor(() => expect(document.title).toBe('Настройки — PilingTrack'));
+  });
+});

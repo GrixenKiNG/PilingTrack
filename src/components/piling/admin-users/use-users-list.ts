@@ -96,6 +96,7 @@ export function useUsersList() {
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
+      if (res.status === 401) throw new Error('Сессия истекла — войдите снова.');
       throw new Error(err.error || 'Ошибка создания');
     }
     await load();
@@ -119,6 +120,7 @@ export function useUsersList() {
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
+      if (res.status === 401) throw new Error('Сессия истекла — войдите снова.');
       throw new Error(err.error || 'Ошибка сохранения');
     }
     await load();
@@ -132,6 +134,7 @@ export function useUsersList() {
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
+      if (res.status === 401) throw new Error('Сессия истекла — войдите снова.');
       throw new Error(err.error || 'Ошибка удаления');
     }
     setUsers((prev) => prev.filter((u) => u.id !== id));
@@ -149,6 +152,7 @@ export function useUsersList() {
         // «это последний администратор организации». Пустой `throw` заменял её
         // на «Ошибка изменения статуса», и человек не понимал, что делать.
         const err = await res.json().catch(() => ({}));
+        if (res.status === 401) throw new Error('Сессия истекла — войдите снова.');
         throw new Error(err.error || 'Ошибка изменения статуса');
       }
       await load();

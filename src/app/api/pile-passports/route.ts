@@ -46,7 +46,7 @@ export const GET = withApi(
       return NextResponse.json({ error: 'Даты периода задаются как ГГГГ-ММ-ДД' }, { status: 400 });
     }
 
-    const { rows, truncated } = await listPilePassports({
+    const { rows, truncated, totals } = await listPilePassports({
       tenantId,
       siteId: params.get('siteId') || undefined,
       pendingOnly: params.get('pendingOnly') === 'true',
@@ -58,9 +58,14 @@ export const GET = withApi(
     // Титул, как и выгрузка .xlsx, считает день забивки по поясу тенанта, а не
     // по UTC: свая, забитая 26.09 в 00:30 МСК, в UTC ещё 25.09, и без пояса
     // «Период забивки» на экране разошёлся бы с файлом и со строками под собой
-    // (F-R37-5).
+    // (F-R37-5). Итоги берём из агрегата периода: при срезе страницы титул не
+    // должен показывать числа только по первым 500 строкам (W21).
     const { timezone } = await getSettings(tenantId);
-    return NextResponse.json({ data: rows, header: pileJournalHeader(rows, timezone), truncated });
+    return NextResponse.json({
+      data: rows,
+      header: pileJournalHeader(rows, totals, timezone),
+      truncated,
+    });
   },
   { domain: 'piles' },
 );

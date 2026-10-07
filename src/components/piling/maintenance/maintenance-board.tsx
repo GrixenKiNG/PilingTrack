@@ -312,7 +312,7 @@ export function MaintenanceBoard() {
 
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <Select value={equipmentFilterId || ALL} onValueChange={(value) => setEquipmentFilterId(value === ALL ? '' : value)}>
-              <SelectTrigger className="min-h-11 h-9 w-[138px] sm:min-h-0" aria-label="Фильтр по установке"><SelectValue placeholder="Все установки" /></SelectTrigger>
+              <SelectTrigger className="min-h-11 h-9 w-[138px] min-w-0 sm:min-h-0" aria-label="Фильтр по установке"><SelectValue placeholder="Все установки" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value={ALL}>Все установки</SelectItem>
                 {equipmentOptions.map(([id, name]) => (
@@ -322,7 +322,7 @@ export function MaintenanceBoard() {
             </Select>
 
             <Select value={siteFilterId || ALL} onValueChange={(value) => setSiteFilterId(value === ALL ? '' : value)}>
-              <SelectTrigger className="min-h-11 h-9 w-[128px] sm:min-h-0" aria-label="Фильтр по объекту"><SelectValue placeholder="Все объекты" /></SelectTrigger>
+              <SelectTrigger className="min-h-11 h-9 w-[128px] min-w-0 sm:min-h-0" aria-label="Фильтр по объекту"><SelectValue placeholder="Все объекты" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value={ALL}>Все объекты</SelectItem>
                 {siteOptions.map(([id, name]) => (
@@ -332,7 +332,7 @@ export function MaintenanceBoard() {
             </Select>
 
             <Select value={filter.assigneeId || ALL} onValueChange={(value) => setF('assigneeId', value)}>
-              <SelectTrigger className="min-h-11 h-9 w-[150px] sm:min-h-0" aria-label="Фильтр по исполнителю"><SelectValue placeholder="Все исполнители" /></SelectTrigger>
+              <SelectTrigger className="min-h-11 h-9 w-[150px] min-w-0 sm:min-h-0" aria-label="Фильтр по исполнителю"><SelectValue placeholder="Все исполнители" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value={ALL}>Все исполнители</SelectItem>
                 {assignees.map((user) => (
@@ -342,7 +342,7 @@ export function MaintenanceBoard() {
             </Select>
 
             <Select value={filter.type || ALL} onValueChange={(value) => setF('type', value)}>
-              <SelectTrigger className="min-h-11 h-9 w-[118px] sm:min-h-0" aria-label="Фильтр по типу ТО"><SelectValue placeholder="Тип ТО" /></SelectTrigger>
+              <SelectTrigger className="min-h-11 h-9 w-[118px] min-w-0 sm:min-h-0" aria-label="Фильтр по типу ТО"><SelectValue placeholder="Тип ТО" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value={ALL}>Все типы</SelectItem>
                 {MAINTENANCE_TYPE_OPTIONS.map((key) => (
@@ -352,7 +352,7 @@ export function MaintenanceBoard() {
             </Select>
 
             <Select value={filter.priority || ALL} onValueChange={(value) => setF('priority', value)}>
-              <SelectTrigger className="min-h-11 h-9 w-[128px] sm:min-h-0" aria-label="Фильтр по приоритету"><SelectValue placeholder="Приоритет" /></SelectTrigger>
+              <SelectTrigger className="min-h-11 h-9 w-[128px] min-w-0 sm:min-h-0" aria-label="Фильтр по приоритету"><SelectValue placeholder="Приоритет" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value={ALL}>Приоритет</SelectItem>
                 {(Object.keys(PRIORITY_LABEL) as MaintenancePriority[]).map((key) => (

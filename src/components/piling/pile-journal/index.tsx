@@ -37,6 +37,40 @@ const ACCEPTANCE_STYLE: Record<PileAcceptanceValue, string> = {
   NEEDS_REDRIVE: 'bg-warning/15 text-warning-strong',
 };
 
+/** Смена в печатном виде. Пустое/чужое значение печатаем как есть. */
+const SHIFT_LABEL: Record<string, string> = {
+  DAY: 'Дневная',
+  NIGHT: 'Ночная',
+};
+
+/**
+ * Число граф журнала. Одно место правды: строка детали (раскрытая карточка сваи)
+ * растягивается на все графы через `colSpan`, и раньше число 17 было вписано
+ * там отдельно — при любой правке набора колонок карточка ломалась молча.
+ */
+export const JOURNAL_COLUMNS = 17;
+
+/**
+ * Закреплённые слева колонки-идентификаторы: «№», «Дата», «№ сваи». Смещение
+ * `left` посчитано из фактических ширин, поэтому ширина задана явно:
+ * № — 3rem, Дата — 7rem, значит «№ сваи» липнет на left: 3rem + 7rem = 10rem.
+ * Между «Дата» и «№ сваи» стоит «Смена» — она прокручивается под ними.
+ */
+const STICKY_COL = {
+  no: 'sticky left-0 w-12 min-w-12',
+  date: 'sticky left-12 w-28 min-w-28',
+  pile: 'sticky left-[10rem] w-24 min-w-24',
+} as const;
+
+/**
+ * Непрозрачный фон ячейки и тонкая правая граница: без них прокручиваемые
+ * колонки просвечивают сквозь закреплённые. Фон тела — `bg-background`, как у
+ * <main> (карточка журнала лежит на нём); у шапки — `bg-muted`, как у <thead>.
+ * Шапка закреплённых колонок держит больший z-index, чем ячейки строк.
+ */
+const STICKY_BODY = 'bg-background border-r border-border z-10';
+const STICKY_HEAD = 'bg-muted border-r border-border z-30';
+
 type StatusFilter = 'PENDING' | 'ACCEPTED' | 'NEEDS_REDRIVE' | 'ALL';
 
 const STATUS_FILTERS: Array<{ key: StatusFilter; label: string }> = [
@@ -55,7 +89,10 @@ interface JournalFilters {
 }
 
 const EMPTY_FILTERS: JournalFilters = {
-  status: 'PENDING',
+  // Стартовый фильтр — «Все»: иначе сваи, записанные без паспорта, не видны
+  // вовсе — ни в «Не разобранных», ни в «Принятых», и журнал снова выглядит
+  // пустым при фактически забитых сваях.
+  status: 'ALL',
   siteId: 'all',
   dateFrom: '',
   dateTo: '',
@@ -155,10 +192,12 @@ export function PileJournal() {
   }, [load]);
 
   const decide = async (row: PilePassportRow, acceptance: 'ACCEPTED' | 'NEEDS_REDRIVE', note: string) => {
+    // Решать можно только сваю с паспортом: решение живёт в паспорте.
+    if (!row.passportId) return;
     setBusyId(row.id);
     setError(null);
     try {
-      const response = await authFetch(`/api/pile-passports/${row.id}/decide`, {
+      const response = await authFetch(`/api/pile-passports/${row.passportId}/decide`, {
         method: 'POST',
         body: JSON.stringify({ acceptance, note: note.trim() || undefined }),
       });
@@ -301,9 +340,9 @@ export function PileJournal() {
 
       {header ? <JournalTitleBlock header={header} /> : null}
 
-      {truncated ? (
+      {truncated && header ? (
         <p className="text-2xs text-warning-strong">
-          Показаны первые 500 свай — сузьте период или объект
+          Показано {rows?.length ?? 0} из {header.rowsTotal} записей — сузьте период или объект
         </p>
       ) : null}
 
@@ -325,22 +364,32 @@ export function PileJournal() {
           </div>
         ) : (
           <p className="rounded-md border border-border p-4 text-sm text-muted-foreground">
-            По этой выборке записей нет. Паспорта свай заводит машинист на вкладке «Сваи»,
-            мастер может дописать пропущенную сваю за него.
+            За период свай нет.
           </p>
         )
       ) : null}
 
       {rows && rows.length > 0 ? (
+        /*
+         * Липкая шапка сверху (`sticky top-0`) здесь НЕ поставлена осознанно:
+         * у контейнера `overflow-x-auto` вертикальной прокрутки нет (высота по
+         * содержимому), а CSS делает такой контейнер скроллом и по оси Y — тогда
+         * `sticky top-0` липнет к нему, а не к странице, и видимого эффекта не
+         * даёт. Закрепление сделано по горизонтали — оно работает без
+         * ограничения высоты и решает главную потерю контекста (к какой свае
+         * относится строка при прокрутке вправо).
+         */
         <div className="overflow-x-auto rounded-md border border-border">
-          <table className="w-full min-w-[1100px] text-2xs">
+          <table className="w-full min-w-[1500px] text-2xs">
             <thead className="bg-muted">
               <tr className="text-left">
-                <Th>№</Th>
-                <Th>Дата</Th>
-                <Th>№ сваи</Th>
+                <Th className={cn(STICKY_COL.no, STICKY_HEAD)}>№</Th>
+                <Th className={cn(STICKY_COL.date, STICKY_HEAD)}>Дата</Th>
+                <Th>Смена</Th>
+                <Th className={cn(STICKY_COL.pile, STICKY_HEAD)}>№ сваи</Th>
                 <Th>Куст, пикет</Th>
                 <Th>Марка</Th>
+                <Th className="text-right">Кол-во</Th>
                 <Th className="text-right">Длина, м</Th>
                 <Th className="text-right">Глубина, м</Th>
                 <Th className="text-right">Отметка головы, м</Th>
@@ -348,7 +397,9 @@ export function PileJournal() {
                 <Th className="text-right">Отказ, мм/уд</Th>
                 <Th className="text-right">Проектный</Th>
                 <Th>По норме</Th>
+                <Th>Машинист</Th>
                 <Th>Решение</Th>
+                <Th>Пометка</Th>
               </tr>
             </thead>
             <tbody>
@@ -364,11 +415,14 @@ export function PileJournal() {
                       open && 'bg-muted/60',
                     )}
                   >
-                    <Td className="text-muted-foreground">{index + 1}</Td>
-                    <Td>{new Date(row.drivenAt).toLocaleDateString('ru-RU')}</Td>
-                    <Td className="font-semibold">{row.pileNumber}</Td>
+                    <Td className={cn(STICKY_COL.no, STICKY_BODY, 'text-muted-foreground')}>{index + 1}</Td>
+                    <Td className={cn(STICKY_COL.date, STICKY_BODY)}>{new Date(row.drivenAt).toLocaleDateString('ru-RU')}</Td>
+                    <Td>{row.shiftType ? SHIFT_LABEL[row.shiftType] ?? row.shiftType : '—'}</Td>
+                    <Td className={cn(STICKY_COL.pile, STICKY_BODY, 'font-semibold')}>{row.pileNumber ?? '—'}</Td>
                     <Td>{row.locationName ?? '—'}</Td>
                     <Td>{row.pileGradeName}</Td>
+                    {/* Количество со знаком: отрицательная запись — поправка к выработке. */}
+                    <Td className="text-right">{row.count}</Td>
                     <Td className="text-right">{num(row.pileLengthM)}</Td>
                     <Td className="text-right">{num(row.drivenDepthM)}</Td>
                     <Td className="text-right">{num(row.actualHeadLevelM)}</Td>
@@ -384,20 +438,48 @@ export function PileJournal() {
                           ? <span className="text-success-strong">да</span>
                           : <span className="text-warning-strong">нет</span>}
                     </Td>
+                    <Td>{row.operatorName}</Td>
                     <Td>
-                      <span className={cn('rounded px-1.5 py-0.5 text-3xs font-semibold', ACCEPTANCE_STYLE[row.acceptance])}>
-                        {PILE_ACCEPTANCE_LABELS[row.acceptance]}
+                      {row.acceptance
+                        ? (
+                          <span className={cn('rounded px-1.5 py-0.5 text-3xs font-semibold', ACCEPTANCE_STYLE[row.acceptance])}>
+                            {PILE_ACCEPTANCE_LABELS[row.acceptance]}
+                          </span>
+                        )
+                        : <span className="text-muted-foreground">—</span>}
+                    </Td>
+                    <Td>
+                      <span className="flex flex-wrap gap-1">
+                        {!row.hasPassport ? (
+                          <span className="rounded bg-muted px-1.5 py-0.5 text-3xs font-semibold text-muted-foreground">
+                            без паспорта
+                          </span>
+                        ) : null}
+                        {row.isDraft ? (
+                          <span className="rounded bg-warning/15 px-1.5 py-0.5 text-3xs font-semibold text-warning-strong">
+                            черновик
+                          </span>
+                        ) : null}
                       </span>
                     </Td>
                   </tr>,
                   open ? (
                     <tr key={`${row.id}-detail`} className="border-t border-border bg-card">
-                      <td colSpan={13} className="p-0">
-                        <PileDetail
-                          row={row}
-                          busy={busyId === row.id}
-                          onDecide={(acceptance, note) => void decide(row, acceptance, note)}
-                        />
+                      <td colSpan={JOURNAL_COLUMNS} className="p-0">
+                        {row.hasPassport ? (
+                          <PileDetail
+                            row={row}
+                            busy={busyId === row.id}
+                            onDecide={(acceptance, note) => void decide(row, acceptance, note)}
+                          />
+                        ) : (
+                          // Сваю без паспорта принимать нечем: решение и замеры
+                          // живут в паспорте, а его не заводили.
+                          <p className="p-3 text-2xs text-muted-foreground">
+                            Свая записана без паспорта — замеров нет, принимать нечего.
+                            Принять или отправить на добивку можно только сваю с паспортом.
+                          </p>
+                        )}
                       </td>
                     </tr>
                   ) : null,

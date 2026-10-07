@@ -230,7 +230,7 @@ export function FleetDashboard() {
   }
 
   return (
-    <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
+    <div className="p-4 sm:p-6 space-y-4 sm:space-y-6 field-type">
       {error && <div role="alert" className="rounded-lg border border-destructive p-3 text-destructive-strong">
         {error} Показан предыдущий снимок.
         <button type="button" className="ml-3 inline-flex min-h-11 items-center underline sm:min-h-0" onClick={() => void fetchSnapshot({bust: true})}>Обновить</button>
@@ -319,14 +319,14 @@ function StatusBar({ snap, conn }: { snap: FleetSnapshot; conn: Connection }) {
         </div>
         <div className="flex flex-col items-end gap-1">
           <div aria-live="polite" className={cn(
-            'rounded-full border px-2.5 py-1 text-3xs uppercase tracking-wide',
+            'rounded-full border px-2.5 py-1 text-2xs uppercase tracking-wide',
             conn === 'live' && 'border-success/30 bg-success/10 text-success-strong',
             conn === 'connecting' && 'border-warning/30 bg-warning/10 text-warning-strong',
             conn === 'offline' && 'border-destructive/30 bg-destructive/10 text-destructive-strong',
           )}>
             {conn === 'live' ? 'Соединение активно' : conn === 'connecting' ? 'Подключение…' : 'Нет связи'}
           </div>
-          <div className="text-3xs text-muted-foreground">Данные обновлены {formatRelative(snap.asOf)}</div>
+          <div className="text-2xs text-muted-foreground">Данные обновлены {formatRelative(snap.asOf)}</div>
         </div>
       </div>
 

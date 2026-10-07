@@ -116,6 +116,8 @@ export interface ReferenceUiProps {
   readinessHistoryError: string | null;
   readinessHistory: ReadinessSnapshotDto[];
   audit: ReadinessAuditEnvelope | null;
+  /** Флаг неудачной загрузки аудита: нужен, чтобы не показывать «0» в плитках как пустой журнал (R125 №8). */
+  auditFailed: boolean;
   filters: ReadinessUrlFilters;
   onFiltersChange: (filters: ReadinessUrlFilters) => void;
   showInternalNavigation: boolean;

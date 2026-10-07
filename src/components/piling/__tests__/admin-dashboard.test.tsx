@@ -363,3 +363,58 @@ describe('AdminDashboard: счётчик отчётов и подсказка о
     expect(document.title).toBe('Дашборд — PilingTrack');
   });
 });
+
+/**
+ * F-R128 №7/№19. Дашборд не показывал, что данные перечитываются: при смене
+ * периода/объекта числа менялись «сами», а кнопка «Обновить дашборд» не
+ * блокировалась — двойной клик слал пачку запросов. Теперь на время выборки
+ * аналитики у шапки видно «Обновляется…», а кнопка заблокирована. До правки
+ * оба теста падали.
+ */
+describe('AdminDashboard: индикация перечитывания (F-R128 №7, №19)', () => {
+  /** Первый запрос аналитики успешен, второй — висит до ручного разрешения. */
+  function mockAnalytics(onSecond: (resolve: (r: Response) => void) => void) {
+    let calls = 0;
+    mocks.authFetch.mockImplementation((url: string) => {
+      if (url.startsWith('/api/analytics/sites')) {
+        calls += 1;
+        if (calls === 1) return Promise.resolve(json({ analytics: [] }));
+        return new Promise<Response>(onSecond);
+      }
+      if (url.startsWith('/api/monitoring/fleet')) return Promise.resolve(json(fleet));
+      if (url.startsWith('/api/maintenance')) return Promise.resolve(json({ records: [] }));
+      if (url.startsWith('/api/reports/recent')) return Promise.resolve(json({ reports: [] }));
+      if (url.startsWith('/api/sites/all')) return Promise.resolve(json({ sites: [] }));
+      return Promise.resolve(json({}));
+    });
+  }
+
+  beforeEach(() => {
+    mocks.authFetch.mockReset();
+  });
+
+  it('смена периода показывает «Обновляется…»', async () => {
+    mockAnalytics(() => {});
+    render(<AdminDashboard />);
+    await screen.findByText(/^Обновлено в /);
+
+    fireEvent.click(screen.getByRole('button', { name: '7 дней' }));
+
+    expect(await screen.findByText('Обновляется…')).toBeInTheDocument();
+  });
+
+  it('во время «Обновить дашборд» кнопка заблокирована, после ответа — снова активна', async () => {
+    let resolveAnalytics: (r: Response) => void = () => {};
+    mockAnalytics((resolve) => { resolveAnalytics = resolve; });
+    render(<AdminDashboard />);
+
+    const button = await screen.findByRole('button', { name: 'Обновить дашборд' });
+    await waitFor(() => expect(button).toBeEnabled());
+
+    fireEvent.click(button);
+    await waitFor(() => expect(button).toBeDisabled());
+
+    await act(async () => { resolveAnalytics(json({ analytics: [] })); });
+    await waitFor(() => expect(button).toBeEnabled());
+  });
+});

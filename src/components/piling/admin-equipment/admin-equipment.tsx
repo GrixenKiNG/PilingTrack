@@ -138,22 +138,33 @@ export function AdminEquipment() {
               <p className="text-sm text-muted-foreground">
                 {cards.length === 0 ? 'Нет установок' : 'Нет установок под выбранные фильтры'}
               </p>
-              {cards.length > 0 && (
+              {filters !== EMPTY_FILTERS && (
                 <button onClick={() => setFilters(EMPTY_FILTERS)} className="mt-2 inline-flex min-h-11 items-center text-xs text-info-strong underline sm:min-h-0">
                   Сбросить фильтры
                 </button>
               )}
             </div>
-          ) : view === 'tiles' ? (
-            <div className="grid gap-3 sm:grid-cols-2">
-              {filtered.map((c) => (
-                <EquipmentTile key={c.id} card={c} selected={c.id === selectedId} onSelect={setSelectedId} />
-              ))}
-            </div>
-          ) : view === 'layout' ? (
-            <EquipmentCardGrid cards={filtered} selectedId={selectedId} onSelect={setSelectedId} />
           ) : (
-            <EquipmentTable cards={filtered} selectedId={selectedId} onSelect={setSelectedId} />
+            <>
+              {filters !== EMPTY_FILTERS && (
+                <div className="mb-2 flex justify-end">
+                  <button onClick={() => setFilters(EMPTY_FILTERS)} className="inline-flex min-h-11 items-center text-xs text-info-strong underline sm:min-h-0">
+                    Сбросить фильтры
+                  </button>
+                </div>
+              )}
+              {view === 'tiles' ? (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {filtered.map((c) => (
+                    <EquipmentTile key={c.id} card={c} selected={c.id === selectedId} onSelect={setSelectedId} />
+                  ))}
+                </div>
+              ) : view === 'layout' ? (
+                <EquipmentCardGrid cards={filtered} selectedId={selectedId} onSelect={setSelectedId} />
+              ) : (
+                <EquipmentTable cards={filtered} selectedId={selectedId} onSelect={setSelectedId} />
+              )}
+            </>
           )}
         </div>
 

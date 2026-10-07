@@ -11,7 +11,7 @@ import type {
   ReportDomainEvent as DomainEvent,
 } from '@/modules/reports/domain';
 // eslint-disable-next-line no-restricted-imports -- legacy cross-layer import pending the parked services<->modules migration (CLAUDE.md); behavior-neutral
-import { normalizeReportDomainEventType } from '@/modules/reports/domain';
+import { REPORT_DOMAIN_EVENT_TYPES, normalizeReportDomainEventType } from '@/modules/reports/domain';
 import { logger } from '@/lib/logger';
 
 function shouldLogHandlerRegistration(): boolean {
@@ -34,6 +34,32 @@ export type {
 type EventHandler = (event: DomainEvent) => void | Promise<void>;
 
 const handlers = new Map<string, Set<EventHandler>>();
+
+/**
+ * Типы событий отчёта, у которых ПО ЗАМЫСЛУ нет подписчиков на этой шине.
+ *
+ * Это события уровня строки отчёта (свая/бурение/простой). Их обслуживает не
+ * in-process шина отчётов, а другой маршрут:
+ *   - SiteDailySummary пересобирается из строки Report на REPORT_SUBMITTED /
+ *     REPORT_UPDATED (event-handlers.ts) — прежний обработчик на каждый
+ *     PileWorkAdded/DrillingAdded убран намеренно;
+ *   - CQRS-проекции читают те же события отдельным потребителем outbox
+ *     (`projectOutboxEvents` → projection-worker, PROJECTABLE_EVENT_TYPES).
+ * Поэтому отсутствие подписчика здесь — норма, а не потеря: событие не
+ * теряется, у него просто иной маршрут. Поведение для этих типов прежнее
+ * (logger.warn и выход), см. emitDomainEvent.
+ *
+ * Список сверен с реестром подписчиков (registerAllEventHandlers +
+ * registerReadinessProjectionHandler) и с содержимым OutboxEvent локальной БД:
+ * из всех типов отчётов подписчика на шине не имеют ровно эти пять.
+ */
+const EVENT_TYPES_WITHOUT_SUBSCRIBERS = new Set<string>([
+  REPORT_DOMAIN_EVENT_TYPES.PILE_WORK_ADDED,
+  REPORT_DOMAIN_EVENT_TYPES.PILE_WORK_REMOVED,
+  REPORT_DOMAIN_EVENT_TYPES.DRILLING_ADDED,
+  REPORT_DOMAIN_EVENT_TYPES.DRILLING_REMOVED,
+  REPORT_DOMAIN_EVENT_TYPES.DOWNTIME_REMOVED,
+]);
 
 /**
  * Register an event handler for a specific event type.
@@ -79,7 +105,8 @@ export async function emitDomainEvent(event: DomainEvent | (Omit<DomainEvent, 't
     await deliverReportPdf(event);
     return;
   }
-  const normalizedType = normalizeReportDomainEventType(event.type) || event.type;
+  const reportEventType = normalizeReportDomainEventType(event.type);
+  const normalizedType = reportEventType || event.type;
   const normalizedEvent =
     normalizedType === event.type ? event : { ...event, type: normalizedType };
   const eventHandlers = handlers.get(normalizedType);
@@ -91,6 +118,24 @@ export async function emitDomainEvent(event: DomainEvent | (Omit<DomainEvent, 't
       type: normalizedType,
       aggregateId: normalizedEvent.aggregateId,
     });
+    // J2: для события ОТЧЁТА пустой реестр — ошибка, а не успех. Событие,
+    // которое увидел outbox-публикатор до registerAllEventHandlers() (гонка на
+    // старте воркера, N-4), иначе помечалось бы доставленным (dispatch-then-
+    // claim) и терялось навсегда. Бросаем — outbox повторит, а после исчерпания
+    // попыток отправит в dead-letter. Исключение — типы, которым подписчик не
+    // нужен ПО ЗАМЫСЛУ (см. EVENT_TYPES_WITHOUT_SUBSCRIBERS): у них другой
+    // маршрут, и отсутствие подписчика здесь не потеря.
+    //
+    // События НЕ отчётов (crew/site/equipment/readiness/… ) сюда не попадают:
+    // normalizeReportDomainEventType для них возвращает null, и шина отчётов их
+    // не обслуживает — для них прежнее warn + выход. Бросать по ним значило бы
+    // увести на повтор/DLQ домены, которые локального подписчика не имеют и не
+    // предполагают (они живут в outbox как журнал событий).
+    if (reportEventType && !EVENT_TYPES_WITHOUT_SUBSCRIBERS.has(normalizedType)) {
+      throw new Error(
+        `No handlers for domain event ${normalizedType} (aggregateId=${normalizedEvent.aggregateId})`,
+      );
+    }
     return;
   }
 

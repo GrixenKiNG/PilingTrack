@@ -15,14 +15,10 @@ function Value({ label, value, icon }: { label: string; value: React.ReactNode; 
     <div className="flex min-w-0 items-center gap-2">
       {icon && <span className="shrink-0 text-muted-foreground">{icon}</span>}
       <span className="min-w-0">
-        {/* Размер в em масштабировался вместе с плиткой, но при её обычных
-            11–12px давал 7.15px — нечитаемо в цеху. Нижняя граница 10px
-            через max() сохраняет масштабирование на крупных плитках.
-            opacity-55 убрана: с ней подпись давала контраст 2.06. */}
-        <span
-          className="block font-medium uppercase tracking-wide text-muted-foreground"
-          style={{ fontSize: 'max(10px, 0.65em)' }}
-        >
+        {/* F-R126-7: инлайн-стиль `fontSize: max(10px, 0.65em)` мешал лифту
+            текста через `.field-type` (globals.css). Заменяем на `text-2xs`,
+            который на телефоне/планшете поднимается до 13px. */}
+        <span className="block font-medium uppercase tracking-wide text-muted-foreground text-2xs">
           {label}
         </span>
         <span className="block truncate font-semibold">{value}</span>
@@ -186,9 +182,9 @@ export function EquipmentTileBlockContent({
     case 'operator':
       return <Value label="Оператор" value={card.assignedOperatorName ?? '—'} icon={<User className="h-4 w-4" />} />;
     case 'engineHours':
-      return <Value label="Моточасы" value={card.engineHoursTotal != null ? `${formatFixed(card.engineHoursTotal, 0)} ч` : '—'} icon={<Timer className="h-4 w-4" />} />;
+      return <Value label="Моточасы" value={card.engineHoursTotal != null ? `${formatFixed(card.engineHoursTotal, 0)} м/ч` : '—'} icon={<Timer className="h-4 w-4" />} />;
     case 'maintenance':
-      return <Value label="Ближайшее ТО" value={hoursLeft != null ? `${Math.max(0, Math.round(hoursLeft))} ч` : '—'} icon={<Wrench className="h-4 w-4" />} />;
+      return <Value label="Ближайшее ТО" value={hoursLeft != null ? `${Math.max(0, Math.round(hoursLeft))} м/ч` : '—'} icon={<Wrench className="h-4 w-4" />} />;
     case 'todayPiles':
       return <Value label="Сваи" value={card.todayTotals ? formatCountMeters(card.todayTotals.piles, card.todayTotals.pileMeters) : '—'} />;
     case 'todayDrilling':
@@ -201,7 +197,7 @@ export function EquipmentTileBlockContent({
       return (
         <span className="flex items-center gap-2 font-semibold">
           <AlertTriangle className="h-4 w-4 shrink-0" />
-          {due.overdue ? 'ТО просрочено' : hoursLeft != null ? `ТО через ${Math.max(0, Math.round(hoursLeft))} ч` : 'ТО скоро'}
+          {due.overdue ? 'ТО просрочено' : hoursLeft != null ? `ТО через ${Math.max(0, Math.round(hoursLeft))} м/ч` : 'ТО скоро'}
         </span>
       );
     }

@@ -20,7 +20,7 @@ vi.mock('@/lib/store', () => ({
   usePilingStore: (selector: (state: { currentUser: null }) => unknown) => selector({ currentUser: null }),
 }));
 
-import { Status4Control, YesNoControl } from '../inspection-controls';
+import { DoneControl, MeasureControl, Status4Control, YesNoControl } from '../inspection-controls';
 import { InspectionItemPhotos } from '../inspection-item-photos';
 import { RunInspection } from '../run-inspection';
 import { StartInspectionForm } from '../start-inspection-form';
@@ -163,5 +163,25 @@ describe('запуск осмотра: поле «Моточасы» на тел
     render(<StartInspectionForm />);
 
     expect(await screen.findByLabelText('Моточасы')).toHaveClass('min-h-11', 'sm:min-h-0');
+  });
+});
+
+/*
+  F-R137-NEXT №16/№17: точка «Выполнено» (DONE) — сырой чекбокс 16px без
+  расширенной области (общий `ui/checkbox.tsx` её носит), а поле измерения —
+  36px `Input h-9`; корень `.field-type` лифта 44px не даёт. Два целевых
+  контрола пункта чек-листа на телефоне механика.
+*/
+describe('контролы пункта осмотра: цель нажатия на телефоне (F-R137-NEXT, №16/№17)', () => {
+  it('«Выполнено» (DONE) — расширенная область попадания, как у ui/checkbox', () => {
+    render(<DoneControl value="" onChange={() => {}} disabled={false} />);
+
+    expect(screen.getByRole('checkbox')).toHaveClass('hit-target', 'h-4', 'w-4');
+  });
+
+  it('поле измерения — не ниже 44px на телефоне, на десктопе прежние 36px', () => {
+    render(<MeasureControl value="" onChange={() => {}} unit="бар" norm="2" disabled={false} />);
+
+    expect(screen.getByPlaceholderText('Значение')).toHaveClass('w-28', 'min-h-11', 'sm:min-h-0');
   });
 });

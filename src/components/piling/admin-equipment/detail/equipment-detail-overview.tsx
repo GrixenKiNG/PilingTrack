@@ -8,7 +8,7 @@
 import { type ReactNode } from 'react';
 import { KIND_LABELS } from '../equipment-form';
 import { type TimelineRow } from './equipment-detail-parts';
-import { formatCountMeters, formatFixed, formatRuDate } from '@/lib/format';
+import { formatCountMeters, formatFixed, formatRuDate, pluralizeRu } from '@/lib/format';
 import type { EquipmentDTO, EquipmentKindDTO } from '@/lib/types';
 import { formatDowntimeHours } from '@/lib/downtime-hours';
 
@@ -95,7 +95,7 @@ export function OverviewHero({
         <div>
           <div className="text-xs uppercase tracking-wide text-white/65">{KIND_LABELS[kind]}</div>
           <h2 className="mt-1 text-xl font-bold leading-tight">{eq.name}</h2>
-          <div className="mt-1 text-sm text-white/80">{eq.model || 'Модель не указана'}</div>
+          <div className="mt-1 text-sm text-white/80">{eq.model || '—'}</div>
         </div>
         <div className="mt-6 grid grid-cols-2 gap-2 text-xs">
           <div>
@@ -153,8 +153,8 @@ export function OverviewTiles({
         title="Текущее состояние"
         rows={[
           ['Статус', eq.isActive ? 'В эксплуатации' : 'Списана'],
-          ['Моточасы', eq.engineHoursTotal != null ? `${formatFixed(Number(eq.engineHoursTotal), 0)} ч` : '—'],
-          ['Телематика', devicesCount > 0 ? `${devicesCount} устройств` : 'не подключена'],
+          ['Моточасы', eq.engineHoursTotal != null ? `${formatFixed(Number(eq.engineHoursTotal), 0)} м/ч` : '—'],
+          ['Телематика', devicesCount > 0 ? `${devicesCount} ${pluralizeRu(devicesCount, ['устройство', 'устройства', 'устройств'])}` : 'не подключена'],
           ['Последний отчёт', formatRuDate(timeline[0]?.date)],
         ]}
       />
@@ -171,7 +171,7 @@ export function OverviewTiles({
         title="ТО и обслуживание"
         rows={[
           ['Ближайшее ТО', formatRuDate(eq.nextMaintenanceDate)],
-          ['Моточасы ТО', eq.nextMaintenanceAtHours != null ? `${formatFixed(Number(eq.nextMaintenanceAtHours), 0)} ч` : '—'],
+          ['ТО при наработке', eq.nextMaintenanceAtHours != null ? `${formatFixed(Number(eq.nextMaintenanceAtHours), 0)} м/ч` : '—'],
           ['Простои за 30 дней', stats.downtimeHours > 0 ? 'есть простой' : 'нет'],
         ]}
       />

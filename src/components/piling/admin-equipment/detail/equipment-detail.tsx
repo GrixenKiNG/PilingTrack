@@ -185,7 +185,7 @@ export function EquipmentDetail({ equipmentId, embedded = false, onSaved }: Prop
           )}
         </div>
         <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-sm text-muted-foreground">
-          {eq.model && <span>{eq.model}</span>}
+          <span>{eq.model || '—'}</span>
           {eq.manufactureYear && <span className="font-mono">{eq.manufactureYear} г.в.</span>}
           {eq.inventoryNumber && <span className="font-mono">инв. {eq.inventoryNumber}</span>}
           {eq.registrationNumber && <span className="font-mono">{eq.registrationNumber}</span>}

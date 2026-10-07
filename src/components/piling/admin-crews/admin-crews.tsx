@@ -108,8 +108,8 @@ export function AdminCrews() {
       cell: (c) => (
         <div className="min-w-0">
           <div className="truncate font-medium text-foreground">{c.name || 'Без названия'}</div>
-          <div className="mt-0.5 flex items-center gap-1.5 truncate text-2xs text-muted-foreground">
-            <MapPin className="h-3 w-3 shrink-0" /><span className="truncate">{c.site?.name ?? '—'}</span>
+          <div className="mt-0.5 flex items-center gap-1.5 text-2xs text-muted-foreground break-words sm:truncate">
+            <MapPin className="h-3 w-3 shrink-0" /><span className="break-words sm:truncate">{c.site?.name ?? '—'}</span>
           </div>
         </div>
       ),
@@ -120,7 +120,7 @@ export function AdminCrews() {
       width: 'minmax(140px,1fr)',
       cell: (c) => (
         <div className="min-w-0">
-          <div className="truncate text-foreground">{c.operator?.name ?? '—'}</div>
+          <div className="truncate text-foreground break-words sm:truncate">{c.operator?.name ?? '—'}</div>
           <div className="mt-0.5 text-2xs text-muted-foreground">{c.assistants.length} {pluralizeRu(c.assistants.length, ['помощник', 'помощника', 'помощников'])}</div>
         </div>
       ),
@@ -130,8 +130,8 @@ export function AdminCrews() {
       header: 'Установка',
       width: 'minmax(130px,1fr)',
       cell: (c) => (
-        <div className="flex items-center gap-1.5 truncate text-foreground">
-          <Wrench className="h-3.5 w-3.5 shrink-0 text-muted-foreground" /><span className="truncate">{c.equipment?.name ?? '—'}</span>
+        <div className="flex items-center gap-1.5 min-w-0 text-foreground break-words sm:truncate">
+          <Wrench className="h-3.5 w-3.5 shrink-0 text-muted-foreground" /><span className="break-words sm:truncate">{c.equipment?.name ?? '—'}</span>
         </div>
       ),
     },

@@ -19,6 +19,10 @@ export function useFleet() {
     try {
       const res = await authFetch('/api/monitoring/fleet', { signal });
       if (!res.ok) {
+        if (res.status === 401) {
+          setError('Сессия истекла — войдите снова.');
+          return;
+        }
         setError(`Сервер вернул ${res.status}`);
         return;
       }

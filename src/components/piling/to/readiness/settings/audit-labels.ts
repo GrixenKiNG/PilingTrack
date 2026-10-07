@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import { pluralizeRu } from '@/lib/format';
 
-const ACTION_LABEL: Record<string, string> = {
+export const ACTION_LABEL: Record<string, string> = {
   'shift.created': 'Смена запланирована',
   'shift.updated': 'Смена изменена',
   'shift.acceptance-requested': 'Запрошен допуск к работе',
@@ -63,7 +63,7 @@ const ACTION_LABEL: Record<string, string> = {
   acting_as_mechanic: 'Включён режим замещения роли',
 };
 
-const ENTITY_LABEL: Record<string, string> = {
+export const ENTITY_LABEL: Record<string, string> = {
   Shift: 'Смена',
   ShiftHandover: 'Передача смены',
   WorkPermit: 'Наряд-допуск',

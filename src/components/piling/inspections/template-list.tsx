@@ -158,6 +158,7 @@ export function TemplateList() {
                 <button
                   type="button"
                   aria-label="Деактивировать"
+                  title="Деактивировать шаблон"
                   disabled={deletingId === t.id}
                   onClick={(e) => { e.preventDefault(); e.stopPropagation(); setPendingDelete(t); }}
                   className="shrink-0 rounded p-1 text-muted-foreground hover:text-destructive-strong disabled:opacity-40"

@@ -15,14 +15,19 @@ const mocks = vi.hoisted(() => ({ authFetch: vi.fn() }));
 vi.mock('@/lib/api', () => ({ authFetch: mocks.authFetch }));
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
-import { PileJournal } from '../index';
+import { PileJournal, JOURNAL_COLUMNS } from '../index';
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
 
-function pileRow(): PilePassportRow {
+function pileRow(over: Partial<PilePassportRow> = {}): PilePassportRow {
   return {
     id: 'pile-1',
+    pileWorkId: 'work-1',
+    passportId: 'pile-1',
+    hasPassport: true,
+    isDraft: false,
+    count: 1,
     pileNumber: 'С-130',
     drivenAt: '2026-09-28T09:00:00.000Z',
     siteName: 'Объект «Север»',
@@ -61,6 +66,7 @@ function pileRow(): PilePassportRow {
     acceptedByName: null,
     redriveReadyAt: null,
     suggestion: null,
+    ...over,
   };
 }
 
@@ -73,10 +79,12 @@ const header = {
   dateFrom: '2026-09-28',
   dateTo: '2026-09-28',
   pilesTotal: 1,
+  draftPiles: 0,
+  withoutPassportPiles: 0,
   accepted: 0,
   needsRedrive: 0,
   pending: 1,
-  overRefusal: 0,
+  rowsTotal: 1,
 };
 
 async function renderJournal() {
@@ -224,14 +232,29 @@ describe('журнал забивки: перепутанный порядок �
 });
 
 /**
- * F-R107-2: стартовый фильтр — «Не разобранные». У объекта, где все сваи уже
- * приняты, мастер читал «По этой выборке записей нет» и решал, что паспортов
- * нет вовсе. Теперь пустой экран называет причину — фильтр — и даёт «Показать
- * все», не меняя фильтр по умолчанию.
+ * F-R107-2 / W14: стартовый фильтр — «Все» (иначе сваи без паспорта не видны),
+ * а пустая выборка честно говорит «За период свай нет». Фильтр «Не разобранные»
+ * по-прежнему объясняет пустоту и даёт «Показать все».
  */
-describe('журнал забивки: пусто из-за фильтра «Не разобранные» (F-R107-2)', () => {
+describe('журнал забивки: пустая выборка (F-R107-2/W14)', () => {
   beforeEach(() => {
     mocks.authFetch.mockReset();
+  });
+
+  const pileUrls = () => mocks.authFetch.mock.calls
+    .map(([url]) => String(url))
+    .filter((url) => url.startsWith('/api/pile-passports?'));
+
+  it('по умолчанию фильтр «Все», пустая выборка → «За период свай нет»', async () => {
+    mocks.authFetch.mockImplementation(async (url: string) => {
+      if (url.startsWith('/api/sites/all')) return json({ sites: [] });
+      return json({ data: [], header, truncated: false });
+    });
+    render(<PileJournal />);
+
+    expect(await screen.findByText('За период свай нет.')).toBeInTheDocument();
+    // Стартовый фильтр — «Все»: запрос уходит без acceptance.
+    expect(new URLSearchParams(pileUrls()[0].split('?')[1]).get('acceptance')).toBeNull();
   });
 
   it('пустая выборка под «Не разобранные» → объяснение и кнопка «Показать все»', async () => {
@@ -240,14 +263,13 @@ describe('журнал забивки: пусто из-за фильтра «Н�
       return json({ data: [], header, truncated: false });
     });
     render(<PileJournal />);
+    await screen.findByText('За период свай нет.');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Не разобранные' }));
 
     expect(await screen.findByText(/Все сваи объекта разобраны/)).toBeInTheDocument();
-
-    // Стартовый фильтр остался прежним — запрос ушёл с acceptance=PENDING.
-    const pileUrls = () => mocks.authFetch.mock.calls
-      .map(([url]) => String(url))
-      .filter((url) => url.startsWith('/api/pile-passports?'));
-    expect(new URLSearchParams(pileUrls()[0].split('?')[1]).get('acceptance')).toBe('PENDING');
+    const last = pileUrls().at(-1) as string;
+    expect(new URLSearchParams(last.split('?')[1]).get('acceptance')).toBe('PENDING');
 
     // «Показать все» снимает статусный фильтр и показывает разобранные сваи.
     mocks.authFetch.mockImplementation(async (url: string) => {
@@ -257,8 +279,8 @@ describe('журнал забивки: пусто из-за фильтра «Н�
     fireEvent.click(screen.getByRole('button', { name: 'Показать все' }));
 
     expect(await screen.findByText('С-130')).toBeInTheDocument();
-    const lastPileUrl = pileUrls().at(-1) as string;
-    expect(new URLSearchParams(lastPileUrl.split('?')[1]).get('acceptance')).toBeNull();
+    const cleared = pileUrls().at(-1) as string;
+    expect(new URLSearchParams(cleared.split('?')[1]).get('acceptance')).toBeNull();
   });
 });
 
@@ -281,7 +303,7 @@ describe('журнал забивки: пустая выгрузка (F-R115-10)
       return json({ data: [], header, truncated: false });
     });
     render(<PileJournal />);
-    expect(await screen.findByText(/Все сваи объекта разобраны/)).toBeInTheDocument();
+    expect(await screen.findByText('За период свай нет.')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: /Выгрузить журнал/ }));
 
@@ -310,5 +332,158 @@ describe('карточка сваи: замеры с запятой (R129 #5)', 
     expect(await screen.findByText('11,5 м')).toBeInTheDocument();
     expect(screen.getByText('1,8 мм/уд')).toBeInTheDocument();
     expect(screen.queryByText('11.5 м')).toBeNull();
+  });
+});
+
+/**
+ * W21: в титуле смешивались единицы — «Свай в журнале» (сваи) рядом с
+ * «Принято» (паспорта), а сваи без паспорта не попадали ни в один счётчик.
+ * Теперь каждая плитка названа своей единицей, а черновики — отдельной строкой.
+ */
+describe('журнал забивки: подписи плиток титула (W21)', () => {
+  beforeEach(() => {
+    mocks.authFetch.mockReset();
+  });
+
+  it('плитки подписаны единицами счёта, черновики — отдельной строкой', async () => {
+    await renderJournal();
+
+    expect(screen.getByText('Свай (всего)')).toBeInTheDocument();
+    expect(screen.getByText('Паспортов принято')).toBeInTheDocument();
+    expect(screen.getByText('Паспортов на добивку')).toBeInTheDocument();
+    expect(screen.getByText('Паспортов не разобрано')).toBeInTheDocument();
+    expect(screen.getByText('Свай без паспорта')).toBeInTheDocument();
+    expect(screen.getByText(/из них в черновиках/)).toBeInTheDocument();
+  });
+});
+
+/**
+ * W52: `decide()` не имел покрытия целиком — ни гвард «решение живёт в
+ * паспорте» (`if (!row.passportId) return`), ни адрес
+ * `/api/pile-passports/<passportId>/decide` (раньше — по `row.id`).
+ */
+describe('журнал забивки: решение по свае уходит в паспорт (W52)', () => {
+  beforeEach(() => {
+    mocks.authFetch.mockReset();
+  });
+
+  const decideUrls = () => mocks.authFetch.mock.calls
+    .map(([url]) => String(url))
+    .filter((url) => url.includes('/decide'));
+
+  /** Журнал отдаёт одну строку; запросы решения считаем отдельно. */
+  function renderWithRow(row: PilePassportRow) {
+    mocks.authFetch.mockImplementation((url: string) => {
+      if (url.startsWith('/api/sites/all')) return Promise.resolve(json({ sites: [] }));
+      if (url.includes('/decide')) return Promise.resolve(json({ ok: true }));
+      return Promise.resolve(json({ data: [row], header, truncated: false }));
+    });
+  }
+
+  it('строка без passportId — решение не уходит на сервер (гвард)', async () => {
+    renderWithRow(pileRow({ passportId: null, hasPassport: true }));
+    render(<PileJournal />);
+
+    fireEvent.click(await screen.findByText('С-130'));
+    fireEvent.click(await screen.findByRole('button', { name: 'Принять сваю' }));
+
+    expect(decideUrls()).toHaveLength(0);
+  });
+
+  it('решение по строке с паспортом уходит на /decide паспорта, а не по row.id', async () => {
+    renderWithRow(pileRow({ id: 'row-9', passportId: 'passport-7' }));
+    render(<PileJournal />);
+
+    fireEvent.click(await screen.findByText('С-130'));
+    fireEvent.click(await screen.findByRole('button', { name: 'Принять сваю' }));
+
+    await waitFor(() => expect(decideUrls()).toHaveLength(1));
+    const [url, init] = mocks.authFetch.mock.calls.find(([u]) => String(u).includes('/decide')) as [string, RequestInit];
+    expect(url).toBe('/api/pile-passports/passport-7/decide');
+    expect(init.method).toBe('POST');
+  });
+});
+
+/**
+ * W52: успешная ветка выгрузки (ветки отказа уже покрыты F-R107-3) —
+ * файл сохраняется через object URL и подтверждается зелёным тостом.
+ */
+describe('журнал забивки: успешная выгрузка (W52)', () => {
+  const createObjectURL = vi.fn(() => 'blob:mock');
+  const revokeObjectURL = vi.fn();
+
+  beforeEach(() => {
+    mocks.authFetch.mockReset();
+    vi.mocked(toast.success).mockClear();
+    URL.createObjectURL = createObjectURL as unknown as typeof URL.createObjectURL;
+    URL.revokeObjectURL = revokeObjectURL as unknown as typeof URL.revokeObjectURL;
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+  });
+
+  it('непустая выборка → файл выгружается, тост «Журнал выгружен»', async () => {
+    await renderJournal();
+    mocks.authFetch.mockImplementation((url: string) => {
+      if (url.startsWith('/api/sites/all')) return Promise.resolve(json({ sites: [] }));
+      if (url.startsWith('/api/pile-passports/export')) {
+        return Promise.resolve(new Response('xlsx', { status: 200 }));
+      }
+      return Promise.resolve(json({ data: [pileRow()], header, truncated: false }));
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /Выгрузить журнал/ }));
+
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Журнал выгружен'));
+    expect(createObjectURL).toHaveBeenCalledTimes(1);
+    expect(revokeObjectURL).toHaveBeenCalledWith('blob:mock');
+  });
+});
+
+/**
+ * W57: слева закреплены колонки-идентификаторы «№», «Дата», «№ сваи» (решение
+ * владельца 07.10, вариант 2). Диспетчер на 1366 px, прокручивая журнал вправо
+ * к «Решение»/«Пометке», терял, к какой свае относится строка. Закрепление —
+ * `sticky left-[…]` с непрозрачным фоном и правой границей (иначе строка
+ * просвечивает), а `colSpan` строки детали берётся из `JOURNAL_COLUMNS`.
+ */
+describe('журнал забивки: закрепление левых колонок (W57)', () => {
+  beforeEach(() => {
+    mocks.authFetch.mockReset();
+  });
+
+  it('«№», «Дата», «№ сваи» — sticky с непрозрачным фоном в шапке и в строке', async () => {
+    await renderJournal();
+    const table = screen.getByRole('table');
+
+    const head = within(table).getAllByRole('columnheader');
+    expect(head[0]).toHaveTextContent('№');
+    expect(head[0]).toHaveClass('sticky', 'left-0', 'bg-muted', 'z-30');
+    expect(head[1]).toHaveTextContent('Дата');
+    expect(head[1]).toHaveClass('sticky', 'left-12', 'bg-muted', 'z-30');
+    // «№ сваи» — четвёртая графа: между «Дата» и ею прокручивается «Смена».
+    expect(head[3]).toHaveTextContent('№ сваи');
+    expect(head[3]).toHaveClass('sticky', 'left-[10rem]', 'bg-muted', 'z-30');
+    // Смещение считается от фиксированных ширин: № (3rem) + Дата (7rem).
+    expect(head[0]).toHaveClass('w-12', 'min-w-12');
+    expect(head[1]).toHaveClass('w-28', 'min-w-28');
+
+    const bodyCells = within(table).getAllByRole('row')[1].querySelectorAll('td');
+    expect(bodyCells[0]).toHaveClass('sticky', 'left-0', 'bg-background');
+    expect(bodyCells[1]).toHaveClass('sticky', 'left-12', 'bg-background');
+    expect(bodyCells[3]).toHaveClass('sticky', 'left-[10rem]', 'bg-background');
+    // Непрозрачный фон без границы всё ещё пропускает соседние ячейки впритык.
+    expect(bodyCells[0]).toHaveClass('border-r');
+    expect(bodyCells[3]).toHaveClass('border-r');
+  });
+
+  it('colSpan строки детали равен JOURNAL_COLUMNS, а число граф ей соответствует', async () => {
+    await renderJournal();
+    const table = screen.getByRole('table');
+    expect(within(table).getAllByRole('columnheader')).toHaveLength(JOURNAL_COLUMNS);
+
+    fireEvent.click(screen.getByText('С-130'));
+    await screen.findByRole('button', { name: 'Принять сваю' });
+
+    const detail = table.querySelector(`td[colspan="${JOURNAL_COLUMNS}"]`);
+    expect(detail).not.toBeNull();
   });
 });

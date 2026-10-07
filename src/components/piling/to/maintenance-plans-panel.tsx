@@ -181,14 +181,16 @@ export function MaintenancePlansPanel({ equipmentId }: { equipmentId: string }) 
             <button
               type="button"
               onClick={() => setTrigger('HOURS')}
-              className={cn('flex-1 rounded px-2 py-1 text-xs font-medium', trigger === 'HOURS' ? 'bg-info/10 text-info-strong' : 'text-muted-foreground')}
+              // R137 №13: выбор «чем меряется регламент» (моточасы/календарь) был
+              // ≈26px — палец легко попадал в соседний вариант. На телефоне 44px.
+              className={cn('flex-1 min-h-11 rounded px-2 py-1 text-xs font-medium sm:min-h-0', trigger === 'HOURS' ? 'bg-info/10 text-info-strong' : 'text-muted-foreground')}
             >
               По моточасам
             </button>
             <button
               type="button"
               onClick={() => setTrigger('CALENDAR')}
-              className={cn('flex-1 rounded px-2 py-1 text-xs font-medium', trigger === 'CALENDAR' ? 'bg-info/10 text-info-strong' : 'text-muted-foreground')}
+              className={cn('flex-1 min-h-11 rounded px-2 py-1 text-xs font-medium sm:min-h-0', trigger === 'CALENDAR' ? 'bg-info/10 text-info-strong' : 'text-muted-foreground')}
             >
               По календарю
             </button>

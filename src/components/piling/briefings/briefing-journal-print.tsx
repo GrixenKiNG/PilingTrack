@@ -29,6 +29,41 @@ import { formatRuDate } from '@/lib/format';
 import { formatDateInTimezone } from '@/lib/timezone';
 import { ROLE_LABELS, type UserRole } from '@/lib/types';
 
+/**
+ * Стили печати журнала инструктажей (R134, находки 7 и 22).
+ *
+ * Находка 7: добавлены CSS-счётчики @page для автоматической нумерации листов
+ * «Лист N из M» вместо ручного «Лист ___ из ___». Браузеры печатают счётчики
+ * в @page margin-boxes (нижний колонтитул).
+ *
+ * Находка 22: переопределяем .journal-code { white-space: nowrap } из print.css,
+ * чтобы длинные коды/версии инструкций переносились и не вылезали за колонку.
+ *
+ * Стили записаны строкой в компоненте: print.css лежит вне разрешённых путей
+ * (src/app/print/briefing-journal/), а импорт CSS из компонента роняет vitest.
+ */
+const JOURNAL_PRINT_CSS = `
+@page {
+  /* Нижний колонтитул с нумерацией страниц: «Лист 1 / 3» */
+  @bottom-center {
+    content: "Лист " counter(page) " / " counter(pages);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-size: 8pt;
+    color: #000;
+  }
+}
+
+/* Находка 22: позволяем коду инструкции переноситься */
+.journal-code {
+  white-space: normal !important;
+  word-break: break-word;
+}
+`;
+
+export function JournalPrintStyles() {
+  return <style dangerouslySetInnerHTML={{ __html: JOURNAL_PRINT_CSS }} />;
+}
+
 interface PrintParams {
   from: string;
   to: string;
@@ -176,6 +211,7 @@ export function BriefingJournalPrint() {
 
   return (
     <main className="journal-sheet">
+      <JournalPrintStyles />
       <header className="journal-head">
         <h1>Журнал регистрации инструктажей по охране труда</h1>
         <dl className="journal-meta">
@@ -244,8 +280,9 @@ export function BriefingJournalPrint() {
           <span>Ответственный за охрану труда ____________________ / ____________________</span>
           <span>Дата составления: {sheetDay(new Date().toISOString(), timezone)}</span>
         </div>
-        {/* Нумерацию листов ставит рукой человек у принтера: браузер не знает,
-            сколько страниц займёт журнал, а @page-счётчики живут в CSS листа. */}
+        {/* Нумерация листов: @page-счётчики в JournalPrintStyles печатают
+            «Лист N / M» в нижнем колонтитуле. Ручная заготовка остаётся как
+            фолбэк для браузеров без поддержки counter(pages). */}
         <p>Лист ___ из ___</p>
       </footer>
     </main>

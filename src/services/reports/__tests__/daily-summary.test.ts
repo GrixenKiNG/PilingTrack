@@ -115,6 +115,7 @@ import {
 } from '../event-handlers';
 import { emitDomainEvent } from '@/services/reports/domain-events';
 import { REPORT_DOMAIN_EVENT_TYPES } from '@/modules/reports/domain';
+import { logger } from '@/lib/logger';
 
 // Доставка PDF отчёта в Telegram (R9-1): сбой должен оставлять событие на
 // повтор, а не теряться в журнале, и повтор не должен слать PDF второй раз.
@@ -191,26 +192,136 @@ describe('handleReportForAnalytics', () => {
   });
 
   /*
-    Проекция без организации раньше писалась с `tenantId: null`: строка
-    становилась невидимой для всех тенантных запросов (сломанная аналитика),
-    а для запроса с пустым тенантом — видна всем организациям. Запись без
-    организации не создаём и сообщаем в лог, как для siteId/userId.
+    J1 (W28-CODEX-J-TESTPLAN): при неразрешимом siteId/userId/tenantId
+    обработчик раньше молча `return`-ил, а outbox-publisher всё равно клеймил
+    строку `published=true` (dispatch-then-claim) — ретрая и DLQ не было, и
+    проекция терялась молча. Теперь неразрешённый идентификатор бросает, чтобы
+    сработал ретрай/DLQ. Этот тест стоял на молчаливом пропуске — переписан.
   */
-  it('пропускает проекцию, когда организацию определить нечем', async () => {
+  it('бросает, когда организацию определить нечем (ретрай/DLQ, а не тихий пропуск)', async () => {
     findUniqueMock.mockResolvedValue({ siteId: 'site_A', userId: 'user-1', tenantId: null });
 
+    await expect(
+      emitDomainEvent({
+        id: 'evt-2',
+        type: REPORT_DOMAIN_EVENT_TYPES.REPORT_SUBMITTED,
+        aggregateId: 'report-uuid-2',
+        aggregateType: 'Report',
+        occurredAt: new Date().toISOString(),
+        siteId: 'site_A',
+        userId: 'user-1',
+        data: {},
+      }),
+    ).rejects.toThrow();
+
+    expect(analyticsUpsertMock).not.toHaveBeenCalled();
+  });
+
+  /*
+    J1 (W28-CODEX-J-TESTPLAN): при неразрешимом siteId/userId/tenantId обработчик
+    теперь бросает, а outbox-publisher повторит и при исчерпании попыток отправит
+    событие в dead-letter. До правки тест фиксировал тихий успех.
+  */
+  it('J1: неразрешимый tenant бросает, проекция не пишется', async () => {
+    findUniqueMock.mockResolvedValue({ siteId: 'site_A', userId: 'user-1', tenantId: null });
+
+    await expect(
+      emitDomainEvent({
+        id: 'evt-j1-1',
+        type: REPORT_DOMAIN_EVENT_TYPES.REPORT_SUBMITTED,
+        aggregateId: 'report-uuid-j1',
+        aggregateType: 'Report',
+        occurredAt: new Date().toISOString(),
+        siteId: 'site_A',
+        userId: 'user-1',
+        data: {},
+      }),
+    ).rejects.toThrow();
+
+    expect(analyticsUpsertMock).not.toHaveBeenCalled();
+  });
+
+  /*
+    J4 (W28-CODEX-J-TESTPLAN): на ReportUpdated аналитика раньше не подписана, поэтому
+    статус проекции меняли лишь ReportCreated/ReportSubmitted. Если ReportSubmitted
+    не дошёл (J1/J2), строка ReportAnalytics навсегда остаётся `draft` при живом
+    Report.status = submitted (наблюдалось на RM-3190cede). Теперь ReportUpdated
+    зеркалит статус отчёта в проекцию (источник — строка Report).
+  */
+  it('J4: ReportUpdated зеркалит статус отчёта в проекцию', async () => {
+    findUniqueMock.mockResolvedValue({
+      siteId: 'site_A', userId: 'user-1', tenantId: 'tenant-a', status: 'submitted',
+    });
+
     await emitDomainEvent({
-      id: 'evt-2',
-      type: REPORT_DOMAIN_EVENT_TYPES.REPORT_SUBMITTED,
-      aggregateId: 'report-uuid-2',
+      id: 'evt-j4-1',
+      type: REPORT_DOMAIN_EVENT_TYPES.REPORT_UPDATED,
+      aggregateId: 'report-uuid-j4',
       aggregateType: 'Report',
       occurredAt: new Date().toISOString(),
       siteId: 'site_A',
       userId: 'user-1',
+      tenantId: 'tenant-a',
       data: {},
     });
 
+    expect(analyticsUpsertMock).toHaveBeenCalled();
+    expect(analyticsUpsertMock.mock.calls[0][0].update.status).toBe('submitted');
+  });
+
+  /*
+    W45 (W45-REPORTUPDATED-DELETED): ReportUpdated приходит для отчёта, которого
+    уже нет в Report (отчёт удалён), но событие само несёт siteId/userId/tenantId.
+    Прежний обработчик писал по ним строку ReportAnalytics для несуществующего
+    отчёта — «сироту» (W12: 5 сирот локально). Удаление отчёта — нормальный
+    конец: проекцию не пишем и НЕ бросаем (бросок увёл бы событие в ретрай/DLQ).
+  */
+  it('W45: ReportUpdated для удалённого отчёта не пишет проекцию и не бросает', async () => {
+    findUniqueMock.mockResolvedValue(null);
+
+    await expect(emitDomainEvent({
+      id: 'evt-w45-1',
+      type: REPORT_DOMAIN_EVENT_TYPES.REPORT_UPDATED,
+      aggregateId: 'report-deleted-1',
+      aggregateType: 'Report',
+      occurredAt: new Date().toISOString(),
+      siteId: 'site_A',
+      userId: 'user-1',
+      tenantId: 'tenant-a',
+      data: {},
+    })).resolves.toBeUndefined();
+
     expect(analyticsUpsertMock).not.toHaveBeenCalled();
+    expect(logger.info).toHaveBeenCalledWith(
+      'Analytics projection skipped: report no longer exists',
+      { eventType: REPORT_DOMAIN_EVENT_TYPES.REPORT_UPDATED, aggregateId: 'report-deleted-1' },
+    );
+  });
+
+  /*
+    W45: правка касается ТОЛЬКО ReportUpdated. Для ReportCreated (/ReportSubmitted)
+    без строки отчёта, но с идентификаторами в событии, поведение прежнее —
+    строка проекции создаётся (её ещё нечем подтвердить, но и не повод молчать).
+  */
+  it('W45: ReportCreated без строки отчёта сохраняет прежнее поведение', async () => {
+    findUniqueMock.mockResolvedValue(null);
+
+    await emitDomainEvent({
+      id: 'evt-w45-2',
+      type: REPORT_DOMAIN_EVENT_TYPES.REPORT_CREATED,
+      aggregateId: 'report-new-1',
+      aggregateType: 'Report',
+      occurredAt: new Date().toISOString(),
+      siteId: 'site_A',
+      userId: 'user-1',
+      tenantId: 'tenant-a',
+      data: {},
+    });
+
+    expect(analyticsUpsertMock).toHaveBeenCalledTimes(1);
+    expect(analyticsUpsertMock.mock.calls[0][0].create).toMatchObject({
+      reportId: 'report-new-1', tenantId: 'tenant-a', status: 'draft',
+    });
   });
 });
 

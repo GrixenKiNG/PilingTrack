@@ -1,6 +1,7 @@
 # ADR-0043: Tenant-scoped append-only AuditLog hash chain
 
 - Status: Accepted
+- Amended: 2026-10-07 (see Amendment at the end)
 - Date: 2026-07-29
 - Decision owners: Security and Tech Readiness backend
 
@@ -24,3 +25,19 @@ The current `AuditLog` is append-only only by application convention, has no int
 - Legacy rows with no tenant are explicitly mapped by an approved manifest or quarantined outside the tenant API; they are never assigned to a default tenant.
 - Hash chaining detects tampering but is not an electronic signature and does not prove actor identity beyond the authenticated application record.
 - Detection against a privileged database owner requires external signed/WORM anchoring of chain heads; without it, claims are limited to application-role tamper evidence.
+
+## Amendment 2026-10-07 (owner decision, option B)
+
+The code never matched Decision item 1. The owner chose to bring the document in line with the code, not the code with the document (see `docs/audits/hermes-night/W24-ADR-0043-OPTIONS.md`).
+
+Decision item 1 is replaced by:
+
+1. `AuditLog` is the tamper-evident hash chain for decisions that matter for safety. Today this is the tech-readiness contour; its only write point is `src/modules/readiness/infrastructure/audit/audit-repository.ts`. `FeedbackEvent` is the audit feed and the entity history for all other modules (sign-in, reports, sites, users, dictionaries, equipment, maintenance). `GET /api/audit` and the audit screen read it through `src/services/audit/audit-history-service.ts`.
+
+Items 2-6 describe the chain itself and stay unchanged.
+
+Consequences of the amendment:
+
+- The chain does not cover actions outside tech readiness.
+- `FeedbackEvent` is not protected against tampering. Outside tech readiness, an external guard (for example signed anchors) is required to prove who changed what.
+- Moving the other modules into the chain (the former option A) is not planned. It needs a new decision of the owner.

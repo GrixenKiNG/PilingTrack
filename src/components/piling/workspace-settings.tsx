@@ -19,6 +19,7 @@ import { MainDashboardLayoutEditor } from '@/components/piling/main-dashboard/da
 import { AdminTelegram } from '@/components/piling/admin-telegram';
 import { AdminDlq } from '@/components/piling/admin-dlq';
 import { EquipmentTileTemplateSettings } from '@/components/piling/monitoring/equipment-tile-template-settings';
+import { useDocumentTitle } from '@/components/piling/ops-shell';
 
 type Tab = 'workspace' | 'roles' | 'notifications' | 'template' | 'telegram' | 'dlq';
 
@@ -91,6 +92,10 @@ function Row({ label, value }: { label: string; value: string }) {
 }
 
 export function WorkspaceSettings() {
+  // Заголовок вкладки браузера. Соседние экраны /admin/* ставят его через
+  // useDocumentTitle; «Настройки» его не ставили и вкладка называлась
+  // заголовком корневого layout («PilingTrack - Управление свайными работами»).
+  useDocumentTitle('Настройки');
   const isAdmin = usePilingStore((state) => state.currentUser?.role) === 'ADMIN';
   const [activeTab, setActiveTab] = useState<Tab>('workspace');
   const [settings, setSettings] = useState<WorkspaceSettingsData>(DEFAULT_WORKSPACE_SETTINGS);

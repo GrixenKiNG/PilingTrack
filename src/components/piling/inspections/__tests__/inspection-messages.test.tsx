@@ -567,6 +567,26 @@ describe('редактор шаблона: снятая версия помеч�
   });
 });
 
+/**
+ * F-R131-NEXT3 №26: кнопка-иконка «корзина» (деактивировать шаблон) в списке
+ * шаблонов имела aria-label, но не имела title.
+ */
+describe('TemplateList — title на кнопке деактивации (F-R131-NEXT3 №26)', () => {
+  const row = {
+    id: 'tpl-1', name: 'ЕО — экскаватор', level: 'EO',
+    blockType: 'BASE', appliesToModel: 'Banut 655', isActive: true,
+  };
+  const listWith = (templates: unknown[]) => json({ templates });
+
+  it('кнопка деактивации имеет title', async () => {
+    mocks.authFetch.mockResolvedValue(listWith([row]));
+    render(<TemplateList />);
+
+    const btn = await screen.findByRole('button', { name: 'Деактивировать' });
+    expect(btn).toHaveAttribute('title', 'Деактивировать шаблон');
+  });
+});
+
 describe('inspection-api-error: выбор текста по причине', () => {
   const texts = { forbidden: 'нет прав', notFound: 'не найден', server: 'сбой сервера' };
 

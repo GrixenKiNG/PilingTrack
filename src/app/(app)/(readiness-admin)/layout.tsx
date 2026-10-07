@@ -1,5 +1,4 @@
 import { redirect } from 'next/navigation';
-import { OPERATOR_HOME_ROUTE } from '@/lib/routes';
 import { readPageSessionUser } from '@/lib/page-session';
 
 const ALLOWED = new Set([
@@ -11,8 +10,11 @@ export default async function ReadinessAdminLayout({ children }: { children: Rea
   const user = await readPageSessionUser();
   if (!user) redirect('/login');
 
+  // Роли вне раздела (ASSISTANT) видят объяснение отказа, а не молчаливый
+  // переход на чужой экран — как в раскладке админки (admin/layout.tsx) и
+  // гварде разделов (require-page-ability.ts): W11-NO-ACCESS-SCREEN, W22.
   if (!ALLOWED.has(user.role)) {
-    redirect(OPERATOR_HOME_ROUTE);
+    redirect('/no-access');
   }
 
   return <>{children}</>;

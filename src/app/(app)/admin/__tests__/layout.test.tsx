@@ -62,12 +62,12 @@ describe('AdminSectionLayout — sessionVersion check', () => {
     await expect(AdminSectionLayout({ children: null })).rejects.toThrow('REDIRECT:/login');
   });
 
-  it('redirects to /operator for a non-admin role even with a fresh sessionVersion', async () => {
+  it('redirects an operator to /no-access with a fresh sessionVersion (W17)', async () => {
     withCookie('valid-token');
     verifySessionTokenMock.mockResolvedValue({ sub: 'user-1', role: 'OPERATOR', sv: 0 });
     findUniqueMock.mockResolvedValue({ tenantId: 'orion', role: 'OPERATOR', isActive: true, sessionVersion: 0 });
 
-    await expect(AdminSectionLayout({ children: null })).rejects.toThrow('REDIRECT:/operator');
+    await expect(AdminSectionLayout({ children: null })).rejects.toThrow('REDIRECT:/no-access');
   });
 
   it('renders children when role and sessionVersion both check out', async () => {
