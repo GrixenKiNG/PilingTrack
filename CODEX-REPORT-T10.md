@@ -111,8 +111,8 @@ output/codex-t10/j8-plans-before.json и j8-plans-after.json. План спис�
 выбирает ID, не измеряет все связанные Prisma presentation SELECTs;
 реальное приложение отдельно проверено по ID/агрегатам.
 
-tsc exit0; полный lint exit0/0 warnings; полный unit — неизменённый итог J9
-3731 passed/250 skipped, runtime queries не редактировались. После первого
+tsc exit0; полный lint exit0/0 warnings; последний полный unit до J8:
+3731 passed/250 skipped. Финальный полный прогон после J7 будет ниже. После первого
 GREEN добавлен guard same local owner/app codex_test target; финальный повтор
 exit0, 1 passed/1 pattern-skipped, 11.63s. GitNexus impact/detect-changes exit1 UNKNOWN, разрешённый
 rg fallback: readers listPilePassports/pileJournalTotals, writers производят
@@ -123,3 +123,87 @@ runbook017 +124. Удалённых файлов/экспортов нет. Ни
 БД не открывались. На бою индексы ещё нужно применить владельцу; runbook017
 содержит проверки объёма, свободного места, длинных транзакций и валидности.
 Удаление невалидного индекса при сбое — отдельное решение владельца.
+Коммит J8: 1ac24e79. Итоговый npm run build после J8: exit0
+(output/codex-t5/t10-final-npm-build-result.json), собственные Postgres/Redis.
+
+## J7 — инструмент и репетиция готовы; настоящая чистка не выполнена
+
+Создан scripts/cleanup-report-analytics-orphans.cjs: только работающий собственный
+codex-pg с ownership label, точным loopback-портом, codex_test и существующим
+владельцем piling. По умолчанию dry-run, включая ноль строк. Никакого выбора
+общего контейнера, чтения .env, отключения RLS или триггеров нет.
+
+Apply требует ровно пять ключей W12, tenant=orion и отсутствие живого Report
+во всех организациях. Проверяются входящие FK и пользовательские триггеры.
+Report/ReportAnalytics блокируются в транзакции, есть lock/statement timeouts.
+До DELETE сохраняются все 11 столбцов пяти строк, описание схемы и SHA-256;
+файл wx/fsync повторно читается и проверяется. Это бэкап выбранных строк,
+не полный dump БД. DELETE RETURNING сверяется с бэкапом. Restore сохраняет
+все значения, проверяет схему/конфликты и не перезаписывает существующие строки.
+Ошибки дают rollback; потеря подтверждения commit требует перепроверки.
+
+RED после исправления fixture: CLI exit1, 8 failed/9 skipped; ownPG exit1,
+3 failed/3 passed/11 pattern-skipped (инструмент отсутствовал). Три refusals
+с exit1 без инструмента не считаются самостоятельным доказательством защиты.
+Первый PG RED содержал дополнительную ошибку уникальности fixture; он не
+выдаётся за дефект продукта. После исправления даты fixture ошибки исчезли.
+Девятый CLI guard для .ENV.json добавлен при review Windows-регистра.
+
+GREEN всего existing disposable-scripts.spec.ts на собственном Postgres:
+exit0, 18 passed/0 skipped, 14.08s (3 старых+9 argv+6 DB сценариев).
+Подтверждены 5→0→5 точные значения/даты/дробные числа, сохранность неизвестной
+шестой сироты, живой проекции и другого tenant; отказ при четырёх целях,
+неверном tenant, существующем backup, живом foreign Report, FK/триггере,
+повреждении checksum/схемы и повторном restore. Независимый review без замечаний.
+Временный backup fixture удаляется тестом только из проверенного собственного
+tmpdir; реальные данные/их backup не создавались и не изменялись.
+
+GitNexus impact/detect-changes exit1 UNKNOWN; перед utility выполнена попытка
+impact ReportAnalytics, затем разрешённый полный rg по src/tests/e2e/scripts/
+prisma. Новый CLI вызывается только тестом/вручную. Readers оборудования и
+аналитики работают по живым Report; rebuild остаётся upsert-only, delete-route
+best-effort. Эти пути не исправлялись: последнее задание владельца — чистка
+пяти строк. Новые сироты по-прежнему возможны. Процессный недочёт: агент
+выполнил первую impact-попытку после добавления первого тестового блока;
+это не чистый graph gate. Перед созданием runtime CLI попытка уже выполнена.
+
+Строки J7: скрипт +142, runbook018 +115, existing tests +171/-1.
+Файлы/экспорты не удалены. ReportAudit/ReportVersion (71+71 из W12), outbox,
+scheduler, security/tenancy, operator и ORION не изменялись.
+
+**Осталось для настоящих пяти строк:** правило CODEX-DESKTOP-TASKS.md §ЭТАП2
+запрещает подключаться к существующим контейнерам/локальной базе владельца;
+все DB действия разрешены только на codex-*. Поэтому локальные пять строк
+из W12 не проверены сегодня и не удалены. Для продолжения нужна отдельная
+команда владельца, разрешающая именно эту общую локальную БД, затем актуальная
+проверка ссылок/ключей и бэкап. Production запрещён и не открывался.
+Runbook018 содержит готовый порядок репетиции/проверок и эту границу.
+
+## Итоговые проверки всей текущей ветки
+
+- Очистка .next/dev/types: выполнена только в wt-codex10, exit0; в финале
+  папка отсутствует. Основное дерево владельца не затронуто.
+- npx tsc --noEmit: exit0, output/codex-t10/final-tsc.log.
+- npm run lint: exit0/0 warnings, text integrity passed, final-lint.log.
+  Штатный ESLint игнорирует .cjs; новый CLI отдельно node --check: exit0.
+  npx eslint --no-ignore scripts/cleanup-report-analytics-orphans.cjs
+  --rule '@typescript-eslint/no-require-imports: off' --max-warnings 0:
+  exit0 (отключено только require-style правило для CommonJS).
+  Конфиг ESLint/inline-disable не редактировался.
+- npm run test:unit -- --maxWorkers=4: exit0, 3740 passed/257 skipped,
+  3997 tests; 372 passed/14 skipped files (386), 258.35s, final-unit.log.
+  Пропуски не названы проверками БД; J7 DB отдельно 18/0, J8 отдельно1/1
+  (skip другого теста по name filter), J9 Chromium отдельно1/0.
+- npx playwright test --list: exit0, 297 tests/29 files, final-playwright-list.log.
+- npm run build на финальном исходном коде: exit0 на собственном реальном
+  Postgres/Redis, output/codex-t5/t10-final-source-build-result.json.
+  Сохранились предупреждения необязательного BullMQ Valkey и Vitest listeners/
+  config; зависимости и таймауты не менялись. Сам .env не создавался.
+- git diff --check / node --check: exit0; GitNexus остаётся UNKNOWN, не green.
+- Собственный стенд остановлен: supervisor exit0, CLEANUP done; docker ps -a
+  подтверждает отсутствие codex-pg-054a44aa2472 и обоих собственных Redis.
+
+На финальной проверке main всё ещё e6fa7e35, owner/operator-flow-0707=b251d993
+ещё не слита. Поэтому I2/I1/I3/I5 и J3 остаются отложенными по явной команде
+владельца. H2–H4/G3–G6 ждут отдельного решения о переносе потока7; merge,
+push, production, исправления уже принятых J1/J2/J4/J5/J6 не выполнялись.
