@@ -115,6 +115,7 @@ import {
 } from '../event-handlers';
 import { emitDomainEvent } from '@/services/reports/domain-events';
 import { REPORT_DOMAIN_EVENT_TYPES } from '@/modules/reports/domain';
+import { logger } from '@/lib/logger';
 
 // Доставка PDF отчёта в Telegram (R9-1): сбой должен оставлять событие на
 // повтор, а не теряться в журнале, и повтор не должен слать PDF второй раз.
@@ -266,6 +267,61 @@ describe('handleReportForAnalytics', () => {
 
     expect(analyticsUpsertMock).toHaveBeenCalled();
     expect(analyticsUpsertMock.mock.calls[0][0].update.status).toBe('submitted');
+  });
+
+  /*
+    W45 (W45-REPORTUPDATED-DELETED): ReportUpdated приходит для отчёта, которого
+    уже нет в Report (отчёт удалён), но событие само несёт siteId/userId/tenantId.
+    Прежний обработчик писал по ним строку ReportAnalytics для несуществующего
+    отчёта — «сироту» (W12: 5 сирот локально). Удаление отчёта — нормальный
+    конец: проекцию не пишем и НЕ бросаем (бросок увёл бы событие в ретрай/DLQ).
+  */
+  it('W45: ReportUpdated для удалённого отчёта не пишет проекцию и не бросает', async () => {
+    findUniqueMock.mockResolvedValue(null);
+
+    await expect(emitDomainEvent({
+      id: 'evt-w45-1',
+      type: REPORT_DOMAIN_EVENT_TYPES.REPORT_UPDATED,
+      aggregateId: 'report-deleted-1',
+      aggregateType: 'Report',
+      occurredAt: new Date().toISOString(),
+      siteId: 'site_A',
+      userId: 'user-1',
+      tenantId: 'tenant-a',
+      data: {},
+    })).resolves.toBeUndefined();
+
+    expect(analyticsUpsertMock).not.toHaveBeenCalled();
+    expect(logger.info).toHaveBeenCalledWith(
+      'Analytics projection skipped: report no longer exists',
+      { eventType: REPORT_DOMAIN_EVENT_TYPES.REPORT_UPDATED, aggregateId: 'report-deleted-1' },
+    );
+  });
+
+  /*
+    W45: правка касается ТОЛЬКО ReportUpdated. Для ReportCreated (/ReportSubmitted)
+    без строки отчёта, но с идентификаторами в событии, поведение прежнее —
+    строка проекции создаётся (её ещё нечем подтвердить, но и не повод молчать).
+  */
+  it('W45: ReportCreated без строки отчёта сохраняет прежнее поведение', async () => {
+    findUniqueMock.mockResolvedValue(null);
+
+    await emitDomainEvent({
+      id: 'evt-w45-2',
+      type: REPORT_DOMAIN_EVENT_TYPES.REPORT_CREATED,
+      aggregateId: 'report-new-1',
+      aggregateType: 'Report',
+      occurredAt: new Date().toISOString(),
+      siteId: 'site_A',
+      userId: 'user-1',
+      tenantId: 'tenant-a',
+      data: {},
+    });
+
+    expect(analyticsUpsertMock).toHaveBeenCalledTimes(1);
+    expect(analyticsUpsertMock.mock.calls[0][0].create).toMatchObject({
+      reportId: 'report-new-1', tenantId: 'tenant-a', status: 'draft',
+    });
   });
 });
 

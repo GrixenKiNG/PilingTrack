@@ -75,6 +75,20 @@ async function handleReportForAnalytics(event: ReportDomainEvent) {
       where: { reportId: event.aggregateId },
       select: { siteId: true, userId: true, tenantId: true, status: true },
     });
+    // W45: ReportUpdated для отчёта, которого уже нет в Report (отчёт удалён).
+    // Событие само несёт siteId/userId/tenantId, и прежний код создавал по ним
+    // строку ReportAnalytics для несуществующего отчёта — «сироту» (W12: 5
+    // сирот локально; класс не само-лечится, см. rebuild.ts). Удаление отчёта —
+    // нормальный конец его жизненного цикла: проекцию не пишем, но и НЕ бросаем
+    // (бросок увёл бы событие в ретрай/DLQ без шанса на успех). Только для
+    // ReportUpdated: для ReportCreated/ReportSubmitted поведение прежнее.
+    if (!report && event.type === REPORT_DOMAIN_EVENT_TYPES.REPORT_UPDATED) {
+      logger.info('Analytics projection skipped: report no longer exists', {
+        eventType: event.type,
+        aggregateId: event.aggregateId,
+      });
+      return;
+    }
     const siteId = event.siteId || report?.siteId;
     const userId = event.userId || report?.userId;
     const tenantId = event.tenantId || report?.tenantId || undefined;
