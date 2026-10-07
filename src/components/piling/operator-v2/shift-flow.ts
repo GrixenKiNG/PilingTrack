@@ -184,9 +184,8 @@ export function resolveV2State(
   if (!facts.shift) {
     return { step: 'acceptance', blockers: [] };
   }
-  if (facts.shift.state === 'HANDOVER_PENDING') {
-    return { step: 'closed', blockers: [] };
-  }
+  // HANDOVER_PENDING — «работа завершена, смена ещё не сдана» (07.10.2026): это не
+  // «закрыта». Дальше ведёт фаза: ЕО после работы, затем отчёт; выработку можно дописать.
 
   const incoming = facts.incomingHandover;
   const handoverPending = Boolean(incoming && incoming.shiftId !== facts.shift.id);

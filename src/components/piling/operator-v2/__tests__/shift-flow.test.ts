@@ -45,3 +45,15 @@ describe('resolveV2State — закрытая смена (F-QA-005B)', () => {
     expect(resolveV2State(blocked, 'CLOSED', true, session)).toEqual({step: 'closed', blockers: []});
   });
 });
+
+describe('resolveV2State — смена после «Завершить работу» ещё не сдана', () => {
+  const pending = facts({shift: {id: 'shift-1', state: 'HANDOVER_PENDING'} as unknown as NonNullable<OperatorShiftFacts['shift']>, report: null});
+
+  it('без ЕО после работы — шаг «ЕО после работы», а не «Смена закрыта»', () => {
+    expect(resolveV2State(pending, 'CLOSING', false, {accepted: true, finishing: false}).step).toBe('post-inspection');
+  });
+
+  it('после ЕО — шаг «Отчёт», смену ещё можно сдать', () => {
+    expect(resolveV2State(pending, 'CLOSING', true, {accepted: true, finishing: false}).step).toBe('report');
+  });
+});

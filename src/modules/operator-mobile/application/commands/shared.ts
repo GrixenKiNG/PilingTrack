@@ -50,6 +50,9 @@ export async function requireCrew(tx: Tx, tenantId: string, operatorId: string, 
  * диспетчером или администратором, машинист ведёт сам — это не чужая.
  */
 export async function requireOpenShift(tx: Tx, tenantId: string, shiftId: string, operatorId: string) {
+  // Команды одной смены идут по очереди: запись выработки не должна проскочить
+  // между чтением итогов отчёта и закрытием смены в `closeShift`.
+  await tx.$executeRaw`SELECT 1 FROM "Shift" WHERE "tenantId" = ${tenantId} AND id = ${shiftId} FOR UPDATE`;
   const shift = await tx.shift.findFirst({
     where: {tenantId, id: shiftId},
     select: {

@@ -35,6 +35,7 @@ const input = {
 
 /** Клиент транзакции: только то, до чего команда доходит перед заведением отчёта. */
 const tx = {
+  $executeRaw: vi.fn(),
   shift: {findFirst: vi.fn()},
   report: {findFirst: vi.fn(), upsert: vi.fn()},
   crew: {findFirst: vi.fn()},
@@ -144,6 +145,7 @@ describe('ensureReport — upsert по ключу [tenantId, shiftId]', () => {
 */
 describe('logProduction — след записи выработки в истории отчёта', () => {
   const auditTx = {
+    $executeRaw: vi.fn(),
     shift: {findFirst: vi.fn()},
     report: {findFirst: vi.fn(), upsert: vi.fn(), findUnique: vi.fn(), findUniqueOrThrow: vi.fn()},
     crew: {findFirst: vi.fn()},
@@ -236,6 +238,7 @@ describe('logProduction — след записи выработки в исто
 */
 describe('logProduction — после завершения работы выработка и простой принимаются до сдачи смены', () => {
   const finishTx = {
+    $executeRaw: vi.fn(),
     shift: {findFirst: vi.fn()},
     report: {findFirst: vi.fn(), upsert: vi.fn(), findUnique: vi.fn(), findUniqueOrThrow: vi.fn()},
     crew: {findFirst: vi.fn()},

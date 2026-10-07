@@ -36,10 +36,6 @@ function record(entry: Record<string, unknown>) {
   console.log('[record]', JSON.stringify(entry).slice(0, 400));
 }
 
-function hm(d: Date): string {
-  return new Intl.DateTimeFormat('ru-RU', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Europe/Moscow' }).format(d);
-}
-
 async function strip(page: Page) {
   await page.evaluate(() => document.querySelectorAll('nextjs-portal').forEach((el) => el.remove()));
 }
@@ -196,21 +192,18 @@ test('v7 (Banut 655, r0mix0n): полная смена — допуск, осм�
   }
   await dump(page, 'v7-05-бурение');
 
-  // Простой (причина + интервал внутри смены)
+  // Простой (причина + часы)
   const dtCount = Number(db(`SELECT COUNT(*) FROM "ReportDowntime" WHERE "shiftId"='${shiftId}'`));
   if (dtCount === 0) {
     await tap(page, page.getByRole('button', { name: /^Простой$/ }).first(), 'простой');
     await page.waitForTimeout(1000);
     await tap(page, page.locator('.picks button').first(), 'причина (первая)');
-    const shiftStart = new Date(db(`SELECT "startedAt" FROM "Shift" WHERE id='${shiftId}'`));
-    const startedAt = new Date(Math.max(shiftStart.getTime() + 60_000, Date.now() - 10 * 60_000));
-    await page.getByLabel('Простой начался').fill(hm(startedAt));
-    await tap(page, page.getByRole('button', { name: /Закончился сейчас/ }), 'закончился сейчас');
+    await page.getByLabel('Простой, часов').fill('0,5');
     await page.getByLabel('Примечание (необязательно)').fill('AC-QA walk-1006 простой');
     await tap(page, page.getByRole('button', { name: /^Записать$/ }), 'записать простой');
     await page.waitForTimeout(2500);
     const dtAfter = Number(db(`SELECT COUNT(*) FROM "ReportDowntime" WHERE "shiftId"='${shiftId}'`));
-    record({ step: 'v7-простой', dtBefore: dtCount, dtAfter, интервалНачало: hm(startedAt) });
+    record({ step: 'v7-простой', dtBefore: dtCount, dtAfter, часы: '0,5' });
     expect(dtAfter, 'простой записан').toBe(1);
   }
   await dump(page, 'v7-06-простой');
@@ -428,10 +421,7 @@ test('v1 (Bauer RTG RM20, operator@): полная смена от допуск�
     await page.waitForTimeout(1500);
     await dump(page, 'operator-10-форма-простоя');
     await page.getByLabel('Причина простоя').selectOption({ index: 1 });
-    const shiftStart = new Date(db(`SELECT "startedAt" FROM "Shift" WHERE id='${shiftId}'`));
-    const startedAt = new Date(Math.max(shiftStart.getTime() + 60_000, Date.now() - 10 * 60_000));
-    await page.getByLabel('Простой начался').fill(hm(startedAt));
-    await page.getByLabel('Закончился').fill(hm(new Date()));
+    await page.getByLabel('Простой, часов').fill('0,5');
     await page.getByLabel('Комментарий').fill('AC-QA walk-1006 простой');
     await tap(page, page.getByRole('button', { name: /^Записать$/ }), 'записать простой');
     await page.waitForTimeout(2800);

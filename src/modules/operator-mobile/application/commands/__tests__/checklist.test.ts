@@ -118,9 +118,11 @@ describe('submitChecklist — advisory-замки на ключи дефекто
   it('берёт по одному замку на отсортированный уникальный ключ', async () => {
     await submitChecklist(input);
 
-    expect(tx.$executeRaw).toHaveBeenCalledTimes(2);
+    // Первый замок — на строку смены (requireOpenShift), его здесь не считаем.
     // Второй аргумент вызова — значение, подставленное в шаблон тега.
-    expect(tx.$executeRaw.mock.calls.map((call) => call[1])).toEqual([
+    const defectLocks = tx.$executeRaw.mock.calls.map((call) => call[1]).filter((value) => String(value).startsWith('defect:'));
+    expect(defectLocks).toHaveLength(2);
+    expect(defectLocks).toEqual([
       'defect:tenant-a:eq-1:PRESHIFT_INSPECTION:cab-dirty',
       'defect:tenant-a:eq-1:PRESHIFT_INSPECTION:leaks-ground',
     ]);

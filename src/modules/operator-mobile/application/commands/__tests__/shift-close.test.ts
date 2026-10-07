@@ -28,6 +28,7 @@ const input = {
 
 /** Клиент транзакции: только то, до чего команда доходит при закрытии смены. */
 const tx = {
+  $executeRaw: vi.fn(),
   shift: {findFirst: vi.fn(), update: vi.fn()},
   crew: {findFirst: vi.fn()},
   operatorChecklistExecution: {findFirst: vi.fn()},

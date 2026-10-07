@@ -80,7 +80,8 @@ export const DOWNTIME_QUICK_HOURS = [0.5, 1, 2, 4] as const;
 export function downtimeHoursProblem(value: string): string | null {
   if (value.trim() === '') return null;
   if (parseDowntimeHours(value) !== null) return null;
-  return 'Часы простоя: от 0,25 до 24, с шагом в четверть часа — например, 1 или 2,5.';
+  const min = String(DOWNTIME_STEP_HOURS).replace('.', ',');
+  return `Часы простоя: от ${min} до ${DOWNTIME_MAX_HOURS}, с шагом в четверть часа — например, 1 или 2,5.`;
 }
 
 /** Часы для показа: «1,5 ч», «2 ч». Только часы, без минут. */

@@ -26,6 +26,11 @@ describe('рабочий обзор оператора', () => {
     expect(screen.queryByText('мин')).not.toBeInTheDocument();
     expect(screen.getByText('К работе допущен')).toBeInTheDocument();
   });
+  it('в последних записях простой тоже в часах', () => {
+    show({...state, entries: [{id: 'e1', kind: 'DOWNTIME', label: 'Ожидание бетона', value: 1.5, occurredAt: '2026-09-20T08:00:00.000Z', corrections: []}]} as unknown as OperatorMobileState);
+    expect(screen.getByText('1,5 ч')).toBeInTheDocument();
+    expect(screen.queryByText(/мин/)).not.toBeInTheDocument();
+  });
   it('не объявляет готовность только по разрешению сервера при незавершённом осмотре', () => {
     show({...state, checklists: state.checklists.map(c => ({...c, done: false}))});
     expect(screen.queryByText('К работе допущен')).not.toBeInTheDocument();

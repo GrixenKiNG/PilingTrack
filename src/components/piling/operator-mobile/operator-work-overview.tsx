@@ -5,6 +5,7 @@ import {Clock, Flag, TriangleAlert} from 'lucide-react';
 import {PilingIcon, type PilingIconName} from '@/components/piling/icons';
 import type {OperatorMobileState} from '@/modules/operator-mobile/contracts';
 import {formatNumber} from '@/lib/format';
+import {formatDowntimeHoursOnly} from '@/lib/downtime-hours';
 import './operator-concept.css';
 
 export type WorkAction = 'PILES' | 'PASSPORT' | 'DRILLING' | 'DOWNTIME';
@@ -58,7 +59,7 @@ export function OperatorWorkOverview({state, variant, busy, onAction, onFinish, 
     </section>
     <section className="oc-card oc-preparation"><h2>Подготовка <small>{preparation.filter(s=>s.done).length} из 4</small></h2>{preparation.map(s=><div key={s.label}><PilingIcon name={s.done?'check':'inspection'} size={22} decorative /><span>{s.label}</span><small>{s.done?'Выполнено':'Ожидает'}</small></div>)}{finish}</section>
     <section className="oc-card oc-recent"><header><h2>Последние записи</h2>{entries.length>2&&<button type="button" onClick={()=>setAllEntries(!allEntries)}>{allEntries?'Свернуть':'Все записи'}<PilingIcon name="external" size={16} decorative /></button>}</header>
-      {entries.length===0?<p className="oc-caption">За смену пока ничего не записано.</p>:(allEntries?entries:entries.slice(0,2)).map(e=><div className="oc-entry" key={e.id}><time>{new Date(e.occurredAt).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'})}</time><PilingIcon name={e.kind==='PILES'?'pile-driving':e.kind==='DRILLING'?'drilling-auger':'downtime'} size={26} decorative /><div><strong>{e.label}</strong><span>{e.kind==='DOWNTIME'?`${Math.round(e.value*60)} мин`:`${formatNumber(e.value,0)} шт. · ${formatNumber(e.meters??0,1)} м`}</span>{e.corrections.length>0&&<small>Есть поправки: {e.corrections.length}</small>}</div><span className="oc-saved"><PilingIcon name="check" size={15} decorative /><span>Сохранено</span></span></div>)}
+      {entries.length===0?<p className="oc-caption">За смену пока ничего не записано.</p>:(allEntries?entries:entries.slice(0,2)).map(e=><div className="oc-entry" key={e.id}><time>{new Date(e.occurredAt).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'})}</time><PilingIcon name={e.kind==='PILES'?'pile-driving':e.kind==='DRILLING'?'drilling-auger':'downtime'} size={26} decorative /><div><strong>{e.label}</strong><span>{e.kind==='DOWNTIME'?formatDowntimeHoursOnly(e.value):`${formatNumber(e.value,0)} шт. · ${formatNumber(e.meters??0,1)} м`}</span>{e.corrections.length>0&&<small>Есть поправки: {e.corrections.length}</small>}</div><span className="oc-saved"><PilingIcon name="check" size={15} decorative /><span>Сохранено</span></span></div>)}
     </section>
     {finish ? <div className="oc-mobile-finish">{finish}</div> : null}
   </div>;

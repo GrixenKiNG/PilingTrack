@@ -543,6 +543,7 @@ describe('интервал простоя', () => {
 describe('смена одного машиниста (сменщиков нет)', () => {
   function fakeTx(starter: {id: string; role: string} | null, reportUserId: string | null) {
     return {
+      $executeRaw: async () => 0,
       shift: {findFirst: async () => ({
         id: 's1', state: 'STARTED', equipmentId: 'eq1', productionDate: NOW, type: 'DAY', starter,
       })},

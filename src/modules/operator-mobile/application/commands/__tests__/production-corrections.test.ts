@@ -32,6 +32,7 @@ const input = {
 
 /** Клиент транзакции: только то, до чего команда доходит при поправке свай. */
 const tx = {
+  $executeRaw: vi.fn(),
   shift: {findFirst: vi.fn()},
   crew: {findFirst: vi.fn()},
   report: {findFirst: vi.fn(), findUniqueOrThrow: vi.fn()},
