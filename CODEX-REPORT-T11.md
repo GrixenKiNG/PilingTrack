@@ -83,3 +83,77 @@ RED exit 1: 8 failed / 41 passed / 0 skipped. GREEN exit 0: 62 passed / 0 skippe
 Проверка обнаружила перенос введённого замера и отметки «Счётчик заменён» при обновлении экрана на другую смену. Общий осмотр теперь пересоздаётся при смене shiftId, equipmentId или этапа во всех местах использования v1/v2/v7/v10. В v5 отметка уже привязана к смене и этапу. При обновлении той же смены черновик сохраняется.
 
 RED exit 1: 1 failed / 7 skipped (фильтр), конкретная ошибка — checkbox остаётся отмеченным. Первый вариант теста давал таймаут из-за неоднозначного селектора раздела, исправлен до изменения runtime. GREEN exit 0: 167 passed / 0 skipped в 15 файлах. Tsc exit 0. GitNexus impact/detect-changes exit 1, UNKNOWN; вызывающие места проверены текстовым поиском. Это дополнительный коммит I7 после выполнения основной последовательности.
+
+Коммит дополнительной правки I7: `26059a23`.
+
+## Итоговые проверки 08.10.2026
+
+Каждая проверка запускалась отдельной командой; код завершения получен от процесса, без пайпа, скрывающего ошибку. Логи сохранены в игнорируемом `output/codex-t11/`.
+
+| Проверка | Exit | Результат и лог |
+| --- | --- | --- |
+| Удаление собственных `.next/dev/types` через Node с проверкой абсолютного пути | 0 | `final-types-cleanup.log`, целевой каталог отсутствовал |
+| `npx --no-install tsc --noEmit` | 0 | `final-tsc.log` |
+| `npm run lint` | 0 | 0 errors / 1 warning; проверка текстовой целостности прошла; `final-lint.log` |
+| `npm run test:unit` | 1 | 3820 passed / 2 failed / 2 expected fail / 257 skipped; `final-unit.log` |
+| `npm run test:unit -- --maxWorkers=2` | 0 | 3822 passed / 2 expected fail / 257 skipped, 4081 всего, 373 passed / 14 skipped файлов; `final-unit-bounded.log` |
+| `npx --no-install vitest run src/components src/app src/modules src/lib --maxWorkers=2` | 0 | 2861 passed / 2 expected fail / 20 skipped, 2883 всего, 297 файлов; `final-requested-vitest.log` |
+| `npx --no-install playwright test --list` с защитой чтения секретов | 1 | Windows npx bootstrap несовместим с preload guard; `final-playwright-list.log` |
+| Эквивалентный прямой CLI: `node node_modules/@playwright/test/cli.js test --list` с guard | 0 | 291 тест / 27 файлов, `final-playwright-list-direct.log` |
+| Сравнение списка с архивом e2e/config из исходного main `0f53cd01` | 0 | Исходные 291 тест / 27 файлов; имена тестов совпали полностью, `baseline-playwright-list.log`, `playwright-collection-compare.log` |
+| `npm run build` | 1 | Нет DATABASE_PROVIDER и SESSION_SECRET; `final-build.log`; Next build не достигнут |
+| GitNexus impact / detect-changes all и compare с main | 1 | Runner отсутствует, риск UNKNOWN; `i*-impact*.log`, `i*-detect*.log`, `final-graph-compare.log` |
+| `git diff --check` | 0 | Ошибок пробелов нет |
+
+Два падения первого общего прогона — таймауты существующих тестов `page-ability-layouts.test.ts` (5 с, чтение дерева src/app) и `unified-worker.test.ts` (30 с, первый импорт графа модулей). При двух исполнителях весь набор прошёл без изменения тестов или их таймаутов. Первый прогон шёл одновременно с lint/tsc; результат остаётся зафиксирован как FAILED. Vitest также выводит существующие предупреждения Vite-конфигурации и MaxListenersExceededWarning, они не названы проверкой без предупреждений.
+
+Единственное предупреждение ESLint — ставший неиспользуемым существующий `eslint-disable-next-line react-hooks/set-state-in-effect` в v5. Комментарий сохранён по прямому запрету AGENTS удалять такие директивы; baseline «ноль предупреждений» сейчас не достигнут. Ошибок линтера нет.
+
+Для Playwright использован `output/codex-t11/playwright-list-guard.cjs`: парольный QA-файл оставлен непрочитанным, неиспользуемый при сборе списка объект credentials пустой. Guard допускает только `--list`, блокирует чтение .env и запись вне дерева. QA_RUN_DIR и PWTEST_CACHE_DIR направлены в собственный output; исходные список тестов и config не менялись. Предварительный прямой запуск остановился на внешнем каталоге кэша; после переноса кэша сбор прошёл. В архиве исходного main для сбора нужен сгенерированный клиент — добавлена ссылка только на собственный generated. Ни одного браузерного теста, входа под QA-аккаунтом или запроса к БД не выполнялось.
+
+Графовые callers/processes не получены: это UNKNOWN, а не нулевое влияние. Текстовый fallback проверил цепочки: UI v1/v2/v7/v10 → общий ChecklistScreen; v5 → собственный осмотр; command route → acceptEquipment/submitChecklist → recordMeter; state route → queryOperatorMobileState; analytics/sites route → getSiteAnalytics → плитки дашборда. Изменённые потоки — дописывание/сдача смены, доступ к v2, приёмка техники, осмотр и замер, отображение простоя. Это текстовые связи, не результат GitNexus.
+
+## Изменённые файлы
+
+Числа добавленных/удалённых строк — `git diff --numstat 0f53cd01 HEAD`, полный итог изменений относительно исходного main. Удаления строк внутри правок не означают удаления файлов: ни один файл, экспорт или вариант экрана не удалён. Два новых тестовых файла защищают доступ/чужие данные; остальные тесты добавлены в существующие файлы.
+
+| Файл | + | − |
+| --- | ---: | ---: |
+| `e2e/qa-ac/operator-walk.spec.ts` | 7 | 2 |
+| `src/app/(app)/operator/v2/page.test.tsx` | 32 | 0 |
+| `src/app/(app)/operator/v2/page.tsx` | 6 | 0 |
+| `src/components/piling/operator-mobile/operator-mobile-app.tsx` | 1 | 2 |
+| `src/components/piling/operator-mobile/operator-work-overview.test.tsx` | 16 | 1 |
+| `src/components/piling/operator-mobile/operator-work-overview.tsx` | 5 | 6 |
+| `src/components/piling/operator-mobile/screens/checklist-screen.test.tsx` | 30 | 0 |
+| `src/components/piling/operator-mobile/screens/checklist-screen.tsx` | 24 | 15 |
+| `src/components/piling/operator-mobile/v10/__tests__/operator-v10-flow.test.tsx` | 81 | 2 |
+| `src/components/piling/operator-mobile/v10/__tests__/operator-v10-port.test.tsx` | 15 | 5 |
+| `src/components/piling/operator-mobile/v10/operator-v10-app.tsx` | 30 | 15 |
+| `src/components/piling/operator-mobile/v7/operator-v7-app.tsx` | 1 | 1 |
+| `src/components/piling/operator-v2/__tests__/operator-shift-v2.test.tsx` | 76 | 2 |
+| `src/components/piling/operator-v2/operator-shift-v2.tsx` | 25 | 5 |
+| `src/components/piling/operator-v5/__tests__/operator-v5-app.test.tsx` | 179 | 1 |
+| `src/components/piling/operator-v5/operator-v5-app.tsx` | 143 | 21 |
+| `src/modules/operator-mobile/application/commands/__tests__/checklist.test.ts` | 29 | 0 |
+| `src/modules/operator-mobile/application/commands/__tests__/shared.test.ts` | 56 | 1 |
+| `src/modules/operator-mobile/application/commands/checklist.ts` | 6 | 1 |
+| `src/modules/operator-mobile/application/commands/equipment.ts` | 2 | 1 |
+| `src/modules/operator-mobile/application/commands/shared.ts` | 13 | 6 |
+| `src/modules/operator-mobile/application/mobile-shift-query.test.ts` | 112 | 0 |
+| `src/modules/operator-mobile/application/mobile-shift-query.ts` | 26 | 8 |
+| `src/modules/operator-mobile/contracts.ts` | 1 | 0 |
+| `src/modules/operator-mobile/domain/__tests__/operator-mobile-rules.test.ts` | 62 | 1 |
+| `src/modules/operator-mobile/domain/view-contracts.ts` | 2 | 0 |
+| `src/services/analytics/__tests__/site-analytics-service.test.ts` | 41 | 0 |
+| `src/services/analytics/site-analytics-service.ts` | 1 | 1 |
+
+Сам отчёт — новый `CODEX-REPORT-T11.md`: +159 / −0 строк. Всего изменено 29 файлов, ни один не удалён.
+
+## Что оставлено и ограничения
+
+I2 → I1 → I3 → I6 → I7 → I8 → I5 выполнены в заданном порядке; I4 пропущен как неописанный. После основного порядка исправлена выявленная при проверке ошибка I7. Решение по вчерашней работе подтверждено владельцем, открытых вопросов по этой политике нет.
+
+Не менялись реальные смены/отчёты, scheduler, схема/миграции Prisma, защищённые файлы, RLS/tenant-фильтры, зависимости, ORION и остальные замороженные варианты. Разрешённые операторские правки сделаны с RED → GREEN. Сохранены изменения владельца от 07.10: общая нижняя панель, часы простоя с шагом 0,25, HANDOVER_PENDING для выработки, последнее показание в кэше, FOR UPDATE.
+
+Живой стенд, БД-интеграция и браузерные сценарии остаются НЕ ПРОВЕРЕНЫ; 257 пропусков не считаются успешными тестами. Сборка и генерируемые Next route types не проверены из-за окружения. Графовый риск UNKNOWN. Эти ограничения не скрыты зелёным общим статусом. Слияния, push, выкладки и SSH не выполнялись. Проверку и принятие проводит владелец/ревьюер.
