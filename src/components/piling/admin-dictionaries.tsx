@@ -95,7 +95,7 @@ export function AdminDictionaries() {
   const [confirmDelete, setConfirmDelete] = useState<{ kind: DictionaryKind; item: RegistryItem } | null>(null);
   const [saving, setSaving] = useState(false);
   const [selectedItem, setSelectedItem] = useState<RegistryItem | null>(null);
-  const [panelDraft, setPanelDraft] = useState<{ name: string; section: string; length: string } | null>(null);
+  const [panelDraft, setPanelDraft] = useState<{ name: string; section: string; length: string; notes: string } | null>(null);
   const [inspectorTab, setInspectorTab] = useState<'general' | 'history'>('general');
   const [history, setHistory] = useState<HistoryEntry[] | null>(null);
   const [historyFailed, setHistoryFailed] = useState(false);
@@ -229,7 +229,7 @@ export function AdminDictionaries() {
   // Selecting a row seeds the inline-edit draft for the inspector.
   const selectItem = (item: RegistryItem | null) => {
     setSelectedItem(item);
-    setPanelDraft(item ? { name: item.name, section: item.sectionOrDiameter || '', length: formatMetres(item.lengthMm) } : null);
+    setPanelDraft(item ? { name: item.name, section: item.sectionOrDiameter || '', length: formatMetres(item.lengthMm), notes: item.notes || '' } : null);
     setInspectorTab('general');
     setHistory(null);
   };
@@ -238,7 +238,8 @@ export function AdminDictionaries() {
     panelDraft.name.trim() !== selectedItem.name ||
     (selectedKind === 'pileGrade' && (
       panelDraft.section.trim() !== (selectedItem.sectionOrDiameter || '') ||
-      panelDraft.length.trim() !== formatMetres(selectedItem.lengthMm)
+      panelDraft.length.trim() !== formatMetres(selectedItem.lengthMm) ||
+      panelDraft.notes.trim() !== (selectedItem.notes || '')
     ))
   ));
 
@@ -253,6 +254,8 @@ export function AdminDictionaries() {
     if (selectedKind === 'pileGrade') {
       const section = panelDraft.section.trim();
       if (section !== (selectedItem.sectionOrDiameter || '')) payload.sectionOrDiameter = section || null;
+      const notes = panelDraft.notes.trim();
+      if (notes !== (selectedItem.notes || '')) payload.notes = notes;
       const lengthRaw = panelDraft.length.trim();
       if (!lengthRaw && selectedItem.lengthMm != null) {
         // Length is the single source for м.п. — clearing it would silently
@@ -286,6 +289,7 @@ export function AdminDictionaries() {
         ...selectedItem,
         ...(payload.name !== undefined ? { name: payload.name as string } : {}),
         ...(payload.sectionOrDiameter !== undefined ? { sectionOrDiameter: payload.sectionOrDiameter as string | null } : {}),
+        ...(payload.notes !== undefined ? { notes: payload.notes as string } : {}),
         ...(payload.lengthMm !== undefined ? { lengthMm: payload.lengthMm as number } : {}),
       });
       await loadData();
@@ -572,6 +576,9 @@ export function AdminDictionaries() {
                 <span>Погонные метры считаются от этой длины. Если её изменить, цифры в уже сданных отчётах ({selectedItem.reportCount}) и в аналитике за прошлые периоды станут другими.</span>
               </p>
             )}
+          </label>
+          <label className="block"><span className="text-muted-foreground">Примечание</span>
+            <Input aria-label="Примечание" value={panelDraft?.notes ?? ''} maxLength={500} placeholder="Например: для мостовых свай" onChange={(event) => setPanelDraft((draft) => draft && ({ ...draft, notes: event.target.value }))} className="mt-1 h-11" />
           </label>
           </> : (selectedItem.code ? <div><span className="text-muted-foreground">Код</span><div className="mt-1 rounded-md border border-border bg-muted p-2 font-medium text-foreground">{selectedItem.code}</div></div> : null)}
           </div>

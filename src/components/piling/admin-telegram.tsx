@@ -190,15 +190,18 @@ export function AdminTelegram() {
         toast.error(await apiFailureText(res, 'Ошибка сохранения'));
         return;
       }
-      const data = await res.json();
-      if (isEdit) {
-        setConfigs((prev) => prev.map((c) => (c.id === editingId ? data.config : c)));
-        toast.success('Конфигурация обновлена');
-      } else {
-        setConfigs((prev) => [...prev, data.config]);
-        toast.success('Конфигурация добавлена');
-      }
+      /*
+        Перечитываем список после сохранения.
+
+        Ответ на правку отдаёт запись без хвоста токена (botTokenHint пуст —
+        секрет наружу не выходит), поэтому строка теряла «••••1234» до
+        перезагрузки, и казалось, что токен испортился (W62, находка 6). Тот же
+        путь и у создания. Полный список с хвостом даёт только чтение.
+      */
+      await res.json();
+      toast.success(isEdit ? 'Конфигурация обновлена' : 'Конфигурация добавлена');
       closeDialog();
+      await loadData();
     } catch {
       toast.error('Ошибка сохранения');
     } finally {

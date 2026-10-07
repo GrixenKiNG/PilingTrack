@@ -343,6 +343,33 @@ export async function setPileGradeSection(
   return updated;
 }
 
+/**
+ * Примечание марки сваи.
+ *
+ * Поле писалось при создании, но не показывалось и не принималось на правку —
+ * введённые «буквы» после закрытия диалога были недостижимы (W62, находка 2).
+ * Пустая строка — «примечания нет» (в БД NOT NULL default ""), поэтому null
+ * сводим к пустой строке. Лимит тот же, что у схемы создания (500).
+ */
+export async function setPileGradeNotes(
+  context: DictionaryMutationContext,
+  id: string,
+  notes: string
+) {
+  const { tenantId, actorId } = context;
+  assertTenantId(tenantId);
+  const trimmed = notes?.trim() ?? '';
+  if (trimmed.length > 500) throw new ServiceError('Примечание слишком длинное', 400);
+  const item = await db.pileGrade.findFirst({ where: { id, tenantId } });
+  if (!item) throw new ServiceError('Элемент не найден', 404);
+  const updated = await db.pileGrade.update({ where: { id, tenantId }, data: { notes: trimmed } });
+  await recordAuditEvent({
+    action: 'dictionary.notes_updated', scope: 'dictionaries', actorId,
+    targetId: id, tenantId, metadata: { type: 'pileGrade', before: item, after: updated },
+  });
+  return updated;
+}
+
 export async function renameDictionaryItem(
   context: DictionaryMutationContext,
   type: DictType,

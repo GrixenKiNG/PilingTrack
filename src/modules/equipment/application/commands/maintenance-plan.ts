@@ -92,9 +92,28 @@ export async function updateMaintenancePlan(
   const data: Record<string, unknown> = {};
   if (input.title !== undefined) data.title = input.title.trim();
   if (input.type !== undefined) data.type = input.type;
-  if (input.triggerType !== undefined) data.triggerType = input.triggerType;
-  if (input.intervalHours !== undefined) data.intervalHours = input.intervalHours ?? null;
-  if (input.intervalDays !== undefined) data.intervalDays = input.intervalDays ?? null;
+  /*
+    Смена типа меры очищает неиспользуемый интервал.
+
+    Панель при смене «по моточасам» → «по календарю» шлёт только новый интервал,
+    а сервис писал лишь присланное: старый intervalHours оставался в строке. Расчёт
+    берёт значение по triggerType, поэтому «работало», но при обратном
+    переключении всплывало давно забытое число (W62, находка 5). Интервал самого
+    выбранного типа не трогаем, если его не прислали.
+  */
+  if (input.triggerType !== undefined) {
+    data.triggerType = input.triggerType;
+    if (input.triggerType === 'HOURS') {
+      if (input.intervalHours !== undefined) data.intervalHours = input.intervalHours ?? null;
+      data.intervalDays = null;
+    } else {
+      if (input.intervalDays !== undefined) data.intervalDays = input.intervalDays ?? null;
+      data.intervalHours = null;
+    }
+  } else {
+    if (input.intervalHours !== undefined) data.intervalHours = input.intervalHours ?? null;
+    if (input.intervalDays !== undefined) data.intervalDays = input.intervalDays ?? null;
+  }
   if (input.leadTimeDays !== undefined) data.leadTimeDays = input.leadTimeDays ?? 7;
   if (input.lastDoneHours !== undefined) data.lastDoneHours = input.lastDoneHours ?? null;
   if (input.lastDoneAt !== undefined) data.lastDoneAt = toDate(input.lastDoneAt);

@@ -215,6 +215,21 @@ describe('createUser', () => {
     ).rejects.toMatchObject({ status: 400 });
     expect(createUserMock).not.toHaveBeenCalled();
   });
+
+  /*
+    W67 (W62, находка 1): сервис молча обрезал телефон до 20 знаков, хотя форма
+    и zod разрешают 30, а колонка phone — TEXT. Номер с добавочным сохранялся
+    укороченным при тосте «сохранено».
+  */
+  it('сохраняет телефон до 30 знаков целиком, не обрезая до 20', async () => {
+    const phone = '+7 (999) 123-45-67 доб. 1234';
+    expect(phone.length).toBeGreaterThan(20);
+    await createUser(
+      { email: 'a@b.ru', password: 'pw', name: 'A', role: 'OPERATOR', phone, tenantId: 'orion' },
+      'admin-1'
+    );
+    expect(createUserMock.mock.calls[0][0].data.phone).toBe(phone);
+  });
 });
 
 describe('updateUser', () => {
@@ -245,6 +260,18 @@ describe('updateUser', () => {
 
     expect(updateUserMock).toHaveBeenCalledWith(expect.objectContaining({
       where: { id: 'user-b', tenantId: 'tenant-a' },
+    }));
+  });
+
+  // W67 (W62, находка 1): телефон не должен обрезаться и при обновлении.
+  it('не обрезает телефон до 20 знаков при обновлении', async () => {
+    findFirstUserMock.mockResolvedValue(existingUser);
+    const phone = '+7 (999) 123-45-67 доб. 1234';
+
+    await updateUser('tenant-a', { id: 'user-b', phone }, 'admin-a');
+
+    expect(updateUserMock).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ phone }),
     }));
   });
 

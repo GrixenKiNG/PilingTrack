@@ -165,7 +165,10 @@ export async function createUser(input: {
         email: input.email.trim().toLowerCase(),
         password: hashedPassword,
         name: input.name.trim(),
-        phone: String(input.phone || '').trim().slice(0, 20),
+        // Колонка phone — TEXT (без ограничения длины), форма и zod разрешают
+        // 30 знаков. Обрезка до 20 молча съедала хвост длинного номера при
+        // успешном тосте «обновлено» — лишнего ограничения тут быть не должно.
+        phone: String(input.phone || '').trim(),
         role: input.role || 'OPERATOR',
       },
       select: { id: true, email: true, name: true, phone: true, role: true, isActive: true },
@@ -224,7 +227,9 @@ export async function updateUser(
   const data: Record<string, unknown> = {};
   if (input.name !== undefined) data.name = input.name.trim();
   if (input.email !== undefined) data.email = input.email.trim().toLowerCase();
-  if (input.phone !== undefined) data.phone = input.phone.trim().slice(0, 20);
+  // Длину ограничивают форма и zod (30), а не молчаливая обрезка: колонка
+  // TEXT, и номер с добавочным вводился до конца (W67).
+  if (input.phone !== undefined) data.phone = input.phone.trim();
   if (input.role !== undefined) data.role = input.role;
   if (input.isActive !== undefined) data.isActive = input.isActive;
   if (input.password) data.password = await hashPassword(input.password);

@@ -6,6 +6,7 @@ import { assertCan } from '@/services/auth/authorization-service';
 import {
   createDictionaryItem, deleteDictionaryItem, archiveDictionaryItem,
   restoreDictionaryItem, renameDictionaryItem, setPileGradeLength, setPileGradeSection,
+  setPileGradeNotes,
   listDictionaries, getDictionaryUsage,
   type DictFilter, type UsageMap,
 } from '@/services/dictionaries/dictionary-service';
@@ -48,14 +49,20 @@ const patchSchema = z.object({
   // Section/diameter label; null clears it. Only valid for pileGrade.
   sectionOrDiameter: z.string().max(100).nullable().optional(),
   /*
+    Примечание марки сваи. Писалось только при создании и не принималось на
+    правку — введённый текст после закрытия диалога был недостижим (W62,
+    находка 2). Лимит тот же, что у схемы создания.
+  */
+  notes: z.string().max(500).optional(),
+  /*
     Явное «да» диалога о пересчёте прошлых отчётов. Длина у марки одна и метры
     считаются живьём, поэтому смена длины используемой марки применяется только
     с этим флагом — см. setPileGradeLength.
   */
   confirmRecalculate: z.boolean().optional(),
 }).refine(
-  (v) => v.name !== undefined || v.isActive !== undefined || v.lengthMm !== undefined || v.sectionOrDiameter !== undefined,
-  { message: 'Укажите хотя бы одно поле: name, isActive, lengthMm или sectionOrDiameter' },
+  (v) => v.name !== undefined || v.isActive !== undefined || v.lengthMm !== undefined || v.sectionOrDiameter !== undefined || v.notes !== undefined,
+  { message: 'Укажите хотя бы одно поле: name, isActive, lengthMm, sectionOrDiameter или notes' },
 );
 
 function withUsage<T extends { id: string }>(items: T[], usage: UsageMap) {
@@ -111,15 +118,16 @@ export const PATCH = withMutation(async (request: NextRequest) => {
   const validated = patchSchema.safeParse(await readJsonBody(request));
   if (!validated.success) return NextResponse.json({ error: 'Некорректные данные', details: validated.error.flatten() }, { status: 400 });
 
-  const { type, id, name, isActive, lengthMm, sectionOrDiameter, confirmRecalculate } = validated.data;
-  if ((lengthMm !== undefined || sectionOrDiameter !== undefined) && type !== 'pileGrade') {
-    return NextResponse.json({ error: 'lengthMm и sectionOrDiameter применимы только для типа сваи pileGrade' }, { status: 400 });
+  const { type, id, name, isActive, lengthMm, sectionOrDiameter, notes, confirmRecalculate } = validated.data;
+  if ((lengthMm !== undefined || sectionOrDiameter !== undefined || notes !== undefined) && type !== 'pileGrade') {
+    return NextResponse.json({ error: 'lengthMm, sectionOrDiameter и notes применимы только для типа сваи pileGrade' }, { status: 400 });
   }
   if (name !== undefined) await renameDictionaryItem(context, type, id, name);
   if (isActive === true) await restoreDictionaryItem(context, type, id);
   if (isActive === false) await archiveDictionaryItem(context, type, id);
   if (lengthMm !== undefined) await setPileGradeLength(context, id, lengthMm, confirmRecalculate === true);
   if (sectionOrDiameter !== undefined) await setPileGradeSection(context, id, sectionOrDiameter);
+  if (notes !== undefined) await setPileGradeNotes(context, id, notes);
   await invalidateDictionaries(context.tenantId);
   return NextResponse.json({ success: true });
 }, { domain: 'dictionary' });

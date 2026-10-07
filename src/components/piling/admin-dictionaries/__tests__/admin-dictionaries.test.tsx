@@ -351,3 +351,37 @@ describe('AdminDictionaries: числа с запятой (W64)', () => {
     });
   });
 });
+
+/**
+ * W67 (W62, находка 2): «Примечание» марки сваи писалось при создании, но не
+ * показывалось и не правилось — введённые «буквы» были недостижимы. Теперь оно
+ * видно и сохраняется в панели сведений.
+ */
+describe('AdminDictionaries: примечание марки сваи (W67)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    authFetch.mockResolvedValue(jsonResponse({
+      ...registry,
+      pileGrades: [{ ...registry.pileGrades[0], notes: 'старое примечание' }],
+    }));
+  });
+
+  it('показывает примечание и отправляет новое при сохранении', async () => {
+    render(<AdminDictionaries />);
+    const row = await screen.findByRole('row', { name: /СВ 120-35/ });
+    fireEvent.click(row);
+
+    const notes = screen.getByLabelText('Примечание');
+    expect(notes).toHaveValue('старое примечание');
+
+    fireEvent.change(notes, { target: { value: 'для мостовых' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить' }));
+
+    await waitFor(() => expect(authFetch).toHaveBeenCalledWith(
+      '/api/dictionary/manage', expect.objectContaining({ method: 'PATCH' })));
+    const patch = authFetch.mock.calls.find((call) => call[1]?.method === 'PATCH');
+    expect(JSON.parse(patch?.[1]?.body as string)).toMatchObject({
+      type: 'pileGrade', id: 'g1', notes: 'для мостовых',
+    });
+  });
+});

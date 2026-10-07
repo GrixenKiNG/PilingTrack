@@ -20,6 +20,7 @@ import {
   deleteDictionaryItem,
   archiveDictionaryItem, restoreDictionaryItem, renameDictionaryItem,
   createDictionaryItem, getDictionaryUsage, getItemUsage, listDictionaries, setPileGradeLength,
+  setPileGradeNotes,
 } from '../dictionary-service';
 
 const tenantId = 'tenant-a';
@@ -258,6 +259,43 @@ describe('setPileGradeLength', () => {
 
     await setPileGradeLength(mutation, 'g1', 15000, true);
     expect(dbMock.pileGrade.update).toHaveBeenCalledWith({ where: { id: 'g1', tenantId }, data: { lengthMm: 15000 } });
+  });
+});
+
+/*
+  W67 (W62, находка 2): «Примечание» марки сваи писалось при создании, но не
+  показывалось и не принималось на правку — введённый текст был недостижим.
+  Сервис принимает его, обрезая пробелы, и отказывает по чужой марке.
+*/
+describe('setPileGradeNotes', () => {
+  beforeEach(() => { vi.clearAllMocks(); });
+
+  it('сохраняет примечание марки, обрезая окружающие пробелы', async () => {
+    dbMock.pileGrade.findFirst.mockResolvedValue({ id: 'g1', notes: '' });
+    dbMock.pileGrade.update.mockResolvedValue({ id: 'g1', notes: 'для мостовых' });
+
+    await setPileGradeNotes(mutation, 'g1', '  для мостовых  ');
+
+    expect(dbMock.pileGrade.update).toHaveBeenCalledWith({ where: { id: 'g1', tenantId }, data: { notes: 'для мостовых' } });
+    expect(auditMock).toHaveBeenCalledWith(expect.objectContaining({
+      action: 'dictionary.notes_updated', targetId: 'g1', tenantId, actorId: 'admin-a',
+    }));
+  });
+
+  it('пустая строка очищает примечание (в БД NOT NULL default "")', async () => {
+    dbMock.pileGrade.findFirst.mockResolvedValue({ id: 'g1', notes: 'было' });
+    dbMock.pileGrade.update.mockResolvedValue({ id: 'g1', notes: '' });
+
+    await setPileGradeNotes(mutation, 'g1', '   ');
+
+    expect(dbMock.pileGrade.update).toHaveBeenCalledWith({ where: { id: 'g1', tenantId }, data: { notes: '' } });
+  });
+
+  it('отказывает по марке другого тенанта (404)', async () => {
+    dbMock.pileGrade.findFirst.mockResolvedValue(null);
+
+    await expect(setPileGradeNotes(mutation, 'foreign', 'a')).rejects.toMatchObject({ status: 404 });
+    expect(dbMock.pileGrade.update).not.toHaveBeenCalled();
   });
 });
 

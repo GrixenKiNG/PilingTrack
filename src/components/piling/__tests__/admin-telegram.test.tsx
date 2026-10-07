@@ -344,3 +344,33 @@ describe('AdminTelegram: истёкшая сессия (F-R133 №12)', () => {
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Сессия истекла — войдите снова.'));
   });
 });
+
+/**
+ * W62, находка 6 (W67): после «Редактировать» ответ кладётся в список напрямую,
+ * а он отдаёт запись без хвоста токена (botTokenHint пуст — секрет наружу не
+ * выходит). Строка теряла «••••1234» до перезагрузки, и казалось, что токен
+ * испортился. Теперь список перечитывается, и хвост остаётся на месте.
+ */
+describe('AdminTelegram: хвост токена не пропадает после правки (W62 находка 6)', () => {
+  beforeEach(() => {
+    mocks.authFetch.mockReset();
+    vi.mocked(toast.success).mockClear();
+  });
+
+  it('после сохранения правки строка по-прежнему показывает ••••oken', async () => {
+    mocks.authFetch.mockImplementation((_url: string, init?: RequestInit) =>
+      init?.method === 'PUT'
+        ? Promise.resolve(json({ config: { ...config(), label: 'Переименован', botTokenHint: '' } }))
+        : Promise.resolve(json({ configs: [config()] })),
+    );
+    render(<AdminTelegram />);
+    await screen.findAllByRole('button', { name: 'Тест' });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Редактировать' }));
+    fireEvent.change(screen.getByPlaceholderText('Например: Основной чат'), { target: { value: 'Переименован' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить' }));
+
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Конфигурация обновлена'));
+    await waitFor(() => expect(screen.getByText('Токен: ••••oken')).toBeInTheDocument());
+  });
+});
