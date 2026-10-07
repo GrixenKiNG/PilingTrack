@@ -1,8 +1,9 @@
 'use client';
 
-import {type ReactNode} from 'react';
+import {useLayoutEffect, useRef, type ReactNode} from 'react';
 import {cn} from '@/lib/utils';
 import {PilingIcon, type PilingIconName} from '@/components/piling/icons';
+import {useStepBarSlot} from './step-bar';
 
 /**
  * Части экрана машиниста.
@@ -22,8 +23,30 @@ export function Screen({title, subtitle, children, footer, tabs}: {
   /** Нижние вкладки. Появляются только после начала работы — см. TabBar. */
   tabs?: ReactNode;
 }) {
+  // Нижняя панель шагов («Главная», «Следующий шаг», «Завершить смену») лежит
+  // в контексте модуля и рисуется на КАЖДОМ экране — над нижними вкладками.
+  const stepBar = useStepBarSlot();
+  // Высоты панели шагов и нижних вкладок — в переменные экрана (см. operator-concept.css).
+  const root = useRef<HTMLDivElement | null>(null);
+  const hasStepBar = stepBar !== null && stepBar !== undefined;
+  const hasTabs = Boolean(tabs);
+  useLayoutEffect(() => {
+    const node = root.current;
+    if (!node) return undefined;
+    const measure = () => {
+      const bar = node.querySelector<HTMLElement>('.operator-step-bar');
+      const tab = node.querySelector<HTMLElement>('.operator-tab-bar');
+      node.style.setProperty('--sb-h', `${bar?.offsetHeight ?? 0}px`);
+      node.style.setProperty('--tb-h', `${tab?.offsetHeight ?? 0}px`);
+    };
+    measure();
+    if (typeof ResizeObserver === 'undefined') return undefined;
+    const observer = new ResizeObserver(measure);
+    node.querySelectorAll('.operator-step-bar, .operator-tab-bar').forEach((element) => observer.observe(element));
+    return () => observer.disconnect();
+  }, [hasStepBar, hasTabs]);
   return (
-    <div className="operator-screen flex min-h-dvh flex-col bg-background text-foreground">
+    <div ref={root} className="operator-screen flex min-h-dvh flex-col bg-background text-foreground">
       <header className="operator-screen-header border-b px-4 pb-2.5 pt-3">
         <h1 className="text-[1.4rem] font-black leading-tight tracking-[-0.025em] text-balance">{title}</h1>
         {subtitle ? <p className="mt-0.5 text-sm text-muted-foreground">{subtitle}</p> : null}
@@ -42,9 +65,10 @@ export function Screen({title, subtitle, children, footer, tabs}: {
         Пустую панель не рисуем вовсе: с рамкой и тенью она выглядела как
         оборванный низ экрана.
       */}
-      {footer || tabs ? (
+      {footer || tabs || stepBar ? (
         <div className="operator-screen-footer sticky bottom-0 z-20 border-t bg-card pb-[max(0.5rem,env(safe-area-inset-bottom))] shadow-[0_-8px_24px_rgba(15,23,42,0.08)]">
           {footer ? <div className="space-y-2 px-4 py-1.5">{footer}</div> : null}
+          {stepBar}
           {tabs}
         </div>
       ) : null}

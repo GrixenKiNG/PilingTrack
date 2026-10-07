@@ -18,6 +18,8 @@ import {
 import {KnowledgeScreen} from '../operator-mobile/screens/knowledge-screen';
 import {PilePassportForm} from '../operator-mobile/screens/pile-passport-form';
 import {formatNumber} from '@/lib/format';
+import {finishShift, nextStep} from '../operator-mobile/shift-next-step';
+import {StepBar} from '../operator-mobile/step-bar';
 import {
   ApiError, QueuedOffline, currentPosition, fetchState, newCommandId, sendCommand,
   type ProductionEntryInput,
@@ -594,7 +596,7 @@ function IncidentScreen({state, busy, onReport}: {
 }
 
 /** F. Работа: плитки выработки и запись — экраны F1–F5 макета. */
-export function WorkScreen({state, busy, onLog, onFinish, onOpenSafety, onIncident}: {
+export function WorkScreen({state, busy, onLog, onFinish, onOpenSafety, onIncident, afterFinish = false}: {
   state: OperatorMobileState;
   busy: boolean;
   /** Признак успеха: по нему форма решает, чистить ли поля. */
@@ -603,6 +605,8 @@ export function WorkScreen({state, busy, onLog, onFinish, onOpenSafety, onIncide
   onIncident: () => void;
   /** Открыть периодический чек-лист ТБ — срок вышел либо подходит. */
   onOpenSafety: (stage: ChecklistStage) => void;
+  /** Работа завершена, смена ждёт сдачи: выработку и простой дописывают, «Завершить работу» нет. */
+  afterFinish?: boolean;
 }) {
   const [formOpen, setFormOpen] = useState(false);
   const [kind, setKind] = useState<'PILES' | 'DRILLING' | 'DOWNTIME' | 'PASSPORT'>('PILES');
@@ -667,7 +671,7 @@ export function WorkScreen({state, busy, onLog, onFinish, onOpenSafety, onIncide
   };
 
   if (!formOpen) return <div className="scr"><OperatorWorkOverview state={state} variant="v5" busy={busy}
-    onAction={(next)=>{pick(next);setFormOpen(true);}} onFinish={onFinish} onIncident={onIncident}>
+    onAction={(next)=>{pick(next);setFormOpen(true);}} onFinish={onFinish} hideFinish={afterFinish} onIncident={onIncident}>
     {safety.filter(c=>c.period?.due||c.period?.warn).map(c=><button key={c.stage} type="button" className="oc-form-back" onClick={()=>onOpenSafety(c.stage)}>{c.title} · пройти проверку</button>)}
   </OperatorWorkOverview></div>;
 
@@ -789,10 +793,14 @@ export function WorkScreen({state, busy, onLog, onFinish, onOpenSafety, onIncide
       </div>
       )}
 
-      <button className="b gh" type="button" disabled={busy} onClick={onFinish}>
-        Завершить работу
-      </button>
-      <p className="note">Машина остановлена безопасно — дальше осмотр после смены.</p>
+      {afterFinish ? null : (
+        <>
+          <button className="b gh" type="button" disabled={busy} onClick={onFinish}>
+            Завершить работу
+          </button>
+          <p className="note">Машина остановлена безопасно — дальше осмотр после смены.</p>
+        </>
+      )}
     </div>
   );
 }
@@ -804,10 +812,12 @@ export function WorkScreen({state, busy, onLog, onFinish, onOpenSafety, onIncide
  * отложенной выработке 409 «Смена уже закрыта», и в отчёт она не попадает:
  * сначала очередь, потом закрытие.
  */
-export function CloseScreen({state, busy, onClose, unsent, onFlush}: {
+export function CloseScreen({state, busy, onClose, unsent, onFlush, onAddWork}: {
   state: OperatorMobileState;
   busy: boolean;
   onClose: () => void;
+  /** Дописать выработку или простой до сдачи смены (решение владельца 07.10.2026). */
+  onAddWork?: () => void;
   /** Записей на устройстве, ещё не принятых сервером. */
   unsent: number;
   /** Отправить их немедленно. */
@@ -865,6 +875,11 @@ export function CloseScreen({state, busy, onClose, unsent, onFlush}: {
           <p className="note warn">Сначала отправьте записи с телефона: {unsent} не отправлено</p>
           <button className="b gh" type="button" onClick={onFlush}>Отправить сейчас</button>
         </>
+      ) : null}
+      {onAddWork ? (
+        <button className="b gh" type="button" disabled={busy} onClick={onAddWork}>
+          Дописать сваи, бурение или простой
+        </button>
       ) : null}
       <button className="b" type="button" disabled={busy || unsent > 0} onClick={onClose}>
         {busy ? 'Закрываем…' : 'Закрыть смену'}
@@ -1119,6 +1134,27 @@ export function OperatorV5App() {
 
   const shiftId = state.shift?.id ?? null;
 
+  /*
+    Нижняя панель шагов: «Главная», «Следующий шаг», «Завершить смену».
+    Что считать следующим шагом, решает фаза сервера (shift-next-step); здесь
+    только переходы этого модуля. Экран фазы (допуск, приём, осмотр, сдача)
+    и есть главный экран: «Главная» закрывает обходные шаги и вкладку.
+  */
+  const goHome = () => { setAdmissionStep(null); setSafetyStage(null); setTab('SHIFT'); };
+  const goNext = () => {
+    const action = nextStep(state).action;
+    switch (action.kind) {
+      case 'ADMISSION': setSafetyStage(null); setTab('SHIFT'); setAdmissionStep(action.open); break;
+      case 'WAIT_ADMISSION': void reload(); break;
+      case 'LOG_WORK': setAdmissionStep(null); setSafetyStage(null); setTab('WORK'); break;
+      case 'ACCEPT_EQUIPMENT':
+      case 'CHECKLIST':
+      case 'SERVICE_AFTER':
+      case 'CLOSE_SHIFT': goHome(); break;
+      default: break;
+    }
+  };
+
   const body = () => {
     /*
       Шаг допуска перекрывает экран фазы: у каждого свой порядок и своя кнопка.
@@ -1212,7 +1248,7 @@ export function OperatorV5App() {
       );
     }
 
-    if (tab === 'WORK' && state.phase !== 'WORK') {
+    if (tab === 'WORK' && state.phase !== 'WORK' && state.phase !== 'CLOSING') {
       return (
         <div className="scr">
           <p className="note warn">
@@ -1224,13 +1260,14 @@ export function OperatorV5App() {
 
     // Открытый по сроку чек-лист ТБ перекрывает рабочий экран: человек его сам
     // и открыл, и возврат — по кнопке «Завершить» внизу списка.
-    if (state.phase === 'WORK' && !safetyStage) {
+    if ((state.phase === 'WORK' || (state.phase === 'CLOSING' && tab === 'WORK')) && !safetyStage) {
       return (
         <WorkScreen
           state={state}
           busy={busy}
           onLog={logProduction}
           onOpenSafety={setSafetyStage}
+          afterFinish={state.phase !== 'WORK'}
           onIncident={()=>setTab('EVENTS')}
           onFinish={() => {
             if (shiftId) void run(() => sendCommand({command: 'finish-work', shiftId}), 'Работа завершена.');
@@ -1290,6 +1327,7 @@ export function OperatorV5App() {
         busy={busy}
         unsent={queued.length}
         onFlush={() => void flushQueued()}
+        onAddWork={() => setTab('WORK')}
         onClose={() => {
           if (shiftId) void run(() => sendCommand({command: 'close-shift', shiftId, comment: ''}), 'Смена закрыта.');
         }}
@@ -1304,7 +1342,24 @@ export function OperatorV5App() {
       {notice ? <p className="note">{notice}</p> : null}
       <OfflineQueueBanner items={queued} onRetry={retryQueued} onDiscard={discardQueued} />
       {body()}
+      {/* Нижняя панель шагов (решение владельца 07.10.2026) — над нижним меню. */}
+      <div className="v5-bottom">
+      <StepBar
+        className="v5-stepbar"
+        step={nextStep(state)}
+        finish={finishShift(state)}
+        busy={busy}
+        onHome={goHome}
+        onNext={goNext}
+        onGoClosing={goHome}
+        onFinishWork={() => {
+          if (!shiftId) return;
+          goHome();
+          void run(() => sendCommand({command: 'finish-work', shiftId}), 'Работа завершена.');
+        }}
+      />
       <Dock active={tab} onSelect={setTab} />
+      </div>
     </div>
   );
 }

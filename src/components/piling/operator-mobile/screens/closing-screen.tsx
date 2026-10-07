@@ -33,7 +33,7 @@ import {WarningsPanel} from '../warnings-panel';
  * человека: повторить или убрать, поэтому кнопка зовёт к разбору, а закрытие
  * смены не прячется навсегда — правило держится только на `PENDING`.
  */
-export function ClosingScreen({state, onOpenService, onClose, busy, error, errorDetails, tabs, pending = 0, failed = 0, onSendNow, onRetryFailed}: {
+export function ClosingScreen({state, onOpenService, onClose, busy, error, errorDetails, tabs, pending = 0, failed = 0, onSendNow, onRetryFailed, onAddWork}: {
   state: OperatorMobileState;
   onOpenService: () => void;
   onClose: (comment: string) => void;
@@ -51,6 +51,11 @@ export function ClosingScreen({state, onOpenService, onClose, busy, error, error
   onSendNow?: () => void;
   /** Вернуть отклонённые в отправку — решение человека. */
   onRetryFailed?: () => void;
+  /**
+   * Дописать выработку или простой до сдачи (решение владельца 07.10.2026:
+   * «оператор может после работы занести выполненные работы и простой»).
+   */
+  onAddWork?: () => void;
 }) {
   const [comment, setComment] = useState('');
   const service = state.checklists.find((checklist) => checklist.stage === 'EO_AFTER');
@@ -118,6 +123,12 @@ export function ClosingScreen({state, onOpenService, onClose, busy, error, error
             : 'Пока машина не осмотрена и не обслужена, смену закрыть нельзя.'}
         </p>
       </Panel>
+
+      {onAddWork ? (
+        <BigButton tone="ghost" disabled={busy} onClick={onAddWork}>
+          Дописать сваи, бурение или простой
+        </BigButton>
+      ) : null}
 
       <Panel>
         <PanelTitle>Итог смены</PanelTitle>

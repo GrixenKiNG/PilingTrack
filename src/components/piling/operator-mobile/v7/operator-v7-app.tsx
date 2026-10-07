@@ -17,6 +17,8 @@ import {Banner, Button, Dock, OPERATOR_DOCK, PhoneShell as Shell, Title, type Do
 import {admissionSteps} from '../safety/admission-steps';
 import {AdmissionResult, BriefingFlow, KnowledgeFlow, PpeFlow} from './v7-identity';
 import {AcceptFlow, ChecklistFlow, CloseFlow, IncidentFlow, ProductionFlow} from './v7-shift';
+import {finishShift, nextStep} from '../shift-next-step';
+import {StepBar} from '../step-bar';
 import {
   EquipmentScreen, HomeScreen, IncidentsScreen, JournalScreen, MoreScreen, TasksScreen,
   type Detour,
@@ -262,6 +264,44 @@ export function OperatorV7App() {
     />
   );
 
+  /*
+    Нижняя панель шагов — «Главная», «Следующий шаг», «Завершить смену»
+    (решение владельца 07.10.2026). Что считать следующим шагом, решает фаза
+    сервера (shift-next-step); здесь только переходы этого модуля.
+  */
+  const goHome = () => { setDetour(null); setTab('HOME'); setActionError(null); };
+  const step = nextStep(state);
+  const goNext = () => {
+    setActionError(null);
+    const action = step.action;
+    switch (action.kind) {
+      case 'ADMISSION': setDetour({kind: action.open}); break;
+      case 'WAIT_ADMISSION': void reload(); break;
+      case 'ACCEPT_EQUIPMENT': setDetour({kind: 'ACCEPT'}); break;
+      case 'CHECKLIST': setDetour({kind: 'CHECKLIST', stage: action.stage}); break;
+      case 'SERVICE_AFTER': setDetour({kind: 'CHECKLIST', stage: 'EO_AFTER'}); break;
+      case 'LOG_WORK': setDetour({kind: 'PRODUCTION', entry: 'PILES'}); break;
+      case 'CLOSE_SHIFT': setDetour({kind: 'CLOSE'}); break;
+      default: break;
+    }
+  };
+  const stepBar = (
+    <StepBar
+      step={step}
+      finish={finishShift(state)}
+      busy={busy}
+      onHome={goHome}
+      onNext={goNext}
+      onGoClosing={() => setDetour({kind: 'CLOSE'})}
+      onFinishWork={() => {
+        if (!shiftId) return;
+        setDetour(null);
+        setTab('HOME');
+        void run({command: 'finish-work', shiftId}, {close: false});
+      }}
+    />
+  );
+
   /* ------------------------------------------------------------- шаги --- */
 
   if (detour) {
@@ -269,7 +309,7 @@ export function OperatorV7App() {
     return (
       <Shell online={online} syncedAt={syncedAt} pending={pending}
         back={DETOUR_BACK[detour.kind]} onBack={back}
-        dock={detour.kind === 'CLOSE' ? dock : undefined}>
+        dock={<>{stepBar}{detour.kind === 'CLOSE' ? dock : null}</>}>
         {detour.kind === 'PPE' ? (
           <PpeFlow
             busy={busy}
@@ -414,7 +454,7 @@ export function OperatorV7App() {
       pending={pending}
       back="PilingTrack"
       desktopNav={<aside className="oc-desktop-nav"><div className="oc-brand"><PilingIcon name="equipment-rig" size={30} decorative /><strong>PilingTrack</strong></div><p>Рабочее место оператора</p><nav aria-label="Рабочее место">{OPERATOR_DOCK.map(item=><button type="button" key={item.key} aria-current={tab===item.key?'page':undefined} onClick={()=>setTab(item.key)}><PilingIcon name={item.key==='HOME'?'home':item.key==='SAFETY'?'accepted':item.key==='EQUIP'?'equipment-rig':'menu'} size={24} decorative />{item.label}</button>)}</nav><a href="/operator/v7/history"><PilingIcon name="history" size={24} decorative />История</a></aside>}
-      dock={dock}
+      dock={<>{stepBar}{dock}</>}
       action={shiftId && !(tab === 'HOME' && state.phase === 'WORK') ? (
         <Button tone="danger" onClick={() => setDetour({kind: 'INCIDENT'})}>
           ⚠ Сообщить об инциденте

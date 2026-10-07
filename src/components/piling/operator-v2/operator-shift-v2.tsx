@@ -70,6 +70,8 @@ import { KnowledgeScreen } from '@/components/piling/operator-mobile/screens/kno
 import { ChecklistScreen } from '@/components/piling/operator-mobile/screens/checklist-screen';
 import { knownAnswers } from '@/components/piling/operator-mobile/safety/known-answers';
 import { V2_STEP_STAGE, V2_STEP_TITLE, resolveV2State, stepCaption } from './shift-flow';
+import { StepBar } from '../operator-mobile/step-bar';
+import { v2FinishShift, v2NextStep } from './step-bar-model';
 
 /**
  * Строка состояния документа в карточке допуска.
@@ -731,6 +733,23 @@ export function OperatorShiftV2() {
   }
 
   const { step } = state;
+  /*
+    Нижняя панель шагов — «Главная», «Следующий шаг», «Завершить смену»
+    (решение владельца 07.10.2026). Шаг и подписи — по порядку экранов v2
+    (step-bar-model); здесь только переходы этого модуля.
+  */
+  const goHome = () => { setSafetyStep(null); setTab('shift'); };
+  const stepBar = (
+    <StepBar
+      step={v2NextStep(step)}
+      finish={v2FinishShift(step)}
+      busy={busy}
+      onHome={goHome}
+      onNext={goHome}
+      onGoClosing={goHome}
+      onFinishWork={() => { goHome(); setFinishing(true); }}
+    />
+  );
   const equipment = facts.equipment;
   const photo = getEquipmentPhoto(equipment?.model);
   // Секундомер приёмки в подписи виден до пуска: после него он теряет смысл,
@@ -754,7 +773,7 @@ export function OperatorShiftV2() {
     // Приёмка уже открытой смены (передача от прошлой) — кнопка внизу.
     const canAct = cleared && Boolean(facts.shift);
     return (
-      <StepShell
+      <StepShell bar={stepBar}
         title={tab === 'safety' ? 'Техника безопасности' : V2_STEP_TITLE.acceptance}
         subtitle={stepLabel}
         tone={cleared ? 'green' : 'blue'}
@@ -914,7 +933,7 @@ export function OperatorShiftV2() {
     const list = mobile?.checklists.find((item) => item.stage === catalogStage) ?? null;
     if (!mobile || !list) {
       return (
-        <StepShell title={V2_STEP_TITLE[step]} subtitle={stepLabel}>
+        <StepShell bar={stepBar} title={V2_STEP_TITLE[step]} subtitle={stepLabel}>
           <p className="text-base text-muted-foreground">
             {mobileError ?? 'Читаем список осмотра…'}
           </p>
@@ -929,7 +948,7 @@ export function OperatorShiftV2() {
       );
     }
     return (
-      <StepShell title={V2_STEP_TITLE[step]} subtitle={stepLabel}>
+      <StepShell bar={stepBar} title={V2_STEP_TITLE[step]} subtitle={stepLabel}>
         <ChecklistScreen
           checklist={list}
           warnings={mobile.warnings}
@@ -948,7 +967,7 @@ export function OperatorShiftV2() {
   if (step === 'work') {
     return (
       <>
-        <StepShell
+        <StepShell bar={stepBar}
           title={tab === 'shift' ? V2_STEP_TITLE.work
             : tab === 'safety' ? 'Техника безопасности'
               : tab === 'equipment' ? 'Техника' : 'Ещё'}
@@ -1125,7 +1144,7 @@ export function OperatorShiftV2() {
     const submitted = mobile?.receipt != null;
     const unsent = queued.length;
     return (
-      <StepShell
+      <StepShell bar={stepBar}
         title={V2_STEP_TITLE.report}
         subtitle={stepLabel}
         footer={
@@ -1200,7 +1219,7 @@ export function OperatorShiftV2() {
 
   // ---------- 8. Смена закрыта ----------
   return (
-    <StepShell
+    <StepShell bar={stepBar}
       title={V2_STEP_TITLE.closed}
       subtitle={stepLabel}
       tone="purple"

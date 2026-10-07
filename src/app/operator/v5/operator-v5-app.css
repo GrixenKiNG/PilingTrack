@@ -35,6 +35,17 @@
   padding-bottom: calc(0.85rem + env(safe-area-inset-bottom));
 }
 
+/* Панель шагов и вкладки — одной липкой полосой: две липкие полосы друг на друга наезжали бы. */
+.v5 .app .v5-bottom {
+  position: sticky;
+  bottom: 0;
+  margin-top: auto;
+  z-index: 5;
+}
+.v5 .app .v5-bottom .dock {
+  position: static;
+}
+
 .v5 .app .dock {
   position: sticky;
   bottom: 0;

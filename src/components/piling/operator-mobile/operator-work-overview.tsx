@@ -15,9 +15,11 @@ export function OperatorMachineHeader({state}: {state: OperatorMobileState}) {
 }
 
 /** One overview of server facts; actions delegate to each version's existing forms. */
-export function OperatorWorkOverview({state, variant, busy, onAction, onFinish, onIncident, onDefect, children}: {
+export function OperatorWorkOverview({state, variant, busy, onAction, onFinish, hideFinish, onIncident, onDefect, children}: {
   state: OperatorMobileState; variant: Variant; busy?: boolean;
   onAction: (action: WorkAction) => void; onFinish: () => void;
+  /** Работа уже завершена: кнопки «Завершить работу» нет (выработку дописывают до сдачи). */
+  hideFinish?: boolean;
   onIncident?: () => void; onDefect?: () => void; children?: ReactNode;
 }) {
   const [allEntries, setAllEntries] = useState(false);
@@ -25,7 +27,8 @@ export function OperatorWorkOverview({state, variant, busy, onAction, onFinish, 
     {label: 'СИЗ и допуск', done: state.identity.ppe.confirmed && state.identity.ppe.missing.length === 0 && state.identity.briefing.ok && state.identity.knowledge.ok && state.identity.documents.every(d => !d.required || d.verdict === 'VALID' || d.verdict === 'EXPIRING')},
     ...(['PRESHIFT_INSPECTION', 'SITE_READY', 'EO_BEFORE'] as const).map((stage, i) => ({label: ['Осмотр машины', 'Площадка', 'Пуск'][i], done: state.checklists.some(c => c.stage === stage && c.done)})),
   ];
-  const ready = state.phase === 'WORK' && state.permit.allowed && preparation.every(s => s.done);
+  // После «Завершить работу» выработку можно дописать до сдачи смены (решение владельца 07.10.2026).
+  const ready = (state.phase === 'WORK' || state.phase === 'CLOSING') && state.permit.allowed && preparation.every(s => s.done);
   // Простой — только часы (решение владельца 07.10.2026).
   const downtimeHours = Math.round(state.production.downtimeHours * 100) / 100;
   const entries = [...state.entries].sort((a,b)=>b.occurredAt.localeCompare(a.occurredAt));
@@ -36,7 +39,7 @@ export function OperatorWorkOverview({state, variant, busy, onAction, onFinish, 
     {icon: 'downtime', label: 'Простой', value: String(downtimeHours).replace('.', ','), unit: 'ч', tone: 'pause'},
   ].map(m=><div className={`oc-stat oc-${m.tone}`} key={m.label}>{m.tone === 'pause' ? <Clock className="oc-symbol oc-clock" size={40} aria-hidden /> : <PilingIcon name={m.icon as PilingIconName} size={30} decorative />}<div><span>{m.label}</span><strong>{m.value}</strong><small>{m.unit}</small></div></div>)}</div>;
   const action = (kind: WorkAction, label: string, icon: PilingIconName, cls: string) => <button type="button" className={`oc-action ${cls}`} disabled={busy || (kind !== 'DOWNTIME' && !ready)} onClick={()=>onAction(kind)}>{kind === 'DOWNTIME' ? <Clock className="oc-symbol" size={32} aria-hidden /> : <PilingIcon name={icon} size={26} decorative />}<span>{label}</span></button>;
-  const finish = <button type="button" className="oc-action oc-finish" disabled={busy} onClick={onFinish}><Flag className="oc-symbol" size={30} aria-hidden /><span>Завершить работу</span></button>;
+  const finish = hideFinish ? null : <button type="button" className="oc-action oc-finish" disabled={busy} onClick={onFinish}><Flag className="oc-symbol" size={30} aria-hidden /><span>Завершить работу</span></button>;
   return <div className={`operator-concept oc-${variant}`}>
     <OperatorMachineHeader state={state} />
     {variant === 'v5' && <section className="oc-card oc-stages"><h2>Этапы смены</h2><ol>{['Допуск','Осмотр','Площадка','Работа','Итог'].map((label,i)=><li key={label} className={i<3&&preparation[i].done?'is-done':i===3?'is-current':''}><span>{i<3&&preparation[i].done?<PilingIcon name="check" size={16} decorative />:i+1}</span>{label}</li>)}</ol>{status}</section>}
@@ -57,7 +60,7 @@ export function OperatorWorkOverview({state, variant, busy, onAction, onFinish, 
     <section className="oc-card oc-recent"><header><h2>Последние записи</h2>{entries.length>2&&<button type="button" onClick={()=>setAllEntries(!allEntries)}>{allEntries?'Свернуть':'Все записи'}<PilingIcon name="external" size={16} decorative /></button>}</header>
       {entries.length===0?<p className="oc-caption">За смену пока ничего не записано.</p>:(allEntries?entries:entries.slice(0,2)).map(e=><div className="oc-entry" key={e.id}><time>{new Date(e.occurredAt).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'})}</time><PilingIcon name={e.kind==='PILES'?'pile-driving':e.kind==='DRILLING'?'drilling-auger':'downtime'} size={26} decorative /><div><strong>{e.label}</strong><span>{e.kind==='DOWNTIME'?`${Math.round(e.value*60)} мин`:`${formatNumber(e.value,0)} шт. · ${formatNumber(e.meters??0,1)} м`}</span>{e.corrections.length>0&&<small>Есть поправки: {e.corrections.length}</small>}</div><span className="oc-saved"><PilingIcon name="check" size={15} decorative /><span>Сохранено</span></span></div>)}
     </section>
-    <div className="oc-mobile-finish">{finish}</div>
+    {finish ? <div className="oc-mobile-finish">{finish}</div> : null}
   </div>;
 }
 

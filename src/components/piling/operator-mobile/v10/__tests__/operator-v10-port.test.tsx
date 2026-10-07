@@ -377,3 +377,66 @@ describe('v10: запись выработки и отказ сервера', ()
     expect(count.value).toBe('12');
   });
 });
+
+/* ------------------------------------- 6. нижняя панель шагов (07.10.2026) --- */
+
+/**
+ * Решение владельца 07.10.2026: внизу каждого модуля — «Главная», «Следующий
+ * шаг» и «Завершить смену». Следующий шаг определяет фаза сервера.
+ */
+describe('v10: нижняя панель шагов', () => {
+  it('в работе: три кнопки; «Завершить смену» спрашивает и только потом шлёт finish-work', async () => {
+    api.fetchState.mockResolvedValue(workState());
+    api.sendCommand.mockResolvedValue({ok: true});
+    render(<OperatorV10App />);
+
+    expect(await screen.findByRole('button', {name: 'Следующий шаг: Записать выработку'})).toBeInTheDocument();
+    expect(screen.getByRole('button', {name: 'Главная'})).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', {name: 'Завершить смену'}));
+    expect(api.sendCommand).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', {name: 'Да, завершить'}));
+
+    await waitFor(() => expect(api.sendCommand)
+      .toHaveBeenCalledWith({command: 'finish-work', shiftId: 'shift-1'}));
+  });
+
+  it('«Следующий шаг» из допуска ведёт к первому непройденному — СИЗ', async () => {
+    const identity = makeState('IDENTITY').identity;
+    api.fetchState.mockResolvedValue({
+      ...makeState('IDENTITY'),
+      identity: {...identity, ppe: {...identity.ppe, confirmed: false}},
+    });
+    render(<OperatorV10App />);
+
+    fireEvent.click(await screen.findByRole('button', {name: 'Следующий шаг: СИЗ'}));
+
+    expect(await screen.findByText('Средства защиты')).toBeInTheDocument();
+  });
+
+  it('«Главная» возвращает на ленту смены из любого экрана', async () => {
+    api.fetchState.mockResolvedValue(workState());
+    render(<OperatorV10App />);
+
+    fireEvent.click(await screen.findByRole('button', {name: 'Следующий шаг: Записать выработку'}));
+    const title = () => document.querySelector('.ov10-nav .ttl')?.textContent;
+    await waitFor(() => expect(title()).toBe('Работа'));
+
+    fireEvent.click(screen.getByRole('button', {name: 'Главная'}));
+    await waitFor(() => expect(title()).toBe('Смена'));
+  });
+
+  it('в сдаче можно дописать сваи, бурение и простой — открывается полная форма', async () => {
+    api.fetchState.mockResolvedValue(makeState('CLOSING',
+      ['PRESHIFT_INSPECTION', 'SITE_READY', 'EO_BEFORE', 'EO_AFTER']));
+    render(<OperatorV10App />);
+
+    fireEvent.click(await screen.findByRole('button', {name: 'Следующий шаг: Закрыть смену'}));
+    fireEvent.click(await screen.findByRole('button', {name: 'Дописать сваи, бурение или простой'}));
+
+    // После завершения работы доступны все четыре вида записи, а не только простой.
+    expect(await screen.findByRole('button', {name: 'Свая'})).toBeInTheDocument();
+    expect(screen.getByRole('button', {name: 'Бурение'})).toBeInTheDocument();
+    expect(screen.getByRole('button', {name: 'Простой'})).toBeInTheDocument();
+  });
+});

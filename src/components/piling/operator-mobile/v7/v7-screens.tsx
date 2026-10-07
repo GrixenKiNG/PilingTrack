@@ -242,6 +242,10 @@ function ClosingBlock({state, onStep}: {state: OperatorMobileState; onStep: (det
           ) : null}
         </>
       ) : null}
+      {/* Выработку и простой можно дописать до сдачи смены (решение владельца 07.10.2026). */}
+      <Button tone="ghost" onClick={() => onStep({kind: 'PRODUCTION', entry: 'PILES'})}>
+        Дописать сваи, бурение или простой
+      </Button>
       <Button tone="danger" onClick={() => onStep({kind: 'CLOSE'})}>Закрыть смену</Button>
     </>
   );

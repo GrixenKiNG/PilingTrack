@@ -44,7 +44,10 @@ function weatherAge(at: string): string {
   return `${Math.round(minutes / 60)} ч назад`;
 }
 
-export function WorkScreen({state, onLog, onFinish, onOpenSafety, busy, error, errorDetails, tabs, onCorrect}: {
+export function WorkScreen({
+  state, onLog, onFinish, onOpenSafety, busy, error, errorDetails, tabs, onCorrect,
+  afterFinish = false, onBack, homeSignal = 0, openFormSignal = 0,
+}: {
   state: OperatorMobileState;
   /** Возвращает признак удачи: по нему экран решает, чистить ли форму. */
   onLog: (entry: ProductionEntryInput) => Promise<boolean>;
@@ -56,21 +59,34 @@ export function WorkScreen({state, onLog, onFinish, onOpenSafety, busy, error, e
   errorDetails?: string[];
   /** Нижние вкладки. Рисует оболочка — экран лишь отдаёт их в Screen. */
   tabs?: ReactNode;
+  /**
+   * Работа уже завершена, смена ждёт сдачи: форма открыта сразу, «Работа
+   * завершена» не показывается, назад ведёт к сдаче смены (решение владельца
+   * 07.10.2026: выработку и простой можно дописать после работы).
+   */
+  afterFinish?: boolean;
+  onBack?: () => void;
+  /** Растёт на каждое нажатие «Главная» в нижней панели: экран возвращается к обзору. */
+  homeSignal?: number;
+  /** Растёт на нажатие «Следующий шаг» в фазе работы: открыть форму записи. */
+  openFormSignal?: number;
   /** Поправка к ошибочной записи. Возвращает признак удачи. */
   onCorrect: (input: {
     entryId: string; kind: 'PILES' | 'DRILLING' | 'DOWNTIME'; actual: number; reason: string;
   }) => Promise<boolean>;
 }) {
-  const [formOpen, setFormOpen] = useState(false);
+  const [formOpen, setFormOpen] = useState(afterFinish);
   const [tab, setTab] = useState<Tab>('PILES');
   /**
    * Как записывают сваи.
    *
    * Паспорт стоит первым и включён по умолчанию: он и есть исполнительный
    * документ, а пачка — способ добрать задним числом то, что записать сразу не
-   * вышло. Порядок кнопок здесь и есть указание, как правильно.
+   * вышло. Порядок кнопок здесь и есть указание, как правильно. После «Завершить
+   * работу» (дописывание до сдачи смены) по умолчанию включена пачка: именно
+   * так добирают записи задним числом.
    */
-  const [pileMode, setPileMode] = useState<'PASSPORT' | 'BATCH'>('PASSPORT');
+  const [pileMode, setPileMode] = useState<'PASSPORT' | 'BATCH'>(afterFinish ? 'BATCH' : 'PASSPORT');
   const [reference, setReference] = useState('');
   const [count, setCount] = useState('');
   const [metersPerUnit, setMetersPerUnit] = useState('');
@@ -81,6 +97,20 @@ export function WorkScreen({state, onLog, onFinish, onOpenSafety, busy, error, e
   // и промах по ней в перчатке заканчивал смену досрочно. Второе нажатие
   // здесь — не бюрократия, а единственная защита от промаха.
   const [finishing, setFinishing] = useState(false);
+  // Сигналы нижней панели. Реакция на смену значения — во время отрисовки, как
+  // рекомендует React для состояния, производного от пропсов: эффект дал бы
+  // лишний цикл отрисовки.
+  const [seenHomeSignal, setSeenHomeSignal] = useState(homeSignal);
+  if (homeSignal !== seenHomeSignal) {
+    setSeenHomeSignal(homeSignal);
+    setFormOpen(afterFinish);
+    setFinishing(false);
+  }
+  const [seenOpenSignal, setSeenOpenSignal] = useState(openFormSignal);
+  if (openFormSignal !== seenOpenSignal) {
+    setSeenOpenSignal(openFormSignal);
+    setFormOpen(true);
+  }
 
   // Смена вкладки очищает форму: марка сваи не имеет смысла в простое, а «5»
   // из поля свай, оставшееся в поле часов, — это ошибочный отчёт. Сброс живёт
@@ -191,7 +221,7 @@ export function WorkScreen({state, onLog, onFinish, onOpenSafety, busy, error, e
       <OperatorWorkOverview state={state} variant="base" busy={busy}
         onAction={(kind)=>{switchTab(kind==='PASSPORT'?'PILES':kind);setPileMode(kind==='PASSPORT'?'PASSPORT':'BATCH');setFormOpen(true);}}
         onFinish={()=>setFinishing(true)} />
-      {finishing&&<Panel tone="warning"><PanelTitle>Завершить работу?</PanelTitle><p className="my-3 text-sm">Дальше — ЕО после работы. Новую выработку записывать будет нельзя.</p><BigButton tone="danger" disabled={busy} onClick={onFinish}>Да, работа завершена</BigButton><BigButton tone="ghost" onClick={()=>setFinishing(false)}>Продолжить работу</BigButton></Panel>}
+      {finishing&&<Panel tone="warning"><PanelTitle>Завершить работу?</PanelTitle><p className="my-3 text-sm">Дальше — ЕО после работы и сдача. Выработку и простой можно дописать до сдачи смены.</p><BigButton tone="danger" disabled={busy} onClick={onFinish}>Да, работа завершена</BigButton><BigButton tone="ghost" onClick={()=>setFinishing(false)}>Продолжить работу</BigButton></Panel>}
     </Screen>
   );
 
@@ -230,10 +260,10 @@ export function WorkScreen({state, onLog, onFinish, onOpenSafety, busy, error, e
               </BigButton>
             </>
           ) : null}
-          {finishing ? (
+          {afterFinish ? null : finishing ? (
             <div className="space-y-2 rounded-lg border border-warning bg-warning/10 p-3">
               <p className="text-sm font-semibold">
-                Завершить работу? Записывать выработку после этого нельзя.
+                Завершить работу? Дальше — ЕО после работы и сдача.
               </p>
               <p className="text-2xs text-muted-foreground">
                 За смену: {state.production.piles.count} свай, {state.production.drilling.count} скважин,
@@ -250,7 +280,9 @@ export function WorkScreen({state, onLog, onFinish, onOpenSafety, busy, error, e
         </>
       )}
     >
-      <button type="button" className="oc-form-back" onClick={()=>setFormOpen(false)}>← К смене</button>
+      <button type="button" className="oc-form-back" onClick={afterFinish && onBack ? onBack : () => setFormOpen(false)}>
+        {afterFinish ? '← К сдаче смены' : '← К смене'}
+      </button>
       <PermitPanel permit={state.permit} />
       <WarningsPanel warnings={state.warnings} />
 

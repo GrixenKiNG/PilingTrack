@@ -1,5 +1,7 @@
 'use client';
 
+import {finishShift, nextStep} from '../shift-next-step';
+import {StepBar} from '../step-bar';
 import {OperatorWorkOverview, type WorkAction} from '../operator-work-overview';
 import {useCallback, useEffect, useRef, useState} from 'react';
 import {
@@ -810,7 +812,7 @@ function ScreenClosing({state, busy, onFinish, onClose, go, unsent, onFlush}: {
         </button>
       ) : null}
       {!closed ? (
-        <button type="button" className="ov10-btn ghost" onClick={() => go('work')}>Записать простой</button>
+        <button type="button" className="ov10-btn ghost" onClick={() => go('work')}>Дописать сваи, бурение или простой</button>
       ) : null}
     </>
   );
@@ -1596,6 +1598,25 @@ export function OperatorV10App() {
       unsent={queued.length} onFlush={() => void flushQueued()} />;
   };
 
+  /** Куда ведёт «Следующий шаг»: экран этого модуля по действию из shift-next-step. */
+  const goNextStep = (value: OperatorMobileState) => {
+    const action = nextStep(value).action;
+    switch (action.kind) {
+      case 'ADMISSION':
+        setActive(action.open === 'PPE' ? 'ppe' : action.open === 'BRIEFING' ? 'briefing' : 'knowledge');
+        break;
+      case 'WAIT_ADMISSION':
+        void reload();
+        break;
+      case 'ACCEPT_EQUIPMENT': setActive('accept'); break;
+      case 'CHECKLIST':
+      case 'SERVICE_AFTER': setActive('step'); break;
+      case 'LOG_WORK': setActive('work'); break;
+      case 'CLOSE_SHIFT': setActive('closing'); break;
+      default: break;
+    }
+  };
+
   const current = SCREENS.find((screen) => screen.id === active) ?? SCREENS[0];
   const activeTab = TABS.find((tab) => tab.screen === current.id)?.key ?? current.tab;
 
@@ -1659,6 +1680,19 @@ export function OperatorV10App() {
         {!loading && !state && !loadError ? <Badge tone="warn">нет данных</Badge> : null}
         {body}
       </div>
+      {/* Нижняя панель шагов (решение владельца 07.10.2026) — над нижним меню. */}
+      {state ? (
+        <StepBar
+          className="ov10-stepbar"
+          step={nextStep(state)}
+          finish={finishShift(state)}
+          busy={busy}
+          onHome={() => setActive('today')}
+          onNext={() => goNextStep(state)}
+          onGoClosing={() => setActive('closing')}
+          onFinishWork={finishWork}
+        />
+      ) : null}
       <Tabbar
         tabs={TABS}
         active={activeTab}

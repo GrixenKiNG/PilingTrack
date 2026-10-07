@@ -26,7 +26,7 @@ const TONE_BUTTON: Record<StepTone, string> = {
 
 /** Экран шага: светлая шапка с акцентом фазы, содержимое и основное действие. */
 export function StepShell({
-  title, subtitle, tone = 'blue', onBack, children, footer,
+  title, subtitle, tone = 'blue', onBack, children, footer, bar,
 }: {
   title: string;
   subtitle?: string;
@@ -34,6 +34,8 @@ export function StepShell({
   onBack?: () => void;
   children: ReactNode;
   footer?: ReactNode;
+  /** Нижняя панель шагов: «Главная», «Следующий шаг», «Завершить смену» (07.10.2026). */
+  bar?: ReactNode;
 }) {
   // Очередь устройства видна на каждом шаге смены: раньше v2 клал записи в
   // очередь, но не показывал и не отправлял её — они ждали, пока человек не
@@ -62,8 +64,9 @@ export function StepShell({
       <OfflineQueueBanner items={queue.queued} onRetry={queue.retry} onDiscard={queue.discard} className="space-y-1 px-4 pt-3" />
       <div className="space-y-3 p-4">{children}</div>
 
-      {footer && (
+      {(footer || bar) && (
         <div className="sticky bottom-0 z-20 border-t border-border bg-card p-3 pb-safe">
+          {bar ? <div className="-mx-3 -mt-3 mb-3">{bar}</div> : null}
           {footer}
         </div>
       )}

@@ -14,6 +14,8 @@ import {OfflineQueueBanner} from './offline-queue-banner';
 import {useOfflineQueue} from './use-offline-queue';
 import {OperatorStatusStrip} from './operator-status-strip';
 import {BigButton, Panel, PanelTitle, PhaseBar, Screen, TabBar} from './ui';
+import {finishShift, nextStep} from './shift-next-step';
+import {StepBar, StepBarSlotProvider} from './step-bar';
 import {IdentityScreen} from './screens/identity-screen';
 import {BriefingScreen} from './screens/briefing-screen';
 import {KnowledgeScreen, isKnowledgeAttemptExpired} from './screens/knowledge-screen';
@@ -99,7 +101,9 @@ type Detour =
   | {kind: 'KNOWLEDGE'}
   | {kind: 'CHECKLIST'; stage: ChecklistStage}
   /** Просмотр пройденного этапа: только чтение, ничего не меняет. */
-  | {kind: 'REVIEW'; phase: OperatorPhase};
+  | {kind: 'REVIEW'; phase: OperatorPhase}
+  /** Дописать выработку или простой после «Завершить работу», до сдачи смены. */
+  | {kind: 'WORK_ENTRY'};
 
 /**
  * Мобильное рабочее место машиниста.
@@ -172,6 +176,9 @@ export function OperatorMobileApp() {
    */
   const [equipmentId, setEquipmentId] = useState<string | null>(null);
   const [workTab, setWorkTab] = useState<WorkTab>('SHIFT');
+  // Сигналы нижней панели экрану работы: вернуться к обзору / открыть форму записи.
+  const [homeSignal, setHomeSignal] = useState(0);
+  const [openFormSignal, setOpenFormSignal] = useState(0);
   const coordinates = useRef<{latitude: number; longitude: number} | null>(null);
   /** Таймер перехода на вход после истёкшей сессии: снимаем при размонтировании. */
   const authRedirectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -590,6 +597,64 @@ export function OperatorMobileApp() {
   const tabsVisible = !detour && !checklist;
 
   /*
+    НИЖНЯЯ ПАНЕЛЬ ШАГОВ — «Главная», «Следующий шаг», «Завершить смену»
+    (решение владельца 07.10.2026). Что считать следующим шагом, решает фаза
+    сервера (shift-next-step); здесь только переходы этого модуля.
+  */
+  const goHome = () => {
+    setDetour(null);
+    setWorkTab('SHIFT');
+    setHomeSignal((value) => value + 1);
+  };
+  const step = nextStep(state);
+  const finish = finishShift(state);
+  const goNext = () => {
+    const action = step.action;
+    switch (action.kind) {
+      case 'ADMISSION':
+        setWorkTab('SHIFT');
+        setDetour({kind: action.open});
+        break;
+      case 'WAIT_ADMISSION':
+        void reload();
+        break;
+      case 'CHECKLIST':
+        // Чек-лист фазы и есть главный экран фазы.
+        goHome();
+        break;
+      case 'SERVICE_AFTER':
+        setWorkTab('SHIFT');
+        setDetour({kind: 'CHECKLIST', stage: 'EO_AFTER'});
+        break;
+      case 'LOG_WORK':
+        goHome();
+        setOpenFormSignal((value) => value + 1);
+        break;
+      case 'ACCEPT_EQUIPMENT':
+      case 'CLOSE_SHIFT':
+        goHome();
+        break;
+      default:
+        break;
+    }
+  };
+  const stepBar = (
+    <StepBar
+      step={step}
+      finish={finish}
+      busy={busy}
+      onHome={goHome}
+      onNext={goNext}
+      onGoClosing={goHome}
+      onFinishWork={() => {
+        if (!shift) return;
+        goHome();
+        void run(() => sendCommand({command: 'finish-work', shiftId: shift.id}));
+      }}
+    />
+  );
+
+  /*
     ПОКАЗАНА ЛИ ПРИЧИНА ОТКАЗА НА ЭКРАНЕ (F-R89-DUP-REJECT-b).
 
     `shownElsewhere` говорит плашке очереди: эту фразу уже печатает `ErrorNote`
@@ -779,6 +844,30 @@ export function OperatorMobileApp() {
       );
     }
 
+    if (detour?.kind === 'WORK_ENTRY' && shift) {
+      return (
+        <WorkScreen
+          state={state}
+          busy={busy}
+          error={actionError}
+          errorDetails={actionErrorDetails}
+          onLog={(entry: ProductionEntryInput) => run(() => sendCommand({
+            command: 'log-production',
+            clientCommandId: productionCommandId,
+            shiftId: shift.id,
+            entry,
+          }))}
+          onOpenSafety={(safetyStage) => setDetour({kind: 'CHECKLIST', stage: safetyStage})}
+          onFinish={() => setDetour(null)}
+          tabs={undefined}
+          onCorrect={correctProduction}
+          afterFinish
+          onBack={() => setDetour(null)}
+          homeSignal={homeSignal}
+        />
+      );
+    }
+
     if (checklist) {
       return (
         <ChecklistScreen
@@ -845,6 +934,8 @@ export function OperatorMobileApp() {
             onFinish={() => void run(() => sendCommand({command: 'finish-work', shiftId: shift.id}))}
             tabs={tabBar}
             onCorrect={correctProduction}
+            homeSignal={homeSignal}
+            openFormSignal={openFormSignal}
           />
         );
       case 'CLOSING':
@@ -856,6 +947,7 @@ export function OperatorMobileApp() {
             error={actionError}
             errorDetails={actionErrorDetails}
             onOpenService={() => setDetour({kind: 'CHECKLIST', stage: 'EO_AFTER'})}
+            onAddWork={() => setDetour({kind: 'WORK_ENTRY'})}
             onClose={(comment) => void run(() => sendCommand({
               command: 'close-shift',
               shiftId: shift.id,
@@ -894,6 +986,7 @@ export function OperatorMobileApp() {
   };
 
   return (
+    <StepBarSlotProvider value={stepBar}>
     <OperatorFrame>
       <PhaseBar
         progress={state.progress}
@@ -928,6 +1021,7 @@ export function OperatorMobileApp() {
       ) : null}
       {screen()}
     </OperatorFrame>
+    </StepBarSlotProvider>
   );
 }
 
