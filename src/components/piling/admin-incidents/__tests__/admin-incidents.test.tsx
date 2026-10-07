@@ -147,4 +147,12 @@ describe('AdminIncidents — запись разбора (F-R104-6,7,8)', () => 
 
     expect(screen.getByPlaceholderText(NOTE_PLACEHOLDER)).toHaveAttribute('maxlength', '4000');
   });
+
+  /** W75: кнопка «Записать разбор» серая до 10 знаков, но минимум нигде не был указан. */
+  it('под полем разбора показан минимум знаков (W75)', async () => {
+    render(<AdminIncidents />);
+    fireEvent.click(await screen.findByRole('button', {name: 'Разобрать'}));
+
+    expect(screen.getByText('Нужно не меньше 10 знаков.')).toBeInTheDocument();
+  });
 });

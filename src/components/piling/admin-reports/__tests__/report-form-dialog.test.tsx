@@ -368,6 +368,30 @@ describe('ReportFormDialog — доступные имена кнопок «+» 
     expect(screen.getByRole('button', { name: 'Добавить бурение' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Добавить простой' })).toBeTruthy();
   });
+
+  /** W75: одинокий «+» без текста не объясняет, что добавится. Текст — где есть место, подсказка — всегда. */
+  it('у кнопки добавления есть видимая подпись и подсказка (W75)', () => {
+    render(
+      <ReportFormDialog
+        open
+        onClose={vi.fn()}
+        editReport={editReport}
+        loadingReferenceData={false}
+        dictionaryError={null}
+        operators={[]}
+        sites={[]}
+        pileGrades={[{ id: 'g1', name: 'С90.30', isActive: true, lengthMm: 9000 }]}
+        drillingTypes={[]}
+        downtimeReasons={[]}
+        equipment={[]}
+        onSuccess={vi.fn()}
+      />,
+    );
+
+    const pileButton = screen.getByRole('button', { name: 'Добавить сваю' });
+    expect(pileButton).toHaveTextContent('Добавить');
+    expect(pileButton).toHaveAttribute('title', 'Добавить сваю');
+  });
 });
 
 describe('ReportFormDialog — доступные имена полей смены (F-R116-3)', () => {

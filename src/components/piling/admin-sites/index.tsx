@@ -452,7 +452,7 @@ function SiteDetail({
     <OpsDetailPanel title={row.siteName} subtitle={`Объект · ${row.totalReports} ${pluralizeRu(row.totalReports, ['отчёт', 'отчёта', 'отчётов'])}`} status={<OpsRiskBadge level={risk.level} label={risk.label} />}>
       {canManage && <div className="flex flex-wrap gap-2">
         <Button size="sm" variant="outline" onClick={onEdit} className="h-11 text-xs sm:h-8"><Pencil className="mr-1 h-3.5 w-3.5" />Редактировать</Button>
-        <Button size="sm" variant="outline" onClick={onAssign} className="h-11 text-xs sm:h-8"><UserPlus className="mr-1 h-3.5 w-3.5" />Пользователи</Button>
+        <Button size="sm" variant="outline" onClick={onAssign} className="h-11 text-xs sm:h-8"><UserPlus className="mr-1 h-3.5 w-3.5" />Назначить пользователей</Button>
         <Button size="sm" variant="outline" onClick={onToggleCompleted} disabled={completingId === row.siteId} className="h-11 text-xs sm:h-8"><CheckCircle2 className="mr-1 h-3.5 w-3.5" />{completed ? 'Снять «Выполнен»' : 'Выполнен'}</Button>
         <Button size="sm" variant="outline" onClick={onToggleActive} disabled={togglingId === row.siteId} className="h-11 text-xs sm:h-8">{row.isActive ? <PowerOff className="mr-1 h-3.5 w-3.5" /> : <Power className="mr-1 h-3.5 w-3.5" />}{row.isActive ? 'Деактивировать' : 'Активировать'}</Button>
         <Button size="sm" variant="outline" onClick={onDelete} className="h-11 text-xs text-destructive-strong hover:bg-destructive/10 sm:h-8"><Trash2 className="mr-1 h-3.5 w-3.5" />Удалить навсегда</Button>

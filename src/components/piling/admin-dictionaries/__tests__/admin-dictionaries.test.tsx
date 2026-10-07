@@ -385,3 +385,41 @@ describe('AdminDictionaries: примечание марки сваи (W67)', ()
     });
   });
 });
+
+/**
+ * W75: фильтр статуса был подписан «Активные / Архив / Все» и читался как заголовок,
+ * а не как выбранное значение. Действия строки в мобильной карточке показывались
+ * одними значками — на телефоне подсказка по наведению не читается.
+ */
+describe('AdminDictionaries: подписи фильтра и действий (W75)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    authFetch.mockResolvedValue(jsonResponse(registry));
+  });
+
+  it('в поле фильтра стоит выбранное «Активные», а не перечень вариантов', async () => {
+    render(<AdminDictionaries />);
+
+    const select = await screen.findByLabelText('Статус');
+    expect(select).toHaveDisplayValue('Активные');
+    expect(screen.queryByText('Активные / Архив / Все')).toBeNull();
+  });
+
+  it('на телефоне действия строки подписаны текстом', async () => {
+    const original = window.matchMedia;
+    window.matchMedia = vi.fn().mockReturnValue({
+      matches: true, addEventListener: vi.fn(), removeEventListener: vi.fn(),
+    }) as unknown as typeof window.matchMedia;
+    try {
+      render(<AdminDictionaries />);
+      await screen.findByText('СВ 120-35');
+
+      expect(screen.getByText('Переименовать')).toBeInTheDocument();
+      expect(screen.getByText('Длина')).toBeInTheDocument();
+      expect(screen.getByText('В архив')).toBeInTheDocument();
+      expect(screen.getByText('Удалить')).toBeInTheDocument();
+    } finally {
+      window.matchMedia = original;
+    }
+  });
+});

@@ -307,6 +307,7 @@ export function AdminIncidents() {
                       placeholder="Разобрали с бригадой, зону оградили, инструктаж повторили"
                       className="w-full rounded-md border bg-card px-3 py-2 text-sm shadow-xs"
                     />
+                    <p className="text-2xs text-muted-foreground">Нужно не меньше 10 знаков.</p>
                     <div className="flex gap-2">
                       <button
                         type="button"

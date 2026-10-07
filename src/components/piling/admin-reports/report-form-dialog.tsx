@@ -309,7 +309,7 @@ export function ReportFormDialog({
               </Select>
               <Input type="number" placeholder="Кол-во" value={tempPileCount} onChange={(e) => setTempPileCount(e.target.value)}
                 min="1" className="w-20 h-9 font-mono text-sm" />
-              <Button onClick={addPile} aria-label="Добавить сваю" size="sm" className="h-9 bg-signal hover:bg-signal-strong text-white px-3"><Plus className="w-4 h-4" /></Button>
+              <Button onClick={addPile} aria-label="Добавить сваю" title="Добавить сваю" size="sm" className="h-9 bg-signal hover:bg-signal-strong text-white px-3"><Plus className="w-4 h-4" /><span className="ml-1.5 hidden sm:inline">Добавить</span></Button>
             </div>
             {tempPileGrade && Number(tempPileCount) > 0 && (
               <p className="mb-2 rounded-md border border-signal/30 bg-signal/10 px-3 py-2 text-xs text-signal-strong">
@@ -359,7 +359,7 @@ export function ReportFormDialog({
                 min="1" className="w-20 h-9 font-mono text-sm" />
               <Input type="number" step="0.1" placeholder="м/шт" value={tempDrillMetersPerUnit} onChange={(e) => setTempDrillMetersPerUnit(e.target.value)}
                 min="0.1" className="w-20 h-9 font-mono text-sm" />
-              <Button onClick={addDrilling} aria-label="Добавить бурение" size="sm" className="h-9 bg-info-strong hover:bg-info-strong text-white px-3"><Plus className="w-4 h-4" /></Button>
+              <Button onClick={addDrilling} aria-label="Добавить бурение" title="Добавить бурение" size="sm" className="h-9 bg-info-strong hover:bg-info-strong text-white px-3"><Plus className="w-4 h-4" /><span className="ml-1.5 hidden sm:inline">Добавить</span></Button>
             </div>
             {formDrillings.length > 0 && (
               <div className="space-y-1 max-h-40 overflow-y-auto custom-scrollbar">
@@ -401,7 +401,7 @@ export function ReportFormDialog({
                   </Select>
                   <Input type="number" step="0.5" placeholder="Часы" value={tempDtDuration} onChange={(e) => setTempDtDuration(e.target.value)}
                     min="0.5" max={DOWNTIME_MAX_HOURS} className="w-20 h-9 font-mono text-sm" />
-                  <Button onClick={addDowntime} aria-label="Добавить простой" size="sm" className="h-9 bg-warning-strong hover:bg-warning-strong text-white px-3"><Plus className="w-4 h-4" /></Button>
+                  <Button onClick={addDowntime} aria-label="Добавить простой" title="Добавить простой" size="sm" className="h-9 bg-warning-strong hover:bg-warning-strong text-white px-3"><Plus className="w-4 h-4" /><span className="ml-1.5 hidden sm:inline">Добавить</span></Button>
                 </div>
                 <Input placeholder="Комментарий (необязательно)" value={tempDtComment} onChange={(e) => setTempDtComment(e.target.value)} maxLength={1000} className="h-9 text-sm" />
                 {formDowntimes.length > 0 && (
