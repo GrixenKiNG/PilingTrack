@@ -472,7 +472,7 @@ export function ReadinessCentre(props: ReferenceUiProps) {
   // Счёт по исходу, а не «все блокеры критические»: возврат оператору и
   // подтверждение — не критический дефект, красным красится только запрет пуска.
   const blockerTones = countBlockersByTone(presentation.blockers);
-  const facts = authoritativeCurrent?.facts ?? null;
+  const facts = presentation.mode === 'inactive' ? null : authoritativeCurrent?.facts ?? null;
   const doneStages = presentation.stages.filter((stage) => stage.state === 'pass').length;
   const stageProgress = Math.round((doneStages / presentation.stages.length) * 100);
   /**

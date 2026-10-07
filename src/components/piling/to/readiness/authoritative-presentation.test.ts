@@ -1,5 +1,5 @@
 import {describe, expect, it} from 'vitest';
-import type {CurrentReadinessDto} from './api/contracts';
+import type {CurrentReadinessDto, ReadinessSnapshotDto} from './api/contracts';
 import {
   authoritativeFactsForEquipment,
   buildAuthoritativeReadinessPresentation,
@@ -45,6 +45,35 @@ function snapshot(overrides: Partial<CurrentReadinessDto> = {}): CurrentReadines
 }
 
 describe('buildAuthoritativeReadinessPresentation', () => {
+  it('hides the current verdict and score for equipment taken out of service', () => {
+    const current = {...snapshot(), equipmentActive: false};
+    const result = buildAuthoritativeReadinessPresentation(current);
+    expect(result).toMatchObject({
+      mode: 'inactive', status: 'UNCONFIRMED', outcome: 'UNCONFIRMED', score: null,
+      title: 'Выведена из работы',
+      calculatedAt: current.calculatedAt,
+    });
+    expect(result.stages.every((stage) => stage.state === 'unknown')).toBe(true);
+    expect(authoritativeFactsForEquipment([current], current.equipmentId)).toBeNull();
+    expect(current).toMatchObject({status: 'READY', score: 96, facts});
+  });
+
+  it('keeps the current verdict for active equipment and preserves the historical snapshot', () => {
+    const active = {...snapshot(), equipmentActive: true};
+    expect(buildAuthoritativeReadinessPresentation(active)).toMatchObject({
+      mode: 'authoritative', status: 'READY', score: 96,
+    });
+    const {snapshotId, ...saved} = snapshot();
+    const history: ReadinessSnapshotDto = {
+      ...saved, id: snapshotId, shiftId: null, triggerId: 'inspection-1',
+      factsHash: '00'.repeat(32),
+    };
+    expect(buildAuthoritativeReadinessPresentation(history)).toMatchObject({
+      mode: 'authoritative', status: 'READY', score: 96,
+      calculatedAt: '2026-08-08T12:00:00.000Z',
+    });
+  });
+
   it('builds READY status, five stages and evidence only from the snapshot', () => {
     const result = buildAuthoritativeReadinessPresentation(snapshot());
     expect(result).toMatchObject({

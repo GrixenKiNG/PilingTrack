@@ -98,13 +98,14 @@ export function ReportsScreen(props: ReferenceUiProps) {
     finally { setExportPending(false); }
   };
   const states = Object.values(props.readinessByEquipment);
-  const authoritative = props.currentReadiness.length > 0 ? props.currentReadiness : null;
+  const authoritative = props.currentReadiness.length > 0
+    ? props.currentReadiness.filter((item) => item.equipmentActive !== false) : null;
   const ready = authoritative
     ? authoritative.filter((item) => item.status === 'READY').length
     : states.filter((item) => item.canOperate).length;
   const readinessPercent = authoritative?.length
     ? Math.round(authoritative.reduce((sum, item) => sum + item.score, 0) / authoritative.length * 10) / 10
-    : props.authoritativeReadinessError
+    : authoritative || props.authoritativeReadinessError
       // Отказ авторитетного чтения — производный процент по журналу не
       // показываем: сервер вердикта не вынес, и число было бы выдуманным
       // (F-N1004-UNKNOWN-READINESS). Неизвестное — прочерк, а не ноль.
@@ -171,7 +172,8 @@ export function ReportsScreen(props: ReferenceUiProps) {
   // бралась именно из неё; заодно `.slice(0, 5)` молча прятал остальные.
   const fleetRows = props.equipment.map((item) => {
     const authority = props.currentReadiness.find((row) => row.equipmentId === item.id);
-    const score = authority?.score ?? props.readinessByEquipment[item.id]?.score ?? null;
+    const score = authority?.equipmentActive === false
+      ? null : authority?.score ?? props.readinessByEquipment[item.id]?.score ?? null;
     const days = usageDays(item.id);
     return {
       id: item.id,
@@ -250,7 +252,7 @@ export function ReportsScreen(props: ReferenceUiProps) {
    * причине. Ключа 'crew' среди доказательств вообще нет, эта строка была
    * равна общему числу установок при любых данных.
    */
-  const facts = props.currentReadiness.flatMap((item) => item.facts ? [item.facts] : []);
+  const facts = props.currentReadiness.flatMap((item) => item.equipmentActive !== false && item.facts ? [item.facts] : []);
   const blockerRows: Array<readonly [string, number]> = [
     ['Критический дефект', facts.filter((item) => item.criticalDefect).length],
     ['Нет осмотра за сегодня', facts.filter((item) => !item.inspectionCompleted).length],

@@ -44,7 +44,7 @@ export interface PresentationEvidence {
 }
 
 export interface AuthoritativeReadinessPresentation {
-  mode: 'authoritative' | 'historical-incomplete' | 'missing' | 'malformed';
+  mode: 'authoritative' | 'historical-incomplete' | 'missing' | 'malformed' | 'inactive';
   status: 'READY' | 'BLOCKED' | 'UNCONFIRMED';
   /**
    * Исход для человека: готова / готова с замечанием / требует решения /
@@ -166,7 +166,13 @@ function unconfirmed(
   mode: Exclude<AuthoritativeReadinessPresentation['mode'], 'authoritative'>,
   snapshot: Snapshot | null,
 ): AuthoritativeReadinessPresentation {
-  const copy = mode === 'historical-incomplete'
+  const copy = mode === 'inactive'
+    ? {
+        title: 'Выведена из работы',
+        description: 'Историческая оценка не подтверждает текущую готовность выведенной из работы установки.',
+        nextAction: 'После возврата в работу выполнить новую оценку',
+      }
+    : mode === 'historical-incomplete'
     ? {
         title: 'Исторические доказательства неполны',
         description: 'Снимок создан до сохранения точных фактов. Его балл нельзя использовать как полное доказательство решения.',
@@ -202,6 +208,7 @@ export function buildAuthoritativeReadinessPresentation(
   snapshot: Snapshot | null,
 ): AuthoritativeReadinessPresentation {
   if (!snapshot) return unconfirmed('missing', null);
+  if ('equipmentActive' in snapshot && snapshot.equipmentActive === false) return unconfirmed('inactive', snapshot);
   if (!snapshot.facts) return unconfirmed('historical-incomplete', snapshot);
 
   const evidence = evidenceRecord(snapshot.evidence);
