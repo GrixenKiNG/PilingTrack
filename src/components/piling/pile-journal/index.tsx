@@ -43,6 +43,34 @@ const SHIFT_LABEL: Record<string, string> = {
   NIGHT: 'Ночная',
 };
 
+/**
+ * Число граф журнала. Одно место правды: строка детали (раскрытая карточка сваи)
+ * растягивается на все графы через `colSpan`, и раньше число 17 было вписано
+ * там отдельно — при любой правке набора колонок карточка ломалась молча.
+ */
+export const JOURNAL_COLUMNS = 17;
+
+/**
+ * Закреплённые слева колонки-идентификаторы: «№», «Дата», «№ сваи». Смещение
+ * `left` посчитано из фактических ширин, поэтому ширина задана явно:
+ * № — 3rem, Дата — 7rem, значит «№ сваи» липнет на left: 3rem + 7rem = 10rem.
+ * Между «Дата» и «№ сваи» стоит «Смена» — она прокручивается под ними.
+ */
+const STICKY_COL = {
+  no: 'sticky left-0 w-12 min-w-12',
+  date: 'sticky left-12 w-28 min-w-28',
+  pile: 'sticky left-[10rem] w-24 min-w-24',
+} as const;
+
+/**
+ * Непрозрачный фон ячейки и тонкая правая граница: без них прокручиваемые
+ * колонки просвечивают сквозь закреплённые. Фон тела — `bg-background`, как у
+ * <main> (карточка журнала лежит на нём); у шапки — `bg-muted`, как у <thead>.
+ * Шапка закреплённых колонок держит больший z-index, чем ячейки строк.
+ */
+const STICKY_BODY = 'bg-background border-r border-border z-10';
+const STICKY_HEAD = 'bg-muted border-r border-border z-30';
+
 type StatusFilter = 'PENDING' | 'ACCEPTED' | 'NEEDS_REDRIVE' | 'ALL';
 
 const STATUS_FILTERS: Array<{ key: StatusFilter; label: string }> = [
@@ -342,14 +370,23 @@ export function PileJournal() {
       ) : null}
 
       {rows && rows.length > 0 ? (
+        /*
+         * Липкая шапка сверху (`sticky top-0`) здесь НЕ поставлена осознанно:
+         * у контейнера `overflow-x-auto` вертикальной прокрутки нет (высота по
+         * содержимому), а CSS делает такой контейнер скроллом и по оси Y — тогда
+         * `sticky top-0` липнет к нему, а не к странице, и видимого эффекта не
+         * даёт. Закрепление сделано по горизонтали — оно работает без
+         * ограничения высоты и решает главную потерю контекста (к какой свае
+         * относится строка при прокрутке вправо).
+         */
         <div className="overflow-x-auto rounded-md border border-border">
           <table className="w-full min-w-[1500px] text-2xs">
             <thead className="bg-muted">
               <tr className="text-left">
-                <Th>№</Th>
-                <Th>Дата</Th>
+                <Th className={cn(STICKY_COL.no, STICKY_HEAD)}>№</Th>
+                <Th className={cn(STICKY_COL.date, STICKY_HEAD)}>Дата</Th>
                 <Th>Смена</Th>
-                <Th>№ сваи</Th>
+                <Th className={cn(STICKY_COL.pile, STICKY_HEAD)}>№ сваи</Th>
                 <Th>Куст, пикет</Th>
                 <Th>Марка</Th>
                 <Th className="text-right">Кол-во</Th>
@@ -378,10 +415,10 @@ export function PileJournal() {
                       open && 'bg-muted/60',
                     )}
                   >
-                    <Td className="text-muted-foreground">{index + 1}</Td>
-                    <Td>{new Date(row.drivenAt).toLocaleDateString('ru-RU')}</Td>
+                    <Td className={cn(STICKY_COL.no, STICKY_BODY, 'text-muted-foreground')}>{index + 1}</Td>
+                    <Td className={cn(STICKY_COL.date, STICKY_BODY)}>{new Date(row.drivenAt).toLocaleDateString('ru-RU')}</Td>
                     <Td>{row.shiftType ? SHIFT_LABEL[row.shiftType] ?? row.shiftType : '—'}</Td>
-                    <Td className="font-semibold">{row.pileNumber ?? '—'}</Td>
+                    <Td className={cn(STICKY_COL.pile, STICKY_BODY, 'font-semibold')}>{row.pileNumber ?? '—'}</Td>
                     <Td>{row.locationName ?? '—'}</Td>
                     <Td>{row.pileGradeName}</Td>
                     {/* Количество со знаком: отрицательная запись — поправка к выработке. */}
@@ -428,7 +465,7 @@ export function PileJournal() {
                   </tr>,
                   open ? (
                     <tr key={`${row.id}-detail`} className="border-t border-border bg-card">
-                      <td colSpan={17} className="p-0">
+                      <td colSpan={JOURNAL_COLUMNS} className="p-0">
                         {row.hasPassport ? (
                           <PileDetail
                             row={row}

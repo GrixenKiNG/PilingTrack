@@ -15,7 +15,7 @@ const mocks = vi.hoisted(() => ({ authFetch: vi.fn() }));
 vi.mock('@/lib/api', () => ({ authFetch: mocks.authFetch }));
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
-import { PileJournal } from '../index';
+import { PileJournal, JOURNAL_COLUMNS } from '../index';
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
@@ -435,5 +435,55 @@ describe('журнал забивки: успешная выгрузка (W52)',
     await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Журнал выгружен'));
     expect(createObjectURL).toHaveBeenCalledTimes(1);
     expect(revokeObjectURL).toHaveBeenCalledWith('blob:mock');
+  });
+});
+
+/**
+ * W57: слева закреплены колонки-идентификаторы «№», «Дата», «№ сваи» (решение
+ * владельца 07.10, вариант 2). Диспетчер на 1366 px, прокручивая журнал вправо
+ * к «Решение»/«Пометке», терял, к какой свае относится строка. Закрепление —
+ * `sticky left-[…]` с непрозрачным фоном и правой границей (иначе строка
+ * просвечивает), а `colSpan` строки детали берётся из `JOURNAL_COLUMNS`.
+ */
+describe('журнал забивки: закрепление левых колонок (W57)', () => {
+  beforeEach(() => {
+    mocks.authFetch.mockReset();
+  });
+
+  it('«№», «Дата», «№ сваи» — sticky с непрозрачным фоном в шапке и в строке', async () => {
+    await renderJournal();
+    const table = screen.getByRole('table');
+
+    const head = within(table).getAllByRole('columnheader');
+    expect(head[0]).toHaveTextContent('№');
+    expect(head[0]).toHaveClass('sticky', 'left-0', 'bg-muted', 'z-30');
+    expect(head[1]).toHaveTextContent('Дата');
+    expect(head[1]).toHaveClass('sticky', 'left-12', 'bg-muted', 'z-30');
+    // «№ сваи» — четвёртая графа: между «Дата» и ею прокручивается «Смена».
+    expect(head[3]).toHaveTextContent('№ сваи');
+    expect(head[3]).toHaveClass('sticky', 'left-[10rem]', 'bg-muted', 'z-30');
+    // Смещение считается от фиксированных ширин: № (3rem) + Дата (7rem).
+    expect(head[0]).toHaveClass('w-12', 'min-w-12');
+    expect(head[1]).toHaveClass('w-28', 'min-w-28');
+
+    const bodyCells = within(table).getAllByRole('row')[1].querySelectorAll('td');
+    expect(bodyCells[0]).toHaveClass('sticky', 'left-0', 'bg-background');
+    expect(bodyCells[1]).toHaveClass('sticky', 'left-12', 'bg-background');
+    expect(bodyCells[3]).toHaveClass('sticky', 'left-[10rem]', 'bg-background');
+    // Непрозрачный фон без границы всё ещё пропускает соседние ячейки впритык.
+    expect(bodyCells[0]).toHaveClass('border-r');
+    expect(bodyCells[3]).toHaveClass('border-r');
+  });
+
+  it('colSpan строки детали равен JOURNAL_COLUMNS, а число граф ей соответствует', async () => {
+    await renderJournal();
+    const table = screen.getByRole('table');
+    expect(within(table).getAllByRole('columnheader')).toHaveLength(JOURNAL_COLUMNS);
+
+    fireEvent.click(screen.getByText('С-130'));
+    await screen.findByRole('button', { name: 'Принять сваю' });
+
+    const detail = table.querySelector(`td[colspan="${JOURNAL_COLUMNS}"]`);
+    expect(detail).not.toBeNull();
   });
 });
