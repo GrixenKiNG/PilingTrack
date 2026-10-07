@@ -116,12 +116,23 @@ export async function getEquipmentDetails(equipmentId: string, tenantId: string)
       })
     : [];
   const analyticsByReport = new Map(analyticsRows.map((a) => [a.reportId, a]));
-  // Match ReportAnalytics rebuild formulas only when the read model is missing.
-  const totalsForReport = (report: (typeof allReports)[number]) => analyticsByReport.get(report.reportId) ?? {
+  // J6: итоги отчёта считаем из ИСТОЧНИКА — строк PileWork/ReportDowntime,
+  // уже выбранных в reportSelect. Проекция ReportAnalytics — витрина, которая
+  // может отставать (потерянный ReportSubmitted, см. J1/J2/J4) или содержать
+  // нули у черновых отчётов; карточка же показывала её числа как факт («0
+  // свай» при живых работах). Проекцию берём ТОЛЬКО если у отчёта нет ни одной
+  // строки источника — тогда иного источника у нас нет.
+  const sourceTotals = (report: (typeof allReports)[number]) => ({
     totalPiles: report.piles.reduce((sum, pile) => sum + (pile.count || 0), 0),
     totalDrilling: report.drillings.reduce((sum, drilling) => sum + (drilling.meters || 0), 0),
     totalDowntime: report.downtimes.reduce((sum, downtime) => sum + (downtime.duration || 0), 0),
-  };
+  });
+  const hasSourceData = (report: (typeof allReports)[number]) =>
+    report.piles.length > 0 || report.drillings.length > 0 || report.downtimes.length > 0;
+  const totalsForReport = (report: (typeof allReports)[number]) =>
+    hasSourceData(report)
+      ? sourceTotals(report)
+      : (analyticsByReport.get(report.reportId) ?? sourceTotals(report));
   const stats30d = reports30d.reduce(
     (acc, r) => {
       const a = totalsForReport(r);

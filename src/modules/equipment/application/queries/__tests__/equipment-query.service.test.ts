@@ -205,18 +205,18 @@ describe('getEquipmentDetails — complete 30-day stats with existing history ca
     expect(details.timeline[0]).toMatchObject({ piles: 1, drillingMeters: 14, downtimeHours: 1 });
   });
 
-  it('preserves an existing projection even if its totals differ from current source', async () => {
+  it('prefers source totals over an existing projection that differs from current source (J6)', async () => {
     reports = [detailReport(7)];
     analyticsFindManyMock.mockResolvedValue([{ reportId: 'uuid-7', totalPiles: 0, totalDrilling: 0, totalDowntime: 0 }]);
     const { getEquipmentDetails } = await import('../equipment-query.service');
     const details = await getEquipmentDetails('equipment-1', 'orion');
-    expect(details.stats30d).toEqual({ reportCount: 1, piles: 0, pileMeters: 24, drillingCount: 3, drillingMeters: 0, downtimeHours: 0 });
-    expect(details.timeline[0]).toMatchObject({ piles: 0, drillingMeters: 0, downtimeHours: 0 });
+    // Проекция занулена, но источник жив: карточка показывает работы, а не 0.
+    expect(details.stats30d).toEqual({ reportCount: 1, piles: 2, pileMeters: 24, drillingCount: 3, drillingMeters: 18, downtimeHours: 1.5 });
+    expect(details.timeline[0]).toMatchObject({ piles: 2, drillingMeters: 18, downtimeHours: 1.5 });
     expect(analyticsFindManyMock.mock.calls[0][0].where.reportId.in).toEqual(['uuid-7']);
   });
 
-  // J6: ждёт правки Codex
-  it.fails('J6: сданный отчёт с нулевой проекцией берёт итоги из источника', async () => {
+  it('J6: сданный отчёт с нулевой проекцией берёт итоги из источника', async () => {
     reports = [detailReport(7)];
     analyticsFindManyMock.mockResolvedValue([{ reportId: 'uuid-7', totalPiles: 0, totalDrilling: 0, totalDowntime: 0 }]);
     const { getEquipmentDetails } = await import('../equipment-query.service');
