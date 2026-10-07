@@ -20,7 +20,7 @@ import { Button } from '@/components/ui/button';
 import { authFetch } from '@/lib/api';
 import { catchText, extractApiError } from '@/components/piling/admin-crews/crew-messages';
 import { cn } from '@/lib/utils';
-import { KIND_LABELS } from '../equipment-form';
+import { KIND_LABELS, withoutUnchangedHours } from '../equipment-form';
 import { EditEquipmentDialog } from '../equipment-dialogs';
 import { EquipmentPhotos } from './equipment-photos';
 import { EquipmentDocuments } from './equipment-documents';
@@ -133,7 +133,10 @@ export function EquipmentDetail({ equipmentId, embedded = false, onSaved }: Prop
     const res = await authFetch(`/api/equipment/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...payload, expectedUpdatedAt: details?.equipment.updatedAt }),
+      body: JSON.stringify({
+        ...withoutUnchangedHours(payload, details?.equipment.engineHoursTotal),
+        expectedUpdatedAt: details?.equipment.updatedAt,
+      }),
     });
     if (!res.ok) {
       if (res.status === 409) await refresh();

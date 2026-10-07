@@ -374,6 +374,26 @@ function ActiveToggle({ value, onChange }: { value: boolean; onChange: (v: boole
 // --------------------------------------------------------------------------
 
 /** Build a payload suitable for POST /api/equipment or PUT /api/equipment/[id]. */
+/**
+ * Наработку отправляем только тогда, когда её изменили.
+ *
+ * Форма карточки держит число, снятое в момент открытия. Пока диалог открыт,
+ * оператор может внести свежее показание, и без этой проверки любое другое
+ * сохранение откатывало бы наработку к старому числу — «моточасы заново
+ * появляются» (владелец 07.10.2026). `original` — значение, с которым открыли
+ * карточку.
+ */
+export function withoutUnchangedHours(
+  payload: Record<string, unknown>,
+  original: unknown,
+): Record<string, unknown> {
+  const before = typeof original === 'number' ? original : null;
+  if (payload.engineHoursTotal !== before) return payload;
+  const rest = { ...payload };
+  delete rest.engineHoursTotal;
+  return rest;
+}
+
 export function formStateToPayload(state: EquipmentFormState): Record<string, unknown> {
   const num = (s: string) => (s.trim() === '' ? null : Number(s));
   const str = (s: string) => (s.trim() === '' ? null : s.trim());

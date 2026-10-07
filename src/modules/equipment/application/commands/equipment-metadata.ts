@@ -93,8 +93,20 @@ export async function updateEquipmentMetadata(
   // Обнуление поля («наработка неизвестна») показанием не является и пишется
   // по-прежнему напрямую.
   const hours = data.engineHoursTotal;
-  const recordAsReading = typeof hours === 'number';
+  let recordAsReading = typeof hours === 'number';
   if (recordAsReading) delete data.engineHoursTotal;
+
+  // Та же цифра, что уже стоит у установки, — не показание. Форма карточки шлёт
+  // наработку при КАЖДОМ сохранении: без этой проверки правка любого другого
+  // поля писала бы устаревшее число новым последним показанием поверх свежих
+  // показаний оператора — и наработка «откатывалась» (владелец 07.10.2026).
+  if (recordAsReading) {
+    const current = await (tx ?? db).equipment.findFirst({
+      where: { id: equipmentId, tenantId: ctx.tenantId },
+      select: { engineHoursTotal: true },
+    });
+    if (current?.engineHoursTotal === hours) recordAsReading = false;
+  }
 
   const wroteMetadata = Object.keys(data).length > 0;
   if (wroteMetadata) {

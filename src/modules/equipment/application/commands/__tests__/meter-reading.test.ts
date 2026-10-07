@@ -7,8 +7,8 @@ const {
   findUniqueEquipmentMock: vi.fn(),
   findFirstMock: vi.fn(),
   createReadingMock: vi.fn(),
-  // Кэш наработки Equipment.engineHoursTotal обновляется запросом самой базы
-  // (GREATEST / MAX), а не прочитанным в JS значением — см. F-R38-4.
+  // Кэш наработки Equipment.engineHoursTotal = последнее показание; его считает
+  // сама база под блокировкой строки установки, а не значение из JS.
   executeRawMock: vi.fn(),
   // Показание меняет наработку — вход критерия готовности «Моточасы», поэтому
   // команда заказывает пересчёт снимка в той же транзакции.
@@ -77,15 +77,33 @@ describe('addMeterReading', () => {
     await expect(addMeterReading('eq_1', { engineHours: 1.5 }, { tenantId: 'orion' })).rejects.toThrow();
   });
 
-  it('двигает кэш наработки монотонно, запросом самой базы (GREATEST)', async () => {
+  it('блокирует строку установки до записи показания, потом ставит кэш по последнему показанию', async () => {
     findFirstMock.mockResolvedValueOnce(null);
     await addMeterReading('eq_1', { engineHours: 5670 }, { tenantId: 'orion' });
-    const call = executeRawMock.mock.calls[0];
-    const sql = sqlOf(call);
+    const [lock, sync] = executeRawMock.mock.calls;
+    expect(sqlOf(lock)).toMatch(/FROM "Equipment"\s+WHERE id = \? AND "tenantId" = \?\s+FOR UPDATE/);
+    expect(lock.slice(1)).toEqual(['eq_1', 'orion']);
+    const sql = sqlOf(sync);
     expect(sql).toMatch(/UPDATE "Equipment"/);
-    expect(sql).toMatch(/SET "engineHoursTotal" = GREATEST\(COALESCE\("engineHoursTotal", 0\), \?\)/);
+    expect(sql).toMatch(/SET "engineHoursTotal" = \(\s+SELECT m\."engineHours" FROM "MeterReading" m/);
+    expect(sql).toMatch(/ORDER BY m\."recordedAt" DESC, m\."createdAt" DESC/);
     expect(sql).toMatch(/WHERE id = \? AND "tenantId" = \?/);
-    expect(call.slice(1)).toEqual([5670, 'eq_1', 'orion']);
+    expect(sync.slice(1)).toEqual(['eq_1', 'orion', 'eq_1', 'orion']);
+    // Блокировка раньше записи показания, пересчёт — после.
+    expect(executeRawMock.mock.invocationCallOrder[0]).toBeLessThan(createReadingMock.mock.invocationCallOrder[0]);
+    expect(createReadingMock.mock.invocationCallOrder[0]).toBeLessThan(executeRawMock.mock.invocationCallOrder[1]);
+  });
+
+  // Владелец 07.10.2026: «нельзя заменить моточасы, после смены они заново
+  // появляются». Кэш держал максимум (GREATEST): замена счётчика и правка в
+  // карточке не снижали наработку, а новое показание возвращало старую цифру.
+  it('кэш наработки не держит максимум: правка вниз и показание после неё не возвращают старую цифру', async () => {
+    findFirstMock.mockResolvedValueOnce({ engineHours: 99999 }).mockResolvedValueOnce({ engineHours: 3000 });
+    await addMeterReading('eq_1', { engineHours: 3000 }, { tenantId: 'orion', allowDecrease: true });
+    for (const call of executeRawMock.mock.calls) expect(sqlOf(call)).not.toMatch(/GREATEST|MAX\(/);
+    expect(createReadingMock).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ engineHours: 3000 }),
+    }));
   });
 
   it('отклоняет показание ниже предыдущего и ничего не пишет', async () => {
@@ -94,7 +112,9 @@ describe('addMeterReading', () => {
       addMeterReading('eq_1', { engineHours: 5800 }, { tenantId: 'orion' }),
     ).rejects.toThrow(/меньше предыдущего/);
     expect(createReadingMock).not.toHaveBeenCalled();
-    expect(executeRawMock).not.toHaveBeenCalled();
+    // Только блокировка строки; кэш не пересчитывался.
+    expect(executeRawMock).toHaveBeenCalledTimes(1);
+    expect(sqlOf(executeRawMock.mock.calls[0])).toMatch(/FOR UPDATE/);
   });
 
   it('разрешает снижение с предупреждением, когда счётчик заменили', async () => {
@@ -166,14 +186,16 @@ describe('deleteMeterReading', () => {
     findUniqueReadingMock.mockResolvedValue({ id: 'rd_1', equipmentId: 'eq_1', tenantId: 'orion' });
   });
 
-  it('пересчитывает кэш наработки максимумом оставшихся показаний в той же транзакции', async () => {
+  it('пересчитывает кэш наработки по последнему из оставшихся показаний в той же транзакции', async () => {
     await deleteMeterReading('eq_1', 'rd_1', { tenantId: 'orion' });
     expect(deleteReadingMock).toHaveBeenCalledWith({ where: { id: 'rd_1' } });
-    const call = executeRawMock.mock.calls[0];
-    const sql = sqlOf(call);
-    expect(sql).toMatch(/SELECT MAX\("engineHours"\) FROM "MeterReading"/);
-    expect(sql).toMatch(/WHERE "equipmentId" = \? AND "tenantId" = \?/);
-    expect(call.slice(1)).toEqual(['eq_1', 'orion', 'eq_1', 'orion']);
+    const [lock, sync] = executeRawMock.mock.calls;
+    expect(sqlOf(lock)).toMatch(/FOR UPDATE/);
+    const sql = sqlOf(sync);
+    expect(sql).toMatch(/SELECT m\."engineHours" FROM "MeterReading" m/);
+    expect(sql).toMatch(/ORDER BY m\."recordedAt" DESC, m\."createdAt" DESC/);
+    expect(sql).not.toMatch(/MAX\(/);
+    expect(sync.slice(1)).toEqual(['eq_1', 'orion', 'eq_1', 'orion']);
   });
 
   it('чужое показание (другой tenant) не удаляет', async () => {

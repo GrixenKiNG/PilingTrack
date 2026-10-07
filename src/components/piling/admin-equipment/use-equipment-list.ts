@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { authFetch } from '@/lib/api';
 import { extractApiError } from '@/components/piling/admin-crews/crew-messages';
 import type { EquipmentDTO } from '@/lib/types';
+import { withoutUnchangedHours } from './equipment-form';
 
 /**
  * Owns the equipment list, its derived per-equipment crew counts, and the
@@ -84,7 +85,10 @@ export function useEquipmentList() {
     const res = await authFetch(`/api/equipment/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...payload, expectedUpdatedAt: equipment.find((e) => e.id === id)?.updatedAt }),
+      body: JSON.stringify({
+        ...withoutUnchangedHours(payload, equipment.find((e) => e.id === id)?.engineHoursTotal),
+        expectedUpdatedAt: equipment.find((e) => e.id === id)?.updatedAt,
+      }),
     });
     if (!res.ok) {
       if (res.status === 409) await reloadCard(id);

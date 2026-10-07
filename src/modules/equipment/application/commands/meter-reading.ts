@@ -2,9 +2,12 @@
  * MeterReading — журнал показаний наработки (моточасы).
  *
  * Источник истины наработки — история показаний. Equipment.engineHoursTotal
- * остаётся денормализованным кэшем наработки и синхронизируется здесь на каждое
- * добавление/удаление запросом самой базы: кэш монотонно растёт (GREATEST), а
- * при удалении показания пересчитывается как максимум оставшихся.
+ * остаётся денормализованным кэшем и ВСЕГДА равен последнему показанию
+ * (по recordedAt, затем createdAt) — тому же, с которым сверяется следующее.
+ * Раньше кэш держал максимум (GREATEST): замена счётчика и правка наработки в
+ * карточке «не сохранялись» — старая большая цифра возвращалась после любого
+ * нового показания (владелец 07.10.2026). Кэш пересчитывается запросом самой
+ * базы под блокировкой строки установки на каждое добавление и удаление.
  *
  * Монотонность форсируется для тех, кто снимает показание с машины: счётчик
  * назад не идёт, и цифра меньше предыдущей — это опечатка, а не событие.
@@ -90,32 +93,29 @@ async function latestReading(
 }
 
 /**
- * Кэш наработки двигает сама база, одним оператором: GREATEST(текущее, новое).
+ * Блокировка строки установки на время записи показания.
  *
- * Считанное в JS значение здесь не годится: между чтением и записью чужая
- * транзакция успевает закоммитить большее показание, и кэш получает старое —
- * наработка «идёт назад» вместе с порогами ТО (аудит F-R38-4). Tenant в
+ * Две одновременные записи по одной установке выстраиваются в очередь: вторая
+ * видит уже закоммиченное показание первой, и кэш не остаётся на старой цифре
+ * (аудит F-R38-4 — тот же риск, который раньше закрывал GREATEST). Tenant в
  * условии — строгим равенством (IDOR guard).
  */
-async function bumpEngineHoursTotal(
-  tx: typeof db,
-  equipmentId: string,
-  tenantId: string,
-  engineHours: number,
-): Promise<void> {
+async function lockEquipmentRow(tx: typeof db, equipmentId: string, tenantId: string): Promise<void> {
   await tx.$executeRaw`
-    UPDATE "Equipment"
-    SET "engineHoursTotal" = GREATEST(COALESCE("engineHoursTotal", 0), ${engineHours})
+    SELECT 1 FROM "Equipment"
     WHERE id = ${equipmentId} AND "tenantId" = ${tenantId}
+    FOR UPDATE
   `;
 }
 
 /**
- * Кэш после удаления показания — максимум оставшихся, посчитанный базой в той
- * же транзакции. Чтение в JS взяло бы снимок, снятый до удаления (аудит F-R38-4);
- * нет ни одного показания — кэш пуст, как и раньше.
+ * Кэш наработки = последнее показание, посчитанное базой в той же транзакции.
+ *
+ * Порядок тот же, что у `latestReading`: recordedAt, затем createdAt. Показаний
+ * нет — кэш пуст. Выполняется после блокировки строки установки, поэтому
+ * видит все закоммиченные показания.
  */
-async function recomputeEngineHoursTotal(
+async function syncEngineHoursTotal(
   tx: typeof db,
   equipmentId: string,
   tenantId: string,
@@ -123,8 +123,10 @@ async function recomputeEngineHoursTotal(
   await tx.$executeRaw`
     UPDATE "Equipment"
     SET "engineHoursTotal" = (
-      SELECT MAX("engineHours") FROM "MeterReading"
-      WHERE "equipmentId" = ${equipmentId} AND "tenantId" = ${tenantId}
+      SELECT m."engineHours" FROM "MeterReading" m
+      WHERE m."equipmentId" = ${equipmentId} AND m."tenantId" = ${tenantId}
+      ORDER BY m."recordedAt" DESC, m."createdAt" DESC, m.id DESC
+      LIMIT 1
     )
     WHERE id = ${equipmentId} AND "tenantId" = ${tenantId}
   `;
@@ -184,6 +186,10 @@ export async function recordMeterReadingInTx(
   const recordedAt = toDate(input.recordedAt) ?? new Date();
   const note = input.note?.trim() ?? '';
 
+  // Строка установки заблокирована до конца транзакции: проверка «назад не идёт»
+  // и пересчёт кэша видят одно и то же состояние журнала.
+  await lockEquipmentRow(tx, equipmentId, ctx.tenantId);
+
   // Повтор запроса не должен плодить показания: если у машины уже есть
   // показание с тем же значением и той же пометкой-идентификатором события
   // (сменный отчёт за дату), вторую запись не создаём. Значение другое —
@@ -217,10 +223,9 @@ export async function recordMeterReadingInTx(
     select: { id: true, engineHours: true, recordedAt: true },
   });
 
-  // Sync the engineHoursTotal cache. The write goes to the database itself
-  // (GREATEST), so a concurrent reading that commits a larger value cannot be
-  // overwritten by an older one read in JS before this transaction committed.
-  await bumpEngineHoursTotal(tx, equipmentId, ctx.tenantId, input.engineHours);
+  // Кэш наработки — последнее показание (в том числе меньшее прежнего: замена
+  // счётчика, правка в карточке). Считает сама база, не значение из JS.
+  await syncEngineHoursTotal(tx, equipmentId, ctx.tenantId);
 
   // Наработка — 15 баллов готовности и вход в расчёт просрочки ТО, поэтому
   // новое показание обязано пересчитать снимок. Заказываем в этой же
@@ -272,9 +277,10 @@ export async function deleteMeterReading(
   }
 
   await db.$transaction(async (tx) => {
+    await lockEquipmentRow(tx as typeof db, equipmentId, ctx.tenantId);
     await tx.meterReading.delete({ where: { id: readingId } });
-    // Кэш пересчитывает база в той же транзакции: максимум оставшихся показаний.
-    await recomputeEngineHoursTotal(tx as typeof db, equipmentId, ctx.tenantId);
+    // Кэш пересчитывает база в той же транзакции: последнее из оставшихся показаний.
+    await syncEngineHoursTotal(tx as typeof db, equipmentId, ctx.tenantId);
     // Удаление ошибочного показания меняет наработку так же, как ввод нового.
     await requestReadinessSnapshot(tx as typeof db, {
       tenantId: ctx.tenantId,
