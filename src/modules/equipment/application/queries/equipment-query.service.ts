@@ -11,10 +11,12 @@ import { requireTenantId } from '@/lib/tenant-scope';
 const MAINTENANCE_LIST_LIMIT = 500;
 
 export async function getAccessibleEquipment(tenantId: string) {
+  if (!tenantId) throw new ServiceError('Не определена организация пользователя', 400); // fail-closed (IDOR guard)
   return db.equipment.findMany({ where: { isActive: true, tenantId }, orderBy: { name: 'asc' } });
 }
 
 export async function getEquipmentById(id: string, tenantId: string) {
+  if (!tenantId) throw new ServiceError('Не определена организация пользователя', 400); // fail-closed (IDOR guard)
   return db.equipment.findUnique({
     where: { id, tenantId },
     include: { crews: { select: { id: true, name: true, siteId: true } } },
@@ -22,6 +24,7 @@ export async function getEquipmentById(id: string, tenantId: string) {
 }
 
 export async function getEquipmentByIdOrThrow(id: string, tenantId: string) {
+  if (!tenantId) throw new ServiceError('Не определена организация пользователя', 400); // fail-closed (IDOR guard)
   const equipment = await db.equipment.findUnique({
     where: { id, tenantId },
     include: {
@@ -39,6 +42,7 @@ export async function getEquipmentByIdOrThrow(id: string, tenantId: string) {
 }
 
 export async function listEquipmentWithCrewCounts(tenantId: string) {
+  if (!tenantId) throw new ServiceError('Не определена организация пользователя', 400); // fail-closed (IDOR guard)
   const list = await db.equipment.findMany({
     where: { tenantId },
     include: { crews: { where: { isActive: true } } },
@@ -61,6 +65,7 @@ export async function listEquipmentWithCrewCounts(tenantId: string) {
  * Rich snapshot for /admin/equipment/[id].
  */
 export async function getEquipmentDetails(equipmentId: string, tenantId: string) {
+  if (!tenantId) throw new ServiceError('Не определена организация пользователя', 400); // fail-closed (IDOR guard)
   const equipment = await db.equipment.findUnique({
     where: { id: equipmentId, tenantId },
     include: {
@@ -204,6 +209,7 @@ export async function getEquipmentDetails(equipmentId: string, tenantId: string)
 }
 
 export async function listEquipmentCatalog(tenantId: string) {
+  if (!tenantId) throw new ServiceError('Не определена организация пользователя', 400); // fail-closed (IDOR guard)
   return db.equipment.findMany({ where: { tenantId }, orderBy: { name: 'asc' } });
 }
 
@@ -211,6 +217,7 @@ export async function listEquipmentCatalog(tenantId: string) {
  * Журнал ТО/ремонтов установки
  */
 export async function listMaintenance(equipmentId: string, tenantId: string) {
+  if (!tenantId) throw new ServiceError('Не определена организация пользователя', 400); // fail-closed (IDOR guard)
   return db.maintenanceRecord.findMany({
     where: { equipmentId, tenantId },
     orderBy: [{ status: 'asc' }, { scheduledAt: 'desc' }, { createdAt: 'desc' }],

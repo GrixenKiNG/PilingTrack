@@ -48,6 +48,12 @@ import {
   listMaintenance,
   listMaintenancePlans,
   getFleetKpiData,
+  getAccessibleEquipment,
+  getEquipmentById,
+  getEquipmentByIdOrThrow,
+  listEquipmentWithCrewCounts,
+  getEquipmentDetails,
+  listEquipmentCatalog,
 } from '../equipment-query.service';
 
 describe('listAllEquipment — operator scope', () => {
@@ -292,6 +298,7 @@ describe('getEquipmentDetails — complete 30-day stats with existing history ca
  */
 describe('equipment-query — tenant fail-closed guards (W52)', () => {
   beforeEach(() => {
+    findManyMock.mockReset().mockResolvedValue([]);
     meterReadingFindManyMock.mockReset().mockResolvedValue([]);
     meterReadingFirstMock.mockReset().mockResolvedValue(null);
     fuelLogFindManyMock.mockReset().mockResolvedValue([]);
@@ -308,17 +315,23 @@ describe('equipment-query — tenant fail-closed guards (W52)', () => {
     ['getFuelSummary', () => getFuelSummary('eq-1', '', new Date('2026-10-01'), new Date('2026-10-07')), equipmentUniqueMock],
     ['listMaintenancePlans', () => listMaintenancePlans(''), planFindManyMock],
     ['getFleetKpiData', () => getFleetKpiData('', new Date('2026-10-01'), new Date('2026-10-07')), findManyRecMock],
+    // W55: остальные функции файла с обязательным tenantId тоже получили гвард.
+    ['listEquipmentCatalog', () => listEquipmentCatalog(''), findManyMock],
+    ['listEquipmentWithCrewCounts', () => listEquipmentWithCrewCounts(''), findManyMock],
+    ['getAccessibleEquipment', () => getAccessibleEquipment(''), findManyMock],
+    ['getEquipmentById', () => getEquipmentById('eq-1', ''), equipmentUniqueMock],
+    ['getEquipmentByIdOrThrow', () => getEquipmentByIdOrThrow('eq-1', ''), equipmentUniqueMock],
+    ['getEquipmentDetails', () => getEquipmentDetails('eq-1', ''), equipmentUniqueMock],
   ])('%s: пустой tenantId → ServiceError, запрос к базе не выполнен', async (_name, call, dbSpy) => {
     await expect(call()).rejects.toThrow('Не определена организация пользователя');
     expect(dbSpy).not.toHaveBeenCalled();
   });
 
   /**
-   * Дефект, вскрытый этим тестом (не чиним — вне задачи): в отличие от
-   * остальных листингов, `listMaintenance` не имеет гварда `if (!tenantId)`,
-   * хотя назван в задаче W52. С пустым tenantId он уходит в базу.
+   * W55: `listMaintenance` раньше не имел гварда `if (!tenantId)` и с пустым
+   * tenantId уходил в базу. Теперь отказывает, как соседние листинги.
    */
-  it.fails('listMaintenance: пустой tenantId → отказ (гварда нет — дефект)', async () => {
+  it('listMaintenance: пустой tenantId → отказ', async () => {
     await expect(listMaintenance('eq-1', '')).rejects.toThrow('Не определена организация пользователя');
     expect(findManyRecMock).not.toHaveBeenCalled();
   });
