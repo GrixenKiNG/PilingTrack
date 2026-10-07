@@ -618,10 +618,10 @@ export function ReadinessCentre(props: ReferenceUiProps) {
           <HardHat className="mx-auto h-9 w-9 text-muted-foreground" />
           <h1 className="mt-3 text-lg font-bold">Установки не найдены</h1>
           <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-            Добавьте установку в модуле «Оборудование» или повторите загрузку, если данные появились недавно.
+            Добавьте установку в модуле «Установки» или повторите загрузку, если данные появились недавно.
           </p>
           <div className="mt-5 flex flex-wrap justify-center gap-2">
-            <Button asChild variant="outline"><Link href="/admin/equipment">Открыть оборудование</Link></Button>
+            <Button asChild variant="outline"><Link href="/admin/equipment">Открыть установки</Link></Button>
             <Button type="button" onClick={props.onRetry}>Повторить</Button>
           </div>
         </div>

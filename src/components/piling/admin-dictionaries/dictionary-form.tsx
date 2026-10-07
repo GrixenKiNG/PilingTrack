@@ -14,6 +14,14 @@ import type { DictionaryKind, RegistryItem } from './dictionary-table';
 const MAX_NAME_LENGTH = 100;
 const MAX_LENGTH_MM = 1_000_000;
 
+/* Заголовок диалога называет предмет: на вкладке «Сваи» ждут «марку сваи»,
+   а не безликий «элемент» (W72 №15). */
+const DIALOG_TITLE: Record<DictionaryKind, { create: string; rename: string }> = {
+  pileGrade: { create: 'Новая марка сваи', rename: 'Переименовать марку сваи' },
+  drillingType: { create: 'Новый тип бурения', rename: 'Переименовать тип бурения' },
+  downtimeReason: { create: 'Новая причина простоя', rename: 'Переименовать причину простоя' },
+};
+
 export interface DictionaryFormValue {
   name: string;
   code?: string;
@@ -62,7 +70,7 @@ export function DictionaryForm({ mode, kind, item, saving, onClose, onSubmit }: 
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent aria-describedby={undefined} className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{mode === 'create' ? 'Добавить элемент' : 'Переименовать элемент'}</DialogTitle>
+          <DialogTitle>{DIALOG_TITLE[kind][mode]}</DialogTitle>
         </DialogHeader>
         <div className="grid gap-3 py-1">
           <label className="grid gap-1.5 text-sm font-medium text-foreground">

@@ -412,7 +412,7 @@ export function AdminAnalytics() {
           ) : trendsLoading ? (
             <Skeleton className="h-80 w-full" />
           ) : trendChartData.length === 0 ? (
-            <EmptyState text="Нет данных по неделям. Проекция SiteWeeklyTrend заполняется автоматически по мере поступления отчётов." />
+            <EmptyState text="Нет данных за недели. Числа появятся, когда поступят отчёты." />
           ) : sectionVisible('chart-trends') ? (
             <Card className="gap-2 py-3">
               <CardHeader>

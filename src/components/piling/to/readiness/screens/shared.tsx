@@ -185,8 +185,8 @@ export function ReadinessFiltersBar({filters, onChange, mode}: {
             </Select>
           </label>
           <label className="grid gap-1 text-2xs text-muted-foreground">
-            Актор
-            <Input aria-label="Актор" value={filters.actor ?? ''} onChange={(event) => update('actor', event.target.value, 300)} className="h-9 w-[170px]" />
+            Кто изменил
+            <Input aria-label="Кто изменил" placeholder="Имя или должность" value={filters.actor ?? ''} onChange={(event) => update('actor', event.target.value, 300)} className="h-9 w-[170px]" />
           </label>
         </>
       )}

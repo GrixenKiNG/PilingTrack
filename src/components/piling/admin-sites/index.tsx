@@ -341,7 +341,7 @@ export function AdminSites() {
           getRowId={(r) => r.siteId}
           activeId={active?.siteId ?? null}
           onRowSelect={(r) => setActiveId(r.siteId)}
-          empty={<OpsTableEmpty icon={MapPin} title="Объекты не найдены" hint="Измените быстрый фильтр." />}
+          empty={<OpsTableEmpty icon={MapPin} title={allRows.length === 0 ? 'Объектов пока нет' : 'Объекты не найдены'} hint={allRows.length === 0 ? 'Заведите первый кнопкой «Новый объект».' : 'Измените быстрый фильтр.'} />}
         />
       </OpsPage>
 
@@ -525,7 +525,7 @@ function SiteCrewBoard({ crews, error }: { crews?: SiteCrew[]; error?: boolean }
       </h3>
 
       {crews === undefined && error ? (
-        <p className="text-2xs text-destructive-strong">Не удалось загрузить состав бригад — повторите в блоке «Иерархия».</p>
+        <p className="text-2xs text-destructive-strong">Состав бригад не загрузился — обновите страницу.</p>
       ) : null}
       {crews === undefined && !error ? <p className="text-2xs text-muted-foreground">Загрузка…</p> : null}
       {crews?.length === 0 ? (

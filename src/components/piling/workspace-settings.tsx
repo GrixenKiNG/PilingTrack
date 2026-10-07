@@ -398,7 +398,7 @@ function TemplatesTab() {
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Card><CardHeader><CardTitle className="flex items-center gap-2 text-base"><LayoutTemplate className="h-4 w-4 text-signal-strong" />Плитки установок (мониторинг)</CardTitle><CardDescription>Блоки, размер и фото карточки на экране мониторинга.</CardDescription></CardHeader><CardContent>{isAdmin ? <EquipmentTileTemplateSettings /> : <p className="text-sm text-muted-foreground">Настройка плиток доступна администратору.</p>}</CardContent></Card>
-        <Card><CardHeader><CardTitle className="flex items-center gap-2 text-base"><LayoutGrid className="h-4 w-4 text-signal-strong" />Карточки оборудования</CardTitle><CardDescription>Индивидуальная раскладка карточек в модуле «Оборудование».</CardDescription></CardHeader><CardContent><Button variant="outline" className="w-full justify-start" asChild><a href="/admin/equipment"><LayoutGrid className="mr-2 h-4 w-4" />Открыть «Конструктор»</a></Button></CardContent></Card>
+        <Card><CardHeader><CardTitle className="flex items-center gap-2 text-base"><LayoutGrid className="h-4 w-4 text-signal-strong" />Карточки установок</CardTitle><CardDescription>Индивидуальная раскладка карточек в модуле «Установки».</CardDescription></CardHeader><CardContent><Button variant="outline" className="w-full justify-start" asChild><a href="/admin/equipment"><LayoutGrid className="mr-2 h-4 w-4" />Открыть «Конструктор»</a></Button></CardContent></Card>
       </div>
     </div>
   );

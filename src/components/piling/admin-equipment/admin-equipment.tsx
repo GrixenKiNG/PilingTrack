@@ -108,7 +108,7 @@ export function AdminEquipment() {
         </div>
         {canManage && <div className="flex gap-2">
           <Button onClick={() => setShowCreate(true)} className="min-h-11 bg-signal text-white hover:bg-signal-strong sm:min-h-9">
-            <PilingIcon name="add" size={16} decorative className="mr-1 !text-white" /> Добавить
+            <PilingIcon name="add" size={16} decorative className="mr-1 !text-white" /> Добавить установку
           </Button>
         </div>}
       </div>
@@ -136,7 +136,7 @@ export function AdminEquipment() {
             <div className="py-16 text-center">
               <PilingIcon name="equipment-rig" size={48} decorative className="mx-auto mb-3 opacity-40" />
               <p className="text-sm text-muted-foreground">
-                {cards.length === 0 ? 'Нет установок' : 'Нет установок под выбранные фильтры'}
+                {cards.length === 0 ? 'В парке нет установок. Добавьте первую' : 'Нет установок под выбранные фильтры'}
               </p>
               {filters !== EMPTY_FILTERS && (
                 <button onClick={() => setFilters(EMPTY_FILTERS)} className="mt-2 inline-flex min-h-11 items-center text-xs text-info-strong underline sm:min-h-0">

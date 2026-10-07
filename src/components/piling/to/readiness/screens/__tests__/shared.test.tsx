@@ -26,7 +26,7 @@ describe('ReadinessFiltersBar: audit mode debounce and dropdown (R125 №6, №7
       />
     );
 
-    fireEvent.change(screen.getByLabelText('Актор'), { target: { value: 'test-actor' } });
+    fireEvent.change(screen.getByLabelText('Кто изменил'), { target: { value: 'test-actor' } });
 
     expect(mockOnChange).not.toHaveBeenCalled();
 

@@ -53,7 +53,7 @@ export const SAFETY_TABS = [
   { id: 'briefings', label: 'Журнал инструктажей', icon: 'documents' },
   { id: 'instructions', label: 'Инструкции и регламенты', icon: 'reports' },
   { id: 'knowledge', label: 'Проверка знаний', icon: 'accepted' },
-  { id: 'incidents', label: 'Нарушения и инциденты', icon: 'defect' },
+  { id: 'incidents', label: 'Происшествия', icon: 'defect' },
   // «Документы» и «Наряд-допуски» на макете отдельными вкладками не значились,
   // но это работающие экраны с живыми данными: срок удостоверения и реестр
   // нарядов. Убрать их значило бы потерять готовое ради сходства картинки.

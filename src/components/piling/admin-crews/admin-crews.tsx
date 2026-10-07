@@ -209,7 +209,7 @@ export function AdminCrews() {
       subtitle="Сменные назначения: оператор, помощники, установка, объект"
       actions={canManage &&
         <Button onClick={() => setShowCreate(true)} className="h-11 bg-signal text-white hover:bg-signal-strong sm:h-10">
-          <Plus className="mr-1.5 h-4 w-4" />Добавить
+          <Plus className="mr-1.5 h-4 w-4" />Добавить бригаду
         </Button>
       }
     />

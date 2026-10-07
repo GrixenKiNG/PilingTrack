@@ -252,13 +252,13 @@ describe('AdminDictionaries: диалоги ограничены по высот
   const contentOf = (title: string | RegExp) =>
     screen.getByText(title).closest('[data-slot="dialog-content"]');
 
-  it('форма «Добавить элемент» ограничена 90vh и прокручивается', async () => {
+  it('форма «Новая марка сваи» ограничена 90vh и прокручивается', async () => {
     render(<AdminDictionaries />);
     await screen.findByText('СВ 120-35');
 
     fireEvent.click(screen.getByRole('button', { name: 'Добавить марку сваи' }));
 
-    expect(contentOf('Добавить элемент')).toHaveClass('max-h-[90vh]', 'overflow-y-auto');
+    expect(contentOf('Новая марка сваи')).toHaveClass('max-h-[90vh]', 'overflow-y-auto');
   });
 
   it('диалог «Длина сваи» ограничен 90vh и прокручивается', async () => {
