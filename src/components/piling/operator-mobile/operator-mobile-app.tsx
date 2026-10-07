@@ -871,7 +871,7 @@ export function OperatorMobileApp() {
     if (checklist) {
       return (
         <ChecklistScreen
-          key={checklist.stage}
+          key={`${state.shift?.id}:${state.assignment?.equipmentId}:${checklist.stage}`}
           checklist={checklist}
           warnings={state.warnings}
           onSubmit={submitChecklist(checklist.stage)}
@@ -1095,4 +1095,3 @@ function ShiftMissingScreen({onReload}: {onReload: () => void}) {
     </Screen>
   );
 }
-

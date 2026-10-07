@@ -655,7 +655,7 @@ function ScreenSafetyChecklists({state, busy, error, commandId, onSubmit, go}: {
   if (opened) {
     return (
       <ChecklistScreen
-        key={opened.stage}
+        key={`${state.shift?.id}:${state.assignment?.equipmentId}:${opened.stage}`}
         checklist={opened}
         warnings={state.warnings}
         busy={busy}
@@ -1581,7 +1581,7 @@ export function OperatorV10App() {
       if (!list) return <Card><Nodata>Список «{stage}» не пришёл с сервера — обновите экран</Nodata></Card>;
       return (
         <ChecklistScreen
-          key={list.stage}
+          key={`${current.shift?.id}:${current.assignment?.equipmentId}:${list.stage}`}
           checklist={list}
           warnings={current.warnings}
           busy={busy}

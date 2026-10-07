@@ -595,6 +595,7 @@ function ChecklistDetour({state, stage, busy, onSubmit, onBack, commandId}: {
   }
   return (
     <ChecklistFlow
+      key={`${state.shift?.id}:${state.assignment?.equipmentId}:${checklist.stage}`}
       commandId={commandId}
       checklist={checklist} warnings={state.warnings}
       busy={busy}
@@ -604,5 +605,4 @@ function ChecklistDetour({state, stage, busy, onSubmit, onBack, commandId}: {
     />
   );
 }
-
 

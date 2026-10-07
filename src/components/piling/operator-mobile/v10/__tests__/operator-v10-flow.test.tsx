@@ -5,7 +5,7 @@
  * «Сдать ЕО после работы — ничего не происходит», «не показывает моточасы
  * прошлой смены». Каждый тест — одна из этих жалоб.
  */
-import {fireEvent, render, screen, waitFor} from '@testing-library/react';
+import {act, fireEvent, render, screen, waitFor} from '@testing-library/react';
 import {beforeEach, describe, expect, it, vi} from 'vitest';
 import type {OperatorMobileState} from '@/modules/operator-mobile/contracts';
 
@@ -200,6 +200,29 @@ describe('v10: отказ сервера виден, введённое не п�
 });
 
 describe('v10: ЕО после работы', () => {
+  it('не переносит пометку замены счётчика и замер при обновлении на другую смену', async () => {
+    const closing = makeState('CLOSING', ['PRESHIFT_INSPECTION', 'SITE_READY', 'EO_BEFORE']);
+    api.fetchState.mockResolvedValue(closing);
+    render(<OperatorV10App />);
+    fireEvent.click(await screen.findByRole('button', {name: 'Дальше: ЕО после работы и закрытие смены'}));
+    fireEvent.click(await screen.findByRole('button', {name: /Узел/, expanded: false}));
+    fireEvent.click(screen.getByRole('button', {name: 'Норма'}));
+    fireEvent.change(screen.getByRole('spinbutton'), {target: {value: '99'}});
+    fireEvent.click(screen.getByRole('checkbox', {name: 'Счётчик заменён'}));
+    expect(screen.getByRole('checkbox', {name: 'Счётчик заменён'})).toBeChecked();
+
+    const next = makeState('CLOSING', ['PRESHIFT_INSPECTION', 'SITE_READY', 'EO_BEFORE']);
+    next.shift = {id: 'shift-2', productionDate: '2026-09-28', state: 'HANDOVER_PENDING', startedAt: null};
+    api.fetchState.mockResolvedValue(next);
+    await act(async () => { fireEvent.click(screen.getByRole('button', {name: 'Обновить'})); });
+    expect(api.fetchState).toHaveBeenCalledTimes(2);
+    const section = screen.queryByRole('button', {name: /Узел/, expanded: false});
+    if (section) fireEvent.click(section);
+    expect(screen.getByRole('checkbox', {name: 'Счётчик заменён'})).not.toBeChecked();
+    expect(screen.getByRole('spinbutton')).toHaveValue(null);
+    expect(api.sendCommand).not.toHaveBeenCalled();
+  });
+
   it('открывается шагом, показывает прошлые моточасы и после сдачи ведёт к закрытию', async () => {
     const closing = makeState('CLOSING', ['PRESHIFT_INSPECTION', 'SITE_READY', 'EO_BEFORE']);
     api.fetchState.mockResolvedValue(closing);

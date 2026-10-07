@@ -958,6 +958,7 @@ export function OperatorShiftV2() {
     return (
       <StepShell bar={stepBar} title={V2_STEP_TITLE[step]} subtitle={stepLabel}>
         <ChecklistScreen
+          key={`${mobile.shift?.id}:${mobile.assignment?.equipmentId}:${list.stage}`}
           checklist={list}
           warnings={mobile.warnings}
           busy={busy}
@@ -1292,4 +1293,3 @@ export function OperatorShiftV2() {
     </StepShell>
   );
 }
-
