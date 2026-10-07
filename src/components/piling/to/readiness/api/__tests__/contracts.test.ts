@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { ZodError } from 'zod';
 import {
   READINESS_ABILITIES,
   isReadinessBootstrapEnvelope,
@@ -80,8 +81,8 @@ describe('authoritative readiness response contracts', () => {
 
   it('rejects malformed authoritative facts', () => {
     const malformed = {...completeFacts, inspectionProgress: '1'};
-    expect(() => parseCurrentReadinessResponse({data: [currentItem(malformed)]})).toThrow();
+    expect(() => parseCurrentReadinessResponse({data: [currentItem(malformed)]})).toThrow(ZodError);
     const {meterKnown: _meterKnown, ...missingField} = completeFacts;
-    expect(() => parseCurrentReadinessResponse({data: [currentItem(missingField)]})).toThrow();
+    expect(() => parseCurrentReadinessResponse({data: [currentItem(missingField)]})).toThrow(ZodError);
   });
 });

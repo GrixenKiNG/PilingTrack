@@ -101,7 +101,11 @@ describe('итог проверки знаний при просроченной
 
     expect(screen.getByText('Проверка пройдена')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', {name: 'Записать результат'}));
-    expect(onDone).toHaveBeenCalledWith(expect.any(Array), 'token-1');
+    // Уходят именно выбранные варианты — по одному на каждый вопрос попытки.
+    expect(onDone).toHaveBeenCalledWith(
+      Array.from({length: 8}, (_, index) => ({questionId: `q-${index}`, picked: 0})),
+      'token-1',
+    );
 
     // Рабочее место получило 400 «попытка истекла» и сообщает об этом экрану.
     rerender(

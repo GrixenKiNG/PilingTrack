@@ -9,11 +9,15 @@ describe('assigned knowledge attempt',()=>{
  await expect(verifyKnowledgeAttempt(actor,a.attemptToken,a.questions.map(q=>({questionId:q.id,picked:0})))).resolves.toBeUndefined();});
  it('rejects a single answer, duplicate questions and another question',async()=>{const a=await createKnowledgeAttempt(actor);const picks=a.questions.map(q=>({questionId:q.id,picked:0}));
  for(const invalid of [picks.slice(0,1),picks.map(()=>picks[0]),[...picks.slice(1),{questionId:'unassigned',picked:0}]])
- await expect(verifyKnowledgeAttempt(actor,a.attemptToken,invalid)).rejects.toThrow();});
+ await expect(verifyKnowledgeAttempt(actor,a.attemptToken,invalid)).rejects.toThrow('Attempt does not match the assigned questions');});
  it('rejects another user, tenant, role and a changed token',async()=>{const a=await createKnowledgeAttempt(actor);const picks=a.questions.map(q=>({questionId:q.id,picked:0}));
- for(const wrong of [{...actor,operatorId:'other'},{...actor,tenantId:'other'},{...actor,audience:'ASSISTANT' as const}])
- await expect(verifyKnowledgeAttempt(wrong,a.attemptToken,picks)).rejects.toThrow();
- await expect(verifyKnowledgeAttempt(actor,'x'+a.attemptToken,picks)).rejects.toThrow();});
+ // Чужой пользователь: подпись верна, но `sub` токена не совпадает с актором.
+ await expect(verifyKnowledgeAttempt({...actor,operatorId:'other'},a.attemptToken,picks)).rejects.toThrow(/sub/i);
+ // Чужой тенант и чужая роль: токен разобран, но не сошёлся с выданным набором.
+ for(const wrong of [{...actor,tenantId:'other'},{...actor,audience:'ASSISTANT' as const}])
+ await expect(verifyKnowledgeAttempt(wrong,a.attemptToken,picks)).rejects.toThrow('Attempt does not match the assigned questions');
+ // Испорченный токен (лишний знак в заголовке JWS) отвергается, а не проходит.
+ await expect(verifyKnowledgeAttempt(actor,'x'+a.attemptToken,picks)).rejects.toThrow(/Protected Header is invalid/i);});
  it('expires the issued set after 30 minutes',async()=>{vi.useFakeTimers();const a=await createKnowledgeAttempt(actor);vi.advanceTimersByTime(31*60*1000);
- await expect(verifyKnowledgeAttempt(actor,a.attemptToken,a.questions.map(q=>({questionId:q.id,picked:0})))).rejects.toThrow();});
+ await expect(verifyKnowledgeAttempt(actor,a.attemptToken,a.questions.map(q=>({questionId:q.id,picked:0})))).rejects.toThrow(/"exp" claim timestamp check failed/i);});
 });

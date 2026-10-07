@@ -359,6 +359,8 @@ describe('Несколько причин блокировки видны в с�
   it('неизвестный снимок не показывает счётчик причин', () => {
     render(<FleetScreen {...propsFor({ currentReadiness: [] })} />);
 
+    // Строка парка отрисована — иначе негативная проверка ниже прошла бы впустую.
+    expect(screen.getByRole('button', { name: 'Выбрать Установка 1' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Открыть основания оценки/ })).not.toBeInTheDocument();
   });
 });

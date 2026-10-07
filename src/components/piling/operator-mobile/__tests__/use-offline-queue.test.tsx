@@ -17,8 +17,21 @@ vi.mock('../offline-queue', () => ({
 vi.mock('../api', () => ({sendQueuedCommand: vi.fn()}));
 
 import {useOfflineQueue} from '../use-offline-queue';
+import {sendQueuedCommand} from '../api';
 
-const pendingCommand = {state: 'PENDING'} as QueuedCommand;
+// Настоящая запись очереди, а не заглушка `{state: 'PENDING'}`: тип и данные
+// должны совпадать с тем, что хук читает и учитывает.
+const pendingCommand: QueuedCommand = {
+  ownerId: 'op-1',
+  ownerName: 'Иванов И.',
+  clientCommandId: 'c1',
+  label: 'Выработка',
+  command: {command: 'log-production', clientCommandId: 'c1', entry: {kind: 'PILES'}},
+  queuedAt: '2026-10-01T00:00:00.000Z',
+  attempts: 1,
+  state: 'PENDING',
+  lastError: null,
+};
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -38,6 +51,8 @@ describe('useOfflineQueue — повторная отправка при лож�
   it('пробует очередь через 60 секунд офлайн, но не на обычном 30-секундном тике', async () => {
     renderHook(() => useOfflineQueue());
     expect(queue.flushQueue).toHaveBeenCalledTimes(1);
+    // Слив отправляет очередь настоящим отправителем, а не произвольной функцией.
+    expect(queue.flushQueue).toHaveBeenCalledWith(sendQueuedCommand);
 
     await act(async () => { await vi.advanceTimersByTimeAsync(30_000); });
     expect(queue.flushQueue).toHaveBeenCalledTimes(1);
