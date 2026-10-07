@@ -64,6 +64,53 @@ afterEach(() => {
 const visible = (node: HTMLElement) => node.closest('[hidden]') === null;
 
 describe('v1: нижняя панель шагов', () => {
+  it('на приёмке «Следующий шаг» ведёт к действию приёмки, не открывая смену сам', async () => {
+    current = workStateFixture({phase: 'ADMISSION', shift: null,
+      options: [{crewId: 'c1', equipmentId: 'eq-1', equipmentName: 'Установка 12', siteName: 'Площадка А'}],
+      assignment: {equipmentId: 'eq-1', equipmentName: 'Установка 12', siteName: 'Площадка А', lastMeter: null,
+        maintenance: {daysLeft: null}, siteDowntimeHours: 0, siteDowntimeEvents: 0,
+        sitePiles: {count: 0, meters: 0}, siteDrilling: {count: 0, meters: 0}, fuelPercent: null, assistants: []},
+    } as unknown as Partial<OperatorMobileState>);
+    render(<OperatorMobileApp />);
+    fireEvent.click(await screen.findByRole('button', {name: 'Следующий шаг: Принять установку'}));
+    expect(screen.getByRole('button', {name: 'Принять и открыть смену'})).toHaveFocus();
+    expect(commands).toHaveLength(0);
+  });
+
+  it.each([
+    ['PRESHIFT_INSPECTION', 'PRESHIFT_INSPECTION', 'Предсменный осмотр'],
+    ['SITE_READY', 'SITE_READY', 'Осмотр площадки'],
+    ['STARTUP', 'EO_BEFORE', 'Пуск и ЕО перед работой'],
+    ['CLOSING', 'EO_AFTER', 'ЕО после работы'],
+  ] as const)('%s: «Следующий шаг» раскрывает осмотр и сохраняет введённое', async (phase, stage, title) => {
+    current = workStateFixture({phase, checklists: [{stage, title, purpose: '', version: '1', period: null, done: false,
+      sections: [{id: 'machine', title: 'Узел', items: [{id: 'check', text: 'Проверить установку', severity: 'NOTE'}]}],
+    }]});
+    render(<OperatorMobileApp />);
+    const next = await screen.findByRole('button', {name: `Следующий шаг: ${title}`});
+    fireEvent.click(next);
+    expect(screen.getByRole('button', {name: /Узел/, expanded: true})).toHaveFocus();
+    fireEvent.click(screen.getByRole('button', {name: 'Замечание'}));
+    const note = screen.getByRole('textbox');
+    fireEvent.change(note, {target: {value: 'Подтёк масла'}});
+    fireEvent.click(next);
+    expect(screen.getByRole('textbox')).toHaveValue('Подтёк масла');
+    expect(screen.getByRole('button', {name: /Узел/, expanded: true})).toHaveFocus();
+    expect(commands).toHaveLength(0);
+  });
+
+  it('в сдаче «Следующий шаг» ведёт к кнопке сдачи, а закрывает только явное нажатие', async () => {
+    current = workStateFixture({phase: 'CLOSING', checklists: [{stage: 'EO_AFTER', done: true}] as OperatorMobileState['checklists']});
+    render(<OperatorMobileApp />);
+    fireEvent.click(await screen.findByRole('button', {name: 'Следующий шаг: Закрыть смену'}));
+    const close = screen.getByRole('button', {name: 'Закрыть смену и отправить отчёт'});
+    expect(close).toHaveFocus();
+    expect(commands).toHaveLength(0);
+    fireEvent.click(close);
+    await waitFor(() => expect(commands).toHaveLength(1));
+    expect(commands[0]).toMatchObject({command: 'close-shift', shiftId: 'shift-1'});
+  });
+
   it('в работе стоят три кнопки, а шаг — «Записать выработку», пока записей нет', async () => {
     render(<OperatorMobileApp />);
 
