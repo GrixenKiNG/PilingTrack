@@ -18,6 +18,18 @@ const checklist: ChecklistView = {
 };
 
 describe('чек-лист машиниста', () => {
+  it('объясняет, что снимок нужен при замечании или отказе, и принимает норму без снимка', () => {
+    const onSubmit = vi.fn();
+    render(<ChecklistScreen checklist={{...checklist, sections: [{
+      id: 'mast', title: 'Мачта', items: [{id: 'welds', text: 'Швы мачты', severity: 'ALERT', photoOnIssue: true}],
+    }]}} warnings={[]} busy={false} error={null} commandId="test-command" onSubmit={onSubmit} />);
+    expect(screen.getByText('Проверьте каждый пункт: фото при замечании или отказе, замеры')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', {expanded: false}));
+    fireEvent.click(screen.getByRole('button', {name: 'Норма'}));
+    expect(screen.queryByRole('button', {name: 'Снять фото'})).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', {name: 'Завершить'}));
+    expect(onSubmit).toHaveBeenCalledWith([expect.objectContaining({answer: 'OK', mediaIds: undefined})]);
+  });
   it.each([true, false])('передаёт отметку замены счётчика только при явном выборе: %s', (replacement) => {
     const onSubmit = vi.fn();
     render(<ChecklistScreen checklist={{...checklist, sections: [{id: 'meter', title: 'Счётчик', items: [

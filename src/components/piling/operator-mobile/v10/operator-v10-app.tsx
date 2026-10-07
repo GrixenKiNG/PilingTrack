@@ -443,13 +443,13 @@ function ProductionForm({state, busy, onLog, initialKind = 'PILES'}: {
     <Card title="Записать выработку">
       <div className="ov10-chips on-work">
         <button type="button" className={kind === 'PILES' ? 'on' : ''}
-          aria-pressed={kind === 'PILES'} onClick={() => switchKind('PILES')}>Свая</button>
+          aria-pressed={kind === 'PILES'} onClick={() => switchKind('PILES')}>Добавить сваю</button>
         <button type="button" className={kind === 'PASSPORT' ? 'on' : ''}
-          aria-pressed={kind === 'PASSPORT'} onClick={() => switchKind('PASSPORT')}>Паспорт</button>
+          aria-pressed={kind === 'PASSPORT'} onClick={() => switchKind('PASSPORT')}>Записать паспорт сваи</button>
         <button type="button" className={kind === 'DRILLING' ? 'on' : ''}
-          aria-pressed={kind === 'DRILLING'} onClick={() => switchKind('DRILLING')}>Бурение</button>
+          aria-pressed={kind === 'DRILLING'} onClick={() => switchKind('DRILLING')}>Добавить бурение</button>
         <button type="button" className={kind === 'DOWNTIME' ? 'on' : ''}
-          aria-pressed={kind === 'DOWNTIME'} onClick={() => switchKind('DOWNTIME')}>Простой</button>
+          aria-pressed={kind === 'DOWNTIME'} onClick={() => switchKind('DOWNTIME')}>Записать простой</button>
       </div>
 
       {/* Паспорт — журнал забивки на одну сваю по СП 45.13330: номер, залоги,

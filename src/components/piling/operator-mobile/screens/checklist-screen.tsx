@@ -268,8 +268,8 @@ export function ChecklistScreen({
                     {!open && apart > 0 ? (
                       <span className="block text-3xs text-muted-foreground">
                         {bulk.length > 0
-                          ? `Со снимком и замером — отдельно (${apart})`
-                          : 'Каждый пункт со снимком или замером — откройте раздел'}
+                          ? `Проверьте отдельно: фото при замечании или отказе, замеры (${apart})`
+                          : 'Проверьте каждый пункт: фото при замечании или отказе, замеры'}
                       </span>
                     ) : null}
                   </span>
@@ -353,7 +353,7 @@ function ItemCard({item, draft, commandId, onChange, lastMeter, known}: {
         ) : null}
         {item.photoOnIssue ? (
           <span className="rounded-full border border-warning/30 bg-warning/10 px-2 py-0.5 text-3xs font-semibold uppercase tracking-wide text-warning-strong">
-            Фото
+            Фото при замечании или отказе
           </span>
         ) : null}
         {item.onlyWhen?.map((condition) => (

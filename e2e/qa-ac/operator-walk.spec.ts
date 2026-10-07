@@ -483,7 +483,7 @@ test('v10 (Woltman-PVE 50PR, ivv@): продолжает смену 04.10 под
   // Пробная запись: проверяем, в какую смену уходит выработка
   const OLD_SHIFT = '95cd98f5-989d-42eb-89cf-193ed993ad31';
   const before = Number(db(`SELECT COUNT(*) FROM "PileWork" WHERE "shiftId"='${OLD_SHIFT}'`));
-  const pileBtn = page.getByRole('button', { name: /^Свая$/ });
+  const pileBtn = page.getByRole('button', { name: /^Добавить сваю$/ });
   if (await pileBtn.count()) {
     await tap(page, pileBtn.first(), 'Свая (открыть форму)');
     await page.waitForTimeout(1800);

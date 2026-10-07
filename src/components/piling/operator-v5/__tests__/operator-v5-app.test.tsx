@@ -14,6 +14,7 @@ const api = vi.hoisted(() => ({
   sendCommand: vi.fn(async () => undefined),
   sendQueuedCommand: vi.fn(async () => undefined),
   newCommandId: vi.fn(() => 'cmd-1'),
+  uploadPhoto: vi.fn(async () => 'media-1'),
 }));
 vi.mock('@/components/piling/operator-mobile/api', () => ({
   ApiError: class ApiError extends Error {
@@ -30,13 +31,93 @@ import {ApiError, QueuedOffline} from '@/components/piling/operator-mobile/api';
 import {CloseScreen, OperatorV5App, WorkScreen} from '../operator-v5-app';
 import {workStateFixture} from '../../operator-mobile/__tests__/fixtures';
 
+describe('v5: вердикты осмотра и подтверждение замечаний (I5)', () => {
+  async function openInspection(photoOnIssue = false, meter = false) {
+    api.fetchState.mockReset();
+    api.sendCommand.mockReset().mockResolvedValue(undefined);
+    api.uploadPhoto.mockReset().mockResolvedValue('media-1');
+    api.fetchState.mockResolvedValue(workStateFixture({phase: 'PRESHIFT_INSPECTION',
+      operator: {id: 'me', name: 'Машинист'},
+      checklists: [{stage: 'PRESHIFT_INSPECTION', title: 'Осмотр', purpose: '', version: '1', done: false, period: null,
+        sections: [{id: 'machine', title: 'Машина', items: [{id: 'check', text: 'Проверить установку', severity: 'NOTE', photoOnIssue,
+          ...(meter ? {measure: {key: 'engineHours', label: 'Моточасы', unit: 'м/ч'}} : {}),
+        }]}]}],
+    }));
+    render(<OperatorV5App />);
+    await screen.findByRole('button', {name: /^норма$/i});
+  }
+
+  it.each([{label: 'Замечание', answer: 'REMARK'}, {label: 'Отказ', answer: 'FAULT'}])(
+    '$label отправляется с описанием, а не вместо него', async ({label, answer}) => {
+      await openInspection();
+      expect(screen.getByRole('button', {name: 'Норма'})).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', {name: label}));
+      expect(screen.getByRole('button', {name: /Осталось отметить/})).toBeDisabled();
+      fireEvent.change(screen.getByRole('textbox', {name: /Что именно не так/}), {target: {value: 'Подтёк масла'}});
+      fireEvent.click(screen.getByRole('button', {name: 'Завершить'}));
+      await waitFor(() => expect(api.sendCommand).toHaveBeenCalledWith(expect.objectContaining({
+        command: 'submit-checklist', answers: [expect.objectContaining({answer, note: 'Подтёк масла'})],
+      })));
+    },
+  );
+
+  it('требует подтверждённый снимок, сохраняет описание при отказе загрузки и позволяет повторить', async () => {
+    await openInspection(true);
+    fireEvent.click(screen.getByRole('button', {name: 'Замечание'}));
+    fireEvent.change(screen.getByRole('textbox', {name: /Что именно не так/}), {target: {value: 'Подтёк масла'}});
+    expect(screen.getByRole('button', {name: /Осталось отметить/})).toBeDisabled();
+    api.uploadPhoto.mockRejectedValueOnce(new Error('Снимок не загружен'));
+    const file = new File(['photo'], 'inspection.jpg', {type: 'image/jpeg'});
+    const input = screen.getByLabelText(/Снимок: Проверить установку/);
+    fireEvent.change(input, {target: {files: [file]}});
+    expect(await screen.findByText('Снимок не загружен')).toBeInTheDocument();
+    expect(screen.getByRole('textbox', {name: /Что именно не так/})).toHaveValue('Подтёк масла');
+    expect(api.sendCommand).not.toHaveBeenCalled();
+    fireEvent.change(input, {target: {files: [file]}});
+    await waitFor(() => expect(screen.getByRole('button', {name: 'Завершить'})).toBeEnabled());
+    fireEvent.click(screen.getByRole('button', {name: 'Завершить'}));
+    await waitFor(() => expect(api.sendCommand).toHaveBeenCalledWith(expect.objectContaining({
+      clientCommandId: 'cmd-1', answers: [expect.objectContaining({answer: 'REMARK', note: 'Подтёк масла', mediaIds: ['media-1']})],
+    })));
+    expect(api.uploadPhoto).toHaveBeenCalledWith({file, clientCommandId: 'cmd-1', itemId: 'check'});
+  });
+
+  it('сохраняет описание и снимок, если сервер отказал в сдаче осмотра', async () => {
+    await openInspection(true);
+    fireEvent.click(screen.getByRole('button', {name: 'Отказ'}));
+    fireEvent.change(screen.getByRole('textbox', {name: /Что именно не так/}), {target: {value: 'Трещина'}});
+    fireEvent.change(screen.getByLabelText(/Снимок: Проверить установку/), {target: {files: [new File(['photo'], 'inspection.jpg', {type: 'image/jpeg'})]}});
+    await waitFor(() => expect(screen.getByRole('button', {name: 'Завершить'})).toBeEnabled());
+    api.sendCommand.mockRejectedValueOnce(new ApiError(400, 'Осмотр не принят'));
+    fireEvent.click(screen.getByRole('button', {name: 'Завершить'}));
+    expect(await screen.findByText('Осмотр не принят')).toBeInTheDocument();
+    expect(screen.getByRole('textbox', {name: /Что именно не так/})).toHaveValue('Трещина');
+    expect(screen.getByText('Снимков: 1')).toBeInTheDocument();
+    expect(screen.getByRole('button', {name: 'Завершить'})).toBeEnabled();
+  });
+
+  it('сохраняет пометку замены счётчика вместе с описанием замечания', async () => {
+    await openInspection(false, true);
+    fireEvent.click(screen.getByRole('button', {name: 'Замечание'}));
+    fireEvent.change(screen.getByRole('textbox', {name: /Что именно не так/}), {target: {value: 'Повреждено стекло счётчика'}});
+    fireEvent.change(screen.getByRole('textbox', {name: ''}), {target: {value: '99'}});
+    fireEvent.click(screen.getByRole('checkbox', {name: 'Счётчик заменён'}));
+    fireEvent.click(screen.getByRole('button', {name: 'Завершить'}));
+    await waitFor(() => expect(api.sendCommand).toHaveBeenCalledWith(expect.objectContaining({
+      answers: [expect.objectContaining({answer: 'REMARK', note: 'Счётчик заменён; Повреждено стекло счётчика', measures: {engineHours: 99}})],
+    })));
+  });
+});
+
 describe('v5: явная замена счётчика моточасов', () => {
   it('посылает новое меньшее показание с пометкой, не отмечая неисправность', async () => {
+    const assignment = working.assignment;
+    if (!assignment) throw new Error('Для проверки нужна назначенная установка');
     api.fetchState.mockReset();
     api.sendCommand.mockReset().mockResolvedValue(undefined);
     api.fetchState.mockResolvedValue(workStateFixture({phase: 'CLOSING',
       operator: {id: 'me', name: 'Машинист'},
-      assignment: {...working.assignment!, lastMeter: {engineHours: 3000, recordedAt: '2026-09-19T15:00:00.000Z'}},
+      assignment: {...assignment, lastMeter: {engineHours: 3000, recordedAt: '2026-09-19T15:00:00.000Z'}},
       checklists: [{stage: 'EO_AFTER', title: 'ЕО после работы', purpose: '', version: '1', done: false, period: null,
         sections: [{id: 'meter', title: 'Счётчик', items: [{id: 'hours', text: 'Снять показание', severity: 'NOTE', measure: {key: 'engineHours', label: 'Моточасы', unit: 'м/ч'}}]}]}],
     }));

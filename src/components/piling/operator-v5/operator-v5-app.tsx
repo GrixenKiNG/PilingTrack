@@ -22,7 +22,7 @@ import {formatNumber} from '@/lib/format';
 import {finishShift, nextStep} from '../operator-mobile/shift-next-step';
 import {StepBar} from '../operator-mobile/step-bar';
 import {
-  ApiError, QueuedOffline, currentPosition, fetchState, newCommandId, sendCommand,
+  ApiError, QueuedOffline, currentPosition, fetchState, newCommandId, sendCommand, uploadPhoto,
   type ProductionEntryInput,
 } from '../operator-mobile/api';
 import {OfflineQueueBanner} from '../operator-mobile/offline-queue-banner';
@@ -384,10 +384,14 @@ function AcceptScreen({state, busy, onAccept}: {
 }
 
 /** D/E. Чек-лист этапа — экраны D1–D4 и E1 макета. */
-function ChecklistScreen({checklist, answers, measures, busy, lastMeter, meterReplaced, onMeterReplacement, onAnswer, onMeasure, onSubmit}: {
+function ChecklistScreen({checklist, answers, measures, notes, media, uploading, photoErrors, busy, lastMeter, meterReplaced, onMeterReplacement, onAnswer, onMeasure, onNote, onPhoto, onSubmit}: {
   checklist: ChecklistView;
   answers: Record<string, OperatorAnswer>;
   measures: Record<string, string>;
+  notes: Record<string, string>;
+  media: Record<string, string[]>;
+  uploading: Record<string, boolean>;
+  photoErrors: Record<string, string>;
   busy: boolean;
   /** Последнее показание счётчика — подсказка у поля моточасов. */
   lastMeter: {engineHours: number; recordedAt: string} | null;
@@ -395,15 +399,20 @@ function ChecklistScreen({checklist, answers, measures, busy, lastMeter, meterRe
   onMeterReplacement: (replaced: boolean) => void;
   onAnswer: (itemId: string, answer: OperatorAnswer) => void;
   onMeasure: (key: string, value: string) => void;
+  onNote: (itemId: string, value: string) => void;
+  onPhoto: (itemId: string, file: File) => Promise<void>;
   onSubmit: () => void;
 }) {
   const items = checklist.sections.flatMap((section) => section.items);
   // Замер обязателен при таком ответе — без него сервер список не примет.
   const needsMeasure = (item: (typeof items)[number]) => Boolean(item.measure)
     && measureRequired(item, answers[item.id] ?? 'OK');
+  const isIssue = (itemId: string) => answers[itemId] === 'REMARK' || answers[itemId] === 'FAULT';
   const left = items.filter(
     (item) => !answers[item.id]
-      || (needsMeasure(item) && !(measures[item.measure?.key ?? ''] ?? '').trim()),
+      || (needsMeasure(item) && !(measures[item.measure?.key ?? ''] ?? '').trim())
+      || (isIssue(item.id) && (!(notes[item.id] ?? '').trim()
+        || (item.photoOnIssue && !(media[item.id]?.length)) || uploading[item.id])),
   ).length;
   const done = items.length - left;
   return (
@@ -430,16 +439,47 @@ function ChecklistScreen({checklist, answers, measures, busy, lastMeter, meterRe
                     className={answers[item.id] === 'OK' ? 'on' : ''}
                     onClick={() => onAnswer(item.id, 'OK')}
                   >
-                    норма
+                    Норма
+                  </button>
+                  <button
+                    type="button"
+                    className={answers[item.id] === 'REMARK' ? 'on' : ''}
+                    onClick={() => onAnswer(item.id, 'REMARK')}
+                  >
+                    Замечание
                   </button>
                   <button
                     type="button"
                     className={answers[item.id] === 'FAULT' ? 'bad' : ''}
                     onClick={() => onAnswer(item.id, 'FAULT')}
                   >
-                    дефект
+                    Отказ
                   </button>
                 </span>
+              </div>
+            ))}
+            {section.items.filter((item) => isIssue(item.id)).map((item) => (
+              <div className="card" key={item.id + '-issue'}>
+                <label>
+                  <span className="lbl">Что именно не так: {item.text}</span>
+                  <textarea value={notes[item.id] ?? ''} rows={2}
+                    onChange={(event) => onNote(item.id, event.target.value)} />
+                </label>
+                {item.photoOnIssue ? (
+                  <>
+                    <label>
+                      <span className="lbl">Снимок: {item.text}</span>
+                      <input type="file" accept="image/*" capture="environment" disabled={busy || uploading[item.id]}
+                        onChange={(event) => {
+                          const file = event.target.files?.[0];
+                          event.target.value = '';
+                          if (file) void onPhoto(item.id, file);
+                        }} />
+                    </label>
+                    <p className="m">{uploading[item.id] ? 'Загружаем снимок…' : `Снимков: ${media[item.id]?.length ?? 0}`}</p>
+                    {photoErrors[item.id] ? <p role="alert" className="note warn">{photoErrors[item.id]}</p> : null}
+                  </>
+                ) : null}
               </div>
             ))}
             {section.items.filter(needsMeasure).map((item) => (
@@ -479,7 +519,7 @@ function ChecklistScreen({checklist, answers, measures, busy, lastMeter, meterRe
         <button
           className={left > 0 ? 'b dis' : 'b'}
           type="button"
-          disabled={busy || left > 0}
+          disabled={busy || left > 0 || Object.values(uploading).some(Boolean)}
           onClick={onSubmit}
         >
           {busy ? 'Отправляем…' : left > 0 ? `Осталось отметить: ${left}` : 'Завершить'}
@@ -927,6 +967,10 @@ export function OperatorV5App() {
   const [tab, setTab] = useState<Tab>('SHIFT');
   const [editingShiftId, setEditingShiftId] = useState<string | null>(null);
   const [answers, setAnswers] = useState<Record<string, OperatorAnswer>>({});
+  const [notes, setNotes] = useState<Record<string, string>>({});
+  const [media, setMedia] = useState<Record<string, string[]>>({});
+  const [uploading, setUploading] = useState<Record<string, boolean>>({});
+  const [photoErrors, setPhotoErrors] = useState<Record<string, string>>({});
   /** Числовые замеры текущего списка: моточасы, остаток топлива, доливы. */
   const [measures, setMeasures] = useState<Record<string, string>>({});
   const [meterReplacement, setMeterReplacement] = useState<{shiftId: string; stage: ChecklistStage} | null>(null);
@@ -1071,12 +1115,25 @@ export function OperatorV5App() {
     return list.done ? null : list;
   }, [stage, state, safetyStage]);
 
-  const submitChecklist = useCallback(() => {
+  const attachChecklistPhoto = async (itemId: string, file: File) => {
+    setUploading((current) => ({...current, [itemId]: true}));
+    setPhotoErrors((current) => ({...current, [itemId]: ''}));
+    try {
+      const mediaId = await uploadPhoto({file, clientCommandId: commandId, itemId});
+      setMedia((current) => ({...current, [itemId]: [...(current[itemId] ?? []), mediaId]}));
+    } catch (cause) {
+      setPhotoErrors((current) => ({...current, [itemId]: cause instanceof Error ? cause.message : 'Снимок не загружен'}));
+    } finally {
+      setUploading((current) => ({...current, [itemId]: false}));
+    }
+  };
+
+  const submitChecklist = useCallback(async () => {
     const shiftId = state?.shift?.id;
     const equipmentId = state?.assignment?.equipmentId;
     if (!shiftId || !equipmentId || !checklist || !stage) return;
     const items = checklist.sections.flatMap((section) => section.items);
-    void run(() => sendCommand({
+    const accepted = await run(() => sendCommand({
       command: 'submit-checklist',
       clientCommandId: commandId,
       shiftId,
@@ -1088,18 +1145,22 @@ export function OperatorV5App() {
         measures: item.measure && (measures[item.measure.key] ?? '').trim() !== ''
           ? {[item.measure.key]: Number((measures[item.measure.key] ?? '').replace(',', '.'))}
           : undefined,
-        // Сервер требует описание к неисправности. Экран макета отдельного
-        // поля не предусматривает, поэтому пишем честный источник ответа.
         note: [item.measure?.key === 'engineHours' && meterReplacement?.shiftId === shiftId && meterReplacement.stage === stage ? ENGINE_HOURS_REPLACEMENT_NOTE : '',
-          answers[item.id] === 'FAULT' ? 'Отмечено машинистом на осмотре' : ''].filter(Boolean).join('; ') || undefined,
+          answers[item.id] === 'REMARK' || answers[item.id] === 'FAULT' ? notes[item.id]?.trim() : ''].filter(Boolean).join('; ') || undefined,
+        mediaIds: (answers[item.id] === 'REMARK' || answers[item.id] === 'FAULT') && media[item.id]?.length
+          ? media[item.id] : undefined,
       })),
     }), `${checklist.title}: принято.`);
+    if (!accepted) return;
     setMeasures({});
     setAnswers({});
+    setNotes({});
+    setMedia({});
+    setPhotoErrors({});
     setMeterReplacement(null);
     // Периодический список сдан — возвращаемся туда, откуда его открыли.
     setSafetyStage(null);
-  }, [answers, checklist, commandId, measures, meterReplacement, run, stage, state]);
+  }, [answers, checklist, commandId, measures, media, meterReplacement, notes, run, stage, state]);
 
   const reportIncident = useCallback((input: {
     category: IncidentCategory; signs: IncidentSign[]; injured: boolean; description: string;
@@ -1359,12 +1420,18 @@ export function OperatorV5App() {
           checklist={checklist}
           answers={answers}
           measures={measures}
+          notes={notes}
+          media={media}
+          uploading={uploading}
+          photoErrors={photoErrors}
           meterReplaced={meterReplacement?.shiftId === shiftId && meterReplacement?.stage === stage}
           onMeterReplacement={(replaced) => setMeterReplacement(replaced && shiftId && stage ? {shiftId, stage} : null)}
           busy={busy}
           lastMeter={state.assignment?.lastMeter ?? null}
           onAnswer={(itemId, answer) => setAnswers((current) => ({...current, [itemId]: answer}))}
           onMeasure={(key, value) => setMeasures((current) => ({...current, [key]: value}))}
+          onNote={(itemId, value) => setNotes((current) => ({...current, [itemId]: value}))}
+          onPhoto={attachChecklistPhoto}
           onSubmit={submitChecklist}
         />
       );

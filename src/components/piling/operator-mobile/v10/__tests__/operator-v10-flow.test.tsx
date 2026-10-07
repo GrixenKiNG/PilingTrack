@@ -86,26 +86,26 @@ beforeEach(() => {
 describe('v10: порядок смены', () => {
   it('старую смену явно датирует и следующий шаг ведёт к сдаче вместо сегодняшней выработки', async () => {
     const state = makeState('WORK', ['PRESHIFT_INSPECTION', 'SITE_READY', 'EO_BEFORE']);
-    state.shift = {...state.shift!, productionDate: '2026-09-27', state: 'STARTED'};
+    state.shift = {id: 'shift-1', productionDate: '2026-09-27', state: 'STARTED', startedAt: null};
     api.fetchState.mockResolvedValue(state);
     render(<OperatorV10App />);
 
     await screen.findByRole('button', {name: 'Дальше: Работа: сваи, бурение, простой'});
     expect(screen.getByText('Не сдана смена за 27.09.2026')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', {name: 'Дальше: Работа: сваи, бурение, простой'}));
-    expect(screen.queryByRole('button', {name: 'Свая'})).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', {name: 'Добавить сваю'})).not.toBeInTheDocument();
     expect(screen.getByRole('button', {name: 'Дописать отчёт за 27.09.2026'})).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', {name: 'Дописать отчёт за 27.09.2026'}));
-    expect(await screen.findByRole('button', {name: 'Свая'})).toBeInTheDocument();
+    expect(await screen.findByRole('button', {name: 'Добавить сваю'})).toBeInTheDocument();
     expect(screen.getByText('27.09.2026')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', {name: 'К сдаче смены'}));
-    expect(screen.queryByRole('button', {name: 'Свая'})).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', {name: 'Добавить сваю'})).not.toBeInTheDocument();
     expect(api.sendCommand).not.toHaveBeenCalled();
   });
 
   it('дописанное вчерашнее остаётся в старой смене, после сдачи открывается сегодняшняя', async () => {
     const old = makeState('CLOSING', [...STAGES]);
-    old.shift = {...old.shift!, productionDate: '2026-09-27', state: 'HANDOVER_PENDING'};
+    old.shift = {id: 'shift-1', productionDate: '2026-09-27', state: 'HANDOVER_PENDING', startedAt: null};
     api.fetchState.mockResolvedValue(old);
     api.sendCommand.mockResolvedValue({ok: true});
     render(<OperatorV10App />);
@@ -114,7 +114,7 @@ describe('v10: порядок смены', () => {
     expect(screen.getByText('Не сдана смена за 27.09.2026')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', {name: 'Дальше: ЕО после работы и закрытие смены'}));
     fireEvent.click(await screen.findByRole('button', {name: 'Дописать отчёт за 27.09.2026'}));
-    fireEvent.click(screen.getByRole('button', {name: 'Простой'}));
+    fireEvent.click(screen.getByRole('button', {name: 'Записать простой'}));
     fireEvent.change(screen.getByRole('combobox'), {target: {value: 'r1'}});
     fireEvent.change(screen.getByLabelText('Простой, часов'), {target: {value: '1.5'}});
     fireEvent.click(screen.getByRole('button', {name: 'Записать'}));
@@ -129,12 +129,12 @@ describe('v10: порядок смены', () => {
     await waitFor(() => expect(screen.queryByText('Не сдана смена за 27.09.2026')).not.toBeInTheDocument());
 
     const workingToday = makeState('WORK', ['PRESHIFT_INSPECTION', 'SITE_READY', 'EO_BEFORE']);
-    workingToday.shift = {...workingToday.shift!, id: 'shift-today', productionDate: '2026-09-28', state: 'STARTED'};
+    workingToday.shift = {id: 'shift-today', productionDate: '2026-09-28', state: 'STARTED', startedAt: null};
     api.fetchState.mockResolvedValue(workingToday);
     fireEvent.click(screen.getByRole('button', {name: 'Обновить'}));
     fireEvent.click(await screen.findByRole('button', {name: 'Главная'}));
     fireEvent.click(await screen.findByRole('button', {name: 'Дальше: Работа: сваи, бурение, простой'}));
-    fireEvent.click(screen.getByRole('button', {name: 'Простой'}));
+    fireEvent.click(screen.getByRole('button', {name: 'Записать простой'}));
     fireEvent.change(screen.getByRole('combobox'), {target: {value: 'r1'}});
     fireEvent.change(screen.getByLabelText('Простой, часов'), {target: {value: '0.25'}});
     fireEvent.click(screen.getByRole('button', {name: 'Записать'}));
@@ -188,7 +188,7 @@ describe('v10: отказ сервера виден, введённое не п�
     render(<OperatorV10App />);
 
     fireEvent.click(await screen.findByRole('button', {name: 'Дальше: Работа: сваи, бурение, простой'}));
-    fireEvent.click(screen.getByRole('button', {name: 'Простой'}));
+    fireEvent.click(screen.getByRole('button', {name: 'Записать простой'}));
     fireEvent.change(screen.getByRole('combobox'), {target: {value: 'r1'}});
     fireEvent.change(screen.getByLabelText('Простой, часов'), {target: {value: '1.5'}});
     fireEvent.click(screen.getByRole('button', {name: 'Записать'}));
