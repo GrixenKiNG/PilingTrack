@@ -273,6 +273,7 @@ export function OperatorShiftV2() {
   const [passportOpen, setPassportOpen] = useState(false);
   const [drillingOpen, setDrillingOpen] = useState(false);
   const [downtimeOpen, setDowntimeOpen] = useState(false);
+  const [editingProductionShiftId, setEditingProductionShiftId] = useState<string | null>(null);
   const [tab, setTab] = useState<V2Tab>('shift');
   /*
     Выбранная установка на приёмке.
@@ -661,8 +662,9 @@ export function OperatorShiftV2() {
    *
    * ПЕРЕДАЧИ СМЕНЫ ЗДЕСЬ НЕТ. Бригада работает в одну смену, следующие
    * операторы машину не принимают, и смена после отчёта ждала в
-   * HANDOVER_PENDING коллегу, который не приходил, до авто-закрытия через пять
-   * часов (D-20260927-005). `close-shift` закрывает смену и отправляет отчёт в
+   * HANDOVER_PENDING коллегу, который не приходил (D-20260927-005).
+   * Планировщик не закрывает HANDOVER_PENDING: непринятая передача должна
+   * оставаться доступной. `close-shift` закрывает смену и отправляет отчёт в
    * одной транзакции — второго нажатия «Сдать смену» больше не нужно.
    */
   const closeShift = useCallback(async () => {
@@ -733,12 +735,18 @@ export function OperatorShiftV2() {
   }
 
   const { step } = state;
+  const editingProduction = step === 'report'
+    && editingProductionShiftId === (mobile?.shift?.id ?? facts.shift?.id);
   /*
     Нижняя панель шагов — «Главная», «Следующий шаг», «Завершить смену»
     (решение владельца 07.10.2026). Шаг и подписи — по порядку экранов v2
     (step-bar-model); здесь только переходы этого модуля.
   */
-  const goHome = () => { setSafetyStep(null); setTab('shift'); };
+  const goHome = () => {
+    setEditingProductionShiftId(null);
+    setPileOpen(false); setPassportOpen(false); setDrillingOpen(false); setDowntimeOpen(false);
+    setSafetyStep(null); setTab('shift');
+  };
   const stepBar = (
     <StepBar
       step={v2NextStep(step)}
@@ -964,7 +972,7 @@ export function OperatorShiftV2() {
   }
 
   // ---------- 5. Работа ----------
-  if (step === 'work') {
+  if (step === 'work' || editingProduction) {
     return (
       <>
         <StepShell bar={stepBar}
@@ -974,8 +982,15 @@ export function OperatorShiftV2() {
           subtitle={stepLabel}
           footer={<BottomTabs active={tab} onSelect={setTab} />}
         >
+          {editingProduction ? (
+            <button type="button" onClick={goHome}
+              className="min-h-12 w-full rounded-lg border border-border bg-card text-base font-semibold text-foreground">
+              К сдаче смены
+            </button>
+          ) : null}
           {tab === 'shift' && mobile && <OperatorWorkOverview state={mobile} variant="v2" busy={busy}
             onAction={(kind)=>{if(kind==='PILES')setPileOpen(true);else if(kind==='PASSPORT')setPassportOpen(true);else if(kind==='DRILLING')setDrillingOpen(true);else setDowntimeOpen(true);}}
+            hideFinish={editingProduction}
             onIncident={()=>setTab('safety')} onDefect={()=>setDefectOpen(true)} onFinish={()=>setFinishing(true)} />}
 
           {tab === 'safety' && (
@@ -1175,6 +1190,11 @@ export function OperatorShiftV2() {
             </button>
           </div>
         )}
+        <button type="button" disabled={busy || !mobile}
+          onClick={() => { setEditingProductionShiftId(mobile?.shift?.id ?? facts.shift?.id ?? null); setTab('shift'); }}
+          className="min-h-12 w-full rounded-lg border border-border bg-card text-base font-semibold text-foreground disabled:opacity-50">
+          Дописать сваи, бурение или простой
+        </button>
         <RowList>
           <li><ValueRow label="Время работы" value={elapsed ?? '—'} /></li>
           <li>
