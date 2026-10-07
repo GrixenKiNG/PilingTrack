@@ -295,3 +295,60 @@ describe('отказ по роли при загрузке состояния', 
     expect(screen.queryByText(/Смену ведёт машинист/)).not.toBeInTheDocument();
   });
 });
+
+describe('I2: вчерашняя смена v5', () => {
+  const yesterday = () => ({
+    ...working,
+    productionDate: '2026-09-28',
+    shift: {...working.shift, state: 'STARTED'},
+    receipt: null,
+    defects: [],
+    incidents: [],
+  }) as OperatorMobileState;
+
+  it('не открывает вчерашнюю выработку обычной вкладкой; явное дописывание возвращается к сдаче', async () => {
+    vi.mocked(api.fetchState).mockResolvedValue(yesterday());
+    const {container} = render(<OperatorV5App />);
+
+    await screen.findByRole('button', {name: 'Работа'});
+    expect(screen.getByText('Не сдана смена за 27.09.2026')).toBeInTheDocument();
+    expect(screen.queryByRole('button', {name: 'Добавить сваю'})).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', {name: 'Работа'}));
+    expect(screen.queryByRole('button', {name: 'Добавить сваю'})).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', {name: /Следующий шаг/}));
+    expect(screen.queryByRole('button', {name: 'Добавить сваю'})).not.toBeInTheDocument();
+    expect(api.sendCommand).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', {name: 'Дописать отчёт за 27.09.2026'}));
+    fillPiles(container);
+    fireEvent.click(screen.getByRole('button', {name: 'Записать'}));
+    await waitFor(() => expect(api.sendCommand).toHaveBeenCalledWith(expect.objectContaining({
+      command: 'log-production', shiftId: 'shift-1',
+      entry: {kind: 'PILES', pileGradeId: 'grade-1', count: 12},
+    })));
+
+    fireEvent.click(screen.getByRole('button', {name: 'К сдаче смены'}));
+    expect(screen.queryByRole('button', {name: 'Добавить сваю'})).not.toBeInTheDocument();
+    expect(screen.getByRole('button', {name: 'Перейти к сдаче смены'})).toBeInTheDocument();
+  });
+
+  it('завершает старую работу существующей командой, затем сдаёт тот же отчёт', async () => {
+    const closing = {
+      ...yesterday(), phase: 'CLOSING',
+      shift: {...yesterday().shift, state: 'HANDOVER_PENDING'},
+      checklists: [...working.checklists, {stage: 'EO_AFTER', done: true, period: null}],
+    } as OperatorMobileState;
+    vi.mocked(api.fetchState).mockResolvedValueOnce(yesterday()).mockResolvedValue(closing);
+    render(<OperatorV5App />);
+
+    await screen.findByRole('button', {name: 'Работа'});
+    fireEvent.click(screen.getByRole('button', {name: 'Перейти к сдаче смены'}));
+    await waitFor(() => expect(api.sendCommand).toHaveBeenCalledWith({command: 'finish-work', shiftId: 'shift-1'}));
+    await screen.findByRole('button', {name: 'Закрыть смену'});
+    fireEvent.click(screen.getByRole('button', {name: 'Дописать отчёт за 27.09.2026'}));
+    expect(await screen.findByRole('button', {name: 'Добавить сваю'})).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', {name: 'К сдаче смены'}));
+    fireEvent.click(screen.getByRole('button', {name: 'Закрыть смену'}));
+    await waitFor(() => expect(api.sendCommand).toHaveBeenCalledWith({command: 'close-shift', shiftId: 'shift-1', comment: ''}));
+  });
+});

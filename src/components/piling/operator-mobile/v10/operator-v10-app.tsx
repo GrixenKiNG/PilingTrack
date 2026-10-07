@@ -543,7 +543,7 @@ function ScreenWork({state, busy, onLog, go}: {
     return (
       <>
         <ProductionForm state={state} busy={busy} onLog={onLog} />
-        <button type="button" className="ov10-btn ghost" onClick={() => go('step')}>К ЕО после работы и закрытию</button>
+        <button type="button" className="ov10-btn ghost" onClick={() => go(state.shift && state.shift.productionDate < state.productionDate ? 'closing' : 'step')}>{state.shift && state.shift.productionDate < state.productionDate ? 'К сдаче смены' : 'К ЕО после работы и закрытию'}</button>
       </>
     );
   }
@@ -719,6 +719,8 @@ function ScreenClosing({state, busy, onFinish, onClose, go, unsent, onFlush}: {
   onFlush: () => void;
 }) {
   const {assignment} = state;
+  const oldDate = state.shift && state.shift.productionDate < state.productionDate
+    ? dateRu(state.shift.productionDate) : null;
   const [confirmFinish, setConfirmFinish] = useState(false);
   // До работы закрывать нечего: закрытие открывается в свою очередь, а не с
   // первой минуты смены (жалоба 28.09.2026 «можно сразу закрыть смену»).
@@ -755,7 +757,7 @@ function ScreenClosing({state, busy, onFinish, onClose, go, unsent, onFlush}: {
             <button type="button" className="ov10-btn orange" disabled={busy} onClick={() => setConfirmFinish(true)}>
               Завершить работу
             </button>
-            <button type="button" className="ov10-btn ghost" onClick={() => go('work')}>К записи выработки</button>
+            <button type="button" className="ov10-btn ghost" onClick={() => go('work')}>{oldDate ? `Дописать отчёт за ${oldDate}` : 'К записи выработки'}</button>
           </>
         )}
       </>
@@ -812,7 +814,7 @@ function ScreenClosing({state, busy, onFinish, onClose, go, unsent, onFlush}: {
         </button>
       ) : null}
       {!closed ? (
-        <button type="button" className="ov10-btn ghost" onClick={() => go('work')}>Дописать сваи, бурение или простой</button>
+        <button type="button" className="ov10-btn ghost" onClick={() => go('work')}>{oldDate ? `Дописать отчёт за ${oldDate}` : 'Дописать сваи, бурение или простой'}</button>
       ) : null}
     </>
   );
@@ -1368,6 +1370,9 @@ export function OperatorV10App() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [active, setActive] = useState('today');
+  const [editingShiftId, setEditingShiftId] = useState<string | null>(null);
+  const oldShift = state?.shift && state.shift.productionDate < state.productionDate
+    && (state.phase === 'WORK' || state.phase === 'CLOSING');
   const contentRef = useRef<HTMLDivElement | null>(null);
 
   // Новое сообщение — к нему: полоса вверху, форма могла быть прокручена вниз.
@@ -1593,13 +1598,14 @@ export function OperatorV10App() {
         />
       );
     }
-    if (current.phase === 'WORK') return <ScreenWork state={current} busy={busy} onLog={logProduction} go={setActive} />;
-    return <ScreenClosing state={current} busy={busy} onFinish={finishWork} onClose={closeShift} go={setActive}
+    if (current.phase === 'WORK' && !oldShift) return <ScreenWork state={current} busy={busy} onLog={logProduction} go={setActive} />;
+    return <ScreenClosing state={current} busy={busy} onFinish={finishWork} onClose={closeShift} go={goFromClosing}
       unsent={queued.length} onFlush={() => void flushQueued()} />;
   };
 
   /** Куда ведёт «Следующий шаг»: экран этого модуля по действию из shift-next-step. */
   const goNextStep = (value: OperatorMobileState) => {
+    setEditingShiftId(null);
     const action = nextStep(value).action;
     switch (action.kind) {
       case 'ADMISSION':
@@ -1619,6 +1625,10 @@ export function OperatorV10App() {
 
   const current = SCREENS.find((screen) => screen.id === active) ?? SCREENS[0];
   const activeTab = TABS.find((tab) => tab.screen === current.id)?.key ?? current.tab;
+  const goFromClosing: Go = (screen) => {
+    setEditingShiftId(screen === 'work' ? state?.shift?.id ?? null : null);
+    setActive(screen);
+  };
 
   const body = (() => {
     if (loading) {
@@ -1645,12 +1655,16 @@ export function OperatorV10App() {
       );
       case 'accept': return <ScreenAccept state={state} busy={busy} onAccept={accept} go={setActive} />;
       case 'step': return stepScreen(state);
-      case 'work': return (
-        <ScreenWork state={state} busy={busy} onLog={logProduction} go={setActive} />
-      );
+      case 'work': return oldShift && editingShiftId !== state.shift?.id ? (
+        <ScreenClosing state={state} busy={busy} onFinish={finishWork} onClose={closeShift} go={goFromClosing}
+          unsent={queued.length} onFlush={() => void flushQueued()} />
+      ) : <>
+        <ScreenWork state={state} busy={busy} onLog={logProduction} go={goFromClosing} />
+        {oldShift && state.phase === 'WORK' ? <button type="button" className="ov10-btn ghost" onClick={() => goFromClosing('closing')}>К сдаче смены</button> : null}
+      </>;
       case 'maint': return <ScreenMaint state={state} go={setActive} />;
       case 'closing': return (
-        <ScreenClosing state={state} busy={busy} onFinish={finishWork} onClose={closeShift} go={setActive}
+        <ScreenClosing state={state} busy={busy} onFinish={finishWork} onClose={closeShift} go={goFromClosing}
           unsent={queued.length} onFlush={() => void flushQueued()} />
       );
       case 'report': return <ScreenReport state={state} />;
@@ -1673,6 +1687,7 @@ export function OperatorV10App() {
         />
       </div>
       <div className="ov10-content" ref={contentRef}>
+        {oldShift && state?.shift ? <Banner tone="warn" title={`Не сдана смена за ${dateRu(state.shift.productionDate)}`}>Дописать можно только работу этой смены. Сегодняшняя работа — после открытия новой смены.</Banner> : null}
         {loadError && state ? <Banner tone="warn" title={loadError} /> : null}
         {actionError ? <Banner tone="bad" title={`Не записано: ${actionError}`} /> : null}
         {notice ? <Banner tone="info" title={notice} /> : null}

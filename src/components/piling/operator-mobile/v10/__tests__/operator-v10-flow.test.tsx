@@ -84,6 +84,62 @@ beforeEach(() => {
 });
 
 describe('v10: порядок смены', () => {
+  it('старую смену явно датирует и следующий шаг ведёт к сдаче вместо сегодняшней выработки', async () => {
+    const state = makeState('WORK', ['PRESHIFT_INSPECTION', 'SITE_READY', 'EO_BEFORE']);
+    state.shift = {...state.shift!, productionDate: '2026-09-27', state: 'STARTED'};
+    api.fetchState.mockResolvedValue(state);
+    render(<OperatorV10App />);
+
+    await screen.findByRole('button', {name: 'Дальше: Работа: сваи, бурение, простой'});
+    expect(screen.getByText('Не сдана смена за 27.09.2026')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', {name: 'Дальше: Работа: сваи, бурение, простой'}));
+    expect(screen.queryByRole('button', {name: 'Свая'})).not.toBeInTheDocument();
+    expect(screen.getByRole('button', {name: 'Дописать отчёт за 27.09.2026'})).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', {name: 'Дописать отчёт за 27.09.2026'}));
+    expect(await screen.findByRole('button', {name: 'Свая'})).toBeInTheDocument();
+    expect(screen.getByText('27.09.2026')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', {name: 'К сдаче смены'}));
+    expect(screen.queryByRole('button', {name: 'Свая'})).not.toBeInTheDocument();
+    expect(api.sendCommand).not.toHaveBeenCalled();
+  });
+
+  it('дописанное вчерашнее остаётся в старой смене, после сдачи открывается сегодняшняя', async () => {
+    const old = makeState('CLOSING', [...STAGES]);
+    old.shift = {...old.shift!, productionDate: '2026-09-27', state: 'HANDOVER_PENDING'};
+    api.fetchState.mockResolvedValue(old);
+    api.sendCommand.mockResolvedValue({ok: true});
+    render(<OperatorV10App />);
+
+    await screen.findByRole('button', {name: 'Дальше: ЕО после работы и закрытие смены'});
+    expect(screen.getByText('Не сдана смена за 27.09.2026')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', {name: 'Дальше: ЕО после работы и закрытие смены'}));
+    fireEvent.click(await screen.findByRole('button', {name: 'Дописать отчёт за 27.09.2026'}));
+    fireEvent.click(screen.getByRole('button', {name: 'Простой'}));
+    fireEvent.change(screen.getByRole('combobox'), {target: {value: 'r1'}});
+    fireEvent.change(screen.getByLabelText('Простой, часов'), {target: {value: '1.5'}});
+    fireEvent.click(screen.getByRole('button', {name: 'Записать'}));
+    await waitFor(() => expect(api.sendCommand).toHaveBeenCalledWith(expect.objectContaining({command: 'log-production', shiftId: 'shift-1', entry: {kind: 'DOWNTIME', reasonId: 'r1', hours: 1.5}})));
+    fireEvent.click(screen.getByRole('button', {name: 'К сдаче смены'}));
+
+    const today = makeState('ADMISSION');
+    today.shift = null;
+    api.fetchState.mockResolvedValue(today);
+    fireEvent.click(screen.getByRole('button', {name: 'Закрыть смену и отправить отчёт'}));
+    await waitFor(() => expect(api.sendCommand).toHaveBeenCalledWith({command: 'close-shift', shiftId: 'shift-1', comment: ''}));
+    await waitFor(() => expect(screen.queryByText('Не сдана смена за 27.09.2026')).not.toBeInTheDocument());
+
+    const workingToday = makeState('WORK', ['PRESHIFT_INSPECTION', 'SITE_READY', 'EO_BEFORE']);
+    workingToday.shift = {...workingToday.shift!, id: 'shift-today', productionDate: '2026-09-28', state: 'STARTED'};
+    api.fetchState.mockResolvedValue(workingToday);
+    fireEvent.click(screen.getByRole('button', {name: 'Обновить'}));
+    fireEvent.click(await screen.findByRole('button', {name: 'Главная'}));
+    fireEvent.click(await screen.findByRole('button', {name: 'Дальше: Работа: сваи, бурение, простой'}));
+    fireEvent.click(screen.getByRole('button', {name: 'Простой'}));
+    fireEvent.change(screen.getByRole('combobox'), {target: {value: 'r1'}});
+    fireEvent.change(screen.getByLabelText('Простой, часов'), {target: {value: '0.25'}});
+    fireEvent.click(screen.getByRole('button', {name: 'Записать'}));
+    await waitFor(() => expect(api.sendCommand).toHaveBeenCalledWith(expect.objectContaining({command: 'log-production', shiftId: 'shift-today', entry: {kind: 'DOWNTIME', reasonId: 'r1', hours: 0.25}})));
+  });
   it('на «Смене» — сделанные шаги отмечены, нажать можно только текущий', async () => {
     api.fetchState.mockResolvedValue(makeState('PRESHIFT_INSPECTION'));
     render(<OperatorV10App />);

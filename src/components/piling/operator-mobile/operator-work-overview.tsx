@@ -12,7 +12,7 @@ export type WorkAction = 'PILES' | 'PASSPORT' | 'DRILLING' | 'DOWNTIME';
 type Variant = 'base' | 'v2' | 'v5' | 'v7' | 'v10';
 
 export function OperatorMachineHeader({state}: {state: OperatorMobileState}) {
-  return <div className="oc-machine"><PilingIcon name="equipment-rig" size={40} decorative /><div><strong>{state.assignment?.equipmentName ?? 'Установка не назначена'}</strong><span>{state.assignment?.siteName ?? 'Площадка не назначена'}</span><small>{state.productionDate.split('-').reverse().join('.')}</small></div></div>;
+  return <div className="oc-machine"><PilingIcon name="equipment-rig" size={40} decorative /><div><strong>{state.assignment?.equipmentName ?? 'Установка не назначена'}</strong><span>{state.assignment?.siteName ?? 'Площадка не назначена'}</span><small>{(state.shift?.productionDate ?? state.productionDate).split('-').reverse().join('.')}</small></div></div>;
 }
 
 /** One overview of server facts; actions delegate to each version's existing forms. */
@@ -64,4 +64,3 @@ export function OperatorWorkOverview({state, variant, busy, onAction, onFinish, 
     {finish ? <div className="oc-mobile-finish">{finish}</div> : null}
   </div>;
 }
-

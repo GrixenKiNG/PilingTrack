@@ -878,7 +878,9 @@ export function CloseScreen({state, busy, onClose, unsent, onFlush, onAddWork}: 
       ) : null}
       {onAddWork ? (
         <button className="b gh" type="button" disabled={busy} onClick={onAddWork}>
-          Дописать сваи, бурение или простой
+          {state.shift && state.shift.productionDate < state.productionDate
+            ? `Дописать отчёт за ${dateRu(state.shift.productionDate)}`
+            : 'Дописать сваи, бурение или простой'}
         </button>
       ) : null}
       <button className="b" type="button" disabled={busy || unsent > 0} onClick={onClose}>
@@ -908,6 +910,7 @@ export function OperatorV5App() {
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [tab, setTab] = useState<Tab>('SHIFT');
+  const [editingShiftId, setEditingShiftId] = useState<string | null>(null);
   const [answers, setAnswers] = useState<Record<string, OperatorAnswer>>({});
   /** Числовые замеры текущего списка: моточасы, остаток топлива, доливы. */
   const [measures, setMeasures] = useState<Record<string, string>>({});
@@ -1133,6 +1136,11 @@ export function OperatorV5App() {
   }
 
   const shiftId = state.shift?.id ?? null;
+  const oldShift = state.shift && state.shift.productionDate < state.productionDate
+    && (state.shift.state === 'STARTED' || state.shift.state === 'HANDOVER_PENDING')
+    ? state.shift : null;
+  const editingOldShift = oldShift && editingShiftId === shiftId;
+  const addWork = () => { setEditingShiftId(shiftId); setTab('WORK'); };
 
   /*
     Нижняя панель шагов: «Главная», «Следующий шаг», «Завершить смену».
@@ -1140,7 +1148,7 @@ export function OperatorV5App() {
     только переходы этого модуля. Экран фазы (допуск, приём, осмотр, сдача)
     и есть главный экран: «Главная» закрывает обходные шаги и вкладку.
   */
-  const goHome = () => { setAdmissionStep(null); setSafetyStage(null); setTab('SHIFT'); };
+  const goHome = () => { setEditingShiftId(null); setAdmissionStep(null); setSafetyStage(null); setTab('SHIFT'); };
   const goNext = () => {
     const action = nextStep(state).action;
     switch (action.kind) {
@@ -1260,19 +1268,40 @@ export function OperatorV5App() {
 
     // Открытый по сроку чек-лист ТБ перекрывает рабочий экран: человек его сам
     // и открыл, и возврат — по кнопке «Завершить» внизу списка.
-    if ((state.phase === 'WORK' || (state.phase === 'CLOSING' && tab === 'WORK')) && !safetyStage) {
+    if (oldShift && state.phase === 'WORK' && !editingOldShift && !safetyStage) {
       return (
+        <div className="scr">
+          <p className="kicker">Сдача смены за {dateRu(oldShift.productionDate)}</p>
+          <button className="b gh" type="button" disabled={busy} onClick={addWork}>
+            Дописать отчёт за {dateRu(oldShift.productionDate)}
+          </button>
+          <button className="b" type="button" disabled={busy} onClick={() => {
+            goHome();
+            if (shiftId) void run(() => sendCommand({command: 'finish-work', shiftId}), 'Работа завершена.');
+          }}>
+            Перейти к сдаче смены
+          </button>
+        </div>
+      );
+    }
+
+    if ((state.phase === 'WORK' || (state.phase === 'CLOSING' && tab === 'WORK'))
+      && (!oldShift || editingOldShift) && !safetyStage) {
+      return (
+        <>
+        {editingOldShift ? <button className="b gh" type="button" onClick={goHome}>К сдаче смены</button> : null}
         <WorkScreen
           state={state}
           busy={busy}
           onLog={logProduction}
           onOpenSafety={setSafetyStage}
-          afterFinish={state.phase !== 'WORK'}
+          afterFinish={state.phase !== 'WORK' || Boolean(oldShift)}
           onIncident={()=>setTab('EVENTS')}
           onFinish={() => {
             if (shiftId) void run(() => sendCommand({command: 'finish-work', shiftId}), 'Работа завершена.');
           }}
         />
+        </>
       );
     }
 
@@ -1327,7 +1356,7 @@ export function OperatorV5App() {
         busy={busy}
         unsent={queued.length}
         onFlush={() => void flushQueued()}
-        onAddWork={() => setTab('WORK')}
+        onAddWork={addWork}
         onClose={() => {
           if (shiftId) void run(() => sendCommand({command: 'close-shift', shiftId, comment: ''}), 'Смена закрыта.');
         }}
@@ -1339,6 +1368,12 @@ export function OperatorV5App() {
     <div className="app">
       <Bar online={online} />
       <Top state={state} />
+      {oldShift ? (
+        <div className="scr">
+          <p className="note warn">Не сдана смена за {dateRu(oldShift.productionDate)}</p>
+          <p className="note">Сегодняшняя работа — после открытия новой смены. Здесь можно дописать только выполненное за {dateRu(oldShift.productionDate)} и сдать смену.</p>
+        </div>
+      ) : null}
       {notice ? <p className="note">{notice}</p> : null}
       <OfflineQueueBanner items={queued} onRetry={retryQueued} onDiscard={discardQueued} />
       {body()}
