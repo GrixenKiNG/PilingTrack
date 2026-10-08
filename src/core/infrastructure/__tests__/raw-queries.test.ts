@@ -34,7 +34,6 @@ vi.mock('@/lib/logger', () => ({
 
 import {
   getReportsByPeriodRaw,
-  upsertReportRaw,
   PERIOD_REPORTS_LIMIT,
 } from '../raw-queries';
 
@@ -103,60 +102,5 @@ describe('getReportsByPeriodRaw', () => {
       status: 422,
       message: 'За выбранный период больше 2000 отчётов — сузьте период или выберите объект',
     });
-  });
-});
-
-describe('upsertReportRaw', () => {
-  beforeEach(() => {
-    queryRawMock.mockReset();
-    queryRawMock.mockResolvedValue([{ id: 'internal-1' }]);
-  });
-
-  it('uses parameterised tagged template (not $queryRawUnsafe)', async () => {
-    await upsertReportRaw({
-      id: 'r1', tenantId: 't1', userId: 'u1', siteId: 's1',
-      date: '2026-04-10', status: 'draft',
-    });
-
-    expect(queryRawMock).toHaveBeenCalledTimes(1);
-    const [firstArg] = queryRawMock.mock.calls[0];
-    // tagged-template invocation passes a TemplateStringsArray (has .raw)
-    expect(Array.isArray(firstArg)).toBe(true);
-    expect((firstArg as TemplateStringsArray).raw).toBeDefined();
-  });
-
-  it('passes all user-supplied values as template placeholders, never interpolated', async () => {
-    const malicious = "'; DROP TABLE Report; --";
-    await upsertReportRaw({
-      id: malicious, tenantId: 't1', userId: 'u1', siteId: 's1',
-      date: '2026-04-10', status: 'draft',
-    });
-
-    const [, ...values] = queryRawMock.mock.calls[0];
-    expect(values).toContain(malicious);
-    // SQL fragment must NOT contain the injection payload inline
-    const strings = queryRawMock.mock.calls[0][0] as TemplateStringsArray;
-    expect(strings.join('')).not.toContain(malicious);
-  });
-
-  it('defaults missing shiftType/shiftStart/shiftEnd/equipmentId', async () => {
-    await upsertReportRaw({
-      id: 'r1', tenantId: 't1', userId: 'u1', siteId: 's1',
-      date: '2026-04-10', status: 'draft',
-    });
-
-    const [, ...values] = queryRawMock.mock.calls[0];
-    expect(values).toContain('day');
-    expect(values).toContain(null);
-  });
-
-  it('returns the first row from the RETURNING clause', async () => {
-    queryRawMock.mockResolvedValueOnce([{ id: 'row-a', reportId: 'r1' }, { id: 'row-b' }]);
-    const result = await upsertReportRaw({
-      id: 'r1', tenantId: 't1', userId: 'u1', siteId: 's1',
-      date: '2026-04-10', status: 'draft',
-    });
-
-    expect(result).toEqual({ id: 'row-a', reportId: 'r1' });
   });
 });

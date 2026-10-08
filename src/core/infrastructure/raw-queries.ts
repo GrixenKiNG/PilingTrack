@@ -6,7 +6,6 @@
  *
  * Benchmark-цели:
  * - getReportsByPeriod: < 50ms (vs ~200ms Prisma include)
- * - upsertReport: < 10ms (vs ~50ms find-then-update)
  */
 
 import { db } from '@/lib/db';
@@ -112,56 +111,5 @@ export async function getReportsByPeriodRaw(
   }
 
   return reports;
-}
-
-// ============================================================
-// Atomic Upsert Report — один запрос вместо find-then-update
-// ============================================================
-
-export async function upsertReportRaw(params: {
-  id: string;
-  tenantId: string;
-  userId: string;
-  siteId: string;
-  date: string;
-  status: string;
-  shiftType?: string;
-  shiftStart?: string | null;
-  shiftEnd?: string | null;
-  equipmentId?: string | null;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
-}): Promise<any> {
-  const start = Date.now();
-
-  const { id, tenantId, userId, siteId, date, status, shiftType, shiftStart, shiftEnd, equipmentId } = params;
-
-  const report = await db.$queryRaw<Array<Record<string, unknown>>>`
-    INSERT INTO "Report" (
-      id, "tenantId", "userId", "siteId", "date", "status",
-      "shiftType", "shiftStart", "shiftEnd", "equipmentId",
-      "version", "updatedAt", "createdAt"
-    )
-    VALUES (
-      ${id}, ${tenantId}, ${userId}, ${siteId}, ${date}, ${status},
-      ${shiftType || 'day'}, ${shiftStart}, ${shiftEnd}, ${equipmentId || null},
-      1, NOW(), NOW()
-    )
-    ON CONFLICT (id) DO UPDATE SET
-      "status" = EXCLUDED."status",
-      "shiftType" = EXCLUDED."shiftType",
-      "shiftStart" = EXCLUDED."shiftStart",
-      "shiftEnd" = EXCLUDED."shiftEnd",
-      "equipmentId" = EXCLUDED."equipmentId",
-      "version" = "Report"."version" + 1,
-      "updatedAt" = NOW()
-    RETURNING *
-  `;
-
-  const elapsed = Date.now() - start;
-  if (elapsed > 20) {
-    logger.warn('RawQuery: upsertReport slow', { elapsedMs: elapsed });
-  }
-
-  return report[0];
 }
 
