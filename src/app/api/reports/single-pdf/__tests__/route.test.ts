@@ -60,6 +60,7 @@ import { enqueuePdfGeneration } from '@/lib/pdf-queue';
 import { recordFeedbackEvent } from '@/services/feedback/feedback-event-service';
 
 const OPERATOR = { id: 'user-1', role: 'OPERATOR', tenantId: 'tenant-a' };
+const DISPATCHER = { id: 'user-2', role: 'DISPATCHER', tenantId: 'tenant-a' };
 const JOB_ID = '11111111-1111-1111-1111-111111111111';
 
 function statusReq(): NextRequest {
@@ -103,6 +104,30 @@ describe('GET /api/reports/single-pdf — ownership fail-closed', () => {
 
     expect(res.status).toBe(403);
     expect(getPdfJobStatusMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects (403) an OPERATOR on download when the job record is gone', async () => {
+    getPdfJobOwnerIdMock.mockResolvedValue(null);
+    assertCanMock.mockImplementation(() => { throw new ServiceError('Доступ запрещён', 403); });
+
+    const res = await GET(downloadReq());
+
+    expect(assertCanMock).toHaveBeenCalledWith(OPERATOR, 'reports.read_cross_user');
+    expect(res.status).toBe(403);
+    expect(downloadPdfMock).not.toHaveBeenCalled();
+  });
+
+  it('lets a reports.read_cross_user role (DISPATCHER) download when the job record is gone', async () => {
+    getPdfJobOwnerIdMock.mockResolvedValue(null);
+    requireAuthMock.mockResolvedValue({ user: DISPATCHER, error: null });
+    downloadPdfMock.mockResolvedValue(Buffer.from('%PDF-1.4'));
+
+    const res = await GET(downloadReq());
+
+    expect(assertCanMock).toHaveBeenCalledWith(DISPATCHER, 'reports.read_cross_user');
+    expect(res.status).toBe(200);
+    expect(res.headers.get('content-type')).toBe('application/pdf');
+    expect(downloadPdfMock).toHaveBeenCalledWith(JOB_ID);
   });
 
   it('still checks ownership normally when the job record exists', async () => {
