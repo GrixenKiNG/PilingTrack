@@ -3,6 +3,8 @@ import { requireTenantId } from '@/lib/tenant';
 import { requireAuth } from '@/lib/auth';
 import { assertCan } from '@/services/auth/authorization-service';
 import { withApi } from '@/core/api-wrapper';
+import { getSettings } from '@/modules/settings';
+import { getTodayInTimezone } from '@/lib/timezone';
 
 
 export const runtime = 'nodejs';
@@ -59,7 +61,8 @@ export const GET = withApi(
     }
 
     const format = request.nextUrl.searchParams.get('format') === 'xlsx' ? 'xlsx' : 'csv';
-    const today = new Date().toISOString().split('T')[0];
+    const { timezone } = await getSettings(tenantId);
+    const today = getTodayInTimezone(timezone);
     const mod = await getReportsModule();
 
     if (format === 'xlsx') {

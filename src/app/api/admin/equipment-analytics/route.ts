@@ -3,6 +3,7 @@ import { requireAuth } from '@/lib/auth';
 import { assertCan } from '@/services/auth/authorization-service';
 import { withApi } from '@/core/api-wrapper';
 import { getEquipmentAnalytics } from '@/services/analytics/equipment-analytics-service';
+import { getSettings } from '@/modules/settings';
 
 export const runtime = 'nodejs';
 
@@ -27,11 +28,13 @@ export const GET = withApi(
       return NextResponse.json({ error: 'Организация не определена' }, { status: 400 });
     }
 
+    const { timezone } = await getSettings(user.tenantId);
     const data = await getEquipmentAnalytics({
       dateFrom,
       dateTo,
       siteId,
       tenantId: user?.tenantId ?? null,
+      timezone,
     });
     return NextResponse.json(data);
   },

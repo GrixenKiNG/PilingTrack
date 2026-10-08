@@ -7,7 +7,7 @@
  * Лимит — на пользователя (как у PDF-выгрузок), не на адрес: экраны бьют с
  * одного IP за NAT. Превышение — 429 и русский текст, без сборки файла.
  */
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest, NextResponse } from 'next/server';
 
 const { requireAuthMock, assertCanMock, exportMock, rateCheckMock } = vi.hoisted(() => ({
@@ -18,6 +18,7 @@ const { requireAuthMock, assertCanMock, exportMock, rateCheckMock } = vi.hoisted
 }));
 
 vi.mock('@/lib/auth', () => ({ requireAuth: requireAuthMock }));
+vi.mock('@/modules/settings', () => ({ getSettings: vi.fn(async () => ({ timezone: 'Europe/Moscow' })) }));
 vi.mock('@/services/auth/authorization-service', async () => {
   const actual = await vi.importActual<object>('@/services/auth/authorization-service');
   return { ...actual, assertCan: assertCanMock };
@@ -41,11 +42,20 @@ function req(qs = ''): NextRequest {
 }
 
 describe('GET /api/pile-passports/export — ограничение частоты (W30)', () => {
+  afterEach(() => vi.useRealTimers());
   beforeEach(() => {
     vi.clearAllMocks();
     requireAuthMock.mockResolvedValue({ user: admin, error: null });
     rateCheckMock.mockResolvedValue({ allowed: true, remaining: 5 });
     exportMock.mockResolvedValue(Buffer.from('xlsx'));
+  });
+
+  it('names the journal by the production day at midnight', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-10-07T21:30:00Z'));
+    const response = await GET(req());
+    expect(response.status).toBe(200);
+    expect(response.headers.get('Content-Disposition')).toContain('pile-driving-journal-2026-10-08.xlsx');
   });
 
   it('обычный запрос отдаёт файл (200)', async () => {

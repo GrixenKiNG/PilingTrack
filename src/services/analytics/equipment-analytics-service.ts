@@ -1,6 +1,7 @@
 import { SUBMITTED_REPORT_STATUS } from '@/lib/report-status';
 import { db } from '@/lib/db';
 import { checkMaintenanceDue } from '@/lib/maintenance-due';
+import { zonedDayStartUtc } from '@/lib/timezone';
 
 /**
  * Fleet analytics aggregated per equipment for a date range. Mirrors the
@@ -42,6 +43,7 @@ export interface EquipmentAnalyticsParams {
   dateTo: string;
   siteId?: string | null;
   tenantId?: string | null;
+  timezone?: string;
 }
 
 function daysInPeriod(dateFrom: string, dateTo: string): number {
@@ -63,6 +65,7 @@ export async function getEquipmentAnalytics(params: EquipmentAnalyticsParams) {
   if (!tenantId) {
     throw new Error('getEquipmentAnalytics: tenantId is required');
   }
+  const { timezone } = params;
 
   const rows = await db.$queryRaw<EquipmentRow[]>`
     WITH rep AS (
@@ -140,8 +143,10 @@ export async function getEquipmentAnalytics(params: EquipmentAnalyticsParams) {
   `;
 
   // Fuel from telematics cumulative counter (max − min per rig over the range).
-  const fromTs = new Date(`${dateFrom}T00:00:00`);
-  const toTs = new Date(`${dateTo}T23:59:59.999`);
+  const fromTs = zonedDayStartUtc(dateFrom, timezone);
+  const nextDay = new Date(`${dateTo}T12:00:00Z`);
+  nextDay.setUTCDate(nextDay.getUTCDate() + 1);
+  const toTs = zonedDayStartUtc(nextDay.toISOString().slice(0, 10), timezone);
   const fuelGrouped = await db.telemetryRecord.groupBy({
     by: ['equipmentId'],
     where: {
@@ -150,7 +155,7 @@ export async function getEquipmentAnalytics(params: EquipmentAnalyticsParams) {
       // расход. siteId остаётся необязательным.
       tenantId,
       type: 'fuel_total',
-      timestamp: { gte: fromTs, lte: toTs },
+      timestamp: { gte: fromTs, lt: toTs },
       ...(siteId ? { siteId } : {}),
     },
     _min: { value: true },

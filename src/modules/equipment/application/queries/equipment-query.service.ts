@@ -5,6 +5,8 @@ import { pileLengthMeters } from '@/lib/pile-length';
 import type { CursorPaginationResult } from '@/lib/pagination-cursor';
 import type { MaintenanceStatus, MaintenancePriority, MaintenanceType } from '../commands/equipment-maintenance';
 import { requireTenantId } from '@/lib/tenant-scope';
+import { getTodayInTimezone } from '@/lib/timezone';
+import { getSettings } from '@/modules/settings';
 
 // Safety cap for the cross-fleet work order list. Single-tenant volumes are
 // low today; revisit with cursor pagination if a tenant exceeds this.
@@ -92,7 +94,10 @@ export async function getEquipmentDetails(equipmentId: string, tenantId: string)
   });
   if (!equipment) throw new ServiceError('Установка не найдена', 404);
 
-  const cutoff = new Date(Date.now() - 30 * 86_400_000).toISOString().slice(0, 10);
+  const { timezone } = await getSettings(tenantId);
+  const cutoffDay = new Date(`${getTodayInTimezone(timezone)}T12:00:00Z`);
+  cutoffDay.setUTCDate(cutoffDay.getUTCDate() - 30);
+  const cutoff = cutoffDay.toISOString().slice(0, 10);
   const reportSelect = {
     id: true, reportId: true, date: true, shiftType: true, status: true,
     site: { select: { id: true, name: true } },

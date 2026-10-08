@@ -7,7 +7,7 @@
  * resolved, and that the resolved tenantId reaches the query — same pattern
  * as src/app/api/reports/period/__tests__/route.test.ts.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { NextRequest } from 'next/server';
 
 const { requireAuthMock, exportReportsCsvMock } = vi.hoisted(() => ({
@@ -17,6 +17,7 @@ const { requireAuthMock, exportReportsCsvMock } = vi.hoisted(() => ({
 
 vi.mock('@/lib/auth', () => ({ requireAuth: requireAuthMock }));
 vi.mock('@/modules/reports', () => ({ exportReportsCsv: exportReportsCsvMock }));
+vi.mock('@/modules/settings', () => ({ getSettings: vi.fn(async () => ({ timezone: 'Europe/Moscow' })) }));
 
 import { GET } from '../route';
 
@@ -25,10 +26,20 @@ function req(qs: string): NextRequest {
 }
 
 describe('GET /api/reports/export', () => {
+  afterEach(() => vi.useRealTimers());
   beforeEach(() => {
     requireAuthMock.mockReset();
     exportReportsCsvMock.mockReset();
     exportReportsCsvMock.mockResolvedValue('id;date\n');
+  });
+
+  it('names the CSV by the production day at midnight rather than yesterday in UTC', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-10-07T21:30:00Z'));
+    requireAuthMock.mockResolvedValue({ user: { id: 'admin', role: 'ADMIN', tenantId: 'orion' }, error: null });
+    const res = await GET(req('dateFrom=2026-10-01&dateTo=2026-10-07'));
+    expect(res.status).toBe(200);
+    expect(res.headers.get('Content-Disposition')).toContain('pilingtrack-reports-2026-10-08.csv');
   });
 
   it('returns 401 when there is no session', async () => {
