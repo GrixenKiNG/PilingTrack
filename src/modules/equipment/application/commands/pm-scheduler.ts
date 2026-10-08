@@ -9,6 +9,8 @@
  */
 
 import { db } from '@/lib/db';
+// eslint-disable-next-line no-restricted-imports -- W117: shared best-effort audit after the committed mutation; no audit module facade exists
+import { recordAuditEvent } from '@/services/audit/audit-service';
 import { ServiceError } from '@/lib/service-error';
 import { evaluatePlanDue } from '@/lib/pm-due';
 import { requestReadinessSnapshot } from '@/modules/readiness/server';
@@ -141,7 +143,14 @@ async function runPmSchedulerScoped(tenantId: string, now: Date): Promise<PmSche
       });
       return createdRecord;
     });
-    if (record) created++;
+    if (record) {
+      created++;
+      await recordAuditEvent({
+        action: 'maintenance.scheduled', scope: 'equipment', actorId: null,
+        targetId: record.id, tenantId,
+        metadata: { auto: true, name: plan.title, planId: plan.id, equipmentId: plan.equipmentId, type: plan.type },
+      });
+    }
   }
 
   return { evaluated: plans.length, due, created, overdue };

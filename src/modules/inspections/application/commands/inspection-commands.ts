@@ -1,4 +1,6 @@
 import { db } from '@/lib/db';
+// eslint-disable-next-line no-restricted-imports -- W117: shared best-effort audit after the committed mutation; no audit module facade exists
+import { recordAuditEvent } from '@/services/audit/audit-service';
 import type { Prisma } from '@/generated/postgres-client/client';
 import { ServiceError } from '@/lib/service-error';
 import { recordMeterReadingInTx } from '@/modules/equipment';
@@ -142,7 +144,7 @@ export async function startToInspection(
   // наряд ТО, а открытый наряд авторитетный расчёт считает незакрытой работой.
   // Без пересчёта брошенный осмотр держал бы балл готовности на прежнем
   // значении, хотя запись висит «в работе» (симптом «24 зависших записи ТО»).
-  return db.$transaction(async (tx) => {
+  const inspection = await db.$transaction(async (tx) => {
     const record = await tx.maintenanceRecord.create({
       data: {
         tenantId: ctx.tenantId, equipmentId: eq.id, type: input.level,
@@ -171,6 +173,12 @@ export async function startToInspection(
     });
     return inspection;
   });
+  await recordAuditEvent({
+    action: 'inspection.started', scope: 'inspections', actorId: ctx.userId,
+    targetId: inspection.id, tenantId: ctx.tenantId,
+    metadata: { equipmentId: eq.id, level: input.level, phase, maintenanceRecordId: inspection.maintenanceRecordId },
+  });
+  return inspection;
 }
 
 export async function startInspection(
@@ -197,7 +205,7 @@ export async function startInspection(
     })),
   );
 
-  return db.inspection.create({
+  const inspection = await db.inspection.create({
     data: {
       tenantId: ctx.tenantId, equipmentId: eq.id, templateId: tpl.id, level: tpl.level,
       performedById: ctx.userId, inspectionDate: toDate(input.inspectionDate),
@@ -205,6 +213,12 @@ export async function startInspection(
       status: 'DRAFT', templateSnapshot: snapshot,
     },
   });
+  await recordAuditEvent({
+    action: 'inspection.started', scope: 'inspections', actorId: ctx.userId,
+    targetId: inspection.id, tenantId: ctx.tenantId,
+    metadata: { equipmentId: eq.id, level: tpl.level },
+  });
+  return inspection;
 }
 
 export interface AnswerInput { itemId: string; result: string; value?: string | null; note?: string | null; photoCount?: number }

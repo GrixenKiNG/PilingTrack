@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const {
   findManyMock, findFirstMock, createMock, executeRawMock, queryRawMock, dbFindFirstMock,
-  readinessMock, transactionMock,
+  readinessMock, transactionMock, auditMock,
 } = vi.hoisted(() => ({
   findManyMock: vi.fn(),
   findFirstMock: vi.fn(),
@@ -15,7 +15,9 @@ const {
   dbFindFirstMock: vi.fn(),
   readinessMock: vi.fn(),
   transactionMock: vi.fn(),
+  auditMock: vi.fn(),
 }));
+vi.mock('@/services/audit/audit-service', () => ({ recordAuditEvent: auditMock }));
 
 vi.mock('@/lib/db', () => {
   const tx = {
@@ -75,6 +77,7 @@ describe('runPmScheduler', () => {
     dbFindFirstMock.mockReset();
     readinessMock.mockReset();
     transactionMock.mockReset();
+    auditMock.mockReset();
     findManyMock.mockResolvedValue([overduePlan]);
     executeRawMock.mockResolvedValue(1);
     createMock.mockResolvedValue({
@@ -82,6 +85,13 @@ describe('runPmScheduler', () => {
       updatedAt: new Date('2026-09-27T00:00:00.000Z'),
     });
     readinessMock.mockResolvedValue(undefined);
+  });
+
+  it('ошибка в транзакции наряда не создаёт события об успехе', async () => {
+    findFirstMock.mockResolvedValue(null);
+    readinessMock.mockRejectedValue(new Error('transaction failed'));
+    await expect(runPmScheduler('orion', new Date('2026-09-27T00:00:00.000Z'))).rejects.toThrow('transaction failed');
+    expect(auditMock).not.toHaveBeenCalled();
   });
 
   it('берёт advisory-замок на «установка + тип» в организации до проверки дубля', async () => {
@@ -107,6 +117,11 @@ describe('runPmScheduler', () => {
     expect(data).toMatchObject({ tenantId: 'orion', equipmentId: 'eq_1', type: 'TO1', status: 'PLANNED' });
     expect(result.created).toBe(1);
     expect(result.overdue).toHaveLength(1);
+    expect(auditMock).toHaveBeenCalledWith(expect.objectContaining({
+      action: 'maintenance.scheduled', targetId: 'mr_1', tenantId: 'orion', actorId: null,
+      metadata: expect.objectContaining({ auto: true, planId: 'plan_1', equipmentId: 'eq_1' }),
+    }));
+    expect(auditMock.mock.invocationCallOrder[0]).toBeGreaterThan(readinessMock.mock.invocationCallOrder[0]);
   });
 
   it('не создаёт второй наряд, если открытый уже есть', async () => {
@@ -116,6 +131,7 @@ describe('runPmScheduler', () => {
     expect(createMock).not.toHaveBeenCalled();
     expect(readinessMock).not.toHaveBeenCalled();
     expect(result.created).toBe(0);
+    expect(auditMock).not.toHaveBeenCalled();
   });
 
   it('проверяет дубль внутри транзакции, а не чтением до неё', async () => {

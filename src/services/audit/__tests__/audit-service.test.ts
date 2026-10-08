@@ -50,6 +50,30 @@ beforeEach(() => {
   mocks.userFindUnique.mockResolvedValue(null);
 });
 
+describe('W117 — понятные события в ленте владельца', () => {
+  it.each([
+    ['incident.reviewed', 'Происшествие разобрано'],
+    ['inspection.template.created', 'Шаблон осмотра создан'],
+    ['inspection.template.replaced', 'Шаблон осмотра заменён'],
+    ['inspection.template.deactivated', 'Шаблон осмотра отключён'],
+    ['inspection.started', 'Осмотр начат'],
+    ['inspection.answers_saved', 'Ответы осмотра сохранены'],
+    ['briefing.conducted', 'Инструктаж проведён'],
+    ['briefing.signed', 'Инструктаж подтверждён'],
+    ['equipment.document.created', 'Документ техники добавлен'],
+    ['equipment.fuel.created', 'Запись топлива добавлена'],
+    ['maintenance.plan.created', 'Регламент ТО создан'],
+    ['maintenance.scheduled', 'Наряд ТО создан автоматически'],
+    ['dlq.retried', 'Событие отправлено повторно'],
+    ['dlq.discarded', 'Повтор события отменён'],
+    ['media.deleted', 'Вложение удалено'],
+  ])('%s получает русский текст', async (action, title) => {
+    await recordAuditEvent({ action, scope: 'audit' });
+    expect(mocks.recordFeedbackEvent).toHaveBeenCalledWith(expect.objectContaining({ title }));
+    expect(mocks.recordFeedbackEvent.mock.calls[0][0].message).not.toContain('Событие аудита в контуре');
+  });
+});
+
 describe('recordAuditEvent — logging', () => {
   it('always logs at info level under the "audit" message name', async () => {
     await recordAuditEvent({

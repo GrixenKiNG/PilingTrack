@@ -7,6 +7,7 @@ import { addFuelEntry, listFuelLog, getFuelSummary } from '@/modules/equipment';
 import { getCrewForOperator } from '@/modules/crews';
 import { withApi, withMutation, readJsonBody } from '@/core/api-wrapper';
 import { ServiceError } from '@/services/service-error';
+import { recordAuditEvent } from '@/services/audit/audit-service';
 
 export const runtime = 'nodejs';
 
@@ -102,6 +103,11 @@ export const POST = withMutation(
         tenantId,
         // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
         recordedById: user!.id,
+      });
+      await recordAuditEvent({
+        action: 'equipment.fuel.created', scope: 'equipment', actorId: user?.id,
+        targetId: result.id, tenantId,
+        metadata: { equipmentId: id, after: { litersAdded: parsed.data.litersAdded, tankPercent: parsed.data.tankPercent, recordedAt: result.recordedAt } },
       });
       return NextResponse.json(result, { status: 201 });
     } catch (err) {

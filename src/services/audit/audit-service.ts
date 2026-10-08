@@ -312,6 +312,51 @@ function autoSubmitted(meta: Meta): boolean {
  * уедет в общий default и в ленте появится машинный код.
  */
 const AUDIT_DESCRIPTIONS: Record<string, AuditDescription> = {
+  'incident.reviewed': {
+    level: 'audit', title: 'Происшествие разобрано', message: 'Вывод разбора происшествия сохранён.',
+  },
+  'inspection.template.created': {
+    level: 'audit', title: 'Шаблон осмотра создан', message: (m) => withSubject('Создан шаблон осмотра', subject(m)),
+  },
+  'inspection.template.replaced': {
+    level: 'audit', title: 'Шаблон осмотра заменён', message: (m) => withSubject('Прежний шаблон отключён и создан новый', subject(m)),
+  },
+  'inspection.template.deactivated': {
+    level: 'audit', title: 'Шаблон осмотра отключён', message: 'Шаблон больше не используется для новых осмотров.',
+  },
+  'inspection.started': {
+    level: 'audit', title: 'Осмотр начат', message: 'Создана запись осмотра техники.',
+  },
+  'inspection.answers_saved': {
+    level: 'audit', title: 'Ответы осмотра сохранены', message: 'Ответы на пункты осмотра изменены.',
+  },
+  'briefing.conducted': {
+    level: 'audit', title: 'Инструктаж проведён', message: (m) => withSubject('В журнале зарегистрирован инструктаж', str(m, 'documentTitle')),
+  },
+  'briefing.signed': {
+    level: 'audit', title: 'Инструктаж подтверждён', message: 'Участник подтвердил запись инструктажа.',
+  },
+  'equipment.document.created': {
+    level: 'audit', title: 'Документ техники добавлен', message: (m) => withSubject('Добавлен документ техники', subject(m)),
+  },
+  'equipment.fuel.created': {
+    level: 'audit', title: 'Запись топлива добавлена', message: 'В журнал топлива добавлены долив или остаток в баке.',
+  },
+  'maintenance.plan.created': {
+    level: 'audit', title: 'Регламент ТО создан', message: (m) => withSubject('Создан регламент обслуживания', subject(m)),
+  },
+  'maintenance.scheduled': {
+    level: 'audit', title: 'Наряд ТО создан автоматически', message: (m) => withSubject('Планировщик создал наряд ТО по регламенту', subject(m)),
+  },
+  'dlq.retried': {
+    level: 'audit', title: 'Событие отправлено повторно', message: 'Необработанное событие снова поставлено в очередь.',
+  },
+  'dlq.discarded': {
+    level: 'audit', title: 'Повтор события отменён', message: 'Принято решение не повторять необработанное событие.',
+  },
+  'media.deleted': {
+    level: 'audit', title: 'Вложение удалено', message: 'Вложение помечено удалённым.',
+  },
   // ── Вход и выход ──
   'auth.login.succeeded': {
     level: 'success',

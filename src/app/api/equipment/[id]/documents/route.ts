@@ -5,6 +5,7 @@ import { requireAuth } from '@/lib/auth';
 import { assertCan } from '@/services/auth/authorization-service';
 import { createEquipmentDocument } from '@/modules/equipment';
 import { withMutation, readJsonBody } from '@/core/api-wrapper';
+import { recordAuditEvent } from '@/services/audit/audit-service';
 
 export const runtime = 'nodejs';
 
@@ -47,6 +48,11 @@ export const POST = withMutation(
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     const tenantId = requireTenantId(user!);
     const doc = await createEquipmentDocument(id, parsed.data, { tenantId });
+    await recordAuditEvent({
+      action: 'equipment.document.created', scope: 'equipment', actorId: user?.id,
+      targetId: doc.id, tenantId,
+      metadata: { name: doc.title, equipmentId: id, after: { type: doc.type, issuedAt: doc.issuedAt, expiresAt: doc.expiresAt } },
+    });
     return NextResponse.json({ document: doc }, { status: 201 });
   },
   { domain: 'equipment.documents' }

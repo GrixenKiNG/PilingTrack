@@ -7,6 +7,7 @@ import { createMaintenancePlan, listMaintenancePlans } from '@/modules/equipment
 import { evaluatePlanDue } from '@/lib/pm-due';
 import { withApi, withMutation, readJsonBody } from '@/core/api-wrapper';
 import { ServiceError } from '@/services/service-error';
+import { recordAuditEvent } from '@/services/audit/audit-service';
 
 export const runtime = 'nodejs';
 
@@ -68,6 +69,10 @@ export const POST = withMutation(
     const tenantId = requireTenantId(user!);
     try {
       const plan = await createMaintenancePlan(parsed.data, { tenantId });
+      await recordAuditEvent({
+        action: 'maintenance.plan.created', scope: 'equipment', actorId: user?.id,
+        targetId: plan.id, tenantId, metadata: { name: parsed.data.title, equipmentId: parsed.data.equipmentId, triggerType: parsed.data.triggerType },
+      });
       return NextResponse.json({ plan }, { status: 201 });
     } catch (err) {
       if (err instanceof ServiceError) return NextResponse.json({ error: err.message }, { status: err.status });

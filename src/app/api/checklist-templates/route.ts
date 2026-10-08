@@ -6,6 +6,7 @@ import { assertCan } from '@/services/auth/authorization-service';
 import { listTemplates, createTemplate } from '@/modules/inspections';
 import { withApi, withMutation, readJsonBody } from '@/core/api-wrapper';
 import { ServiceError } from '@/services/service-error';
+import { recordAuditEvent } from '@/services/audit/audit-service';
 
 export const runtime = 'nodejs';
 
@@ -73,6 +74,10 @@ export const POST = withMutation(
     try {
       // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
       const template = await createTemplate(parsed.data, { tenantId, createdById: user!.id });
+      await recordAuditEvent({
+        action: 'inspection.template.created', scope: 'inspections', actorId: user?.id,
+        targetId: template.id, tenantId, metadata: { name: parsed.data.name, level: parsed.data.level },
+      });
       return NextResponse.json({ template }, { status: 201 });
     } catch (err) {
       if (err instanceof ServiceError) return NextResponse.json({ error: err.message }, { status: err.status });
