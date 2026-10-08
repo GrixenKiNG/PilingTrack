@@ -1,4 +1,3 @@
-import { SUBMITTED_REPORT_STATUS } from '@/lib/report-status';
 /**
  * Raw SQL Queries — Optimized Hot Paths
  *
@@ -7,8 +6,6 @@ import { SUBMITTED_REPORT_STATUS } from '@/lib/report-status';
  *
  * Benchmark-цели:
  * - getReportsByPeriod: < 50ms (vs ~200ms Prisma include)
- * - getSiteDailySummary: < 30ms (vs ~150ms Prisma aggregation)
- * - upsertReport: < 10ms (vs ~50ms find-then-update)
  */
 
 import { db } from '@/lib/db';
@@ -114,115 +111,5 @@ export async function getReportsByPeriodRaw(
   }
 
   return reports;
-}
-
-// ============================================================
-// Site Daily Summary — агрегация за период
-// ============================================================
-
-export interface DailySummary {
-  siteId: string;
-  date: string;
-  reportCount: number;
-  totalPiles: number;
-  totalDrilling: number;
-  totalDowntime: number;
-}
-
-export async function getSiteDailySummaryRaw(
-  siteId: string,
-  dateFrom: string,
-  dateTo: string
-): Promise<DailySummary[]> {
-  const start = Date.now();
-
-  const summary = await db.$queryRaw<DailySummary[]>`
-    SELECT
-      r."siteId" as "siteId",
-      r."date" as "date",
-      COUNT(DISTINCT r.id)::int as "reportCount",
-      COALESCE(SUM(piles_agg.total_count), 0)::int as "totalPiles",
-      COALESCE(SUM(drillings_agg.total_meters), 0)::float as "totalDrilling",
-      COALESCE(SUM(downtimes_agg.total_duration), 0)::float as "totalDowntime"
-    FROM "Report" r
-    LEFT JOIN LATERAL (
-      SELECT COALESCE(SUM(pw.count), 0) as total_count
-      FROM "PileWork" pw WHERE pw."reportId" = r.id
-    ) piles_agg ON true
-    LEFT JOIN LATERAL (
-      SELECT COALESCE(SUM(ld.meters), 0) as total_meters
-      FROM "LeaderDrilling" ld WHERE ld."reportId" = r.id
-    ) drillings_agg ON true
-    LEFT JOIN LATERAL (
-      SELECT COALESCE(SUM(rd.duration), 0) as total_duration
-      FROM "ReportDowntime" rd WHERE rd."reportId" = r.id
-    ) downtimes_agg ON true
-    WHERE r."siteId" = ${siteId}
-      AND r.status = ${SUBMITTED_REPORT_STATUS}
-      AND r."date" >= ${dateFrom}
-      AND r."date" <= ${dateTo}
-    GROUP BY r."siteId", r."date"
-    ORDER BY r."date" DESC
-  `;
-
-  const elapsed = Date.now() - start;
-  if (elapsed > 50) {
-    logger.warn('RawQuery: getSiteDailySummary slow', { elapsedMs: elapsed });
-  }
-
-  return summary;
-}
-
-
-
-// ============================================================
-// Atomic Upsert Report — один запрос вместо find-then-update
-// ============================================================
-
-export async function upsertReportRaw(params: {
-  id: string;
-  tenantId: string;
-  userId: string;
-  siteId: string;
-  date: string;
-  status: string;
-  shiftType?: string;
-  shiftStart?: string | null;
-  shiftEnd?: string | null;
-  equipmentId?: string | null;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
-}): Promise<any> {
-  const start = Date.now();
-
-  const { id, tenantId, userId, siteId, date, status, shiftType, shiftStart, shiftEnd, equipmentId } = params;
-
-  const report = await db.$queryRaw<Array<Record<string, unknown>>>`
-    INSERT INTO "Report" (
-      id, "tenantId", "userId", "siteId", "date", "status",
-      "shiftType", "shiftStart", "shiftEnd", "equipmentId",
-      "version", "updatedAt", "createdAt"
-    )
-    VALUES (
-      ${id}, ${tenantId}, ${userId}, ${siteId}, ${date}, ${status},
-      ${shiftType || 'day'}, ${shiftStart}, ${shiftEnd}, ${equipmentId || null},
-      1, NOW(), NOW()
-    )
-    ON CONFLICT (id) DO UPDATE SET
-      "status" = EXCLUDED."status",
-      "shiftType" = EXCLUDED."shiftType",
-      "shiftStart" = EXCLUDED."shiftStart",
-      "shiftEnd" = EXCLUDED."shiftEnd",
-      "equipmentId" = EXCLUDED."equipmentId",
-      "version" = "Report"."version" + 1,
-      "updatedAt" = NOW()
-    RETURNING *
-  `;
-
-  const elapsed = Date.now() - start;
-  if (elapsed > 20) {
-    logger.warn('RawQuery: upsertReport slow', { elapsedMs: elapsed });
-  }
-
-  return report[0];
 }
 
