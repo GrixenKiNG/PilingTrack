@@ -161,3 +161,17 @@ workers health import timeout30с; targeted11/0 и полный повтор е�
 причина таймаута не установлена, настройки не ослаблены. Playwright collection99/11,
 exit0; build exit1 на отсутствующих DATABASE_PROVIDER/SESSION_SECRET, до Next build.
 Полные команды, строки и ограничения — [CODEX-REPORT.md](../../CODEX-REPORT.md).
+
+### Состояние на 08.10.2026
+
+Сверка 08.10.2026. Каждый хеш проверен командой `git merge-base --is-ancestor <sha> main`;
+числа тестов — реальным прогоном, не цитатой из отчёта.
+
+| Пункт | Коммиты / проверка | Результат |
+|---|---|---|
+| I01–I05, I11 | 1df899d5, d1f38b5a, 35b5ca49, 1a2d340f, 7cf94a71, 1537f517, d6550123 | в main и в выложенной версии b6f51541 (`is-ancestor`: yes) |
+| M6–M8 | 276d777b, 65a0d051, 46501848, a4398d65 | в main (`is-ancestor`: yes) |
+| M6–M8, доказательство | `scripts/test-m6-m8.sh` на одноразовом Postgres | 5 passed (5), exit 0 |
+| Поток 2 Codex (I06/I07) | cfe78d48, e7d3ab55, 96a904c5, 6c84ff00 | влит в main (`is-ancestor`: yes) |
+| Интеграционный набор | одноразовый Postgres | RLS 21, restore 3, write-pipeline 5, scripts 18, ci 3 — зелёные |
+| H01–H15 | коммиты с пометкой CX-H в main | 13 из 15: H01–H06, H08–H12, H14, H15; H07 и H13 коммитов не найдено |
