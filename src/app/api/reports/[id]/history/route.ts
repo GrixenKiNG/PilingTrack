@@ -12,6 +12,7 @@ export const GET = withApi(async (request: NextRequest, { params }: { params: Pr
   // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
   assertCan(user!, 'reports.read_all');
   const { id } = await params;
-  const history = await getReportHistory(id);
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
+  const history = await getReportHistory(id, user!);
   return NextResponse.json(history);
 }, { domain: 'reports' });

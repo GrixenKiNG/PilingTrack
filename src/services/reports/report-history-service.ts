@@ -1,5 +1,6 @@
 import { db } from '@/lib/db';
 import { requireTenantId } from '@/lib/tenant-scope';
+import { ensureTenantAccess } from '@/services/auth/resource-access-service';
 import {
   actionLabel, humanizeDiff,
   type NameLookups, type ReportHistory, type ReportHistoryEvent, type ReportHistoryVersion,
@@ -19,21 +20,31 @@ function toMap(rows: Array<{ id: string; name: string | null }>): Record<string,
 /**
  * История отчёта с подстановкой имён вместо идентификаторов.
  *
- * Организацию берём у самого отчёта, а не у смотрящего. Так имена всегда
- * разрешаются в той организации, которой отчёт принадлежит: платформенный
- * администратор, открывший чужой отчёт, увидит подписи, а не голые
- * идентификаторы, и при этом ни одной чужой строки в карту не попадёт.
+ * Организация и самого отчёта, и смотрящего сверяются до чтения истории:
+ * `ensureTenantAccess` отдаёт 403, если у сессии нет организации, и 404, если
+ * отчёта нет или он принадлежит другой организации. Без этой сверки право
+ * `reports.read_all` позволяло угадать id чужого отчёта и прочитать его
+ * историю с подписями — защищал только RLS базы.
+ *
+ * Имена при этом разрешаются в организации самого отчёта, а не смотрящего: он
+ * уже доказал, что смотрит свой отчёт, и карты строятся по его организации —
+ * платформенный администратор увидит подписи, а не голые идентификаторы, и ни
+ * одной чужой строки в карту не попадёт.
  *
  * Раньше все шесть карт грузились целиком, без сужения: `findMany` по
  * справочникам, объектам, пользователям и установкам возвращал строки всех
  * организаций сразу. Это единственное место, где список пользователей всей
  * системы оказывался в памяти при открытии одного отчёта.
  */
-export async function getReportHistory(reportId: string): Promise<ReportHistory> {
+export async function getReportHistory(
+  reportId: string,
+  user: { id: string; role: string; tenantId?: string | null },
+): Promise<ReportHistory> {
   const report = await db.report.findUnique({
     where: { reportId },
     select: { tenantId: true },
   });
+  await ensureTenantAccess(user, report?.tenantId, 'Report');
   const scope = { tenantId: requireTenantId(report?.tenantId) };
 
   const [auditRows, versionRows, pileGrades, drillingTypes, downtimeReasons, sites, users, equipment] = await Promise.all([

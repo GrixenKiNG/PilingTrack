@@ -75,6 +75,8 @@ describe('humanizeDiff', () => {
 describe('getReportHistory', () => {
   beforeEach(() => { vi.clearAllMocks(); });
 
+  const viewer = { id: 'u1', role: 'ADMIN', tenantId: 'orion' };
+
   it('returns humanized events (newest first) and versions', async () => {
     (db.report.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue({ tenantId: 'orion' });
     (db.reportAudit.findMany as ReturnType<typeof vi.fn>).mockResolvedValue([
@@ -88,7 +90,7 @@ describe('getReportHistory', () => {
       (m.findMany as ReturnType<typeof vi.fn>).mockResolvedValue([]);
     }
 
-    const res = await getReportHistory('rep-1');
+    const res = await getReportHistory('rep-1', viewer);
     expect(db.reportAudit.findMany).toHaveBeenCalledWith({ where: { reportId: 'rep-1' }, orderBy: { createdAt: 'desc' } });
     expect(res.events[0]).toMatchObject({ id: 'a1', actionLabel: 'Изменён', actorName: 'Админ' });
     expect(res.events[0].changes).toEqual([{ label: 'Статус', before: 'Черновик', after: 'Отправлен' }]);
@@ -106,7 +108,7 @@ describe('getReportHistory', () => {
       (m.findMany as ReturnType<typeof vi.fn>).mockResolvedValue([]);
     }
 
-    await getReportHistory('rep-1');
+    await getReportHistory('rep-1', viewer);
 
     for (const m of [db.pileGrade, db.drillingType, db.downtimeReason, db.site, db.user, db.equipment]) {
       expect(m.findMany).toHaveBeenCalledWith(
@@ -115,10 +117,28 @@ describe('getReportHistory', () => {
     }
   });
 
+  // Чужой отчёт: право reports.read_all больше не даёт прочитать его историю.
+  it('чужая организация отчёта даёт 404', async () => {
+    (db.report.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue({ tenantId: 'other' });
+
+    await expect(getReportHistory('rep-1', viewer)).rejects.toThrow('Report not found');
+    expect(db.user.findMany).not.toHaveBeenCalled();
+  });
+
+  // Сессия без организации: отдаём 403, а не читаем историю без сверки.
+  it('у сессии нет организации — 403', async () => {
+    (db.report.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue({ tenantId: 'orion' });
+
+    await expect(
+      getReportHistory('rep-1', { id: 'u1', role: 'ADMIN', tenantId: null }),
+    ).rejects.toThrow('Tenant context missing');
+    expect(db.user.findMany).not.toHaveBeenCalled();
+  });
+
   it('отчёт без организации — отказ, а не карты по всем организациям', async () => {
     (db.report.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue({ tenantId: null });
 
-    await expect(getReportHistory('rep-1')).rejects.toThrow('Контекст организации не определён');
+    await expect(getReportHistory('rep-1', viewer)).rejects.toThrow('Report not found');
     expect(db.user.findMany).not.toHaveBeenCalled();
   });
 });

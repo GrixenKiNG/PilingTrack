@@ -33,6 +33,7 @@ describe('GET /api/reports/[id]/history', () => {
     const res = await GET(req(), ctx());
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ events: [{ id: 'a1' }], versions: [] });
-    expect(getHistoryMock).toHaveBeenCalledWith('rep-1');
+    // Пользователь передаётся вторым аргументом: сервис сверяет его организацию.
+    expect(getHistoryMock).toHaveBeenCalledWith('rep-1', { id: 'a', role: 'ADMIN' });
   });
 });
