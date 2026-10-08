@@ -19,12 +19,18 @@ export interface TemplateInput {
 }
 
 export async function createTemplate(input: TemplateInput, ctx: { tenantId: string; createdById?: string | null }) {
+  return createTemplateUsing(db, input, ctx);
+}
+
+type TemplateClient = Pick<typeof db, 'checklistTemplate'>;
+
+async function createTemplateUsing(client: TemplateClient, input: TemplateInput, ctx: { tenantId: string; createdById?: string | null }) {
   if (!ctx.tenantId) throw new ServiceError('tenantId is required', 400);
   const blockType = input.blockType ?? 'BASE';
   // Normalize matchers to the block kind: BASE keys on model, HAMMER on hammer kind.
   const appliesToModel = blockType === 'BASE' ? (input.appliesToModel?.trim() || null) : null;
   const appliesToHammerKind = blockType === 'HAMMER' ? (input.appliesToHammerKind ?? null) : null;
-  return db.checklistTemplate.create({
+  return client.checklistTemplate.create({
     data: {
       tenantId: ctx.tenantId,
       name: input.name.trim(),
@@ -63,13 +69,19 @@ export async function createTemplate(input: TemplateInput, ctx: { tenantId: stri
 
 // Update = деактивировать старый + создать новый (проще и безопаснее, чем диффить вложенные пункты).
 export async function updateTemplate(id: string, input: TemplateInput, ctx: { tenantId: string; createdById?: string | null }) {
-  await deleteTemplate(id, ctx.tenantId);
-  return createTemplate(input, ctx);
+  return db.$transaction(async (tx) => {
+    await deactivateTemplateUsing(tx, id, ctx.tenantId);
+    return createTemplateUsing(tx, input, ctx);
+  });
 }
 
 export async function deleteTemplate(id: string, tenantId: string) {
+  return deactivateTemplateUsing(db, id, tenantId);
+}
+
+async function deactivateTemplateUsing(client: TemplateClient, id: string, tenantId: string) {
   if (!tenantId) throw new ServiceError('tenantId is required', 400);
-  const existing = await db.checklistTemplate.findUnique({ where: { id }, select: { id: true, tenantId: true } });
+  const existing = await client.checklistTemplate.findUnique({ where: { id }, select: { id: true, tenantId: true } });
   if (!existing || existing.tenantId !== tenantId) throw new ServiceError('Template not found', 404);
-  return db.checklistTemplate.update({ where: { id }, data: { isActive: false } });
+  return client.checklistTemplate.update({ where: { id }, data: { isActive: false } });
 }
