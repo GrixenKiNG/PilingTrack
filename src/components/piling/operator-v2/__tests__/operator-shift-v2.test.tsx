@@ -314,7 +314,7 @@ describe('I1: ручная сдача HANDOVER_PENDING в v2', () => {
     expect(authFetch.mock.calls.every(([url]) => !url.includes('handover'))).toBe(true);
   });
 
-  it('дописывает часовой простой и возвращается нижней панелью к сдаче', async () => {
+  it('дописывает часовой простой и возвращается кнопкой «К сдаче смены»', async () => {
     current = {...current, checklists: current.checklists.map((list) => list.stage === 'EO_AFTER' ? {...list, done: true} : list)};
     render(<OperatorShiftV2 />);
     await closeButton();
@@ -327,7 +327,7 @@ describe('I1: ручная сдача HANDOVER_PENDING в v2', () => {
     await waitFor(() => expect(api.sendCommand).toHaveBeenCalledWith(expect.objectContaining({
       command: 'log-production', shiftId: 'shift-1', entry: {kind: 'DOWNTIME', reasonId: 'reason-1', hours: 1.5, comment: undefined},
     })));
-    fireEvent.click(screen.getByRole('button', {name: 'Главная'}));
+    fireEvent.click(screen.getByRole('button', {name: 'К сдаче смены'}));
     expect(await closeButton()).toBeEnabled();
     expect(screen.queryByRole('button', {name: 'Добавить сваю'})).not.toBeInTheDocument();
   });

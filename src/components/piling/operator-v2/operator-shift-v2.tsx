@@ -70,8 +70,8 @@ import { KnowledgeScreen } from '@/components/piling/operator-mobile/screens/kno
 import { ChecklistScreen } from '@/components/piling/operator-mobile/screens/checklist-screen';
 import { knownAnswers } from '@/components/piling/operator-mobile/safety/known-answers';
 import { V2_STEP_STAGE, V2_STEP_TITLE, resolveV2State, stepCaption } from './shift-flow';
-import { StepBar } from '../operator-mobile/step-bar';
-import { finishShift, nextStep } from '../operator-mobile/shift-next-step';
+import { NextStepDock, NextStepTab } from '../operator-mobile/step-bar';
+import { nextStep } from '../operator-mobile/shift-next-step';
 
 /**
  * Строка состояния документа в карточке допуска.
@@ -764,9 +764,11 @@ export function OperatorShiftV2() {
   const editingProduction = step === 'report'
     && editingProductionShiftId === (mobile?.shift?.id ?? facts.shift?.id);
   /*
-    Нижняя панель шагов — «Главная», «Следующий шаг», «Завершить смену»
-    (решение владельца 07.10.2026). Следующее действие считает общий nextStep;
-    здесь только переходы и фокус на действии, если его экран уже открыт.
+    Кнопка «Следующий шаг» (решение владельца 09.10.2026; прежняя панель
+    «Главная / Следующий шаг / Завершить смену» убрана). Следующее действие
+    считает общий nextStep; здесь только переходы и фокус на действии, если его
+    экран уже открыт. Где есть нижние вкладки, кнопка стоит в них между «ТБ» и
+    «Техникой»; где вкладок нет, она одна в нижней полосе.
   */
   const goHome = () => {
     setNextNotice(null);
@@ -795,29 +797,31 @@ export function OperatorShiftV2() {
       default: break;
     }
   };
-  const stepBar = next && mobile ? (
+  const nextStepProps = next && mobile ? {
+    step: next,
+    busy,
+    onNext: goNext,
+    onFinishWork: () => {
+      const shiftId = mobile.shift?.id;
+      if (!shiftId) return;
+      setBusy(true);
+      void sendCommand({command: 'finish-work', shiftId}).then(async () => {
+        goHome(); setFinishing(true);
+        await Promise.all([load(), loadMobile()]);
+      }).catch((error) => toast.error(error instanceof Error ? error.message : 'Не удалось завершить работу'))
+        .finally(() => setBusy(false));
+    },
+  } : null;
+  const nextNoticeNode = nextNotice ? <p role="status" className="p-3 text-sm text-muted-foreground">{nextNotice}</p> : null;
+  // Одна кнопка внизу — на экранах без нижних вкладок.
+  const stepBar = nextStepProps ? (
     <>
-      {nextNotice ? <p role="status" className="p-3 text-sm text-muted-foreground">{nextNotice}</p> : null}
-      <StepBar
-        step={next}
-        finish={finishShift(mobile)}
-        busy={busy}
-        onHome={goHome}
-        onNext={goNext}
-        onGoClosing={goHome}
-        onFinishWork={() => {
-          const shiftId = mobile.shift?.id;
-          if (!shiftId) return;
-          setBusy(true);
-          void sendCommand({command: 'finish-work', shiftId}).then(async () => {
-            goHome(); setFinishing(true);
-            await Promise.all([load(), loadMobile()]);
-          }).catch((error) => toast.error(error instanceof Error ? error.message : 'Не удалось завершить работу'))
-            .finally(() => setBusy(false));
-        }}
-      />
+      {nextNoticeNode}
+      <NextStepDock {...nextStepProps} />
     </>
   ) : <p className="p-3 text-sm text-muted-foreground">{mobileError ?? 'Читаем следующий шаг смены…'}</p>;
+  // Кнопка в нижних вкладках — на экранах, где они есть (допуск и работа).
+  const nextTab = nextStepProps ? <NextStepTab {...nextStepProps} /> : undefined;
   const equipment = facts.equipment;
   const photo = getEquipmentPhoto(equipment?.model);
   // Секундомер приёмки в подписи виден до пуска: после него он теряет смысл,
@@ -841,7 +845,7 @@ export function OperatorShiftV2() {
     // Приёмка уже открытой смены (передача от прошлой) — кнопка внизу.
     const canAct = cleared && Boolean(facts.shift);
     return (
-      <StepShell bar={stepBar} screenRef={screenRef}
+      <StepShell bar={nextNoticeNode} screenRef={screenRef}
         title={tab === 'safety' ? 'Техника безопасности' : V2_STEP_TITLE.acceptance}
         subtitle={stepLabel}
         tone={cleared ? 'green' : 'blue'}
@@ -865,7 +869,7 @@ export function OperatorShiftV2() {
                 busy={busy}
               />
             ) : null}
-            <BottomTabs active={tab} onSelect={setTab} />
+            <BottomTabs active={tab} onSelect={setTab} next={nextTab} />
           </>
         )}
       >
@@ -1038,12 +1042,12 @@ export function OperatorShiftV2() {
   if (step === 'work' || editingProduction) {
     return (
       <>
-        <StepShell bar={stepBar} screenRef={screenRef}
+        <StepShell bar={nextNoticeNode} screenRef={screenRef}
           title={tab === 'shift' ? V2_STEP_TITLE.work
             : tab === 'safety' ? 'Техника безопасности'
               : tab === 'equipment' ? 'Техника' : 'Ещё'}
           subtitle={stepLabel}
-          footer={<BottomTabs active={tab} onSelect={setTab} />}
+          footer={<BottomTabs active={tab} onSelect={setTab} next={nextTab} />}
         >
           {editingProduction ? (
             <button type="button" onClick={goHome}

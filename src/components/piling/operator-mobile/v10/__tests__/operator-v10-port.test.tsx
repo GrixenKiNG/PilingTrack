@@ -388,22 +388,40 @@ describe('v10: запись выработки и отказ сервера', ()
   });
 });
 
-/* ------------------------------------- 6. нижняя панель шагов (07.10.2026) --- */
+/* ------------------------------ 6. кнопка «Следующий шаг» (09.10.2026) --- */
 
 /**
- * Решение владельца 07.10.2026: внизу каждого модуля — «Главная», «Следующий
- * шаг» и «Завершить смену». Следующий шаг определяет фаза сервера.
+ * Решение владельца 09.10.2026: «Следующий шаг» — круглая кнопка в нижнем меню
+ * между «ТБ» и «Техникой»; панель «Главная / Завершить смену» убрана. Следующий
+ * шаг определяет фаза сервера.
  */
-describe('v10: нижняя панель шагов', () => {
-  it('в работе: три кнопки; «Завершить смену» спрашивает и только потом шлёт finish-work', async () => {
+describe('v10: кнопка «Следующий шаг»', () => {
+  it('в работе кнопка стоит в меню между «ТБ» и «Техникой»; прежней панели нет', async () => {
     api.fetchState.mockResolvedValue(workState());
+    render(<OperatorV10App />);
+
+    const next = await screen.findByRole('button', {name: 'Следующий шаг: Записать выработку'});
+    const tabs = Array.from(document.querySelectorAll('.ov10-tabs button'));
+    const index = (predicate: (button: Element) => boolean) => tabs.findIndex(predicate);
+    expect(tabs).toContain(next);
+    expect(index((button) => button === next)).toBe(index((button) => button.getAttribute('data-tab') === 'safety') + 1);
+    expect(index((button) => button.getAttribute('data-tab') === 'equip')).toBe(tabs.indexOf(next) + 1);
+    expect(screen.queryByRole('button', {name: 'Главная'})).toBeNull();
+    expect(screen.queryByRole('button', {name: 'Завершить смену'})).toBeNull();
+  });
+
+  it('шаг «Завершить работу» спрашивает и только потом шлёт finish-work', async () => {
+    api.fetchState.mockResolvedValue({
+      ...workState(),
+      entries: [{
+        id: 'e1', kind: 'PILES', label: 'С 300.30-6', value: 2, meters: 12,
+        occurredAt: '2026-09-28T06:00:00.000Z', corrections: [],
+      }],
+    });
     api.sendCommand.mockResolvedValue({ok: true});
     render(<OperatorV10App />);
 
-    expect(await screen.findByRole('button', {name: 'Следующий шаг: Записать выработку'})).toBeInTheDocument();
-    expect(screen.getByRole('button', {name: 'Главная'})).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole('button', {name: 'Завершить смену'}));
+    fireEvent.click(await screen.findByRole('button', {name: 'Следующий шаг: Завершить работу'}));
     expect(api.sendCommand).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', {name: 'Да, завершить'}));
 
@@ -422,18 +440,6 @@ describe('v10: нижняя панель шагов', () => {
     fireEvent.click(await screen.findByRole('button', {name: 'Следующий шаг: СИЗ'}));
 
     expect(await screen.findByText('Средства защиты')).toBeInTheDocument();
-  });
-
-  it('«Главная» возвращает на ленту смены из любого экрана', async () => {
-    api.fetchState.mockResolvedValue(workState());
-    render(<OperatorV10App />);
-
-    fireEvent.click(await screen.findByRole('button', {name: 'Следующий шаг: Записать выработку'}));
-    const title = () => document.querySelector('.ov10-nav .ttl')?.textContent;
-    await waitFor(() => expect(title()).toBe('Работа'));
-
-    fireEvent.click(screen.getByRole('button', {name: 'Главная'}));
-    await waitFor(() => expect(title()).toBe('Смена'));
   });
 
   it('в сдаче можно дописать сваи, бурение и простой — открывается полная форма', async () => {

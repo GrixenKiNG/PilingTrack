@@ -100,14 +100,16 @@ export function Navbar({title, sub, right, onBack}: {
   );
 }
 
-export function Tabbar({tabs, active, onSelect}: {
+export function Tabbar({tabs, active, onSelect, extra}: {
   tabs: ScreenTab[];
   active: string;
   onSelect: (key: string) => void;
+  /** Лишняя ячейка меню (кнопка «Следующий шаг») — встаёт после вкладки `after`. */
+  extra?: {after: string; node: ReactNode};
 }) {
   return (
-    <nav className="ov10-tabs" style={{gridTemplateColumns: `repeat(${tabs.length}, 1fr)`}}>
-      {tabs.map((tab) => (
+    <nav className="ov10-tabs" style={{gridTemplateColumns: tabs.flatMap((tab) => (extra && extra.after === tab.key ? ['minmax(0, 1fr)', 'minmax(0, 1.5fr)'] : ['minmax(0, 1fr)'])).join(' ')}}>
+      {tabs.flatMap((tab) => [
         <button
           key={tab.key}
           type="button"
@@ -118,8 +120,11 @@ export function Tabbar({tabs, active, onSelect}: {
         >
           <Icon name={tab.icon} size={22} />
           <span>{tab.title}</span>
-        </button>
-      ))}
+        </button>,
+        ...(extra && extra.after === tab.key
+          ? [<div key="next-step" style={{display: 'flex', alignItems: 'flex-end', justifyContent: 'center'}}>{extra.node}</div>]
+          : []),
+      ])}
     </nav>
   );
 }

@@ -14,8 +14,8 @@ import {OfflineQueueBanner} from './offline-queue-banner';
 import {useOfflineQueue} from './use-offline-queue';
 import {OperatorStatusStrip} from './operator-status-strip';
 import {BigButton, Panel, PanelTitle, PhaseBar, Screen, TabBar} from './ui';
-import {finishShift, nextStep} from './shift-next-step';
-import {StepBar, StepBarSlotProvider} from './step-bar';
+import {nextStep} from './shift-next-step';
+import {NextStepDock, NextStepSlotProvider, NextStepTab} from './step-bar';
 import {IdentityScreen} from './screens/identity-screen';
 import {BriefingScreen} from './screens/briefing-screen';
 import {KnowledgeScreen, isKnowledgeAttemptExpired} from './screens/knowledge-screen';
@@ -613,9 +613,10 @@ export function OperatorMobileApp() {
   const tabsVisible = !detour && !checklist;
 
   /*
-    НИЖНЯЯ ПАНЕЛЬ ШАГОВ — «Главная», «Следующий шаг», «Завершить смену»
-    (решение владельца 07.10.2026). Что считать следующим шагом, решает фаза
-    сервера (shift-next-step); здесь только переходы этого модуля.
+    КНОПКА «СЛЕДУЮЩИЙ ШАГ» в нижнем меню (решение владельца 09.10.2026; прежняя
+    панель «Главная / Следующий шаг / Завершить смену» убрана). Что считать
+    следующим шагом, решает фаза сервера (shift-next-step); здесь только
+    переходы этого модуля.
   */
   const goHome = () => {
     setDetour(null);
@@ -623,7 +624,6 @@ export function OperatorMobileApp() {
     setHomeSignal((value) => value + 1);
   };
   const step = nextStep(state);
-  const finish = finishShift(state);
   const goNext = () => {
     const action = step.action;
     if (action.kind !== 'WAIT_ADMISSION' && action.kind !== 'NONE') setNotice(step.hint);
@@ -661,21 +661,16 @@ export function OperatorMobileApp() {
         break;
     }
   };
-  const stepBar = (
-    <StepBar
-      step={step}
-      finish={finish}
-      busy={busy}
-      onHome={goHome}
-      onNext={goNext}
-      onGoClosing={goHome}
-      onFinishWork={() => {
-        if (!shift) return;
-        goHome();
-        void run(() => sendCommand({command: 'finish-work', shiftId: shift.id}));
-      }}
-    />
-  );
+  const nextStepProps = {
+    step,
+    busy,
+    onNext: goNext,
+    onFinishWork: () => {
+      if (!shift) return;
+      goHome();
+      void run(() => sendCommand({command: 'finish-work', shiftId: shift.id}));
+    },
+  };
 
   /*
     ПОКАЗАНА ЛИ ПРИЧИНА ОТКАЗА НА ЭКРАНЕ (F-R89-DUP-REJECT-b).
@@ -722,6 +717,7 @@ export function OperatorMobileApp() {
     <TabBar<WorkTab>
       active={workTab}
       onSelect={setWorkTab}
+      extra={{after: 'SAFETY', node: <NextStepTab {...nextStepProps} />}}
       tabs={[
         {
           id: 'SHIFT',
@@ -1009,7 +1005,7 @@ export function OperatorMobileApp() {
   };
 
   return (
-    <StepBarSlotProvider value={stepBar}>
+    <NextStepSlotProvider value={<NextStepDock {...nextStepProps} />}>
     <OperatorFrame>
       <PhaseBar
         progress={state.progress}
@@ -1044,7 +1040,7 @@ export function OperatorMobileApp() {
       ) : null}
       <div ref={stepScreen} className="contents">{screen()}</div>
     </OperatorFrame>
-    </StepBarSlotProvider>
+    </NextStepSlotProvider>
   );
 }
 

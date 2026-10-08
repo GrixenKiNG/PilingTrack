@@ -1,7 +1,8 @@
 /**
- * Нижняя панель шагов на живом экране машиниста v1 (решение владельца 07.10.2026):
- * «Главная», «Следующий шаг», «Завершить смену» стоят на каждом экране, ведут к
- * действию по фазе сервера, а выработку и простой можно дописать после
+ * Кнопка «Следующий шаг» на живом экране машиниста v1 (решение владельца
+ * 09.10.2026): круглая кнопка в нижнем меню между «ТБ» и «Техникой» (а где меню
+ * нет — одна в нижней полосе), ведёт к действию по фазе сервера; панель «Главная /
+ * Завершить смену» убрана. Выработку и простой можно дописать после
  * «Завершить работу» — до сдачи смены.
  */
 import {fireEvent, render, screen, waitFor} from '@testing-library/react';
@@ -63,7 +64,7 @@ afterEach(() => {
 
 const visible = (node: HTMLElement) => node.closest('[hidden]') === null;
 
-describe('v1: нижняя панель шагов', () => {
+describe('v1: кнопка «Следующий шаг»', () => {
   it('на приёмке «Следующий шаг» ведёт к действию приёмки, не открывая смену сам', async () => {
     current = workStateFixture({phase: 'ADMISSION', shift: null,
       options: [{crewId: 'c1', equipmentId: 'eq-1', equipmentName: 'Установка 12', siteName: 'Площадка А'}],
@@ -111,12 +112,19 @@ describe('v1: нижняя панель шагов', () => {
     expect(commands[0]).toMatchObject({command: 'close-shift', shiftId: 'shift-1'});
   });
 
-  it('в работе стоят три кнопки, а шаг — «Записать выработку», пока записей нет', async () => {
+  it('в работе кнопка стоит в меню между «ТБ» и «Техникой», а шаг — «Записать выработку», пока записей нет', async () => {
     render(<OperatorMobileApp />);
 
-    expect(await screen.findByRole('button', {name: 'Следующий шаг: Записать выработку'})).toBeInTheDocument();
-    expect(screen.getAllByRole('button', {name: 'Главная'}).length).toBeGreaterThan(0);
-    expect(screen.getAllByRole('button', {name: 'Завершить смену'}).length).toBeGreaterThan(0);
+    const next = await screen.findByRole('button', {name: 'Следующий шаг: Записать выработку'});
+    const menu = screen.getByRole('navigation', {name: 'Разделы смены'});
+    const labels = Array.from(menu.querySelectorAll('button')).map((button) => button.getAttribute('aria-label') ?? button.textContent?.trim());
+    const at = (text: string) => labels.findIndex((label) => label?.startsWith(text));
+    expect(menu).toContainElement(next);
+    expect(at('Следующий шаг')).toBe(at('ТБ') + 1);
+    expect(at('Техника')).toBe(at('Следующий шаг') + 1);
+    // Прежней панели больше нет.
+    expect(screen.queryByRole('button', {name: 'Главная'})).toBeNull();
+    expect(screen.queryByRole('button', {name: 'Завершить смену'})).toBeNull();
   });
 
   it('«Следующий шаг» в работе открывает форму записи', async () => {
@@ -126,21 +134,14 @@ describe('v1: нижняя панель шагов', () => {
     await waitFor(() => expect(visible(screen.getByLabelText('Марка сваи'))).toBe(true));
   });
 
-  it('«Главная» возвращает из формы к обзору смены', async () => {
+  it('шаг «Завершить работу» (записи есть) просит подтверждение и только потом шлёт finish-work', async () => {
+    current = {...(workState as object), entries: [{
+      id: 'e1', kind: 'PILES', label: 'С 300.30-6', value: 2, meters: 12,
+      occurredAt: '2026-09-20T06:00:00.000Z', corrections: [],
+    }]};
     render(<OperatorMobileApp />);
-    fireEvent.click(await screen.findByRole('button', {name: 'Следующий шаг: Записать выработку'}));
-    await waitFor(() => expect(visible(screen.getByLabelText('Марка сваи'))).toBe(true));
 
-    fireEvent.click(screen.getAllByRole('button', {name: 'Главная'})[0]);
-
-    await waitFor(() => expect(visible(screen.getByLabelText('Марка сваи'))).toBe(false));
-  });
-
-  it('«Завершить смену» в работе просит подтверждение и только потом шлёт finish-work', async () => {
-    render(<OperatorMobileApp />);
-    await screen.findByRole('button', {name: 'Следующий шаг: Записать выработку'});
-
-    fireEvent.click(screen.getAllByRole('button', {name: 'Завершить смену'})[0]);
+    fireEvent.click(await screen.findByRole('button', {name: 'Следующий шаг: Завершить работу'}));
     expect(commands).toHaveLength(0);
     expect(screen.getAllByRole('alertdialog').length).toBeGreaterThan(0);
 
@@ -149,7 +150,7 @@ describe('v1: нижняя панель шагов', () => {
     expect(commands[0]).toMatchObject({command: 'finish-work', shiftId: 'shift-1'});
   });
 
-  it('до работы «Завершить смену» не нажимается и называет, что сделать сначала', async () => {
+  it('до работы кнопка есть, а «Завершить смену» и «Главная» нет', async () => {
     current = workStateFixture({
       phase: 'ADMISSION',
       shift: null,
@@ -163,10 +164,21 @@ describe('v1: нижняя панель шагов', () => {
     render(<OperatorMobileApp />);
 
     expect(await screen.findByRole('button', {name: 'Следующий шаг: Принять установку'})).toBeInTheDocument();
-    fireEvent.click(screen.getAllByRole('button', {name: 'Завершить смену'})[0]);
-
-    expect((await screen.findAllByText(/Сейчас: принять установку/)).length).toBeGreaterThan(0);
+    expect(screen.queryByRole('button', {name: 'Завершить смену'})).toBeNull();
+    expect(screen.queryByRole('button', {name: 'Главная'})).toBeNull();
     expect(commands).toHaveLength(0);
+  });
+
+  it('на осмотре нижних вкладок нет — кнопка стоит одна в нижней полосе', async () => {
+    current = workStateFixture({phase: 'PRESHIFT_INSPECTION', checklists: [{stage: 'PRESHIFT_INSPECTION', title: 'Предсменный осмотр', purpose: '', version: '1', period: null, done: false,
+      sections: [{id: 'machine', title: 'Узел', items: [{id: 'check', text: 'Проверить установку', severity: 'NOTE'}]}],
+    }]});
+    render(<OperatorMobileApp />);
+    fireEvent.click(await screen.findByRole('button', {name: 'Следующий шаг: Предсменный осмотр'}));
+
+    const dock = await screen.findByRole('navigation', {name: 'Следующий шаг смены'});
+    expect(dock.querySelectorAll('button')).toHaveLength(1);
+    expect(screen.queryByRole('navigation', {name: 'Разделы смены'})).toBeNull();
   });
 
   it('в допуске «Следующий шаг» ведёт к первому непройденному — СИЗ', async () => {

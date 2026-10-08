@@ -34,7 +34,7 @@ export function StepShell({
   onBack?: () => void;
   children: ReactNode;
   footer?: ReactNode;
-  /** Нижняя панель шагов: «Главная», «Следующий шаг», «Завершить смену» (07.10.2026). */
+  /** Нижняя полоса с кнопкой «Следующий шаг» там, где нижних вкладок нет (09.10.2026). */
   bar?: ReactNode;
   screenRef?: RefObject<HTMLDivElement | null>;
 }) {
@@ -186,9 +186,11 @@ export type V2Tab = 'shift' | 'safety' | 'equipment' | 'more';
  * конце смены, а до неё, и искать их в списке «прочего» он не станет. Журнал
  * смены, наоборот, открывают раз в день — он уехал в «Ещё».
  */
-export function BottomTabs({ active, onSelect }: {
+export function BottomTabs({ active, onSelect, next }: {
   active: V2Tab;
   onSelect: (tab: V2Tab) => void;
+  /** Кнопка «Следующий шаг» — встаёт в меню между «ТБ» и «Техникой» (09.10.2026). */
+  next?: ReactNode;
 }) {
   const tabs: {id: V2Tab; label: string; icon: PilingIconName}[] = [
     { id: 'shift', label: 'Смена', icon: 'home' },
@@ -198,14 +200,17 @@ export function BottomTabs({ active, onSelect }: {
   ];
   return (
     <nav aria-label="Разделы смены" className="-m-3 flex border-t border-border bg-card">
-      {tabs.map((tab) => (
+      {tabs.flatMap((tab) => [
         <button key={tab.id} type="button" onClick={() => onSelect(tab.id)} aria-current={active === tab.id ? 'page' : undefined}
           className={cn('flex min-h-[60px] min-w-0 flex-1 flex-col items-center justify-center gap-1 py-2 text-sm font-medium focus-visible:outline-2 focus-visible:outline-signal',
             active === tab.id ? 'bg-signal/5 text-signal-strong shadow-[inset_0_-3px_var(--signal)]' : 'text-muted-foreground')}>
           <PilingIcon name={tab.icon} size={24} decorative />
           {tab.label}
-        </button>
-      ))}
+        </button>,
+        ...(next && tab.id === 'safety'
+          ? [<div key="next-step" className="flex min-w-0 flex-[1.5] items-end justify-center pb-1">{next}</div>]
+          : []),
+      ])}
     </nav>
   );
 }

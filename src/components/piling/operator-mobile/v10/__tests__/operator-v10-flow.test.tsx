@@ -132,7 +132,12 @@ describe('v10: порядок смены', () => {
     workingToday.shift = {id: 'shift-today', productionDate: '2026-09-28', state: 'STARTED', startedAt: null};
     api.fetchState.mockResolvedValue(workingToday);
     fireEvent.click(screen.getByRole('button', {name: 'Обновить'}));
-    fireEvent.click(await screen.findByRole('button', {name: 'Главная'}));
+    // Вкладка «Смена» возвращает на ленту смены (панель «Главная» убрана 09.10.2026).
+    fireEvent.click(await waitFor(() => {
+      const tab = document.querySelector<HTMLElement>('.ov10-tabs [data-tab="today"]');
+      if (!tab) throw new Error('нет вкладки «Смена»');
+      return tab;
+    }));
     fireEvent.click(await screen.findByRole('button', {name: 'Дальше: Работа: сваи, бурение, простой'}));
     fireEvent.click(screen.getByRole('button', {name: 'Записать простой'}));
     fireEvent.change(screen.getByRole('combobox'), {target: {value: 'r1'}});

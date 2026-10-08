@@ -224,17 +224,19 @@ const DOCK_ICONS: Record<string, PilingIconName> = {
   MORE: 'menu', CLEARANCE: 'accepted', BRIEFINGS: 'documents', JOURNAL: 'history', HISTORY: 'history',
 };
 
-export function Dock<K extends string>({items, active, badges, onSelect}: {
+export function Dock<K extends string>({items, active, badges, onSelect, extra}: {
   items: readonly DockItem<K>[];
   active: K;
   badges?: Partial<Record<K, number>>;
   onSelect: (tab: K) => void;
+  /** Лишняя ячейка меню (кнопка «Следующий шаг») — встаёт после вкладки `after`. */
+  extra?: {after: K; node: ReactNode};
 }) {
   return (
-    <nav className="dock" style={{gridTemplateColumns: `repeat(${items.length}, 1fr)`}}>
-      {items.map((tab) => {
+    <nav className="dock" style={{gridTemplateColumns: items.flatMap((tab) => (extra && extra.after === tab.key ? ['minmax(0, 1fr)', 'minmax(0, 1.5fr)'] : ['minmax(0, 1fr)'])).join(' ')}}>
+      {items.flatMap((tab) => {
         const count = badges?.[tab.key] ?? 0;
-        return (
+        const cell = (
           <button
             key={tab.key}
             type="button"
@@ -247,6 +249,9 @@ export function Dock<K extends string>({items, active, badges, onSelect}: {
             {count > 0 ? <span className="badge">{count}</span> : null}
           </button>
         );
+        return extra && extra.after === tab.key
+          ? [cell, <div key="next-step" style={{display: 'flex', alignItems: 'flex-end', justifyContent: 'center', paddingBottom: 4}}>{extra.node}</div>]
+          : [cell];
       })}
     </nav>
   );

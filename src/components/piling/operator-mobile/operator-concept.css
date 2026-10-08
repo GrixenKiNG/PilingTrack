@@ -59,25 +59,3 @@
   .operator-screen-footer:has(.operator-tab-bar) { bottom: calc(90px + env(safe-area-inset-bottom, 0px)); }
 }
 
-/*
-  Нижняя панель шагов («Главная», «Следующий шаг», «Завершить смену», 07.10.2026)
-  на телефоне прибита к низу окна НАД нижними вкладками — так же, как сами
-  вкладки: оболочка рабочего места (overflow-x: hidden) делает липкие полосы
-  обычными элементами в конце страницы, и без прибивки панель уезжала бы вниз
-  вместе с прокруткой. Высоты панели и вкладок меряет Screen и кладёт в
-  переменные --sb-h и --tb-h: числом под высоту их не подогнать (в перчатках
-  кнопки крупнее, у вкладок бывает значок-счётчик).
-*/
-@media (max-width: 1023px) {
-  .operator-screen-footer .operator-step-bar {
-    position: fixed;
-    left: 0;
-    right: 0;
-    bottom: var(--tb-h, 0px);
-    z-index: 29;
-    box-shadow: 0 -4px 16px #1822300a;
-  }
-  .operator-screen:has(.operator-step-bar) {
-    padding-bottom: calc(var(--sb-h, 0px) + var(--tb-h, 0px) + 12px);
-  }
-}

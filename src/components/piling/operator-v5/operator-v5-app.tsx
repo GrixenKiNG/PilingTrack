@@ -1,6 +1,6 @@
 'use client';
 
-import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
+import {useCallback, useEffect, useMemo, useRef, useState, type ReactNode} from 'react';
 import {PilingIcon, type PilingIconName} from '@/components/piling/icons';
 import {OperatorWorkOverview} from '../operator-mobile/operator-work-overview';
 import {
@@ -19,8 +19,8 @@ import {
 import {KnowledgeScreen} from '../operator-mobile/screens/knowledge-screen';
 import {PilePassportForm} from '../operator-mobile/screens/pile-passport-form';
 import {formatNumber} from '@/lib/format';
-import {finishShift, nextStep} from '../operator-mobile/shift-next-step';
-import {StepBar} from '../operator-mobile/step-bar';
+import {nextStep} from '../operator-mobile/shift-next-step';
+import {NextStepTab} from '../operator-mobile/step-bar';
 import {
   ApiError, QueuedOffline, currentPosition, fetchState, newCommandId, sendCommand, uploadPhoto,
   type ProductionEntryInput,
@@ -87,7 +87,12 @@ function Top({state}: {state: OperatorMobileState}) {
   );
 }
 
-function Dock({active, onSelect}: {active: Tab; onSelect: (tab: Tab) => void}) {
+function Dock({active, onSelect, extra}: {
+  active: Tab;
+  onSelect: (tab: Tab) => void;
+  /** Лишняя ячейка меню (кнопка «Следующий шаг») — встаёт после вкладки `after`. */
+  extra?: {after: Tab; node: ReactNode};
+}) {
   const tabs: {key: Tab; label: string; icon: PilingIconName}[] = [
     {key: 'SHIFT', label: 'Смена', icon: 'home'},
     {key: 'WORK', label: 'Работа', icon: 'pile-driving'},
@@ -96,8 +101,8 @@ function Dock({active, onSelect}: {active: Tab; onSelect: (tab: Tab) => void}) {
     {key: 'MORE', label: 'Ещё', icon: 'menu'},
   ];
   return (
-    <div className="dock">
-      {tabs.map((tab) => (
+    <div className="dock" style={extra ? {gridTemplateColumns: tabs.flatMap((tab) => (extra.after === tab.key ? ['minmax(0, 1fr)', 'minmax(0, 1.6fr)'] : ['minmax(0, 1fr)'])).join(' ')} : undefined}>
+      {tabs.flatMap((tab) => [
         <button
           key={tab.key}
           type="button"
@@ -107,8 +112,11 @@ function Dock({active, onSelect}: {active: Tab; onSelect: (tab: Tab) => void}) {
         >
           <PilingIcon name={tab.icon} size={24} decorative />
           {tab.label}
-        </button>
-      ))}
+        </button>,
+        ...(extra && extra.after === tab.key
+          ? [<div key="next-step" style={{display: 'flex', alignItems: 'flex-end', justifyContent: 'center', paddingBottom: 4}}>{extra.node}</div>]
+          : []),
+      ])}
     </div>
   );
 }
@@ -1239,10 +1247,12 @@ export function OperatorV5App() {
   const addWork = () => { setEditingShiftId(shiftId); setTab('WORK'); };
 
   /*
-    Нижняя панель шагов: «Главная», «Следующий шаг», «Завершить смену».
-    Что считать следующим шагом, решает фаза сервера (shift-next-step); здесь
-    только переходы этого модуля. Экран фазы (допуск, приём, осмотр, сдача)
-    и есть главный экран: «Главная» закрывает обходные шаги и вкладку.
+    Кнопка «Следующий шаг» в нижнем меню между «Работой» и «Дефектами» (решение
+    владельца 09.10.2026; прежняя панель «Главная / Следующий шаг / Завершить
+    смену» убрана). Что считать следующим шагом, решает фаза сервера
+    (shift-next-step); здесь только переходы этого модуля. Экран фазы (допуск,
+    приём, осмотр, сдача) и есть главный экран: goHome закрывает обходные шаги
+    и вкладку.
   */
   const goHome = () => { setEditingShiftId(null); setAdmissionStep(null); setSafetyStage(null); setTab('SHIFT'); };
   const goNext = () => {
@@ -1486,23 +1496,29 @@ export function OperatorV5App() {
       {notice ? <p className="note">{notice}</p> : null}
       <OfflineQueueBanner items={queued} onRetry={retryQueued} onDiscard={discardQueued} />
       {body()}
-      {/* Нижняя панель шагов (решение владельца 07.10.2026) — над нижним меню. */}
+      {/* Кнопка «Следующий шаг» стоит в самом меню — между «Работой» и «Дефектами». */}
       <div className="v5-bottom">
-      <StepBar
-        className="v5-stepbar"
-        step={nextStep(state)}
-        finish={finishShift(state)}
-        busy={busy}
-        onHome={goHome}
-        onNext={goNext}
-        onGoClosing={goHome}
-        onFinishWork={() => {
-          if (!shiftId) return;
-          goHome();
-          void run(() => sendCommand({command: 'finish-work', shiftId}), 'Работа завершена.');
-        }}
-      />
-      <Dock active={tab} onSelect={setTab} />
+        <Dock
+          active={tab}
+          onSelect={setTab}
+          extra={{
+            after: 'WORK',
+            node: (
+              <NextStepTab
+                step={nextStep(state)}
+                busy={busy}
+                onNext={goNext}
+                onFinishWork={() => {
+                  if (!shiftId) return;
+                  goHome();
+                  void run(() => sendCommand({command: 'finish-work', shiftId}), 'Работа завершена.');
+                }}
+                labelSize="12px"
+                ringColor="var(--surface-2, #fff)"
+              />
+            ),
+          }}
+        />
       </div>
     </div>
   );

@@ -17,8 +17,8 @@ import {Banner, Button, Dock, OPERATOR_DOCK, PhoneShell as Shell, Title, type Do
 import {admissionSteps} from '../safety/admission-steps';
 import {AdmissionResult, BriefingFlow, KnowledgeFlow, PpeFlow} from './v7-identity';
 import {AcceptFlow, ChecklistFlow, CloseFlow, IncidentFlow, ProductionFlow} from './v7-shift';
-import {finishShift, nextStep} from '../shift-next-step';
-import {StepBar} from '../step-bar';
+import {nextStep} from '../shift-next-step';
+import {NextStepDock, NextStepTab} from '../step-bar';
 import {
   EquipmentScreen, HomeScreen, IncidentsScreen, JournalScreen, MoreScreen, TasksScreen,
   type Detour,
@@ -36,7 +36,6 @@ import {
  * блокирует очевидное (пустая форма), но не решает: вторая копия правила рано
  * или поздно разойдётся с первой и начнёт разрешать запрещённое.
  */
-
 
 /** Фазы, показываемые полосой прогресса. `CLOSED` — не шаг, а итог. */
 const TIMELINE: OperatorPhase[] = PHASE_ORDER.filter((phase) => phase !== 'CLOSED');
@@ -249,27 +248,11 @@ export function OperatorV7App() {
   );
 
   /*
-    Нижнее меню — и на шаге закрытия смены.
-
-    Отказ сервера оставлял человека на экране без единой вкладки: выйти можно
-    было только перезагрузкой страницы, а она возвращала его на тот же экран
-    (D-20260927-001). Вкладка закрывает шаг и уводит в раздел.
+    Кнопка «Следующий шаг» в нижнем меню (решение владельца 09.10.2026; прежняя
+    панель «Главная / Следующий шаг / Завершить смену» убрана). Что считать
+    следующим шагом, решает фаза сервера (shift-next-step); здесь только
+    переходы этого модуля.
   */
-  const dock = (
-    <Dock
-      items={OPERATOR_DOCK}
-      active={tab}
-      badges={{MORE: openIncidents}}
-      onSelect={(next) => { setTab(next); setDetour(null); setActionError(null); }}
-    />
-  );
-
-  /*
-    Нижняя панель шагов — «Главная», «Следующий шаг», «Завершить смену»
-    (решение владельца 07.10.2026). Что считать следующим шагом, решает фаза
-    сервера (shift-next-step); здесь только переходы этого модуля.
-  */
-  const goHome = () => { setDetour(null); setTab('HOME'); setActionError(null); };
   const step = nextStep(state);
   const goNext = () => {
     setActionError(null);
@@ -285,20 +268,35 @@ export function OperatorV7App() {
       default: break;
     }
   };
-  const stepBar = (
-    <StepBar
-      step={step}
-      finish={finishShift(state)}
-      busy={busy}
-      onHome={goHome}
-      onNext={goNext}
-      onGoClosing={() => setDetour({kind: 'CLOSE'})}
-      onFinishWork={() => {
-        if (!shiftId) return;
-        setDetour(null);
-        setTab('HOME');
-        void run({command: 'finish-work', shiftId}, {close: false});
-      }}
+  const nextStepProps = {
+    step,
+    busy,
+    onNext: goNext,
+    onFinishWork: () => {
+      if (!shiftId) return;
+      setDetour(null);
+      setTab('HOME');
+      void run({command: 'finish-work', shiftId}, {close: false});
+    },
+    labelSize: '13px',
+    ringColor: 'var(--white, #fff)',
+  };
+  const nextDock = <NextStepDock {...nextStepProps} />;
+
+  /*
+    Нижнее меню — и на шаге закрытия смены.
+
+    Отказ сервера оставлял человека на экране без единой вкладки: выйти можно
+    было только перезагрузкой страницы, а она возвращала его на тот же экран
+    (D-20260927-001). Вкладка закрывает шаг и уводит в раздел.
+  */
+  const dock = (
+    <Dock
+      items={OPERATOR_DOCK}
+      active={tab}
+      badges={{MORE: openIncidents}}
+      extra={{after: 'SAFETY', node: <NextStepTab {...nextStepProps} />}}
+      onSelect={(next) => { setTab(next); setDetour(null); setActionError(null); }}
     />
   );
 
@@ -309,7 +307,7 @@ export function OperatorV7App() {
     return (
       <Shell online={online} syncedAt={syncedAt} pending={pending}
         back={DETOUR_BACK[detour.kind]} onBack={back}
-        dock={<>{stepBar}{detour.kind === 'CLOSE' ? dock : null}</>}>
+        dock={detour.kind === 'CLOSE' ? dock : nextDock}>
         {detour.kind === 'PPE' ? (
           <PpeFlow
             busy={busy}
@@ -454,7 +452,7 @@ export function OperatorV7App() {
       pending={pending}
       back="PilingTrack"
       desktopNav={<aside className="oc-desktop-nav"><div className="oc-brand"><PilingIcon name="equipment-rig" size={30} decorative /><strong>PilingTrack</strong></div><p>Рабочее место оператора</p><nav aria-label="Рабочее место">{OPERATOR_DOCK.map(item=><button type="button" key={item.key} aria-current={tab===item.key?'page':undefined} onClick={()=>setTab(item.key)}><PilingIcon name={item.key==='HOME'?'home':item.key==='SAFETY'?'accepted':item.key==='EQUIP'?'equipment-rig':'menu'} size={24} decorative />{item.label}</button>)}</nav><a href="/operator/v7/history"><PilingIcon name="history" size={24} decorative />История</a></aside>}
-      dock={<>{stepBar}{dock}</>}
+      dock={dock}
       action={shiftId && !(tab === 'HOME' && state.phase === 'WORK') ? (
         <Button tone="danger" onClick={() => setDetour({kind: 'INCIDENT'})}>
           ⚠ Сообщить об инциденте

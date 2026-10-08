@@ -1,7 +1,7 @@
 'use client';
 
-import {finishShift, nextStep} from '../shift-next-step';
-import {StepBar} from '../step-bar';
+import {nextStep} from '../shift-next-step';
+import {NextStepTab} from '../step-bar';
 import {OperatorWorkOverview, type WorkAction} from '../operator-work-overview';
 import {useCallback, useEffect, useRef, useState} from 'react';
 import {
@@ -1695,23 +1695,25 @@ export function OperatorV10App() {
         {!loading && !state && !loadError ? <Badge tone="warn">нет данных</Badge> : null}
         {body}
       </div>
-      {/* Нижняя панель шагов (решение владельца 07.10.2026) — над нижним меню. */}
-      {state ? (
-        <StepBar
-          className="ov10-stepbar"
-          step={nextStep(state)}
-          finish={finishShift(state)}
-          busy={busy}
-          onHome={() => setActive('today')}
-          onNext={() => goNextStep(state)}
-          onGoClosing={() => setActive('closing')}
-          onFinishWork={finishWork}
-        />
-      ) : null}
       <Tabbar
         tabs={TABS}
         active={activeTab}
         onSelect={(key) => setActive(TABS.find((tab) => tab.key === key)?.screen ?? 'today')}
+        // Кнопка «Следующий шаг» между «ТБ» и «Техникой» (решение владельца 09.10.2026).
+        extra={state ? {
+          after: 'safety',
+          node: (
+            <NextStepTab
+              step={nextStep(state)}
+              busy={busy}
+              onNext={() => goNextStep(state)}
+              onFinishWork={finishWork}
+              labelSize="13px"
+              labelColor="var(--orange)"
+              ringColor="var(--navy)"
+            />
+          ),
+        } : undefined}
       />
     </div>
   );
