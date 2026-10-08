@@ -19,6 +19,7 @@ import { authFetch } from '@/lib/api';
 import { catchText } from '@/components/piling/admin-crews/crew-messages';
 import { cn } from '@/lib/utils';
 import { formatNum, formatRelative } from '@/lib/format';
+import { getTodayInTimezone, zonedDayStartUtc } from '@/lib/timezone';
 
 type Subsystem = 'engine' | 'hydraulics' | 'other';
 
@@ -136,13 +137,10 @@ interface ParamSeries {
 }
 
 function todayYmd(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  return getTodayInTimezone();
 }
-function shiftYmd(days: number): string {
-  const d = new Date();
-  d.setDate(d.getDate() + days);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+function shiftYmd(days: number, day: string = todayYmd()): string {
+  return new Date(new Date(`${day}T12:00:00.000Z`).getTime() + days * 86_400_000).toISOString().slice(0, 10);
 }
 
 interface Props {
@@ -160,8 +158,8 @@ export function EquipmentMonitoring({ equipmentId }: Props) {
     if (from > to) return;
     setRecords(null);
     setError(null);
-    const fromIso = new Date(`${from}T00:00:00`).toISOString();
-    const toIso = new Date(`${to}T23:59:59.999`).toISOString();
+    const fromIso = zonedDayStartUtc(from).toISOString();
+    const toIso = new Date(zonedDayStartUtc(shiftYmd(1, to)).getTime() - 1).toISOString();
     const qs = new URLSearchParams({ equipmentId, from: fromIso, to: toIso, limit: '1000' });
     try {
       const res = await authFetch(`/api/telemetry?${qs.toString()}`);

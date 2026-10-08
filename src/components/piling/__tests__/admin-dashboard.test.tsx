@@ -32,6 +32,36 @@ vi.mock('@/components/piling/layout-editor/page-layout-renderer', () => ({
 }));
 import { AdminDashboard } from '../admin-dashboard';
 
+describe('AdminDashboard — срок ТО по дню Москвы (W126 №16)', () => {
+  beforeEach(() => {
+    vi.stubEnv('TZ', 'UTC');
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date('2026-09-25T21:30:00.000Z'));
+    mocks.authFetch.mockReset();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllEnvs();
+  });
+
+  it('показывает просрочку вчерашнего ТО после полуночи Москвы даже в UTC браузере', async () => {
+    mockFetch(json({ analytics: [] }));
+    const base = mocks.authFetch.getMockImplementation() as (url: string) => Promise<Response>;
+    mocks.authFetch.mockImplementation((url: string) => {
+      if (url.startsWith('/api/monitoring/fleet')) return Promise.resolve(json({
+        ...fleet, totals: { ...fleet.totals, totalEquipment: 1 },
+        equipment: [{ id: 'eq-1', name: 'СП-49', model: '', status: 'active', assignedSiteName: null, todayTotals: null }],
+      }));
+      if (url.startsWith('/api/maintenance')) return Promise.resolve(json({ records: [{
+        id: 'to-1', equipmentId: 'eq-1', type: 'TO1', status: 'PLANNED', scheduledAt: '2026-09-25T12:00:00.000Z',
+      }] }));
+      return base(url);
+    });
+    render(<AdminDashboard />);
+    expect(await screen.findByText('СП-49 — ТО просрочено')).toBeInTheDocument();
+  });
+});
+
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
 

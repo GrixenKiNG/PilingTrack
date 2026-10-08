@@ -34,7 +34,7 @@ import {
 import { authFetch } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { formatCountMeters, formatNumber } from '@/lib/format';
+import { daysUntil, formatCountMeters, formatNumber } from '@/lib/format';
 import { getTodayInTimezone } from '@/lib/timezone';
 import { useMinSkeletonDuration } from '@/components/piling/async-ui';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -66,13 +66,6 @@ const ONBOARDING_STEPS = [
 const OPEN_STATUSES = new Set(['PLANNED', 'ASSIGNED', 'IN_PROGRESS', 'ON_HOLD']);
 const REPAIR_TYPES = new Set(['REPAIR', 'FAULT']);
 const REGULAR_TYPES = new Set(['EO', 'TO1', 'TO2', 'TO3', 'SEASONAL', 'SCHEDULED']);
-
-const daysUntil = (iso: string | null): number | null => {
-  if (!iso) return null;
-  const t = new Date(iso); if (Number.isNaN(t.getTime())) return null;
-  const today = new Date(); today.setHours(0, 0, 0, 0); t.setHours(0, 0, 0, 0);
-  return Math.round((t.getTime() - today.getTime()) / 86_400_000);
-};
 
 /** «ЧЧ:ММ» по местному времени — отметка свежести аналитики (F-R109-3). */
 const formatClock = (d: Date): string =>

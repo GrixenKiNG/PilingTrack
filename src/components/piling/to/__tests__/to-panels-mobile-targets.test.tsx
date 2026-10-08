@@ -8,7 +8,7 @@
  * шире) высота прежняя (`min-height` сильнее `height`, поэтому сброс обязателен).
  */
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { toast } from 'sonner';
 
 const mocks = vi.hoisted(() => ({ authFetch: vi.fn() }));
@@ -20,6 +20,35 @@ import { FuelPanel } from '../fuel-panel';
 import { MeterReadingsPanel } from '../meter-readings-panel';
 import { MaintenancePlansPanel } from '../maintenance-plans-panel';
 import { LoadFailure } from '../load-failure';
+
+describe('дата ручной записи — день Москвы, а не браузера (W126 №9)', () => {
+  beforeEach(() => {
+    vi.stubEnv('TZ', 'UTC');
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-09-25T21:30:00.000Z'));
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllEnvs();
+  });
+
+  it.each([
+    { Component: FuelPanel, add: 'Добавить запись', placeholder: 'напр. 200', path: 'fuel' },
+    { Component: MeterReadingsPanel, add: 'Добавить показание', placeholder: 'напр. 5670', path: 'meter-readings' },
+  ])('$path: сегодня 26.09, выбранная дата уходит прежней строкой YYYY-MM-DD', ({ Component, add, placeholder, path }) => {
+    const { container } = render(<Component equipmentId="eq-1" />);
+    fireEvent.click(screen.getByRole('button', { name: add }));
+    const date = container.querySelector('input[type="date"]');
+    if (!date) throw new Error('Не найдено поле даты');
+    expect(date).toHaveValue('2026-09-26');
+    fireEvent.change(date, { target: { value: '2026-09-24' } });
+    fireEvent.change(screen.getByPlaceholderText(placeholder), { target: { value: '100' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить' }));
+    expect(mocks.authFetch).toHaveBeenCalledWith(`/api/equipment/eq-1/${path}`, expect.objectContaining({
+      method: 'POST', body: expect.stringContaining('"recordedAt":"2026-09-24"'),
+    }));
+  });
+});
 
 beforeEach(() => {
   mocks.authFetch.mockReset();

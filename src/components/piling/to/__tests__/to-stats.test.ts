@@ -97,6 +97,21 @@ describe('findOverdueMaintenance', () => {
     expect(out[0]).toMatchObject({ id: 'a', reason: 'date', overdueDays: 10, overdueHours: null });
   });
 
+  it('does not list maintenance as overdue while its planned day is still in progress', () => {
+    expect(findOverdueMaintenance(
+      [{ id: 'a', name: 'Копёр-1', nextMaintenanceDate: '2026-06-20' }],
+      new Date('2026-06-20T20:59:59.999Z'),
+    )).toEqual([]);
+  });
+
+  it.each(['2026-06-20', '2026-06-20T00:00:00.000Z'])('counts the first overdue day at Moscow midnight for %s', (nextMaintenanceDate) => {
+    const out = findOverdueMaintenance(
+      [{ id: 'a', name: 'Копёр-1', nextMaintenanceDate }],
+      new Date('2026-06-20T21:00:00.000Z'),
+    );
+    expect(out[0]).toMatchObject({ reason: 'date', overdueDays: 1 });
+  });
+
   it('flags equipment overdue by engine-hour threshold', () => {
     const out = findOverdueMaintenance(
       [{ id: 'b', name: 'Копёр-2', engineHoursTotal: 520, nextMaintenanceAtHours: 500 }],
