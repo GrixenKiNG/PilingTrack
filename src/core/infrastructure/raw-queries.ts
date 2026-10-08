@@ -13,7 +13,6 @@ import { SUBMITTED_REPORT_STATUS } from '@/lib/report-status';
 
 import { db } from '@/lib/db';
 import { ServiceError } from '@/lib/service-error';
-import { Prisma } from '@/generated/postgres-client';
 import { logger } from '@/lib/logger';
 
 /**
@@ -174,63 +173,7 @@ export async function getSiteDailySummaryRaw(
   return summary;
 }
 
-// ============================================================
-// Crews With Details — одним запросом
-// ============================================================
 
-export interface CrewWithDetails {
-  id: string;
-  name: string;
-  operatorId: string;
-  operatorName: string | null;
-  operatorEmail: string | null;
-  equipmentId: string;
-  equipmentName: string | null;
-  equipmentModel: string | null;
-  siteId: string;
-  siteName: string | null;
-  isActive: boolean;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-export async function getCrewsWithDetailsRaw(
-  tenantId: string,
-  siteId?: string | null
-): Promise<CrewWithDetails[]> {
-  const start = Date.now();
-
-  // Fail closed (CLAUDE.md): у «Crew» нет своей колонки tenantId, он наследуется
-  // от объекта. Пустая организация — отказ, а не полный список активных бригад
-  // всех организаций с e-mail машинистов (аудит R65 #2, тот же случай, что
-  // bulkDeleteReportsRaw в 398d1d50).
-  if (typeof tenantId !== 'string' || tenantId.trim().length === 0) {
-    throw new ServiceError('Не определена организация пользователя', 403);
-  }
-
-  const crews = await db.$queryRaw<CrewWithDetails[]>`
-    SELECT c.id, c.name, c."operatorId", c."equipmentId", c."siteId",
-           c."isActive" as "isActive", c."createdAt", c."updatedAt",
-           u.name as "operatorName", u.email as "operatorEmail",
-           e.name as "equipmentName", e.model as "equipmentModel",
-           s.name as "siteName"
-    FROM "Crew" c
-    LEFT JOIN "User" u ON c."operatorId" = u.id
-    LEFT JOIN "Equipment" e ON c."equipmentId" = e.id
-    LEFT JOIN "Site" s ON c."siteId" = s.id
-    WHERE c."isActive" = true
-      AND s."tenantId" = ${tenantId}
-      ${siteId ? Prisma.sql`AND c."siteId" = ${siteId}` : Prisma.sql``}
-    ORDER BY c."createdAt" DESC
-  `;
-
-  const elapsed = Date.now() - start;
-  if (elapsed > 50) {
-    logger.warn('RawQuery: getCrewsWithDetails slow', { elapsedMs: elapsed });
-  }
-
-  return crews;
-}
 
 // ============================================================
 // Atomic Upsert Report — один запрос вместо find-then-update
