@@ -3,6 +3,7 @@
 import {useMemo, useRef, useState} from 'react';
 import {
   measureRequired,
+  ENGINE_HOURS_REPLACEMENT_NOTE,
   type ChecklistAnswer, type ChecklistItem, type ChecklistSection, type ChecklistView,
   type OperatorAnswer, type WorkWarning,
 } from '@/modules/operator-mobile/contracts';
@@ -24,9 +25,10 @@ interface Draft {
   measures: Record<string, string>;
   mediaIds: string[];
   uploading: boolean;
+  meterReplaced: boolean;
 }
 
-const emptyDraft = (): Draft => ({note: '', measures: {}, mediaIds: [], uploading: false});
+const emptyDraft = (): Draft => ({note: '', measures: {}, mediaIds: [], uploading: false, meterReplaced: false});
 
 /**
  * Пустая строка — это не ноль. `Number('')` даёт 0, и без этой проверки
@@ -82,8 +84,8 @@ export function ChecklistScreen({
   onBack?: () => void;
   /**
    * Последнее показание счётчика моточасов — подсказка под полем ввода.
-   * Счётчик не крутится назад, и человек, видящий прошлое число, замечает
-   * опечатку сам: до отказа сервера, а не после.
+   * Без отметки замены меньшее показание отклоняется; прошлое число помогает
+   * заметить опечатку до отправки.
    */
   lastMeter?: {engineHours: number; recordedAt: string} | null;
   /**
@@ -151,7 +153,8 @@ export function ChecklistScreen({
         answer: fact ? ('OK' as OperatorAnswer) : (draft.answer as OperatorAnswer),
         // Основание системного ответа уходит в журнал: проверяющий через
         // полгода должен отличать подтверждённое человеком от вычисленного.
-        note: fact ? `Подтверждено системой: ${fact.fact}` : draft.note.trim() || undefined,
+        note: fact ? `Подтверждено системой: ${fact.fact}`
+          : [draft.meterReplaced ? ENGINE_HOURS_REPLACEMENT_NOTE : '', draft.note.trim()].filter(Boolean).join('; ') || undefined,
         measures: Object.keys(measures).length > 0 ? measures : undefined,
         mediaIds: draft.mediaIds.length > 0 ? draft.mediaIds : undefined,
       };
@@ -265,8 +268,8 @@ export function ChecklistScreen({
                     {!open && apart > 0 ? (
                       <span className="block text-3xs text-muted-foreground">
                         {bulk.length > 0
-                          ? `Со снимком и замером — отдельно (${apart})`
-                          : 'Каждый пункт со снимком или замером — откройте раздел'}
+                          ? `Проверьте отдельно: фото при замечании или отказе, замеры (${apart})`
+                          : 'Проверьте каждый пункт: фото при замечании или отказе, замеры'}
                       </span>
                     ) : null}
                   </span>
@@ -350,7 +353,7 @@ function ItemCard({item, draft, commandId, onChange, lastMeter, known}: {
         ) : null}
         {item.photoOnIssue ? (
           <span className="rounded-full border border-warning/30 bg-warning/10 px-2 py-0.5 text-3xs font-semibold uppercase tracking-wide text-warning-strong">
-            Фото
+            Фото при замечании или отказе
           </span>
         ) : null}
         {item.onlyWhen?.map((condition) => (
@@ -411,8 +414,16 @@ function ItemCard({item, draft, commandId, onChange, lastMeter, known}: {
               last={lastMeter}
               typed={draft.measures[item.measure.key]}
               unit={item.measure.unit}
+              replaced={draft.meterReplaced}
             />
           ) : null}
+        </label>
+      ) : null}
+
+      {wantsMeasure && item.measure?.key === 'engineHours' ? (
+        <label className="mt-2 flex items-center gap-2 text-sm">
+          <input type="checkbox" checked={draft.meterReplaced} onChange={(event) => onChange({meterReplaced: event.target.checked})} />
+          Счётчик заменён
         </label>
       ) : null}
 
@@ -467,11 +478,8 @@ function ItemCard({item, draft, commandId, onChange, lastMeter, known}: {
 /**
  * Прошлое показание счётчика и предупреждение о движении назад.
  *
- * Счётчик моточасов не крутится обратно: меньшее значение — опечатка, и
- * принять её значит испортить и наработку, и планы ТО, которые от неё
- * зависят. Сервер такую цифру отклоняет, но узнать об этом после
- * заполнения всего списка — плохой способ. Здесь то же правило, только
- * видно сразу.
+ * Без явной отметки замены меньшее значение может быть опечаткой. Показываем
+ * предупреждение до отправки; подтверждённую замену сохраняем в журнале.
  */
 /**
  * Пункт, ответ на который дала система. Всегда «норма» и всегда с основанием:
@@ -488,14 +496,15 @@ function KnownCard({item, known}: {item: ChecklistItem; known: KnownAnswer}) {
   );
 }
 
-function MeterHint({last, typed, unit}: {
+function MeterHint({last, typed, unit, replaced}: {
   last: {engineHours: number; recordedAt: string};
   typed: string | undefined;
   unit: string;
+  replaced: boolean;
 }) {
   const when = new Date(last.recordedAt).toLocaleDateString('ru-RU', {day: '2-digit', month: '2-digit'});
   const value = typed?.trim() ?? '';
-  const goesBack = value !== '' && Number.isFinite(Number(value)) && Number(value) < last.engineHours;
+  const goesBack = !replaced && value !== '' && Number.isFinite(Number(value)) && Number(value) < last.engineHours;
   return (
     <span
       className={cn(
@@ -504,7 +513,7 @@ function MeterHint({last, typed, unit}: {
       )}
     >
       {goesBack
-        ? `Меньше прошлого показания (${last.engineHours} ${unit} от ${when}). Счётчик не крутится назад — проверьте цифру.`
+        ? `Меньше прошлого показания (${last.engineHours} ${unit} от ${when}). Проверьте цифру или отметьте замену счётчика.`
         : `Прошлое показание: ${last.engineHours} ${unit} от ${when}`}
     </span>
   );

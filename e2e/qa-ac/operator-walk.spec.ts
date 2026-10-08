@@ -106,7 +106,12 @@ async function completeChecklist(page: Page) {
     for (let k = 0; k < nm; k++) {
       if (await measures.nth(k).inputValue()) continue;
       const label = await measures.nth(k).evaluate((el) => (el.closest('label')?.innerText ?? '')).catch(() => '');
-      const value = /%/.test(label) ? '50' : /моточас|м\/ч/.test(label) ? '99999' : '10';
+      const previousMeter = label.match(/Прошлое показание:\s*(\d+(?:[.,]\d+)?)\s*м\/ч/i);
+      if (/моточас|м\/ч/i.test(label) && !previousMeter) {
+        throw new Error('Для теста моточасов нужно известное показание на отдельном тестовом стенде. Произвольное значение не подставляем.');
+      }
+      const value = /%/.test(label) ? '50' : previousMeter
+        ? String(Number(previousMeter[1].replace(',', '.')) + 1) : '10';
       await measures.nth(k).fill(value);
     }
     await page.waitForTimeout(400);
@@ -478,7 +483,7 @@ test('v10 (Woltman-PVE 50PR, ivv@): продолжает смену 04.10 под
   // Пробная запись: проверяем, в какую смену уходит выработка
   const OLD_SHIFT = '95cd98f5-989d-42eb-89cf-193ed993ad31';
   const before = Number(db(`SELECT COUNT(*) FROM "PileWork" WHERE "shiftId"='${OLD_SHIFT}'`));
-  const pileBtn = page.getByRole('button', { name: /^Свая$/ });
+  const pileBtn = page.getByRole('button', { name: /^Добавить сваю$/ });
   if (await pileBtn.count()) {
     await tap(page, pileBtn.first(), 'Свая (открыть форму)');
     await page.waitForTimeout(1800);

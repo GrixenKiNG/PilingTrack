@@ -179,6 +179,22 @@ export function OperatorMobileApp() {
   // Сигналы нижней панели экрану работы: вернуться к обзору / открыть форму записи.
   const [homeSignal, setHomeSignal] = useState(0);
   const [openFormSignal, setOpenFormSignal] = useState(0);
+  const stepScreen = useRef<HTMLDivElement>(null);
+  const nextTarget = useRef<'CHECKLIST' | 'ACTION' | null>(null);
+  const [focusRequest, setFocusRequest] = useState(0);
+  useEffect(() => {
+    if (focusRequest === 0) return;
+    const node = stepScreen.current;
+    const target = (nextTarget.current === 'CHECKLIST'
+      ? node?.querySelector<HTMLElement>('main button[aria-expanded="true"]')
+        ?? node?.querySelector<HTMLElement>('main button[aria-expanded="false"]')
+      : node?.querySelector<HTMLElement>('.operator-screen-footer .operator-big-button:not(.bg-card):not(:disabled)'))
+      ?? node?.querySelector<HTMLElement>('main');
+    if (target?.getAttribute('aria-expanded') === 'false') target.click();
+    if (target?.tagName === 'MAIN') target.tabIndex = -1;
+    target?.focus();
+    target?.scrollIntoView?.({block: 'center'});
+  }, [focusRequest]);
   const coordinates = useRef<{latitude: number; longitude: number} | null>(null);
   /** Таймер перехода на вход после истёкшей сессии: снимаем при размонтировании. */
   const authRedirectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -610,6 +626,7 @@ export function OperatorMobileApp() {
   const finish = finishShift(state);
   const goNext = () => {
     const action = step.action;
+    if (action.kind !== 'WAIT_ADMISSION' && action.kind !== 'NONE') setNotice(step.hint);
     switch (action.kind) {
       case 'ADMISSION':
         setWorkTab('SHIFT');
@@ -619,12 +636,16 @@ export function OperatorMobileApp() {
         void reload();
         break;
       case 'CHECKLIST':
-        // Чек-лист фазы и есть главный экран фазы.
         goHome();
+        setDetour({kind: 'CHECKLIST', stage: action.stage});
+        nextTarget.current = 'CHECKLIST';
+        setFocusRequest((value) => value + 1);
         break;
       case 'SERVICE_AFTER':
         setWorkTab('SHIFT');
         setDetour({kind: 'CHECKLIST', stage: 'EO_AFTER'});
+        nextTarget.current = 'CHECKLIST';
+        setFocusRequest((value) => value + 1);
         break;
       case 'LOG_WORK':
         goHome();
@@ -633,6 +654,8 @@ export function OperatorMobileApp() {
       case 'ACCEPT_EQUIPMENT':
       case 'CLOSE_SHIFT':
         goHome();
+        nextTarget.current = 'ACTION';
+        setFocusRequest((value) => value + 1);
         break;
       default:
         break;
@@ -871,7 +894,7 @@ export function OperatorMobileApp() {
     if (checklist) {
       return (
         <ChecklistScreen
-          key={checklist.stage}
+          key={`${state.shift?.id}:${state.assignment?.equipmentId}:${checklist.stage}`}
           checklist={checklist}
           warnings={state.warnings}
           onSubmit={submitChecklist(checklist.stage)}
@@ -1019,7 +1042,7 @@ export function OperatorMobileApp() {
           </Panel>
         </div>
       ) : null}
-      {screen()}
+      <div ref={stepScreen} className="contents">{screen()}</div>
     </OperatorFrame>
     </StepBarSlotProvider>
   );
@@ -1095,4 +1118,3 @@ function ShiftMissingScreen({onReload}: {onReload: () => void}) {
     </Screen>
   );
 }
-

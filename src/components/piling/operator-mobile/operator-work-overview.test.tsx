@@ -18,6 +18,22 @@ function show(value = state, busy = false) {
 }
 
 describe('рабочий обзор оператора', () => {
+  it('v10 называет действия глаголами и передаёт исходные виды записи', () => {
+    const onAction = vi.fn();
+    render(<OperatorWorkOverview state={state} variant="v10" onAction={onAction} onFinish={vi.fn()} />);
+    for (const [label, kind] of [
+      ['Добавить сваю', 'PILES'], ['Добавить бурение', 'DRILLING'],
+      ['Записать простой', 'DOWNTIME'], ['Записать паспорт сваи', 'PASSPORT'],
+    ]) {
+      fireEvent.click(screen.getByRole('button', {name: label}));
+      expect(onAction).toHaveBeenLastCalledWith(kind);
+    }
+  });
+  it('показывает дату открытой смены, а не сегодняшнюю дату старого отчёта', () => {
+    show({...state, shift: {id: 'old-shift', productionDate: '2026-09-19'}} as OperatorMobileState);
+    expect(screen.getByText('19.09.2026')).toBeInTheDocument();
+    expect(screen.queryByText('20.09.2026')).not.toBeInTheDocument();
+  });
   it('показывает метры бурения и простой в часах, а не в минутах', () => {
     show();
     expect(screen.getByText('24')).toBeInTheDocument();
@@ -49,5 +65,4 @@ describe('рабочий обзор оператора', () => {
     for (const button of screen.getAllByRole('button', {name: 'Завершить работу'})) expect(button).toBeDisabled();
   });
 });
-
 

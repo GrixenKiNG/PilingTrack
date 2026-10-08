@@ -17,6 +17,47 @@ const { queryRaw } = vi.hoisted(() => ({ queryRaw: vi.fn() }));
 vi.mock('@/lib/db', () => ({ db: { $queryRaw: queryRaw } }));
 
 import { getSiteAnalytics } from '../site-analytics-service';
+import { computeDashboardKpis } from '@/components/piling/dashboard-kpis';
+import { formatDowntimeHours } from '@/lib/downtime-hours';
+
+describe('getSiteAnalytics — точность простоя на дашборде (I8)', () => {
+  const siteRow = (siteId: string, totalDowntime: number) => ({
+    siteId, siteName: siteId, isActive: true,
+    plannedPiles: 0, plannedPileMeters: 0, plannedDrillingCount: 0,
+    actualPiles: 0, actualPileMeters: 0, actualDrillingCount: 0,
+    plannedDrilling: 0, actualDrilling: 0,
+    actualPilesAllTime: 0, actualPileMetersAllTime: 0, actualDrillingAllTime: 0,
+    totalDowntime, totalReports: 1,
+  });
+
+  beforeEach(() => queryRaw.mockReset());
+
+  it('показывает 0,05 часа как 3 минуты, без удвоения до 6 минут', async () => {
+    queryRaw.mockResolvedValue([siteRow('site-1', 0.05)]);
+
+    const rows = await getSiteAnalytics({
+      tenantId: 'orion', dateFrom: '2026-10-07', dateTo: '2026-10-07',
+    });
+    const kpis = computeDashboardKpis(rows, null, new Map(), []);
+
+    expect(rows[0].totalDowntime).toBe(0.05);
+    expect(kpis.downtime).toBe(0.05);
+    expect(formatDowntimeHours(kpis.downtime)).toBe('3 мин');
+  });
+
+  it('суммирует дробные часы разных объектов до округления минут для показа', async () => {
+    queryRaw.mockResolvedValue([
+      siteRow('site-1', 0.05), siteRow('site-2', 0.02), siteRow('site-3', 0.01),
+    ]);
+
+    const rows = await getSiteAnalytics({tenantId: 'orion'});
+    const kpis = computeDashboardKpis(rows, null, new Map(), []);
+
+    expect(rows.map((row) => row.totalDowntime)).toEqual([0.05, 0.02, 0.01]);
+    expect(kpis.downtime).toBeCloseTo(0.08);
+    expect(formatDowntimeHours(kpis.downtime)).toBe('5 мин');
+  });
+});
 
 describe('getSiteAnalytics — actual pile meters source', () => {
   beforeEach(() => {

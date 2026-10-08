@@ -195,6 +195,6 @@ export async function getSiteAnalytics(opts: SiteAnalyticsOptions) {
         ? Math.min(100, (row.actualDrillingAllTime / row.plannedDrilling) * 100)
         : 0,
     totalReports: row.totalReports,
-    totalDowntime: parseFloat(row.totalDowntime.toFixed(1)),
+    totalDowntime: row.totalDowntime,
   }));
 }

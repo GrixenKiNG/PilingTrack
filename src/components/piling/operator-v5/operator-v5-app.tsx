@@ -1,6 +1,6 @@
 'use client';
 
-import {useCallback, useEffect, useMemo, useState} from 'react';
+import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {PilingIcon, type PilingIconName} from '@/components/piling/icons';
 import {OperatorWorkOverview} from '../operator-mobile/operator-work-overview';
 import {
@@ -14,6 +14,7 @@ import {
   INCIDENT_CATEGORIES, INCIDENT_CATEGORY_LABELS, INCIDENT_DESCRIPTION_MIN,
   INCIDENT_SIGN_LABELS, INCIDENT_SIGNS, PHASE_LABELS, PPE_ITEMS, SAFETY_BRIEFING,
   measureRequired,
+  ENGINE_HOURS_REPLACEMENT_NOTE,
 } from '@/modules/operator-mobile/contracts';
 import {KnowledgeScreen} from '../operator-mobile/screens/knowledge-screen';
 import {PilePassportForm} from '../operator-mobile/screens/pile-passport-form';
@@ -21,7 +22,7 @@ import {formatNumber} from '@/lib/format';
 import {finishShift, nextStep} from '../operator-mobile/shift-next-step';
 import {StepBar} from '../operator-mobile/step-bar';
 import {
-  ApiError, QueuedOffline, currentPosition, fetchState, newCommandId, sendCommand,
+  ApiError, QueuedOffline, currentPosition, fetchState, newCommandId, sendCommand, uploadPhoto,
   type ProductionEntryInput,
 } from '../operator-mobile/api';
 import {OfflineQueueBanner} from '../operator-mobile/offline-queue-banner';
@@ -355,10 +356,17 @@ function AcceptScreen({state, busy, onAccept}: {
         <div className="card" key={option.equipmentId}>
           <span className="lbl">{option.equipmentName}</span>
           <p>{option.siteName}</p>
+          {state.blockedShift?.equipmentId === option.equipmentId ? (
+            <p className="note warn" tabIndex={-1} data-next-target={options.every((entry) => entry.equipmentId === state.blockedShift?.equipmentId)}>
+              Другой машинист не сдал смену за {dateRu(state.blockedShift.productionDate)}.
+              {' '}Обратитесь к диспетчеру, чтобы он организовал сдачу смены. После её закрытия можно принять машину.
+            </p>
+          ) : null}
           <button
             className="b"
             type="button"
-            disabled={busy}
+            data-next-target="true"
+            disabled={busy || state.blockedShift?.equipmentId === option.equipmentId}
             onClick={() => onAccept(option.equipmentId)}
           >
             Принять машину
@@ -377,24 +385,35 @@ function AcceptScreen({state, busy, onAccept}: {
 }
 
 /** D/E. Чек-лист этапа — экраны D1–D4 и E1 макета. */
-function ChecklistScreen({checklist, answers, measures, busy, lastMeter, onAnswer, onMeasure, onSubmit}: {
+function ChecklistScreen({checklist, answers, measures, notes, media, uploading, photoErrors, busy, lastMeter, meterReplaced, onMeterReplacement, onAnswer, onMeasure, onNote, onPhoto, onSubmit}: {
   checklist: ChecklistView;
   answers: Record<string, OperatorAnswer>;
   measures: Record<string, string>;
+  notes: Record<string, string>;
+  media: Record<string, string[]>;
+  uploading: Record<string, boolean>;
+  photoErrors: Record<string, string>;
   busy: boolean;
   /** Последнее показание счётчика — подсказка у поля моточасов. */
   lastMeter: {engineHours: number; recordedAt: string} | null;
+  meterReplaced: boolean;
+  onMeterReplacement: (replaced: boolean) => void;
   onAnswer: (itemId: string, answer: OperatorAnswer) => void;
   onMeasure: (key: string, value: string) => void;
+  onNote: (itemId: string, value: string) => void;
+  onPhoto: (itemId: string, file: File) => Promise<void>;
   onSubmit: () => void;
 }) {
   const items = checklist.sections.flatMap((section) => section.items);
   // Замер обязателен при таком ответе — без него сервер список не примет.
   const needsMeasure = (item: (typeof items)[number]) => Boolean(item.measure)
     && measureRequired(item, answers[item.id] ?? 'OK');
+  const isIssue = (itemId: string) => answers[itemId] === 'REMARK' || answers[itemId] === 'FAULT';
   const left = items.filter(
     (item) => !answers[item.id]
-      || (needsMeasure(item) && !(measures[item.measure?.key ?? ''] ?? '').trim()),
+      || (needsMeasure(item) && !(measures[item.measure?.key ?? ''] ?? '').trim())
+      || (isIssue(item.id) && (!(notes[item.id] ?? '').trim()
+        || (item.photoOnIssue && !(media[item.id]?.length)) || uploading[item.id])),
   ).length;
   const done = items.length - left;
   return (
@@ -418,19 +437,52 @@ function ChecklistScreen({checklist, answers, measures, busy, lastMeter, onAnswe
                 <span className="ans">
                   <button
                     type="button"
+                    data-next-target={!answers[item.id]}
                     className={answers[item.id] === 'OK' ? 'on' : ''}
                     onClick={() => onAnswer(item.id, 'OK')}
                   >
-                    норма
+                    Норма
+                  </button>
+                  <button
+                    type="button"
+                    className={answers[item.id] === 'REMARK' ? 'on' : ''}
+                    onClick={() => onAnswer(item.id, 'REMARK')}
+                  >
+                    Замечание
                   </button>
                   <button
                     type="button"
                     className={answers[item.id] === 'FAULT' ? 'bad' : ''}
                     onClick={() => onAnswer(item.id, 'FAULT')}
                   >
-                    дефект
+                    Отказ
                   </button>
                 </span>
+              </div>
+            ))}
+            {section.items.filter((item) => isIssue(item.id)).map((item) => (
+              <div className="card" key={item.id + '-issue'}>
+                <label>
+                  <span className="lbl">Что именно не так: {item.text}</span>
+                  <textarea value={notes[item.id] ?? ''} rows={2} data-next-target={!(notes[item.id] ?? '').trim()}
+                    onChange={(event) => onNote(item.id, event.target.value)} />
+                </label>
+                {item.photoOnIssue ? (
+                  <>
+                    <label>
+                      <span className="lbl">Снимок: {item.text}</span>
+                      <input type="file" accept="image/*" capture="environment" disabled={busy || uploading[item.id]}
+                        data-next-target={!media[item.id]?.length}
+                        onChange={(event) => {
+                          const file = event.target.files?.[0];
+                          event.target.value = '';
+                          if (file) void onPhoto(item.id, file);
+                        }} />
+                    </label>
+                    <p className="m">{uploading[item.id] ? 'Загружаем снимок…' : `Снимков: ${media[item.id]?.length ?? 0}`}</p>
+                    {photoErrors[item.id] ? <p role="alert" className="note warn">{photoErrors[item.id]}</p> : null}
+                  </>
+                ) : null}
               </div>
             ))}
             {section.items.filter(needsMeasure).map((item) => (
@@ -443,19 +495,26 @@ function ChecklistScreen({checklist, answers, measures, busy, lastMeter, onAnswe
                 </span>
                 <input
                   inputMode="decimal"
+                  data-next-target={!(measures[item.measure?.key ?? ''] ?? '').trim()}
                   value={measures[item.measure?.key ?? ''] ?? ''}
                   onChange={(event) => onMeasure(item.measure?.key ?? '', event.target.value)}
                 />
                 {/* Прошлое показание счётчика — рядом с полем, а не на экране
-                    приёмки, который к этому моменту давно закрыт. Счётчик не
-                    крутится назад, и человек, видящий вчерашнее число, ловит
-                    свою опечатку сам — до того, как сервер откажет. Поле при
+                    приёмки, который к этому моменту давно закрыт. Без отметки
+                    замены меньшее число отклоняется: человек может заметить
+                    опечатку или подтвердить замену до отправки. Поле при
                     этом не заполняем: подставленное отправят не глядя. */}
                 {item.measure?.key === 'engineHours' && lastMeter ? (
                   <span className="m">
                     было {formatNumber(lastMeter.engineHours, 0)} м/ч
                     {' '}на {dateRu(lastMeter.recordedAt)}
                   </span>
+                ) : null}
+                {item.measure?.key === 'engineHours' ? (
+                  <label className="m">
+                    <input type="checkbox" checked={meterReplaced} onChange={(event) => onMeterReplacement(event.target.checked)} />
+                    Счётчик заменён
+                  </label>
                 ) : null}
               </div>
             ))}
@@ -464,7 +523,8 @@ function ChecklistScreen({checklist, answers, measures, busy, lastMeter, onAnswe
         <button
           className={left > 0 ? 'b dis' : 'b'}
           type="button"
-          disabled={busy || left > 0}
+          data-next-target={left === 0}
+          disabled={busy || left > 0 || Object.values(uploading).some(Boolean)}
           onClick={onSubmit}
         >
           {busy ? 'Отправляем…' : left > 0 ? `Осталось отметить: ${left}` : 'Завершить'}
@@ -873,15 +933,17 @@ export function CloseScreen({state, busy, onClose, unsent, onFlush, onAddWork}: 
       {unsent > 0 ? (
         <>
           <p className="note warn">Сначала отправьте записи с телефона: {unsent} не отправлено</p>
-          <button className="b gh" type="button" onClick={onFlush}>Отправить сейчас</button>
+          <button className="b gh" type="button" data-next-target="true" onClick={onFlush}>Отправить сейчас</button>
         </>
       ) : null}
       {onAddWork ? (
         <button className="b gh" type="button" disabled={busy} onClick={onAddWork}>
-          Дописать сваи, бурение или простой
+          {state.shift && state.shift.productionDate < state.productionDate
+            ? `Дописать отчёт за ${dateRu(state.shift.productionDate)}`
+            : 'Дописать сваи, бурение или простой'}
         </button>
       ) : null}
-      <button className="b" type="button" disabled={busy || unsent > 0} onClick={onClose}>
+      <button className="b" type="button" data-next-target={unsent === 0} disabled={busy || unsent > 0} onClick={onClose}>
         {busy ? 'Закрываем…' : 'Закрыть смену'}
       </button>
       <p className="note">
@@ -908,9 +970,27 @@ export function OperatorV5App() {
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [tab, setTab] = useState<Tab>('SHIFT');
+  const stepScreen = useRef<HTMLDivElement>(null);
+  const [focusRequest, setFocusRequest] = useState(0);
+  useEffect(() => {
+    if (focusRequest === 0) return;
+    const screen = stepScreen.current;
+    const target = screen?.querySelector<HTMLElement>('[data-next-target="true"]:not(:disabled)')
+      ?? screen?.querySelector<HTMLElement>('input:not(:disabled), select:not(:disabled), textarea:not(:disabled)')
+      ?? [...(screen?.querySelectorAll<HTMLElement>('button:not(:disabled)') ?? [])]
+        .find((element) => !element.closest('.v5-bottom'));
+    target?.focus();
+    target?.scrollIntoView?.({block: 'center'});
+  }, [focusRequest]);
+  const [editingShiftId, setEditingShiftId] = useState<string | null>(null);
   const [answers, setAnswers] = useState<Record<string, OperatorAnswer>>({});
+  const [notes, setNotes] = useState<Record<string, string>>({});
+  const [media, setMedia] = useState<Record<string, string[]>>({});
+  const [uploading, setUploading] = useState<Record<string, boolean>>({});
+  const [photoErrors, setPhotoErrors] = useState<Record<string, string>>({});
   /** Числовые замеры текущего списка: моточасы, остаток топлива, доливы. */
   const [measures, setMeasures] = useState<Record<string, string>>({});
+  const [meterReplacement, setMeterReplacement] = useState<{shiftId: string; stage: ChecklistStage} | null>(null);
   const [commandId, setCommandId] = useState(newCommandId);
   const [online, setOnline] = useState(true);
 
@@ -1052,12 +1132,25 @@ export function OperatorV5App() {
     return list.done ? null : list;
   }, [stage, state, safetyStage]);
 
-  const submitChecklist = useCallback(() => {
+  const attachChecklistPhoto = async (itemId: string, file: File) => {
+    setUploading((current) => ({...current, [itemId]: true}));
+    setPhotoErrors((current) => ({...current, [itemId]: ''}));
+    try {
+      const mediaId = await uploadPhoto({file, clientCommandId: commandId, itemId});
+      setMedia((current) => ({...current, [itemId]: [...(current[itemId] ?? []), mediaId]}));
+    } catch (cause) {
+      setPhotoErrors((current) => ({...current, [itemId]: cause instanceof Error ? cause.message : 'Снимок не загружен'}));
+    } finally {
+      setUploading((current) => ({...current, [itemId]: false}));
+    }
+  };
+
+  const submitChecklist = useCallback(async () => {
     const shiftId = state?.shift?.id;
     const equipmentId = state?.assignment?.equipmentId;
     if (!shiftId || !equipmentId || !checklist || !stage) return;
     const items = checklist.sections.flatMap((section) => section.items);
-    void run(() => sendCommand({
+    const accepted = await run(() => sendCommand({
       command: 'submit-checklist',
       clientCommandId: commandId,
       shiftId,
@@ -1069,16 +1162,22 @@ export function OperatorV5App() {
         measures: item.measure && (measures[item.measure.key] ?? '').trim() !== ''
           ? {[item.measure.key]: Number((measures[item.measure.key] ?? '').replace(',', '.'))}
           : undefined,
-        // Сервер требует описание к неисправности. Экран макета отдельного
-        // поля не предусматривает, поэтому пишем честный источник ответа.
-        note: answers[item.id] === 'FAULT' ? 'Отмечено машинистом на осмотре' : undefined,
+        note: [item.measure?.key === 'engineHours' && meterReplacement?.shiftId === shiftId && meterReplacement.stage === stage ? ENGINE_HOURS_REPLACEMENT_NOTE : '',
+          answers[item.id] === 'REMARK' || answers[item.id] === 'FAULT' ? notes[item.id]?.trim() : ''].filter(Boolean).join('; ') || undefined,
+        mediaIds: (answers[item.id] === 'REMARK' || answers[item.id] === 'FAULT') && media[item.id]?.length
+          ? media[item.id] : undefined,
       })),
     }), `${checklist.title}: принято.`);
+    if (!accepted) return;
     setMeasures({});
     setAnswers({});
+    setNotes({});
+    setMedia({});
+    setPhotoErrors({});
+    setMeterReplacement(null);
     // Периодический список сдан — возвращаемся туда, откуда его открыли.
     setSafetyStage(null);
-  }, [answers, checklist, commandId, measures, run, stage, state]);
+  }, [answers, checklist, commandId, measures, media, meterReplacement, notes, run, stage, state]);
 
   const reportIncident = useCallback((input: {
     category: IncidentCategory; signs: IncidentSign[]; injured: boolean; description: string;
@@ -1133,6 +1232,11 @@ export function OperatorV5App() {
   }
 
   const shiftId = state.shift?.id ?? null;
+  const oldShift = state.shift && state.shift.productionDate < state.productionDate
+    && (state.shift.state === 'STARTED' || state.shift.state === 'HANDOVER_PENDING')
+    ? state.shift : null;
+  const editingOldShift = oldShift && editingShiftId === shiftId;
+  const addWork = () => { setEditingShiftId(shiftId); setTab('WORK'); };
 
   /*
     Нижняя панель шагов: «Главная», «Следующий шаг», «Завершить смену».
@@ -1140,9 +1244,14 @@ export function OperatorV5App() {
     только переходы этого модуля. Экран фазы (допуск, приём, осмотр, сдача)
     и есть главный экран: «Главная» закрывает обходные шаги и вкладку.
   */
-  const goHome = () => { setAdmissionStep(null); setSafetyStage(null); setTab('SHIFT'); };
+  const goHome = () => { setEditingShiftId(null); setAdmissionStep(null); setSafetyStage(null); setTab('SHIFT'); };
   const goNext = () => {
-    const action = nextStep(state).action;
+    const step = nextStep(state);
+    const action = step.action;
+    if (action.kind !== 'WAIT_ADMISSION' && action.kind !== 'NONE') {
+      setNotice(step.hint);
+      setFocusRequest((request) => request + 1);
+    }
     switch (action.kind) {
       case 'ADMISSION': setSafetyStage(null); setTab('SHIFT'); setAdmissionStep(action.open); break;
       case 'WAIT_ADMISSION': void reload(); break;
@@ -1260,19 +1369,40 @@ export function OperatorV5App() {
 
     // Открытый по сроку чек-лист ТБ перекрывает рабочий экран: человек его сам
     // и открыл, и возврат — по кнопке «Завершить» внизу списка.
-    if ((state.phase === 'WORK' || (state.phase === 'CLOSING' && tab === 'WORK')) && !safetyStage) {
+    if (oldShift && state.phase === 'WORK' && !editingOldShift && !safetyStage) {
       return (
+        <div className="scr">
+          <p className="kicker">Сдача смены за {dateRu(oldShift.productionDate)}</p>
+          <button className="b gh" type="button" disabled={busy} onClick={addWork}>
+            Дописать отчёт за {dateRu(oldShift.productionDate)}
+          </button>
+          <button className="b" type="button" disabled={busy} onClick={() => {
+            goHome();
+            if (shiftId) void run(() => sendCommand({command: 'finish-work', shiftId}), 'Работа завершена.');
+          }}>
+            Перейти к сдаче смены
+          </button>
+        </div>
+      );
+    }
+
+    if ((state.phase === 'WORK' || (state.phase === 'CLOSING' && tab === 'WORK'))
+      && (!oldShift || editingOldShift) && !safetyStage) {
+      return (
+        <>
+        {editingOldShift ? <button className="b gh" type="button" onClick={goHome}>К сдаче смены</button> : null}
         <WorkScreen
           state={state}
           busy={busy}
           onLog={logProduction}
           onOpenSafety={setSafetyStage}
-          afterFinish={state.phase !== 'WORK'}
+          afterFinish={state.phase !== 'WORK' || Boolean(oldShift)}
           onIncident={()=>setTab('EVENTS')}
           onFinish={() => {
             if (shiftId) void run(() => sendCommand({command: 'finish-work', shiftId}), 'Работа завершена.');
           }}
         />
+        </>
       );
     }
 
@@ -1312,10 +1442,18 @@ export function OperatorV5App() {
           checklist={checklist}
           answers={answers}
           measures={measures}
+          notes={notes}
+          media={media}
+          uploading={uploading}
+          photoErrors={photoErrors}
+          meterReplaced={meterReplacement?.shiftId === shiftId && meterReplacement?.stage === stage}
+          onMeterReplacement={(replaced) => setMeterReplacement(replaced && shiftId && stage ? {shiftId, stage} : null)}
           busy={busy}
           lastMeter={state.assignment?.lastMeter ?? null}
           onAnswer={(itemId, answer) => setAnswers((current) => ({...current, [itemId]: answer}))}
           onMeasure={(key, value) => setMeasures((current) => ({...current, [key]: value}))}
+          onNote={(itemId, value) => setNotes((current) => ({...current, [itemId]: value}))}
+          onPhoto={attachChecklistPhoto}
           onSubmit={submitChecklist}
         />
       );
@@ -1327,7 +1465,7 @@ export function OperatorV5App() {
         busy={busy}
         unsent={queued.length}
         onFlush={() => void flushQueued()}
-        onAddWork={() => setTab('WORK')}
+        onAddWork={addWork}
         onClose={() => {
           if (shiftId) void run(() => sendCommand({command: 'close-shift', shiftId, comment: ''}), 'Смена закрыта.');
         }}
@@ -1336,9 +1474,15 @@ export function OperatorV5App() {
   };
 
   return (
-    <div className="app">
+    <div className="app" ref={stepScreen}>
       <Bar online={online} />
       <Top state={state} />
+      {oldShift ? (
+        <div className="scr">
+          <p className="note warn">Не сдана смена за {dateRu(oldShift.productionDate)}</p>
+          <p className="note">Сегодняшняя работа — после открытия новой смены. Здесь можно дописать только выполненное за {dateRu(oldShift.productionDate)} и сдать смену.</p>
+        </div>
+      ) : null}
       {notice ? <p className="note">{notice}</p> : null}
       <OfflineQueueBanner items={queued} onRetry={retryQueued} onDiscard={discardQueued} />
       {body()}

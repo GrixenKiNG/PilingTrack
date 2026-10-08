@@ -1,0 +1,159 @@
+# Поток 11 — I2 → I1 → I3 → I6 → I7 → I8 → I5
+
+Дерево: `D:/PillingR/wt-codex11`, ветка `codex/i-series-1007`, исходный main `0f53cd01a264ffae97e3eaa7fea7582d90bf657d` (07.10.2026). Слияния, push, выкладки, SSH и подключения к рабочей базе не выполнялись. I4 не описан и пропущен.
+
+## I2 — дата незакрытой смены
+
+Решение владельца в этом чате: работа идёт в одну дневную смену, ночью не работают. «Показать вчерашнюю дату, дать дописать вчерашнее и закрыть смену кнопкой; сегодняшняя работа — после открытия новой смены».
+
+Правило автозакрытия в main: DAY — следующие сутки с 00:00 (19:00 + 5 ч), NIGHT/неизвестный тип — с 12:00. Scheduler обрабатывает только STARTED; HANDOVER_PENDING намеренно исключён. Автозакрытие не определяет дату позднего ввода. Один отчёт связан с одной сменой; передатирование существующего отчёта переместило бы вчерашнюю работу. Поэтому даты старого отчёта и записей не переписывались.
+
+В v5/v10 старая открытая смена явно датирована, обычные входы к выработке ведут к сдаче; формы доступны после явного «Дописать отчёт за …». Из дописывания есть возврат к сдаче. Сохранены finish-work, ЕО после работы, close-shift, очередь и нижняя панель. Общий заголовок показывает дату самой смены. Дополнение относится к прежнему shiftId, сегодняшняя работа — к новой смене.
+
+Тесты до исправления: v5 — exit 1, 2 failed / 9 passed / 0 skipped; общий заголовок и v10 — exit 1, 3 failed / 10 passed / 0 skipped. Первые варианты ожиданий v10/v5 давали таймауты; перед runtime-правкой уточнены, повторный RED имеет конкретные ошибки отсутствующих элементов. Проверки после исправления: связанные 7 файлов — exit 0, 81 passed / 0 skipped; tsc — exit 0; ESLint изменённых файлов — exit 0, 2 warnings (non-null assertions в новых тестах). Прежнее указание «0 warnings» было ошибочным; assertions устранены при завершении I5. Окончательная сводка ниже обновляется после всех пунктов.
+
+Отдельный диагностический probe в игнорируемом `output/codex-t11/` подтвердил прежнее поведение: команда после обоих сроков автозакрытия успешно создаёт запись с текущим occurredAt в отчёте старой даты. Exit 0, 2 passed / 21 skipped (фильтр); это характеристика дефекта, не тест успешного исправления. Начальная ошибка probe Date/string исправлена только в probe. Рабочие данные не читались.
+
+GitNexus: impact logProduction/OperatorV5App/OperatorV10App/OperatorMachineHeader — exit 1, runner отсутствует, риск UNKNOWN. Применён ранее явно разрешённый владельцем fallback: поиск вызывающих мест в src/tests/e2e/scripts и git diff. Это не проверка графа. Перед коммитом detect-changes также фиксируется отдельно.
+
+Коммит I2: `5580bed9`. Дополнительно проверен полный маршрут: старые записи → сдача → состояние новой смены → новая запись с новым shiftId; exit 0, 7 passed / 0 skipped. Финальный tsc exit 0.
+
+## I1 — ручная сдача HANDOVER_PENDING в v2
+
+Переход pending → ЕО после работы → отчёт уже исправлен в main. Добавлена кнопка «Дописать сваи, бурение или простой», существующие формы и возврат к сдаче. Проверен полный сценарий pending → сдача ЕО → дописать → close-shift без handover; второй сценарий проверяет 1,5 ч простоя и возврат через «Главная». Очередь продолжает блокировать сдачу до отправки записей.
+
+Почему смены не закрылись с 27.09: scheduler намеренно выбирает только STARTED, исключая HANDOVER_PENDING, чтобы не сделать живую передачу непринимаемой. Этот факт закреплён имеющимся тестом. По новому решению владельца оставлено ручное дописывание и сдача; scheduler и реальные старые смены не менялись. Исправлены неверные комментарии о якобы автоматическом закрытии pending через пять часов.
+
+RED exit 1: 2 failed / 2 passed / 0 skipped. GREEN exit 0: 53 passed / 0 skipped в 5 связанных файлах; scoped ESLint exit 0 (0 warnings); tsc exit 0. GitNexus impact недоступен (exit 1, UNKNOWN), применён разрешённый поиск связей.
+
+Коммит I1: `88b40806`.
+
+## I3 — доступ к странице v2
+
+Страница читает текущего пользователя из существующего store, до его определения не открывает рабочее место; роли кроме OPERATOR видят «Экран доступен только машинисту». API, авторизация и защищённые файлы не менялись. Новый соседний тестовый файл допустим по исключению AGENTS для проверки доступа: пять заданных ролей, OPERATOR и неопределённый пользователь.
+
+RED exit 1: 6 failed / 1 passed / 0 skipped; GREEN exit 0: 27 passed / 0 skipped (4 файла вместе с v2). Tsc и scoped ESLint exit 0, 0 warnings. GitNexus impact/detect-changes exit 1, UNKNOWN; разрешённый поиск связей выполнен.
+
+Коммит I3: `f86f9c8b`.
+
+## I6 — чужая и старая смена в v5
+
+Причина: запрос искал смену только по установке, затем загружал осмотр и отчёт прежнего машиниста после переназначения бригады. Проверка принадлежности теперь выполняется до загрузки содержимого. Чужая активная смена не возвращается как собственная; v5 показывает её дату, объясняет обращение к диспетчеру и блокирует приём этой машины. Команда приёмки повторно использует requireOpenShift с FOR UPDATE, не присваивает чужую смену прямым запросом.
+
+Своя старая смена сохраняет ручной путь I2. Запуск администратором/диспетчером без чужого отчёта разрешён. Чужая CLOSED не подставляется как собственная CLOSED; после её закрытия можно открыть новую, в том числе в те же сутки. Чужую активную смену автоматически не закрываем: её сдачу организует диспетчер, уникальность одной активной смены сохраняется.
+
+RED exit 1: 8 failed / 70 passed / 0 skipped. GREEN exit 0: 81 passed / 0 skipped, 3 файла. Tsc и scoped ESLint exit 0, 0 warnings. Новый query-тест (112 строк) необходим для защиты чужих данных — исключение AGENTS для проверок доступа. GitNexus impact/detect-changes exit 1, UNKNOWN; разрешённый поиск связей выполнен.
+
+Коммит I6: `3048d1d4`.
+
+## I7 — замена счётчика моточасов
+
+recordMeter отклонял число меньше максимума журнала и карточки установки. Осмотр не передавал пользовательское примечание в журнал. Теперь в общем осмотре (v1/v2/v7/v10) и собственном осмотре v5 есть явная отметка «Счётчик заменён». Только пометка именно ответа с engineHours разрешает снижение; отметка другого пункта не разрешает. Пометка сохраняется в MeterReading.note, кэш обновляется последним показанием. Проверены 3000 → 99 с заменой, следующий 100 без замены и отказ снижения без отметки. В v5 выбор привязан к конкретной смене и этапу.
+
+Найден дополнительный прямой источник 99999: старый AutoClaw helper completeChecklist сам вводил его в каждый замер моточасов. Теперь он использует известное показание +1 на тестовом стенде; при неизвестном показании останавливается с пояснением, без произвольной большой цифры. Этот старый обход не запускался: он обращается к общему стенду и реальным аккаунтам. Существующие отчёты и значения 99999 не менялись. report-validation.service.ts не содержит проверки моточасов; legacy /api/reports/upsert не используется актуальной мобильной сдачей и оставлен вне этой правки.
+
+RED backend exit 1: 5 failed / 11 passed; RED общий осмотр (фильтр) exit 1: 2 failed / 3 skipped; RED v5 (фильтр) exit 1: 1 failed / 12 skipped. Первоначальная v5-фикстура не содержала operator и падала до проверки; исправлена, затем RED подтверждён на исходном runtime. GREEN связанных 14 файлов exit 0: 177 passed / 0 skipped; финальный UI-прогон exit 0: 18 passed / 0 skipped. Tsc сначала exit 2 из-за nullable assignment в тестовой фикстуре; исправлено, финальный exit 0. Scoped ESLint exit 0, 0 warnings. GitNexus impact/detect-changes exit 1, UNKNOWN; разрешённый поиск связей выполнен.
+
+Коммит I7: `04df4c6a`.
+
+## I8 — простой 3 → 6 минут
+
+Причина — округление, а не двойной SQL-учёт: сервис превращал 0,05 ч в 0,1 ч через toFixed(1), затем дашборд показывал 6 мин. Теперь сервис сохраняет точные часы; минуты округляются только при отображении. Проверены 0,05 ч → 3 мин и сумма дробных простоев нескольких объектов. SQL и границы организации не менялись.
+
+RED exit 1: 2 failed / 8 passed / 0 skipped; GREEN exit 0: 34 passed / 0 skipped, 3 файла. Tsc и scoped ESLint exit 0. GitNexus impact/detect-changes exit 1, UNKNOWN; разрешённый поиск связей выполнен.
+
+## Подготовка и ограничения проверок
+
+`npm run db:generate`: exit 1, отсутствует DATABASE_URL_POSTGRES. Сгенерирован клиент из настоящей схемы без соединения с БД: `npx --no-install prisma generate --config output/codex-t11/prisma-generate.config.ts`, exit 0; конфигурация содержит только путь к schema.prisma. `node scripts/patch-postgres-client.js`: exit 0. Зависимости не устанавливались, node_modules — ссылка на уже установленные пакеты. Файлы .env не читались, не создавались и не менялись; адреса БД не подставлялись.
+
+Коммит I8: `de245e78`.
+
+## I5 — тексты и вердикты осмотра
+
+В v10 кнопки выработки и переключения форм называют действие глаголом. В v5 доступны «Норма / Замечание / Отказ»; для замечания и отказа вводится описание, для соответствующих пунктов прикладывается снимок. Ошибка загрузки или сдачи не стирает описание и фото, загрузку можно повторить. Пометка замены счётчика сохраняется вместе с описанием. Общая подпись объясняет, что фото требуется при замечании или отказе. Подсказки номера паспорта и категории происшествия уже есть в main — проверены существующими тестами, код не менялся. Обновлён селектор кнопки v10 в старом QA-обходе; сам обход не запускался.
+
+RED exit 1: 8 failed / 41 passed / 0 skipped. GREEN exit 0: 62 passed / 0 skipped в 7 файлах. Повторный прогон пяти изменённых файлов после устранения non-null assertions: exit 0, 56 passed / 0 skipped. Tsc exit 0. Scoped ESLint exit 0; предупреждение о существующем inline eslint-disable в v5 не удалено согласно прямому запрету AGENTS. Общая проверка и точное количество предупреждений будут указаны ниже. GitNexus detect-changes exit 1, UNKNOWN; разрешённый текстовый fallback выполнен.
+
+Тесты компонентов используют подменённый API, доменные тесты — подменённое хранилище. Это не проверка на рабочем стенде. Физические старые смены и отчёты не изменялись.
+
+Коммит I5: `b7d3991e`.
+
+## Дополнительная проверка I7 — смена контекста осмотра
+
+Проверка обнаружила перенос введённого замера и отметки «Счётчик заменён» при обновлении экрана на другую смену. Общий осмотр теперь пересоздаётся при смене shiftId, equipmentId или этапа во всех местах использования v1/v2/v7/v10. В v5 отметка уже привязана к смене и этапу. При обновлении той же смены черновик сохраняется.
+
+RED exit 1: 1 failed / 7 skipped (фильтр), конкретная ошибка — checkbox остаётся отмеченным. Первый вариант теста давал таймаут из-за неоднозначного селектора раздела, исправлен до изменения runtime. GREEN exit 0: 167 passed / 0 skipped в 15 файлах. Tsc exit 0. GitNexus impact/detect-changes exit 1, UNKNOWN; вызывающие места проверены текстовым поиском. Это дополнительный коммит I7 после выполнения основной последовательности.
+
+Коммит дополнительной правки I7: `26059a23`.
+
+## Итоговые проверки 08.10.2026
+
+Каждая проверка запускалась отдельной командой; код завершения получен от процесса, без пайпа, скрывающего ошибку. Логи сохранены в игнорируемом `output/codex-t11/`.
+
+| Проверка | Exit | Результат и лог |
+| --- | --- | --- |
+| Удаление собственных `.next/dev/types` через Node с проверкой абсолютного пути | 0 | `final-types-cleanup.log`, целевой каталог отсутствовал |
+| `npx --no-install tsc --noEmit` | 0 | `final-tsc.log` |
+| `npm run lint` | 0 | 0 errors / 1 warning; проверка текстовой целостности прошла; `final-lint.log` |
+| `npm run test:unit` | 1 | 3820 passed / 2 failed / 2 expected fail / 257 skipped; `final-unit.log` |
+| `npm run test:unit -- --maxWorkers=2` | 0 | 3822 passed / 2 expected fail / 257 skipped, 4081 всего, 373 passed / 14 skipped файлов; `final-unit-bounded.log` |
+| `npx --no-install vitest run src/components src/app src/modules src/lib --maxWorkers=2` | 0 | 2861 passed / 2 expected fail / 20 skipped, 2883 всего, 297 файлов; `final-requested-vitest.log` |
+| `npx --no-install playwright test --list` с защитой чтения секретов | 1 | Windows npx bootstrap несовместим с preload guard; `final-playwright-list.log` |
+| Эквивалентный прямой CLI: `node node_modules/@playwright/test/cli.js test --list` с guard | 0 | 291 тест / 27 файлов, `final-playwright-list-direct.log` |
+| Сравнение списка с архивом e2e/config из исходного main `0f53cd01` | 0 | Исходные 291 тест / 27 файлов; имена тестов совпали полностью, `baseline-playwright-list.log`, `playwright-collection-compare.log` |
+| `npm run build` | 1 | Нет DATABASE_PROVIDER и SESSION_SECRET; `final-build.log`; Next build не достигнут |
+| GitNexus impact / detect-changes all и compare с main | 1 | Runner отсутствует, риск UNKNOWN; `i*-impact*.log`, `i*-detect*.log`, `final-graph-compare.log` |
+| `git diff --check` | 0 | Ошибок пробелов нет |
+
+Два падения первого общего прогона — таймауты существующих тестов `page-ability-layouts.test.ts` (5 с, чтение дерева src/app) и `unified-worker.test.ts` (30 с, первый импорт графа модулей). При двух исполнителях весь набор прошёл без изменения тестов или их таймаутов. Первый прогон шёл одновременно с lint/tsc; результат остаётся зафиксирован как FAILED. Vitest также выводит существующие предупреждения Vite-конфигурации и MaxListenersExceededWarning, они не названы проверкой без предупреждений.
+
+Единственное предупреждение ESLint — ставший неиспользуемым существующий `eslint-disable-next-line react-hooks/set-state-in-effect` в v5. Комментарий сохранён по прямому запрету AGENTS удалять такие директивы; baseline «ноль предупреждений» сейчас не достигнут. Ошибок линтера нет.
+
+Для Playwright использован `output/codex-t11/playwright-list-guard.cjs`: парольный QA-файл оставлен непрочитанным, неиспользуемый при сборе списка объект credentials пустой. Guard допускает только `--list`, блокирует чтение .env и запись вне дерева. QA_RUN_DIR и PWTEST_CACHE_DIR направлены в собственный output; исходные список тестов и config не менялись. Предварительный прямой запуск остановился на внешнем каталоге кэша; после переноса кэша сбор прошёл. В архиве исходного main для сбора нужен сгенерированный клиент — добавлена ссылка только на собственный generated. Ни одного браузерного теста, входа под QA-аккаунтом или запроса к БД не выполнялось.
+
+Графовые callers/processes не получены: это UNKNOWN, а не нулевое влияние. Текстовый fallback проверил цепочки: UI v1/v2/v7/v10 → общий ChecklistScreen; v5 → собственный осмотр; command route → acceptEquipment/submitChecklist → recordMeter; state route → queryOperatorMobileState; analytics/sites route → getSiteAnalytics → плитки дашборда. Изменённые потоки — дописывание/сдача смены, доступ к v2, приёмка техники, осмотр и замер, отображение простоя. Это текстовые связи, не результат GitNexus.
+
+## Изменённые файлы
+
+Числа добавленных/удалённых строк — `git diff --numstat 0f53cd01 HEAD`, полный итог изменений относительно исходного main. Удаления строк внутри правок не означают удаления файлов: ни один файл, экспорт или вариант экрана не удалён. Два новых тестовых файла защищают доступ/чужие данные; остальные тесты добавлены в существующие файлы.
+
+| Файл | + | − |
+| --- | ---: | ---: |
+| `e2e/qa-ac/operator-walk.spec.ts` | 7 | 2 |
+| `src/app/(app)/operator/v2/page.test.tsx` | 32 | 0 |
+| `src/app/(app)/operator/v2/page.tsx` | 6 | 0 |
+| `src/components/piling/operator-mobile/operator-mobile-app.tsx` | 1 | 2 |
+| `src/components/piling/operator-mobile/operator-work-overview.test.tsx` | 16 | 1 |
+| `src/components/piling/operator-mobile/operator-work-overview.tsx` | 5 | 6 |
+| `src/components/piling/operator-mobile/screens/checklist-screen.test.tsx` | 30 | 0 |
+| `src/components/piling/operator-mobile/screens/checklist-screen.tsx` | 24 | 15 |
+| `src/components/piling/operator-mobile/v10/__tests__/operator-v10-flow.test.tsx` | 81 | 2 |
+| `src/components/piling/operator-mobile/v10/__tests__/operator-v10-port.test.tsx` | 15 | 5 |
+| `src/components/piling/operator-mobile/v10/operator-v10-app.tsx` | 30 | 15 |
+| `src/components/piling/operator-mobile/v7/operator-v7-app.tsx` | 1 | 1 |
+| `src/components/piling/operator-v2/__tests__/operator-shift-v2.test.tsx` | 76 | 2 |
+| `src/components/piling/operator-v2/operator-shift-v2.tsx` | 25 | 5 |
+| `src/components/piling/operator-v5/__tests__/operator-v5-app.test.tsx` | 179 | 1 |
+| `src/components/piling/operator-v5/operator-v5-app.tsx` | 143 | 21 |
+| `src/modules/operator-mobile/application/commands/__tests__/checklist.test.ts` | 29 | 0 |
+| `src/modules/operator-mobile/application/commands/__tests__/shared.test.ts` | 56 | 1 |
+| `src/modules/operator-mobile/application/commands/checklist.ts` | 6 | 1 |
+| `src/modules/operator-mobile/application/commands/equipment.ts` | 2 | 1 |
+| `src/modules/operator-mobile/application/commands/shared.ts` | 13 | 6 |
+| `src/modules/operator-mobile/application/mobile-shift-query.test.ts` | 112 | 0 |
+| `src/modules/operator-mobile/application/mobile-shift-query.ts` | 26 | 8 |
+| `src/modules/operator-mobile/contracts.ts` | 1 | 0 |
+| `src/modules/operator-mobile/domain/__tests__/operator-mobile-rules.test.ts` | 62 | 1 |
+| `src/modules/operator-mobile/domain/view-contracts.ts` | 2 | 0 |
+| `src/services/analytics/__tests__/site-analytics-service.test.ts` | 41 | 0 |
+| `src/services/analytics/site-analytics-service.ts` | 1 | 1 |
+
+Сам отчёт — новый `CODEX-REPORT-T11.md`: +159 / −0 строк. Всего изменено 29 файлов, ни один не удалён.
+
+## Что оставлено и ограничения
+
+I2 → I1 → I3 → I6 → I7 → I8 → I5 выполнены в заданном порядке; I4 пропущен как неописанный. После основного порядка исправлена выявленная при проверке ошибка I7. Решение по вчерашней работе подтверждено владельцем, открытых вопросов по этой политике нет.
+
+Не менялись реальные смены/отчёты, scheduler, схема/миграции Prisma, защищённые файлы, RLS/tenant-фильтры, зависимости, ORION и остальные замороженные варианты. Разрешённые операторские правки сделаны с RED → GREEN. Сохранены изменения владельца от 07.10: общая нижняя панель, часы простоя с шагом 0,25, HANDOVER_PENDING для выработки, последнее показание в кэше, FOR UPDATE.
+
+Живой стенд, БД-интеграция и браузерные сценарии остаются НЕ ПРОВЕРЕНЫ; 257 пропусков не считаются успешными тестами. Сборка и генерируемые Next route types не проверены из-за окружения. Графовый риск UNKNOWN. Эти ограничения не скрыты зелёным общим статусом. Слияния, push, выкладки и SSH не выполнялись. Проверку и принятие проводит владелец/ревьюер.

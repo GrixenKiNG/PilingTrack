@@ -106,6 +106,16 @@ function workState() {
   return makeState('WORK', ['PRESHIFT_INSPECTION', 'SITE_READY', 'EO_BEFORE']);
 }
 
+it('v10: кнопки выбора записи называют действие глаголом (I5)', async () => {
+  api.fetchState.mockResolvedValue(workState());
+  render(<OperatorV10App />);
+  fireEvent.click(await screen.findByRole('button', {name: 'Следующий шаг: Записать выработку'}));
+  fireEvent.click(await screen.findByRole('button', {name: 'Добавить сваю'}));
+  for (const name of ['Добавить сваю', 'Записать паспорт сваи', 'Добавить бурение', 'Записать простой']) {
+    expect(screen.getByRole('button', {name})).toBeInTheDocument();
+  }
+});
+
 beforeEach(() => {
   api.fetchState.mockReset();
   api.sendCommand.mockReset();
@@ -213,7 +223,7 @@ describe('v10: простой в часах', () => {
     api.fetchState.mockResolvedValue(workState());
     const view = render(<OperatorV10App />);
     fireEvent.click(await screen.findByRole('button', {name: 'Дальше: Работа: сваи, бурение, простой'}));
-    fireEvent.click(screen.getByRole('button', {name: 'Простой'}));
+    fireEvent.click(screen.getByRole('button', {name: 'Записать простой'}));
     fireEvent.change(screen.getByRole('combobox'), {target: {value: 'r1'}});
     return view;
   };
@@ -317,7 +327,7 @@ function deferred<T>() {
 /** Открывает форму свай на «Работе» и вводит «12 шт». Возвращает поле числа. */
 async function openPilesForm(container: HTMLElement) {
   fireEvent.click(await screen.findByRole('button', {name: 'Дальше: Работа: сваи, бурение, простой'}));
-  fireEvent.click(screen.getByRole('button', {name: 'Свая'}));
+  fireEvent.click(screen.getByRole('button', {name: 'Добавить сваю'}));
   fireEvent.change(container.querySelector('select') as HTMLSelectElement, {target: {value: 'grade-1'}});
   const count = container.querySelector('input[inputmode="decimal"]') as HTMLInputElement;
   fireEvent.change(count, {target: {value: '12'}});
@@ -435,8 +445,8 @@ describe('v10: нижняя панель шагов', () => {
     fireEvent.click(await screen.findByRole('button', {name: 'Дописать сваи, бурение или простой'}));
 
     // После завершения работы доступны все четыре вида записи, а не только простой.
-    expect(await screen.findByRole('button', {name: 'Свая'})).toBeInTheDocument();
-    expect(screen.getByRole('button', {name: 'Бурение'})).toBeInTheDocument();
-    expect(screen.getByRole('button', {name: 'Простой'})).toBeInTheDocument();
+    expect(await screen.findByRole('button', {name: 'Добавить сваю'})).toBeInTheDocument();
+    expect(screen.getByRole('button', {name: 'Добавить бурение'})).toBeInTheDocument();
+    expect(screen.getByRole('button', {name: 'Записать простой'})).toBeInTheDocument();
   });
 });

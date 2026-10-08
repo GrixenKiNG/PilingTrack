@@ -12,7 +12,7 @@ export type WorkAction = 'PILES' | 'PASSPORT' | 'DRILLING' | 'DOWNTIME';
 type Variant = 'base' | 'v2' | 'v5' | 'v7' | 'v10';
 
 export function OperatorMachineHeader({state}: {state: OperatorMobileState}) {
-  return <div className="oc-machine"><PilingIcon name="equipment-rig" size={40} decorative /><div><strong>{state.assignment?.equipmentName ?? 'Установка не назначена'}</strong><span>{state.assignment?.siteName ?? 'Площадка не назначена'}</span><small>{state.productionDate.split('-').reverse().join('.')}</small></div></div>;
+  return <div className="oc-machine"><PilingIcon name="equipment-rig" size={40} decorative /><div><strong>{state.assignment?.equipmentName ?? 'Установка не назначена'}</strong><span>{state.assignment?.siteName ?? 'Площадка не назначена'}</span><small>{(state.shift?.productionDate ?? state.productionDate).split('-').reverse().join('.')}</small></div></div>;
 }
 
 /** One overview of server facts; actions delegate to each version's existing forms. */
@@ -49,12 +49,12 @@ export function OperatorWorkOverview({state, variant, busy, onAction, onFinish, 
     <section className="oc-card oc-work"><h2>{variant === 'v5' ? 'Следующее действие' : variant === 'v2' ? 'Итоги смены' : 'Работа'}</h2>
       {variant==='v5'&&<p className="oc-caption">Запишите результат выполненной работы.</p>}
       <div className="oc-actions">
-        {action('PILES',variant==='v10'?'Свая':'Добавить сваю','add','oc-primary')}
-        {action('DRILLING',variant==='v10'?'Бурение':'Добавить бурение','drilling-auger','oc-drilling')}
-        {action('DOWNTIME','Простой','downtime','oc-downtime')}
+        {action('PILES','Добавить сваю','add','oc-primary')}
+        {action('DRILLING','Добавить бурение','drilling-auger','oc-drilling')}
+        {action('DOWNTIME',variant==='v10'?'Записать простой':'Простой','downtime','oc-downtime')}
         {onIncident&&<button type="button" className="oc-action oc-incident" onClick={onIncident}><TriangleAlert className="oc-symbol" size={32} aria-hidden /><span>Инцидент</span></button>}
       </div>
-      <div className="oc-additional"><button type="button" disabled={!ready||busy} onClick={()=>onAction('PASSPORT')}><PilingIcon name="documents" size={18} decorative />Свая с паспортом</button>{onDefect&&<button type="button" onClick={onDefect}><PilingIcon name="defect" size={18} decorative />Дефект</button>}</div>
+      <div className="oc-additional"><button type="button" disabled={!ready||busy} onClick={()=>onAction('PASSPORT')}><PilingIcon name="documents" size={18} decorative />{variant==='v10'?'Записать паспорт сваи':'Свая с паспортом'}</button>{onDefect&&<button type="button" onClick={onDefect}><PilingIcon name="defect" size={18} decorative />Дефект</button>}</div>
       {children}
     </section>
     <section className="oc-card oc-preparation"><h2>Подготовка <small>{preparation.filter(s=>s.done).length} из 4</small></h2>{preparation.map(s=><div key={s.label}><PilingIcon name={s.done?'check':'inspection'} size={22} decorative /><span>{s.label}</span><small>{s.done?'Выполнено':'Ожидает'}</small></div>)}{finish}</section>
@@ -64,4 +64,3 @@ export function OperatorWorkOverview({state, variant, busy, onAction, onFinish, 
     {finish ? <div className="oc-mobile-finish">{finish}</div> : null}
   </div>;
 }
-

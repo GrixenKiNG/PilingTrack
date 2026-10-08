@@ -191,6 +191,8 @@ export interface OperatorMobileState {
   weather: WeatherView | null;
   conditions: ShiftCondition[];
   shift: {id: string; productionDate: string; startedAt: string | null; state: string} | null;
+  /** Чужая активная смена блокирует приём установки; её данные работнику не выдаём. */
+  blockedShift?: {equipmentId: string; productionDate: string};
   /** Серверная квитанция закрытия: человекочитаемый номер и точные отметки времени. */
   receipt: {
     reportId: string;

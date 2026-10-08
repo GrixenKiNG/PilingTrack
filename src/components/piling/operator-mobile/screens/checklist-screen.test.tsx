@@ -18,6 +18,36 @@ const checklist: ChecklistView = {
 };
 
 describe('чек-лист машиниста', () => {
+  it('объясняет, что снимок нужен при замечании или отказе, и принимает норму без снимка', () => {
+    const onSubmit = vi.fn();
+    render(<ChecklistScreen checklist={{...checklist, sections: [{
+      id: 'mast', title: 'Мачта', items: [{id: 'welds', text: 'Швы мачты', severity: 'ALERT', photoOnIssue: true}],
+    }]}} warnings={[]} busy={false} error={null} commandId="test-command" onSubmit={onSubmit} />);
+    expect(screen.getByText('Проверьте каждый пункт: фото при замечании или отказе, замеры')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', {expanded: false}));
+    fireEvent.click(screen.getByRole('button', {name: 'Норма'}));
+    expect(screen.queryByRole('button', {name: 'Снять фото'})).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', {name: 'Завершить'}));
+    expect(onSubmit).toHaveBeenCalledWith([expect.objectContaining({answer: 'OK', mediaIds: undefined})]);
+  });
+  it.each([true, false])('передаёт отметку замены счётчика только при явном выборе: %s', (replacement) => {
+    const onSubmit = vi.fn();
+    render(<ChecklistScreen checklist={{...checklist, sections: [{id: 'meter', title: 'Счётчик', items: [
+      {id: 'hours', text: 'Снять показание', severity: 'NOTE', measure: {key: 'engineHours', label: 'Моточасы', unit: 'м/ч'}},
+    ]}]}} warnings={[]} onSubmit={onSubmit} busy={false} error={null} commandId="meter-test"
+      lastMeter={{engineHours: 3000, recordedAt: '2026-10-06T15:00:00.000Z'}} />);
+    fireEvent.click(screen.getByRole('button', {expanded: false}));
+    fireEvent.click(screen.getByRole('button', {name: 'Норма'}));
+    fireEvent.change(screen.getByRole('spinbutton'), {target: {value: '99'}});
+    const checkbox = screen.getByRole('checkbox', {name: 'Счётчик заменён'});
+    expect(checkbox).not.toBeChecked();
+    if (replacement) fireEvent.click(checkbox);
+    fireEvent.click(screen.getByRole('button', {name: 'Завершить'}));
+    expect(onSubmit).toHaveBeenCalledWith([expect.objectContaining({
+      itemId: 'hours', answer: 'OK', measures: {engineHours: 99},
+      note: replacement ? 'Счётчик заменён' : undefined,
+    })]);
+  });
   it('позволяет проверить пробелы и называет первый незаполненный пункт', () => {
     const props = {
       warnings: [],

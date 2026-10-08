@@ -14,6 +14,7 @@ const api = vi.hoisted(() => ({
   sendCommand: vi.fn(async () => undefined),
   sendQueuedCommand: vi.fn(async () => undefined),
   newCommandId: vi.fn(() => 'cmd-1'),
+  uploadPhoto: vi.fn(async () => 'media-1'),
 }));
 vi.mock('@/components/piling/operator-mobile/api', () => ({
   ApiError: class ApiError extends Error {
@@ -28,6 +29,195 @@ vi.mock('@/components/piling/operator-mobile/api', () => ({
 
 import {ApiError, QueuedOffline} from '@/components/piling/operator-mobile/api';
 import {CloseScreen, OperatorV5App, WorkScreen} from '../operator-v5-app';
+import {workStateFixture} from '../../operator-mobile/__tests__/fixtures';
+
+describe('T12: следующий шаг v5 открывает действие и фокусирует его', () => {
+  function open(value: Partial<OperatorMobileState>) {
+    api.fetchState.mockReset().mockResolvedValue(workStateFixture({
+      operator: {id: 'me', name: 'Машинист'}, options: [], receipt: null, ...value,
+    }));
+    api.sendCommand.mockReset().mockResolvedValue(undefined);
+    return render(<OperatorV5App />);
+  }
+
+  it('приёмка фокусирует принятие машины, включая повторное нажатие, без отправки команды', async () => {
+    open({phase: 'ADMISSION', shift: null, options: [{crewId: 'crew-1', equipmentId: 'eq-1', equipmentName: 'Установка', siteName: 'Объект'}]});
+    const next = await screen.findByRole('button', {name: 'Следующий шаг: Принять установку'});
+    const accept = screen.getByRole('button', {name: 'Принять машину'});
+    fireEvent.click(next);
+    expect(accept).toHaveFocus();
+    next.focus();
+    fireEvent.click(next);
+    expect(accept).toHaveFocus();
+    expect(api.sendCommand).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    {phase: 'PRESHIFT_INSPECTION', stage: 'PRESHIFT_INSPECTION', title: 'Предсменный осмотр'},
+    {phase: 'SITE_READY', stage: 'SITE_READY', title: 'Осмотр площадки'},
+    {phase: 'STARTUP', stage: 'EO_BEFORE', title: 'Пуск и ЕО перед работой'},
+    {phase: 'CLOSING', stage: 'EO_AFTER', title: 'ЕО после работы'},
+  ])('$phase ведёт к незаполненному пункту, затем к замеру, не сдавая список', async ({phase, stage, title}) => {
+    open({phase, checklists: [{stage, title, purpose: '', version: '1', done: false, period: null,
+      sections: [{id: 'meter', title: 'Счётчик', items: [{id: 'hours', text: 'Снять показание', severity: 'NOTE',
+        measure: {key: 'engineHours', label: 'Моточасы', unit: 'м/ч'}}]}]}]} as Partial<OperatorMobileState>);
+    const next = await screen.findByRole('button', {name: `Следующий шаг: ${title}`});
+    fireEvent.click(next);
+    expect(screen.getByRole('button', {name: 'Норма'})).toHaveFocus();
+    fireEvent.click(screen.getByRole('button', {name: 'Норма'}));
+    fireEvent.click(next);
+    expect(screen.getByRole('textbox')).toHaveFocus();
+    fireEvent.change(screen.getByRole('textbox'), {target: {value: '99'}});
+    fireEvent.click(screen.getByRole('checkbox', {name: 'Счётчик заменён'}));
+    fireEvent.click(next);
+    expect(screen.getByRole('button', {name: 'Завершить'})).toHaveFocus();
+    expect(screen.getByRole('textbox')).toHaveValue('99');
+    expect(screen.getByRole('checkbox', {name: 'Счётчик заменён'})).toBeChecked();
+    expect(api.sendCommand).not.toHaveBeenCalled();
+  });
+
+  it('сдача возвращается из вкладки работы и фокусирует закрытие, не закрывая смену', async () => {
+    open({phase: 'CLOSING', checklists: [{stage: 'EO_AFTER', done: true, period: null}] as OperatorMobileState['checklists']});
+    const next = await screen.findByRole('button', {name: 'Следующий шаг: Закрыть смену'});
+    fireEvent.click(screen.getByRole('button', {name: 'Работа'}));
+    fireEvent.click(next);
+    expect(screen.getByRole('button', {name: 'Закрыть смену'})).toHaveFocus();
+    next.focus();
+    fireEvent.click(next);
+    expect(screen.getByRole('button', {name: 'Закрыть смену'})).toHaveFocus();
+    expect(api.sendCommand).not.toHaveBeenCalled();
+  });
+
+  it('повторное нажатие на открытом шаге СИЗ фокусирует выбор, не подтверждая его', async () => {
+    const identity = workStateFixture().identity;
+    open({phase: 'IDENTITY', identity: {...identity, ppe: {...identity.ppe, confirmed: false}}});
+    const next = await screen.findByRole('button', {name: 'Следующий шаг: СИЗ'});
+    fireEvent.click(next);
+    await screen.findByText('Средства защиты');
+    next.focus();
+    fireEvent.click(next);
+    expect(screen.getByRole('button', {name: /Каска/})).toHaveFocus();
+    expect(api.sendCommand).not.toHaveBeenCalled();
+  });
+
+  it('выработка получает фокус без потери уже введённого количества', async () => {
+    open({phase: 'WORK', entries: [], dictionaries: {
+      pileGrades: [{id: 'grade-1', name: 'С 20-35', lengthMm: 6000}], drillingTypes: [], downtimeReasons: [],
+    }});
+    const next = await screen.findByRole('button', {name: 'Следующий шаг: Записать выработку'});
+    fireEvent.click(next);
+    expect(screen.getByRole('button', {name: 'Добавить сваю'})).toHaveFocus();
+    fireEvent.click(screen.getByRole('button', {name: 'Добавить сваю'}));
+    fireEvent.change(screen.getByRole('combobox'), {target: {value: 'grade-1'}});
+    fireEvent.change(screen.getByRole('textbox'), {target: {value: '12'}});
+    next.focus();
+    fireEvent.click(next);
+    expect(screen.getByRole('combobox')).toHaveFocus();
+    expect(screen.getByRole('textbox')).toHaveValue('12');
+    expect(api.sendCommand).not.toHaveBeenCalled();
+  });
+});
+
+describe('v5: вердикты осмотра и подтверждение замечаний (I5)', () => {
+  async function openInspection(photoOnIssue = false, meter = false) {
+    api.fetchState.mockReset();
+    api.sendCommand.mockReset().mockResolvedValue(undefined);
+    api.uploadPhoto.mockReset().mockResolvedValue('media-1');
+    api.fetchState.mockResolvedValue(workStateFixture({phase: 'PRESHIFT_INSPECTION',
+      operator: {id: 'me', name: 'Машинист'},
+      checklists: [{stage: 'PRESHIFT_INSPECTION', title: 'Осмотр', purpose: '', version: '1', done: false, period: null,
+        sections: [{id: 'machine', title: 'Машина', items: [{id: 'check', text: 'Проверить установку', severity: 'NOTE', photoOnIssue,
+          ...(meter ? {measure: {key: 'engineHours', label: 'Моточасы', unit: 'м/ч'}} : {}),
+        }]}]}],
+    }));
+    render(<OperatorV5App />);
+    await screen.findByRole('button', {name: /^норма$/i});
+  }
+
+  it.each([{label: 'Замечание', answer: 'REMARK'}, {label: 'Отказ', answer: 'FAULT'}])(
+    '$label отправляется с описанием, а не вместо него', async ({label, answer}) => {
+      await openInspection();
+      expect(screen.getByRole('button', {name: 'Норма'})).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', {name: label}));
+      expect(screen.getByRole('button', {name: /Осталось отметить/})).toBeDisabled();
+      fireEvent.change(screen.getByRole('textbox', {name: /Что именно не так/}), {target: {value: 'Подтёк масла'}});
+      fireEvent.click(screen.getByRole('button', {name: 'Завершить'}));
+      await waitFor(() => expect(api.sendCommand).toHaveBeenCalledWith(expect.objectContaining({
+        command: 'submit-checklist', answers: [expect.objectContaining({answer, note: 'Подтёк масла'})],
+      })));
+    },
+  );
+
+  it('требует подтверждённый снимок, сохраняет описание при отказе загрузки и позволяет повторить', async () => {
+    await openInspection(true);
+    fireEvent.click(screen.getByRole('button', {name: 'Замечание'}));
+    fireEvent.change(screen.getByRole('textbox', {name: /Что именно не так/}), {target: {value: 'Подтёк масла'}});
+    expect(screen.getByRole('button', {name: /Осталось отметить/})).toBeDisabled();
+    api.uploadPhoto.mockRejectedValueOnce(new Error('Снимок не загружен'));
+    const file = new File(['photo'], 'inspection.jpg', {type: 'image/jpeg'});
+    const input = screen.getByLabelText(/Снимок: Проверить установку/);
+    fireEvent.change(input, {target: {files: [file]}});
+    expect(await screen.findByText('Снимок не загружен')).toBeInTheDocument();
+    expect(screen.getByRole('textbox', {name: /Что именно не так/})).toHaveValue('Подтёк масла');
+    expect(api.sendCommand).not.toHaveBeenCalled();
+    fireEvent.change(input, {target: {files: [file]}});
+    await waitFor(() => expect(screen.getByRole('button', {name: 'Завершить'})).toBeEnabled());
+    fireEvent.click(screen.getByRole('button', {name: 'Завершить'}));
+    await waitFor(() => expect(api.sendCommand).toHaveBeenCalledWith(expect.objectContaining({
+      clientCommandId: 'cmd-1', answers: [expect.objectContaining({answer: 'REMARK', note: 'Подтёк масла', mediaIds: ['media-1']})],
+    })));
+    expect(api.uploadPhoto).toHaveBeenCalledWith({file, clientCommandId: 'cmd-1', itemId: 'check'});
+  });
+
+  it('сохраняет описание и снимок, если сервер отказал в сдаче осмотра', async () => {
+    await openInspection(true);
+    fireEvent.click(screen.getByRole('button', {name: 'Отказ'}));
+    fireEvent.change(screen.getByRole('textbox', {name: /Что именно не так/}), {target: {value: 'Трещина'}});
+    fireEvent.change(screen.getByLabelText(/Снимок: Проверить установку/), {target: {files: [new File(['photo'], 'inspection.jpg', {type: 'image/jpeg'})]}});
+    await waitFor(() => expect(screen.getByRole('button', {name: 'Завершить'})).toBeEnabled());
+    api.sendCommand.mockRejectedValueOnce(new ApiError(400, 'Осмотр не принят'));
+    fireEvent.click(screen.getByRole('button', {name: 'Завершить'}));
+    expect(await screen.findByText('Осмотр не принят')).toBeInTheDocument();
+    expect(screen.getByRole('textbox', {name: /Что именно не так/})).toHaveValue('Трещина');
+    expect(screen.getByText('Снимков: 1')).toBeInTheDocument();
+    expect(screen.getByRole('button', {name: 'Завершить'})).toBeEnabled();
+  });
+
+  it('сохраняет пометку замены счётчика вместе с описанием замечания', async () => {
+    await openInspection(false, true);
+    fireEvent.click(screen.getByRole('button', {name: 'Замечание'}));
+    fireEvent.change(screen.getByRole('textbox', {name: /Что именно не так/}), {target: {value: 'Повреждено стекло счётчика'}});
+    fireEvent.change(screen.getByRole('textbox', {name: ''}), {target: {value: '99'}});
+    fireEvent.click(screen.getByRole('checkbox', {name: 'Счётчик заменён'}));
+    fireEvent.click(screen.getByRole('button', {name: 'Завершить'}));
+    await waitFor(() => expect(api.sendCommand).toHaveBeenCalledWith(expect.objectContaining({
+      answers: [expect.objectContaining({answer: 'REMARK', note: 'Счётчик заменён; Повреждено стекло счётчика', measures: {engineHours: 99}})],
+    })));
+  });
+});
+
+describe('v5: явная замена счётчика моточасов', () => {
+  it('посылает новое меньшее показание с пометкой, не отмечая неисправность', async () => {
+    const assignment = working.assignment;
+    if (!assignment) throw new Error('Для проверки нужна назначенная установка');
+    api.fetchState.mockReset();
+    api.sendCommand.mockReset().mockResolvedValue(undefined);
+    api.fetchState.mockResolvedValue(workStateFixture({phase: 'CLOSING',
+      operator: {id: 'me', name: 'Машинист'},
+      assignment: {...assignment, lastMeter: {engineHours: 3000, recordedAt: '2026-09-19T15:00:00.000Z'}},
+      checklists: [{stage: 'EO_AFTER', title: 'ЕО после работы', purpose: '', version: '1', done: false, period: null,
+        sections: [{id: 'meter', title: 'Счётчик', items: [{id: 'hours', text: 'Снять показание', severity: 'NOTE', measure: {key: 'engineHours', label: 'Моточасы', unit: 'м/ч'}}]}]}],
+    }));
+    render(<OperatorV5App />);
+    fireEvent.click(await screen.findByRole('button', {name: /^норма$/i}));
+    fireEvent.change(screen.getByRole('textbox'), {target: {value: '99'}});
+    fireEvent.click(screen.getByRole('checkbox', {name: 'Счётчик заменён'}));
+    fireEvent.click(screen.getByRole('button', {name: 'Завершить'}));
+    await waitFor(() => expect(api.sendCommand).toHaveBeenCalledWith(expect.objectContaining({
+      command: 'submit-checklist', answers: [expect.objectContaining({itemId: 'hours', answer: 'OK', note: 'Счётчик заменён', measures: {engineHours: 99}})],
+    })));
+  });
+});
 
 /** Обещание, которым тест сам решает, когда закончится перечитывание экрана. */
 function deferred<T>() {
@@ -117,6 +307,24 @@ const working = {
   entries: [],
   warnings: [],
 } as unknown as OperatorMobileState;
+
+describe('приёмка v5 при чужой незакрытой смене', () => {
+  it('показывает дату и обращение к диспетчеру вместо чужого ЕО и не принимает машину', async () => {
+    api.fetchState.mockResolvedValue({
+      ...workStateFixture, phase: 'ADMISSION', shift: null,
+      options: [{crewId: 'crew-1', equipmentId: 'eq-1', equipmentName: 'Установка', siteName: 'Объект'}],
+      blockedShift: {equipmentId: 'eq-1', productionDate: '2026-09-27'},
+    });
+    render(<OperatorV5App />);
+    const accept = await screen.findByRole('button', {name: 'Принять машину'});
+    expect(accept).toBeDisabled();
+    expect(screen.getByText(/Другой машинист не сдал смену за 27.09.2026/)).toBeInTheDocument();
+    expect(screen.getByText(/Обратитесь к диспетчеру/)).toBeInTheDocument();
+    fireEvent.click(accept);
+    expect(api.sendCommand).not.toHaveBeenCalled();
+    expect(screen.queryByText(/Осталось отметить/)).not.toBeInTheDocument();
+  });
+});
 
 /** Экран работы без формы. */
 function renderWork(onLog: (entry: unknown) => Promise<boolean>) {
@@ -293,5 +501,62 @@ describe('отказ по роли при загрузке состояния', 
     expect(screen.getByRole('button', {name: 'Повторить'})).toBeInTheDocument();
     expect(screen.getByText(/Введённые данные сохранены на телефоне/)).toBeInTheDocument();
     expect(screen.queryByText(/Смену ведёт машинист/)).not.toBeInTheDocument();
+  });
+});
+
+describe('I2: вчерашняя смена v5', () => {
+  const yesterday = () => ({
+    ...working,
+    productionDate: '2026-09-28',
+    shift: {...working.shift, state: 'STARTED'},
+    receipt: null,
+    defects: [],
+    incidents: [],
+  }) as OperatorMobileState;
+
+  it('не открывает вчерашнюю выработку обычной вкладкой; явное дописывание возвращается к сдаче', async () => {
+    vi.mocked(api.fetchState).mockResolvedValue(yesterday());
+    const {container} = render(<OperatorV5App />);
+
+    await screen.findByRole('button', {name: 'Работа'});
+    expect(screen.getByText('Не сдана смена за 27.09.2026')).toBeInTheDocument();
+    expect(screen.queryByRole('button', {name: 'Добавить сваю'})).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', {name: 'Работа'}));
+    expect(screen.queryByRole('button', {name: 'Добавить сваю'})).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', {name: /Следующий шаг/}));
+    expect(screen.queryByRole('button', {name: 'Добавить сваю'})).not.toBeInTheDocument();
+    expect(api.sendCommand).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', {name: 'Дописать отчёт за 27.09.2026'}));
+    fillPiles(container);
+    fireEvent.click(screen.getByRole('button', {name: 'Записать'}));
+    await waitFor(() => expect(api.sendCommand).toHaveBeenCalledWith(expect.objectContaining({
+      command: 'log-production', shiftId: 'shift-1',
+      entry: {kind: 'PILES', pileGradeId: 'grade-1', count: 12},
+    })));
+
+    fireEvent.click(screen.getByRole('button', {name: 'К сдаче смены'}));
+    expect(screen.queryByRole('button', {name: 'Добавить сваю'})).not.toBeInTheDocument();
+    expect(screen.getByRole('button', {name: 'Перейти к сдаче смены'})).toBeInTheDocument();
+  });
+
+  it('завершает старую работу существующей командой, затем сдаёт тот же отчёт', async () => {
+    const closing = {
+      ...yesterday(), phase: 'CLOSING',
+      shift: {...yesterday().shift, state: 'HANDOVER_PENDING'},
+      checklists: [...working.checklists, {stage: 'EO_AFTER', done: true, period: null}],
+    } as OperatorMobileState;
+    vi.mocked(api.fetchState).mockResolvedValueOnce(yesterday()).mockResolvedValue(closing);
+    render(<OperatorV5App />);
+
+    await screen.findByRole('button', {name: 'Работа'});
+    fireEvent.click(screen.getByRole('button', {name: 'Перейти к сдаче смены'}));
+    await waitFor(() => expect(api.sendCommand).toHaveBeenCalledWith({command: 'finish-work', shiftId: 'shift-1'}));
+    await screen.findByRole('button', {name: 'Закрыть смену'});
+    fireEvent.click(screen.getByRole('button', {name: 'Дописать отчёт за 27.09.2026'}));
+    expect(await screen.findByRole('button', {name: 'Добавить сваю'})).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', {name: 'К сдаче смены'}));
+    fireEvent.click(screen.getByRole('button', {name: 'Закрыть смену'}));
+    await waitFor(() => expect(api.sendCommand).toHaveBeenCalledWith({command: 'close-shift', shiftId: 'shift-1', comment: ''}));
   });
 });

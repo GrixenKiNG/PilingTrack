@@ -2,7 +2,7 @@
 
 /** Рабочие экраны v2 в общей светлой теме PilingTrack. */
 
-import type { ReactNode } from 'react';
+import type { ReactNode, RefObject } from 'react';
 import { PilingIcon, type PilingIconName } from '@/components/piling/icons';
 import { Check, ChevronLeft } from '@/components/piling/icons/unified-icons';
 import { cn } from '@/lib/utils';
@@ -26,7 +26,7 @@ const TONE_BUTTON: Record<StepTone, string> = {
 
 /** Экран шага: светлая шапка с акцентом фазы, содержимое и основное действие. */
 export function StepShell({
-  title, subtitle, tone = 'blue', onBack, children, footer, bar,
+  title, subtitle, tone = 'blue', onBack, children, footer, bar, screenRef,
 }: {
   title: string;
   subtitle?: string;
@@ -36,6 +36,7 @@ export function StepShell({
   footer?: ReactNode;
   /** Нижняя панель шагов: «Главная», «Следующий шаг», «Завершить смену» (07.10.2026). */
   bar?: ReactNode;
+  screenRef?: RefObject<HTMLDivElement | null>;
 }) {
   // Очередь устройства видна на каждом шаге смены: раньше v2 клал записи в
   // очередь, но не показывал и не отправлял её — они ждали, пока человек не
@@ -47,7 +48,7 @@ export function StepShell({
     // край, и нажать её было нельзя. Здесь высота по содержимому, а кнопка
     // прилипает к нижней границе окна — она достижима и на длинном списке
     // осмотра, и на коротком экране пуска.
-    <div className="mx-auto w-full max-w-[560px] bg-background">
+    <div ref={screenRef} className="mx-auto w-full max-w-[560px] bg-background [&_button:focus]:outline-2 [&_button:focus]:outline-offset-2 [&_button:focus]:outline-signal">
       <header className={cn('flex items-center gap-2 border-b-2 bg-card px-3 py-3 text-foreground', TONE_BAR[tone])}>
         {onBack ? (
           <button type="button" onClick={onBack} aria-label="Назад"
