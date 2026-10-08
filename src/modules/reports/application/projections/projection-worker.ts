@@ -153,8 +153,9 @@ export function startProjectionWorker(intervalMs = 5000) {
   // running (projections are idempotent, but overlapping passes just pile up
   // duplicate DB work). Mirrors the guard in startOutboxWorker.
   let running = false;
+  let stopping = false;
   const processOnce = async () => {
-    if (running) return;
+    if (running || stopping) return;
     running = true;
     try {
       const count = await projectOutboxEvents(projectEvent);
@@ -176,36 +177,39 @@ export function startProjectionWorker(intervalMs = 5000) {
   // который заводит обёртка маршрута. Без него после перевода политик RLS в
   // fail-closed выборка объектов вернулась бы пустой, и тренд молча перестал
   // бы обновляться.
+  let weeklyRunning = false;
   const weeklyInterval = setInterval(async () => {
+    if (weeklyRunning || stopping) return;
+    weeklyRunning = true;
     try {
       await forEachTenant(async (tenantId) => {
+        if (stopping) return;
         const sites = await db.site.findMany({ where: { tenantId }, select: { id: true } });
         for (const site of sites) {
+          if (stopping) return;
           await projectWeeklyTrend(site.id, null, tenantId);
         }
       });
     } catch (error) {
       logger.error('Weekly trend recomputation failed', error);
+    } finally {
+      weeklyRunning = false;
     }
   }, 3600000);
 
-  process.on('SIGTERM', () => {
+  const stop = () => {
+    if (stopping) return;
+    stopping = true;
+    clearInterval(interval);
+    clearInterval(weeklyInterval);
+    process.removeListener('SIGTERM', stop);
+    process.removeListener('SIGINT', stop);
     if (shouldLogProjectionLifecycle()) {
       logger.info('Projection worker shutting down');
     }
-    clearInterval(interval);
-    clearInterval(weeklyInterval);
-  });
-
-  process.on('SIGINT', () => {
-    clearInterval(interval);
-    clearInterval(weeklyInterval);
-  });
-
-  return {
-    stop: () => {
-      clearInterval(interval);
-      clearInterval(weeklyInterval);
-    },
   };
+  process.on('SIGTERM', stop);
+  process.on('SIGINT', stop);
+
+  return { stop };
 }

@@ -89,6 +89,71 @@ describe('Projection Worker', () => {
   });
 
   describe('startProjectionWorker', () => {
+    it('W121: skips overlapping weekly passes and resumes after the pending pass', async () => {
+      const { startProjectionWorker } = await import('@/modules/reports/application/projections/projection-worker');
+      mocks.mockOutboxFindMany.mockResolvedValue([]);
+      let release!: (sites: { id: string }[]) => void;
+      mocks.mockSiteFindMany.mockImplementationOnce(() => new Promise(resolve => { release = resolve; }));
+      const intervals = vi.spyOn(globalThis, 'setInterval');
+      const worker = startProjectionWorker(14_400_000);
+      const runWeekly = intervals.mock.calls.find(([, delay]) => delay === 3_600_000)?.[0] as () => Promise<void>;
+      try {
+        const pending = runWeekly();
+        await vi.advanceTimersByTimeAsync(0);
+        await runWeekly();
+        expect(mocks.mockSiteFindMany).toHaveBeenCalledTimes(1);
+        release([]);
+        await pending;
+        await runWeekly();
+        expect(mocks.mockSiteFindMany).toHaveBeenCalledTimes(2);
+      } finally { release([]); worker.stop(); intervals.mockRestore(); }
+    });
+
+    it('W121: stop prevents the pending weekly pass from starting the next site', async () => {
+      const { startProjectionWorker } = await import('@/modules/reports/application/projections/projection-worker');
+      mocks.mockOutboxFindMany.mockResolvedValue([]);
+      mocks.mockSiteFindMany.mockResolvedValueOnce([{ id: 'site-1' }, { id: 'site-2' }]);
+      let release!: () => void;
+      mocks.mockWeeklyUpsert.mockImplementationOnce(() => new Promise<void>(resolve => { release = resolve; }));
+      const intervals = vi.spyOn(globalThis, 'setInterval');
+      const worker = startProjectionWorker(14_400_000);
+      const runWeekly = intervals.mock.calls.find(([, delay]) => delay === 3_600_000)?.[0] as () => Promise<void>;
+      try {
+        const pending = runWeekly();
+        await vi.advanceTimersByTimeAsync(0);
+        expect(mocks.mockWeeklyUpsert).toHaveBeenCalledTimes(1);
+        worker.stop();
+        release();
+        await pending;
+        expect(mocks.mockWeeklyUpsert).toHaveBeenCalledTimes(1);
+        await runWeekly();
+        expect(mocks.mockSiteFindMany).toHaveBeenCalledTimes(1);
+      } finally { release(); worker.stop(); intervals.mockRestore(); }
+    });
+
+    it.each(['SIGTERM', 'SIGINT'] as const)('W121: %s and repeated stop release only this worker\'s listeners', async signal => {
+      const { startProjectionWorker } = await import('@/modules/reports/application/projections/projection-worker');
+      mocks.mockOutboxFindMany.mockResolvedValue([]);
+      const before = { SIGTERM: process.listeners('SIGTERM'), SIGINT: process.listeners('SIGINT') };
+      const worker = startProjectionWorker();
+      const added = {
+        SIGTERM: process.listeners('SIGTERM').filter(listener => !before.SIGTERM.includes(listener)),
+        SIGINT: process.listeners('SIGINT').filter(listener => !before.SIGINT.includes(listener)),
+      };
+      try {
+        expect(added[signal]).toHaveLength(1);
+        added[signal][0]();
+        worker.stop(); worker.stop();
+        expect(process.listeners('SIGTERM')).toEqual(before.SIGTERM);
+        expect(process.listeners('SIGINT')).toEqual(before.SIGINT);
+      } finally {
+        worker.stop();
+        for (const name of ['SIGTERM', 'SIGINT'] as const) {
+          for (const listener of added[name]) process.removeListener(name, listener);
+        }
+      }
+    });
+
     it('hourly recomputation skips a site deleted after listing and updates the next site', async () => {
       const { startProjectionWorker } = await import('@/modules/reports/application/projections/projection-worker');
       mocks.mockOutboxFindMany.mockResolvedValue([]);

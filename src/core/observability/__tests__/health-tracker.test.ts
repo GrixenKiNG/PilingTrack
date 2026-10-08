@@ -412,6 +412,59 @@ describe('storage health: медленный S3 ≠ упавший S3 (F-R50-1)'
   инстанс состояния недоступен — проверка не бросает.
 */
 describe('планировщики: истёкший пульс виден и даёт degraded (F-HEALTH-SCHEDULERS)', () => {
+  it.each([false, true])('W121: missing Redis with PM enabled=%s only degrades expected schedulers', async pmEnabled => {
+    for (const key of ['PM_SCHEDULER_ENABLED', 'PROJECTION_REBUILD_ENABLED', 'READINESS_SCHEDULER_ENABLED',
+      'IDEMPOTENCY_CLEANUP_ENABLED', 'PDF_TEMP_CLEANUP_ENABLED']) vi.stubEnv(key, 'false');
+    if (pmEnabled) vi.stubEnv('PM_SCHEDULER_ENABLED', 'true');
+    mocks.stateClient.available = false;
+    try {
+      const { checkSchedulers } = await import('../health-tracker/checkers/schedulers');
+      const { getStateRedisClient } = await import('@/lib/redis-cache');
+      vi.mocked(getStateRedisClient).mockClear();
+      expect(await checkSchedulers()).toEqual(pmEnabled
+        ? { status: 'stale', stale: ['pm-scheduler'] }
+        : { status: 'ok', stale: [] });
+      expect(getStateRedisClient).toHaveBeenCalledTimes(pmEnabled ? 1 : 0);
+    } finally {
+      mocks.stateClient.available = true;
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it.each([
+    ['PM_SCHEDULER_ENABLED', 'pm-scheduler'],
+    ['PROJECTION_REBUILD_ENABLED', 'projection-rebuild'],
+    ['READINESS_SCHEDULER_ENABLED', 'readiness-scheduler'],
+  ])('W121: disabled %s is not required by health checks', async (envKey, name) => {
+    vi.stubEnv(envKey, 'false');
+    try {
+      mocks.stateGet.mockImplementation(async (key: string) => {
+        if (key === 'system:worker:heartbeat:outbox') return String(Date.now());
+        return key === `system:scheduler:${name}` ? null : freshSchedulerHeartbeat(key);
+      });
+      const { checkSystemStatus } = await import('../health-tracker');
+      const status = await checkSystemStatus();
+      expect(status.components.schedulers).toEqual({ status: 'ok', stale: [] });
+      expect(mocks.stateGet).not.toHaveBeenCalledWith(`system:scheduler:${name}`);
+    } finally { vi.unstubAllEnvs(); }
+  });
+
+  it('W121: PDF cleanup requires a heartbeat only with exact opt-in', async () => {
+    const { enabledSchedulerNames } = await import('../health-tracker/scheduler-registry');
+    try {
+      vi.stubEnv('PDF_TEMP_CLEANUP_ENABLED', '1');
+      expect(enabledSchedulerNames()).not.toContain('pdf-cleanup');
+      vi.stubEnv('PDF_TEMP_CLEANUP_ENABLED', 'true');
+      expect(enabledSchedulerNames()).toContain('pdf-cleanup');
+      mocks.stateGet.mockImplementation(async (key: string) => {
+        if (key === 'system:worker:heartbeat:outbox') return String(Date.now());
+        return key === 'system:scheduler:pdf-cleanup' ? null : freshSchedulerHeartbeat(key);
+      });
+      const { checkSystemStatus } = await import('../health-tracker');
+      expect((await checkSystemStatus()).components.schedulers).toEqual({ status: 'stale', stale: ['pdf-cleanup'] });
+    } finally { vi.unstubAllEnvs(); }
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.stateClient.available = true;

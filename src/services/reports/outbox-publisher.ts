@@ -292,15 +292,21 @@ export function startOutboxWorker(
   void processOnce();
   const interval = setInterval(processOnce, intervalMs);
 
+  const stop = () => {
+    clearInterval(interval);
+    if (typeof process !== 'undefined') {
+      process.removeListener('SIGTERM', stop);
+      process.removeListener('SIGINT', stop);
+    }
+  };
+
   // Cleanup on process exit
   if (typeof process !== 'undefined') {
-    process.on('SIGTERM', () => clearInterval(interval));
-    process.on('SIGINT', () => clearInterval(interval));
+    process.on('SIGTERM', stop);
+    process.on('SIGINT', stop);
   }
 
-  return {
-    stop: () => clearInterval(interval),
-  };
+  return { stop };
 }
 
 /**

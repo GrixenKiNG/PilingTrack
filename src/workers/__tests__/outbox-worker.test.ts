@@ -235,6 +235,28 @@ describe('Outbox Publisher', () => {
   });
 
   describe('startOutboxWorker', () => {
+    it.each(['SIGTERM', 'SIGINT'] as const)('W121: %s and repeated stop release only this worker\'s listeners', async signal => {
+      mocks.mockFindMany.mockResolvedValue([]);
+      const before = { SIGTERM: process.listeners('SIGTERM'), SIGINT: process.listeners('SIGINT') };
+      const worker = startOutboxWorker(vi.fn());
+      const added = {
+        SIGTERM: process.listeners('SIGTERM').filter(listener => !before.SIGTERM.includes(listener)),
+        SIGINT: process.listeners('SIGINT').filter(listener => !before.SIGINT.includes(listener)),
+      };
+      try {
+        expect(added[signal]).toHaveLength(1);
+        added[signal][0]();
+        worker.stop(); worker.stop();
+        expect(process.listeners('SIGTERM')).toEqual(before.SIGTERM);
+        expect(process.listeners('SIGINT')).toEqual(before.SIGINT);
+      } finally {
+        worker.stop();
+        for (const name of ['SIGTERM', 'SIGINT'] as const) {
+          for (const listener of added[name]) process.removeListener(name, listener);
+        }
+      }
+    });
+
     it('creates a polling worker with default interval', () => {
       mocks.mockFindMany.mockResolvedValue([]);
 

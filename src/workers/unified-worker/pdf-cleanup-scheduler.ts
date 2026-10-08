@@ -1,5 +1,7 @@
 import { cleanupTemporaryPdfs } from '@/lib/pdf-generator/cleanup';
 import { logger } from '@/lib/logger';
+import { PDF_TEMP_CLEANUP_SCHEDULER_NAME } from '@/core/observability/health-tracker/scheduler-registry';
+import { recordSchedulerHeartbeat } from './scheduler-heartbeat';
 
 /** Opt-in only; the first enabled run is dry-run unless explicitly disabled. */
 export function startPdfCleanupScheduler(): () => Promise<void> {
@@ -12,7 +14,11 @@ export function startPdfCleanupScheduler(): () => Promise<void> {
     const pass = new AbortController();
     controller = pass;
     running = cleanupTemporaryPdfs({ dryRun: process.env.PDF_TEMP_CLEANUP_DRY_RUN !== 'false', signal: pass.signal })
-      .then(() => {})
+      .then(async () => {
+        if (!pass.signal.aborted && !stopping) {
+          await recordSchedulerHeartbeat(PDF_TEMP_CLEANUP_SCHEDULER_NAME, 24 * 60 * 60 * 1000);
+        }
+      })
       .catch(error => { if (!pass.signal.aborted) logger.error('Temporary PDF cleanup failed', error); })
       .finally(() => { running = null; controller = null; });
   };
