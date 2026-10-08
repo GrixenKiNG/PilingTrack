@@ -250,3 +250,58 @@ describe('GET /api/reports/single-pdf — лимит на синхронную �
     expect(generateSinglePdf).toHaveBeenCalledTimes(20);
   });
 });
+
+describe('GET /api/reports/single-pdf — лимит на опрос задачи по jobId', () => {
+  // Тот же приём, что и для синхронной генерации: лимитер считает вызовы по
+  // ключу и берёт порог из конфига маршрута, поэтому проверяется заданный
+  // лимит, а не заглушка.
+  const windows = new Map<string, number>();
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+    windows.clear();
+    requireAuthMock.mockResolvedValue({ user: OPERATOR, error: null });
+    getPdfJobOwnerIdMock.mockResolvedValue(null);
+    getPdfJobStatusMock.mockResolvedValue({ status: 'processing' });
+    rateLimiterCheckMock.mockImplementation(
+      async (key: string, config: { maxAttempts: number }) => {
+        const used = (windows.get(key) ?? 0) + 1;
+        windows.set(key, used);
+        return used > config.maxAttempts
+          ? { allowed: false, remaining: 0, retryAfter: 60 }
+          : { allowed: true, remaining: config.maxAttempts - used };
+      }
+    );
+  });
+
+  it('ключ — по пользователю, отдельный от синхронной генерации', async () => {
+    await GET(statusReq());
+
+    expect(rateLimiterCheckMock).toHaveBeenCalledWith('pdf:job:user-1', {
+      maxAttempts: 60,
+      windowMs: 60 * 1000,
+      blockDurationMs: 60 * 1000,
+    });
+  });
+
+  it('обычный темп опроса — статус отдаётся как раньше', async () => {
+    const res = await GET(statusReq());
+
+    expect(res.status).toBe(200);
+    expect(getPdfJobStatusMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('исчерпанный лимит — 429 без обращения к очереди', async () => {
+    for (let i = 0; i < 60; i++) {
+      expect((await GET(statusReq())).status).toBe(200);
+    }
+    getPdfJobStatusMock.mockClear();
+
+    const res = await GET(statusReq());
+
+    expect(res.status).toBe(429);
+    expect((await res.json()).error).toBe('Слишком много запросов к задаче. Подождите минуту.');
+    expect(res.headers.get('retry-after')).toBe('60');
+    expect(getPdfJobStatusMock).not.toHaveBeenCalled();
+  });
+});
