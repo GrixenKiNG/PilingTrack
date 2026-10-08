@@ -24,7 +24,7 @@ export const runtime = 'nodejs';
 
 type Ctx = { params: Promise<{ surfaceId: string }> };
 
-function tenantOf(user: { tenantId?: string | null }): string | null {
+function tenantOf(user: { tenantId?: string | null }): string {
   return requireTenantId(user);
 }
 
@@ -34,7 +34,6 @@ export const GET = withApi(async (request: NextRequest, ctx: Ctx) => {
   const { surfaceId } = await ctx.params;
   // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
   const tenantId = tenantOf(user!);
-  if (!tenantId) return NextResponse.json({ error: 'Не задан контекст организации' }, { status: 400 });
   const { searchParams } = new URL(request.url);
   try {
     if (searchParams.get('scope') === 'set') {
@@ -56,7 +55,6 @@ export const PUT = withMutation(async (request: NextRequest, ctx: Ctx) => {
   const { surfaceId } = await ctx.params;
   // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
   const tenantId = tenantOf(user!);
-  if (!tenantId) return NextResponse.json({ error: 'Не задан контекст организации' }, { status: 400 });
   const entityId = new URL(request.url).searchParams.get('entityId') ?? BASE_ENTITY;
   let body: unknown;
   try {
@@ -83,7 +81,6 @@ export const DELETE = withMutation(async (request: NextRequest, ctx: Ctx) => {
   const { surfaceId } = await ctx.params;
   // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
   const tenantId = tenantOf(user!);
-  if (!tenantId) return NextResponse.json({ error: 'Не задан контекст организации' }, { status: 400 });
   const entityId = new URL(request.url).searchParams.get('entityId') ?? BASE_ENTITY;
   try {
     await deleteLayout(tenantId, surfaceId, entityId);
