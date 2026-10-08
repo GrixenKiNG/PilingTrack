@@ -276,9 +276,13 @@ export async function listReportsForUserScope(
 ) {
   const userId = resolveUserScope(sessionUser, requestedUserId, 'reports.read_cross_user');
 
-  // Tenant isolation: non-privileged users can only access their tenant's reports
+  // Tenant isolation: non-privileged users can only access their tenant's reports.
+  // Без организации — отказ: раньше фильтр молча не ставился, и оператор без
+  // организации получил бы отчёты всех организаций (аудит V1). Та же реакция,
+  // что в listReportsForReview выше.
   const where: { userId: string; tenantId?: string | null } = { userId };
-  if (sessionUser.role !== 'ADMIN' && sessionUser.role !== 'DISPATCHER' && sessionUser.tenantId) {
+  if (sessionUser.role !== 'ADMIN' && sessionUser.role !== 'DISPATCHER') {
+    if (!sessionUser.tenantId) throw new ServiceError('Пользователь не привязан к организации', 403);
     where.tenantId = sessionUser.tenantId;
   }
 
