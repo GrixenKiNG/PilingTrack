@@ -30,6 +30,24 @@ describe('getEquipmentAnalytics — tenant isolation', () => {
     groupBy.mockResolvedValue([]);
   });
 
+  it('uses production-day boundaries for the fuel window, including the next midnight exclusively', async () => {
+    await getEquipmentAnalytics({ dateFrom: '2026-09-20', dateTo: '2026-09-26', tenantId: 'orion' });
+    expect(groupBy.mock.calls[0][0].where.timestamp).toEqual({
+      gte: new Date('2026-09-19T21:00:00Z'),
+      lt: new Date('2026-09-26T21:00:00Z'),
+    });
+  });
+
+  it('uses the configured timezone instead of the default for fuel boundaries', async () => {
+    await getEquipmentAnalytics({
+      dateFrom: '2026-09-20', dateTo: '2026-09-26', tenantId: 'orion', timezone: 'Asia/Tokyo',
+    });
+    expect(groupBy.mock.calls[0][0].where.timestamp).toEqual({
+      gte: new Date('2026-09-19T15:00:00Z'),
+      lt: new Date('2026-09-26T15:00:00Z'),
+    });
+  });
+
   it('binds tenantId into the Equipment query', async () => {
     await getEquipmentAnalytics({ dateFrom: '2026-01-01', dateTo: '2026-12-31', tenantId: 'orion' });
 

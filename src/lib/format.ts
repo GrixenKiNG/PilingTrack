@@ -80,15 +80,16 @@ export function formatPersonName(name: string | null | undefined): string {
   return `${surname} ${initials}`.trim();
 }
 
-/** Whole days from `now` (local midnight) to `value` (local midnight); null if unparseable. */
+/** Calendar days in Moscow; date-only values keep their day, timestamps use their production day. */
 export function daysUntil(value: string | null | undefined, now: Date = new Date()): number | null {
   if (!value) return null;
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return null;
-  const today = new Date(now);
-  today.setHours(0, 0, 0, 0);
-  date.setHours(0, 0, 0, 0);
-  return Math.round((date.getTime() - today.getTime()) / 86_400_000);
+  const today = now.toLocaleDateString('en-CA', { timeZone: 'Europe/Moscow' });
+  const target = /^\d{4}-\d{2}-\d{2}$/.test(value)
+    ? value
+    : date.toLocaleDateString('en-CA', { timeZone: 'Europe/Moscow' });
+  return Math.round((Date.parse(`${target}T00:00:00.000Z`) - Date.parse(`${today}T00:00:00.000Z`)) / 86_400_000);
 }
 
 /** Human due-date phrase in Russian ("просрочено" / "сегодня" / "через N дн."). */

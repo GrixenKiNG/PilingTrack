@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { formatCountMeters, formatNumber, formatFixed, formatRuDate, formatPersonName } from '@/lib/format';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { daysUntil, dueText, formatCountMeters, formatNumber, formatFixed, formatRuDate, formatPersonName } from '@/lib/format';
 
 describe('formatRuDate', () => {
   it('formats a date-only string as DD.MM.YYYY', () => {
@@ -61,5 +61,30 @@ describe('formatCountMeters', () => {
   it('метры округляются до десятых, штуки — до целых', () => {
     expect(formatCountMeters(3, 12.345)).toBe('3 шт. / 12,3 м.п.');
     expect(formatCountMeters(0, 0)).toBe('0 шт. / 0 м.п.');
+  });
+});
+
+describe('daysUntil / dueText — производственный день (W126 №15)', () => {
+  const now = new Date('2026-09-25T21:30:00.000Z');
+
+  beforeEach(() => { vi.stubEnv('TZ', 'UTC'); });
+  afterEach(() => { vi.unstubAllEnvs(); });
+
+  it.each([
+    ['2026-09-26', 0, 'сегодня'],
+    ['2026-09-25', -1, 'просрочено'],
+    ['2026-09-27', 1, 'завтра'],
+    ['2026-09-25T22:00:00.000Z', 0, 'сегодня'],
+    ['2026-09-25T20:00:00.000Z', -1, 'просрочено'],
+  ])('%s при текущем дне 26.09 МСК → %s дней, %s', (value, days, text) => {
+    expect(daysUntil(value, now)).toBe(days);
+    expect(dueText(value, now)).toBe(text);
+  });
+
+  it('сохраняет обработку пустой и неверной даты, не меняет now', () => {
+    expect(daysUntil(null, now)).toBeNull();
+    expect(daysUntil('not-a-date', now)).toBeNull();
+    expect(dueText(null, now)).toBe('срок не задан');
+    expect(now.toISOString()).toBe('2026-09-25T21:30:00.000Z');
   });
 });

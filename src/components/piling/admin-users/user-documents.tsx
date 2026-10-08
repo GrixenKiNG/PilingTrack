@@ -158,7 +158,11 @@ export function UserDocuments({ userId }: { userId: string }) {
       return;
     }
     const expires = new Date(issuedAt);
-    expires.setMonth(expires.getMonth() + type.defaultValidMonths);
+    const issuedDay = expires.getUTCDate();
+    expires.setUTCDate(1);
+    expires.setUTCMonth(expires.getUTCMonth() + type.defaultValidMonths);
+    const lastDay = new Date(Date.UTC(expires.getUTCFullYear(), expires.getUTCMonth() + 1, 0)).getUTCDate();
+    expires.setUTCDate(Math.min(issuedDay, lastDay));
     setForm((prev) => ({ ...prev, issuedAt, expiresAt: expires.toISOString().slice(0, 10) }));
   };
 

@@ -14,6 +14,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Fuel, Loader2, Plus, Trash2, X } from '@/components/piling/icons/unified-icons';
 import { toast } from 'sonner';
 import { authFetch } from '@/lib/api';
+import { getTodayInTimezone } from '@/lib/timezone';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { LoadFailure, loadFailureText, catchText } from '@/components/piling/to/load-failure';
@@ -44,10 +45,7 @@ const fmtDate = (value: string) => {
   return date.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' });
 };
 
-const todayInput = () => {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-};
+const todayInput = () => getTodayInTimezone();
 
 export function FuelPanel({ equipmentId }: { equipmentId: string }) {
   const [entries, setEntries] = useState<FuelEntry[]>([]);

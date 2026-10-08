@@ -14,7 +14,9 @@ const m = vi.hoisted(() => ({
   executeRaw: vi.fn(), queryRaw: vi.fn(),
   // Счётчик открытых транзакций: фиксируем, что запись идёт одной.
   transaction: vi.fn(),
+  audit: vi.fn(),
 }));
+vi.mock('@/services/audit/audit-service', () => ({ recordAuditEvent: m.audit }));
 vi.mock('@/lib/db', () => {
   const client = {
     checklistTemplate: { findUnique: m.tplFindUnique, findMany: m.tplFindMany },
@@ -55,6 +57,14 @@ beforeEach(() => {
 });
 
 describe('startInspection', () => {
+  it('ошибка записи осмотра не создаёт события об успехе', async () => {
+    m.eqFindUnique.mockResolvedValue({ id: 'eq1' });
+    m.tplFindUnique.mockResolvedValue({ id: 't1', tenantId: 'orion', level: 'EO', sections: [] });
+    m.insCreate.mockRejectedValue(new Error('write failed'));
+    await expect(startInspection({ equipmentId: 'eq1', templateId: 't1', inspectionDate: '2026-06-03' },
+      { tenantId: 'orion', userId: 'u1', role: 'ADMIN' })).rejects.toThrow('write failed');
+    expect(m.audit).not.toHaveBeenCalled();
+  });
   it('snapshots template items and writes tenant-scoped inspection', async () => {
     m.eqFindUnique.mockResolvedValue({ id: 'eq1', tenantId: 'orion' });
     m.tplFindUnique.mockResolvedValue({ id: 't1', tenantId: 'orion', level: 'EO',
@@ -67,6 +77,10 @@ describe('startInspection', () => {
     expect(data.status).toBe('DRAFT');
     expect(Array.isArray(data.templateSnapshot)).toBe(true);
     expect(data.templateSnapshot[0].id).toBe('i1');
+    expect(m.audit).toHaveBeenCalledWith(expect.objectContaining({
+      action: 'inspection.started', actorId: 'u1', tenantId: 'orion', targetId: 'ins1',
+    }));
+    expect(m.audit.mock.invocationCallOrder[0]).toBeGreaterThan(m.insCreate.mock.invocationCallOrder[0]);
   });
   it('throws 404 if equipment cross-tenant', async () => {
     m.eqFindUnique.mockResolvedValue(null);
@@ -102,6 +116,29 @@ describe('startToInspection', () => {
     const insData = m.insCreate.mock.calls[0][0].data;
     expect(insData).toMatchObject({ tenantId: 'orion', maintenanceRecordId: 'rec1', templateId: 'base1', level: 'EO', status: 'DRAFT' });
     expect(insData.templateSnapshot.map((s: { id: string }) => s.id)).toEqual(['b1', 'h1']);
+    expect(m.audit).toHaveBeenCalledWith(expect.objectContaining({
+      action: 'inspection.started', actorId: 'u1', tenantId: 'orion', targetId: 'ins1',
+    }));
+  });
+
+  it('повторный старт существующей фазы не создаёт нового события аудита', async () => {
+    m.eqFindUnique.mockResolvedValue({ id: 'eq1' });
+    m.insFindUnique.mockResolvedValue({ id: 'existing-1' });
+    const result = await startToInspection({ equipmentId: 'eq1', level: 'EO', inspectionDate: '2026-06-06', shiftId: 'shift-1' },
+      { tenantId: 'orion', userId: 'u1', role: 'ADMIN' });
+    expect(result).toEqual({ id: 'existing-1' });
+    expect(m.insCreate).not.toHaveBeenCalled();
+    expect(m.audit).not.toHaveBeenCalled();
+  });
+
+  it('ошибка внутри транзакции старта не создаёт события об успехе', async () => {
+    m.eqFindUnique.mockResolvedValue({ id: 'eq1', model: 'Banut 655', hammerKind: 'HYDRAULIC', isCombined: false });
+    m.tplFindMany.mockResolvedValue([baseTpl, hammerTpl]);
+    m.recCreate.mockResolvedValue({ id: 'rec1' });
+    m.insCreate.mockRejectedValue(new Error('transaction failed'));
+    await expect(startToInspection({ equipmentId: 'eq1', level: 'EO', inspectionDate: '2026-06-06' },
+      { tenantId: 'orion', userId: 'u1', role: 'ADMIN' })).rejects.toThrow('transaction failed');
+    expect(m.audit).not.toHaveBeenCalled();
   });
 
   it('throws 404 for cross-tenant equipment; writes nothing', async () => {
@@ -110,6 +147,7 @@ describe('startToInspection', () => {
       .rejects.toThrow('Equipment not found');
     expect(m.recCreate).not.toHaveBeenCalled();
     expect(m.insCreate).not.toHaveBeenCalled();
+    expect(m.audit).not.toHaveBeenCalled();
   });
 
   it('throws 400 when no BASE block exists for the machine; writes nothing', async () => {

@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { NextRequest, NextResponse } from 'next/server';
+import { recordAuditEvent } from '@/services/audit/audit-service';
 import { requireAuth } from '@/lib/auth';
 import { assertCan } from '@/services/auth/authorization-service';
 import { withApi, withMutation, readJsonBody } from '@/core/api-wrapper';
@@ -125,10 +126,16 @@ export const POST = withMutation(
       if (!ok) {
         return NextResponse.json({ error: 'Не удалось переотправить' }, { status: 400 });
       }
+      await recordAuditEvent({
+        action: 'dlq.retried', scope: 'system', actorId: user?.id, targetId: id, tenantId: user?.tenantId,
+      });
       return NextResponse.json({ ok: true, action });
     }
 
     await discardDlqEntry(id);
+    await recordAuditEvent({
+      action: 'dlq.discarded', scope: 'system', actorId: user?.id, targetId: id, tenantId: user?.tenantId,
+    });
     return NextResponse.json({ ok: true, action });
   },
   { domain: 'admin-dlq' }

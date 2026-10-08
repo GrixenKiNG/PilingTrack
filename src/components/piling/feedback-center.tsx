@@ -70,6 +70,9 @@ function formatEventDate(value: string) {
 const SCOPE_LABELS: Record<string, string> = {
   equipment: 'Техника',
   inspections: 'Осмотры',
+  safety: 'Охрана труда',
+  system: 'Система',
+  media: 'Вложения',
   users: 'Пользователи',
   sites: 'Объекты',
   crews: 'Бригады',

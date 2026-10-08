@@ -4,6 +4,7 @@ import { requireAuth } from '@/lib/auth';
 import { signBriefingRecord } from '@/modules/safety';
 import { withMutation } from '@/core/api-wrapper';
 import { ServiceError } from '@/lib/service-error';
+import { recordAuditEvent } from '@/services/audit/audit-service';
 
 export const runtime = 'nodejs';
 
@@ -28,6 +29,11 @@ export const POST = withMutation(
 
     try {
       const result = await signBriefingRecord({ tenantId, actorId: actor.id, recordId: id });
+      if (!result.alreadySigned) {
+        await recordAuditEvent({
+          action: 'briefing.signed', scope: 'safety', actorId: actor.id, targetId: id, tenantId,
+        });
+      }
       return NextResponse.json({ data: result });
     } catch (err) {
       if (err instanceof ServiceError) return NextResponse.json({ error: err.message }, { status: err.status });

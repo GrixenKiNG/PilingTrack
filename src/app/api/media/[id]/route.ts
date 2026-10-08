@@ -4,6 +4,7 @@ import { getMediaService } from '@/core/media/media-service';
 import { assertCanAccessMedia } from '@/core/media/media-auth';
 import { withMutation } from '@/core/api-wrapper';
 import { ServiceError } from '@/services/service-error';
+import { recordAuditEvent } from '@/services/audit/audit-service';
 
 export const DELETE = withMutation(
   async (request: NextRequest, ctx: { params: Promise<{ id: string }> }) => {
@@ -32,6 +33,10 @@ export const DELETE = withMutation(
 
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     await getMediaService().softDelete(id, user!.id);
+    await recordAuditEvent({
+      action: 'media.deleted', scope: 'media', actorId: user?.id, targetId: id, tenantId: media.tenantId,
+      metadata: { entityType: media.entityType, entityId: media.entityId },
+    });
     return NextResponse.json({ ok: true });
   },
   { domain: 'media.delete' },

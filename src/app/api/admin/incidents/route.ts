@@ -17,6 +17,7 @@ import {withApi, withMutation} from '@/core/api-wrapper';
 import {requireAuth} from '@/lib/auth';
 import {assertCan} from '@/services/auth/authorization-service';
 import {db} from '@/lib/db';
+import {recordAuditEvent} from '@/services/audit/audit-service';
 
 export const runtime = 'nodejs';
 
@@ -126,6 +127,12 @@ export const POST = withMutation(async (request: NextRequest) => {
   if (updated.count === 0) {
     return NextResponse.json({error: 'Происшествие не найдено либо уже разобрано'}, {status: 409});
   }
+
+  await recordAuditEvent({
+    action: 'incident.reviewed', scope: 'safety', actorId: user.id,
+    targetId: parsed.data.id, tenantId: user.tenantId,
+    metadata: { reviewNote: parsed.data.note.trim() },
+  });
 
   return NextResponse.json({data: {ok: true}});
 }, {domain: 'admin-incidents'});

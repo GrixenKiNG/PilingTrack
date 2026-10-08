@@ -6,6 +6,7 @@ import { assertCan } from '@/services/auth/authorization-service';
 import { getTemplate, updateTemplate, deleteTemplate } from '@/modules/inspections';
 import { withApi, withMutation, readJsonBody } from '@/core/api-wrapper';
 import { ServiceError } from '@/services/service-error';
+import { recordAuditEvent } from '@/services/audit/audit-service';
 
 export const runtime = 'nodejs';
 
@@ -79,6 +80,10 @@ export const PUT = withMutation(
     try {
       // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
       const template = await updateTemplate(id, parsed.data, { tenantId, createdById: user!.id });
+      await recordAuditEvent({
+        action: 'inspection.template.replaced', scope: 'inspections', actorId: user?.id,
+        targetId: id, tenantId, metadata: { name: parsed.data.name, replacementId: template.id },
+      });
       return NextResponse.json({ template });
     } catch (err) {
       if (err instanceof ServiceError) return NextResponse.json({ error: err.message }, { status: err.status });
@@ -99,6 +104,10 @@ export const DELETE = withMutation(
     const { id } = await params;
     try {
       await deleteTemplate(id, tenantId);
+      await recordAuditEvent({
+        action: 'inspection.template.deactivated', scope: 'inspections', actorId: user?.id,
+        targetId: id, tenantId,
+      });
       return NextResponse.json({ ok: true });
     } catch (err) {
       if (err instanceof ServiceError) return NextResponse.json({ error: err.message }, { status: err.status });

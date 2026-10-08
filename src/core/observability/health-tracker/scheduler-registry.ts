@@ -23,6 +23,7 @@ export const SCHEDULER_HEARTBEAT_PREFIX = 'system:scheduler:';
  * разошёлся бы молча — ровно то, что закрывает F-SCHED-REGISTRY-IDEMP.
  */
 export const IDEMPOTENCY_CLEANUP_SCHEDULER_NAME = 'idempotency-cleanup';
+export const PDF_TEMP_CLEANUP_SCHEDULER_NAME = 'pdf-cleanup';
 
 /**
  * Переменная явного (opt-in) включения уборки ключей идемпотентности.
@@ -55,6 +56,7 @@ export const SCHEDULER_NAMES = [
   'projection-rebuild',
   'readiness-scheduler',
   IDEMPOTENCY_CLEANUP_SCHEDULER_NAME,
+  PDF_TEMP_CLEANUP_SCHEDULER_NAME,
 ] as const;
 
 /**
@@ -65,7 +67,13 @@ export const SCHEDULER_NAMES = [
  * (R83 #3), и настоящая остановка уборки потерялась бы в постоянном шуме.
  */
 export function enabledSchedulerNames(): string[] {
-  return SCHEDULER_NAMES.filter(
-    (name) => name !== IDEMPOTENCY_CLEANUP_SCHEDULER_NAME || isIdempotencyCleanupEnabled(),
-  );
+  return SCHEDULER_NAMES.filter((name) => {
+    switch (name) {
+      case 'pm-scheduler': return process.env.PM_SCHEDULER_ENABLED !== 'false';
+      case 'projection-rebuild': return process.env.PROJECTION_REBUILD_ENABLED !== 'false';
+      case 'readiness-scheduler': return process.env.READINESS_SCHEDULER_ENABLED !== 'false';
+      case IDEMPOTENCY_CLEANUP_SCHEDULER_NAME: return isIdempotencyCleanupEnabled();
+      case PDF_TEMP_CLEANUP_SCHEDULER_NAME: return process.env.PDF_TEMP_CLEANUP_ENABLED === 'true';
+    }
+  });
 }

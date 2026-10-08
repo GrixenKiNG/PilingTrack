@@ -148,3 +148,40 @@ describe('UserDocuments — title на кнопках-иконках (F-R131-NEX
     expect(screen.getByLabelText('Удалить документ')).toHaveAttribute('title', 'Удалить документ');
   });
 });
+
+describe('UserDocuments — календарный срок действия (W126 №17)', () => {
+  it.each([
+    ['2026-01-31', 1, '2026-02-28'],
+    ['2024-01-31', 1, '2024-02-29'],
+    ['2024-02-29', 12, '2025-02-28'],
+    ['2026-12-31', 2, '2027-02-28'],
+    ['2026-06-15', 1, '2026-07-15'],
+  ])('выдан %s, срок %s месяцев → %s', async (issuedAt, defaultValidMonths, expectedExpiry) => {
+    const doc = docRow('doc-calendar', 'Медосмотр');
+    authFetchMock.mockImplementation((url: string) => Promise.resolve(ok(url.includes('/documents')
+      ? { documents: [doc] }
+      : { types: [{ id: 'type-1', name: 'Медосмотр', requiresExpiry: true, defaultValidMonths, leadTimeDays: 30 }] })));
+    render(<UserDocuments userId="ivanov" />);
+    fireEvent.click(await screen.findByLabelText('Изменить документ'));
+
+    fireEvent.change(screen.getByLabelText('Выдан'), { target: { value: issuedAt } });
+    expect(screen.getByLabelText('Действует до')).toHaveValue(expectedExpiry);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить' }));
+    await waitFor(() => expect(authFetchMock).toHaveBeenCalledWith(
+      '/api/users/ivanov/documents/doc-calendar',
+      expect.objectContaining({ method: 'PUT', body: expect.stringContaining(`"expiresAt":"${expectedExpiry}"`) }),
+    ));
+  });
+
+  it('не заменяет указанный вручную срок при изменении даты выдачи', async () => {
+    const doc = { ...docRow('doc-manual', 'Медосмотр'), expiresAt: '2026-07-01' };
+    authFetchMock.mockImplementation((url: string) => Promise.resolve(ok(url.includes('/documents')
+      ? { documents: [doc] }
+      : { types: [{ id: 'type-1', name: 'Медосмотр', requiresExpiry: true, defaultValidMonths: 1, leadTimeDays: 30 }] })));
+    render(<UserDocuments userId="ivanov" />);
+    fireEvent.click(await screen.findByLabelText('Изменить документ'));
+    fireEvent.change(screen.getByLabelText('Выдан'), { target: { value: '2026-01-31' } });
+    expect(screen.getByLabelText('Действует до')).toHaveValue('2026-07-01');
+  });
+});

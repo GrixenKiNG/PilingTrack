@@ -6,6 +6,7 @@ import { assertCan } from '@/services/auth/authorization-service';
 import { getInspection, saveAnswers } from '@/modules/inspections';
 import { withApi, withMutation, readJsonBody } from '@/core/api-wrapper';
 import { ServiceError } from '@/services/service-error';
+import { recordAuditEvent } from '@/services/audit/audit-service';
 
 export const runtime = 'nodejs';
 
@@ -62,6 +63,10 @@ export const PUT = withMutation(
     try {
       // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
       const inspection = await saveAnswers(id, parsed.data.answers, { tenantId, performerId: user!.role === 'OPERATOR' ? user!.id : null });
+      await recordAuditEvent({
+        action: 'inspection.answers_saved', scope: 'inspections', actorId: user?.id,
+        targetId: id, tenantId, metadata: { answerCount: parsed.data.answers.length },
+      });
       return NextResponse.json({ inspection });
     } catch (err) {
       if (err instanceof ServiceError) return NextResponse.json({ error: err.message }, { status: err.status });

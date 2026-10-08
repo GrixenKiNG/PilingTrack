@@ -6,6 +6,8 @@ import { assertCan } from '@/services/auth/authorization-service';
 import { rateLimiter, type RateLimitConfig } from '@/lib/rate-limiter';
 import { exportPileJournalXlsx } from '@/modules/reports/application/queries/pile-passport.service';
 import type { PileAcceptanceValue } from '@/modules/operator-mobile/domain/pile-passport';
+import { getSettings } from '@/modules/settings';
+import { getTodayInTimezone } from '@/lib/timezone';
 
 export const runtime = 'nodejs';
 
@@ -81,7 +83,8 @@ export const GET = withApi(
       pileNumber: params.get('pileNumber')?.trim() || undefined,
     });
 
-    const today = new Date().toISOString().slice(0, 10);
+    const { timezone } = await getSettings(tenantId);
+    const today = getTodayInTimezone(timezone);
     return new NextResponse(new Uint8Array(xlsx), {
       headers: {
         'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',

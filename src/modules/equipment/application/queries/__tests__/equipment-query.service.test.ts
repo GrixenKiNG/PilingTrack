@@ -39,6 +39,7 @@ vi.mock('@/lib/db', () => ({
     maintenancePlan: { findMany: planFindManyMock },
   },
 }));
+vi.mock('@/modules/settings', () => ({ getSettings: vi.fn(async () => ({ timezone: 'Europe/Moscow' })) }));
 
 import {
   listAllEquipment,
@@ -188,7 +189,8 @@ describe('getEquipmentDetails — complete 30-day stats with existing history ca
   let reports: ReturnType<typeof detailReport>[];
 
   beforeEach(() => {
-    vi.spyOn(Date, 'now').mockReturnValue(new Date('2026-10-02T10:00:00Z').getTime());
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-10-02T10:00:00Z'));
     reports = [];
     equipmentUniqueMock.mockReset().mockResolvedValue({ id: 'equipment-1', crews: [], telematicsDevices: [], documents: [] });
     inspectionFirstMock.mockReset().mockResolvedValue(null);
@@ -201,7 +203,15 @@ describe('getEquipmentDetails — complete 30-day stats with existing history ca
       return take === undefined ? matching : matching.slice(0, take);
     });
   });
-  afterEach(() => vi.restoreAllMocks());
+  afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); });
+
+  it('keeps the 30-day calendar cutoff on today in Moscow after local midnight', async () => {
+    vi.setSystemTime(new Date('2026-10-01T21:30:00Z'));
+    await getEquipmentDetails('equipment-1', 'orion');
+    expect(reportFindManyMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: { equipmentId: 'equipment-1', date: { gte: '2026-09-02' }, status: 'submitted' },
+    }));
+  });
 
   it('counts more than 1000 recent reports while preserving latest-1000 history', async () => {
     reports = Array.from({ length: 1001 }, (_, index) => detailReport(index));

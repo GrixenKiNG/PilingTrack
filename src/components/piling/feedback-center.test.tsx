@@ -132,6 +132,15 @@ describe('центр уведомлений: цели нажатия на тел
  * незнакомая остаётся как есть (не скрываем), локальное событие — «локально».
  */
 describe('лента: подписи области события (F-FEED-SCOPE-LABELS)', () => {
+  it.each([
+    ['safety', 'Охрана труда'], ['system', 'Система'], ['media', 'Вложения'],
+  ])('переводит область нового аудита %s на русский', (scope, label) => {
+    state.events = [feedbackEvent({scope})];
+    render(<FeedbackCenter />);
+    fireEvent.click(screen.getByRole('button', {name: 'Открыть уведомления'}));
+    expect(screen.getByText(label)).toBeInTheDocument();
+    expect(screen.queryByText(scope)).toBeNull();
+  });
   it('переводит известную область на русский', () => {
     state.events = [feedbackEvent({scope: 'equipment'})];
 

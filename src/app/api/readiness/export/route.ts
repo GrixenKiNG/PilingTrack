@@ -152,7 +152,8 @@ async function handleGet(request: NextRequest) {
       return {...csv, timezone, rowCount: Math.max(0, rows.length - 1)};
     });
 
-    const filename = 'pilingtrack-readiness-' + dataset + '-' + generatedAt.toISOString().slice(0, 10) + '.csv';
+    const exportDay = generatedAt.toLocaleDateString('en-CA', {timeZone: result.timezone});
+    const filename = 'pilingtrack-readiness-' + dataset + '-' + exportDay + '.csv';
     return new NextResponse(result.body, {
       status: 200,
       headers: {

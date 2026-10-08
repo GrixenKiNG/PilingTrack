@@ -21,6 +21,7 @@ import type { SchedulerHealth } from '../types';
  */
 export async function checkSchedulers(): Promise<SchedulerHealth> {
   const required = enabledSchedulerNames();
+  if (required.length === 0) return { status: 'ok', stale: [] };
   try {
     const client = await getStateRedisClient();
     if (!client) {

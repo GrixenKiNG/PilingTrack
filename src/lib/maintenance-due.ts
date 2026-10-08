@@ -5,9 +5,10 @@
  * (to-stats.ts), which previously duplicated this logic independently.
  */
 
+import { daysUntil } from '@/lib/format';
+
 const SOON_DAYS = 7;
 const SOON_HOURS = 50;
-const DAY_MS = 86_400_000;
 
 export interface MaintenanceDueInput {
   nextMaintenanceDate?: string | null;
@@ -31,9 +32,9 @@ export function checkMaintenanceDue(
   input: MaintenanceDueInput,
   now: Date = new Date(),
 ): MaintenanceDueResult {
-  const nowMs = now.getTime();
-  const dateMs = input.nextMaintenanceDate != null ? new Date(input.nextMaintenanceDate).getTime() : null;
-  const byDate = dateMs != null && dateMs < nowMs;
+  // Planned maintenance is a calendar date, valid through the current production day.
+  const daysLeft = daysUntil(input.nextMaintenanceDate, now);
+  const byDate = daysLeft != null && daysLeft < 0;
   const byHours =
     input.nextMaintenanceAtHours != null &&
     input.engineHoursTotal != null &&
@@ -42,7 +43,7 @@ export function checkMaintenanceDue(
 
   let soon = false;
   if (!overdue) {
-    if (dateMs != null && (dateMs - nowMs) / DAY_MS <= SOON_DAYS) soon = true;
+    if (daysLeft != null && daysLeft <= SOON_DAYS) soon = true;
     if (input.nextMaintenanceAtHours != null && input.engineHoursTotal != null) {
       const left = input.nextMaintenanceAtHours - input.engineHoursTotal;
       if (left >= 0 && left <= SOON_HOURS) soon = true;
@@ -52,7 +53,7 @@ export function checkMaintenanceDue(
   return {
     overdue,
     reason: overdue ? (byDate && byHours ? 'both' : byDate ? 'date' : 'hours') : null,
-    overdueDays: byDate && dateMs != null ? Math.floor((nowMs - dateMs) / DAY_MS) : null,
+    overdueDays: byDate && daysLeft != null ? -daysLeft : null,
     overdueHours:
       byHours && input.engineHoursTotal != null && input.nextMaintenanceAtHours != null
         ? input.engineHoursTotal - input.nextMaintenanceAtHours

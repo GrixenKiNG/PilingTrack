@@ -1,9 +1,11 @@
-import {beforeEach, describe, expect, it, vi} from 'vitest';
+import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 import {NextRequest, NextResponse} from 'next/server';
 
 const mocks = vi.hoisted(() => ({
   resolveReadinessRequestContext: vi.fn(),
   withReadinessRequestTransaction: vi.fn(),
+  withReadinessSerializableTransaction: vi.fn(),
+  recordChainedReadinessAudit: vi.fn(),
 }));
 
 // Маршруты оборачивают обработчик в withApi. Проверяем сам обработчик: обёртка
@@ -26,7 +28,10 @@ vi.mock('../../_shared/request-context', () => ({
 // Считывающие команды не должны трогать БД на запрещённом пути.
 vi.mock('@/modules/readiness/infrastructure/tenant-transaction', () => ({
   withReadinessRequestTransaction: mocks.withReadinessRequestTransaction,
-  withReadinessSerializableTransaction: vi.fn(),
+  withReadinessSerializableTransaction: mocks.withReadinessSerializableTransaction,
+}));
+vi.mock('@/modules/readiness/infrastructure/audit/record-audit', () => ({
+  recordChainedReadinessAudit: mocks.recordChainedReadinessAudit,
 }));
 
 // Импорты — после vi.mock: vitest подменяет модули до того, как они
@@ -36,6 +41,7 @@ import {GET as shiftByIdGet} from '../../shifts/[id]/route';
 import {GET as handoverByIdGet} from '../../handovers/[id]/route';
 import {GET as permitByIdGet} from '../../work-permits/[id]/route';
 import {GET as currentGet} from '../../current/route';
+import {GET as exportGet} from '../../export/route';
 
 const FORBIDDEN_MESSAGE = 'Нет доступа к контуру технической готовности';
 
@@ -51,6 +57,32 @@ const withoutReadCapability = {
 const request = (url: string) => new NextRequest(url, {headers: {}});
 
 const routeParams = {params: Promise.resolve({id: 'some-id'})};
+
+describe('readiness export date', () => {
+  afterEach(() => vi.useRealTimers());
+
+  it('uses the same production day in the filename and CSV metadata at midnight', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-10-07T21:30:00Z'));
+    mocks.resolveReadinessRequestContext.mockResolvedValue({
+      context: {...withoutReadCapability, capabilities: new Set(['readiness.read'])},
+    });
+    const tx = {
+      tenantSettings: {findUnique: vi.fn(async () => ({timezone: 'Europe/Moscow'}))},
+      equipment: {findMany: vi.fn(async () => [])},
+    };
+    mocks.withReadinessSerializableTransaction.mockImplementation(
+      async (_tenantId: string, callback: (transaction: typeof tx) => Promise<unknown>) => callback(tx),
+    );
+    const response = await exportGet(request('http://localhost/api/readiness/export?dataset=fleet'));
+    expect(response.status).toBe(200);
+    expect(response.headers.get('content-disposition')).toContain('pilingtrack-readiness-fleet-2026-10-08.csv');
+    expect(response.headers.get('x-tenant-timezone')).toBe('Europe/Moscow');
+    expect(mocks.recordChainedReadinessAudit).toHaveBeenCalledWith(tx, expect.objectContaining({
+      action: 'readiness.exported', occurredAt: new Date('2026-10-07T21:30:00Z'),
+    }));
+  });
+});
 
 // Общая проверка ответа: 403 с той же ошибкой, что у соседнего списка нарядов.
 const expectForbidden = async (produce: () => Promise<NextResponse>) => {
