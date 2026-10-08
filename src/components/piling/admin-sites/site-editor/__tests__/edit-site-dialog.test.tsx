@@ -89,6 +89,26 @@ describe('EditSiteDialog', () => {
     const dialog = (await screen.findByText('Редактировать объект')).closest('[data-slot="dialog-content"]');
     expect(dialog).toHaveClass('max-h-[90vh]', 'overflow-y-auto');
   });
+
+  /**
+   * F-R126-17: на 375 px диалог растягивался на всю ширину — `max-w-lg` перебивал
+   * базовый `max-w-[calc(100%-2rem)]` у DialogContent, и отступы 16 px по краям
+   * терялись. Ширина ограничена только с sm, на телефоне работает база.
+   */
+  it('на телефоне оставляет отступы по краям, а не растягивается на всю ширину (F-R126-17)', async () => {
+    authFetch.mockResolvedValueOnce(new Response(JSON.stringify({ site: {} }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    }));
+    render(<EditSiteDialog
+      site={{ id: 's1', name: 'Объект 1', isActive: true, plannedPiles: 1, plannedDrilling: 1 }}
+      open onOpenChange={vi.fn()} loadingPileGrades={false} pileGrades={[]} onSave={vi.fn()}
+    />);
+
+    const dialog = (await screen.findByText('Редактировать объект')).closest('[data-slot="dialog-content"]');
+    expect(dialog).toHaveClass('sm:max-w-lg');
+    expect(dialog).not.toHaveClass('max-w-lg');
+  });
 });
 
 // Guard инцидента 2026-07-17: сохранение объекта с опустевшим планом стёрло

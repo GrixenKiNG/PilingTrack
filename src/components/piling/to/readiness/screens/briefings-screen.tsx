@@ -24,6 +24,7 @@ import {
 } from '@/modules/operator-mobile/contracts';
 import { BriefingConductDialog } from './briefing-conduct-dialog';
 import { authFetch } from '@/lib/api';
+import { formatDateInTimezone } from '@/lib/timezone';
 import { ROLE_LABELS, type UserRole } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -46,10 +47,36 @@ type StatusFilter = BriefingJournalStatus | '';
  */
 type JournalRow = BriefingJournalEntry & { siteName?: string };
 
-/** Отметка подписи в графе: дата или честное «нет». */
-function signatureCell(iso: string | null) {
+/**
+ * Мгновение записи в поясе тенанта — тем же порядком значений, что и на печатном
+ * листе журнала (R134, находка 8): рядом экран подписывает «Время тенанта», и
+ * строка таблицы не должна показывать часы браузера. Инструктаж проходят до
+ * начала смены, поэтому сдвиг часов менял бы дату записи. Пока пояс неизвестен —
+ * прежний формат по часам браузера.
+ */
+function momentInTimezone(iso: string, timezone?: string): string {
+  const moment = new Date(iso);
+  if (Number.isNaN(moment.getTime())) return '—';
+  if (!timezone) return formatJournalMoment(iso);
+  const day = formatDateInTimezone(moment, timezone, { day: '2-digit', month: '2-digit', year: 'numeric' });
+  const time = formatDateInTimezone(moment, timezone, { hour: '2-digit', minute: '2-digit' });
+  return `${day}, ${time}`;
+}
+
+/** День мгновения в поясе тенанта — графы «действует до» и подписей. */
+function dayInTimezone(iso: string | null, timezone?: string): string {
+  if (!iso) return '—';
+  if (!timezone) return formatJournalDay(iso);
+  const moment = new Date(iso);
+  return Number.isNaN(moment.getTime())
+    ? '—'
+    : formatDateInTimezone(moment, timezone, { day: '2-digit', month: '2-digit', year: 'numeric' });
+}
+
+/** Отметка подписи в графе: дата по поясу тенанта или честное «нет». */
+function signatureCell(iso: string | null, timezone?: string) {
   return iso
-    ? <span className="whitespace-nowrap text-success-strong">✓ {formatJournalDay(iso)}</span>
+    ? <span className="whitespace-nowrap text-success-strong">✓ {dayInTimezone(iso, timezone)}</span>
     : <span className="text-muted-foreground">—</span>;
 }
 
@@ -422,7 +449,7 @@ export function BriefingsScreen(props: ReferenceUiProps) {
                 <tbody className="divide-y divide-border">
                   {visible.map((row) => (
                     <tr key={row.id}>
-                      <td className="py-2 pr-3 whitespace-nowrap">{formatJournalMoment(row.recordedAt)}</td>
+                      <td className="py-2 pr-3 whitespace-nowrap">{momentInTimezone(row.recordedAt, props.bootstrap?.tenant.timezone)}</td>
                       <td className="py-2 pr-3">
                         {/* Вид есть только у инструктажа. У проверки знаний его
                             нет, и у записей до 13.09.2026 — тоже: показываем,
@@ -454,11 +481,11 @@ export function BriefingsScreen(props: ReferenceUiProps) {
                         <div>{row.documentTitle}</div>
                         <div className="text-2xs text-muted-foreground">
                           {row.documentCode}, в. {row.documentVersion}
-                          {row.validUntil ? ` · до ${formatJournalDay(row.validUntil)}` : ''}
+                          {row.validUntil ? ` · до ${dayInTimezone(row.validUntil, props.bootstrap?.tenant.timezone)}` : ''}
                         </div>
                       </td>
-                      <td className="py-2 pr-3">{signatureCell(row.employeeSignedAt)}</td>
-                      <td className="py-2 pr-3">{signatureCell(row.instructorSignedAt)}</td>
+                      <td className="py-2 pr-3">{signatureCell(row.employeeSignedAt, props.bootstrap?.tenant.timezone)}</td>
+                      <td className="py-2 pr-3">{signatureCell(row.instructorSignedAt, props.bootstrap?.tenant.timezone)}</td>
                       <td className="py-2 whitespace-nowrap">
                         <span className={cn(
                           'rounded-full px-2 py-0.5 text-2xs font-semibold',
@@ -554,7 +581,7 @@ export function BriefingsScreen(props: ReferenceUiProps) {
               <tbody className="divide-y divide-border">
                 {historyEvents.map((event, index) => (
                   <tr key={`${event.at}-${event.action}-${index}`}>
-                    <td className="py-2 pr-3 whitespace-nowrap">{formatJournalMoment(event.at)}</td>
+                    <td className="py-2 pr-3 whitespace-nowrap">{momentInTimezone(event.at, props.bootstrap?.tenant.timezone)}</td>
                     <td className="py-2 pr-3">{event.action}</td>
                     <td className="py-2 pr-3">{event.user}</td>
                     <td className="py-2 pr-3">{event.role}</td>

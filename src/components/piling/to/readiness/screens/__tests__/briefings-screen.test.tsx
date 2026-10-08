@@ -141,3 +141,27 @@ describe('журнал инструктажей: непонятные места
     expect(screen.getByText('История изменений записи')).toBeInTheDocument();
   });
 });
+
+/**
+ * R134, находка 8. Рядом экран подписывает «Время тенанта», а строки журнала
+ * печатали часы браузера: у тенанта не в МСК дата и время инструктажа расходились
+ * с этой подписью и с печатным листом. Строки журнала и истории должны считаться
+ * по поясу тенанта.
+ */
+describe('журнал инструктажей: время строк по поясу тенанта (R134 №8)', () => {
+  it('показывает дату и время инструктажа по поясу тенанта, а не браузера', async () => {
+    mocks.authFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        rows: [{ ...journalRow, id: 'tz', recordedAt: '2026-09-01T20:00:00.000Z' }],
+        truncated: false,
+      }),
+    });
+    render(<BriefingsScreen {...({ bootstrap: { tenant: { timezone: 'Asia/Vladivostok' } } } as unknown as ReferenceUiProps)} />);
+
+    // 20:00 UTC 01.09 — это 06:00 02.09 во Владивостоке; по московскому времени
+    // было бы «01.09.2026, 23:00», то есть другой день.
+    expect((await screen.findAllByText('02.09.2026, 06:00')).length).toBeGreaterThan(0);
+    expect(screen.queryByText('01.09.2026, 23:00')).toBeNull();
+  });
+});

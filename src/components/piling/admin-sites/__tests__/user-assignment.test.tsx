@@ -83,6 +83,22 @@ describe('UserAssignmentDialog — назначение оператора', () 
   });
 
   /**
+   * F-R131 №23: у кнопки-иконки снятия назначения был только `title` —
+   * скринридер объявлял «кнопка» без имени. Стандарт проекта — и `aria-label`,
+   * и всплывающая подсказка.
+   */
+  it('снятие назначения названо и для скринридера, и подсказкой (F-R131 №23)', async () => {
+    const assigned = { id: 'assignment-1', userId: 'u1', user: { name: 'Оператор 1', email: 'op@example.com' } };
+    authFetchMock.mockResolvedValue(jsonResponse(200, { site: { users: [assigned] } }));
+
+    renderDialog();
+    const removeButton = await screen.findByTitle('Снять назначение');
+
+    expect(removeButton).toHaveAttribute('aria-label', 'Снять назначение');
+    expect(removeButton).toHaveAttribute('title', 'Снять назначение');
+  });
+
+  /**
    * F-R126-6: диалог «Операторы на объекте» растёт с числом операторов и не
    * ограничивал высоту — на коротком экране обрезался сверху и снизу, крестик
    * уходил за кадр. Добавлены `max-h-[90vh]` и прокрутка.

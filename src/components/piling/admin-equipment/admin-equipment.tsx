@@ -13,7 +13,7 @@ import { EquipmentTile } from './equipment-tile';
 import { EquipmentCardGrid } from './equipment-card-grid';
 import { EquipmentTable } from './equipment-table';
 import { EquipmentDetail } from './detail/equipment-detail';
-import { buildFleetFilterOptions, applyFleetFilters } from './fleet-filter';
+import { buildFleetFilterOptions, applyFleetFilters, hasActiveFleetFilters } from './fleet-filter';
 import { CreateEquipmentDialog } from './equipment-dialogs';
 import { PilingIcon } from '@/components/piling/icons';
 import { usePilingStore } from '@/lib/store';
@@ -138,7 +138,7 @@ export function AdminEquipment() {
               <p className="text-sm text-muted-foreground">
                 {cards.length === 0 ? 'В парке нет установок. Добавьте первую' : 'Нет установок под выбранные фильтры'}
               </p>
-              {filters !== EMPTY_FILTERS && (
+              {hasActiveFleetFilters(filters) && (
                 <button onClick={() => setFilters(EMPTY_FILTERS)} className="mt-2 inline-flex min-h-11 items-center text-xs text-info-strong underline sm:min-h-0">
                   Сбросить фильтры
                 </button>
@@ -146,7 +146,7 @@ export function AdminEquipment() {
             </div>
           ) : (
             <>
-              {filters !== EMPTY_FILTERS && (
+              {hasActiveFleetFilters(filters) && (
                 <div className="mb-2 flex justify-end">
                   <button onClick={() => setFilters(EMPTY_FILTERS)} className="inline-flex min-h-11 items-center text-xs text-info-strong underline sm:min-h-0">
                     Сбросить фильтры

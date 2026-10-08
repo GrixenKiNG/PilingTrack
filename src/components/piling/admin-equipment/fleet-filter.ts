@@ -52,3 +52,11 @@ export function applyFleetFilters(cards: FleetCard[], filters: FleetFilterState)
     return true;
   });
 }
+
+/**
+ * Выставлен ли хоть один отбор. Пустая строка значит «фильтр не задан»,
+ * поэтому сброс в EMPTY_FILTERS гасит кнопку «Сбросить фильтры».
+ */
+export function hasActiveFleetFilters(filters: FleetFilterState): boolean {
+  return Object.values(filters).some((value) => value !== '');
+}

@@ -511,6 +511,20 @@ describe('список шаблонов: деактивация с объясн�
     )).toBe(true));
   });
 
+  /**
+   * F-R131 №26: у кнопки-иконки деактивации был только `aria-label` — при
+   * наведении мышью подсказки не было. Стандарт проекта — и доступное имя, и
+   * `title`.
+   */
+  it('кнопка деактивации объясняет себя и при наведении (F-R131 №26)', async () => {
+    mocks.authFetch.mockResolvedValue(listWith([row]));
+    render(<TemplateList />);
+
+    const button = await screen.findByRole('button', { name: 'Деактивировать' });
+    expect(button).toHaveAttribute('aria-label', 'Деактивировать');
+    expect(button).toHaveAttribute('title', 'Деактивировать шаблон');
+  });
+
   it('есть другая «База» для той же модели → о поломке не предупреждаем', async () => {
     mocks.authFetch.mockResolvedValue(listWith([row, { ...row, id: 'tpl-2', name: 'ТО1 — экскаватор' }]));
     render(<TemplateList />);
