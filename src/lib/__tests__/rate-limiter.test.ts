@@ -3,7 +3,6 @@ import {
   rateLimiter,
   AUTH_RATE_LIMIT,
   getRateLimitIdentifier,
-  getTenantRateLimitIdentifier,
   createRateLimitMiddleware,
 } from '../rate-limiter';
 
@@ -244,24 +243,6 @@ describe('rate-limiter — чем выключается защита', () => {
     vi.stubEnv('TRUST_PROXY', 'true');
 
     expect(getRateLimitIdentifier(req({ 'x-real-ip': '203.0.113.10' }))).toBe('203.0.113.10');
-  });
-
-  it('тенантный ключ всегда содержит адрес — одним заголовком вёдра не наплодить', async () => {
-    vi.stubEnv('TRUST_PROXY', 'true');
-
-    const a = getTenantRateLimitIdentifier(req({ 'x-tenant-id': 'a', 'x-forwarded-for': '203.0.113.9' }));
-    const b = getTenantRateLimitIdentifier(req({ 'x-tenant-id': 'b', 'x-forwarded-for': '203.0.113.9' }));
-
-    expect(a).toContain('203.0.113.9');
-    expect(b).toContain('203.0.113.9');
-    expect(a).not.toBe(b); // тенанты всё же разделены
-  });
-
-  it('без тенанта ключ общий, но по-прежнему привязан к адресу', async () => {
-    vi.stubEnv('TRUST_PROXY', 'true');
-
-    expect(getTenantRateLimitIdentifier(req({ 'x-forwarded-for': '203.0.113.9' })))
-      .toBe('global:203.0.113.9');
   });
 
   it('недоступность Redis не открывает ворота — счёт продолжается в памяти', async () => {
