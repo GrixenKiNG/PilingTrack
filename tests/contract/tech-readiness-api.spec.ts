@@ -1,4 +1,13 @@
-import {describe, expect, it} from 'vitest';
+import {describe, expect, it, vi} from 'vitest';
+import {NextRequest} from 'next/server';
+
+const mocks = vi.hoisted(() => ({context: vi.fn(), transaction: vi.fn()}));
+vi.mock('@/core/api-wrapper', () => ({withMutation: (handler: unknown) => handler}));
+vi.mock('@/app/api/readiness/_shared/request-context', () => ({resolveReadinessRequestContext: mocks.context}));
+vi.mock('@/modules/readiness/infrastructure/tenant-transaction', () => ({withReadinessSerializableTransaction: mocks.transaction}));
+
+import {POST as approvePermit} from '@/app/api/readiness/work-permits/[id]/approve/route';
+import {ROLE_ABILITIES} from '@/modules/readiness/domain/capability-defaults';
 import {
   TECH_READINESS_ENTITIES,
   TECH_READINESS_FILTERS,
@@ -30,8 +39,20 @@ interface ApiContractHarness {
 }
 
 const api = {
-  request: async (): Promise<ContractResponse> => {
-    throw new Error('Bind ApiContractHarness to the implemented readiness routes');
+  request: async (input): Promise<ContractResponse> => {
+    // Only the existing matching scenario is bound. Auth/DB are replaced;
+    // the real route, strict schema and error adapter produce the response.
+    const match = input.path.match(/^\/api\/readiness\/work-permits\/([^/]+)\/approve$/);
+    if (input.method !== 'POST' || !match) throw new Error('Unbound, skipped API contract scenario');
+    mocks.context.mockResolvedValue({context: {
+      tenantId: input.actor.tenantId, actorId: input.actor.id, actorRole: input.actor.role,
+      actorName: input.actor.id, actingAs: null, requestId: 'contract-request', correlationId: 'contract-correlation',
+      capabilities: new Set(ROLE_ABILITIES[input.actor.role]),
+    }});
+    const response = await approvePermit(new NextRequest(`http://localhost${input.path}`, {
+      method: input.method, headers: input.headers, body: JSON.stringify(input.body),
+    }), {params: Promise.resolve({id: match[1]})});
+    return {status: response.status, headers: Object.fromEntries(response.headers), body: await response.json()};
   },
   seedFixture: async () => {
     throw new Error('Bind isolated test tenant seed');
@@ -39,15 +60,16 @@ const api = {
   resetFixture: async () => {
     throw new Error('Bind isolated test tenant cleanup');
   },
-} as ApiContractHarness;
+} satisfies ApiContractHarness;
 
 const commandHeaders = (version = 1) => ({
   'Idempotency-Key': `test-readiness-command-${version}`.padEnd(24, 'x'),
   'If-Match': `"shift-${TECH_READINESS_ENTITIES.shiftId}-v${version}"`,
 });
 
-describe.skip('Tech Readiness API contract [PRD §8, backend design §10]', () => {
-  it('returns list envelope, exact page total, normalized filters and opaque cursor', async () => {
+describe('Tech Readiness API contract [PRD §8, backend design §10]', () => {
+  // Current list has no sort/cursor/exact total contract.
+  it.skip('returns list envelope, exact page total, normalized filters and opaque cursor', async () => {
     const response = await api.request({
       method: 'GET',
       path: '/api/readiness/shifts',
@@ -82,7 +104,8 @@ describe.skip('Tech Readiness API contract [PRD §8, backend design §10]', () =
     expect(JSON.stringify(response.body)).not.toContain(TECH_READINESS_FOREIGN_TENANT.id);
   });
 
-  it('returns a strong ETag and rejects weak/missing/mismatched preconditions', async () => {
+  // MECHANIC cannot start a shift; the original scenario expects 428/400.
+  it.skip('returns a strong ETag and rejects weak/missing/mismatched preconditions', async () => {
     const detail = await api.request({
       method: 'GET',
       path: `/api/readiness/shifts/${TECH_READINESS_ENTITIES.shiftId}`,
@@ -119,7 +142,9 @@ describe.skip('Tech Readiness API contract [PRD §8, backend design §10]', () =
     });
   });
 
-  it.each([
+  // Current handover: ADMIN/MECHANIC return 201, OPERATOR is allowed;
+  // DISPATCHER is denied with VALIDATION_ERROR, not FORBIDDEN.
+  it.skip.each([
     ['ADMIN', 200],
     ['MECHANIC', 200],
     ['DISPATCHER', 403],
@@ -147,6 +172,7 @@ describe.skip('Tech Readiness API contract [PRD §8, backend design §10]', () =
   });
 
   it('does not trust tenantId, timezone, actor, or approval role from input', async () => {
+    mocks.transaction.mockClear();
     const response = await api.request({
       method: 'POST',
       path: `/api/readiness/work-permits/${TECH_READINESS_ENTITIES.normalPermitId}/approve`,
@@ -168,9 +194,11 @@ describe.skip('Tech Readiness API contract [PRD §8, backend design §10]', () =
       status: 422,
       body: {error: {code: expect.stringMatching(/VALIDATION|UNKNOWN_FIELD/)}},
     });
+    expect(mocks.transaction).not.toHaveBeenCalled();
   });
 
-  it('returns the same safe 404 for missing and cross-tenant resources', async () => {
+  // /readiness/equipment/:id/current does not exist; current is a query route.
+  it.skip('returns the same safe 404 for missing and cross-tenant resources', async () => {
     const missing = await api.request({
       method: 'GET',
       path: '/api/readiness/shifts/test-shift-missing',
@@ -188,7 +216,8 @@ describe.skip('Tech Readiness API contract [PRD §8, backend design §10]', () =
     expect(JSON.stringify(foreign.body)).not.toContain(TECH_READINESS_FOREIGN_TENANT.id);
   });
 
-  it('returns a current safe resource on stale handover accept conflict', async () => {
+  // Current error is VERSION_CONFLICT with current, without the proposed actions/version fields.
+  it.skip('returns a current safe resource on stale handover accept conflict', async () => {
     const response = await api.request({
       method: 'POST',
       path: `/api/readiness/handovers/${TECH_READINESS_ENTITIES.handoverId}/accept`,
@@ -217,7 +246,8 @@ describe.skip('Tech Readiness API contract [PRD §8, backend design §10]', () =
     });
   });
 
-  it('returns explainable 422 blockers and correcting actions', async () => {
+  // MECHANIC has no shift.authorize and receives 403 before blocker evaluation.
+  it.skip('returns explainable 422 blockers and correcting actions', async () => {
     const response = await api.request({
       method: 'POST',
       path: `/api/readiness/shifts/${TECH_READINESS_ENTITIES.shiftId}/start`,
@@ -246,7 +276,8 @@ describe.skip('Tech Readiness API contract [PRD §8, backend design §10]', () =
     });
   });
 
-  it('replays identical idempotent command and rejects key reuse with another payload', async () => {
+  // submit is strict: the mismatch body contains unsupported scope (422 before replay).
+  it.skip('replays identical idempotent command and rejects key reuse with another payload', async () => {
     const headers = {
       'Idempotency-Key': 'test-readiness-idempotency-replay',
       'If-Match': `"work-permit-${TECH_READINESS_ENTITIES.normalPermitId}-v1"`,
@@ -269,7 +300,8 @@ describe.skip('Tech Readiness API contract [PRD §8, backend design §10]', () =
     });
   });
 
-  it('rejects a cursor generated for different canonical filters', async () => {
+  // /api/audit is legacy entity history requiring scope + targetId, not a cursor list.
+  it.skip('rejects a cursor generated for different canonical filters', async () => {
     const response = await api.request({
       method: 'GET',
       path: '/api/audit',
@@ -287,7 +319,8 @@ describe.skip('Tech Readiness API contract [PRD §8, backend design §10]', () =
     });
   });
 
-  it('keeps JSON audit filters and CSV export filter hash in parity', async () => {
+  // /api/audit/export.csv does not exist; readiness audit/export have another contract.
+  it.skip('keeps JSON audit filters and CSV export filter hash in parity', async () => {
     const query = {...TECH_READINESS_FILTERS};
     const json = await api.request({
       method: 'GET',
