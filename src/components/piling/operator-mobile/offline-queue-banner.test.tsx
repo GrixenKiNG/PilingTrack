@@ -53,7 +53,7 @@ describe('плашка очереди на общем телефоне', () => {
 
     // Основное действие — удаление записи (заливка), повтор — второстепенная кнопка с пояснением.
     expect(screen.getByRole('button', {name: 'Удалить запись'}).className).toContain('bg-destructive');
-    expect(screen.getByText(/Повтор отправит то же самое/)).toBeTruthy();
+    expect(screen.getByText(/Повтор отправит то же самое/)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', {name: 'Повторить'}));
     expect(onRetry).toHaveBeenCalledWith('f1');
@@ -89,7 +89,7 @@ describe('плашка ждущих записей: связь или отказ
     render(<OfflineQueueBanner items={[pending(reason)]} onRetry={vi.fn()} onDiscard={vi.fn()} />);
 
     expect(screen.getByRole('status').textContent).toContain('Сервер не принял запись, повторим автоматически.');
-    expect(screen.getByText(reason)).toBeTruthy();
+    expect(screen.getByText(reason)).toBeInTheDocument();
   });
 
   it('английский текст сети не показывается как причина отказа сервера', () => {
@@ -148,8 +148,8 @@ describe('причина отказа не повторяется в карто�
 
     expect(screen.queryByText(reason)).toBeNull();
     // Состав и кнопки карточки на месте — запись можно разобрать.
-    expect(screen.getByRole('button', {name: 'Удалить запись'})).toBeTruthy();
-    expect(screen.getByRole('button', {name: 'Повторить'})).toBeTruthy();
+    expect(screen.getByRole('button', {name: 'Удалить запись'})).toBeInTheDocument();
+    expect(screen.getByRole('button', {name: 'Повторить'})).toBeInTheDocument();
   });
 
   it('другая причина у кнопки — причина карточки видна как раньше', () => {
@@ -163,7 +163,7 @@ describe('причина отказа не повторяется в карто�
       />,
     );
 
-    expect(screen.getByText(reason)).toBeTruthy();
+    expect(screen.getByText(reason)).toBeInTheDocument();
   });
 
   it('пустой shownElsewhere — причина карточки видна как раньше', () => {
@@ -172,6 +172,6 @@ describe('причина отказа не повторяется в карто�
       <OfflineQueueBanner items={[failed(reason)]} onRetry={vi.fn()} onDiscard={vi.fn()} />,
     );
 
-    expect(screen.getByText(reason)).toBeTruthy();
+    expect(screen.getByText(reason)).toBeInTheDocument();
   });
 });

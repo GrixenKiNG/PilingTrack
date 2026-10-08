@@ -63,8 +63,8 @@ describe('SafetyScreen — ссылка «Карточка» видна по п�
     render(<SafetyScreen {...propsFor()} />);
     await screen.findByText('Петров Пётр');
 
-    expect(screen.queryByRole('link', { name: 'Карточка' })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Карточка ТБ и допуски' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Профиль пользователя' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Допуск и инструктажи' })).toBeInTheDocument();
   });
 
   it('показывает обе карточки администратору', async () => {
@@ -72,8 +72,8 @@ describe('SafetyScreen — ссылка «Карточка» видна по п�
     render(<SafetyScreen {...propsFor()} />);
     await screen.findByText('Петров Пётр');
 
-    await waitFor(() => expect(screen.getByRole('link', { name: 'Карточка' })).toHaveAttribute('href', '/admin/users'));
-    expect(screen.getByRole('button', { name: 'Карточка ТБ и допуски' })).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole('link', { name: 'Профиль пользователя' })).toHaveAttribute('href', '/admin/users'));
+    expect(screen.getByRole('button', { name: 'Допуск и инструктажи' })).toBeInTheDocument();
   });
 });
 

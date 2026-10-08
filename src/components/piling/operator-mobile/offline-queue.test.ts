@@ -164,7 +164,10 @@ describe('очередь команд на устройстве', () => {
       globalThis.fetch = (async () => new Response(
         JSON.stringify({error: 'Смена закрыта'}), {status: 409, headers: {'Content-Type': 'application/json'}},
       )) as typeof fetch;
-      await expect(sendCommand(wrong)).rejects.toBeTruthy();
+      const rejection = await sendCommand(wrong).catch((error: unknown) => error);
+      expect(rejection).toBeInstanceOf(ApiError);
+      expect((rejection as ApiError).status).toBe(409);
+      expect((rejection as ApiError).message).toBe('Смена закрыта');
       expect(readQueue()[0].state).toBe('FAILED');
 
       // Повтор с исправленным составом обрывается на середине запроса.

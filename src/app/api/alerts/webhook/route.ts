@@ -4,8 +4,8 @@
  * Alertmanager sends grouped alerts as JSON; we forward each one to the
  * configured Telegram chat via the existing notifier.
  *
- * Auth: shared-secret token via `Authorization: Bearer <token>` or
- * `?token=<token>` query, matched against ALERTMANAGER_WEBHOOK_TOKEN.
+ * Auth: shared-secret token via the `Authorization: Bearer <token>` header,
+ * matched against ALERTMANAGER_WEBHOOK_TOKEN.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -67,10 +67,13 @@ const SEVERITY_MAP: Record<string, 'low' | 'medium' | 'high' | 'critical'> = {
 };
 
 // Constant-time string comparison to prevent a timing side-channel on the
-// shared-secret token (mirrors auth-service.ts's constantTimeEquals).
+// shared-secret token (mirrors auth-service.ts's constantTimeEquals). Both
+// sides are hashed to a fixed-length SHA-256 digest first, so differing
+// lengths do not leak through the comparison time.
 function constantTimeEquals(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  return timingSafeEqual(Buffer.from(a), Buffer.from(b));
+  const left = createHash('sha256').update(a).digest();
+  const right = createHash('sha256').update(b).digest();
+  return timingSafeEqual(left, right);
 }
 
 function isAuthorized(request: NextRequest): boolean {
@@ -79,9 +82,7 @@ function isAuthorized(request: NextRequest): boolean {
 
   const header = request.headers.get('authorization');
   const bearer = header?.startsWith('Bearer ') ? header.slice(7) : null;
-  const query = request.nextUrl.searchParams.get('token');
-  return (!!bearer && constantTimeEquals(bearer, expected)) ||
-    (!!query && constantTimeEquals(query, expected));
+  return !!bearer && constantTimeEquals(bearer, expected);
 }
 
 export async function POST(request: NextRequest) {

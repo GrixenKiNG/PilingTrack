@@ -1,15 +1,20 @@
 import { fireEvent, render, screen } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ReadinessFiltersBar } from '../shared';
-
-vi.useFakeTimers();
 
 describe('ReadinessFiltersBar: audit mode debounce and dropdown (R125 №6, №7)', () => {
   const mockOnChange = vi.fn();
 
   beforeEach(() => {
+    // Фейковые таймеры включаются на время теста и снимаются после: включение
+    // на уровне модуля протекало на весь файл.
+    vi.useFakeTimers();
     vi.clearAllMocks();
     vi.clearAllTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it('does not call onChange immediately for actor when typing (debounce 300ms)', () => {
@@ -21,7 +26,7 @@ describe('ReadinessFiltersBar: audit mode debounce and dropdown (R125 №6, №7
       />
     );
 
-    fireEvent.change(screen.getByLabelText('Актор'), { target: { value: 'test-actor' } });
+    fireEvent.change(screen.getByLabelText('Кто изменил'), { target: { value: 'test-actor' } });
 
     expect(mockOnChange).not.toHaveBeenCalled();
 
@@ -66,27 +71,6 @@ describe('ReadinessFiltersBar: audit mode debounce and dropdown (R125 №6, №7
     expect(selectTrigger).toBeInTheDocument();
     // Placeholder should be visible
     expect(selectTrigger).toHaveTextContent('Все типы');
-  });
-
-  it('debounces actor field (300ms)', () => {
-    render(
-      <ReadinessFiltersBar
-        filters={{}}
-        onChange={mockOnChange}
-        mode="audit"
-      />
-    );
-
-    fireEvent.change(screen.getByLabelText('Актор'), { target: { value: 'actor-1' } });
-    expect(mockOnChange).not.toHaveBeenCalled();
-
-    vi.advanceTimersByTime(150);
-    expect(mockOnChange).not.toHaveBeenCalled();
-
-    vi.advanceTimersByTime(150); // total 300ms
-    expect(mockOnChange).toHaveBeenCalledWith(
-      expect.objectContaining({ actor: 'actor-1' })
-    );
   });
 
   it('does not debounce status field in shifts mode', () => {

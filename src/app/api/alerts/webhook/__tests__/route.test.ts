@@ -2,10 +2,10 @@
  * POST /api/alerts/webhook — token auth regression (constant-time compare).
  *
  * Pins functional behavior around the timing-safe-equal refactor: still
- * accepts via Bearer header or ?token= query, still rejects mismatches and
- * a misconfigured (missing) env token. Timing safety itself isn't
- * meaningfully unit-testable — this just guards against breaking auth while
- * fixing the side-channel.
+ * accepts via the Bearer header only, still rejects mismatches, a rejected
+ * ?token= query param and a misconfigured (missing) env token. Timing safety
+ * itself isn't meaningfully unit-testable — this just guards against
+ * breaking auth while fixing the side-channel.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { NextRequest } from 'next/server';
@@ -94,9 +94,9 @@ describe('POST /api/alerts/webhook — auth', () => {
     expect(res.status).toBe(200);
   });
 
-  it('accepts a matching ?token= query param', async () => {
+  it('rejects a matching ?token= query param (Bearer header only, 401)', async () => {
     const res = await POST(reqWithQuery(TOKEN));
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(401);
   });
 
   it('rejects a mismatched token', async () => {

@@ -111,3 +111,33 @@ describe('журнал инструктажей: подсчёт сегодняш
     expect(screen.getByText('в сравнении со вчера: +1')).toBeInTheDocument();
   });
 });
+
+/**
+ * W75: плитка «Просрочены повторные» жёстко показывала 0, хотя статуса просрочки
+ * в журнале нет — читалось как ложное «просрочек нет». Числа в данных нет, значит
+ * и показывать нечего: «нет данных». Мёртвые кнопки без обработчика убраны.
+ */
+describe('журнал инструктажей: непонятные места (W75)', () => {
+  beforeEach(() => {
+    mocks.authFetch.mockReset();
+    mocks.authFetch.mockResolvedValue({ ok: true, json: async () => ({ rows: [journalRow], truncated: false }) });
+  });
+
+  it('плитка «Просрочены повторные» показывает «нет данных», а не выдуманный 0', async () => {
+    render(<BriefingsScreen {...({ bootstrap: null } as unknown as ReferenceUiProps)} />);
+
+    await screen.findByText('Просрочены повторные');
+    const tile = screen.getByText('Просрочены повторные').closest('[class*="min-h-28"]');
+    expect(tile).toHaveTextContent('нет данных');
+    expect(tile).not.toHaveTextContent('0');
+  });
+
+  it('кнопок «Все шаблоны →» и «Все события →» без обработчика больше нет', async () => {
+    render(<BriefingsScreen {...({ bootstrap: null } as unknown as ReferenceUiProps)} />);
+
+    await screen.findByText('Шаблоны программ');
+    expect(screen.queryByText('Все шаблоны →')).toBeNull();
+    expect(screen.queryByText('Все события →')).toBeNull();
+    expect(screen.getByText('История изменений записи')).toBeInTheDocument();
+  });
+});

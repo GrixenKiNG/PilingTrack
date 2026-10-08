@@ -308,12 +308,12 @@ export function SafetyScreen(props: ReferenceUiProps) {
                     кто её действительно откроет. */}
                 {mayOpenUsers && (
                   <Button asChild variant="outline" className="h-8 text-2xs">
-                    <Link href="/admin/users">Карточка</Link>
+                    <Link href="/admin/users">Профиль пользователя</Link>
                   </Button>
                 )}
                 <Button variant="outline" className="h-8 text-2xs"
                   onClick={() => setCardRow(row)}>
-                  Карточка ТБ и допуски
+                  Допуск и инструктажи
                 </Button>
               </div>
             ))}

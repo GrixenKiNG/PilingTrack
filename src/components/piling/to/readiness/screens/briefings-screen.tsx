@@ -291,8 +291,9 @@ export function BriefingsScreen(props: ReferenceUiProps) {
       <section className={cn(COMPACT_KPI_GRID, 'mt-2')} style={kpiGridStyle(5)}>
         <RefKpi icon="calendar" label="Сегодня проведено" tone="info" value={stats.todayCount}
           detail={stats.todayDetail} />
-        {/* Статуса просрочки в журнале нет: состояние только «подтверждён/ожидает». */}
-        <RefKpi icon="history" label="Просрочены повторные" tone="warning" value={0}
+        {/* Статуса просрочки в журнале нет: состояние только «подтверждён/ожидает».
+            Числа просрочек в данных нет — показываем «нет данных», а не ложный 0. */}
+        <RefKpi icon="history" label="Просрочены повторные" tone="warning" value="нет данных"
           detail="статус просрочки в журнале не ведётся" />
         <RefKpi icon="shift-start" label="Внеплановые за месяц" tone="warning" value={stats.unscheduled}
           detail="внеплановых инструктажей за период" />
@@ -501,12 +502,7 @@ export function BriefingsScreen(props: ReferenceUiProps) {
           </section>
 
           <section className={cn(card, 'p-3')}>
-            <div className="flex items-center justify-between gap-2">
-              <h2 className="text-sm font-semibold text-foreground">Шаблоны программ</h2>
-              <button type="button" className="text-2xs font-medium text-primary hover:underline">
-                Все шаблоны →
-              </button>
-            </div>
+            <h2 className="text-sm font-semibold text-foreground">Шаблоны программ</h2>
             <ul className="mt-2 grid gap-1.5">
               {PROGRAM_TEMPLATES.map((name) => (
                 <li key={name} className="flex items-center gap-2 text-xs text-foreground">
@@ -539,12 +535,7 @@ export function BriefingsScreen(props: ReferenceUiProps) {
       </p>
 
       <section className={cn(card, 'mt-2 p-3')}>
-        <div className="flex items-center justify-between gap-2">
-          <h2 className="text-sm font-semibold text-foreground">История изменений записи</h2>
-          <button type="button" className="text-2xs font-medium text-primary hover:underline">
-            Все события →
-          </button>
-        </div>
+        <h2 className="text-sm font-semibold text-foreground">История изменений записи</h2>
 
         {historyEvents.length === 0 ? (
           <p className="py-4 text-center text-xs text-muted-foreground">Событий за выбранный период нет.</p>

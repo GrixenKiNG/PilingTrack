@@ -13,10 +13,10 @@ import {
   FileText,
   HardHat,
   Image as ImageIcon,
+  Info,
   Pencil,
   Plus,
   Printer,
-  ShieldCheck,
   Trash2,
   UserRound,
   Wrench,
@@ -230,7 +230,7 @@ export function EvidenceReportRow({
         <ReportThumbnail reportId={report.reportId} mediaId={report.thumbnailMediaId ?? null} />
         <IconButton label="Показать в правой панели" onClick={() => onSelect(report)} icon={FileText} />
         <IconButton label="Предпросмотр PDF" onClick={() => onPreviewPdf(report)} icon={Eye} />
-        <IconButton label="Подробнее" onClick={() => onOpenDetails(report)} icon={ShieldCheck} />
+        <IconButton label="Подробнее" onClick={() => onOpenDetails(report)} icon={Info} />
         {onEdit && <IconButton label="Редактировать" onClick={() => onEdit(report)} icon={Pencil} />}
         {onDelete && <IconButton label="Удалить" onClick={() => onDelete(report)} icon={Trash2} danger disabled={deleting} />}
       </div>

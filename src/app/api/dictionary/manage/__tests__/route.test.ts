@@ -12,6 +12,8 @@ const { requireAuthMock, svc } = vi.hoisted(() => ({
     renameDictionaryItem: vi.fn(),
     deleteDictionaryItem: vi.fn(),
     setPileGradeLength: vi.fn(),
+    setPileGradeSection: vi.fn(),
+    setPileGradeNotes: vi.fn(),
   },
 }));
 const invalidateDictionaries = vi.hoisted(() => vi.fn());
@@ -116,6 +118,21 @@ describe('dictionary/manage route', () => {
   it('PATCH returns 400 with neither name nor isActive', async () => {
     requireAuthMock.mockResolvedValue(admin);
     expect((await PATCH(req('PATCH', { type: 'pileGrade', id: 'g1' }))).status).toBe(400);
+  });
+
+  // W67 (W62, находка 2): «Примечание» марки сваи принималось только при создании.
+  it('PATCH сохраняет примечание марки сваи', async () => {
+    requireAuthMock.mockResolvedValue(admin);
+    svc.setPileGradeNotes.mockResolvedValue({ id: 'g1' });
+    const res = await PATCH(req('PATCH', { type: 'pileGrade', id: 'g1', notes: 'для мостовых' }));
+    expect(res.status).toBe(200);
+    expect(svc.setPileGradeNotes).toHaveBeenCalledWith({ tenantId: 'tenant-a', actorId: 'a' }, 'g1', 'для мостовых');
+  });
+
+  it('PATCH не принимает примечание для не-марки', async () => {
+    requireAuthMock.mockResolvedValue(admin);
+    expect((await PATCH(req('PATCH', { type: 'drillingType', id: 't1', notes: 'x' }))).status).toBe(400);
+    expect(svc.setPileGradeNotes).not.toHaveBeenCalled();
   });
 
   it('DELETE maps the service 409 to HTTP 409', async () => {

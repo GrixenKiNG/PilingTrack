@@ -234,3 +234,27 @@ describe('AdminSites — текстовый поиск по объекту (R130
     expect(document.title).toBe('Объекты — PilingTrack');
   });
 });
+
+/**
+ * W75: кнопка «Пользователи» открывала назначение пользователей на объект —
+ * читалась как «список пользователей», а не как действие. Названа по действию.
+ */
+describe('AdminSites — кнопка назначения названа действием (W75)', () => {
+  beforeEach(() => {
+    authFetchMock.mockReset();
+    authFetchMock.mockResolvedValue(jsonResponse(200, { site: { id: 's1', crews: [] } }));
+    sitesData.current = {
+      sites: [site], setSites: vi.fn(), users: [], pileGrades: [],
+      loading: false, sitesError: null, reloadSites: vi.fn(),
+      loadingUsers: false, loadingPileGrades: false, loadUsers: vi.fn(), loadPileGrades: vi.fn(),
+    };
+    overview.current = { rows: [], loading: false, error: null, crewsError: false, reload: vi.fn() };
+  });
+
+  it('кнопка подписана «Назначить пользователей», а не «Пользователи»', async () => {
+    render(<AdminSites />);
+
+    expect(await screen.findByRole('button', { name: 'Назначить пользователей' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Пользователи' })).toBeNull();
+  });
+});

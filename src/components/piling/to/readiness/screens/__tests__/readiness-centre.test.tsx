@@ -475,8 +475,8 @@ describe('Роли: подсказка «что делать сейчас» (W61
  * W66: у шага должен быть свой проверяемый факт и понятный адрес. Оператору
  * карточка установки закрыта (нет `equipment.read`) и потому не даёт ссылку в
  * тупик; журнал заявок отдают только с `maintenance.manage`, поэтому без него
- * шаг механика «нет данных», а не «выполнено»; «Открыть смену» диспетчеру не
- * под силу — этот шаг помечен исполнителем и не загорается чужим событием.
+ * шаг механика «нет данных», а не «выполнено»; «Проверить, что смена открыта»
+ * диспетчеру не завести самому — шаг помечен исполнителем (W71).
  */
 describe('Шаги ролей: тупики и ложные «выполнено» (W66)', () => {
   const open = (label: string) =>
@@ -538,7 +538,7 @@ describe('Шаги ролей: тупики и ложные «выполнено
     expect(screen.queryByRole('button', { name: 'Приёмка: перейти' })).not.toBeInTheDocument();
   });
 
-  it('диспетчер: «Открыть смену» не загорается запуском смены и подписан исполнителем', () => {
+  it('диспетчер: «Проверить, что смена открыта» загорается открытой сменой и подписан исполнителем (W71)', () => {
     render(<ReadinessCentre {...propsFor({
       currentReadiness: [snapshot(true)],
       shifts: [startedShift()],
@@ -548,7 +548,7 @@ describe('Шаги ролей: тупики и ложные «выполнено
     const items = within(panel).getAllByRole('listitem');
 
     expect(within(items[1]).getByText('Выполнено')).toBeInTheDocument();
-    expect(within(items[2]).queryByText('Выполнено')).not.toBeInTheDocument();
+    expect(within(items[2]).getByText('Выполнено')).toBeInTheDocument();
     expect(within(items[2]).getByText('Выполняет оператор')).toBeInTheDocument();
   });
 
@@ -569,5 +569,80 @@ describe('Шаги ролей: тупики и ложные «выполнено
     const items = within(panel).getAllByRole('listitem');
 
     expect(within(items[2]).getByText('Выполнено')).toBeInTheDocument();
+  });
+});
+
+/**
+ * W71: шаг `D_SHIFT` диспетчера был всегда «не выполнен» (`done: false`) —
+ * смену заводит оператор или администратор, у диспетчера права `shift.manage`
+ * нет, и «3 из 3» он не набирал никогда. Отдельного факта про смену в
+ * `AuthoritativeReadinessFactsDto` нет, поэтому шаг — проверка: он загорается,
+ * когда по снимку смен установка открыта (`STARTED`/`HANDOVER_PENDING` — то же
+ * правило, по которому установка считается «в работе»), а исполнитель подписан
+ * в подсказке.
+ */
+describe('Диспетчер: третий шаг считается по открытой смене (W71)', () => {
+  const open = (label: string) =>
+    fireEvent.click(screen.getByRole('button', { name: `${label}: что делать сейчас` }));
+
+  const snapshot = (): CurrentReadinessDto => ({
+    snapshotId: 'snap-eq-1', equipmentId: 'eq-1', status: 'READY', verdict: 'ALLOWED', score: 90,
+    calculatedAt: '2026-10-01T06:00:00.000Z', ruleSetVersion: 'v1', triggerType: null,
+    blockers: [], warnings: [],
+    facts: { inspectionCompleted: true, inspectionProgress: 1, healthScore: 90, meterKnown: true, permitValid: true,
+      permitExpired: false, maintenanceConfigured: true, maintenanceOverdueHours: 0, maintenanceOverdueDays: 0,
+      accepted: true, criticalDefect: false, findings: 0 },
+    evidence: { equipmentId: 'eq-1', inspectionId: null, permitId: null, maintenanceRecordIds: [], evaluatedAt: '2026-10-01T06:00:00.000Z' },
+  });
+
+  const shift = (state: ReadinessShiftDto['state']): ReadinessShiftDto => ({
+    id: 'sh1', equipmentId: 'eq-1', type: 'DAY', state, productionDate: '2026-10-01',
+    timezone: 'Europe/Moscow', plannedStartAt: null, plannedEndAt: null, requestedAt: null,
+    declinedAt: null, declineReason: null, startedAt: '2026-10-01T06:00:00.000Z', closedAt: null,
+    version: 1, handovers: [],
+  });
+
+  const dispatcherCard = () => screen.getByRole('button', { name: 'Диспетчер: что делать сейчас' });
+
+  it('смены нет — третий шаг не выполнен, диспетчер не «3 из 3»', () => {
+    render(<ReadinessCentre {...propsFor({ currentReadiness: [snapshot()], shifts: [] })} />);
+
+    expect(within(dispatcherCard()).getByText('2/3 шагов')).toBeInTheDocument();
+    open('Диспетчер');
+    const items = within(screen.getByRole('region', { name: 'Что делать сейчас: Диспетчер' })).getAllByRole('listitem');
+    expect(within(items[2]).queryByText('Выполнено')).not.toBeInTheDocument();
+    expect(within(items[2]).getByText('Выполняет оператор')).toBeInTheDocument();
+  });
+
+  it('смена только заведена (PLANNED) — третий шаг не выполнен', () => {
+    render(<ReadinessCentre {...propsFor({ currentReadiness: [snapshot()], shifts: [shift('PLANNED')] })} />);
+    open('Диспетчер');
+    const items = within(screen.getByRole('region', { name: 'Что делать сейчас: Диспетчер' })).getAllByRole('listitem');
+
+    expect(within(items[2]).queryByText('Выполнено')).not.toBeInTheDocument();
+  });
+
+  it('смена открыта (STARTED) — третий шаг выполнен, диспетчер «3 из 3»', () => {
+    render(<ReadinessCentre {...propsFor({ currentReadiness: [snapshot()], shifts: [shift('STARTED')] })} />);
+
+    expect(within(dispatcherCard()).getByText('3/3 шагов')).toBeInTheDocument();
+    open('Диспетчер');
+    const items = within(screen.getByRole('region', { name: 'Что делать сейчас: Диспетчер' })).getAllByRole('listitem');
+    expect(within(items[2]).getByText('Выполнено')).toBeInTheDocument();
+  });
+
+  it('смена ждёт приёмки (HANDOVER_PENDING) — открыта, третий шаг выполнен', () => {
+    render(<ReadinessCentre {...propsFor({ currentReadiness: [snapshot()], shifts: [shift('HANDOVER_PENDING')] })} />);
+    open('Диспетчер');
+    const items = within(screen.getByRole('region', { name: 'Что делать сейчас: Диспетчер' })).getAllByRole('listitem');
+
+    expect(within(items[2]).getByText('Выполнено')).toBeInTheDocument();
+  });
+
+  it('шаг подписан: «Выполняет оператор — вы только проверяете»', () => {
+    render(<ReadinessCentre {...propsFor({ shifts: [] })} />);
+    open('Диспетчер');
+
+    expect(screen.getByText('Выполняет оператор — вы только проверяете.')).toBeInTheDocument();
   });
 });

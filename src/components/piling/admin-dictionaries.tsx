@@ -5,6 +5,7 @@ import { useDocumentTitle } from '@/components/piling/ops-shell';
 import { AlertCircle, AlertTriangle, Archive, Clock, Drill, Filter, HardHat, Plus, Ruler, Save, Search, X } from '@/components/piling/icons/unified-icons';
 import { toast } from 'sonner';
 import { authFetch } from '@/lib/api';
+import { parseDecimalInput } from '@/lib/parse-decimal';
 import { catchText, extractApiError } from '@/components/piling/admin-crews/crew-messages';
 import { normalizeSearch } from '@/components/piling/to/readiness/shared/text-search';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -94,7 +95,7 @@ export function AdminDictionaries() {
   const [confirmDelete, setConfirmDelete] = useState<{ kind: DictionaryKind; item: RegistryItem } | null>(null);
   const [saving, setSaving] = useState(false);
   const [selectedItem, setSelectedItem] = useState<RegistryItem | null>(null);
-  const [panelDraft, setPanelDraft] = useState<{ name: string; section: string; length: string } | null>(null);
+  const [panelDraft, setPanelDraft] = useState<{ name: string; section: string; length: string; notes: string } | null>(null);
   const [inspectorTab, setInspectorTab] = useState<'general' | 'history'>('general');
   const [history, setHistory] = useState<HistoryEntry[] | null>(null);
   const [historyFailed, setHistoryFailed] = useState(false);
@@ -228,7 +229,7 @@ export function AdminDictionaries() {
   // Selecting a row seeds the inline-edit draft for the inspector.
   const selectItem = (item: RegistryItem | null) => {
     setSelectedItem(item);
-    setPanelDraft(item ? { name: item.name, section: item.sectionOrDiameter || '', length: formatMetres(item.lengthMm) } : null);
+    setPanelDraft(item ? { name: item.name, section: item.sectionOrDiameter || '', length: formatMetres(item.lengthMm), notes: item.notes || '' } : null);
     setInspectorTab('general');
     setHistory(null);
   };
@@ -237,7 +238,8 @@ export function AdminDictionaries() {
     panelDraft.name.trim() !== selectedItem.name ||
     (selectedKind === 'pileGrade' && (
       panelDraft.section.trim() !== (selectedItem.sectionOrDiameter || '') ||
-      panelDraft.length.trim() !== formatMetres(selectedItem.lengthMm)
+      panelDraft.length.trim() !== formatMetres(selectedItem.lengthMm) ||
+      panelDraft.notes.trim() !== (selectedItem.notes || '')
     ))
   ));
 
@@ -252,6 +254,8 @@ export function AdminDictionaries() {
     if (selectedKind === 'pileGrade') {
       const section = panelDraft.section.trim();
       if (section !== (selectedItem.sectionOrDiameter || '')) payload.sectionOrDiameter = section || null;
+      const notes = panelDraft.notes.trim();
+      if (notes !== (selectedItem.notes || '')) payload.notes = notes;
       const lengthRaw = panelDraft.length.trim();
       if (!lengthRaw && selectedItem.lengthMm != null) {
         // Length is the single source for м.п. — clearing it would silently
@@ -260,8 +264,8 @@ export function AdminDictionaries() {
         return;
       }
       if (lengthRaw) {
-        const metres = Number(lengthRaw.replace(',', '.'));
-        if (!Number.isFinite(metres) || metres <= 0) { toast.error('Введите положительную длину в метрах'); return; }
+        const metres = parseDecimalInput(lengthRaw);
+        if (metres === null || metres <= 0) { toast.error('Введите положительную длину в метрах'); return; }
         const lengthMm = Math.round(metres * 1000);
         if (lengthMm !== selectedItem.lengthMm) payload.lengthMm = lengthMm;
         if (!confirmed && lengthChangesHistory(selectedItem, lengthMm)) {
@@ -285,6 +289,7 @@ export function AdminDictionaries() {
         ...selectedItem,
         ...(payload.name !== undefined ? { name: payload.name as string } : {}),
         ...(payload.sectionOrDiameter !== undefined ? { sectionOrDiameter: payload.sectionOrDiameter as string | null } : {}),
+        ...(payload.notes !== undefined ? { notes: payload.notes as string } : {}),
         ...(payload.lengthMm !== undefined ? { lengthMm: payload.lengthMm as number } : {}),
       });
       await loadData();
@@ -385,8 +390,8 @@ export function AdminDictionaries() {
 
   const saveLength = async (confirmed = false) => {
     if (!lengthState) return;
-    const metres = Number(lengthState.value.replace(',', '.'));
-    if (!Number.isFinite(metres) || metres <= 0) {
+    const metres = parseDecimalInput(lengthState.value);
+    if (metres === null || metres <= 0) {
       toast.error('Введите положительную длину в метрах');
       return;
     }
@@ -446,7 +451,7 @@ export function AdminDictionaries() {
       <div className="min-w-0 space-y-4">
       <header className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div><h1 className="text-3xl font-bold tracking-tight text-foreground">Справочники</h1><p className="mt-1 text-sm text-muted-foreground">Рабочие значения вашей организации для отчётов и планирования</p></div>
-        <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center"><div className="relative min-w-0 sm:w-80"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Поиск по справочникам" aria-label="Поиск по справочникам" className="h-12 pl-9 pr-16" /><kbd className="pointer-events-none absolute right-3 top-1/2 hidden -translate-y-1/2 rounded border border-border bg-muted px-1.5 py-0.5 text-2xs font-medium text-muted-foreground sm:block">Ctrl + K</kbd></div><div className="relative w-full sm:w-auto"><Filter className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><select aria-label="Статус" value={filter} onChange={(event) => setFilter(event.target.value as StatusFilter)} className="h-12 w-full rounded-md border border-border bg-card py-0 pl-9 pr-3 text-sm sm:w-auto"><option value="active">Активные / Архив / Все</option><option value="archived">Архив</option><option value="all">Все</option></select></div><Button aria-label={activeDictionary.addLabel} className="h-12 w-full bg-signal text-white hover:bg-signal-strong sm:w-auto" onClick={() => setForm({ mode: 'create', kind: activeKind })}><Plus className="h-4 w-4" />Добавить</Button></div>
+        <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center"><div className="relative min-w-0 sm:w-80"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Поиск по справочникам" aria-label="Поиск по справочникам" className="h-12 pl-9 pr-16" /><kbd className="pointer-events-none absolute right-3 top-1/2 hidden -translate-y-1/2 rounded border border-border bg-muted px-1.5 py-0.5 text-2xs font-medium text-muted-foreground sm:block">Ctrl + K</kbd></div><div className="relative w-full sm:w-auto"><Filter className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><select aria-label="Статус" value={filter} onChange={(event) => setFilter(event.target.value as StatusFilter)} className="h-12 w-full rounded-md border border-border bg-card py-0 pl-9 pr-3 text-sm sm:w-auto"><option value="active">Активные</option><option value="archived">Архив</option><option value="all">Все</option></select></div><Button aria-label={activeDictionary.addLabel} className="h-12 w-full bg-signal text-white hover:bg-signal-strong sm:w-auto" onClick={() => setForm({ mode: 'create', kind: activeKind })}><Plus className="h-4 w-4" />{activeDictionary.addLabel}</Button></div>
       </header>
 
       {loadError ? (
@@ -571,6 +576,9 @@ export function AdminDictionaries() {
                 <span>Погонные метры считаются от этой длины. Если её изменить, цифры в уже сданных отчётах ({selectedItem.reportCount}) и в аналитике за прошлые периоды станут другими.</span>
               </p>
             )}
+          </label>
+          <label className="block"><span className="text-muted-foreground">Примечание</span>
+            <Input aria-label="Примечание" value={panelDraft?.notes ?? ''} maxLength={500} placeholder="Например: для мостовых свай" onChange={(event) => setPanelDraft((draft) => draft && ({ ...draft, notes: event.target.value }))} className="mt-1 h-11" />
           </label>
           </> : (selectedItem.code ? <div><span className="text-muted-foreground">Код</span><div className="mt-1 rounded-md border border-border bg-muted p-2 font-medium text-foreground">{selectedItem.code}</div></div> : null)}
           </div>

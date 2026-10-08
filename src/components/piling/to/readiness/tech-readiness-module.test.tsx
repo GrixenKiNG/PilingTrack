@@ -1,8 +1,11 @@
 import { render, screen } from '@testing-library/react';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { TechReadinessModule } from './tech-readiness-module';
-import { MODULE_TABS } from './module-tab-list';
 import { bootstrapEnvelope } from './api/__tests__/fixtures';
+
+// Утверждённое число вкладок модуля — в тесте, а не через `MODULE_TABS`:
+// сверка с той же константой, которую рендерит компонент, проходит впустую.
+const APPROVED_TAB_COUNT = 6;
 
 beforeAll(() => {
   Element.prototype.scrollIntoView = vi.fn();
@@ -33,7 +36,7 @@ describe('TechReadinessModule', () => {
       </TechReadinessModule>,
     );
 
-    expect(screen.getAllByRole('tab')).toHaveLength(MODULE_TABS.length);
+    expect(screen.getAllByRole('tab')).toHaveLength(APPROVED_TAB_COUNT);
     expect(screen.getByRole('tabpanel', { name: 'Центр готовности' })).toContainElement(
       screen.getByText('Рабочая область'),
     );
@@ -46,7 +49,9 @@ describe('TechReadinessModule', () => {
       'data-scroll-region',
       'module-tabs',
     );
-    expect(root.innerHTML).not.toMatch(/100vh-|min-w-\[(?:1280|1440)px\]/);
+    // Страх отката: ни одной жёсткой ширины/высоты экрана — любая
+    // `min-w-[NNNpx]` или `h-screen`, а не только два прежних числа.
+    expect(root.innerHTML).not.toMatch(/100vh|h-screen|min-w-\[\d+px\]/);
   });
 
   it('keeps every tab visible when the active feature is scoped off', () => {
@@ -59,7 +64,7 @@ describe('TechReadinessModule', () => {
         <div>Смены</div>
       </TechReadinessModule>,
     );
-    expect(screen.getAllByRole('tab')).toHaveLength(MODULE_TABS.length);
+    expect(screen.getAllByRole('tab')).toHaveLength(APPROVED_TAB_COUNT);
     expect(screen.getByText('Смены включаются поэтапно.')).toBeInTheDocument();
   });
 

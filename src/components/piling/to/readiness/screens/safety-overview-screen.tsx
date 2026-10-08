@@ -232,10 +232,10 @@ export function SafetyOverviewScreen(props: ReferenceUiProps) {
         <RefKpi icon="risk" label="Просроченные инструктажи" tone="danger"
           value={totals?.briefingsOverdue ?? '—'} alert={Boolean(totals?.briefingsOverdue)}
           detail="повторный не проведён в срок" />
-        <RefKpi icon="documents" label="Ожидают ознакомления" tone="warning"
+        <RefKpi icon="documents" label="Не прочитали инструкцию" tone="warning"
           value={totals?.awaitingAcquaintance ?? '—'}
           detail="с действующей редакцией инструкции" />
-        <RefKpi icon="accepted" label="Ожидают подтверждения" tone="info" value={awaiting ?? '—'}
+        <RefKpi icon="accepted" label="Нет двух подписей" tone="info" value={awaiting ?? '—'}
           detail="записей журнала без двух отметок" />
         <RefKpi icon="accepted" label="Назначены проверки знаний" tone="info"
           value={totals?.knowledgeOverdue ?? '—'} alert={Boolean(totals?.knowledgeOverdue)}

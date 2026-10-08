@@ -288,10 +288,19 @@ describe('проверка знаний', () => {
   });
 
   it('два набора подряд не совпадают', () => {
-    const first = buildAttempt().map((question) => question.id).join(',');
-    const second = buildAttempt().map((question) => question.id).join(',');
-    const third = buildAttempt().map((question) => question.id).join(',');
-    expect(new Set([first, second, third]).size).toBeGreaterThan(1);
+    // Источник случайности задан явно: наборы собираются заново, а не берутся
+    // из готовой константы. Тот же источник — тот же набор (сборка без скрытого
+    // состояния), другой источник — другой набор.
+    const sequence = (values: number[]) => {
+      let index = 0;
+      return () => values[index++ % values.length];
+    };
+    const first = buildAttempt(sequence([0.12, 0.94, 0.31, 0.77, 0.55, 0.2])).map((q) => q.id);
+    const second = buildAttempt(sequence([0.93, 0.11, 0.72, 0.35, 0.26, 0.58])).map((q) => q.id);
+
+    expect(first).not.toEqual(second);
+    expect(buildAttempt(sequence([0.12, 0.94, 0.31, 0.77, 0.55, 0.2])).map((q) => q.id))
+      .toEqual(first);
   });
 
   it('итог считает сервер по своему банку', () => {
@@ -307,7 +316,10 @@ describe('проверка знаний', () => {
 
   it('у каждого вопроса верный вариант существует', () => {
     for (const question of KNOWLEDGE_BANK) {
-      expect(question.options[question.correct]).toBeTruthy();
+      expect(Number.isInteger(question.correct)).toBe(true);
+      expect(question.correct).toBeGreaterThanOrEqual(0);
+      expect(question.correct).toBeLessThan(question.options.length);
+      expect(question.options[question.correct].length).toBeGreaterThan(0);
     }
   });
 });

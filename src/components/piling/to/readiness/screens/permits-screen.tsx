@@ -240,7 +240,7 @@ export function PermitsScreen(props: ReferenceUiProps) {
             { title: 'Место работ', icon: 'site' as PilingIconName, state: props.crews.some((crew) => crew.isActive && crew.site) ? 'pass' : 'missing', lines: [`Объектов: ${new Set(props.crews.flatMap((crew) => crew.site?.id ? [crew.site.id] : [])).size}`,
               // Подтверждения схемы площадки в системе нет — не делаем вид, что есть.
               `Экипажей без объекта: ${props.crews.filter((crew) => crew.isActive && !crew.site).length}`] },
-            { title: 'Документы', icon: 'documents' as PilingIconName, state: pending > 0 ? 'warning' : authoritativeUnknown ? 'missing' : 'pass', lines: [authoritativeUnknown ? 'Регламент ТО соблюдён: не проверено — авторитетный снимок недоступен' : `Регламент ТО соблюдён: ${maintenanceOkCount} из ${props.equipment.length}`, pending > 0 ? `Ожидают: ${pending}` : 'Решения подтверждены'] },
+            { title: 'Обслуживание (ТО)', icon: 'documents' as PilingIconName, state: pending > 0 ? 'warning' : authoritativeUnknown ? 'missing' : 'pass', lines: [authoritativeUnknown ? 'Регламент ТО соблюдён: не проверено — авторитетный снимок недоступен' : `Регламент ТО соблюдён: ${maintenanceOkCount} из ${props.equipment.length}`, pending > 0 ? `Ожидают: ${pending}` : 'Решения подтверждены'] },
           ].map((item) => (
             <article key={item.title} className="rounded-lg border border-border p-2">
               <div className="flex items-center gap-2"><span className="grid h-8 w-8 place-items-center rounded-lg bg-info/10 text-info-strong"><PilingIcon name={item.icon} size={12} decorative /></span><div className="min-w-0 flex-1"><h3 className="text-xs font-bold">{item.title}</h3><EvidenceState state={item.state} /></div></div>

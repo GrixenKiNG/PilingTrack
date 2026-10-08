@@ -3,6 +3,7 @@ import { Loader2 } from '@/components/piling/icons/unified-icons';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { parseDecimalInput } from '@/lib/parse-decimal';
 import type { DictionaryKind, RegistryItem } from './dictionary-table';
 
 /*
@@ -12,6 +13,14 @@ import type { DictionaryKind, RegistryItem } from './dictionary-table';
 */
 const MAX_NAME_LENGTH = 100;
 const MAX_LENGTH_MM = 1_000_000;
+
+/* Заголовок диалога называет предмет: на вкладке «Сваи» ждут «марку сваи»,
+   а не безликий «элемент» (W72 №15). */
+const DIALOG_TITLE: Record<DictionaryKind, { create: string; rename: string }> = {
+  pileGrade: { create: 'Новая марка сваи', rename: 'Переименовать марку сваи' },
+  drillingType: { create: 'Новый тип бурения', rename: 'Переименовать тип бурения' },
+  downtimeReason: { create: 'Новая причина простоя', rename: 'Переименовать причину простоя' },
+};
 
 export interface DictionaryFormValue {
   name: string;
@@ -39,9 +48,9 @@ export function DictionaryForm({ mode, kind, item, saving, onClose, onSubmit }: 
   const [sectionOrDiameter, setSectionOrDiameter] = useState(item?.sectionOrDiameter || '');
   const [notes, setNotes] = useState(item?.notes || '');
   const isPileCreate = mode === 'create' && kind === 'pileGrade';
-  const parsedLength = Number(lengthMetres.replace(',', '.'));
+  const parsedLength = parseDecimalInput(lengthMetres);
   const lengthValid = !isPileCreate
-    || (lengthMetres.trim() !== '' && parsedLength > 0 && Math.round(parsedLength * 1000) <= MAX_LENGTH_MM);
+    || (parsedLength !== null && parsedLength > 0 && Math.round(parsedLength * 1000) <= MAX_LENGTH_MM);
   const valid = name.trim().length > 0 && lengthValid;
 
   const submit = () => {
@@ -50,7 +59,7 @@ export function DictionaryForm({ mode, kind, item, saving, onClose, onSubmit }: 
       name: name.trim(),
       ...(isPileCreate ? {
         code: code.trim() || name.trim(),
-        lengthMm: Math.round(parsedLength * 1000),
+        lengthMm: Math.round((parsedLength ?? 0) * 1000),
         sectionOrDiameter: sectionOrDiameter.trim(),
         notes: notes.trim(),
       } : {}),
@@ -61,7 +70,7 @@ export function DictionaryForm({ mode, kind, item, saving, onClose, onSubmit }: 
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent aria-describedby={undefined} className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{mode === 'create' ? 'Добавить элемент' : 'Переименовать элемент'}</DialogTitle>
+          <DialogTitle>{DIALOG_TITLE[kind][mode]}</DialogTitle>
         </DialogHeader>
         <div className="grid gap-3 py-1">
           <label className="grid gap-1.5 text-sm font-medium text-foreground">

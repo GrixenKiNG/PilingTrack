@@ -2,11 +2,25 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { useState } from 'react';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import type { ReferenceView } from '../readiness-reference-ui';
-import { MODULE_TABS, ModuleTabList } from './module-tab-list';
+import { ModuleTabList } from './module-tab-list';
 
 beforeAll(() => {
   Element.prototype.scrollIntoView = vi.fn();
 });
+
+/**
+ * Утверждённый порядок и состав вкладок модуля зафиксирован в тесте списком, а
+ * не длиной `MODULE_TABS`: иначе правка константы (перестановка, лишняя или
+ * пропавшая вкладка) прошла бы молча — тест сверялся бы сам с собой.
+ */
+const APPROVED_TABS = [
+  'Центр готовности',
+  'Готовность парка',
+  'Смены',
+  'Обслуживание ТО',
+  'Отчёты',
+  'Настройки',
+];
 
 function ControlledTabs() {
   const [activeView, setActiveView] = useState<ReferenceView>('readiness');
@@ -14,16 +28,12 @@ function ControlledTabs() {
 }
 
 describe('ModuleTabList', () => {
-  // Восьмая вкладка — «Документы» (контроль сроков документов работников,
-  // роль диспетчера в утверждённом порядке). Длина сверяется с MODULE_TABS, а
-  // не с числом в тесте: смысл проверки — порядок и полнота списка, а не то,
-  // что вкладок ровно семь навсегда.
   it('renders the module tab contract in the approved order', () => {
     render(<ControlledTabs />);
 
     const tabs = screen.getAllByRole('tab');
-    expect(tabs).toHaveLength(MODULE_TABS.length);
-    expect(tabs.map((tab) => tab.textContent)).toEqual(MODULE_TABS.map((tab) => tab.label));
+    expect(tabs).toHaveLength(APPROVED_TABS.length);
+    expect(tabs.map((tab) => tab.textContent)).toEqual(APPROVED_TABS);
     expect(tabs[0]).toHaveAttribute('aria-selected', 'true');
     expect(tabs[0]).toHaveAttribute('aria-controls', 'view-panel-readiness');
   });

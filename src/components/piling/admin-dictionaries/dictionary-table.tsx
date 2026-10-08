@@ -138,32 +138,32 @@ export function DictionaryTable({
                 title={used ? 'Используемое значение нельзя переименовать' : 'Переименовать'}
                 disabled={used}
                 onClick={() => onRename(item)}
-                className="flex min-h-11 items-center justify-center rounded-lg text-muted-foreground enabled:hover:bg-card enabled:hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-info/30 disabled:cursor-not-allowed disabled:opacity-35"
-              ><Pencil className="h-4 w-4" /></button>
+                className="flex min-h-11 flex-col items-center justify-center gap-0.5 rounded-lg text-muted-foreground enabled:hover:bg-card enabled:hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-info/30 disabled:cursor-not-allowed disabled:opacity-35"
+              ><Pencil className="h-4 w-4" /><span className="text-3xs leading-tight">Переименовать</span></button>
               {isPileGrade ? (
                 <button
                   type="button"
                   aria-label={`Изменить длину ${item.name}`}
                   title="Изменить длину"
                   onClick={() => onLength(item)}
-                  className="flex min-h-11 items-center justify-center rounded-lg text-muted-foreground hover:bg-card hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-info/30"
-                ><Ruler className="h-4 w-4" /></button>
+                  className="flex min-h-11 flex-col items-center justify-center gap-0.5 rounded-lg text-muted-foreground hover:bg-card hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-info/30"
+                ><Ruler className="h-4 w-4" /><span className="text-3xs leading-tight">Длина</span></button>
               ) : <span aria-hidden />}
               <button
                 type="button"
                 aria-label={`${item.isActive ? 'Архивировать' : 'Восстановить'} ${item.name}`}
                 title={item.isActive ? 'Архивировать' : 'Восстановить'}
                 onClick={() => onStatus(item, !item.isActive)}
-                className="flex min-h-11 items-center justify-center rounded-lg text-muted-foreground hover:bg-card hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-info/30"
-              >{item.isActive ? <Archive className="h-4 w-4" /> : <RotateCcw className="h-4 w-4" />}</button>
+                className="flex min-h-11 flex-col items-center justify-center gap-0.5 rounded-lg text-muted-foreground hover:bg-card hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-info/30"
+              >{item.isActive ? <Archive className="h-4 w-4" /> : <RotateCcw className="h-4 w-4" />}<span className="text-3xs leading-tight">{item.isActive ? 'В архив' : 'Восстановить'}</span></button>
               <button
                 type="button"
                 aria-label={`Удалить ${item.name}`}
                 title={used ? 'Используемое значение можно только архивировать' : 'Удалить навсегда'}
                 disabled={used}
                 onClick={() => onDelete(item)}
-                className="flex min-h-11 items-center justify-center rounded-lg text-destructive-strong enabled:hover:bg-destructive/10 enabled:hover:text-destructive-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive/30 disabled:cursor-not-allowed disabled:text-muted-foreground disabled:opacity-35"
-              ><Trash2 className="h-4 w-4" /></button>
+                className="flex min-h-11 flex-col items-center justify-center gap-0.5 rounded-lg text-destructive-strong enabled:hover:bg-destructive/10 enabled:hover:text-destructive-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive/30 disabled:cursor-not-allowed disabled:text-muted-foreground disabled:opacity-35"
+              ><Trash2 className="h-4 w-4" /><span className="text-3xs leading-tight">Удалить</span></button>
             </div>
           </article>
         );

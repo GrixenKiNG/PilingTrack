@@ -341,7 +341,7 @@ export function AdminSites() {
           getRowId={(r) => r.siteId}
           activeId={active?.siteId ?? null}
           onRowSelect={(r) => setActiveId(r.siteId)}
-          empty={<OpsTableEmpty icon={MapPin} title="Объекты не найдены" hint="Измените быстрый фильтр." />}
+          empty={<OpsTableEmpty icon={MapPin} title={allRows.length === 0 ? 'Объектов пока нет' : 'Объекты не найдены'} hint={allRows.length === 0 ? 'Заведите первый кнопкой «Новый объект».' : 'Измените быстрый фильтр.'} />}
         />
       </OpsPage>
 
@@ -452,7 +452,7 @@ function SiteDetail({
     <OpsDetailPanel title={row.siteName} subtitle={`Объект · ${row.totalReports} ${pluralizeRu(row.totalReports, ['отчёт', 'отчёта', 'отчётов'])}`} status={<OpsRiskBadge level={risk.level} label={risk.label} />}>
       {canManage && <div className="flex flex-wrap gap-2">
         <Button size="sm" variant="outline" onClick={onEdit} className="h-11 text-xs sm:h-8"><Pencil className="mr-1 h-3.5 w-3.5" />Редактировать</Button>
-        <Button size="sm" variant="outline" onClick={onAssign} className="h-11 text-xs sm:h-8"><UserPlus className="mr-1 h-3.5 w-3.5" />Пользователи</Button>
+        <Button size="sm" variant="outline" onClick={onAssign} className="h-11 text-xs sm:h-8"><UserPlus className="mr-1 h-3.5 w-3.5" />Назначить пользователей</Button>
         <Button size="sm" variant="outline" onClick={onToggleCompleted} disabled={completingId === row.siteId} className="h-11 text-xs sm:h-8"><CheckCircle2 className="mr-1 h-3.5 w-3.5" />{completed ? 'Снять «Выполнен»' : 'Выполнен'}</Button>
         <Button size="sm" variant="outline" onClick={onToggleActive} disabled={togglingId === row.siteId} className="h-11 text-xs sm:h-8">{row.isActive ? <PowerOff className="mr-1 h-3.5 w-3.5" /> : <Power className="mr-1 h-3.5 w-3.5" />}{row.isActive ? 'Деактивировать' : 'Активировать'}</Button>
         <Button size="sm" variant="outline" onClick={onDelete} className="h-11 text-xs text-destructive-strong hover:bg-destructive/10 sm:h-8"><Trash2 className="mr-1 h-3.5 w-3.5" />Удалить навсегда</Button>
@@ -525,7 +525,7 @@ function SiteCrewBoard({ crews, error }: { crews?: SiteCrew[]; error?: boolean }
       </h3>
 
       {crews === undefined && error ? (
-        <p className="text-2xs text-destructive-strong">Не удалось загрузить состав бригад — повторите в блоке «Иерархия».</p>
+        <p className="text-2xs text-destructive-strong">Состав бригад не загрузился — обновите страницу.</p>
       ) : null}
       {crews === undefined && !error ? <p className="text-2xs text-muted-foreground">Загрузка…</p> : null}
       {crews?.length === 0 ? (
