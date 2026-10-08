@@ -25,10 +25,11 @@ interface IntegrationsSettingsProps {
 }
 
 const DEVICE_STATUS_LABEL: Record<string, string> = {
-  ONLINE: 'На связи',
+  PROVISIONED: 'Ожидает подключения',
   ACTIVE: 'На связи',
+  DEGRADED: 'Связь с перебоями',
   OFFLINE: 'Нет связи',
-  INACTIVE: 'Отключено',
+  ARCHIVED: 'Архив',
 };
 
 export function IntegrationsSettings({ devices, bootstrap }: IntegrationsSettingsProps) {
@@ -49,7 +50,7 @@ export function IntegrationsSettings({ devices, bootstrap }: IntegrationsSetting
     return () => { active = false; };
   }, []);
 
-  const online = devices.filter((device) => device.status === 'ONLINE' || device.status === 'ACTIVE');
+  const online = devices.filter((device) => device.status === 'ACTIVE');
   const telegramReady = (telegramCount ?? 0) > 0;
 
   /**
