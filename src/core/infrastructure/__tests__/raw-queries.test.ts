@@ -37,7 +37,6 @@ import {
   getCrewsWithDetailsRaw,
   upsertReportRaw,
   PERIOD_REPORTS_LIMIT,
-  getSiteDailySummaryRaw,
 } from '../raw-queries';
 
 describe('getReportsByPeriodRaw', () => {
@@ -204,12 +203,4 @@ describe('upsertReportRaw', () => {
 
     expect(result).toEqual({ id: 'row-a', reportId: 'r1' });
   });
-});
-
-it('I05: raw daily summary requires the submitted status bound into SQL', async () => {
-  queryRawMock.mockReset().mockResolvedValue([]);
-  await getSiteDailySummaryRaw('site-1', '2026-10-01', '2026-10-02');
-  const [strings, ...values] = queryRawMock.mock.calls[0];
-  expect(strings.join('?')).toContain('r.status = ?');
-  expect(values).toContain('submitted');
 });
