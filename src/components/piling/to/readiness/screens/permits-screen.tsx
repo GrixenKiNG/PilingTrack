@@ -49,6 +49,9 @@ export function PermitsScreen(props: ReferenceUiProps) {
   const [composing, setComposing] = useState(false);
   const [permitQuery, setPermitQuery] = useState('');
   const [permitFilter, setPermitFilter] = useState<'ALL' | 'APPROVED' | 'PENDING_APPROVAL' | 'OVERDUE'>('ALL');
+  // Ссылка с дашборда («Требует решения сейчас») открывает сразу просроченные.
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- initial filter comes from the URL deep link
+  useEffect(() => { if (new URLSearchParams(window.location.search).get('filter') === 'overdue') setPermitFilter('OVERDUE'); }, []);
   /*
     Диалог остался только для решений по существующему наряду: отправить,
     согласовать, отозвать. Создание переехало в полноэкранную форму — прежнее

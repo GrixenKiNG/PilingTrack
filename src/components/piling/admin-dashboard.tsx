@@ -38,6 +38,7 @@ import { daysUntil, formatCountMeters, formatNumber } from '@/lib/format';
 import { getTodayInTimezone } from '@/lib/timezone';
 import { useMinSkeletonDuration } from '@/components/piling/async-ui';
 import { Skeleton } from '@/components/ui/skeleton';
+import { DashboardAttention } from '@/components/piling/dashboard-attention';
 import { computeDashboardKpis } from '@/components/piling/dashboard-kpis';
 import { formatDowntimeHours } from '@/lib/downtime-hours';
 import { useMainDashboardLayout } from '@/components/piling/main-dashboard/dashboard-layout';
@@ -305,6 +306,10 @@ export function AdminDashboard() {
     }),
     [visibleRisks],
   );
+  const equipmentName = useCallback(
+    (id: string) => fleet?.equipment.find((item) => item.id === id)?.name ?? 'Установка',
+    [fleet],
+  );
   const planRows = useMemo(() => sites.slice(0, 4), [sites]);
   const fleetRows = useMemo(() => visibleFleet.slice(0, 6), [visibleFleet]);
   // Процент выполнения — накопительный (с начала объекта), а не за период:
@@ -548,6 +553,8 @@ export function AdminDashboard() {
           </Section>
         </div>
 
+        <div className="space-y-3">
+        <DashboardAttention equipmentName={equipmentName} refreshKey={sitesAttempt} />
         <Section icon={AlertTriangle} title="Риски дня" count={visibleRisks.length} dominant>
           {visibleRisks.length === 0 ? (
             (stale.fleet || stale.maint || stale.recent)
@@ -565,6 +572,7 @@ export function AdminDashboard() {
             </div>
           )}
         </Section>
+        </div>
       </div>
     </div>
   );
