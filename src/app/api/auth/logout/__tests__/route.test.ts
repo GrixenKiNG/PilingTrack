@@ -26,7 +26,8 @@ vi.mock('@/lib/csrf-protection', () => ({ withCsrf: () => null }));
 vi.mock('@/services/auth/session-service', () => ({ readSessionToken: readMock, revokeSessionToken: revokeMock }));
 vi.mock('@/lib/store', () => ({ usePilingStore: { getState: () => ({ logout: localLogoutMock }) } }));
 vi.mock('sonner', () => ({ toast: { error: toastMock } }));
-import { logoutClient } from '@/lib/api';
+vi.mock('@/lib/client-feedback', () => ({ pushClientFeedback: vi.fn() }));
+import { authFetch, logoutClient, probeSession } from '@/lib/api';
 afterEach(() => vi.unstubAllGlobals());
 import { POST } from '../route';
 
@@ -98,5 +99,50 @@ describe('POST /api/auth/logout', () => {
     expect(auditMock).not.toHaveBeenCalled();
     // Must still produce the cookie-clearing response.
     expect(createLogoutMock).toHaveBeenCalledWith('req-123');
+  });
+});
+
+describe('X1: bounded client requests', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.stubGlobal('fetch', vi.fn((_url: string, options: RequestInit) => new Promise<Response>((_resolve, reject) => {
+      options.signal?.addEventListener('abort', () => reject(options.signal?.reason), { once: true });
+    })));
+  });
+  afterEach(() => vi.useRealTimers());
+
+  it('a hanging session probe becomes unknown after 20 seconds', async () => {
+    const pending = probeSession();
+    await vi.advanceTimersByTimeAsync(20_000);
+    expect(await pending).toEqual({ status: 'unknown' });
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('a hanging report request rejects with a readable message', async () => {
+    const pending = expect(authFetch('/api/reports/upsert', { method: 'POST', body: '{}' }))
+      .rejects.toThrow('Нет связи. Проверьте сеть и повторите');
+    await vi.advanceTimersByTimeAsync(20_000);
+    await pending;
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('file uploads have a longer deadline', async () => {
+    const body = new FormData();
+    body.append('file', new Blob(['photo']), 'photo.jpg');
+    const pending = expect(authFetch('/api/media/upload', { method: 'POST', body }))
+      .rejects.toThrow('Нет связи. Проверьте сеть и повторите');
+    await vi.advanceTimersByTimeAsync(20_000);
+    expect(vi.mocked(fetch).mock.calls[0][1]?.signal?.aborted).toBe(false);
+    await vi.advanceTimersByTimeAsync(100_000);
+    await pending;
+  });
+
+  it('preserves external cancellation and clears its timer', async () => {
+    const external = new AbortController();
+    const cause = new DOMException('Leaving page', 'AbortError');
+    const pending = expect(authFetch('/api/sites', { signal: external.signal })).rejects.toBe(cause);
+    external.abort(cause);
+    await pending;
+    expect(vi.getTimerCount()).toBe(0);
   });
 });

@@ -3,6 +3,33 @@ import { usePilingStore } from '@/lib/store';
 import { pushClientFeedback } from '@/lib/client-feedback';
 import type { UserRole } from '@/lib/types';
 
+// Short JSON requests: 20 s, matching operator-mobile. Uploads need more time
+// on field networks. Use a controller so older Safari and caller cancellation
+// work without AbortSignal.any/timeout, and every timer can be cleaned up.
+async function fetchWithTimeout(url: string, options: RequestInit): Promise<Response> {
+  const controller = new AbortController();
+  const external = options.signal;
+  const isUpload = (typeof FormData !== 'undefined' && options.body instanceof FormData)
+    || (typeof Blob !== 'undefined' && options.body instanceof Blob);
+  let timedOut = false;
+  const timer = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, isUpload ? 120_000 : 20_000);
+  const cancel = () => controller.abort(external?.reason);
+  if (external?.aborted) cancel();
+  else external?.addEventListener('abort', cancel, { once: true });
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } catch (error) {
+    if (timedOut) throw new Error('Нет связи. Проверьте сеть и повторите');
+    throw error;
+  } finally {
+    clearTimeout(timer);
+    external?.removeEventListener('abort', cancel);
+  }
+}
+
 function buildHeaders(options: RequestInit) {
   const headers = new Headers(options.headers || {});
   const body = options.body;
@@ -29,7 +56,7 @@ function buildHeaders(options: RequestInit) {
 export async function authFetch(url: string, options: RequestInit = {}): Promise<Response> {
   let res: Response;
   try {
-    res = await fetch(url, {
+    res = await fetchWithTimeout(url, {
       ...options,
       headers: buildHeaders(options),
       credentials: 'same-origin',
@@ -56,7 +83,7 @@ export async function authFetch(url: string, options: RequestInit = {}): Promise
 
   if (res.status === 401) {
     try {
-      await fetch('/api/auth/logout', {
+      await fetchWithTimeout('/api/auth/logout', {
         method: 'POST',
         credentials: 'same-origin',
       });
@@ -135,7 +162,7 @@ export async function loadJson<T>(url: string, options: RequestInit = {}): Promi
 
 export async function logoutClient() {
   try {
-    const response = await fetch('/api/auth/logout', {
+    const response = await fetchWithTimeout('/api/auth/logout', {
       method: 'POST',
       credentials: 'same-origin',
     });
@@ -176,7 +203,7 @@ export type SessionProbe =
 export async function probeSession(): Promise<SessionProbe> {
   let res: Response;
   try {
-    res = await fetch('/api/auth/me', { credentials: 'same-origin' });
+    res = await fetchWithTimeout('/api/auth/me', { credentials: 'same-origin' });
   } catch {
     return { status: 'unknown' };
   }
