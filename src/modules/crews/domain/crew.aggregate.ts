@@ -31,10 +31,10 @@ export class CrewAggregate {
   }
 
   static create(data: CrewCreateData, userId?: string): CrewAggregate {
-    if (!data.name) throw new Error('Crew name is required');
-    if (!data.operatorId) throw new Error('Operator is required');
-    if (!data.equipmentId) throw new Error('Equipment is required');
-    if (!data.siteId) throw new Error('Site is required');
+    if (!data.name) throw new Error('Укажите название бригады');
+    if (!data.operatorId) throw new Error('Выберите машиниста');
+    if (!data.equipmentId) throw new Error('Выберите установку');
+    if (!data.siteId) throw new Error('Выберите объект');
 
     const now = new Date().toISOString();
     const state: CrewInfo = {
@@ -67,7 +67,7 @@ export class CrewAggregate {
 
   update(data: { name?: string }, userId?: string): void {
     if (data.name !== undefined) {
-      if (data.name.trim().length < 1) throw new Error('Crew name cannot be empty');
+      if (data.name.trim().length < 1) throw new Error('Название бригады не может быть пустым');
       this.state.name = data.name.trim();
     }
     this.state.updatedAt = new Date().toISOString();
@@ -105,7 +105,7 @@ export class CrewAggregate {
   }
 
   deactivate(userId?: string): void {
-    if (!this.state.isActive) throw new Error('Crew is already deactivated');
+    if (!this.state.isActive) throw new Error('Бригада уже расформирована');
     this.state.isActive = false;
     this.state.updatedAt = new Date().toISOString();
 
@@ -115,7 +115,7 @@ export class CrewAggregate {
   }
 
   reactivate(userId?: string): void {
-    if (this.state.isActive) throw new Error('Crew is already active');
+    if (this.state.isActive) throw new Error('Бригада уже активна');
     this.state.isActive = true;
     this.state.updatedAt = new Date().toISOString();
 

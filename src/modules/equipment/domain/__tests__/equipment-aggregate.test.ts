@@ -41,13 +41,13 @@ describe('EquipmentAggregate', () => {
 
     it('should throw when name is empty', () => {
       expect(() => EquipmentAggregate.create({ name: '', tenantId: 'orion' })).toThrow(
-        'Equipment name is required'
+        'Укажите название установки'
       );
     });
 
     it('should throw when name is whitespace only', () => {
       expect(() => EquipmentAggregate.create({ name: '   ', tenantId: 'orion' })).toThrow(
-        'Equipment name is required'
+        'Укажите название установки'
       );
     });
 
@@ -82,7 +82,7 @@ describe('EquipmentAggregate', () => {
 
     it('should throw when updated name is empty', () => {
       const agg = EquipmentAggregate.create({ name: 'Valid', tenantId: 'orion' });
-      expect(() => agg.update({ name: '' })).toThrow('Name required');
+      expect(() => agg.update({ name: '' })).toThrow('Укажите название установки');
     });
 
     it('should emit EquipmentUpdated event', () => {
