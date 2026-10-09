@@ -163,7 +163,7 @@ export function EquipmentMonitoring({ equipmentId }: Props) {
     const qs = new URLSearchParams({ equipmentId, from: fromIso, to: toIso, limit: '1000' });
     try {
       const res = await authFetch(`/api/telemetry?${qs.toString()}`);
-      if (!res.ok) { setError(`Сервер вернул ${res.status}`); return; }
+      if (!res.ok) { setError(`повторите позже (код ${res.status})`); return; }
       const data = await res.json();
       setRecords(Array.isArray(data.records) ? data.records : []);
     } catch (err) {
