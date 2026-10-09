@@ -128,7 +128,7 @@ export async function createDictionaryItem(
     });
     return item;
   }
-  throw new ServiceError('Invalid type', 400);
+  throw new ServiceError('Неизвестный тип справочника. Обновите страницу и повторите.', 400);
 }
 
 /** One row per distinct site of the reports that mention a dictionary item. */
@@ -260,7 +260,7 @@ async function setActive(
   const { tenantId, actorId } = context;
   assertTenantId(tenantId);
   const model = MODEL[type];
-  if (!model) throw new ServiceError('Invalid type', 400);
+  if (!model) throw new ServiceError('Неизвестный тип справочника. Обновите страницу и повторите.', 400);
   const item = await model.findFirst({ where: { id, tenantId } });
   if (!item) throw new ServiceError('Элемент не найден', 404);
   // Время архивации хранит только марка сваи: по нему принимаются сваи,
@@ -382,7 +382,7 @@ export async function renameDictionaryItem(
   if (!trimmed) throw new ServiceError('Название обязательно', 400);
   if (trimmed.length > 100) throw new ServiceError('Название слишком длинное', 400);
   const model = MODEL[type];
-  if (!model) throw new ServiceError('Invalid type', 400);
+  if (!model) throw new ServiceError('Неизвестный тип справочника. Обновите страницу и повторите.', 400);
   const item = await model.findFirst({ where: { id, tenantId } });
   if (!item) throw new ServiceError('Элемент не найден', 404);
   const usage = await getItemUsage(tenantId, type, id);
@@ -404,9 +404,9 @@ export async function renameDictionaryItem(
 export async function deleteDictionaryItem(context: DictionaryMutationContext, type: DictType, id: string) {
   const { tenantId, actorId } = context;
   assertTenantId(tenantId);
-  if (!type || !id) throw new ServiceError('type and id required', 400);
+  if (!type || !id) throw new ServiceError('Недостаточно данных — обновите страницу и повторите.', 400);
   const model = MODEL[type];
-  if (!model) throw new ServiceError('Invalid type', 400);
+  if (!model) throw new ServiceError('Неизвестный тип справочника. Обновите страницу и повторите.', 400);
 
   const item = await model.findFirst({ where: { id, tenantId } });
   if (!item) throw new ServiceError('Элемент не найден', 404);
