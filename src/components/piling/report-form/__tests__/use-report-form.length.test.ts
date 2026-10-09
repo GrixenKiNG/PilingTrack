@@ -8,7 +8,7 @@
  * never re-parse the name. This guard fails if name-parsing is reintroduced.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { renderHook, waitFor, act } from '@testing-library/react';
+import { renderHook, waitFor, act, cleanup } from '@testing-library/react';
 import { toast } from 'sonner';
 
 const { authFetchMock } = vi.hoisted(() => ({ authFetchMock: vi.fn() }));
@@ -31,13 +31,74 @@ vi.mock('@/lib/store', () => ({
 
 import { useReportForm } from '../use-report-form';
 
-describe('X2: logout reads the mounted report draft', () => {
+afterEach(() => { cleanup(); localStorage.clear(); vi.useRealTimers(); });
+
+describe('X2/X3: report draft lifecycle', () => {
   beforeEach(() => {
     localStorage.clear();
     storeState.selectedSiteId = 'site-1';
     authFetchMock.mockImplementation(() => Promise.resolve({ ok: true, status: 200, json: async () => ({}) }));
   });
-  afterEach(() => { storeState.selectedSiteId = ''; localStorage.clear(); });
+  afterEach(() => { vi.useRealTimers(); storeState.selectedSiteId = ''; localStorage.clear(); });
+
+  it('flushes the latest input on client navigation before the debounce expires', async () => {
+    const { result, unmount } = renderHook(() => useReportForm());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    act(() => result.current.setEngineHours('43'));
+    const key = `report-draft-op1-site-1-${result.current.date}`;
+    unmount();
+    expect(JSON.parse(localStorage.getItem(key) || '{}').engineHours).toBe('43');
+  });
+
+  it('flushes on visibilitychange when the application becomes hidden', async () => {
+    const { result } = renderHook(() => useReportForm());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    act(() => result.current.setEngineHours('44'));
+    vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden');
+    act(() => document.dispatchEvent(new Event('visibilitychange')));
+    expect(JSON.parse(localStorage.getItem(`report-draft-op1-site-1-${result.current.date}`) || '{}').engineHours).toBe('44');
+    vi.restoreAllMocks();
+  });
+
+  it('caps the delay at two seconds during continuous input', async () => {
+    vi.useFakeTimers();
+    const { result } = renderHook(() => useReportForm());
+    await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+    expect(result.current.loading).toBe(false);
+    for (let value = 1; value <= 4; value++) {
+      act(() => result.current.setEngineHours(String(value)));
+      act(() => vi.advanceTimersByTime(500));
+    }
+    expect(JSON.parse(localStorage.getItem(`report-draft-op1-site-1-${result.current.date}`) || '{}').engineHours).toBe('4');
+  });
+
+  it('does not recreate a draft on unmount after a successful submission', async () => {
+    const { result, unmount } = renderHook(() => useReportForm());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    act(() => {
+      result.current.setEngineHours('45');
+      result.current.setPiles([{ id: 'p1', picketId: '', pileGradeId: 'g1', count: 1 }]);
+    });
+    authFetchMock.mockImplementation(() => Promise.resolve({ ok: true, status: 200, headers: new Headers(), json: async () => ({}) }));
+    await act(async () => { await result.current.handleSubmit(); });
+    expect(result.current.submittedAt).not.toBeNull();
+    const key = `report-draft-op1-site-1-${result.current.date}`;
+    unmount();
+    expect(localStorage.getItem(key)).toBeNull();
+  });
+
+  it('flushes the old object without copying its input into the new object', async () => {
+    const { result, rerender, unmount } = renderHook(() => useReportForm());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    act(() => result.current.setDraftTempState({ pileGrade: 'g1', pileCount: '7', drillingType: '', drillingCount: '', drillingMetersPerUnit: '', downtimeReason: '', downtimeDuration: '', downtimeComment: '' }));
+    const date = result.current.date;
+    storeState.selectedSiteId = 'site-2';
+    rerender();
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(JSON.parse(localStorage.getItem(`report-draft-op1-site-1-${date}`) || '{}').temp?.pileCount).toBe('7');
+    unmount();
+    expect(JSON.parse(localStorage.getItem(`report-draft-op1-site-2-${date}`) || '{}').temp?.pileCount).not.toBe('7');
+  });
 
   it('flushes values typed less than 800 ms ago before logout', async () => {
     const { result } = renderHook(() => useReportForm());

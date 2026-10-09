@@ -122,6 +122,7 @@ export function useReportForm(): UseReportFormReturn {
   const [downtimes, setDowntimes] = useState<DowntimeEntry[]>([]);
 
   const [loading, setLoading] = useState(true);
+  const [loadedDraftKey, setLoadedDraftKey] = useState('');
   const [loadError, setLoadError] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   // Version of the loaded report, sent back on submit so the server can reject
@@ -158,6 +159,7 @@ export function useReportForm(): UseReportFormReturn {
   // Load data
   const loadData = useCallback(async () => {
     if (!user) return;
+    let loaded = false;
     setLoading(true);
     setLoadError(false);
     try {
@@ -217,10 +219,14 @@ export function useReportForm(): UseReportFormReturn {
           }
         } finally { setLoadingReport(false); }
       }
+      loaded = true;
     } catch {
       setLoadError(true);
       toast.error('Не удалось загрузить данные формы');
-    } finally { setLoading(false); }
+    } finally {
+      setLoadedDraftKey(loaded ? `report-draft-${user.id}-${selectedSiteId}-${date}` : '');
+      setLoading(false);
+    }
   }, [user, selectedSiteId, date]);
 
   // Другая дата или объект — другой отчёт. Номер и строки прежнего отчёта
@@ -238,6 +244,19 @@ export function useReportForm(): UseReportFormReturn {
     setPiles([]);
     setDrillings([]);
     setDowntimes([]);
+    setEngineHours('');
+    setShiftStart('07:00');
+    setShiftEnd('19:00');
+    setSelectedEquipmentId('');
+    setSelectedFieldId('');
+    setSelectedClusterId('');
+    setSelectedPicketId('');
+    setShowDowntime(false);
+    setQuickMode(true);
+    setSubmittedAt(null);
+    setDraftSavedAt(null);
+    setRestoredDraftTemp(null);
+    setDraftTempState({ pileGrade: '', pileCount: '', drillingType: '', drillingCount: '', drillingMetersPerUnit: '', downtimeReason: '', downtimeDuration: '', downtimeComment: '' });
   }, [selectedSiteId, date]);
 
   // Init date
@@ -280,10 +299,22 @@ export function useReportForm(): UseReportFormReturn {
     };
   });
 
+  const draftTimers = useRef<{ debounce?: number; maxWait?: number }>({});
+  const draftFlush = useRef<(() => boolean | undefined) | null>(null);
+  const draftSubmitted = useRef(false);
   useEffect(() => {
     if (!user || !selectedSiteId || !date || loading || submittedAt) return;
     const draftKey = `report-draft-${user.id}-${selectedSiteId}-${date}`;
+    if (loadedDraftKey !== draftKey) return;
+    draftSubmitted.current = false;
+    const clearTimers = () => {
+      window.clearTimeout(draftTimers.current.debounce);
+      window.clearTimeout(draftTimers.current.maxWait);
+      draftTimers.current = {};
+    };
     const saveDraft = () => {
+      clearTimers();
+      if (draftSubmitted.current) return;
       const s = draftSnapshotRef.current;
       const hasTypedValues = Object.values(s.temp).some((value) => value.trim() !== '');
       const hasWork = s.piles.length > 0 || s.drillings.length > 0 || s.downtimes.length > 0
@@ -296,21 +327,43 @@ export function useReportForm(): UseReportFormReturn {
       setDraftSavedAt(savedAt);
       return true;
     };
+    const flushSafely = () => {
+      try { saveDraft(); }
+      catch { toast.error('Не удалось сохранить черновик на этом устройстве'); }
+    };
+    draftFlush.current = saveDraft;
+    const onHidden = () => {
+      if (document.visibilityState === 'hidden') flushSafely();
+    };
     const beforeLogout = (event: Event) => {
       const { detail } = event as CustomEvent<{ hasDraft: boolean; saveFailed: boolean }>;
       try { detail.hasDraft = saveDraft() === true; }
       catch { detail.saveFailed = true; }
     };
-    const debounce = window.setTimeout(saveDraft, 800);
-    window.addEventListener('beforeunload', saveDraft);
+    window.addEventListener('beforeunload', flushSafely);
+    document.addEventListener('visibilitychange', onHidden);
     window.addEventListener('report-draft-before-logout', beforeLogout);
     return () => {
-      window.clearTimeout(debounce);
-      window.removeEventListener('beforeunload', saveDraft);
+      flushSafely();
+      clearTimers();
+      draftFlush.current = null;
+      window.removeEventListener('beforeunload', flushSafely);
+      document.removeEventListener('visibilitychange', onHidden);
       window.removeEventListener('report-draft-before-logout', beforeLogout);
     };
+  }, [user, selectedSiteId, date, loading, loadedDraftKey, submittedAt]);
+
+  useEffect(() => {
+    if (!draftFlush.current) return;
+    const flush = () => {
+      try { draftFlush.current?.(); }
+      catch { toast.error('Не удалось сохранить черновик на этом устройстве'); }
+    };
+    draftTimers.current.debounce = window.setTimeout(flush, 800);
+    draftTimers.current.maxWait ??= window.setTimeout(flush, 2_000);
+    return () => { window.clearTimeout(draftTimers.current.debounce); };
   }, [
-    user, selectedSiteId, date, loading, submittedAt, piles, drillings, downtimes,
+    user, selectedSiteId, date, loading, loadedDraftKey, submittedAt, piles, drillings, downtimes,
     shiftStart, shiftEnd, selectedEquipmentId, selectedFieldId,
     selectedClusterId, selectedPicketId, engineHours, quickMode,
     showDowntime, draftTempState,
@@ -465,6 +518,7 @@ export function useReportForm(): UseReportFormReturn {
         hapticError();
       }
       pushClientFeedback({ level: 'success', scope: 'reports', action: 'report.submit.client_succeeded', title: 'Отчёт отправлен', message: 'Сменный отчёт был успешно сохранён.', requestId: result?.requestId || res.headers.get('x-request-id') });
+      draftSubmitted.current = true;
       if (user && selectedSiteId && date) {
         localStorage.removeItem(`report-draft-${user.id}-${selectedSiteId}-${date}`);
         setDraftSavedAt(null);
