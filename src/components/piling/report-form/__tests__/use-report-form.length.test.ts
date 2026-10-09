@@ -31,6 +31,25 @@ vi.mock('@/lib/store', () => ({
 
 import { useReportForm } from '../use-report-form';
 
+describe('X2: logout reads the mounted report draft', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    storeState.selectedSiteId = 'site-1';
+    authFetchMock.mockImplementation(() => Promise.resolve({ ok: true, status: 200, json: async () => ({}) }));
+  });
+  afterEach(() => { storeState.selectedSiteId = ''; localStorage.clear(); });
+
+  it('flushes values typed less than 800 ms ago before logout', async () => {
+    const { result } = renderHook(() => useReportForm());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    act(() => result.current.setEngineHours('42'));
+    const draft = new CustomEvent('report-draft-before-logout', { detail: { hasDraft: false, saveFailed: false } });
+    act(() => window.dispatchEvent(draft));
+    expect(draft.detail).toEqual({ hasDraft: true, saveFailed: false });
+    expect(JSON.parse(localStorage.getItem(`report-draft-op1-site-1-${result.current.date}`) || '{}').engineHours).toBe('42');
+  });
+});
+
 function okJson(body: unknown) {
   return { ok: true, status: 200, json: async () => body };
 }

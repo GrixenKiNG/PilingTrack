@@ -281,7 +281,7 @@ export function useReportForm(): UseReportFormReturn {
   });
 
   useEffect(() => {
-    if (!user || !selectedSiteId || !date || loading) return;
+    if (!user || !selectedSiteId || !date || loading || submittedAt) return;
     const draftKey = `report-draft-${user.id}-${selectedSiteId}-${date}`;
     const saveDraft = () => {
       const s = draftSnapshotRef.current;
@@ -294,15 +294,23 @@ export function useReportForm(): UseReportFormReturn {
       const savedAt = new Date().toISOString();
       localStorage.setItem(draftKey, JSON.stringify({ ...s, savedAt, schemaVersion: 2 }));
       setDraftSavedAt(savedAt);
+      return true;
+    };
+    const beforeLogout = (event: Event) => {
+      const { detail } = event as CustomEvent<{ hasDraft: boolean; saveFailed: boolean }>;
+      try { detail.hasDraft = saveDraft() === true; }
+      catch { detail.saveFailed = true; }
     };
     const debounce = window.setTimeout(saveDraft, 800);
     window.addEventListener('beforeunload', saveDraft);
+    window.addEventListener('report-draft-before-logout', beforeLogout);
     return () => {
       window.clearTimeout(debounce);
       window.removeEventListener('beforeunload', saveDraft);
+      window.removeEventListener('report-draft-before-logout', beforeLogout);
     };
   }, [
-    user, selectedSiteId, date, loading, piles, drillings, downtimes,
+    user, selectedSiteId, date, loading, submittedAt, piles, drillings, downtimes,
     shiftStart, shiftEnd, selectedEquipmentId, selectedFieldId,
     selectedClusterId, selectedPicketId, engineHours, quickMode,
     showDowntime, draftTempState,

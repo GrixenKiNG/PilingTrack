@@ -68,6 +68,35 @@ describe('POST /api/auth/logout', () => {
     expect(localLogoutMock).not.toHaveBeenCalled(); expect(toastMock).toHaveBeenCalled();
   });
 
+  it('X2: declining logout with a draft leaves the session intact', async () => {
+    const checkDraft = (event: Event) => { (event as CustomEvent).detail.hasDraft = true; };
+    window.addEventListener('report-draft-before-logout', checkDraft);
+    const confirm = vi.fn().mockReturnValue(false);
+    vi.stubGlobal('confirm', confirm);
+    const request = vi.fn().mockResolvedValue(NextResponse.json({ ok: true }));
+    vi.stubGlobal('fetch', request);
+    try {
+      expect(await logoutClient()).toBe(false);
+      expect(confirm).toHaveBeenCalledTimes(1);
+      expect(request).not.toHaveBeenCalled();
+      expect(localLogoutMock).not.toHaveBeenCalled();
+    } finally {
+      window.removeEventListener('report-draft-before-logout', checkDraft);
+    }
+  });
+
+  it('X2: a draft storage failure blocks logout', async () => {
+    const checkDraft = (event: Event) => { (event as CustomEvent).detail.saveFailed = true; };
+    window.addEventListener('report-draft-before-logout', checkDraft);
+    const request = vi.fn().mockResolvedValue(NextResponse.json({ ok: true }));
+    vi.stubGlobal('fetch', request);
+    try {
+      expect(await logoutClient()).toBe(false);
+      expect(request).not.toHaveBeenCalled();
+      expect(localLogoutMock).not.toHaveBeenCalled();
+    } finally { window.removeEventListener('report-draft-before-logout', checkDraft); }
+  });
+
   it('F6 review9: successful revocation still clears server and client session', async () => {
     requireAuthMock.mockResolvedValue({ user: { id: 'u1', role: 'ADMIN' }, error: null });
     readMock.mockReturnValue('owned-fake-token');

@@ -161,6 +161,21 @@ export async function loadJson<T>(url: string, options: RequestInit = {}): Promi
 }
 
 export async function logoutClient() {
+  // Only the mounted report form answers; an old draft on another page does
+  // not cause a confirmation. Flush before revoking the session/unmounting.
+  if (typeof window !== 'undefined') {
+    const draft = new CustomEvent('report-draft-before-logout', {
+      detail: { hasDraft: false, saveFailed: false },
+    });
+    window.dispatchEvent(draft);
+    if (draft.detail.saveFailed) {
+      toast.error('Не удалось сохранить черновик. Выход отменён — сохраните данные и повторите.');
+      return false;
+    }
+    if (draft.detail.hasDraft && !window.confirm('В форме есть неотправленный черновик. Он сохранён на этом устройстве. Выйти?')) {
+      return false;
+    }
+  }
   try {
     const response = await fetchWithTimeout('/api/auth/logout', {
       method: 'POST',
