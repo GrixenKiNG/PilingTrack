@@ -43,6 +43,18 @@ describe('F4: selected Telegram config is tenant scoped', () => {
     expect((await POST(request({ configId: 'second' }))).status).toBe(403);
     expect(m.test).not.toHaveBeenCalled();
   });
+  it.each(['DISPATCHER', 'FOREMAN', 'SAFETY_ENGINEER'])('denies a report reader without telegram.manage: %s', async role => {
+    m.auth.mockResolvedValue({ user: { ...admin, role }, error: null });
+    expect((await POST(request({ configId: 'second' }))).status).toBe(403);
+    expect(m.find).not.toHaveBeenCalled();
+    expect(m.test).not.toHaveBeenCalled();
+  });
+  it('denies ADMIN acting as FOREMAN', async () => {
+    m.auth.mockResolvedValue({ user: { ...admin, actingAs: 'FOREMAN' }, error: null });
+    expect((await POST(request({ configId: 'second' }))).status).toBe(403);
+    expect(m.find).not.toHaveBeenCalled();
+    expect(m.test).not.toHaveBeenCalled();
+  });
   it('retains the authentication guard', async () => {
     m.auth.mockResolvedValue({ user: null, error: NextResponse.json({ error: 'auth' }, { status: 401 }) });
     expect((await POST(request({ configId: 'second' }))).status).toBe(401);

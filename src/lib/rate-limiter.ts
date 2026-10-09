@@ -503,13 +503,3 @@ export function getRateLimitIdentifier(
   const ip = resolveClientIp(request, fallback);
   return ip === fallback ? `host-${request.headers.get('host') || 'localhost'}` : ip;
 }
-
-/**
- * Get tenant-scoped rate limit identifier.
- * Falls back to IP-based limiting if no tenant header.
- */
-export function getTenantRateLimitIdentifier(request: Request): string {
-  const tenantId = request.headers.get('x-tenant-id');
-  const ip = resolveClientIp(request, 'unknown');
-  return tenantId ? `tenant:${tenantId}:${ip}` : `global:${ip}`;
-}

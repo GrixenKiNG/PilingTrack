@@ -4,6 +4,7 @@
 
 import { db } from '@/lib/db';
 import { ServiceError } from '@/lib/service-error';
+import { resolveEffectiveRole } from '@/lib/types';
 // eslint-disable-next-line no-restricted-imports -- legacy cross-layer import pending the parked services<->modules migration (CLAUDE.md); behavior-neutral
 import { isPrivilegedRole } from '@/services/auth/authorization-service';
 import type { CursorPaginationResult } from '@/lib/pagination-cursor';
@@ -52,10 +53,10 @@ export async function getCrewById(crewId: string) {
  * Get crew for operator (with role-based access control)
  */
 export async function getCrewForOperator(
-  sessionUser: { id: string; role: string },
+  sessionUser: { id: string; role: string; actingAs?: string | null },
   requestedOperatorId?: string | null
 ) {
-  const lookupUserId = isPrivilegedRole(sessionUser.role)
+  const lookupUserId = isPrivilegedRole(resolveEffectiveRole(sessionUser.role, sessionUser.actingAs))
     ? requestedOperatorId || sessionUser.id
     : sessionUser.id;
 

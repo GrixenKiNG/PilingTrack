@@ -10,10 +10,13 @@
 import {describe, it, expect, vi, beforeEach} from 'vitest';
 import {NextRequest} from 'next/server';
 
-const {requireAuthMock, findManyMock, upsertMock} = vi.hoisted(() => ({
+const {requireAuthMock, findManyMock, upsertMock, createMock, findFirstMock, findUniqueMock} = vi.hoisted(() => ({
   requireAuthMock: vi.fn(),
   findManyMock: vi.fn(),
   upsertMock: vi.fn(),
+  createMock: vi.fn(),
+  findFirstMock: vi.fn(),
+  findUniqueMock: vi.fn(),
 }));
 
 // Маршруты оборачивают обработчик в withApi/withMutation. Проверяем сам
@@ -33,7 +36,7 @@ vi.mock('@/lib/auth', () => ({requireAuth: requireAuthMock}));
 
 vi.mock('@/lib/db', () => ({
   db: {
-    feedbackEvent: {findMany: findManyMock},
+    feedbackEvent: {findMany: findManyMock, create: createMock, findFirst: findFirstMock, findUnique: findUniqueMock},
     feedbackEventRead: {upsert: upsertMock},
   },
 }));
@@ -137,5 +140,48 @@ describe('GET /api/feedback/events — фильтр ленты (F-FEED-LOGIN)', 
 
     const res = await GET(req());
     expect(res.status).toBe(401);
+  });
+});
+
+describe('POST /api/feedback/events — исполняемая роль', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    createMock.mockImplementation(async ({data}) => ({...row('client.feedback', 'new'), ...data}));
+    findFirstMock.mockResolvedValue(row('ReportSubmitted', 'r1'));
+    findUniqueMock.mockResolvedValue(row('ReportSubmitted', 'r1'));
+    upsertMock.mockResolvedValue({});
+  });
+
+  function post(body: unknown) {
+    return POST(new NextRequest('http://localhost/api/feedback/events', {
+      method: 'POST', body: JSON.stringify(body),
+    }));
+  }
+
+  it.each([
+    [{...ADMIN, role: 'OPERATOR'}, 403],
+    [{...ADMIN, actingAs: 'OPERATOR'}, 403],
+    [ADMIN, 200],
+    [{...ADMIN, role: 'DISPATCHER'}, 200],
+  ])('acknowledgement respects effective role: %j', async (user, status) => {
+    requireAuthMock.mockResolvedValue({user, error: null});
+    expect((await post({operation: 'acknowledge', eventId: 'r1'})).status).toBe(status);
+    if (status === 403) {
+      expect(findFirstMock).not.toHaveBeenCalled();
+      expect(upsertMock).not.toHaveBeenCalled();
+    }
+  });
+
+  it.each([
+    [{...ADMIN, role: 'OPERATOR'}, 'USER'],
+    [{...ADMIN, actingAs: 'OPERATOR'}, 'USER'],
+    [ADMIN, 'OPERATIONS'],
+    [{...ADMIN, role: 'DISPATCHER'}, 'OPERATIONS'],
+  ])('event audience respects effective role: %j', async (user, audience) => {
+    requireAuthMock.mockResolvedValue({user, error: null});
+    expect((await post({title: 'Событие', message: 'Текст', audience: 'OPERATIONS'})).status).toBe(201);
+    expect(createMock).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({audience, actorRole: user.role}),
+    }));
   });
 });

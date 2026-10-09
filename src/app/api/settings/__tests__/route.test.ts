@@ -76,6 +76,18 @@ describe('PUT /api/settings', () => {
     expect(getSettingsMock).not.toHaveBeenCalled();
   });
 
+  it.each([
+    { ...admin, role: 'OPERATOR' },
+    { ...admin, actingAs: 'OPERATOR' },
+  ])('denies settings mutation for an effective operator: %j', async (user) => {
+    requireAuthMock.mockResolvedValue({ user, error: null });
+    const response = await PUT(req({ timezone: 'Asia/Krasnoyarsk' }));
+    expect(response.status).toBe(403);
+    expect(getSettingsMock).not.toHaveBeenCalled();
+    expect(saveSettingsMock).not.toHaveBeenCalled();
+    expect(recordAuditEventMock).not.toHaveBeenCalled();
+  });
+
   it('reads the previous settings before saving', async () => {
     await PUT(req({ companyName: 'Ромашка' }));
 
