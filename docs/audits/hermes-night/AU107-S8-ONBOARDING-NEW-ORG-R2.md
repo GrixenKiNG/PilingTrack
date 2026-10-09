@@ -10,7 +10,7 @@
 Контекст (решение владельца, не ошибка): второй организации не будет; производство
 однотенантное (`orion`). Ниже — что понадобилось бы, если решение изменится.
 
-Найдено 19 пунктов: **критично — 1, важно — 9, мелочь — 9**.
+Найдено 20 пунктов: **критично — 1, важно — 9, мелочь — 10**.
 
 Топ-5:
 1. **критично**: фоновые уведомления (отчёты, простои, PDF, DLQ, алерты воркера)
@@ -27,7 +27,7 @@
    — ни одного `tenant.create` (кроме `src/generated`). Значит: только ручной SQL.
 3. **важно**: включить многотенантный режим нельзя, не сломав вход —
    `src/proxy.ts:226` вызывает `enforceTenant` на каждом `/api/*`, список
-   исключений `/api/auth/login` не содержит (`src/proxy.ts:120-126`), а X-Tenant-ID
+   исключений `/api/auth/login` не содержит (`src/proxy.ts:120`, `:123`), а X-Tenant-ID
    не отправляет ни один клиент (grep по `src/components`, `src/lib`, `src/app` — 0).
    Плюс `MULTI_TENANT_MODE` и `TENANT_DOMAIN` не проброшены в контейнер
    (grep по `docker-compose*.yml` — 0 совпадений).
@@ -90,12 +90,27 @@
 | 5 | Настроить организацию (название, ИНН, часовой пояс, форматы, уведомления) | UI `/admin/settings` (PUT только для ADMIN); строка создаётся ленивым upsert | `src/app/api/settings/route.ts:23-42`; `src/modules/settings/application/settings-service.ts:102-106` | ПРОЙДЕНО |
 | 6 | Заполнить справочники (марки свай, типы бурения, причины простоя, типы документов) | Автозаполнение есть, но вызывается только из сида. В проде — вручную в `/admin/dictionaries` | `src/services/dictionaries/tenant-dictionary-initializer.ts:15-58`; вызов — `prisma/seed.ts:267`; UI — `src/app/api/dictionary/manage/route.ts:77-78` | ПРОЙДЕНО (ручной путь), НЕ ПРОВЕРЕНО (что шаблоны покрывают все марки клиента) |
 | 7 | Завести объекты/участки | UI `/admin/sites` → `sites/create`; `tenantId` берётся из сессии | `src/modules/sites/application/commands/site-admin-command.service.ts:97` | ПРОЙДЕНО |
-| 8 | Завести оборудование | Только сид (`seedEquipment`) либо SQL; в UI — карточка оборудования, но машин не создаёт | `src/lib/seed/equipment.seed.ts:61` (жёсткая привязка к `DEFAULT_TENANT_ID ?? 'orion'`) | НЕ ПРОВЕРЕНО |
+| 8 | Завести оборудование | UI `/admin/equipment` → `POST /api/equipment` (тенант из сессии) — по одной машине; типовой парк (`PVE 50PR` и пр.) заливает только сид | `src/app/api/equipment/route.ts:31,39,56`; сид — `src/lib/seed/equipment.seed.ts:61` (жёсткая привязка к `DEFAULT_TENANT_ID ?? 'orion'`) | ПРОЙДЕНО (ручной путь), НЕ ПРОВЕРЕНО (сид для второго тенанта без правки переменной) |
 | 9 | Настроить Telegram-канал | UI `/admin/telegram` + `POST /api/telegram/configs`; канал свой у каждой организации; токен шифруется ключом развёртывания | `src/app/(app)/admin/telegram/page.tsx:6-11`; `src/app/api/telegram/configs/route.ts:48,74`; `src/services/telegram/telegram-config-service.ts:122` | ПРОЙДЕНО (для ручного просмотра), но см. находку 1 — фоновые отправки тенант не учитывают |
 | 10 | Домен | Второй домен/поддомен: правка `deploy/Caddyfile.prod` на сервере + `TENANT_DOMAIN`; в контейнеры переменная не проброшена | `deploy/Caddyfile.prod:23`; `src/proxy.ts:102-103`; `grep TENANT_DOMAIN docker-compose*.yml` → 0 | НЕ ПРОВЕРЕНО |
 | 11 | Включить многотенантный режим | `MULTI_TENANT_MODE=multi` в `.env` **и** проброс в `environment:` сервисов; сейчас не проброшен, а при включении вход сломается (нет X-Tenant-ID у клиента) | `src/proxy.ts:87,226`; `src/services/tenancy/tenant-context-service.ts:13-18`; `docker-compose.yml:99` (есть только `DEFAULT_TENANT_ID`) | НЕ ПРОВЕРЕНО |
 | 12 | Префиксы S3 | Присваиваются автоматически из `tenantId`; бакет один на развёртывание | `src/core/storage/s3-service.ts:150,158`; `src/core/media/media-service.ts:135`; `docker-compose.yml:88` (`S3_BUCKET`) | ПРОЙДЕНО |
 | 13 | База/RLS | Одна БД и одна роль приложения; организация передаётся в `app.current_tenant` из сессии; отдельной роли/схемы на организацию нет | `src/lib/tenant.ts:25` (`requireTenantId` бросает при отсутствии организации); `prisma/seed.ts:25-27` (клиент обёрнут `applyTenantGuc`) | ПРОЙДЕНО (по чтению кода) |
+
+### Что делается через интерфейс, а что только SQL или скриптом
+
+| Действие | Путь | Почему не иначе |
+|---|---|---|
+| Создать организацию | **только SQL вручную** | ни API, ни UI; сид в проде выключен (`prisma/seed.ts:35,98`) |
+| Задать активность/лимит/тариф | **только SQL** | поля есть в схеме (`prisma/schema.prisma:18-20`), кода нет |
+| Создать пользователя и задать ему пароль | интерфейс `/admin/users` | `src/app/api/users/route.ts:40-86`; сброса по почте нет |
+| Настроить название/ИНН/часовой пояс/уведомления | интерфейс `/admin/settings` | `src/app/api/settings/route.ts:23-42` |
+| Заполнить справочники | интерфейс `/admin/dictionaries` (по одной записи) | автозаполнение шаблонами — только сид (`prisma/seed.ts:267`) |
+| Завести объект/участок | интерфейс `/admin/sites` | `src/modules/sites/application/commands/site-admin-command.service.ts:97` |
+| Завести оборудование | интерфейс `/admin/equipment` (по одной машине) | парк типовых машин — сид (`src/lib/seed/equipment.seed.ts:61`) |
+| Настроить Telegram | интерфейс `/admin/telegram` | `src/app/api/telegram/configs/route.ts:48,74` |
+| Домен, поддомены, TLS | **только правка файла на сервере** (`deploy/Caddyfile.prod`) + env | `deploy/Caddyfile.prod:23` |
+| Префиксы S3 | автоматически из `tenantId`, ручных шагов нет | `src/core/storage/s3-service.ts:150,158` |
 
 ## Находки
 
@@ -120,6 +135,7 @@
 | 17 | мелочь | `src/app/api/users/route.ts:47-48` | Тенант берётся из записи пользователя сессии, а не из заголовка. | Это как раз хорошо (в single-режиме пользователь №2 сможет работать), но означает, что `enforceTenant` к данным отношения не имеет — он только про режим. Стоит зафиксировать, чтобы не ждать от него защиты данных. | Записать в документацию по мультиаренде. |
 | 18 | мелочь | `src/modules/reports/application/queries/report-query.service.ts:221`; `src/lib/pdf-data.ts:49` | Название организации берётся только из сессии; `DEFAULT_TENANT_ID` намеренно не подставляется. | Правильное поведение, но означает, что печатные формы без сессии (фоновый PDF) имени организации не получат. | Убедиться, что фоновые PDF всегда получают `tenantId` события. |
 | 19 | мелочь | `prisma/schema.prisma:20,23-29,65` | Поля `plan`, `subscriptionStatus`, `monthlyFee`, `stripeCustomerId`, модель `TenantInvoice` не читает ни один файл в `src/` (кроме `src/generated`). | Биллинга/тарифов фактически нет: «тариф» — только колонка. | Либо реализовать, либо не обещать тарифы клиентам. |
+| 20 | важно | `prisma/schema.prisma:2524-2550`; `src/services/feedback/feedback-event-service.ts:83-89,112-131`; `src/services/audit/audit-service.ts:13` | У `FeedbackEvent` (лента событий и журнал аудита) нет колонки организации. Интерфейс `AuditEvent.tenantId` объявлен (`audit-service.ts:13`), но `recordAuditEvent` его никуда не передаёт — запись идёт в `recordFeedbackEvent` без тенанта. Права на чтение раздаёт `getAccessWhere`: привилегированные роли получают `{}` (все события), остальные — `{OR:[{actorId},{audience:'ALL'}]}`. | Перед появлением тенанта №2 лента общая по построению: ADMIN/DISPATCHER увидят события всех организаций, оператор чужой фирмы — всё, что помечено `audience:'ALL'`. Например, `user.created` (`src/services/users/user-service.ts:177-187`) пишется вообще без организации. | Добавить `tenantId` в `FeedbackEvent`, писать и фильтровать по нему. |
 
 ## Что не проверено
 
