@@ -174,4 +174,39 @@ describe('X1: bounded client requests', () => {
     await pending;
     expect(vi.getTimerCount()).toBe(0);
   });
+
+  it('X1 follow-up: session JSON cannot hang after headers arrive', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new NextResponse(new ReadableStream(), { headers: { 'Content-Type': 'application/json' } })));
+    const pending = probeSession();
+    await vi.advanceTimersByTimeAsync(20_000);
+    expect(await Promise.race([pending, Promise.resolve('still pending')])).toEqual({ status: 'unknown' });
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('X1 follow-up: hanging report JSON rejects and releases the caller', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new NextResponse(new ReadableStream())));
+    const response = await authFetch('/api/reports/upsert', { method: 'POST', body: '{}' });
+    const body = response.json().catch((error: Error) => error.message);
+    await vi.advanceTimersByTimeAsync(20_000);
+    expect(await Promise.race([body, Promise.resolve('still pending')])).toBe('Нет связи. Проверьте сеть и повторите');
+  });
+
+  it('X1 follow-up: successful JSON parsing clears its deadline', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(NextResponse.json({ ok: true })));
+    const response = await authFetch('/api/sites');
+    expect(await response.json()).toEqual({ ok: true });
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('X1 follow-up: external cancellation still works while reading JSON', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new NextResponse(new ReadableStream())));
+    const external = new AbortController();
+    const response = await authFetch('/api/sites', { signal: external.signal });
+    const cause = new DOMException('Leaving page', 'AbortError');
+    const body = response.json().catch((error: Error) => error);
+    external.abort(cause);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(await Promise.race([body, Promise.resolve('still pending')])).toBe(cause);
+    expect(vi.getTimerCount()).toBe(0);
+  });
 });

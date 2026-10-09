@@ -12,21 +12,42 @@ async function fetchWithTimeout(url: string, options: RequestInit): Promise<Resp
   const isUpload = (typeof FormData !== 'undefined' && options.body instanceof FormData)
     || (typeof Blob !== 'undefined' && options.body instanceof Blob);
   let timedOut = false;
+  let rejectAbort: (reason: unknown) => void = () => {};
+  const aborted = new Promise<never>((_resolve, reject) => { rejectAbort = reject; });
+  // Responses whose bodies are ignored must not create unhandled rejections.
+  void aborted.catch(() => {});
+  const onAbort = () => rejectAbort(timedOut
+    ? new Error('Нет связи. Проверьте сеть и повторите') : controller.signal.reason);
+  controller.signal.addEventListener('abort', onAbort, { once: true });
+  const cleanup = () => {
+    clearTimeout(timer);
+    external?.removeEventListener('abort', cancel);
+    controller.signal.removeEventListener('abort', onAbort);
+  };
   const timer = setTimeout(() => {
     timedOut = true;
     controller.abort();
+    cleanup();
   }, isUpload ? 120_000 : 20_000);
-  const cancel = () => controller.abort(external?.reason);
+  const cancel = () => { controller.abort(external?.reason); cleanup(); };
   if (external?.aborted) cancel();
   else external?.addEventListener('abort', cancel, { once: true });
   try {
-    return await fetch(url, { ...options, signal: controller.signal });
+    const response = await Promise.race([fetch(url, { ...options, signal: controller.signal }), aborted]);
+    // Fetch resolves on headers. Keep the same deadline through body reading
+    // so a stalled JSON response cannot freeze session checks or submitting.
+    for (const method of ['json', 'text', 'blob', 'arrayBuffer', 'formData'] as const) {
+      const read = response[method].bind(response);
+      Object.defineProperty(response, method, {
+        value: () => Promise.race([read(), aborted]).finally(cleanup),
+      });
+    }
+    if (response.body === null) cleanup();
+    return response;
   } catch (error) {
+    cleanup();
     if (timedOut) throw new Error('Нет связи. Проверьте сеть и повторите');
     throw error;
-  } finally {
-    clearTimeout(timer);
-    external?.removeEventListener('abort', cancel);
   }
 }
 
