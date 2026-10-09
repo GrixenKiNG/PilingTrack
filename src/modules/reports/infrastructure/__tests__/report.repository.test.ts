@@ -27,12 +27,23 @@ const tx = {
 vi.mock('@/lib/db', () => ({
   DEFAULT_TX_OPTIONS: {},
   db: {
+    get report() { return tx.report; },
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test transaction shim
     $transaction: (cb: any) => cb(tx),
   },
 }));
 
-import { PrismaReportRepository } from '../report.repository';
+import { PrismaReportRepository, saveReportEndingEngineHours } from '../report.repository';
+
+it('X6: binds accepted readings to the saved report version and equipment', async () => {
+  tx.report.updateMany.mockResolvedValueOnce({ count: 1 });
+  expect(await saveReportEndingEngineHours({ reportId: 'r1', version: 5, equipmentId: 'eq1', tenantId: 't1', engineHours: 0 })).toBe(true);
+  expect(tx.report.updateMany).toHaveBeenCalledWith({
+    where: { reportId: 'r1', version: 5, equipmentId: 'eq1', tenantId: 't1' }, data: { endingEngineHours: 0 },
+  });
+  tx.report.updateMany.mockResolvedValueOnce({ count: 0 });
+  expect(await saveReportEndingEngineHours({ reportId: 'r1', version: 5, equipmentId: 'eq1', tenantId: 't1', engineHours: 1234 })).toBe(false);
+});
 
 function makeUpdateAggregate(): ReportAggregate {
   const aggregate = ReportAggregate.create({

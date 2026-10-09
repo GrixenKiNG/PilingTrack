@@ -325,6 +325,16 @@ export class PrismaReportRepository implements ReportRepository {
   }
 }
 
+// Показание подтверждено журналом техники после сохранения веб-отчёта.
+// Запоздалый ответ не должен менять снимок уже отредактированного отчёта.
+export async function saveReportEndingEngineHours(input: {
+  reportId: string; version: number; equipmentId: string; tenantId: string; engineHours: number;
+}): Promise<boolean> {
+  const {engineHours, ...where} = input;
+  const result = await db.report.updateMany({where, data: {endingEngineHours: engineHours}});
+  return result.count === 1;
+}
+
 // Singleton instance
 let _instance: PrismaReportRepository | null = null;
 

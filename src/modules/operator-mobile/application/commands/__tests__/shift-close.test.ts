@@ -72,6 +72,16 @@ beforeEach(() => {
 });
 
 describe('closeShift — след сдачи в истории отчёта', () => {
+  it('X6: freezes actual ending readings, preserving zero and absence', async () => {
+    tx.operatorShiftEvidence.findFirst.mockResolvedValue({payload: {fuelPercent: 0}});
+    await closeShift(input);
+    expect(tx.report.update).toHaveBeenCalledWith(expect.objectContaining({data: expect.objectContaining({endingEngineHours: 1234, endingFuelPercent: 0})}));
+    tx.report.update.mockClear();
+    tx.meterReading.findFirst.mockResolvedValue(null);
+    tx.operatorShiftEvidence.findFirst.mockResolvedValue(null);
+    await closeShift(input);
+    expect(tx.report.update).toHaveBeenCalledWith(expect.objectContaining({data: expect.objectContaining({endingEngineHours: null, endingFuelPercent: null})}));
+  });
   it('пишет строку «submitted» от имени оператора в транзакции смены', async () => {
     await expect(closeShift(input)).resolves.toEqual({ok: true, reportId: 'report-pk-1'});
 

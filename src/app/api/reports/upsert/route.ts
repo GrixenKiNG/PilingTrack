@@ -112,13 +112,21 @@ export const POST = withMutation(
           { tenantId, recordedById: user!.id, allowDecrease: false, dedupeByNote: true },
         );
         meterWarning = meterResult.warning;
+        const {saveReportEndingEngineHours} = await import('@/modules/reports/infrastructure/report.repository');
+        if (await saveReportEndingEngineHours({
+          reportId: result.report.reportId, version: result.report.version,
+          equipmentId: validatedDto.equipmentId, tenantId,
+          engineHours: meterResult.reading.engineHours,
+        })) {
+          result.report.endingEngineHours = meterResult.reading.engineHours;
+        }
       } catch (err) {
         const { ServiceError } = await import('@/lib/service-error');
         if (err instanceof ServiceError && err.status === 422) {
           meterError = err.message;
         } else {
           const { logger } = await import('@/lib/logger');
-          logger.warn('meter reading from report failed', {
+          logger.warn('meter reading or report snapshot failed', {
             equipmentId: validatedDto.equipmentId,
             engineHours: validatedDto.engineHours,
             error: err instanceof Error ? err.message : String(err),

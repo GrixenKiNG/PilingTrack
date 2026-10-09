@@ -43,6 +43,8 @@ export async function generateSinglePdf(data: SingleReportData): Promise<Buffer>
       ['Оператор', data.user?.name || '—', 'Смена', `${shiftLabel(data.shiftType)} ${data.shiftStart || ''}-${data.shiftEnd || ''}`],
       ['Помощник', data.assistantName || '—', 'Оборудование', data.equipmentName || '—'],
       ['Статус', statusLabel(data.status), 'Изменил', editorLabel(data.lastEditedByRole, data.lastEditedByName)],
+      ['Моточасы на конец', data.endingEngineHours == null ? 'не указано' : `${data.endingEngineHours} м/ч`,
+        'Топливо на конец', data.endingFuelPercent == null ? 'не указано' : `${data.endingFuelPercent} %`],
     ]);
 
     const hasWork = data.piles.length > 0 || data.drillings.length > 0 || data.downtimes.length > 0;

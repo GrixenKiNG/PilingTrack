@@ -164,7 +164,7 @@ export async function exportReportsCsv(filters: ReportExportFilters) {
 
   const BOM = '\uFEFF';
   const header =
-    'ID отчёта;Дата;Смена;Статус;Объект;Оператор;Экипаж;Установка;Марка сваи;Кол-во свай;Свай, м.п.;Тип бурения;Метры бурения;Причина простоя;Часы простоя;Комментарий';
+    'ID отчёта;Дата;Смена;Статус;Объект;Оператор;Экипаж;Установка;Моточасы на конец, м/ч;Остаток топлива, %;Марка сваи;Кол-во свай;Свай, м.п.;Тип бурения;Метры бурения;Причина простоя;Часы простоя;Комментарий';
 
   const rows = reports.flatMap((report) => {
     const base = {
@@ -177,6 +177,8 @@ export async function exportReportsCsv(filters: ReportExportFilters) {
       operator: report.user.name,
       crew: report.crew?.name || '',
       equipment: report.equipment?.name || report.crew?.equipment?.name || '',
+      endingEngineHours: report.endingEngineHours == null ? '' : csvDecimal(report.endingEngineHours),
+      endingFuelPercent: report.endingFuelPercent == null ? '' : csvDecimal(report.endingFuelPercent),
     };
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
@@ -344,7 +346,7 @@ export async function exportReportsXlsx(filters: ReportExportFilters): Promise<B
   // --- Лист 2: итоги по отчёту. ---
   const totals: (string | number | null)[][] = [[
     'ID отчёта', 'Дата', 'Смена', 'Объект', 'Оператор', 'Установка',
-    'Свай, всего', 'Свай, м.п.', 'Бурение, скв.', 'Бурение, м', 'Простой, ч', 'Остаток топлива, %', 'Примечание', 'Статус',
+    'Свай, всего', 'Свай, м.п.', 'Бурение, скв.', 'Бурение, м', 'Простой, ч', 'Остаток топлива, %', 'Примечание', 'Статус', 'Моточасы на конец, м/ч',
   ]];
   const drafts: (string | number | null)[][] = [totals[0]];
   for (const r of reports) {
@@ -364,7 +366,7 @@ export async function exportReportsXlsx(filters: ReportExportFilters): Promise<B
     (isSubmittedReport(r) ? totals : drafts).push([
       r.reportId, formatRuDate(r.date), shiftLabel(r.shiftType), r.site.name, r.user.name, r.equipment?.name || r.crew?.equipment?.name || '',
       piles, pileMeters, wells, meters, downtime, r.endingFuelPercent ?? null,
-      pilesWithoutLength ? PILE_METERS_INCOMPLETE_NOTE : '', reportStatusExportLabel(r.status),
+      pilesWithoutLength ? PILE_METERS_INCOMPLETE_NOTE : '', reportStatusExportLabel(r.status), r.endingEngineHours ?? null,
     ]);
   }
 

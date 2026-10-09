@@ -219,6 +219,10 @@ export function addReportBreakdown(doc: PdfDoc, report: PeriodReportRow, index: 
   doc.font('Bold').fontSize(9.5).fillColor(COLORS.dark);
   doc.text(title, PAGE.left, doc.y, { width: CONTENT_WIDTH });
   doc.moveDown(0.25);
+  addTable(doc, ['Моточасы на конец', 'Топливо на конец'], [[
+    report.endingEngineHours == null ? 'не указано' : `${report.endingEngineHours} м/ч`,
+    report.endingFuelPercent == null ? 'не указано' : `${report.endingFuelPercent} %`,
+  ]], [0.5, 0.5], true);
 
   if ((report.piles || []).length > 0) {
     addTable(
