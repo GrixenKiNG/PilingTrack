@@ -3,6 +3,54 @@ import { usePilingStore } from '@/lib/store';
 import { pushClientFeedback } from '@/lib/client-feedback';
 import type { UserRole } from '@/lib/types';
 
+// Short JSON requests: 20 s, matching operator-mobile. Uploads need more time
+// on field networks. Use a controller so older Safari and caller cancellation
+// work without AbortSignal.any/timeout, and every timer can be cleaned up.
+async function fetchWithTimeout(url: string, options: RequestInit): Promise<Response> {
+  const controller = new AbortController();
+  const external = options.signal;
+  const isUpload = (typeof FormData !== 'undefined' && options.body instanceof FormData)
+    || (typeof Blob !== 'undefined' && options.body instanceof Blob);
+  let timedOut = false;
+  let rejectAbort: (reason: unknown) => void = () => {};
+  const aborted = new Promise<never>((_resolve, reject) => { rejectAbort = reject; });
+  // Responses whose bodies are ignored must not create unhandled rejections.
+  void aborted.catch(() => {});
+  const onAbort = () => rejectAbort(timedOut
+    ? new Error('Нет связи. Проверьте сеть и повторите') : controller.signal.reason);
+  controller.signal.addEventListener('abort', onAbort, { once: true });
+  const cleanup = () => {
+    clearTimeout(timer);
+    external?.removeEventListener('abort', cancel);
+    controller.signal.removeEventListener('abort', onAbort);
+  };
+  const timer = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+    cleanup();
+  }, isUpload ? 120_000 : 20_000);
+  const cancel = () => { controller.abort(external?.reason); cleanup(); };
+  if (external?.aborted) cancel();
+  else external?.addEventListener('abort', cancel, { once: true });
+  try {
+    const response = await Promise.race([fetch(url, { ...options, signal: controller.signal }), aborted]);
+    // Fetch resolves on headers. Keep the same deadline through body reading
+    // so a stalled JSON response cannot freeze session checks or submitting.
+    for (const method of ['json', 'text', 'blob', 'arrayBuffer', 'formData'] as const) {
+      const read = response[method].bind(response);
+      Object.defineProperty(response, method, {
+        value: () => Promise.race([read(), aborted]).finally(cleanup),
+      });
+    }
+    if (response.body === null) cleanup();
+    return response;
+  } catch (error) {
+    cleanup();
+    if (timedOut) throw new Error('Нет связи. Проверьте сеть и повторите');
+    throw error;
+  }
+}
+
 function buildHeaders(options: RequestInit) {
   const headers = new Headers(options.headers || {});
   const body = options.body;
@@ -29,7 +77,7 @@ function buildHeaders(options: RequestInit) {
 export async function authFetch(url: string, options: RequestInit = {}): Promise<Response> {
   let res: Response;
   try {
-    res = await fetch(url, {
+    res = await fetchWithTimeout(url, {
       ...options,
       headers: buildHeaders(options),
       credentials: 'same-origin',
@@ -56,7 +104,7 @@ export async function authFetch(url: string, options: RequestInit = {}): Promise
 
   if (res.status === 401) {
     try {
-      await fetch('/api/auth/logout', {
+      await fetchWithTimeout('/api/auth/logout', {
         method: 'POST',
         credentials: 'same-origin',
       });
@@ -134,8 +182,23 @@ export async function loadJson<T>(url: string, options: RequestInit = {}): Promi
 }
 
 export async function logoutClient() {
+  // Only the mounted report form answers; an old draft on another page does
+  // not cause a confirmation. Flush before revoking the session/unmounting.
+  if (typeof window !== 'undefined') {
+    const draft = new CustomEvent('report-draft-before-logout', {
+      detail: { hasDraft: false, saveFailed: false },
+    });
+    window.dispatchEvent(draft);
+    if (draft.detail.saveFailed) {
+      toast.error('Не удалось сохранить черновик. Выход отменён — сохраните данные и повторите.');
+      return false;
+    }
+    if (draft.detail.hasDraft && !window.confirm('В форме есть неотправленный черновик. Он сохранён на этом устройстве. Выйти?')) {
+      return false;
+    }
+  }
   try {
-    const response = await fetch('/api/auth/logout', {
+    const response = await fetchWithTimeout('/api/auth/logout', {
       method: 'POST',
       credentials: 'same-origin',
     });
@@ -176,7 +239,7 @@ export type SessionProbe =
 export async function probeSession(): Promise<SessionProbe> {
   let res: Response;
   try {
-    res = await fetch('/api/auth/me', { credentials: 'same-origin' });
+    res = await fetchWithTimeout('/api/auth/me', { credentials: 'same-origin' });
   } catch {
     return { status: 'unknown' };
   }

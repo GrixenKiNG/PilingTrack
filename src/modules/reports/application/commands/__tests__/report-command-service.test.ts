@@ -175,6 +175,12 @@ describe('Report Command Service', () => {
   });
 
   describe('update existing report', () => {
+    it('X5: requires the version the client actually edited', async () => {
+      mockRepoFindById.mockResolvedValue(ReportAggregate.create({ reportId: 'report-1', userId: 'user-1', siteId: 'site-1', date: '2026-04-05' }));
+      await expect(upsertReport({ reportId: 'report-1', userId: 'user-1', siteId: 'site-1', date: '2026-04-05', piles: [{ pileGradeId: 'grade-1', count: 2 }] }))
+        .rejects.toMatchObject({ status: 400 });
+      expect(mockRepoSave).not.toHaveBeenCalled();
+    });
     it('should update an existing report', async () => {
       const existingAggregate = ReportAggregate.create({
         reportId: 'report-1',
@@ -193,6 +199,7 @@ describe('Report Command Service', () => {
         siteId: 'site-1',
         date: '2026-04-05',
         piles: [{ pileGradeId: 'grade-1', count: 10 }],
+        expectedVersion: existingAggregate.getState().version,
       };
 
       const result = await upsertReport(input);
@@ -224,6 +231,7 @@ describe('Report Command Service', () => {
         siteId: 'site-1',
         date: '2026-04-03',
         piles: [{ pileGradeId: 'grade-1', count: 5 }],
+        expectedVersion: existingAggregate.getState().version,
       };
 
       await expect(upsertReport(input, { enforceEditWindow: true })).rejects.toThrow(
@@ -253,6 +261,7 @@ describe('Report Command Service', () => {
         siteId: 'site-1',
         date: '2026-04-03',
         piles: [{ pileGradeId: 'grade-1', count: 5 }],
+        expectedVersion: existingAggregate.getState().version,
       };
 
       const result = await upsertReport(input, { enforceEditWindow: false });
@@ -310,6 +319,7 @@ describe('Report Command Service', () => {
         siteId: 'site-1',
         date: '2026-04-05',
         piles: [{ pileGradeId: 'grade-1', count: 5 }],
+        expectedVersion: existingAggregate.getState().version,
       };
     }
 
@@ -384,6 +394,7 @@ describe('Report Command Service', () => {
           siteId: 'site-1',
           date: '2026-04-05',
           piles: [{ pileGradeId: 'grade-1', count: 5 }],
+          expectedVersion: existingAggregate.getState().version,
         },
         { enforceEditWindow: true },
       ).then(
@@ -530,6 +541,7 @@ describe('Report Command Service', () => {
         siteId: 'site-1',
         date: '2026-04-05',
         piles: [{ pileGradeId: 'grade-1', count: 7 }],
+        expectedVersion: own.getState().version,
       });
 
       expect(mockRepoSave).toHaveBeenCalledTimes(1);
@@ -585,6 +597,7 @@ describe('Report Command Service', () => {
         tenantId: 'tenant-a',
         date: '2026-04-05',
         piles: [{ pileGradeId: 'grade-1', count: 7 }],
+        expectedVersion: legacy.getState().version,
       });
 
       expect(mockRepoSave).toHaveBeenCalledTimes(1);

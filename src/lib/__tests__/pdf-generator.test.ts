@@ -158,6 +158,19 @@ const singleReportWithPiles = (
 });
 
 describe('pdf-generator', () => {
+  it('X6: prints ending readings in single and period PDFs, including zero', async () => {
+    const { generateSinglePdf, generatePeriodPdf } = await import('@/lib/pdf-generator');
+    const report = { ...singleReportWithPiles([]), endingEngineHours: 1234, endingFuelPercent: 0 };
+    const single = await capturePdfText(async () => { await generateSinglePdf(report); });
+    expect(single).toEqual(expect.arrayContaining(['Моточасы, итог', '1234 м/ч', 'Топливо, итог', '0 %']));
+    const period = await capturePdfText(async () => {
+      await generatePeriodPdf({ dateFrom: report.date, dateTo: report.date, siteId: 'site-1', reports: [report], totalPiles: 0, totalDrilling: 0, totalDowntime: 0 });
+    });
+    expect(period.join(' ')).toContain('1234 м/ч');
+    expect(period.join(' ')).toContain('0 %');
+    const unknown = await capturePdfText(async () => { await generateSinglePdf(singleReportWithPiles([])); });
+    expect(unknown).toContain('не указано');
+  }, 30_000);
   it('generates a single-report PDF in-process', async () => {
     const { generateSinglePdf } = await import('@/lib/pdf-generator');
 

@@ -15,6 +15,8 @@ import {
 import {validatePassport} from '../../domain/pile-passport';
 import {safetyChecklistPeriod} from '../../domain/safety-checklist-period';
 import {findDowntimeConflict} from '../../domain/downtime-interval';
+import {SHIFT_WINDOW} from '../../domain/shift-window';
+import {validateDowntimeWithinShift} from '@/modules/reports';
 import type {ReadWeather} from '../../domain/view-contracts';
 import {
   OperatorCommandError, requireCrew, requireOpenShift, ensureReport, businessReportId,
@@ -217,7 +219,7 @@ export async function logProduction(input: {
     // сдачи живёт до передачи машины, и записи продолжали ложиться в уже
     // сданный отчёт: событие «сдан» ушло с одними итогами, а в отчёте — другие.
     // Простой тоже: сданный отчёт уже сказал, сколько машина стояла.
-    const report = await tx.report.findUnique({where: {id: reportId}, select: {status: true}});
+    const report = await tx.report.findUnique({where: {id: reportId}, select: {status: true, shiftStart: true, shiftEnd: true}});
     if (report?.status === 'submitted') {
       throw new OperatorCommandError(
         409,
@@ -227,6 +229,20 @@ export async function logProduction(input: {
     }
 
     const {entry} = input;
+    const checkDowntimeTotal = async (hours: number) => {
+      const recorded = await tx.reportDowntime.findMany({
+        where: {tenantId: input.tenantId, reportId}, select: {duration: true},
+      });
+      // До закрытия мобильной смены фактические часы отчёта ещё не заполнены.
+      // Используем расписание организации, а не время, проведённое в приложении.
+      const window = SHIFT_WINDOW[shift.type];
+      const clock = (hour: number) => `${String(hour % 24).padStart(2, '0')}:00`;
+      validateDowntimeWithinShift(
+        report?.shiftStart ?? clock(window.startHour),
+        report?.shiftEnd ?? clock(window.endHour),
+        [...recorded, {duration: hours}],
+      );
+    };
 
     /*
       ЗАПРЕТ ПРОВЕРЯЕТСЯ ЗДЕСЬ И ТОЛЬКО ДЛЯ ВЫРАБОТКИ.
@@ -423,6 +439,7 @@ export async function logProduction(input: {
       }
 
       const reason = await requireDowntimeReason(tx, input.tenantId, entry.reasonId);
+      await checkDowntimeTotal(hours);
       await tx.reportDowntime.create({
         data: {
           reportId,
@@ -506,6 +523,7 @@ export async function logProduction(input: {
       }
 
       const reason = await requireDowntimeReason(tx, input.tenantId, entry.reasonId);
+      await checkDowntimeTotal(hours);
       await tx.reportDowntime.create({
         data: {
           reportId,

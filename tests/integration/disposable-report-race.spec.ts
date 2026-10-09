@@ -23,12 +23,18 @@ describe.skipIf(!process.env.CODEX_STAND_URL || !process.env.INTEGRATION_DATABAS
   });
   afterAll(async () => {
     if (!fixture) return;
+    await fixture.owner.query('DELETE FROM "MeterReading" WHERE "equipmentId"=$1',[fixture.id(tenant,'Equipment')]);
     await fixture.owner.query('DELETE FROM "Report" WHERE id=$1',[fixture.id(tenant,'Report')]);
     await fixture.owner.query('DELETE FROM "PileGrade" WHERE id=$1',[grade]);
     await fixture.owner.query('DELETE FROM "UserSiteAssignment" WHERE id=$1',[tenant+'-assignment']);
     await fixture.close();
   });
   it('один победитель, второй 409; данные победителя сохранены', async () => {
+    const missingVersion = await fetch(base+'/api/reports/upsert', {
+      method:'POST', headers:{Cookie:cookie,Origin:base,'Content-Type':'application/json','Idempotency-Key':randomUUID()},
+      body:JSON.stringify({reportId:fixture.id(tenant,'Report'),siteId:fixture.id(tenant,'Site'),date:'2026-10-02',piles:[{pileGradeId:grade,count:99}]}),
+    });
+    expect(missingVersion.status, JSON.stringify(await missingVersion.json())).toBe(400);
     const save = (count: number) => fetch(base+'/api/reports/upsert',{method:'POST',headers:{Cookie:cookie,Origin:base,'Content-Type':'application/json','Idempotency-Key':randomUUID()},body:JSON.stringify({reportId:fixture.id(tenant,'Report'),siteId:fixture.id(tenant,'Site'),date:'2026-10-02',version:1,piles:[{pileGradeId:grade,count}]})});
     const results = await Promise.all([save(5),save(7)]);
     const bodies = await Promise.all(results.map(r=>r.json()));
@@ -37,5 +43,22 @@ describe.skipIf(!process.env.CODEX_STAND_URL || !process.env.INTEGRATION_DATABAS
     expect(saved.rows[0].version).toBe(2);
     const piles = await fixture.owner.query('SELECT sum(count)::int AS count FROM "PileWork" WHERE "reportId"=$1',[fixture.id(tenant,'Report')]);
     expect(piles.rows[0].count).toBe(results[0].status===200?5:7);
+  });
+  it('X6: web report snapshots only accepted engine hours, preserving a rejected decrease', async () => {
+    const save = (version: number, engineHours: number) => fetch(base+'/api/reports/upsert', {
+      method:'POST', headers:{Cookie:cookie,Origin:base,'Content-Type':'application/json','Idempotency-Key':randomUUID()},
+      body:JSON.stringify({reportId:fixture.id(tenant,'Report'),siteId:fixture.id(tenant,'Site'),date:'2026-10-02',version,equipmentId:fixture.id(tenant,'Equipment'),engineHours,piles:[{pileGradeId:grade,count:5}]}),
+    });
+    const accepted = await save(2,1234);
+    const acceptedBody = await accepted.json();
+    expect(accepted.status,JSON.stringify(acceptedBody)).toBe(200);
+    expect(acceptedBody.meterError).toBeNull();
+    expect(acceptedBody.report.report.endingEngineHours).toBe(1234);
+    const rejected = await save(3,1230);
+    const rejectedBody = await rejected.json();
+    expect(rejected.status,JSON.stringify(rejectedBody)).toBe(200);
+    expect(rejectedBody.meterError).toBeTruthy();
+    const stored = await fixture.owner.query('SELECT "endingEngineHours", "endingFuelPercent" FROM "Report" WHERE id=$1',[fixture.id(tenant,'Report')]);
+    expect(stored.rows[0]).toEqual({endingEngineHours:1234,endingFuelPercent:null});
   });
 });

@@ -111,6 +111,10 @@ export class PrismaReportRepository implements ReportRepository {
         select: { id: true, version: true, tenantId: true, shiftId: true },
       });
 
+      if (existing && hooks?.expectedVersion === undefined) {
+        throw new ServiceError('Для правки существующего отчёта обязательна version. Обновите форму.', 400);
+      }
+
       // Optimistic-concurrency guard (race-free: the version is read in the
       // same tx that writes). If the caller passed the version it edited and
       // the stored row has moved on, abort so the loser can reload instead of
@@ -319,6 +323,16 @@ export class PrismaReportRepository implements ReportRepository {
     const state = fromPrismaToState(prismaReport);
     return ReportAggregate.reconstitute(state);
   }
+}
+
+// Показание подтверждено журналом техники после сохранения веб-отчёта.
+// Запоздалый ответ не должен менять снимок уже отредактированного отчёта.
+export async function saveReportEndingEngineHours(input: {
+  reportId: string; version: number; equipmentId: string; tenantId: string; engineHours: number;
+}): Promise<boolean> {
+  const {engineHours, ...where} = input;
+  const result = await db.report.updateMany({where, data: {endingEngineHours: engineHours}});
+  return result.count === 1;
 }
 
 // Singleton instance

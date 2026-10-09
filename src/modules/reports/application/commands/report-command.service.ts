@@ -187,6 +187,10 @@ export async function upsertReport(
         select: { submittedAt: true },
       });
 
+      if (input.expectedVersion === undefined) {
+        throw new ServiceError('Для правки существующего отчёта обязательна version. Обновите форму.', 400);
+      }
+
       // Отчёт идущей смены пишется с экрана смены. Сдача его здесь закрыла бы
       // запись выработки до конца смены (сданный отчёт новых записей не берёт).
       // Связи Report→Shift в схеме нет, только shiftId, — отсюда второй запрос.
@@ -322,7 +326,7 @@ export async function upsertReport(
         await validateAgainstSitePlans(saveTx, input.siteId, input.piles || [], previousCountByGrade);
         await writeReportAuditRow(auditRecord, saveTx);
       },
-      expectedVersion: input.expectedVersion ?? existing?.getState().version,
+      expectedVersion: input.expectedVersion,
     }, tx);
 
     return { auditRecord, action, events: aggregate.getPendingEvents() };

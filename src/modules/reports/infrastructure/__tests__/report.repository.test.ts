@@ -27,12 +27,23 @@ const tx = {
 vi.mock('@/lib/db', () => ({
   DEFAULT_TX_OPTIONS: {},
   db: {
+    get report() { return tx.report; },
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test transaction shim
     $transaction: (cb: any) => cb(tx),
   },
 }));
 
-import { PrismaReportRepository } from '../report.repository';
+import { PrismaReportRepository, saveReportEndingEngineHours } from '../report.repository';
+
+it('X6: binds accepted readings to the saved report version and equipment', async () => {
+  tx.report.updateMany.mockResolvedValueOnce({ count: 1 });
+  expect(await saveReportEndingEngineHours({ reportId: 'r1', version: 5, equipmentId: 'eq1', tenantId: 't1', engineHours: 0 })).toBe(true);
+  expect(tx.report.updateMany).toHaveBeenCalledWith({
+    where: { reportId: 'r1', version: 5, equipmentId: 'eq1', tenantId: 't1' }, data: { endingEngineHours: 0 },
+  });
+  tx.report.updateMany.mockResolvedValueOnce({ count: 0 });
+  expect(await saveReportEndingEngineHours({ reportId: 'r1', version: 5, equipmentId: 'eq1', tenantId: 't1', engineHours: 1234 })).toBe(false);
+});
 
 function makeUpdateAggregate(): ReportAggregate {
   const aggregate = ReportAggregate.create({
@@ -72,14 +83,34 @@ describe('PrismaReportRepository optimistic concurrency', () => {
     expect(tx.reportVersion.create).toHaveBeenCalledTimes(1);
   });
 
-  it('skips the check (last-write-wins) when expectedVersion is undefined', async () => {
+  it('X5: rejects an existing report without expectedVersion before writing', async () => {
     tx.report.findUnique.mockResolvedValue({ id: 'rep-internal', version: 99 });
 
     await expect(
       repo.save(makeUpdateAggregate(), {}),
-    ).resolves.toBeUndefined();
+    ).rejects.toMatchObject({ status: 400 });
 
-    expect(tx.reportVersion.create).toHaveBeenCalledTimes(1);
+    expect(tx.reportVersion.create).not.toHaveBeenCalled();
+    expect(tx.report.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('X5: only one of two edits based on version 5 is accepted', async () => {
+    let version = 5;
+    tx.report.findUnique.mockImplementation(async () => ({ id: 'rep-internal', version }));
+    tx.report.updateMany.mockImplementation(async ({ where }: { where: { version: number } }) => {
+      if (where.version !== version) return { count: 0 };
+      version++;
+      return { count: 1 };
+    });
+    try {
+      const edits = await Promise.allSettled([
+        repo.save(makeUpdateAggregate(), { expectedVersion: 5 }),
+        repo.save(makeUpdateAggregate(), { expectedVersion: 5 }),
+      ]);
+      expect(edits.filter((edit) => edit.status === 'fulfilled')).toHaveLength(1);
+      expect(edits.find((edit) => edit.status === 'rejected')).toMatchObject({ reason: { status: 409 } });
+      expect(version).toBe(6);
+    } finally { tx.report.updateMany.mockResolvedValue({ count: 1 }); }
   });
 });
 

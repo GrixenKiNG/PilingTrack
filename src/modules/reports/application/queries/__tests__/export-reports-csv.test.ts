@@ -10,13 +10,14 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 type Sheet = { name: string; rows: (string | number | null)[][] };
 
-const { findManyMock, getSettingsMock, sheets } = vi.hoisted(() => ({
+const { findManyMock, findUniqueMock, getSettingsMock, sheets } = vi.hoisted(() => ({
   findManyMock: vi.fn(),
+  findUniqueMock: vi.fn(),
   getSettingsMock: vi.fn(),
   sheets: { current: [] as Sheet[] },
 }));
 
-vi.mock('@/lib/db', () => ({ db: { report: { findMany: findManyMock } } }));
+vi.mock('@/lib/db', () => ({ db: { report: { findMany: findManyMock, findUnique: findUniqueMock } } }));
 
 vi.mock('@/modules/settings', () => ({ getSettings: getSettingsMock }));
 
@@ -28,6 +29,31 @@ vi.mock('@/lib/xlsx-writer', () => ({
 }));
 
 import { exportReportsCsv, exportReportsXlsx } from '../report-query.service';
+
+it('X6: exports ending engine hours and fuel as numbers, preserving zero and unknown', async () => {
+  getSettingsMock.mockResolvedValue({ timezone: 'Europe/Moscow' });
+  const report = { reportId: 'readings', date: '2026-10-09', shiftType: 'DAY', status: 'submitted', site: { name: 'S' }, user: { name: 'U' }, piles: [], drillings: [], downtimes: [], endingEngineHours: 1234, endingFuelPercent: 0 };
+  findManyMock.mockResolvedValue([report]);
+  await exportReportsXlsx({ tenantId: 'tenant-a' });
+  let rows = sheets.current.find((sheet) => sheet.name === 'Итоги')?.rows ?? [];
+  expect(rows[1][rows[0].indexOf('Моточасы на конец, м/ч')]).toBe(1234);
+  expect(rows[1][rows[0].indexOf('Остаток топлива, %')]).toBe(0);
+  const csv = await exportReportsCsv({ tenantId: 'tenant-a' });
+  expect(csv).toContain('Моточасы на конец, м/ч;Остаток топлива, %');
+  expect(csv).toContain('"1234";"0"');
+  findManyMock.mockResolvedValue([{ ...report, endingEngineHours: null, endingFuelPercent: null }]);
+  await exportReportsXlsx({ tenantId: 'tenant-a' });
+  rows = sheets.current.find((sheet) => sheet.name === 'Итоги')?.rows ?? [];
+  expect(rows[1][rows[0].indexOf('Моточасы на конец, м/ч')]).toBeNull();
+  expect(rows[1][rows[0].indexOf('Остаток топлива, %')]).toBeNull();
+});
+
+it('X6: carries the stored ending readings into the PDF job payload', async () => {
+  const { loadSingleReportPdfContext } = await import('@/lib/pdf-data');
+  findUniqueMock.mockResolvedValue({ reportId: 'r1', date: '2026-10-09', tenantId: 't1', endingEngineHours: 1234, endingFuelPercent: 0, crew: { assistants: [], equipment: null }, piles: [], drillings: [], downtimes: [] });
+  getSettingsMock.mockResolvedValue({});
+  expect((await loadSingleReportPdfContext('r1'))?.pdfData).toMatchObject({ endingEngineHours: 1234, endingFuelPercent: 0 });
+});
 
 describe('exportReportsCsv — tenant scoping', () => {
   beforeEach(() => {

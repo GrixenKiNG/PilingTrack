@@ -43,7 +43,7 @@ function OperatorLayout({ children }: { children: React.ReactNode }) {
     resolveEffectiveRole(user?.role || 'OPERATOR', actingAs) as UserRole];
 
   const nav = (
-    <nav className="fixed bottom-0 left-0 right-0 z-30 bg-card/95 backdrop-blur-sm border-t safe-area-bottom">
+    <nav className="fixed bottom-0 left-0 right-0 z-30 bg-card/95 backdrop-blur-sm border-t pb-safe">
       <div className="flex items-center justify-around py-2 px-2">
         {navItems.map((item) => {
           const href = item.href === '/operator' && (pathname === '/operator/v3' || pathname.startsWith('/operator/v3/'))

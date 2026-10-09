@@ -5,6 +5,10 @@ name: Deploy to prod
 on:
   workflow_dispatch:
     inputs:
+      sha:
+        description: 'Full 40-character commit SHA on main with a successful CI run'
+        required: true
+        type: string
       external_workers_stopped:
         description: 'External standalone/systemd/pm2/other-host workers and their auto-restart have been stopped and verified'
         required: true
@@ -24,12 +28,18 @@ concurrency:
   group: deploy-prod
   cancel-in-progress: false
 
+permissions:
+  contents: read
+  actions: read
+
 jobs:
   deploy:
     name: SSH + rebuild + restart
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment: production
+    env:
+      DEPLOY_SHA: ${{ inputs.sha }}
 
     steps:
       - name: Confirm external worker barrier
@@ -40,6 +50,18 @@ jobs:
           [ "$CONFIRMED" = true ] || { echo '::error::Stop and verify all external workers before deployment'; exit 1; }
           case "$SERVICES" in app|workers|"app workers") ;; *) echo '::error::Unknown service'; exit 1 ;; esac
 
+      - name: Verify CI for requested SHA
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          [[ "$DEPLOY_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo '::error::Provide a full lowercase commit SHA'; exit 1; }
+          RUNS=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?head_sha=$DEPLOY_SHA&branch=main&event=push&per_page=1")
+          echo "$RUNS" | jq -e --arg sha "$DEPLOY_SHA" '
+            .workflow_runs[0] |
+            .head_sha == $sha and .head_branch == "main" and .event == "push" and
+            .status == "completed" and .conclusion == "success"
+          ' > /dev/null || { echo '::error::Latest CI run for this SHA on main has not passed'; exit 1; }
+
       - name: Install SSH key
         env:
           SSH_PRIVATE_KEY: ${{ secrets.PROD_SSH_KEY }}
@@ -49,7 +71,7 @@ jobs:
           chmod 600 ~/.ssh/id
           ssh-keyscan -H 87.242.102.125 >> ~/.ssh/known_hosts
 
-      - name: Pull, rebuild, restart
+      - name: Checkout, rebuild, restart
         env:
           SERVICES: ${{ inputs.services }}
         run: |
@@ -64,8 +86,10 @@ jobs:
               old_image=\$(docker inspect --format '{{.Image}}' \"pilingtrack-\$s\")
               docker tag \"\$old_image\" \"pilingtrack-\$s:\$ROLLBACK\"
             done
-            git pull origin main
-            export APP_VERSION=\$(git rev-parse --short HEAD)
+            git fetch origin main
+            git merge-base --is-ancestor '$DEPLOY_SHA' origin/main
+            git checkout --detach '$DEPLOY_SHA'
+            export APP_VERSION='$DEPLOY_SHA'
             SVCS=\"app workers\"
             # A new Prisma migration means the 'migrate' image must be rebuilt
             # too — it bakes prisma/migrations at build time, so building only
@@ -103,23 +127,18 @@ jobs:
 
       - name: Verify health + deployed SHA
         run: |
-          # Expected SHA = current prod HEAD (the step above pulled main there).
-          EXPECTED=$(ssh -i ~/.ssh/id user1@87.242.102.125 "git -C /opt/pilingtrack rev-parse --short HEAD")
+          EXPECTED="$DEPLOY_SHA"
           echo "Expected version: $EXPECTED"
           for i in $(seq 1 30); do
-            if curl -sf https://orionpiling.ru/api/health > /dev/null; then
-              BODY=$(curl -s https://orionpiling.ru/api/health)
-              echo "$BODY"
-              ACTUAL=$(echo "$BODY" | grep -o '"version":"[^"]*"' | cut -d'"' -f4)
+            if BODY=$(curl --connect-timeout 3 --max-time 5 -sf https://orionpiling.ru/api/health); then
+              ACTUAL=$(echo "$BODY" | jq -r '.version // empty' 2>/dev/null || true)
               # All service choices replace app+workers, so always verify app SHA.
-              if [ "$ACTUAL" != "$EXPECTED" ]; then
-                echo "::error::Version mismatch: health reports '$ACTUAL', expected '$EXPECTED'"
-                exit 1
+              if [ "$ACTUAL" = "$EXPECTED" ]; then
+                exit 0
               fi
-              exit 0
+              echo "Waiting for version '$EXPECTED'; health reports '$ACTUAL' (attempt $i/30)"
             fi
             sleep 3
           done
-          echo "Health check timed out after 90s"
-          curl -s https://orionpiling.ru/api/health
+          echo '::error::Health did not report the requested SHA after 30 attempts'
           exit 1

@@ -16,6 +16,8 @@ interface SingleReportContextReport {
   shiftEnd: string | null;
   shiftType: string;
   status: string;
+  endingEngineHours?: number | null;
+  endingFuelPercent?: number | null;
   lastEditedByName: string | null;
   lastEditedByRole: string | null;
   equipment: { name: string } | null;
@@ -213,6 +215,8 @@ function toSingleReportPdfData(
     shiftEnd: report.shiftEnd,
     shiftType: report.shiftType,
     status: report.status,
+    endingEngineHours: report.endingEngineHours,
+    endingFuelPercent: report.endingFuelPercent,
     lastEditedByName: report.lastEditedByName,
     lastEditedByRole: report.lastEditedByRole,
     assistantName: crewData.assistantName,

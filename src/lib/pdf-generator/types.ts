@@ -20,6 +20,8 @@ export interface SingleReportData {
   shiftEnd: string | null;
   shiftType: string;
   status: string;
+  endingEngineHours?: number | null;
+  endingFuelPercent?: number | null;
   lastEditedByName: string | null;
   lastEditedByRole: string | null;
   assistantName: string;
@@ -50,6 +52,8 @@ export interface PeriodReportRow {
   date?: string | null;
   shiftType?: string | null;
   status?: string | null;
+  endingEngineHours?: number | null;
+  endingFuelPercent?: number | null;
   assistantName?: string | null;
   equipmentName?: string | null;
   user?: { name?: string | null } | null;
