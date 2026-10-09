@@ -113,7 +113,7 @@ export async function updateTelegramConfig(
   // before touching it — id alone is not enough.
   const existing = await db.telegramConfig.findFirst({ where: { id, tenantId }, select: { id: true } });
   if (!existing) {
-    throw new ServiceError('Config not found', 404);
+    throw new ServiceError('Конфигурация не найдена — возможно, удалена. Обновите список.', 404);
   }
 
   const data: Record<string, unknown> = {};
@@ -132,7 +132,7 @@ export async function updateTelegramConfig(
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Internal error';
     if (message.includes('Record to update not found')) {
-      throw new ServiceError('Config not found', 404);
+      throw new ServiceError('Конфигурация не найдена — возможно, удалена. Обновите список.', 404);
     }
     throw error;
   }
@@ -147,7 +147,7 @@ export async function deleteTelegramConfig(tenantId: string, id: string) {
   // Tenant ownership (IDOR guard) before an irreversible delete.
   const existing = await db.telegramConfig.findFirst({ where: { id, tenantId }, select: { id: true } });
   if (!existing) {
-    throw new ServiceError('Config not found', 404);
+    throw new ServiceError('Конфигурация не найдена — возможно, удалена. Обновите список.', 404);
   }
 
   try {
@@ -155,7 +155,7 @@ export async function deleteTelegramConfig(tenantId: string, id: string) {
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Internal error';
     if (message.includes('Record to delete not found')) {
-      throw new ServiceError('Config not found', 404);
+      throw new ServiceError('Конфигурация не найдена — возможно, удалена. Обновите список.', 404);
     }
     throw error;
   }

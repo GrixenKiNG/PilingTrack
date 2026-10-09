@@ -250,6 +250,15 @@ describe('updateTelegramConfig', () => {
     expect(mocks.update).not.toHaveBeenCalled();
   });
 
+  // AU71: сообщение об отсутствующей записи уходит прямо в тост администратора,
+  // поэтому оно должно быть по-русски и подсказывать следующий шаг.
+  it('отдаёт русский текст, когда запись не найдена', async () => {
+    mocks.findFirst.mockResolvedValue(null);
+    await expect(updateTelegramConfig(TENANT_A, 'cfg-1', { label: 'X' })).rejects.toMatchObject({
+      message: 'Конфигурация не найдена — возможно, удалена. Обновите список.',
+    });
+  });
+
   it('encrypts a new botToken before writing', async () => {
     mocks.update.mockResolvedValue({ id: 'cfg-1' });
 
