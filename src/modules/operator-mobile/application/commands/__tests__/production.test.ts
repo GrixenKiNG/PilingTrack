@@ -318,6 +318,28 @@ describe('logProduction — после завершения работы выр�
       finishTx.reportDowntime.create.mockResolvedValue({});
     });
 
+    it.each(['DAY', 'NIGHT'])('X4: не позволяет сумме простоев превысить плановую смену %s', async (type) => {
+      finishTx.shift.findFirst.mockResolvedValue({ ...shiftRow('STARTED'), type });
+      finishTx.reportDowntime.findMany.mockResolvedValue([{ duration: 11 }]);
+      await expect(logProduction({ ...base, clientCommandId: 'cmd-over', entry: hoursEntry(1.5) }))
+        .rejects.toMatchObject({ status: 400, message: expect.stringContaining('превышает продолжительность смены') });
+      expect(finishTx.reportDowntime.create).not.toHaveBeenCalled();
+    });
+
+    it('X4: использует длительность из отчёта, если часы смены заданы', async () => {
+      finishTx.report.findUnique.mockResolvedValue({ status: 'draft', shiftStart: '08:00', shiftEnd: '16:00' });
+      finishTx.reportDowntime.findMany.mockResolvedValue([{ duration: 7 }]);
+      await expect(logProduction({ ...base, clientCommandId: 'cmd-short', entry: hoursEntry(1.5) }))
+        .rejects.toMatchObject({ status: 400 });
+      expect(finishTx.reportDowntime.create).not.toHaveBeenCalled();
+    });
+
+    it('X4: принимает сумму ровно по длительности смены', async () => {
+      finishTx.reportDowntime.findMany.mockResolvedValue([{ duration: 10.5 }]);
+      await expect(logProduction({ ...base, clientCommandId: 'cmd-full', entry: hoursEntry(1.5) }))
+        .resolves.toEqual({ reportId: 'report-1' });
+    });
+
     it('записывает ровно введённые часы, без начала и конца и без сверки со временем', async () => {
       await expect(logProduction({
         ...base, clientCommandId: 'cmd-h-1', entry: hoursEntry(1.5),
@@ -330,10 +352,12 @@ describe('logProduction — после завершения работы выр�
       expect(data.startedAt).toBeUndefined();
       expect(data.endedAt).toBeUndefined();
       // Пересечение с другими простоями и начало смены не сверяются.
-      expect(finishTx.reportDowntime.findMany).not.toHaveBeenCalled();
+      expect(finishTx.reportDowntime.findMany).toHaveBeenCalledWith({
+        where: { tenantId: 'tenant-a', reportId: 'report-1' }, select: { duration: true },
+      });
     });
 
-    it.each([0.25, 0.5, 1, 2.75, 24])('принимает %s ч', async (hours) => {
+    it.each([0.25, 0.5, 1, 2.75, 12])('принимает %s ч', async (hours) => {
       await expect(logProduction({
         ...base, clientCommandId: 'cmd-h-ok', entry: hoursEntry(hours),
       })).resolves.toEqual({reportId: 'report-1'});
@@ -348,6 +372,13 @@ describe('logProduction — после завершения работы выр�
       await expect(logProduction({
         ...base, clientCommandId: 'cmd-h-bad', entry: hoursEntry(hours),
       })).rejects.toThrow(message);
+      expect(finishTx.reportDowntime.create).not.toHaveBeenCalled();
+    });
+
+    it('X4: старый клиент с интервалом не обходит проверку суммы', async () => {
+      finishTx.reportDowntime.findMany.mockResolvedValueOnce([]).mockResolvedValueOnce([{ duration: 12 }]);
+      await expect(logProduction({ ...base, clientCommandId: 'cmd-interval-over', entry: input.entry }))
+        .rejects.toMatchObject({ status: 400 });
       expect(finishTx.reportDowntime.create).not.toHaveBeenCalled();
     });
   });
