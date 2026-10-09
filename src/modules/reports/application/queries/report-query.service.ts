@@ -45,7 +45,7 @@ export async function getEditableReport(
   date: string | null
 ) {
   if (!siteId || !date) {
-    throw new ServiceError('siteId, date required', 400);
+    throw new ServiceError('Выберите объект и дату.', 400);
   }
 
   const userId = resolveReportUserId(sessionUser, requestedUserId);
@@ -75,7 +75,7 @@ export async function getReportsByPeriod(
   userId?: string | null
 ) {
   if (!dateFrom || !dateTo) {
-    throw new ServiceError('dateFrom and dateTo are required', 400);
+    throw new ServiceError('Укажите начало и конец периода.', 400);
   }
 
   // Use raw SQL for performance — 4-10x faster than Prisma includes

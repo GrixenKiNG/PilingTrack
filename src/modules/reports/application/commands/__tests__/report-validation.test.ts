@@ -39,7 +39,7 @@ describe('Report Validation', () => {
           userId: 'u1',
           date: '2026-04-10',
         })
-      ).toThrow('Missing required fields');
+      ).toThrow('Заполните обязательные поля отчёта.');
     });
 
     it('should throw when siteId is missing', () => {
@@ -49,7 +49,7 @@ describe('Report Validation', () => {
           userId: 'u1',
           date: '2026-04-10',
         })
-      ).toThrow('Missing required fields');
+      ).toThrow('Заполните обязательные поля отчёта.');
     });
   });
 
@@ -226,7 +226,7 @@ describe('Report Validation', () => {
     });
 
     it('should throw for missing required fields', () => {
-      expect(() => validateReportInput({})).toThrow('Missing required fields');
+      expect(() => validateReportInput({})).toThrow('Заполните обязательные поля отчёта.');
     });
   });
 

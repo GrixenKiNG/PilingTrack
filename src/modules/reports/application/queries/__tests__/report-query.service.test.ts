@@ -39,7 +39,7 @@ vi.mock('@/lib/xlsx-writer', () => ({
   },
 }));
 
-import { exportReportsCsv, exportReportsXlsx, listReportsForReview, listReportsForUserScope } from '../report-query.service';
+import { exportReportsCsv, exportReportsXlsx, listReportsForReview, listReportsForUserScope, getEditableReport, getReportsByPeriod } from '../report-query.service';
 
 describe('exportReportsCsv — tenant isolation', () => {
   beforeEach(() => {
@@ -296,5 +296,20 @@ describe('listReportsForReview — устойчивые страницы (F-R140
     expect(findMany).toHaveBeenCalledWith(
       expect.objectContaining({ orderBy: [{ date: 'desc' }, { id: 'desc' }] }),
     );
+  });
+});
+
+// AU70: отказы при нехватке параметров показывались по-английски и с именами
+// полей (siteId, dateFrom). Тексты переведены, поведение (400 и порядок
+// проверок до обращения к базе) не менялось.
+describe('русские тексты отказов при нехватке параметров (AU70)', () => {
+  it('getEditableReport без объекта и даты говорит, что выбрать', async () => {
+    await expect(
+      getEditableReport({ id: 'u1', role: 'OPERATOR' }, null, null, null),
+    ).rejects.toThrow('Выберите объект и дату.');
+  });
+
+  it('getReportsByPeriod без начала и конца периода просит указать период', async () => {
+    await expect(getReportsByPeriod(null, null)).rejects.toThrow('Укажите начало и конец периода.');
   });
 });

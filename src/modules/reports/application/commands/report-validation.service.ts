@@ -48,7 +48,7 @@ export function validateReportRequiredFields(input: {
   date?: string;
 }) {
   if (!input.reportId || !input.siteId || !input.userId || !input.date) {
-    throw new ServiceError('Missing required fields', 400);
+    throw new ServiceError('Заполните обязательные поля отчёта.', 400);
   }
 }
 
