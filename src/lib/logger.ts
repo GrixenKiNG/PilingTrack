@@ -54,7 +54,12 @@ function formatEntry(
     ...data,
   };
 
-  return JSON.stringify(entry);
+  return JSON.stringify(entry, (key, value: unknown) => {
+    const normalized = key.toLowerCase().replace(/[-_]/g, '');
+    const sensitive = /password|authorization|cookie|secret|initdata|phone|email/.test(normalized)
+      || /token(?:hash|value)?$/.test(normalized);
+    return sensitive && value != null ? '[REDACTED]' : value;
+  });
 }
 
 function shouldLog(level: LogLevel): boolean {
