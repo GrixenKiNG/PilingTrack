@@ -1,0 +1,68 @@
+# AU123-S5-SENSITIVE-DATA-INVENTORY — Персональные данные: где хранятся и кто видит
+
+Версия: `git rev-parse HEAD` = `ba232f4dbd79295cb07e2d4c46e8b95b4924ffc1`
+Ветка: `hermes/q4-0926` (worktree `D:\PillingR\wt-night`). Только чтение: код приложения не изменялся.
+Отчёт создан: `docs/audits/hermes-night/AU123-S5-SENSITIVE-DATA-INVENTORY.md`
+
+## Итог
+
+Инвентаризация полей с персональными данными по `prisma/schema.prisma` (2883 строки, 41 модельное объявление с ПДн-полями; грубый счёт значимых полей — 25) и по коду чтения. Критичных утечек чужим ролям не найдено: список работников и документы закрыты правами. Крупнейшие проблемы — не доступ, а СЛЕДЫ: ПДн попадают в структурные логи и в БД-ленту без маскирования, а политики хранения нет.
+Найдено: критично — 0, важно — 4, мелочь — 6 (плюс раздел «Пройдено»).
+Топ-5:
+1. `src/services/audit/audit-service.ts:1000` — `logger.info('audit', event)` пишет событие целиком, включая metadata с email/phone/name.
+2. `src/services/users/user-service.ts:183,313,374` — email/phone/name кладутся в metadata аудита; маска (`mask.ts`) на этом пути НЕ применяется, ПДн оседают в `FeedbackEvent.metadata` и видны в ленте и в истории изменений.
+3. `src/services/reports/event-handlers.ts:642,653` — ФИО оператора уходит в Telegram (текст + имя файла) и в PDF отчёта; внешняя передача без зафиксированного срока/основания.
+4. `src/app/api/users/route.ts:25` + `src/services/auth/authorization-service.ts:82` — право `users.read` отдано FOREMAN и SAFETY_ENGINEER, а `listUsers` (`src/services/users/user-service.ts:40-42`) возвращает email и телефон ВСЕХ работников.
+5. Ретеншен ПДн отсутствует: `Media.runRetention` (`src/core/media/media-service.ts:439`) не вызывается ниоткуда (0 внешних вызовов), физического удаления файлов нет; удаление пользователя блокируется при наличии отчётов.
+
+## Методика
+
+Что искалось и как повторить (из корня репозитория, Git Bash):
+
+1. Схема ПДн: `rg -n "^\s+(email|phone|pin|pinLookup|password|userName|actorName|signedByName|instructorName|grantedByName|producerName|observerName|safetyName|lastEditedByName|chatId|botToken|latitude|longitude|contact)\s+" prisma/schema.prisma` → 25 совпадений; полное чтение `prisma/schema.prisma` (2000+ строк).
+2. Чтение полей: `rg -n "email:|phone:|pin:|name:" src/ -g '!*.test.*'`; `rg -n "select: \{ id: true, name" src/`.
+3. Права: полное чтение `src/services/auth/authorization-service.ts` (матрица `abilityRoles`).
+4. Логи: `rg -n "logger\.(info|warn|error|debug).*(email|phone|...)" src/` → 0; затем чтение `src/lib/logger.ts` (редукции ПДн нет) и `src/services/audit/audit-service.ts`.
+5. Маска аудита: `rg -n "maskAuditPayload|maskOptionalAuditPayload" src/` → только цепочка готовности.
+6. Sentry: чтение `sentry.server.config.ts`, `sentry.edge.config.ts`, `src/instrumentation-client.ts`, `src/workers/unified-worker/sentry.ts`; `rg -n "Sentry\.(setUser|captureException|...)" src/`.
+7. Экспорт/PDF/Telegram: `rg -n "phone|email" ...pdf-data.ts`, `report-export.service.ts`, `pile-journal-export.ts`; чтение `src/services/reports/event-handlers.ts:590-672`.
+8. Медиа/документы: чтение `src/core/media/media-auth.ts`, `src/services/users/user-documents.ts`, `user-document-access.ts`.
+9. Ретеншен: `rg -n "deleteMany|retention|RETENTION|cleanup" src/workers src/services src/core`; `rg -n "\.runRetention\(" src/`.
+10. Токен/сессия: чтение `src/services/auth/session-service.ts:189-210`, `src/lib/auth.ts`.
+
+Ограничения: строки БД в проде не читались (нет доступа), «фактические» объёмы ПДн — НЕ ПРОВЕРЕНО. Прод — один тенант (`orion`), поэтому кросс-тенантные замечания помечены как «до второго тенанта».
+
+## Находки
+
+| # | severity | path:line | Проблема | Сценарий / почему важно | Как чинить |
+|---|---|---|---|---|---|
+| 1 | важно | `D:\PillingR\wt-night\src\services\audit\audit-service.ts:1000` | `logger.info('audit', event as unknown as Record<string, unknown>)` логирует событие аудита ЦЕЛИКОМ, включая `metadata`. Редукции ПДн в `src/lib/logger.ts` нет (файл прочитан целиком). | События `user.created`/`user.updated` несут в metadata email, phone, name (см. #2), а `auth.login.failed`/`succeeded` — email (`src/app/api/auth/login/route.ts:78,90`). Все они уходят в структурные JSON-логи (Loki), откуда доступны всем, кто логи читает; логи не чистятся. | Логировать только безопасные поля (`action`, `scope`, `actorId`, `requestId`) либо прогонять metadata через уже существующий `maskOptionalAuditPayload` (`src/modules/readiness/domain/audit/mask.ts:33`) перед `logger`. |
+| 2 | важно | `D:\PillingR\wt-night\src\services\users\user-service.ts:183,313,374` | `recordAuditEvent` кладёт в `metadata` email (создание/удаление) и снимки `before/after` с email, phone, name (правка, строки 312-313 указывают на выборки 244 и 294). Путь `recordAuditEvent` → `recordFeedbackEvent` (`src/services/feedback/feedback-event-service.ts:128`) пишет metadata в `FeedbackEvent.metadata` без маски; `mask.ts` применяется только в цепочке готовности (`src/modules/readiness/infrastructure/audit/append-audit.ts:71`). | ПДн работников оседают в таблице `FeedbackEvent` (ПДн-полей у неё нет, но metadata произвольна) и показываются в UI: лента (`feedback-event-service.ts:74`, `mapEvent` возвращает metadata) и история изменений (`src/services/audit/audit-history-service.ts:57`, метка `email: 'Email'`). Удалить пользователя, не потеряв снимок email/телефона, нельзя. | Не класть email/phone в metadata аудита либо маскировать на входе `recordAuditEvent`. |
+| 3 | важно | `D:\PillingR\wt-night\src\services\reports\event-handlers.ts:642,653` | ФИО оператора уходит в Telegram в тексте сообщения (`👷 Оператор: <b>...</b>`) и в имени файла PDF (`report-${date}-${user.name}.pdf`); сам PDF (`src/lib/pdf-generator/single-pdf.ts:43-44`) печатает ФИО оператора и помощника. Отправка — `deliverReportPdf` → `telegramNotifier.sendDocument` (строка 665). | Персональные данные (ФИО) передаются стороннему сервису (Telegram) при каждом сданном отчёте и остаются в истории чата бессрочно; в коде нет ни согласия, ни срока. Для оператора с телефоном это форма «внешней» передачи ПДн. | Зафиксировать решение владельца (какие поля допустимо слать во внешний чат) и/или заменить ФИО на табельный/ID в подписи и имени файла. |
+| 4 | важно | `D:\PillingR\wt-night\src\app\api\users\route.ts:25` + `D:\PillingR\wt-night\src\services\auth\authorization-service.ts:82` | `GET /api/users` требует `users.read`; право выдано ADMIN, DISPATCHER, FOREMAN, SAFETY_ENGINEER. `listUsers` (`src/services/users/user-service.ts:40-42`) возвращает `email` и `phone` каждого работника. | FOREMAN («Мастер») и SAFETY_ENGINEER («Инженер ОТ») видят email и телефоны всех работников, хотя для их задач (закрепить/допустить/отфильтровать) достаточно ФИО, роли и активности. Перечень полей избыточен для этих ролей. | В выдачу для ролей без `users.manage` не включать `email`/`phone` (оставить `id`, `name`, `role`, `isActive`, объекты). |
+| 5 | важно | `D:\PillingR\wt-night\src\core\media\media-service.ts:439` | `runRetention(retentionDays = 90)` объявлен, но не вызывается ни в одном файле (`rg "\.runRetention\(" src/` — 0 внешних вызовов). Soft-delete файлов (`softDelete`) физического удаления не делает. | Сканы документов работников (паспорт/медосмотр — `prisma/schema.prisma:202`) и фото с геометками остаются на S3/диске навсегда, включая «удалённые». Срок хранения ПДн не реализован. | Подключить `runRetention` к планировщику воркера (`src/workers/unified-worker/`) и определить сроки ПДн решением владельца. |
+| 6 | мелочь | `D:\PillingR\wt-night\src\modules\sites\application\queries\site-query.service.ts:23` | Карточка объекта (`GET /api/sites/[id]`) отдаёт закреплённых пользователей с `email`; доступ — `assertCanAccessSite(..., 'sites.read_all')` (`.../site-query.service.ts:91`), т.е. те же ADMIN/DISPATCHER/FOREMAN/SAFETY_ENGINEER. | Дублирующий (по отношению к #4) канал утечки email тем же ролям. | Убрать `email` из `siteDetailInclude` либо ограничить право. |
+| 7 | мелочь | `D:\PillingR\wt-night\src\services\audit\audit-history-service.ts:102` | `getEntityHistory` читает `FeedbackEvent` по `scope` + `targetId` БЕЗ фильтра `tenantId`; тенантом сужены только карты имён (строки 109-113). У модели `FeedbackEvent` (`prisma/schema.prisma:2524-2550`) нет колонки `tenantId` вовсе. | При втором тенанте история/lenta одного тенанта может отдать события (в т.ч. `actorName`) другого, если совпадут `scope`+`targetId`. Прод однотенантный — «до второго тенанта». | Добавить `tenantId` в `FeedbackEvent` и в фильтр чтения. |
+| 8 | мелочь | `D:\PillingR\wt-night\src\services\auth\session-service.ts:195-196` | В JWT-сессии (`createSessionToken`) в открытом виде лежат `email` и `name`. | JWT подписан (HS256), но не шифрован: содержимое читается любым, кто получил cookie (в т.ч. при XSS/утечке). ПДн (email, ФИО) в теле токена. | Убрать `email`/`name` из payload — они не нужны для аутентификации (id + sv достаточно), при потребности добирать из БД, как это делает `resolveSessionUser`. |
+| 9 | мелочь | `D:\PillingR\wt-night\src\core\media\media-auth.ts:193-199` | Файл, приложенный к документу работника, читают ADMIN/DISPATCHER (privileged) и владелец, но правило НЕ знает про право `users.documents.read_all` (SAFETY_ENGINEER, `authorization-service.ts:90`). | Несоответствие «вижу список — не вижу файл»: SAFETY_ENGINEER видит список документов (`src/services/users/user-documents.ts:87-89`), но скачивание вернёт 403. Это не утечка, а функциональный разрыв; проверка «свой файл» — `ownsUserDocumentMedia` (`media-auth.ts:164`). | Согласовать `assertCanAccessMedia` с `users.documents.read_all` (или наоборот) одним решением. |
+| 10 | мелочь | `D:\PillingR\wt-night\prisma\schema.prisma:2581` (`AuditLog.userName`), `:2014` (`ReportAudit.actorName`), `:300` (`BriefingRecord.userName`) | Денормализованные снимки ФИО в неизменяемых журналах. | По замыслу (подпись/история) — но это означает, что ФИО работника остаётся в БД даже после удаления/переименования учётной записи; согласуется с блокировкой удаления (`user-service.ts:351`). При запросе «удалить мои данные» стереть нельзя. | Признать как осознанный дизайн в политике ПДн, а не как баг; фиксировать срок хранения журналов. |
+
+## Пройдено (проверено, нарушения не найдено)
+
+- **ПРОЙДЕНО** — Пароль и PIN не отдаются наружу. Единственная выборка `password: true` — `src/services/auth/auth-service.ts:115`, строго внутри аутентификации, и `toSessionUser` (`auth-service.ts:54-65`) пароль не переносит. Полей `pin`/`pinLookup` (`prisma/schema.prisma:99,103`) в коде чтения нет (`rg` по `src/` — только комментарии).
+- **ПРОЙДЕНО** — Телефон и email не попадают в PDF и CSV-экспорты. PDF (`src/lib/pdf-generator/single-pdf.ts:42-44`) и журнал забивки (`src/modules/reports/application/queries/pile-journal-export.ts:190-191`) содержат только ФИО; `phone` не встречается в экспортёрах (`rg "phone" src/lib/pdf-data.ts src/modules/reports/application/queries/*export*`).
+- **ПРОЙДЕНО** — Sentry не получает ПДн по умолчанию: `sendDefaultPii: false` в `sentry.server.config.ts:17`, `sentry.edge.config.ts:12`, `src/instrumentation-client.ts:24`, `src/workers/unified-worker/sentry.ts:34`. `Sentry.setUser` нигде не вызывается. Оговорка: `beforeSend`-скруббера нет, поэтому ПДн внутри `error.message` ушли бы — ГИПОТЕЗА (не проверено на живых ошибках).
+- **ПРОЙДЕНО** — Автор IP/userAgent фактически не пишутся: `ReportAudit.ipAddress/userAgent` (`prisma/schema.prisma:2020-2021`) заполняются в `src/services/reports/audit-service.ts:48-49`, но ни один вызывающий не передаёт эти поля (`rg "ipAddress:|userAgent:" src/` — только сам сервис и тип). Поля остаются `null`.
+- **ПРОЙДЕНО** — Медиа защищено проверкой доступа на всех путях: список/загрузка (`src/app/api/media/route.ts:41`), удаление (`.../media/[id]/route.ts:28`), скачивание (`.../media/[id]/download/route.ts:28,34`), пакетная выдача (`.../media/download-batch/route.ts:65` — `filterReadableMedia`).
+- **ПРОЙДЕНО** — Список работников закрыт правом `users.read`; роли OPERATOR/ASSISTANT его не имеют (`src/services/auth/authorization-service.ts:82`). Единственный маршрут — `src/app/api/users/route.ts`.
+
+## Не проверено
+
+- **НЕ ПРОВЕРЕНО** — фактическое содержимое прод-БД: объёмы ПДн, реальные значения `phone`/`email`/`name`, число строк. Доступа к проду нет (запрещено AGENTS.md), локальная БД не читалась. Все выводы — по схеме и коду.
+- **НЕ ПРОВЕРЕНО** — настройки лог-агрегатора (Loki): сколько хранит логи, кто имеет к ним доступ, попадают ли уже ПДн в долговременное хранилище. В репозитории конфигурации Loki нет.
+- **НЕ ПРОВЕРЕНО** — правовые документы (152-ФЗ, согласия на обработку, политика конфиденциальности) — вне кода; существующих отчётов и docs/strategy не читал (запрет задачи).
+- **НЕ ПРОВЕРЕНО** — присутствие ПДн в бэкапах (R2) и в Redis. Бэкап-скрипты и Redis-ключи под ПДн не разбирались.
+- **НЕ ПРОВЕРЕНО** — ретеншен ПДн в вендорах: сколько Telegram хранит сообщения с ФИО, сколько Sentry хранит события.
+- **НЕ ПРОВЕРЕНО** — «мёртвое» поле `pinLookup`: логики PIN-входа по нему в `src/` не найдено, но, возможно, реализация вне этого worktree/ветки — утверждать «не используется» не берусь.
+- **ГИПОТЕЗА** — что `phone`/`email` нигде не логируются кроме путей #1/#2: проверено `rg`-поиском по `logger.*`/`console.*` (0 совпадений с email/phone), но динамически собираемые данные (например, `logger.info('audit', event)`) формально не подпадают под этот шаблон — они и есть находка #1.
+- **Пропущено по правилам задачи** — ORION-сайт и заявки (`OrionLead.name`/`contact`, `prisma/schema.prisma:2864-2865`) — замороженная зона, не разбирал. Операторские экраны (`src/app/operator/**`, `src/modules/operator-mobile/**`) — тоже заморожены и не аудировались.
