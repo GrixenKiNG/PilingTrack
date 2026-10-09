@@ -216,7 +216,7 @@ export function WorkOrderDetail({ recordId }: { recordId: string }) {
       toast.success('Принято');
       await load();
     } catch (err) {
-      toast.error(maintenanceCatchText(err, 'Ошибка'));
+      toast.error(maintenanceCatchText(err, 'Не удалось принять наряд. Повторите.'));
     } finally {
       setAccepting(false);
     }

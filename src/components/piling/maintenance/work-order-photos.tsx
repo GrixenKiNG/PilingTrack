@@ -128,7 +128,7 @@ export function WorkOrderPhotos({ recordId, entityId }: Props) {
       await refresh();
     } catch (err) {
       // Обрыв сети fetch бросает TypeError с английским «Failed to fetch» (F-R112-2).
-      toast.error(maintenanceCatchText(err, 'Ошибка загрузки'));
+      toast.error(maintenanceCatchText(err, 'Не удалось загрузить фото. Выберите файл и повторите.'));
     } finally {
       setBusy(false);
       if (inputRef.current) inputRef.current.value = '';
@@ -145,7 +145,7 @@ export function WorkOrderPhotos({ recordId, entityId }: Props) {
       setPhotos((prev) => prev.filter((p) => p.id !== id));
     } catch (err) {
       // Обрыв сети fetch бросает TypeError с английским «Failed to fetch» (F-R112-2).
-      toast.error(maintenanceCatchText(err, 'Ошибка удаления'));
+      toast.error(maintenanceCatchText(err, 'Не удалось удалить фото. Повторите.'));
     } finally {
       setBusy(false);
     }

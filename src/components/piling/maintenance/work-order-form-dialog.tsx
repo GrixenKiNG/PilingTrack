@@ -257,7 +257,7 @@ export function WorkOrderFormDialog({
       onOpenChange(false);
       onSaved();
     } catch (err) {
-      toast.error(maintenanceCatchText(err, 'Ошибка'));
+      toast.error(maintenanceCatchText(err, 'Не удалось сохранить наряд. Повторите.'));
     } finally {
       setBusy(false);
     }
