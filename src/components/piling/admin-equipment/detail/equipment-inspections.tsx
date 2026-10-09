@@ -14,6 +14,7 @@ import { toast } from 'sonner';
 import { authFetch } from '@/lib/api';
 import { formatRuDate } from '@/lib/format';
 import { Button } from '@/components/ui/button';
+import { OperatorChecklistHistory } from './operator-checklist-history';
 import { cn } from '@/lib/utils';
 import {
   LEVEL_LABEL, LEVEL_STYLE, STATUS_LABEL, STATUS_STYLE, healthScoreColor,
@@ -89,6 +90,7 @@ export function EquipmentInspections({ equipmentId }: { equipmentId: string }) {
           ))}
         </ul>
       )}
+      <OperatorChecklistHistory equipmentId={equipmentId} title="Осмотры машиниста по сменам" />
     </div>
   );
 }

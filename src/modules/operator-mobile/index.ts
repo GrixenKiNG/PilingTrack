@@ -19,3 +19,5 @@ export {listBriefingJournal} from './application/briefing-journal-query';
 export type {
   BriefingJournalFilters, BriefingJournalRow,
 } from './application/briefing-journal-query';
+export {listEquipmentChecklistHistory} from './application/equipment-checklist-history';
+export type {EquipmentChecklistRow} from './application/equipment-checklist-history';

@@ -76,7 +76,9 @@ describe('EquipmentMaintenance — подтверждение «Выполнен
         ? {}
         : String(url) === '/api/maintenance/assignees'
           ? { users: [] }
-          : { records: [PLANNED] };
+          : String(url).endsWith('/operator-checklists')
+            ? { records: [] }
+            : { records: [PLANNED] };
       return { ok: true, status: 200, json: async () => body };
     });
   });

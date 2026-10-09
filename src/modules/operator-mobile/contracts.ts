@@ -49,3 +49,4 @@ export type {
 
 export {PPE_ITEMS, PPE_LABELS, missingPpeLabels} from './domain/ppe';
 export type {PpeItem} from './domain/ppe';
+export type {EquipmentChecklistRow} from './application/equipment-checklist-history';

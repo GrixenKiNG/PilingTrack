@@ -17,6 +17,7 @@ import { authFetch } from '@/lib/api';
 import { catchText } from '@/components/piling/admin-crews/crew-messages';
 import { formatRuDate } from '@/lib/format';
 import { Button } from '@/components/ui/button';
+import { OperatorChecklistHistory } from './operator-checklist-history';
 import { cn } from '@/lib/utils';
 import {
   TYPE_LABEL, STATUS_LABEL, STATUS_STYLE, PRIORITY_LABEL, PRIORITY_STYLE,
@@ -222,6 +223,7 @@ export function EquipmentMaintenance({ equipmentId }: { equipmentId: string }) {
         editingId={editingId}
         onSaved={load}
       />
+      <OperatorChecklistHistory equipmentId={equipmentId} onlyEo title="ЕО машиниста по сменам" />
       <ConfirmActionDialog
         open={Boolean(pendingDone)}
         onOpenChange={(open) => { if (!open) setPendingDone(null); }}
