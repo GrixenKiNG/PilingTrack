@@ -28,6 +28,7 @@ export {
   resolveReportUserId,
   assertCanActForUser,
   validateReportInput,
+  validateDowntimeWithinShift,
 } from './application';
 export type { UpsertReportCommand, UpsertReportResult } from './application';
 

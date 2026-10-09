@@ -16,7 +16,7 @@ import {validatePassport} from '../../domain/pile-passport';
 import {safetyChecklistPeriod} from '../../domain/safety-checklist-period';
 import {findDowntimeConflict} from '../../domain/downtime-interval';
 import {SHIFT_WINDOW} from '../../domain/shift-window';
-import {validateDowntimeWithinShift} from '@/modules/reports/application/commands/report-validation.service';
+import {validateDowntimeWithinShift} from '@/modules/reports';
 import type {ReadWeather} from '../../domain/view-contracts';
 import {
   OperatorCommandError, requireCrew, requireOpenShift, ensureReport, businessReportId,
