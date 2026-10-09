@@ -132,6 +132,50 @@ describe('UserDocuments — обрыв сети (F-R112-1)', () => {
 });
 
 /**
+ * AU75: сбой сохранения/удаления документа без поля `error` в теле показывал
+ * обезличенное «Ошибка» / «Ошибка сохранения» — человек не понимал, что
+ * произошло и что делать. Теперь тост называет действие. Серверную причину
+ * (`error`) по-прежнему показываем как есть.
+ */
+describe('UserDocuments — понятные тексты отказов (AU75)', () => {
+  it('500 без поля error при сохранении → тост объясняет действие', async () => {
+    documentsResponse = () => Promise.resolve(ok({ documents: [docRow('doc-a', 'Удостоверение')] }));
+    render(<UserDocuments userId="ivanov" />);
+    await screen.findByText('Удостоверение');
+
+    authFetchMock.mockImplementation((url?: unknown, init?: RequestInit) =>
+      (init?.method === 'PUT'
+        ? Promise.resolve({ ok: false, json: async () => ({}) })
+        : Promise.resolve(ok({ types: [] }))));
+
+    fireEvent.click(screen.getByLabelText('Изменить документ'));
+    fireEvent.click(await screen.findByRole('button', { name: 'Сохранить' }));
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith(
+      'Не удалось сохранить документ. Проверьте связь и повторите.',
+    ));
+  });
+
+  it('500 без поля error при удалении → тост объясняет действие', async () => {
+    documentsResponse = () => Promise.resolve(ok({ documents: [docRow('doc-b', 'Удостоверение')] }));
+    render(<UserDocuments userId="ivanov" />);
+    await screen.findByText('Удостоверение');
+
+    authFetchMock.mockImplementation((url?: unknown, init?: RequestInit) =>
+      (init?.method === 'DELETE'
+        ? Promise.resolve({ ok: false, json: async () => ({}) })
+        : Promise.resolve(ok({ types: [] }))));
+
+    fireEvent.click(screen.getByLabelText('Удалить документ'));
+    fireEvent.click(await screen.findByRole('button', { name: 'Удалить' }));
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith(
+      'Не удалось удалить документ. Проверьте связь и повторите.',
+    ));
+  });
+});
+
+/**
  * R121 №10: «Номер» и «Примечание» в диалоге документа не имели maxLength, хотя
  * схема маршрута (`app/api/users/[id]/documents/route.ts`: `createSchema`)
  * ограничивает номер 100 символами, примечание — 2000. Длинный номер

@@ -125,7 +125,7 @@ export function CreateUserDialog({ open, onOpenChange, onSubmit }: CreateProps) 
       toast.success('Пользователь создан');
     } catch (err: unknown) {
       // Обрыв сети fetch бросает TypeError с английским «Failed to fetch» (F-R112-1).
-      toast.error(catchText(err, 'Ошибка создания'));
+      toast.error(catchText(err, 'Не удалось создать пользователя. Проверьте связь и повторите.'));
     } finally {
       setSubmitting(false);
     }
@@ -281,7 +281,7 @@ export function EditUserDialog({ open, user, onOpenChange, onSubmit }: EditProps
       toast.success('Пользователь обновлён');
     } catch (err: unknown) {
       // Обрыв сети fetch бросает TypeError с английским «Failed to fetch» (F-R112-1).
-      toast.error(catchText(err, 'Ошибка сохранения'));
+      toast.error(catchText(err, 'Не удалось сохранить пользователя. Проверьте связь и повторите.'));
     } finally {
       setSubmitting(false);
     }
@@ -391,7 +391,7 @@ export function DeleteUserDialog({ open, user, onOpenChange, onConfirm }: Delete
       toast.success('Пользователь удалён');
     } catch (err: unknown) {
       // Обрыв сети fetch бросает TypeError с английским «Failed to fetch» (F-R112-1).
-      toast.error(catchText(err, 'Ошибка удаления'));
+      toast.error(catchText(err, 'Не удалось удалить пользователя. Проверьте связь и повторите.'));
     } finally {
       setSubmitting(false);
     }
