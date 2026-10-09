@@ -162,7 +162,7 @@ describe('pdf-generator', () => {
     const { generateSinglePdf, generatePeriodPdf } = await import('@/lib/pdf-generator');
     const report = { ...singleReportWithPiles([]), endingEngineHours: 1234, endingFuelPercent: 0 };
     const single = await capturePdfText(async () => { await generateSinglePdf(report); });
-    expect(single).toEqual(expect.arrayContaining(['Моточасы на конец', '1234 м/ч', 'Топливо на конец', '0 %']));
+    expect(single).toEqual(expect.arrayContaining(['Моточасы, итог', '1234 м/ч', 'Топливо, итог', '0 %']));
     const period = await capturePdfText(async () => {
       await generatePeriodPdf({ dateFrom: report.date, dateTo: report.date, siteId: 'site-1', reports: [report], totalPiles: 0, totalDrilling: 0, totalDowntime: 0 });
     });
