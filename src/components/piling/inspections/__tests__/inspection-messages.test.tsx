@@ -240,6 +240,21 @@ describe('редактор шаблона (F-R100-4, F-R100-5)', () => {
     );
     expect(toast.error).not.toHaveBeenCalledWith('Failed to fetch');
   });
+
+  // AU72: сбой сохранения без поля `error` в теле показывал обезличенное
+  // «Ошибка сохранения» — человек не понимал, что произошло и что делать.
+  it('сервер ответил 500 без поля error → тост объясняет действие (AU72)', async () => {
+    mocks.authFetch.mockImplementation(async (_url: string, init?: RequestInit) => (
+      init?.method === 'PUT' ? json({}, 500) : json(templatePayload)
+    ));
+    render(<TemplateEditor templateId="tpl-1" />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Сохранить' }));
+
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith('Не удалось сохранить шаблон. Повторите.'),
+    );
+  });
 });
 
 describe('редактор шаблона: сбой сохранения правки (F-R123-1)', () => {

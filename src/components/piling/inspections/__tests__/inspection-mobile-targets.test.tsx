@@ -8,14 +8,18 @@
  * фиксированная высота) — `h-9 … sm:min-h-0 sm:min-w-9`. Одного `sm:h-*` мало:
  * `min-height` сильнее `height`. На десктопе (sm и шире) вид не меняется.
  */
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { toast } from 'sonner';
 
-const mocks = vi.hoisted(() => ({ authFetch: vi.fn(), loadJson: vi.fn() }));
+const mocks = vi.hoisted(() => ({ authFetch: vi.fn(), loadJson: vi.fn(), searchParams: '' }));
 
 vi.mock('@/lib/api', () => ({ authFetch: mocks.authFetch, loadJson: mocks.loadJson }));
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
-vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }), useSearchParams: () => new URLSearchParams() }));
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ push: vi.fn() }),
+  useSearchParams: () => new URLSearchParams(mocks.searchParams),
+}));
 vi.mock('@/lib/store', () => ({
   usePilingStore: (selector: (state: { currentUser: null }) => unknown) => selector({ currentUser: null }),
 }));
@@ -64,6 +68,9 @@ async function renderInspection(templateSnapshot: unknown[]) {
 
 beforeEach(() => {
   mocks.authFetch.mockReset();
+  mocks.loadJson.mockReset();
+  mocks.searchParams = '';
+  vi.mocked(toast.error).mockClear();
 });
 
 describe('контролы ответа осмотра: цель нажатия на телефоне (R73)', () => {
@@ -183,5 +190,30 @@ describe('контролы пункта осмотра: цель нажатия 
     render(<MeasureControl value="" onChange={() => {}} unit="бар" norm="2" disabled={false} />);
 
     expect(screen.getByPlaceholderText('Значение')).toHaveClass('w-28', 'min-h-11', 'sm:min-h-0');
+  });
+});
+
+/*
+  AU72: сбой старта осмотра без поля `error` в теле показывал обезличенное
+  «Ошибка создания осмотра» — механик не понимал, что произошло и что делать.
+*/
+describe('запуск осмотра: понятный текст сбоя старта (AU72)', () => {
+  it('сервер ответил 500 без поля error → тост объясняет действие', async () => {
+    mocks.searchParams = 'equipmentId=eq-1';
+    mocks.loadJson.mockResolvedValue({
+      data: [{ id: 'eq-1', name: 'СП-49', model: 'PVE 50PR', hammerKind: 'NONE', isCombined: false }],
+    });
+    mocks.authFetch.mockImplementation(async (_url: string, init?: RequestInit) => (
+      init?.method === 'POST'
+        ? json({}, 500)
+        : json({ templates: [{ blockType: 'BASE', appliesToModel: 'PVE 50PR', appliesToHammerKind: 'NONE' }] })
+    ));
+    render(<StartInspectionForm />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Начать осмотр' }));
+
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith('Не удалось начать осмотр. Повторите.'),
+    );
   });
 });
