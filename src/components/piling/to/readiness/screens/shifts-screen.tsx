@@ -15,6 +15,7 @@ import type { ReadinessShiftDto } from '../api/contracts';
 import { CommandDialog } from '../shared/command-dialog';
 import { EquipmentPhoto, ProcessRoleStrip, RefKpi, commandFailure } from './shared';
 import type { ReferenceUiProps } from './types';
+import { buildShiftRoleSteps } from './shift-role-steps';
 
 function formatTimeInTimezone(value: Date | string, timezone: string) {
   return formatDateInTimezone(value, timezone, {
@@ -35,6 +36,9 @@ function decimalHourInTimezone(value: Date, timezone: string) {
   const minute = Number(parts.find((part) => part.type === 'minute')?.value ?? 0);
   return hour + minute / 60;
 }
+
+const ROLE_ICON = {'Оператор': 'operator', 'Диспетчер': 'crew', 'Механик': 'repair'} as const;
+const ROLE_TONE = {'Оператор': 'green', 'Диспетчер': 'blue', 'Механик': 'orange'} as const;
 
 export function ShiftsScreen(props: ReferenceUiProps) {
   const [period, setPeriod] = useState<'day' | 'week'>('day');
@@ -162,6 +166,13 @@ export function ShiftsScreen(props: ReferenceUiProps) {
     props.onRetry();
   };
 
+  const roleSteps = buildShiftRoleSteps({
+    shifts: todayShifts,
+    currentReadiness: props.currentReadiness,
+    defects: props.defects,
+    defectsError: props.defectsError,
+  });
+
   return (
     <>
       <ScreenTitle
@@ -282,11 +293,13 @@ export function ShiftsScreen(props: ReferenceUiProps) {
       </section>
       <ProcessRoleStrip
         ariaLabel="Роли передачи операторской смены"
-        roles={[
-          { label: 'Оператор', icon: 'operator', tasks: ['Открыть смену', 'Провести осмотр', 'Передать смену'], tone: 'green' },
-          { label: 'Диспетчер', icon: 'crew', tasks: ['Проверить готовность', 'Принять передачу', 'Запустить смену'], tone: 'blue' },
-          { label: 'Механик', icon: 'repair', tasks: ['Устранить дефект', 'Подтвердить выполнение', 'Вернуть технику'], tone: 'orange' },
-        ]}
+        roles={roleSteps.map((role) => ({
+          label: role.label,
+          icon: ROLE_ICON[role.label],
+          tone: ROLE_TONE[role.label],
+          tasks: role.steps.map((step) => step.title),
+          steps: role.steps,
+        }))}
       />
       <CommandDialog
         open={reworkTarget !== null}

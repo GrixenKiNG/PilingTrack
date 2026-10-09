@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { ChevronRight } from 'lucide-react';
 import { PilingIcon, type PilingIconName } from '@/components/piling/icons';
 import { getEquipmentPhoto } from '@/components/piling/admin-equipment/equipment-photo';
 import { KpiTile, type KpiTone } from '@/components/piling/kpi-tile';
@@ -297,6 +298,13 @@ export function EquipmentPhoto({
   );
 }
 
+export interface ProcessRoleStep {
+  title: string;
+  /** `null` — данных нет: шаг не считается ни сделанным, ни оставшимся. */
+  done: boolean | null;
+  hint: string;
+}
+
 export function ProcessRoleStrip({
   ariaLabel,
   roles,
@@ -307,8 +315,11 @@ export function ProcessRoleStrip({
     icon: PilingIconName;
     tasks: string[];
     tone: 'green' | 'blue' | 'orange';
+    /** Если заданы, карточка по нажатию показывает, какой шаг не сделан и что делать. */
+    steps?: ProcessRoleStep[];
   }>;
 }) {
+  const [openIndex, setOpenIndex] = useState<number | null>(null);
   const tones = {
     green: 'border-success/25 bg-success/10 text-success-strong',
     blue: 'border-info/25 bg-info/10 text-info-strong',
@@ -317,22 +328,57 @@ export function ProcessRoleStrip({
 
   return (
     <section aria-label={ariaLabel} className="mt-2 grid grid-cols-1 items-stretch gap-2 sm:grid-cols-2 2xl:flex 2xl:gap-0">
-      {roles.map((role, index) => (
-        <div key={role.label} className="contents">
-          {index > 0 && <div aria-hidden className="hidden w-7 shrink-0 items-center justify-center text-xl text-muted-foreground 2xl:flex">→</div>}
-          <article className="min-w-0 flex-1 overflow-hidden rounded-lg border bg-card shadow-sm">
+      {roles.map((role, index) => {
+        const pending = role.steps?.find((step) => step.done === false) ?? null;
+        const open = openIndex === index;
+        const body = (
+          <>
             <header className={cn('flex items-center gap-2 border-b px-3.5 py-2', tones[role.tone])}>
               <PilingIcon name={role.icon} decorative className="h-4 w-4" />
               <h2 className="text-sm font-extrabold">{role.label}</h2>
+              {role.steps && <ChevronRight aria-hidden className={cn('ml-auto h-4 w-4', open && 'rotate-90')} />}
             </header>
             <div className="flex min-h-[52px] items-center gap-3 px-3 py-1.5">
               <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1 text-2xs leading-[1.35] text-muted-foreground">
                 {role.tasks.map((task, taskIndex) => <span key={task} className="whitespace-nowrap">{taskIndex > 0 && <span className="mr-3 text-muted-foreground">•</span>}{task}</span>)}
               </div>
             </div>
-          </article>
-        </div>
-      ))}
+          </>
+        );
+        return (
+          <div key={role.label} className="contents">
+            {index > 0 && <div aria-hidden className="hidden w-7 shrink-0 items-center justify-center text-xl text-muted-foreground 2xl:flex">→</div>}
+            <article className="min-w-0 flex-1 overflow-hidden rounded-lg border bg-card shadow-sm">
+              {role.steps ? (
+                <button
+                  type="button"
+                  onClick={() => setOpenIndex(open ? null : index)}
+                  aria-expanded={open}
+                  aria-label={`${role.label}: что делать сейчас`}
+                  className="block w-full text-left transition hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  {body}
+                </button>
+              ) : body}
+              {role.steps && open && (
+                <div role="status" className="border-t bg-muted/30 px-3 py-2 text-2xs leading-[1.4]">
+                  <ul className="space-y-1">
+                    {role.steps.map((step) => (
+                      <li key={step.title} className="flex gap-1.5">
+                        <span aria-hidden>{step.done === true ? '✓' : step.done === false ? '○' : '–'}</span>
+                        <span>{step.title}{step.done === null ? ' — нет данных' : ''}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  {pending
+                    ? <p className="mt-2"><strong>{pending.title}</strong>{' — '}<span>{pending.hint}</span></p>
+                    : <p className="mt-2 text-muted-foreground">Невыполненных шагов нет.</p>}
+                </div>
+              )}
+            </article>
+          </div>
+        );
+      })}
     </section>
   );
 }
@@ -401,8 +447,20 @@ export const STAGE_CTA: Record<PresentationStage['key'], string> = {
 
 /** Русский текст отказа команды: код статуса читателю ничего не говорит. */
 export async function commandFailure(response: Response): Promise<string> {
-  const body = await response.json().catch(() => null) as {error?: {message?: string} | string} | null;
-  const serverMessage = typeof body?.error === 'string' ? body.error : body?.error?.message;
+  const body = await response.json().catch(() => null) as {error?: {message?: string; details?: {blockers?: unknown}} | string} | null;
+  const baseMessage = typeof body?.error === 'string' ? body.error : body?.error?.message;
+  // Отказ в допуске приходит с перечнем блокирующих условий в details.blockers
+  // (объекты с label или готовые строки). Без них пользователь видел «запрещён
+  // правилами» и не знал, какой шаг не сделан.
+  const rawBlockers = typeof body?.error === 'object' ? body.error?.details?.blockers : undefined;
+  const reasons = Array.isArray(rawBlockers)
+    ? rawBlockers
+      .map((item) => typeof item === 'string' ? item : (item as {label?: unknown} | null)?.label)
+      .filter((label): label is string => typeof label === 'string' && label.length > 0)
+    : [];
+  const serverMessage = baseMessage && reasons.length > 0
+    ? `${baseMessage.replace(/[.]$/, '')}. Причины: ${reasons.join('; ')}.`
+    : baseMessage;
   // 409 приходит и на состязание версий, и на запрещённый переход состояния
   // («Сначала возьмите дефект в работу, потом закрывайте»). Общий текст про
   // «кто-то уже изменил запись» стирал вторую причину, и пользователь видел
