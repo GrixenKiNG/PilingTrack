@@ -85,7 +85,7 @@ describe('startInspection', () => {
   it('throws 404 if equipment cross-tenant', async () => {
     m.eqFindUnique.mockResolvedValue(null);
     await expect(startInspection({ equipmentId: 'x', templateId: 't1', inspectionDate: '2026-06-03' },
-      { tenantId: 'orion', userId: 'u1', role: 'ADMIN' })).rejects.toThrow('Equipment not found');
+      { tenantId: 'orion', userId: 'u1', role: 'ADMIN' })).rejects.toThrow('Установка не найдена — обновите список.');
   });
 });
 
@@ -144,7 +144,7 @@ describe('startToInspection', () => {
   it('throws 404 for cross-tenant equipment; writes nothing', async () => {
     m.eqFindUnique.mockResolvedValue(null);
     await expect(startToInspection({ equipmentId: 'x', level: 'EO', inspectionDate: '2026-06-06' }, { tenantId: 'orion', userId: 'u1', role: 'ADMIN' }))
-      .rejects.toThrow('Equipment not found');
+      .rejects.toThrow('Установка не найдена — обновите список.');
     expect(m.recCreate).not.toHaveBeenCalled();
     expect(m.insCreate).not.toHaveBeenCalled();
     expect(m.audit).not.toHaveBeenCalled();
@@ -163,7 +163,7 @@ describe('saveAnswers', () => {
   it('throws 404 when inspection cross-tenant; does not write', async () => {
     m.insFindUnique.mockResolvedValue({ id: 'ins1', tenantId: 'other', status: 'DRAFT' });
     await expect(saveAnswers('ins1', [{ itemId: 'i1', result: 'YES' }], { tenantId: 'orion' }))
-      .rejects.toThrow('Inspection not found');
+      .rejects.toThrow('Осмотр не найден — обновите список.');
     expect(m.ansCreateMany).not.toHaveBeenCalled();
   });
   it('throws 409 when inspection already completed; does not write', async () => {

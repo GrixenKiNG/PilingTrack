@@ -27,6 +27,6 @@ export async function getTemplate(id: string, tenantId: string) {
     where: { id },
     include: { sections: { orderBy: { order: 'asc' }, include: { items: { orderBy: { order: 'asc' } } } } },
   });
-  if (!t || t.tenantId !== tenantId) throw new ServiceError('Template not found', 404);
+  if (!t || t.tenantId !== tenantId) throw new ServiceError('Шаблон не найден — обновите список.', 404);
   return t;
 }

@@ -68,7 +68,7 @@ export async function startToInspection(
     where: { id: input.equipmentId, tenantId: ctx.tenantId },
     select: { id: true, model: true, hammerKind: true, isCombined: true },
   });
-  if (!eq) throw new ServiceError('Equipment not found', 404);
+  if (!eq) throw new ServiceError('Установка не найдена — обновите список.', 404);
 
   const phase: ShiftInspectionPhase = input.phase ?? 'PRE_SHIFT';
 
@@ -187,12 +187,12 @@ export async function startInspection(
 ) {
   if (!ctx.tenantId) throw new ServiceError('tenantId is required', 400);
   const eq = await db.equipment.findUnique({ where: { id: input.equipmentId, tenantId: ctx.tenantId }, select: { id: true } });
-  if (!eq) throw new ServiceError('Equipment not found', 404);
+  if (!eq) throw new ServiceError('Установка не найдена — обновите список.', 404);
   const tpl = await db.checklistTemplate.findUnique({
     where: { id: input.templateId },
     include: { sections: { orderBy: { order: 'asc' }, include: { items: { orderBy: { order: 'asc' } } } } },
   });
-  if (!tpl || tpl.tenantId !== ctx.tenantId) throw new ServiceError('Template not found', 404);
+  if (!tpl || tpl.tenantId !== ctx.tenantId) throw new ServiceError('Шаблон осмотра не найден — возможно, деактивирован.', 404);
   // Та же граница, что и в блочном старте: иначе оператор обходит сужение,
   // выбрав шаблон ТО напрямую через устаревший маршрут.
   await assertOperatorInspectionScope(ctx, input.equipmentId, tpl.level as MaintenanceLevel);
@@ -272,9 +272,9 @@ export async function saveAnswers(
     where: { id },
     select: { id: true, tenantId: true, status: true, performedById: true },
   });
-  if (!ins || ins.tenantId !== ctx.tenantId) throw new ServiceError('Inspection not found', 404);
+  if (!ins || ins.tenantId !== ctx.tenantId) throw new ServiceError('Осмотр не найден — обновите список.', 404);
   // Оператор правит только свой осмотр (см. getInspection про 404).
-  if (ctx.performerId && ins.performedById !== ctx.performerId) throw new ServiceError('Inspection not found', 404);
+  if (ctx.performerId && ins.performedById !== ctx.performerId) throw new ServiceError('Осмотр не найден — обновите список.', 404);
   if (ins.status === 'COMPLETED') throw new ServiceError('Осмотр уже завершён', 409);
   // Присланный photoCount игнорируем: в базу идёт число реально
   // приложенных файлов. Считаем до транзакции: снимки она не защищает.
@@ -335,9 +335,9 @@ export async function completeInspectionWithOutcome(
 ) {
   if (!ctx.tenantId) throw new ServiceError('tenantId is required', 400);
   const ins = await db.inspection.findUnique({ where: { id }, include: { answers: true } });
-  if (!ins || ins.tenantId !== ctx.tenantId) throw new ServiceError('Inspection not found', 404);
+  if (!ins || ins.tenantId !== ctx.tenantId) throw new ServiceError('Осмотр не найден — обновите список.', 404);
   // Оператор завершает только свой осмотр (см. getInspection про 404).
-  if (ctx.performerId && ins.performedById !== ctx.performerId) throw new ServiceError('Inspection not found', 404);
+  if (ctx.performerId && ins.performedById !== ctx.performerId) throw new ServiceError('Осмотр не найден — обновите список.', 404);
 
   const items = (ins.templateSnapshot as unknown as SnapItem[]) ?? [];
   // Пересчёт на завершении, а не доверие сохранённому: снимок могли

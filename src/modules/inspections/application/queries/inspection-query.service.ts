@@ -49,10 +49,10 @@ export async function getInspection(id: string, tenantId: string, performerId: s
     where: { id },
     include: { answers: true, equipment: { select: { id: true, name: true, model: true } } },
   });
-  if (!ins || ins.tenantId !== tenantId) throw new ServiceError('Inspection not found', 404);
+  if (!ins || ins.tenantId !== tenantId) throw new ServiceError('Осмотр не найден — обновите список.', 404);
   // 404, а не 403: чужой осмотр для оператора не существует, и по коду ответа
   // нельзя перебором узнать, какие идентификаторы заняты.
-  if (performerId && ins.performedById !== performerId) throw new ServiceError('Inspection not found', 404);
+  if (performerId && ins.performedById !== performerId) throw new ServiceError('Осмотр не найден — обновите список.', 404);
   return ins;
 }
 
