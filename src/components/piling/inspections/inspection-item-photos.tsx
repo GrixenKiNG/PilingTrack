@@ -121,20 +121,20 @@ export function InspectionItemPhotos({ inspectionId, itemId, onCountChange }: Pr
           entityId,
         }),
       });
-      if (!presign.ok) throw new Error((await presign.json()).error || 'Не удалось получить ссылку');
+      if (!presign.ok) throw new Error((await presign.json()).error || 'Не удалось загрузить фото. Проверьте связь и повторите.');
       const { mediaId, uploadUrl } = await presign.json();
 
       const put = await fetch(uploadUrl, { method: 'PUT', body: file, headers: { 'Content-Type': contentType } });
-      if (!put.ok) throw new Error('Загрузка не удалась');
+      if (!put.ok) throw new Error('Не удалось загрузить фото. Проверьте связь и повторите.');
 
       const confirm = await authFetch(`/api/media/${mediaId}/confirm`, { method: 'POST' });
-      if (!confirm.ok) throw new Error((await confirm.json()).error || 'Подтверждение не удалось');
+      if (!confirm.ok) throw new Error((await confirm.json()).error || 'Не удалось загрузить фото. Проверьте связь и повторите.');
 
       toast.success('Фото загружено');
       await refresh();
     } catch (err) {
       // Обрыв сети fetch бросает TypeError с английским «Failed to fetch» (F-R112-2).
-      toast.error(catchText(err, 'Ошибка загрузки'));
+      toast.error(catchText(err, 'Не удалось загрузить фото. Проверьте связь и повторите.'));
     } finally {
       setBusy(false);
       if (inputRef.current) inputRef.current.value = '';
@@ -146,14 +146,14 @@ export function InspectionItemPhotos({ inspectionId, itemId, onCountChange }: Pr
     setBusy(true);
     try {
       const res = await authFetch(`/api/media/${id}`, { method: 'DELETE' });
-      if (!res.ok) throw new Error('Удаление не удалось');
+      if (!res.ok) throw new Error('Не удалось удалить фото. Проверьте связь и повторите.');
       toast.success('Фото удалено');
       const next = photos.filter((p) => p.id !== id);
       setPhotos(next);
       onCountChange?.(next.length);
     } catch (err) {
       // Обрыв сети fetch бросает TypeError с английским «Failed to fetch» (F-R112-2).
-      toast.error(catchText(err, 'Ошибка удаления'));
+      toast.error(catchText(err, 'Не удалось удалить фото. Проверьте связь и повторите.'));
     } finally {
       setBusy(false);
     }
