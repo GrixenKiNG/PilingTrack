@@ -211,12 +211,12 @@ export function AdminDlq() {
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || 'Ошибка');
+        throw new Error(data.error || 'Не удалось выполнить действие с событием. Повторите.');
       }
       toast.success(action === 'retry' ? 'Повтор поставлен в очередь' : 'Событие отброшено');
       await load();
     } catch (e) {
-      toast.error(catchText(e, 'Ошибка'));
+      toast.error(catchText(e, 'Не удалось выполнить действие с событием. Повторите.'));
     } finally {
       setActingId(null);
     }
