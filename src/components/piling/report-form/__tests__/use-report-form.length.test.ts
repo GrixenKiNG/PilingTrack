@@ -361,6 +361,8 @@ describe('useReportForm — 409 сохраняет свои правки', () =>
     authFetchMock.mockClear();
     let accepted: boolean | undefined;
     await act(async () => { accepted = await result.current.handleSubmit({ pile: { gradeId: 'g1', count: 2 } }); });
+    const [, request] = authFetchMock.mock.calls.find(([url]) => url === '/api/reports/upsert') || [];
+    expect(JSON.parse(request.body).version).toBe(1);
     expect(accepted).toBe(false);
     expect(result.current.piles).toEqual(rows);
     expect(result.current.submittedAt).toBeNull();

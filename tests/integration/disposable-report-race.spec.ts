@@ -29,6 +29,11 @@ describe.skipIf(!process.env.CODEX_STAND_URL || !process.env.INTEGRATION_DATABAS
     await fixture.close();
   });
   it('один победитель, второй 409; данные победителя сохранены', async () => {
+    const missingVersion = await fetch(base+'/api/reports/upsert', {
+      method:'POST', headers:{Cookie:cookie,Origin:base,'Content-Type':'application/json','Idempotency-Key':randomUUID()},
+      body:JSON.stringify({reportId:fixture.id(tenant,'Report'),siteId:fixture.id(tenant,'Site'),date:'2026-10-02',piles:[{pileGradeId:grade,count:99}]}),
+    });
+    expect(missingVersion.status, JSON.stringify(await missingVersion.json())).toBe(400);
     const save = (count: number) => fetch(base+'/api/reports/upsert',{method:'POST',headers:{Cookie:cookie,Origin:base,'Content-Type':'application/json','Idempotency-Key':randomUUID()},body:JSON.stringify({reportId:fixture.id(tenant,'Report'),siteId:fixture.id(tenant,'Site'),date:'2026-10-02',version:1,piles:[{pileGradeId:grade,count}]})});
     const results = await Promise.all([save(5),save(7)]);
     const bodies = await Promise.all(results.map(r=>r.json()));

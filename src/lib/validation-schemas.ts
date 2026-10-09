@@ -250,9 +250,8 @@ export const reportUpsertSchema = z.object({
   shiftEnd: z.string().regex(/^\d{2}:\d{2}$/).optional(),
   status: z.enum(['draft', 'submitted']).default('draft'),
   // Optimistic-concurrency token: the report version the client based its
-  // edit on. When present, the save fails with 409 if the stored row has
-  // advanced (someone else saved meanwhile). Absent → no check (offline /
-  // legacy clients keep last-write-wins, no false conflicts).
+  // edit on. Optional only for creation; the command requires it when a report
+  // already exists. A stale version fails with 409 instead of overwriting edits.
   version: z.number().int().nonnegative().optional(),
   piles: z.array(z.object({
     id: internalIdSchema.optional(),

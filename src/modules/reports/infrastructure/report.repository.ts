@@ -111,6 +111,10 @@ export class PrismaReportRepository implements ReportRepository {
         select: { id: true, version: true, tenantId: true, shiftId: true },
       });
 
+      if (existing && hooks?.expectedVersion === undefined) {
+        throw new ServiceError('Для правки существующего отчёта обязательна version. Обновите форму.', 400);
+      }
+
       // Optimistic-concurrency guard (race-free: the version is read in the
       // same tx that writes). If the caller passed the version it edited and
       // the stored row has moved on, abort so the loser can reload instead of
