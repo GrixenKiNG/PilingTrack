@@ -33,7 +33,7 @@ export interface SiteCommandContext { tenantId: string; actorId: string }
 async function requireTenantSite(siteId: string, tenantId: string) {
   if (!tenantId) throw new ServiceError('tenantId is required', 400);
   const site = await db.site.findFirst({ where: { id: siteId, tenantId } });
-  if (!site) throw new ServiceError('Site not found', 404);
+  if (!site) throw new ServiceError('Объект не найден — возможно, удалён. Обновите список.', 404);
   return site;
 }
 
@@ -41,7 +41,7 @@ async function validatePileGrades(tenantId: string, plans: ValidPilePlan[]) {
   const ids = [...new Set(plans.map((plan) => plan.pileGradeId))];
   if (!ids.length) return;
   const count = await db.pileGrade.count({ where: { id: { in: ids }, tenantId } });
-  if (count !== ids.length) throw new ServiceError('Pile grade not found', 404);
+  if (count !== ids.length) throw new ServiceError('Марка сваи не найдена — обновите справочник.', 404);
 }
 
 export function normalizeSitePlans(input: {
@@ -84,7 +84,7 @@ export async function createSiteWithPlans(input: {
 }, ctx: SiteCommandContext) {
   if (!ctx.tenantId) throw new ServiceError('tenantId is required', 400);
   if (!input.name?.trim()) {
-    throw new ServiceError('Name required', 400);
+    throw new ServiceError('Укажите название.', 400);
   }
 
   const normalized = normalizeSitePlans(input);
@@ -311,12 +311,12 @@ export async function setSiteCompleted(siteId: string, completed: boolean, ctx: 
 
 export async function assignUserToSite(siteId: string, userId: string, ctx: SiteCommandContext) {
   if (!siteId || !userId) {
-    throw new ServiceError('userId and siteId required', 400);
+    throw new ServiceError('Выберите пользователя и объект.', 400);
   }
 
   await requireTenantSite(siteId, ctx.tenantId);
   const user = await db.user.findFirst({ where: { id: userId, tenantId: ctx.tenantId }, select: { id: true } });
-  if (!user) throw new ServiceError('User not found', 404);
+  if (!user) throw new ServiceError('Пользователь не найден.', 404);
   const result = await db.userSiteAssignment.upsert({
     where: { userId_siteId: { userId, siteId } },
     update: {},
@@ -329,7 +329,7 @@ export async function assignUserToSite(siteId: string, userId: string, ctx: Site
 
 export async function unassignUserFromSite(siteId: string, userId: string, ctx: SiteCommandContext) {
   if (!siteId || !userId) {
-    throw new ServiceError('userId and siteId required', 400);
+    throw new ServiceError('Выберите пользователя и объект.', 400);
   }
 
   await requireTenantSite(siteId, ctx.tenantId);
@@ -400,10 +400,10 @@ export async function createSiteHierarchyItem(input: {
   parentId?: string;
 }, ctx: SiteCommandContext) {
   if (!input.type || !input.name?.trim()) {
-    throw new ServiceError('Type and name required', 400);
+    throw new ServiceError('Недостаточно данных — обновите страницу и повторите.', 400);
   }
-  if (!['field', 'cluster', 'picket'].includes(input.type)) throw new ServiceError('Invalid type', 400);
-  if (input.type !== 'field' && !input.parentId) throw new ServiceError('parentId required', 400);
+  if (!['field', 'cluster', 'picket'].includes(input.type)) throw new ServiceError('Неизвестный тип элемента — обновите страницу.', 400);
+  if (input.type !== 'field' && !input.parentId) throw new ServiceError('Выберите родительский элемент.', 400);
 
   await requireTenantSite(input.siteId, ctx.tenantId);
   if (input.type === 'field') {
@@ -416,7 +416,7 @@ export async function createSiteHierarchyItem(input: {
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: guarded above (type !== 'field' requires parentId)
     const parentId = input.parentId!;
     const parent = await db.pileField.findFirst({ where: { id: parentId, siteId: input.siteId }, select: { id: true } });
-    if (!parent) throw new ServiceError('Parent not found', 404);
+    if (!parent) throw new ServiceError('Родительский элемент не найден — обновите схему.', 404);
     return db.cluster.create({
       data: { name: input.name.trim(), fieldId: parentId },
     });
@@ -426,20 +426,20 @@ export async function createSiteHierarchyItem(input: {
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: guarded above (type !== 'field' requires parentId)
     const parentId = input.parentId!;
     const parent = await db.cluster.findFirst({ where: { id: parentId, field: { siteId: input.siteId } }, select: { id: true } });
-    if (!parent) throw new ServiceError('Parent not found', 404);
+    if (!parent) throw new ServiceError('Родительский элемент не найден — обновите схему.', 404);
     return db.picket.create({
       data: { name: input.name.trim(), clusterId: parentId },
     });
   }
 
-  throw new ServiceError('Invalid type', 400);
+  throw new ServiceError('Неизвестный тип элемента — обновите страницу.', 400);
 }
 
 export async function deleteSiteHierarchyItem(siteId: string, type: string, itemId: string, ctx: SiteCommandContext) {
   if (!type || !itemId || !siteId) {
-    throw new ServiceError('Type and itemId required', 400);
+    throw new ServiceError('Недостаточно данных — обновите страницу и повторите.', 400);
   }
-  if (!['field', 'cluster', 'picket'].includes(type)) throw new ServiceError('Invalid type', 400);
+  if (!['field', 'cluster', 'picket'].includes(type)) throw new ServiceError('Неизвестный тип элемента — обновите страницу.', 400);
 
   await requireTenantSite(siteId, ctx.tenantId);
   if (type === 'field') {
@@ -452,7 +452,7 @@ export async function deleteSiteHierarchyItem(siteId: string, type: string, item
       await tx.$queryRaw<Array<{ id: string }>>`SELECT id FROM "Cluster" WHERE "fieldId" = ${itemId} ORDER BY id FOR UPDATE`;
       await tx.$queryRaw<Array<{ id: string }>>`SELECT id FROM "Picket" WHERE "clusterId" IN (SELECT id FROM "Cluster" WHERE "fieldId" = ${itemId}) ORDER BY id FOR UPDATE`;
       const item = await tx.pileField.findFirst({ where: { id: itemId, siteId }, select: { id: true } });
-      if (!item) throw new ServiceError('Hierarchy item not found', 404);
+      if (!item) throw new ServiceError('Элемент схемы не найден — возможно, удалён.', 404);
       await assertNoSubtreeProduction(tx, 'field', itemId);
       await tx.pileField.delete({ where: { id: itemId } });
       return { success: true };
@@ -465,7 +465,7 @@ export async function deleteSiteHierarchyItem(siteId: string, type: string, item
       await tx.$queryRaw<Array<{ id: string }>>`SELECT id FROM "Cluster" WHERE id = ${itemId} FOR UPDATE`;
       await tx.$queryRaw<Array<{ id: string }>>`SELECT id FROM "Picket" WHERE "clusterId" = ${itemId} ORDER BY id FOR UPDATE`;
       const item = await tx.cluster.findFirst({ where: { id: itemId, field: { siteId } }, select: { id: true } });
-      if (!item) throw new ServiceError('Hierarchy item not found', 404);
+      if (!item) throw new ServiceError('Элемент схемы не найден — возможно, удалён.', 404);
       await assertNoSubtreeProduction(tx, 'cluster', itemId);
       await tx.cluster.delete({ where: { id: itemId } });
       return { success: true };
@@ -476,12 +476,12 @@ export async function deleteSiteHierarchyItem(siteId: string, type: string, item
     return db.$transaction(async (tx) => {
       await tx.$queryRaw<Array<{ id: string }>>`SELECT id FROM "Picket" WHERE id = ${itemId} FOR UPDATE`;
       const item = await tx.picket.findFirst({ where: { id: itemId, cluster: { field: { siteId } } }, select: { id: true } });
-      if (!item) throw new ServiceError('Hierarchy item not found', 404);
+      if (!item) throw new ServiceError('Элемент схемы не найден — возможно, удалён.', 404);
       await assertNoSubtreeProduction(tx, 'picket', itemId);
       await tx.picket.delete({ where: { id: itemId } });
       return { success: true };
     });
   }
 
-  throw new ServiceError('Invalid type', 400);
+  throw new ServiceError('Неизвестный тип элемента — обновите страницу.', 400);
 }
