@@ -778,6 +778,14 @@ export function ToModule({ surface = 'readiness' }: { surface?: ModuleSurface } 
   };
 
   const changeView = (next: ReferenceView) => {
+    // Раздел чужого модуля (например, «Происшествия» из обзора «ТБ и допусков»,
+    // переехавшие в «Техготовность») открывается его адресом: в чужой оболочке
+    // не подсветилась бы ни одна вкладка.
+    if (surfaceOfView(next) !== surface) {
+      // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- полная загрузка нужна: оболочка другого модуля монтируется заново (как у старых ссылок выше)
+      window.location.assign(`${SURFACE_ROUTE[surfaceOfView(next)]}?view=${next}`);
+      return;
+    }
     setView(next);
     replaceUrlState(next, settingsSection);
   };

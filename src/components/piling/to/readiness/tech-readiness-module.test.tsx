@@ -5,7 +5,7 @@ import { bootstrapEnvelope } from './api/__tests__/fixtures';
 
 // Утверждённое число вкладок модуля — в тесте, а не через `MODULE_TABS`:
 // сверка с той же константой, которую рендерит компонент, проходит впустую.
-const APPROVED_TAB_COUNT = 6;
+const APPROVED_TAB_COUNT = 7;
 
 beforeAll(() => {
   Element.prototype.scrollIntoView = vi.fn();

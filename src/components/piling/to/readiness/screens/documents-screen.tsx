@@ -16,7 +16,6 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
-import Link from 'next/link';
 import { AlertTriangle, Loader2, Search } from '@/components/piling/icons/unified-icons';
 import { authFetch } from '@/lib/api';
 import { formatRuDate } from '@/lib/format';
@@ -65,6 +64,18 @@ export function DocumentsScreen(props: ReferenceUiProps) {
 
   // eslint-disable-next-line react-hooks/set-state-in-effect -- loads data on mount; the async loader sets state
   useEffect(() => { void load(); }, [load]);
+
+  /**
+   * Карточка работника — во вкладке «Сотрудники» этого же модуля. Раньше кнопка
+   * вела на /admin/users/{id}#documents: такой страницы нет (есть только список
+   * /admin/users, закрытый администраторской раскладкой) — получался 404.
+   */
+  const openEmployeeCard = (userId: string) => {
+    const url = new URL(window.location.href);
+    url.searchParams.set('userId', userId);
+    window.history.replaceState({}, '', `${url.pathname}${url.search}`);
+    props.onViewChange('employees');
+  };
 
   const expired = rows?.filter((row) => row.expiry.status === 'expired') ?? [];
   const expiring = rows?.filter((row) => row.expiry.status === 'expiring') ?? [];
@@ -158,8 +169,13 @@ export function DocumentsScreen(props: ReferenceUiProps) {
                   </div>
                   {/* Каждая строка заканчивается действием: продлить документ
                       можно только в карточке работника — туда и ведём. */}
-                  <Button asChild variant="outline" className="h-8 text-2xs">
-                    <Link href={`/admin/users/${row.user.id}#documents`}>Открыть карточку</Link>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-8 text-2xs"
+                    onClick={() => openEmployeeCard(row.user.id)}
+                  >
+                    Открыть карточку
                   </Button>
                 </div>
               );

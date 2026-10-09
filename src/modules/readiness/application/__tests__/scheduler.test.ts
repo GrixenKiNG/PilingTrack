@@ -72,12 +72,12 @@ describe('суточный сброс техготовности', () => {
     outboxCreate.mockResolvedValue({});
   });
 
-  it('истекают только согласованные наряды с прошедшим сроком', async () => {
+  it('истекают согласованные и ожидающие согласования наряды с прошедшим сроком; черновики не трогаем', async () => {
     await runReadinessScheduler('orion', NOW);
     // Отбор переехал в выборку: обновляем потом по идентификаторам, чтобы
     // знать, какие именно строки поменяли, и записать это в аудит.
     const where = permitFindMany.mock.calls[0][0].where;
-    expect(where).toEqual({tenantId: 'orion', state: 'APPROVED', validTo: {lte: NOW}});
+    expect(where).toEqual({tenantId: 'orion', state: {in: ['APPROVED', 'PENDING_APPROVAL']}, validTo: {lte: NOW}});
   });
 
   // Автопереход — единственное изменение состояния без человека. Без записи в
@@ -102,6 +102,23 @@ describe('суточный сброс техготовности', () => {
     expect(event.userRole).toBe('SYSTEM');
     expect(event.userId).toBeNull();
     expect(event.userName).toBe('Планировщик техготовности');
+  });
+
+  // Наряд на согласовании с истёкшим окном согласовать нельзя (команда approve
+  // отказывает), а отозвать — тоже (revoke только для согласованного). Без
+  // автоперехода он висел в «Ожидают согласования» вечно: тупик без выхода.
+  it('просроченный наряд на согласовании тоже становится истёкшим, причина записана в аудит', async () => {
+    permitFindMany.mockResolvedValue([
+      {id: 'permit-2', version: 1, state: 'PENDING_APPROVAL', validTo: new Date('2026-08-14T08:00:00.000Z')},
+    ]);
+    permitUpdateMany.mockResolvedValue({count: 1});
+
+    await runReadinessScheduler('orion', NOW);
+
+    expect(permitUpdateMany.mock.calls[0][0].where.state).toEqual({in: ['APPROVED', 'PENDING_APPROVAL']});
+    const event = auditCreate.mock.calls[0][0].data;
+    expect(event.before.state).toBe('PENDING_APPROVAL');
+    expect(JSON.stringify(event.metadata)).toContain('UNAPPROVED_WINDOW_ELAPSED');
   });
 
   // Главная защита: закрыть смену текущих суток — значит оборвать работу,

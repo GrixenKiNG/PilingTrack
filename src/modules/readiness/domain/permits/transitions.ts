@@ -6,7 +6,7 @@ const ALLOWED: Record<string, readonly WorkPermitState[]> = {
   approve: ['PENDING_APPROVAL'],
   edit: ['DRAFT', 'PENDING_APPROVAL', 'APPROVED'],
   revoke: ['APPROVED'],
-  expire: ['APPROVED'],
+  expire: ['APPROVED', 'PENDING_APPROVAL'],
 };
 
 const PERMIT_STATE_TEXT: Record<WorkPermitState, string> = {

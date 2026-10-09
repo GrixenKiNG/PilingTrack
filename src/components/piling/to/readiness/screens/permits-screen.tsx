@@ -19,6 +19,7 @@ import type { WorkPermitDto } from '../api/contracts';
 import { CommandDialog } from '../shared/command-dialog';
 import { PermitForm } from '../forms/permit-form';
 import { ProcessRoleStrip, RefKpi, commandFailure, downloadReadinessExport } from './shared';
+import { buildPermitRoleSteps, isOverduePermit } from './permit-role-steps';
 import { normalizeSearch } from '../shared/text-search';
 import type { ReferenceUiProps } from './types';
 
@@ -47,7 +48,7 @@ export function PermitsScreen(props: ReferenceUiProps) {
   */
   const [composing, setComposing] = useState(false);
   const [permitQuery, setPermitQuery] = useState('');
-  const [permitFilter, setPermitFilter] = useState<'ALL' | 'APPROVED' | 'PENDING_APPROVAL'>('ALL');
+  const [permitFilter, setPermitFilter] = useState<'ALL' | 'APPROVED' | 'PENDING_APPROVAL' | 'OVERDUE'>('ALL');
   /*
     Диалог остался только для решений по существующему наряду: отправить,
     согласовать, отозвать. Создание переехало в полноэкранную форму — прежнее
@@ -87,9 +88,19 @@ export function PermitsScreen(props: ReferenceUiProps) {
 
   const active = props.permits.filter((item) => item.state === 'APPROVED').length;
   const blocked = props.permits.filter((item) => ['EXPIRED', 'REVOKED'].includes(item.state)).length;
-  const pending = props.permits.filter((item) => item.state === 'PENDING_APPROVAL').length;
   const crewByEquipment = new Map(props.crews.flatMap((crew) => crew.isActive && crew.equipment ? [[crew.equipment.id, crew] as const] : []));
-  const awaitingApproval = props.permits.filter((item) => item.state === 'PENDING_APPROVAL');
+  /*
+    Время берётся один раз за рендер. Просроченный наряд на согласовании
+    согласовать нельзя (команда отказывает), поэтому в очередь решений он не
+    попадает: раньше такие наряды висели в «Ожидают согласования», и ни
+    согласовать, ни убрать их было нельзя. Планировщик переводит их в «истёк»
+    раз в сутки; до тех пор экран показывает их как просроченные.
+  */
+  const nowMs = Date.now();
+  const overduePermits = props.permits.filter((item) => isOverduePermit(item, new Date(nowMs)));
+  const awaitingApproval = props.permits.filter((item) => item.state === 'PENDING_APPROVAL' && !isOverduePermit(item, new Date(nowMs)));
+  const pending = awaitingApproval.length;
+  const roleSteps = buildPermitRoleSteps({permits: props.permits, now: new Date(nowMs)});
   const equipmentWithApprovedPermit = new Set(
     props.permits.flatMap((item) => item.state === 'APPROVED' ? [item.equipmentId] : []),
   ).size;
@@ -125,7 +136,11 @@ export function PermitsScreen(props: ReferenceUiProps) {
     ? journalPermit.approvals.filter((item) => item.valid && item.permitVersion === journalPermit.version).length
     : 0;
   const filteredPermits = props.permits.filter((permit) => {
-    if (permitFilter !== 'ALL' && permit.state !== permitFilter) return false;
+    // «Все» не показывает истёкшие и отозванные: они закрыты и только
+    // загромождали реестр. Просроченные — отдельный фильтр со счётчиком.
+    if (permitFilter === 'ALL' && (permit.state === 'EXPIRED' || permit.state === 'REVOKED' || isOverduePermit(permit, new Date(nowMs)))) return false;
+    if (permitFilter === 'OVERDUE') { if (!isOverduePermit(permit, new Date(nowMs))) return false; }
+    else if (permitFilter !== 'ALL' && (permit.state !== permitFilter || isOverduePermit(permit, new Date(nowMs)))) return false;
     const equipmentName = props.equipment.find((item) => item.id === permit.equipmentId)?.name ?? '';
     const query = normalizeSearch(permitQuery);
     return !query || normalizeSearch(permit.id).includes(query) || normalizeSearch(equipmentName).includes(query) || normalizeSearch(permit.scope).includes(query);
@@ -209,6 +224,15 @@ export function PermitsScreen(props: ReferenceUiProps) {
         </div>
         <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-2xs text-muted-foreground"><span>● <b>{active}</b> допущено</span><span className="text-signal-strong">● <b>{pending}</b> ожидают подтверждения</span><span className="text-destructive-strong">● <b>{blocked}</b> заблокировано</span>{props.permits.length - active - pending - blocked > 0 && <span>● <b>{props.permits.length - active - pending - blocked}</b> черновиков</span>}<span className="xl:ml-auto text-muted-foreground">Фактическая проверка условий готовности</span></div>
       </section>
+      {overduePermits.length > 0 && (
+        <section role="alert" className="mt-2 flex flex-wrap items-center gap-3 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm">
+          <div className="min-w-0 flex-1">
+            <b className="text-destructive-strong">Просрочено нарядов-допусков: {overduePermits.length}</b>
+            <p className="mt-0.5 text-xs text-foreground">Просроченный наряд согласовать нельзя, и пока у установки нет действующего наряда, допуск к работе закрыт. Инженер ОТ или механик оформляет новый наряд; диспетчер согласует его.</p>
+          </div>
+          <Button type="button" variant="outline" className="min-h-11" onClick={() => setPermitFilter('OVERDUE')}>Показать просроченные</Button>
+        </section>
+      )}
       <section className={cn(card, 'mt-2 p-3')}>
         <div className="flex items-center justify-between"><div><h2 className="font-bold">Доказательства допуска</h2><p className="mt-0.5 text-2xs text-muted-foreground">Полный комплект подтверждений перед началом работ</p></div>{/*
             Было «{active} из {equipment.length}» — согласованные НАРЯДЫ против
@@ -251,7 +275,7 @@ export function PermitsScreen(props: ReferenceUiProps) {
       </section>
       <div className="mt-2 grid grid-cols-1 gap-2 xl:grid-cols-[minmax(0,1fr)_300px]">
         <section className={cn(card, 'overflow-x-auto')}>
-          <div className="p-3"><h2 className="font-bold">Реестр нарядов-допусков</h2><div className="mt-2 flex flex-wrap gap-2"><div className="relative min-w-[220px] flex-1"><Search className="absolute left-3 top-3.5 h-4 w-4 text-muted-foreground" /><Input aria-label="Поиск нарядов" value={permitQuery} onChange={(event) => setPermitQuery(event.target.value)} placeholder="Номер, установка, объект" className="min-h-11 bg-muted pl-9 text-xs" /></div>{([['ALL', 'Все'], ['APPROVED', 'Действующие'], ['PENDING_APPROVAL', 'На согласовании']] as const).map(([value, label]) => <button key={value} type="button" aria-pressed={permitFilter === value} onClick={() => setPermitFilter(value)} className={cn('min-h-11 rounded border px-3 text-2xs', permitFilter === value ? 'border-info bg-info/10 text-info-strong' : 'border-border text-muted-foreground')}>{label}</button>)}</div></div>
+          <div className="p-3"><h2 className="font-bold">Реестр нарядов-допусков</h2><div className="mt-2 flex flex-wrap gap-2"><div className="relative min-w-[220px] flex-1"><Search className="absolute left-3 top-3.5 h-4 w-4 text-muted-foreground" /><Input aria-label="Поиск нарядов" value={permitQuery} onChange={(event) => setPermitQuery(event.target.value)} placeholder="Номер, установка, объект" className="min-h-11 bg-muted pl-9 text-xs" /></div>{([['ALL', 'Все'], ['APPROVED', 'Действующие'], ['PENDING_APPROVAL', 'На согласовании'], ['OVERDUE', `Просроченные (${overduePermits.length})`]] as const).map(([value, label]) => <button key={value} type="button" aria-pressed={permitFilter === value} onClick={() => setPermitFilter(value)} className={cn('min-h-11 rounded border px-3 text-2xs', permitFilter === value ? 'border-info bg-info/10 text-info-strong' : 'border-border text-muted-foreground')}>{label}</button>)}</div></div>
           <div className="hidden min-w-[880px] grid-cols-[125px_minmax(120px,1.2fr)_minmax(110px,1fr)_70px_100px_80px_110px_120px] border-y border-border bg-muted px-3 py-2 text-3xs uppercase tracking-wide text-muted-foreground md:grid"><span>№ наряда</span><span>Установка</span><span>Объект</span><span>Смена</span><span>Действует до</span><span>Готовность</span><span>Статус</span><span>Действие</span></div>
           <div className="hidden max-h-[230px] min-w-[760px] divide-y divide-border overflow-y-auto md:block">
             {filteredPermits.map((permit, index) => {
@@ -376,9 +400,9 @@ export function PermitsScreen(props: ReferenceUiProps) {
       <ProcessRoleStrip
         ariaLabel="Кто что делает с нарядом-допуском"
         roles={[
-          { label: 'Инженер ОТ или механик', icon: 'inspection', tasks: ['Создаёт наряд-допуск', 'Описывает состав и границы работ', 'Отправляет на согласование'], tone: 'green' },
-          { label: 'Диспетчер', icon: 'crew', tasks: ['Проверяет условия', 'Согласовывает наряд', 'Отказ фиксируется в журнале'], tone: 'blue' },
-          { label: 'Администратор', icon: 'accepted', tasks: ['Второе решение при повышенном риске', 'Свой наряд согласовать нельзя', 'Отзыв прекращает действие'], tone: 'orange' },
+          { label: 'Инженер ОТ или механик', icon: 'inspection', tasks: ['Создаёт наряд-допуск', 'Описывает состав и границы работ', 'Отправляет на согласование'], tone: 'green', steps: roleSteps[0].steps },
+          { label: 'Диспетчер', icon: 'crew', tasks: ['Проверяет условия', 'Согласовывает наряд', 'Отказ фиксируется в журнале'], tone: 'blue', steps: roleSteps[1].steps },
+          { label: 'Администратор', icon: 'accepted', tasks: ['Второе решение при повышенном риске', 'Свой наряд согласовать нельзя', 'Отзыв прекращает действие'], tone: 'orange', steps: roleSteps[2].steps },
         ]}
       />
       <CommandDialog

@@ -206,3 +206,42 @@ describe('SafetyOverviewScreen — «Сформировать выгрузку»
     expect(screen.queryByRole('button', { name: 'Сформировать выгрузку' })).not.toBeInTheDocument();
   });
 });
+
+/**
+ * «Документы» → «Открыть карточку» вели на /admin/users/{id}#documents. Такой
+ * страницы нет (только список /admin/users), и диспетчер с инженером ОТ в любом
+ * случае получили бы 404 или отказ. Карточка работника живёт здесь, во вкладке
+ * «Сотрудники», — туда и ведёт ссылка через параметр userId.
+ */
+describe('SafetyScreen — переход из «Документов» открывает карточку сотрудника', () => {
+  afterEach(() => { window.history.replaceState({}, '', '/'); });
+
+  it('при ?userId= в адресе после загрузки сразу открывается карточка этого работника', async () => {
+    asRole('SAFETY_ENGINEER');
+    window.history.replaceState({}, '', '/admin/safety?view=employees&userId=user-1');
+    render(<SafetyScreen {...propsFor()} />);
+
+    expect(await screen.findByRole('tab', { name: 'Документы' })).toBeInTheDocument();
+    expect(screen.getByText('Петров Пётр', { selector: 'h1, h2, h3' })).toBeInTheDocument();
+  });
+
+  it('при неизвестном userId остаётся обычный список', async () => {
+    asRole('SAFETY_ENGINEER');
+    window.history.replaceState({}, '', '/admin/safety?view=employees&userId=нет-такого');
+    render(<SafetyScreen {...propsFor()} />);
+
+    await screen.findByText('Петров Пётр');
+    expect(screen.queryByRole('tab', { name: 'Документы' })).not.toBeInTheDocument();
+  });
+
+  it('«Назад» из карточки убирает userId из адреса, чтобы список не открывал её снова', async () => {
+    asRole('SAFETY_ENGINEER');
+    window.history.replaceState({}, '', '/admin/safety?view=employees&userId=user-1');
+    render(<SafetyScreen {...propsFor()} />);
+    await screen.findByRole('tab', { name: 'Документы' });
+
+    fireEvent.click(screen.getByRole('button', { name: /назад/i }));
+
+    expect(new URL(window.location.href).searchParams.get('userId')).toBeNull();
+  });
+});

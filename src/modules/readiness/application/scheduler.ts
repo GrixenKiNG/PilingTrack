@@ -121,19 +121,22 @@ export async function runReadinessScheduler(
   const runId = randomUUID();
 
   return withReadinessTenantTransaction(tenantId, async (tx) => {
-    // 1. Наряды с истёкшим сроком. Только APPROVED: черновик и наряд на
-    //    согласовании срока не имеют, отозванный уже закрыт человеком.
+    // 1. Наряды с истёкшим сроком: согласованные и ожидающие согласования.
+    //    Наряд на согласовании с прошедшим окном согласовать нельзя (approve
+    //    отказывает), поэтому без перехода он висел бы в очереди вечно.
+    //    Черновик не трогаем — его можно перепланировать; отозванный уже
+    //    закрыт человеком.
     //
     // Сначала выбираем строки, потом обновляем по их идентификаторам: слепой
     // `updateMany` не оставлял следа, кто и что поменял, а модуль стоит на
     // доказательности. Внутри одной транзакции выбранный набор и есть
     // обновлённый.
     const expiring = await tx.workPermit.findMany({
-      where: {tenantId, state: 'APPROVED', validTo: {lte: now}},
+      where: {tenantId, state: {in: ['APPROVED', 'PENDING_APPROVAL']}, validTo: {lte: now}},
       select: {id: true, version: true, state: true, validTo: true},
     });
     const expired = expiring.length === 0 ? {count: 0} : await tx.workPermit.updateMany({
-      where: {tenantId, id: {in: expiring.map((permit) => permit.id)}, state: 'APPROVED'},
+      where: {tenantId, id: {in: expiring.map((permit) => permit.id)}, state: {in: ['APPROVED', 'PENDING_APPROVAL']}},
       data: {state: 'EXPIRED', expiredAt: now, version: {increment: 1}},
     });
     for (const permit of expiring) {
@@ -150,7 +153,8 @@ export async function runReadinessScheduler(
         before: {state: permit.state, version: permit.version,
           validTo: permit.validTo ? permit.validTo.toISOString() : null},
         after: {state: 'EXPIRED', version: permit.version + 1, expiredAt: now.toISOString()},
-        metadata: {trigger: 'SCHEDULER', reason: 'VALIDITY_ELAPSED'},
+        metadata: {trigger: 'SCHEDULER',
+          reason: permit.state === 'PENDING_APPROVAL' ? 'UNAPPROVED_WINDOW_ELAPSED' : 'VALIDITY_ELAPSED'},
       });
     }
 

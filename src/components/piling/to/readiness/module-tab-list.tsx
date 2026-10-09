@@ -32,6 +32,9 @@ export const MODULE_TABS = [
   { id: 'shifts', label: 'Смены', icon: 'shift-start' },
   { id: 'maintenance', label: 'Обслуживание ТО', icon: 'repair' },
   { id: 'reports', label: 'Отчёты', icon: 'reports' },
+  // Происшествия переехали сюда из «ТБ и допусков» (решение владельца 10.10.2026):
+  // разбор случаев с техникой читается рядом с отчётами по ней.
+  { id: 'incidents', label: 'Происшествия', icon: 'defect' },
   { id: 'settings', label: 'Настройки', icon: 'settings' },
 ] as const satisfies ReadonlyArray<ModuleTab>;
 
@@ -39,7 +42,7 @@ export const MODULE_TABS = [
  * Вкладки модуля «ТБ и допуски» — всё про ЛЮДЕЙ.
  *
  * Порядок — от вопроса «кого нельзя пускать сегодня» к подробностям и
- * истории: сводка, бумаги, журнал инструктажей, разбор происшествий и в конце
+ * истории: сводка, бумаги, журнал инструктажей и в конце
  * реестр нарядов (в ОРИОН их не выписывают, см. `readiness-rules.ts`).
  */
 export const SAFETY_TABS = [
@@ -53,7 +56,6 @@ export const SAFETY_TABS = [
   { id: 'briefings', label: 'Журнал инструктажей', icon: 'documents' },
   { id: 'instructions', label: 'Инструкции и регламенты', icon: 'reports' },
   { id: 'knowledge', label: 'Проверка знаний', icon: 'accepted' },
-  { id: 'incidents', label: 'Происшествия', icon: 'defect' },
   // «Документы» и «Наряд-допуски» на макете отдельными вкладками не значились,
   // но это работающие экраны с живыми данными: срок удостоверения и реестр
   // нарядов. Убрать их значило бы потерять готовое ради сходства картинки.

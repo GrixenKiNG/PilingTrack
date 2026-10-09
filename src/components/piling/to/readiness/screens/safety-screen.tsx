@@ -15,7 +15,7 @@
  * отказ по нажатию.
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { Loader2, Search } from '@/components/piling/icons/unified-icons';
 import { authFetch } from '@/lib/api';
@@ -111,6 +111,27 @@ export function SafetyScreen(props: ReferenceUiProps) {
   // eslint-disable-next-line react-hooks/set-state-in-effect -- loads data on mount; the async loader sets state
   useEffect(() => { void load(); }, [load]);
 
+  // Переход из «Документов» («Открыть карточку») приходит с ?userId=: карточка
+  // открывается сама, как только список загружен. Один раз — после «Назад»
+  // параметр убирается, иначе список снова открывал бы ту же карточку.
+  const deepLinkHandled = useRef(false);
+  useEffect(() => {
+    if (deepLinkHandled.current || !data) return;
+    deepLinkHandled.current = true;
+    const userId = new URLSearchParams(window.location.search).get('userId');
+    const target = userId ? data.rows.find((item) => item.userId === userId) : undefined;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- opens the card requested by the URL once the rows are known
+    if (target) setCardRow(target);
+  }, [data]);
+  const closeCard = () => {
+    const url = new URL(window.location.href);
+    if (url.searchParams.has('userId')) {
+      url.searchParams.delete('userId');
+      window.history.replaceState({}, '', `${url.pathname}${url.search}`);
+    }
+    setCardRow(null);
+  };
+
   const needle = normalizeSearch(query);
   const visible = useMemo(() => {
     const rows = data?.rows ?? [];
@@ -130,8 +151,8 @@ export function SafetyScreen(props: ReferenceUiProps) {
         <EmployeeCard
           row={cardRow}
           editable={mayManage}
-          onBack={() => setCardRow(null)}
-          onGoTo={(view) => { setCardRow(null); props.onViewChange(view); }}
+          onBack={closeCard}
+          onGoTo={(view) => { closeCard(); props.onViewChange(view); }}
         />
       ) : (
         <>
