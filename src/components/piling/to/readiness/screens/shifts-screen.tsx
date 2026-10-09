@@ -16,6 +16,7 @@ import { CommandDialog } from '../shared/command-dialog';
 import { EquipmentPhoto, ProcessRoleStrip, RefKpi, commandFailure } from './shared';
 import type { ReferenceUiProps } from './types';
 import { buildShiftRoleSteps } from './shift-role-steps';
+import { buildShiftNextAction } from './shift-next-action';
 
 function formatTimeInTimezone(value: Date | string, timezone: string) {
   return formatDateInTimezone(value, timezone, {
@@ -173,6 +174,20 @@ export function ShiftsScreen(props: ReferenceUiProps) {
     defectsError: props.defectsError,
   });
 
+  const selectedEquipment = props.equipment.find((item) => item.id === props.selectedId);
+  const nextAction = selectedEquipment
+    ? buildShiftNextAction({
+      equipmentName: selectedEquipment.name,
+      shifts: todayShifts.filter((shift) => shift.equipmentId === selectedEquipment.id),
+      inspectionDone: props.currentReadiness.find((item) => item.equipmentId === selectedEquipment.id)?.facts?.inspectionCompleted ?? null,
+      caps: {
+        manage: Boolean(props.bootstrap?.capabilities.entities.shift.manage),
+        decide: Boolean(props.bootstrap?.capabilities.entities.shift.decideHandover),
+        prepare: Boolean(props.bootstrap?.capabilities.entities.shift.prepareHandover),
+      },
+    })
+    : null;
+
   return (
     <>
       <ScreenTitle
@@ -193,6 +208,28 @@ export function ShiftsScreen(props: ReferenceUiProps) {
   : <Button disabled className="min-h-11 bg-signal-strong hover:bg-signal-strong">+ Создать смену</Button>}</div>}
       />
       <div className="mb-2 flex flex-wrap gap-2 text-2xs text-muted-foreground"><span className="rounded border border-border bg-card px-2 py-1">Дневная 07:00–19:00</span><span className="rounded border border-border bg-card px-2 py-1">Ночная 19:00–07:00</span><span className="rounded border border-border bg-card px-2 py-1">Часовой пояс: {timezone}</span></div>
+      {nextAction && (
+        <section aria-label="Следующее действие по выбранной установке" className="mb-3 rounded-lg border border-signal bg-signal/10 p-3">
+          <div className="text-2xs text-muted-foreground">Следующее действие</div>
+          <div className="mt-1 font-bold">{nextAction.title}</div>
+          <p className="mt-1 text-sm leading-relaxed text-muted-foreground sm:text-xs">{nextAction.text}</p>
+          {nextAction.button?.kind === 'create' && selectedEquipment && (
+            <Button asChild className="mt-3 min-h-11 bg-signal-strong hover:bg-signal-strong">
+              <Link href={`/admin/to/shifts/new?equipmentId=${selectedEquipment.id}`}>{nextAction.button.label}</Link>
+            </Button>
+          )}
+          {nextAction.button?.kind === 'command' && (() => {
+            const button = nextAction.button;
+            const target = props.shifts.find((shift) => shift.id === button.shiftId);
+            return target ? (
+              <Button type="button" className="mt-3 min-h-11 bg-signal-strong hover:bg-signal-strong"
+                onClick={() => { setCommand({shift: target, action: button.action}); setCommandError(null); }}>
+                {button.label}
+              </Button>
+            ) : null;
+          })()}
+        </section>
+      )}
       <section className={COMPACT_KPI_GRID} style={kpiGridStyle(4)}>
         <RefKpi icon="shift-start" label="Смен сегодня" tone="info" value={todayShifts.length} />
         <RefKpi icon="technical-readiness" label="В работе" tone="success" value={ready.length} />

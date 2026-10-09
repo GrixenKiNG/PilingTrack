@@ -149,6 +149,10 @@ export function FleetEvidencePanel({ item, props }: { item: FleetItem; props: Re
                     {sourceLinks('inspection').map((link) => <FleetSourceLink key={link.href} href={link.href}>{link.text}</FleetSourceLink>)}
                     {sourceLinks('inspection').length === 0 && <p className="mt-2 text-muted-foreground">Подробная запись этого источника пока недоступна. Здесь показаны сведения, сохранённые при оценке.</p>}</>
                 : <p className="text-muted-foreground">Ссылка на осмотр не сохранена в этой оценке.</p>}</>}
+              {stage.key === 'INSPECTION' && stage.state !== 'pass' && <>
+                <p className="mt-2">Осмотр проходит машинист на своём экране перед сменой и засчитывает его в той смене, где провёл. Осмотр вчерашней или другой смены не считается.</p>
+                <Button type="button" variant="outline" className="mt-2 min-h-11" onClick={() => props.onViewChange('shifts')}>Проверить смену установки <ArrowRight className="ml-2 h-4 w-4" /></Button>
+              </>}
               {stage.key === 'ENGINE_HOURS' && <p>Оценка сохраняет наличие показаний. Текущая наработка: {equipment.engineHoursTotal?.toLocaleString('ru-RU') ?? 'не получена'} ч. Эти данные могли обновиться после оценки.</p>}
               {stage.key === 'PERMIT' && <>{presentation.evidence.find((evidence) => evidence.key === 'permit')
                 ? <p>Наряд: <span className="break-all text-xs">{presentation.evidence.find((evidence) => evidence.key === 'permit')?.reference}</span>. {props.permits.find((permit) => permit.id === presentation.evidence.find((evidence) => evidence.key === 'permit')?.reference)?.title || 'Подробности наряда не получены в текущей выборке.'}</p>
@@ -156,7 +160,10 @@ export function FleetEvidencePanel({ item, props }: { item: FleetItem; props: Re
               {stage.key === 'MAINTENANCE' && <>{sourceLinks('maintenance').length
                 ? sourceLinks('maintenance').map((link) => <div key={link.href}><FleetSourceLink href={link.href}>{link.text}</FleetSourceLink></div>)
                 : <p>Отдельные записи ТО не указаны в оценке. Регламент и текущие записи доступны ниже.</p>}</>}
-              {stage.key === 'ACCEPTANCE' && <p>Приёмка отражена в сохранённой оценке. Для проверки и выполнения процесса откройте центр готовности выбранной установки.</p>}
+              {stage.key === 'ACCEPTANCE' && <>
+                <p>Приёмка — допуск смены к работе. Её даёт диспетчер во вкладке «Смены» кнопкой «Допустить» у смены этой установки. Приёмка считается по смене: если смены на сегодня нет, сначала создайте её.</p>
+                <Button type="button" variant="outline" className="mt-2 min-h-11" onClick={() => props.onViewChange('shifts')}>Перейти в «Смены» <ArrowRight className="ml-2 h-4 w-4" /></Button>
+              </>}
             </div>
           </details>)}
         </div>

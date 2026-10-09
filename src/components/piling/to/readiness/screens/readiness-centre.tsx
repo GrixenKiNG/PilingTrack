@@ -46,11 +46,11 @@ const ROLE_FLOW = [
     border: 'border-success/25',
     header: 'border-success/25 bg-success/10 text-success-strong',
     steps: [
-      { key: 'INSPECTION', title: 'Провести осмотр', hint: 'Откройте вкладку «Смены» и нажмите «Провести осмотр». Осмотр засчитывается только за сегодня.', target: { view: 'shifts' }, ability: 'readiness.inspection.manage' },
+      { key: 'INSPECTION', title: 'Провести осмотр', hint: 'Осмотр проходит машинист на своём экране перед сменой. Он засчитывается только в той смене, где его провели; во вкладке «Смены» видно, есть ли у установки смена.', target: { view: 'shifts' }, ability: 'readiness.inspection.manage' },
       { key: 'ENGINE_HOURS', title: 'Зафиксировать моточасы', hint: 'На экране машиниста нажмите «Снять моточасы» и введите показание счётчика.', target: { view: 'shifts' } },
       { key: 'PERMIT', title: 'Допуск', hint: 'Наряд-допуск оформляет инженер ОТ (или механик) во вкладке «Наряд-допуски». Если допуск правилами не требуется, шаг закрыт сам.', target: { view: 'permits' }, ability: 'readiness.permit.edit', executor: 'инженер по охране труда' },
       { key: 'MAINTENANCE', title: 'Техническое обслуживание', hint: 'Обслуживание закрывает механик во вкладке «Обслуживание ТО».', target: { view: 'maintenance' }, ability: 'readiness.maintenance.manage', executor: 'механик' },
-      { key: 'ACCEPTANCE', title: 'Приёмка', hint: 'Смену допускает к работе тот, кто выходит в смену: нажмите «Допустить смену к работе» во вкладке «Смены».', target: { view: 'shifts' }, ability: 'readiness.shift.authorize', executor: 'диспетчер' },
+      { key: 'ACCEPTANCE', title: 'Приёмка', hint: 'Откройте вкладку «Смены» и нажмите «Допустить» у смены этой установки. Если смены на сегодня нет, сначала создайте её кнопкой «Создать смену».', target: { view: 'shifts' }, ability: 'readiness.shift.authorize', executor: 'диспетчер' },
     ] as RoleStepHint[],
   },
   {
