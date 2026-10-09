@@ -259,6 +259,50 @@ describe('EquipmentDocuments — диалог ограничен по высот
 });
 
 /*
+  AU73: сбой сохранения/удаления документа без поля `error` в теле показывал
+  обезличенное «Ошибка» — человек не понимал, что произошло и что делать.
+  Теперь тост называет действие. Серверную причину (`error`) показываем как есть.
+*/
+describe('EquipmentDocuments — понятные тексты отказов (AU73)', () => {
+  beforeEach(() => {
+    mocks.authFetch.mockReset();
+    vi.mocked(toast.error).mockClear();
+  });
+
+  it('500 без поля error при сохранении → тост объясняет действие', async () => {
+    mocks.authFetch.mockImplementation(async (_url: string, init?: RequestInit) =>
+      init?.method === 'POST' ? json({}, 500) : json({}),
+    );
+    render(<EquipmentDocuments equipmentId="eq-1" documents={[]} canManage onChanged={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /Добавить/ }));
+    fireEvent.change(screen.getByLabelText('Название *'), { target: { value: 'Полис ОСАГО' } });
+    const submitButton = screen.getAllByRole('button', { name: 'Добавить' }).at(-1);
+    if (!submitButton) throw new Error('кнопка «Добавить» не найдена');
+    fireEvent.click(submitButton);
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith(
+      'Не удалось сохранить документ. Проверьте связь и повторите.',
+    ));
+  });
+
+  it('500 при удалении → тост объясняет действие', async () => {
+    mocks.authFetch.mockImplementation(async (_url: string, init?: RequestInit) =>
+      init?.method === 'DELETE' ? json({}, 500) : json({}),
+    );
+    const doc = { id: 'd1', type: 'PASSPORT', title: 'Паспорт', issuedAt: null, expiresAt: null, notes: '' };
+    render(<EquipmentDocuments equipmentId="eq-1" documents={[doc]} canManage onChanged={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /Удалить документ/ }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Удалить документ' }));
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith(
+      'Не удалось удалить документ. Проверьте связь и повторите.',
+    ));
+  });
+});
+
+/*
   F-R136-TOP №2: карточка установки показывала одну ссылку «← К списку
   установок» — пути «Установки → СГ-1» не было видно.
 */
