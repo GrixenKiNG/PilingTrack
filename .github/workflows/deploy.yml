@@ -1,12 +1,11 @@
 name: Deploy to prod
 
-# Manual-only — no auto-deploy on push.
-# Triggered from GitHub UI: Actions → Deploy to prod → Run workflow.
+# Manual-only. production must require the owner's review with admin bypass disabled.
 on:
   workflow_dispatch:
     inputs:
       sha:
-        description: 'Full 40-character commit SHA on main with a successful CI run'
+        description: 'Full 40-character current main SHA with a successful CI run'
         required: true
         type: string
       external_workers_stopped:
@@ -15,7 +14,7 @@ on:
         default: false
         type: boolean
       services:
-        description: 'Services to redeploy (space-separated)'
+        description: 'Requested services (app and workers are always replaced together)'
         required: false
         default: 'app workers'
         type: choice
@@ -34,10 +33,18 @@ permissions:
 
 jobs:
   deploy:
-    name: SSH + rebuild + restart
+    name: Build SHA images + replace generation
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      vars.PROD_DEPLOY_OWNER != '' &&
+      github.actor == vars.PROD_DEPLOY_OWNER &&
+      github.triggering_actor == vars.PROD_DEPLOY_OWNER
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 60
     environment: production
+    defaults:
+      run:
+        shell: bash
     env:
       DEPLOY_SHA: ${{ inputs.sha }}
 
@@ -62,68 +69,77 @@ jobs:
             .status == "completed" and .conclusion == "success"
           ' > /dev/null || { echo '::error::Latest CI run for this SHA on main has not passed'; exit 1; }
 
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Verify main SHA
+        run: |
+          git fetch origin main
+          [ "$(git branch --show-current)" = main ] || { echo '::error::Checkout must be main'; exit 1; }
+          git diff --quiet && git diff --cached --quiet || { echo '::error::Working tree is dirty'; exit 1; }
+          [ "$(git rev-parse HEAD)" = "$DEPLOY_SHA" ] && [ "$(git rev-parse origin/main)" = "$DEPLOY_SHA" ] || { echo '::error::Requested SHA must equal current main and origin/main'; exit 1; }
+
+      - name: Build SHA images + workers smoke
+        run: |
+          docker build -f Dockerfile.workers --target runner --build-arg "APP_VERSION=$DEPLOY_SHA" -t "pilingtrack-workers:$DEPLOY_SHA" .
+          bash scripts/smoke-workers-image.sh "pilingtrack-workers:$DEPLOY_SHA"
+          docker build -f Dockerfile --target runner --build-arg "APP_VERSION=$DEPLOY_SHA" -t "pilingtrack-app:$DEPLOY_SHA" .
+          # Always ship the lightweight migrate target so migrations cannot use a stale image.
+          docker build -f Dockerfile --target migrate -t "pilingtrack-migrate:$DEPLOY_SHA" .
+
       - name: Install SSH key
         env:
           SSH_PRIVATE_KEY: ${{ secrets.PROD_SSH_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.PROD_SSH_KNOWN_HOSTS }}
         run: |
+          [ -n "$SSH_PRIVATE_KEY" ] && [ -n "$SSH_KNOWN_HOSTS" ] || { echo '::error::Configure production SSH key and verified host key'; exit 1; }
+          umask 077
           mkdir -p ~/.ssh
-          echo "$SSH_PRIVATE_KEY" > ~/.ssh/id
-          chmod 600 ~/.ssh/id
-          ssh-keyscan -H 87.242.102.125 >> ~/.ssh/known_hosts
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/id
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
 
-      - name: Checkout, rebuild, restart
-        env:
-          SERVICES: ${{ inputs.services }}
+      - name: Save rollback images
         run: |
-          # $SERVICES expands here (runner); \$VARS evaluate on the prod host.
-          ssh -i ~/.ssh/id user1@87.242.102.125 "
-            set -e
+          ssh -i ~/.ssh/id -o BatchMode=yes -o StrictHostKeyChecking=yes user1@87.242.102.125 bash -se -- "$DEPLOY_SHA" <<'REMOTE'
+            DEPLOY_SHA=$1
             cd /opt/pilingtrack
-            BEFORE=\$(git rev-parse HEAD)
-            # Preserve actual running image IDs before build changes :latest.
-            ROLLBACK=\"\$BEFORE-\$(date +%Y%m%d)\"
-            for s in app workers; do
-              old_image=\$(docker inspect --format '{{.Image}}' \"pilingtrack-\$s\")
-              docker tag \"\$old_image\" \"pilingtrack-\$s:\$ROLLBACK\"
-            done
             git fetch origin main
-            git merge-base --is-ancestor '$DEPLOY_SHA' origin/main
-            git checkout --detach '$DEPLOY_SHA'
-            export APP_VERSION='$DEPLOY_SHA'
-            SVCS=\"app workers\"
-            # A new Prisma migration means the 'migrate' image must be rebuilt
-            # too — it bakes prisma/migrations at build time, so building only
-            # app/workers would run 'migrate deploy' on a stale image and
-            # silently skip the migration (runbook 008). Auto-include it.
-            if git diff --name-only --diff-filter=A \"\$BEFORE\"..HEAD -- 'prisma/migrations/**' | grep -q .; then
-              echo '>> New migration detected — adding migrate to the build set'
-              SVCS=\"migrate \$SVCS\"
-            fi
-            df -h /
-            # Build sequentially with a prune between — a parallel build fills
-            # the 30 GB VPS disk to 100% (reference_prod_deploy_disk).
-            for s in \$SVCS; do
-              echo \">> Building \$s\"
-              docker compose build \"\$s\"
-              docker builder prune -f || true
+            [ "$(git branch --show-current)" = main ] || { echo 'Server checkout must be main'; exit 1; }
+            git diff --quiet && git diff --cached --quiet || { echo 'Server working tree is dirty'; exit 1; }
+            [ "$(git rev-parse origin/main)" = "$DEPLOY_SHA" ] || { echo 'Requested SHA is no longer origin/main'; exit 1; }
+            ROLLBACK="$(git rev-parse HEAD)-$(date +%Y%m%d)"
+            for s in app workers; do
+              old_image=$(docker inspect --format '{{.Image}}' "pilingtrack-$s")
+              docker tag "$old_image" "pilingtrack-$s:$ROLLBACK"
             done
-            # Smoke именно построенного образа; до замены работающих сервисов.
-            case \" \$SVCS \" in
-              *\" workers \"*)
-                WORKERS_IMAGE=''
-                for image in \$(docker compose config --images workers); do
-                  service=\$(docker image inspect --format '{{ index .Config.Labels \"com.docker.compose.service\" }}' \"\$image\" 2>/dev/null || true)
-                  if [ \"\$service\" = workers ]; then
-                    WORKERS_IMAGE=\"\$image\"
-                    break
-                  fi
-                done
-                [ -n \"\$WORKERS_IMAGE\" ] || exit 1
-                bash scripts/smoke-workers-image.sh \"\$WORKERS_IMAGE\"
-                ;;
-            esac
+            df -h /
+          REMOTE
+
+      - name: Transfer SHA images
+        run: |
+          docker save "pilingtrack-app:$DEPLOY_SHA" "pilingtrack-workers:$DEPLOY_SHA" "pilingtrack-migrate:$DEPLOY_SHA" | gzip -1 | \
+            ssh -i ~/.ssh/id -o BatchMode=yes -o StrictHostKeyChecking=yes user1@87.242.102.125 'bash -o pipefail -c "gunzip | docker load"'
+
+      - name: Switch main + replace generation
+        run: |
+          ssh -i ~/.ssh/id -o BatchMode=yes -o StrictHostKeyChecking=yes user1@87.242.102.125 bash -se -- "$DEPLOY_SHA" <<'REMOTE'
+            DEPLOY_SHA=$1
+            cd /opt/pilingtrack
+            git fetch origin main
+            [ "$(git branch --show-current)" = main ] || { echo 'Server checkout must be main'; exit 1; }
+            git diff --quiet && git diff --cached --quiet || { echo 'Server working tree is dirty'; exit 1; }
+            [ "$(git rev-parse origin/main)" = "$DEPLOY_SHA" ] || { echo 'Requested SHA is no longer origin/main'; exit 1; }
+            git merge --ff-only origin/main
+            [ "$(git rev-parse HEAD)" = "$DEPLOY_SHA" ] || exit 1
+            for s in app workers migrate; do
+              docker tag "pilingtrack-$s:$DEPLOY_SHA" "pilingtrack-$s:latest"
+            done
+            export APP_VERSION="$DEPLOY_SHA"
             WORKER_GENERATION_EXTERNAL_STOPPED=1 bash scripts/replace-worker-generation.sh app workers
-          "
+          REMOTE
 
       - name: Verify health + deployed SHA
         run: |
