@@ -1,4 +1,4 @@
-import type {FinishShift, NextStep} from '../operator-mobile/shift-next-step';
+import type {NextStep} from '../operator-mobile/shift-next-step';
 import {V2_STEPS, V2_STEP_STAGE, V2_STEP_TITLE, type V2Step} from './shift-flow';
 
 /**
@@ -44,25 +44,5 @@ export function v2NextStep(step: V2Step): NextStep {
       return {...base, action: {kind: 'CLOSE_SHIFT'}};
     case 'closed':
       return {...base, action: {kind: 'NONE'}};
-  }
-}
-
-export function v2FinishShift(step: V2Step): FinishShift {
-  switch (step) {
-    case 'work':
-      return {
-        action: {kind: 'FINISH_WORK'}, enabled: true,
-        hint: 'Работа закончится. Дальше — осмотр после работы и сдача отчёта.',
-      };
-    case 'post-inspection':
-    case 'report':
-      return {action: {kind: 'GO_CLOSING'}, enabled: true, hint: 'Перейти к сдаче смены.'};
-    case 'closed':
-      return {action: {kind: 'NONE'}, enabled: false, hint: 'Смена уже закрыта.'};
-    default:
-      return {
-        action: {kind: 'NONE'}, enabled: false,
-        hint: `Смену можно завершить, когда начнётся работа. Сейчас: ${V2_STEP_TITLE[step].toLowerCase()}.`,
-      };
   }
 }

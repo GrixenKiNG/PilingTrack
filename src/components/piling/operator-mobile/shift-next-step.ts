@@ -2,7 +2,7 @@ import type {ChecklistStage, OperatorMobileState} from '@/modules/operator-mobil
 import {admissionSteps} from './safety/admission-steps';
 
 /**
- * «Следующий шаг» и «Завершить смену» — один расчёт на все модули оператора.
+ * «Следующий шаг» — один расчёт на все модули оператора.
  *
  * ЗАЧЕМ. Владелец 07.10.2026: внизу каждого модуля — большие кнопки «Главная»,
  * «Следующий шаг» и «Завершить смену». Что считать следующим шагом, решает
@@ -110,45 +110,5 @@ export function nextStep(state: OperatorMobileState): NextStep {
     }
     case 'CLOSED':
       return step({kind: 'NONE'}, 'Смена закрыта', 'Отчёт сдан. Новая смена начнётся завтра.', false);
-  }
-}
-
-export type FinishShiftAction =
-  /** Работа идёт: завершить её, дальше ЕО после работы и сдача. */
-  | {kind: 'FINISH_WORK'}
-  /** Работа завершена: перейти к сдаче смены. */
-  | {kind: 'GO_CLOSING'}
-  | {kind: 'NONE'};
-
-export interface FinishShift {
-  action: FinishShiftAction;
-  enabled: boolean;
-  /** Пояснение под кнопкой: что произойдёт или почему сейчас нельзя. */
-  hint: string;
-}
-
-/**
- * Что делает кнопка «Завершить смену» сейчас.
- *
- * Кнопка есть всегда, но нажимается не всегда: смену нельзя завершить, пока она
- * не началась, и дважды. В недоступном состоянии она говорит, что сделать
- * сначала, а не молчит.
- */
-export function finishShift(state: OperatorMobileState): FinishShift {
-  switch (state.phase) {
-    case 'WORK':
-      return {
-        action: {kind: 'FINISH_WORK'}, enabled: true,
-        hint: 'Работа закончится. Дальше — ЕО после работы и сдача отчёта.',
-      };
-    case 'CLOSING':
-      return {action: {kind: 'GO_CLOSING'}, enabled: true, hint: 'Перейти к сдаче смены.'};
-    case 'CLOSED':
-      return {action: {kind: 'NONE'}, enabled: false, hint: 'Смена уже закрыта.'};
-    default:
-      return {
-        action: {kind: 'NONE'}, enabled: false,
-        hint: `Смену можно завершить, когда начнётся работа. Сейчас: ${nextStep(state).title.toLowerCase()}.`,
-      };
   }
 }

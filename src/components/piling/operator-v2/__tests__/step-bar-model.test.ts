@@ -1,6 +1,6 @@
 import {describe, expect, it} from 'vitest';
 import {V2_STEPS} from '../shift-flow';
-import {v2FinishShift, v2NextStep} from '../step-bar-model';
+import {v2NextStep} from '../step-bar-model';
 
 // Владелец 07.10.2026: панель «Главная / Следующий шаг / Завершить смену» — во
 // всех модулях оператора. У v2 свой порядок экранов, панель строится по нему.
@@ -31,28 +31,5 @@ describe('v2NextStep', () => {
     const result = v2NextStep('closed');
     expect(result.enabled).toBe(false);
     expect(result.action).toEqual({kind: 'NONE'});
-  });
-});
-
-describe('v2FinishShift', () => {
-  it('в работе завершает работу', () => {
-    expect(v2FinishShift('work')).toMatchObject({action: {kind: 'FINISH_WORK'}, enabled: true});
-  });
-
-  it('после работы ведёт к сдаче', () => {
-    expect(v2FinishShift('post-inspection')).toMatchObject({action: {kind: 'GO_CLOSING'}, enabled: true});
-    expect(v2FinishShift('report')).toMatchObject({action: {kind: 'GO_CLOSING'}, enabled: true});
-  });
-
-  it.each(['acceptance', 'inspection', 'site-safety', 'startup'] as const)(
-    'до работы (%s) не нажимается и называет, что сделать сначала', (step) => {
-      const result = v2FinishShift(step);
-      expect(result.enabled).toBe(false);
-      expect(result.hint).toMatch(/Сейчас:/);
-    },
-  );
-
-  it('после закрытия не нажимается', () => {
-    expect(v2FinishShift('closed')).toMatchObject({enabled: false});
   });
 });
