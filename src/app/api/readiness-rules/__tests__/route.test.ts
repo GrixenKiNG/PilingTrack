@@ -21,6 +21,18 @@ vi.mock('@/modules/readiness/application/readiness-rules-service', () => ({
   publishReadinessRules: publishMock,
 }));
 
+const { saveTemplateMock } = vi.hoisted(() => ({ saveTemplateMock: vi.fn() }));
+vi.mock('@/modules/monitoring', () => ({ getTemplate: vi.fn(), saveTemplate: saveTemplateMock }));
+import { PUT as putMonitoringTemplate } from '../../monitoring/template/route';
+
+it('администратор за механика не сохраняет шаблон мониторинга', async () => {
+  saveTemplateMock.mockReset().mockResolvedValue({});
+  requireAuthMock.mockResolvedValue({ user: { id: 'admin', role: 'ADMIN', actingAs: 'MECHANIC', tenantId: 'tenant-1' }, error: null });
+  const response = await putMonitoringTemplate(request('PUT', '{}'));
+  expect(response.status).toBe(403);
+  expect(saveTemplateMock).not.toHaveBeenCalled();
+});
+
 import { GET, PUT } from '../route';
 import { POST } from '../publish/route';
 

@@ -6,12 +6,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 
-const mocks = vi.hoisted(() => ({ authFetch: vi.fn() }));
+const mocks = vi.hoisted(() => ({ authFetch: vi.fn(), actingAs: null as string | null }));
 
 vi.mock('@/lib/api', () => ({ authFetch: mocks.authFetch }));
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 vi.mock('@/lib/store', () => ({
-  usePilingStore: (pick: (s: unknown) => unknown) => pick({ currentUser: { role: 'ADMIN' } }),
+  usePilingStore: (pick: (s: unknown) => unknown) => pick({ currentUser: { role: 'ADMIN' }, actingAs: mocks.actingAs }),
 }));
 vi.mock('@/components/piling/analytics-dashboard/kpi-widgets', () => ({ AnalyticsDashboardLayoutEditor: () => null }));
 vi.mock('@/components/piling/main-dashboard/dashboard-layout', () => ({ MainDashboardLayoutEditor: () => null }));
@@ -20,6 +20,16 @@ vi.mock('@/components/piling/admin-dlq', () => ({ AdminDlq: () => null }));
 vi.mock('@/components/piling/monitoring/equipment-tile-template-settings', () => ({ EquipmentTileTemplateSettings: () => null }));
 
 import { WorkspaceSettings } from '../workspace-settings';
+
+it('администратор за диспетчера не изменяет уведомления', async () => {
+  mocks.actingAs = 'DISPATCHER';
+  mocks.authFetch.mockImplementation(async () => json({ companyName: 'Орион', timezone: 'Europe/Moscow', notifications: {} }));
+  try {
+    render(<WorkspaceSettings />);
+    expect(await screen.findByRole('switch', { name: LABEL })).toBeDisabled();
+    expect(screen.queryByRole('button', { name: 'Редактировать' })).not.toBeInTheDocument();
+  } finally { mocks.actingAs = null; }
+});
 
 const LABEL = 'Простой в сменном отчёте дольше 2 часов';
 const json = (body: unknown, status = 200) =>

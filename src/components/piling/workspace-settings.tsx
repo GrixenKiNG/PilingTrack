@@ -7,7 +7,7 @@ import { authFetch } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { usePilingStore } from '@/lib/store';
-import { ROLE_LABELS, type UserRole } from '@/lib/types';
+import { ROLE_LABELS, resolveEffectiveRole, type UserRole } from '@/lib/types';
 import {
   DEFAULT_WORKSPACE_SETTINGS,
   NOTIFICATION_KEYS,
@@ -96,7 +96,7 @@ export function WorkspaceSettings() {
   // useDocumentTitle; «Настройки» его не ставили и вкладка называлась
   // заголовком корневого layout («PilingTrack - Управление свайными работами»).
   useDocumentTitle('Настройки');
-  const isAdmin = usePilingStore((state) => state.currentUser?.role) === 'ADMIN';
+  const isAdmin = usePilingStore((state) => resolveEffectiveRole(state.currentUser?.role ?? '', state.actingAs)) === 'ADMIN';
   const [activeTab, setActiveTab] = useState<Tab>('workspace');
   const [settings, setSettings] = useState<WorkspaceSettingsData>(DEFAULT_WORKSPACE_SETTINGS);
   // Пока настройки не загрузились, править их нельзя: под значениями по
@@ -372,7 +372,7 @@ export function WorkspaceSettings() {
 }
 
 function TemplatesTab() {
-  const isAdmin = usePilingStore((state) => state.currentUser?.role) === 'ADMIN';
+  const isAdmin = usePilingStore((state) => resolveEffectiveRole(state.currentUser?.role ?? '', state.actingAs)) === 'ADMIN';
   const [surface, setSurface] = useState<'analytics' | 'main'>('analytics');
   return (
     <div className="space-y-4">
