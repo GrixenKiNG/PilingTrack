@@ -9,7 +9,7 @@ import type {Prisma} from '@/generated/postgres-client/client';
 import {withReadinessTenantTransaction} from '@/modules/readiness/server';
 // eslint-disable-next-line no-restricted-imports -- legacy cross-layer import pending the parked services<->modules migration (CLAUDE.md); behavior-neutral
 import {writeReportAuditRow} from '@/services/reports/audit-service';
-import {OperatorCommandError, requireCrew, requireOpenShift, ensureReport} from './shared';
+import {OperatorCommandError, requireCrew, requireOpenShift, ensureReport, businessReportId} from './shared';
 import type {Tx} from './shared';
 
 /** Оператор объявил, что работа закончена: дальше только ЕО после работы. */
@@ -169,8 +169,8 @@ export async function submitShiftReport(tx: Tx, input: {
     }).format(at)
     : null);
 
-  const submittedReport = await tx.report.update({
-    where: {id: reportId},
+  const submitted = await tx.report.updateMany({
+    where: {id: reportId, status: 'draft'},
     data: {
       status: 'submitted',
       submittedAt: input.now,
@@ -181,8 +181,9 @@ export async function submitShiftReport(tx: Tx, input: {
       endingFuelPercent: fuelPercent,
       lastEditedById: input.operatorId,
     },
-    select: {reportId: true},
   });
+  if (submitted.count === 0) return {reportId};
+  const submittedReportId = await businessReportId(tx, reportId);
 
   // Сужение типа: параметр `writeReportAuditRow` описан вручную (его `create`
   // принимает аргументы Prisma), поэтому клиент транзакции приводится явно —
@@ -202,7 +203,7 @@ export async function submitShiftReport(tx: Tx, input: {
     строки по нему (`report-history-service.ts`).
   */
   await writeReportAuditRow({
-    reportId: submittedReport.reportId,
+    reportId: submittedReportId,
     action: 'submitted',
     userId: input.operatorId,
     newData: {
