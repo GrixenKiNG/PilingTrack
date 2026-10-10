@@ -429,7 +429,7 @@ export function useReportForm(): UseReportFormReturn {
 
   const addDrilling = (typeId: string, count: number, metersPerUnit: number) => {
     if (!typeId || !(count > 0) || !(metersPerUnit > 0)) { toast.error('Заполните тип бурения, количество и метры'); return false; }
-    setDrillings((prev) => [...prev, { id: crypto.randomUUID(), picketId: selectedPicketId, typeId, count, metersPerUnit, meters: Number((count * metersPerUnit).toFixed(1)) }]);
+    setDrillings((prev) => [...prev, { id: crypto.randomUUID(), picketId: selectedPicketId, typeId, count, metersPerUnit, meters: count * metersPerUnit }]);
     setSelectedPicketId(''); toast.success('Бурение добавлено');
     return true;
   };
@@ -460,7 +460,7 @@ export function useReportForm(): UseReportFormReturn {
       ? [...piles, { id: crypto.randomUUID(), picketId: selectedPicketId, pileGradeId: pending.pile.gradeId, count: pending.pile.count }]
       : piles;
     const effectiveDrillings: DrillingEntry[] = pending?.drilling
-      ? [...drillings, { id: crypto.randomUUID(), picketId: selectedPicketId, typeId: pending.drilling.typeId, count: pending.drilling.count, metersPerUnit: pending.drilling.metersPerUnit, meters: Number((pending.drilling.count * pending.drilling.metersPerUnit).toFixed(1)) }]
+      ? [...drillings, { id: crypto.randomUUID(), picketId: selectedPicketId, typeId: pending.drilling.typeId, count: pending.drilling.count, metersPerUnit: pending.drilling.metersPerUnit, meters: pending.drilling.count * pending.drilling.metersPerUnit }]
       : drillings;
     const effectiveDowntimes: DowntimeEntry[] = pending?.downtime
       ? [...downtimes, { id: crypto.randomUUID(), reasonId: pending.downtime.reasonId, duration: pending.downtime.duration, comment: pending.downtime.comment }]

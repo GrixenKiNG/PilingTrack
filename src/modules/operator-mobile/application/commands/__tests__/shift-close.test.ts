@@ -33,7 +33,7 @@ const tx = {
   crew: {findFirst: vi.fn()},
   operatorChecklistExecution: {findFirst: vi.fn()},
   inspection: {findFirst: vi.fn()},
-  report: {findFirst: vi.fn(), upsert: vi.fn(), update: vi.fn(), findUnique: vi.fn()},
+  report: {findFirst: vi.fn(), upsert: vi.fn(), update: vi.fn(), updateMany: vi.fn(), findUnique: vi.fn(), findUniqueOrThrow: vi.fn()},
   meterReading: {findFirst: vi.fn()},
   operatorShiftEvidence: {findFirst: vi.fn()},
   outboxEvent: {create: vi.fn()},
@@ -59,6 +59,8 @@ beforeEach(() => {
   tx.inspection.findFirst.mockResolvedValue(null);
   tx.report.upsert.mockResolvedValue({id: 'report-pk-1'});
   tx.report.update.mockResolvedValue({reportId: 'RM-shift-12-2026-09-26'});
+  tx.report.updateMany.mockReset().mockResolvedValue({count: 1});
+  tx.report.findUniqueOrThrow.mockResolvedValue({reportId: 'RM-shift-12-2026-09-26'});
   tx.report.findUnique.mockResolvedValue({
     reportId: 'RM-shift-12-2026-09-26', siteId: 'site-1', userId: input.operatorId,
     piles: [], drillings: [], downtimes: [],
@@ -75,12 +77,12 @@ describe('closeShift — след сдачи в истории отчёта', ()
   it('X6: freezes actual ending readings, preserving zero and absence', async () => {
     tx.operatorShiftEvidence.findFirst.mockResolvedValue({payload: {fuelPercent: 0}});
     await closeShift(input);
-    expect(tx.report.update).toHaveBeenCalledWith(expect.objectContaining({data: expect.objectContaining({endingEngineHours: 1234, endingFuelPercent: 0})}));
-    tx.report.update.mockClear();
+    expect(tx.report.updateMany).toHaveBeenCalledWith(expect.objectContaining({data: expect.objectContaining({endingEngineHours: 1234, endingFuelPercent: 0})}));
+    tx.report.updateMany.mockClear();
     tx.meterReading.findFirst.mockResolvedValue(null);
     tx.operatorShiftEvidence.findFirst.mockResolvedValue(null);
     await closeShift(input);
-    expect(tx.report.update).toHaveBeenCalledWith(expect.objectContaining({data: expect.objectContaining({endingEngineHours: null, endingFuelPercent: null})}));
+    expect(tx.report.updateMany).toHaveBeenCalledWith(expect.objectContaining({data: expect.objectContaining({endingEngineHours: null, endingFuelPercent: null})}));
   });
   it('пишет строку «submitted» от имени оператора в транзакции смены', async () => {
     await expect(closeShift(input)).resolves.toEqual({ok: true, reportId: 'report-pk-1'});
@@ -98,10 +100,10 @@ describe('closeShift — след сдачи в истории отчёта', ()
   it('ссылается на деловой номер отчёта, а не на первичный ключ', async () => {
     await closeShift(input);
 
-    expect(tx.report.update).toHaveBeenCalledWith(expect.objectContaining({
-      where: {id: 'report-pk-1'},
-      select: {reportId: true},
+    expect(tx.report.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: {id: 'report-pk-1', status: 'draft'},
     }));
+    expect(tx.report.findUniqueOrThrow).toHaveBeenCalledWith({where: {id: 'report-pk-1'}, select: {reportId: true}});
     expect(writeReportAuditRow.mock.calls[0][0]).toEqual(
       expect.objectContaining({reportId: 'RM-shift-12-2026-09-26'}),
     );
@@ -110,7 +112,7 @@ describe('closeShift — след сдачи в истории отчёта', ()
   it('пишет след после перевода статуса, а не до него', async () => {
     await closeShift(input);
 
-    expect(tx.report.update.mock.invocationCallOrder[0])
+    expect(tx.report.updateMany.mock.invocationCallOrder[0])
       .toBeLessThan(writeReportAuditRow.mock.invocationCallOrder[0]);
   });
 
@@ -222,7 +224,7 @@ describe('submitReport — след сдачи в истории отчёта', 
   it('пишет строку «submitted» и переводит отчёт в submitted', async () => {
     await expect(submitReport(submitInput)).resolves.toEqual({reportId: 'report-pk-1'});
 
-    expect(tx.report.update).toHaveBeenCalledWith(expect.objectContaining({
+    expect(tx.report.updateMany).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({status: 'submitted', submittedAt: submitInput.now}),
     }));
     expect(writeReportAuditRow).toHaveBeenCalledTimes(1);
@@ -236,20 +238,55 @@ describe('submitReport — след сдачи в истории отчёта', 
     expect(client).toBe(tx);
   });
 
-  /*
-    ПОВТОРНАЯ СДАЧА НЕ ОТВЕРГАЕТСЯ — ФАКТИЧЕСКОЕ ПОВЕДЕНИЕ.
+  function storedReport(status = 'draft') {
+    const stored = {status, submittedAt: new Date('2026-09-26T19:00:00Z'), closingComment: 'Первоначальный комментарий', endingEngineHours: 1200, endingFuelPercent: 30};
+    tx.report.update.mockImplementation(async ({data}) => {
+      Object.assign(stored, data);
+      return {reportId: 'RM-shift-12-2026-09-26'};
+    });
+    tx.report.updateMany.mockImplementation(async ({where, data}) => {
+      if (where.id !== 'report-pk-1' || where.status !== stored.status) return {count: 0};
+      Object.assign(stored, data);
+      return {count: 1};
+    });
+    return stored;
+  }
 
-    У команды `submit-report` нет ни `clientCommandId`, ни проверки уже сданного
-    отчёта: контур готовности держит смену открытой после сдачи, поэтому
-    `requireOpenShift` пропускает повтор, и вторая сдача пишет вторую строку
-    истории и второе событие `ReportSubmitted`. Тест фиксирует это как есть —
-    расхождение с ожидаемым «отказ/идемпотентность» описано в отчёте по задаче.
-  */
-  it('повторная сдача принимается и пишет вторую строку истории', async () => {
+  it('повторная сдача сохраняет первую отметку, показания, историю и событие (AU126)', async () => {
+    const stored = storedReport();
     await submitReport(submitInput);
-    await submitReport(submitInput);
+    const first = {...stored};
+    tx.meterReading.findFirst.mockResolvedValue({engineHours: 9999});
+    tx.operatorShiftEvidence.findFirst.mockResolvedValue({payload: {fuelPercent: 99}});
+    await submitReport({...submitInput, now: new Date('2026-09-26T21:00:00Z'), comment: 'Повтор'});
 
-    expect(writeReportAuditRow).toHaveBeenCalledTimes(2);
-    expect(tx.outboxEvent.create).toHaveBeenCalledTimes(2);
+    expect(stored).toEqual(first);
+    expect(writeReportAuditRow).toHaveBeenCalledTimes(1);
+    expect(tx.outboxEvent.create).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(['submitted', 'approved'])('не меняет уже сданный отчёт со статусом %s', async (status) => {
+    const stored = storedReport(status);
+    const before = {...stored};
+    await expect(submitReport(submitInput)).resolves.toEqual({reportId: 'report-pk-1'});
+
+    expect(stored).toEqual(before);
+    expect(writeReportAuditRow).not.toHaveBeenCalled();
+    expect(tx.outboxEvent.create).not.toHaveBeenCalled();
+  });
+
+  it('два одновременных вызова сдают один снимок отчёта', async () => {
+    storedReport();
+    tx.report.findUnique.mockResolvedValue({
+      reportId: 'RM-shift-12-2026-09-26', siteId: 'site-1', userId: input.operatorId,
+      piles: [{count: 2}], drillings: [{meters: 49.98}], downtimes: [{duration: 0.25}],
+    });
+    await expect(Promise.all([submitReport(submitInput), submitReport(submitInput)]))
+      .resolves.toEqual([{reportId: 'report-pk-1'}, {reportId: 'report-pk-1'}]);
+
+    expect(writeReportAuditRow).toHaveBeenCalledTimes(1);
+    expect(tx.outboxEvent.create).toHaveBeenCalledTimes(1);
+    expect(tx.outboxEvent.create.mock.calls[0][0].data.payload)
+      .toMatchObject({totalPiles: 2, totalDrilling: 49.98, totalDowntime: 0.25});
   });
 });

@@ -297,7 +297,7 @@ export async function listReportsForUserScope(
       drillings: { select: { count: true, meters: true } },
       downtimes: { select: { duration: true } },
     },
-    orderBy: { date: 'desc' },
+    orderBy: [{ date: 'desc' }, { id: 'desc' }],
     cursor: cursor ? { id: cursor } : undefined,
     take: take + 1,
     skip: cursor ? 1 : 0,

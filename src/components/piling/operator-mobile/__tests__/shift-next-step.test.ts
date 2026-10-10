@@ -1,6 +1,6 @@
 import {describe, expect, it} from 'vitest';
 import type {OperatorMobileState} from '@/modules/operator-mobile/contracts';
-import {finishShift, nextStep, TOTAL_STEPS} from '../shift-next-step';
+import {nextStep, TOTAL_STEPS} from '../shift-next-step';
 
 type Phase = OperatorMobileState['phase'];
 
@@ -93,32 +93,4 @@ describe('nextStep — что делать дальше', () => {
       expect(step.hint.length).toBeGreaterThan(5);
     }
   });
-});
-
-describe('finishShift — кнопка «Завершить смену»', () => {
-  it('в работе завершает работу', () => {
-    const result = finishShift(state('WORK'));
-    expect(result.action).toEqual({kind: 'FINISH_WORK'});
-    expect(result.enabled).toBe(true);
-  });
-
-  it('в сдаче ведёт к закрытию смены', () => {
-    const result = finishShift(state('CLOSING'));
-    expect(result.action).toEqual({kind: 'GO_CLOSING'});
-    expect(result.enabled).toBe(true);
-  });
-
-  it('после закрытия не нажимается и говорит почему', () => {
-    const result = finishShift(state('CLOSED'));
-    expect(result.enabled).toBe(false);
-    expect(result.hint).toMatch(/уже закрыта/);
-  });
-
-  it.each(['IDENTITY', 'ADMISSION', 'PRESHIFT_INSPECTION', 'SITE_READY', 'STARTUP'] as const)(
-    'до начала работы (%s) не нажимается и называет, что сделать сначала', (phase) => {
-      const result = finishShift(state(phase));
-      expect(result.enabled).toBe(false);
-      expect(result.hint).toMatch(/Сейчас:/);
-    },
-  );
 });

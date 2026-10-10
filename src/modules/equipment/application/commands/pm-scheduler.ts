@@ -59,7 +59,7 @@ export async function runPmScheduler(tenantId: string, now: Date = new Date()): 
 async function runPmSchedulerScoped(tenantId: string, now: Date): Promise<PmSchedulerResult> {
 
   const plans = await db.maintenancePlan.findMany({
-    where: { tenantId, isActive: true },
+    where: { tenantId, isActive: true, equipment: { isActive: true } },
     include: {
       equipment: {
         select: {

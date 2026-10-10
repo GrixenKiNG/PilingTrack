@@ -29,6 +29,13 @@ const PDF_GET_RATE_LIMIT: RateLimitConfig = {
   blockDurationMs: 5 * 60 * 1000,
 };
 
+// Общий с single-pdf бюджет статуса и скачивания, отдельный от генерации.
+const PDF_JOB_RATE_LIMIT: RateLimitConfig = {
+  maxAttempts: 60,
+  windowMs: 60 * 1000,
+  blockDurationMs: 60 * 1000,
+};
+
 // FeedbackEvent messages are rendered verbatim in the feedback feed, so a
 // non-ServiceError (Prisma/English internals) must never reach it — the real
 // text goes to the log instead.
@@ -221,6 +228,15 @@ export const GET = withApi(async (request: NextRequest) => {
 
   // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
   assertCan(user!, 'reports.read_all');
+
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
+  const rl = await rateLimiter.check(`pdf:job:${user!.id}`, PDF_JOB_RATE_LIMIT);
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: 'Слишком много запросов к задаче. Подождите минуту.' },
+      { status: 429, headers: { 'Retry-After': String(rl.retryAfter || 60) } }
+    );
+  }
 
   if (action === 'status') {
     return handleJobStatus(jobId);

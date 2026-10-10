@@ -17,6 +17,11 @@ const mocks = vi.hoisted(() => ({
   mockOutboxUpdate: vi.fn().mockResolvedValue({}),
   mockOutboxCreate: vi.fn().mockResolvedValue({ id: 'outbox-1' }),
   mockUpdateMany: vi.fn().mockResolvedValue({ count: 1 }),
+  mockSendMessage: vi.fn().mockResolvedValue(true),
+}));
+
+vi.mock('@/core/notifications/telegram', () => ({
+  telegramNotifier: { sendMessage: mocks.mockSendMessage },
 }));
 
 vi.mock('@/lib/db', () => {
@@ -88,6 +93,30 @@ describe('Dead Letter Queue', () => {
       where: { id: 'dlq-1', status: 'pending' },
       data: { status: 'resolved' },
     });
+  });
+
+  it('экранирует подстановки HTML в алерте, сохраняя исходную ошибку в DLQ', async () => {
+    const errorMessage = 'Ошибка <record> & повтор ' + 'я'.repeat(210);
+    await moveToDlq('outbox-html', 'Event<created>&', 'aggregate<&>', {}, new Error(errorMessage), 5, ORIGIN);
+
+    await vi.waitFor(() => expect(mocks.mockSendMessage).toHaveBeenCalled());
+    const text = mocks.mockSendMessage.mock.calls[0][0] as string;
+    expect(text).toContain('<code>Event&lt;created&gt;&amp;</code>');
+    expect(text).toContain('<code>aggregate&lt;&amp;&gt;</code>');
+    expect(text).toContain('<code>Ошибка &lt;record&gt; &amp; повтор ');
+    expect(text).not.toContain('<record>');
+    expect(mocks.mockCreate).toHaveBeenCalledWith({ data: expect.objectContaining({ errorMessage }) });
+    const errorText = text.match(/Ошибка: <code>(.*)<\/code>$/)?.[1]
+      .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+    expect(errorText).toBe(errorMessage.substring(0, 200));
+  });
+
+  it('сохраняет запись DLQ, когда уведомление Telegram отклонено', async () => {
+    mocks.mockSendMessage.mockRejectedValueOnce(new Error('Telegram unavailable'));
+    await moveToDlq('outbox-offline', 'ReportCreated', null, {}, new Error('failure'), 5, ORIGIN);
+
+    await vi.waitFor(() => expect(mocks.mockSendMessage).toHaveBeenCalled());
+    expect(mocks.mockCreate).toHaveBeenCalledWith({ data: expect.objectContaining({ sourceOutboxId: 'outbox-offline' }) });
   });
 
   it('повтор сохраняет организацию и будит только упавшего потребителя', async () => {

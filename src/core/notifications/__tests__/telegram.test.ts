@@ -331,6 +331,42 @@ describe('telegramNotifier — человекочитаемые поля и зо
     return JSON.parse(fetchMock.mock.calls[0][1].body as string).text as string;
   }
 
+  it.each([
+    ['кириллица', 'я'.repeat(4000), ''],
+    ['HTML entities', '<&>'.repeat(1333) + 'я', ''],
+    ['emoji', '🙂'.repeat(2000), ''],
+    ['emoji с другой границей', '🙂'.repeat(2000), 'я'],
+  ])('ограничивает длинное происшествие: %s, сохраняя предупреждение и метаданные', async (_label, description, extra) => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-09-26T21:30:00Z'));
+    const prefix = 'Происшествие: требуется прекратить работы. ';
+    const alert = {
+      severity: 'critical' as const,
+      message: prefix + description + '\nСобытие: event-1',
+      siteName: 'Объект <Север> & Co' + extra,
+      reportNumber: 'RM-1<&>',
+      ruleId: 'incidentStopWork',
+    };
+    const originalMessage = alert.message;
+
+    expect(await telegramNotifier.sendAlert(alert)).toBe(true);
+
+    const rendered = document.createElement('div');
+    rendered.innerHTML = sentText();
+    expect(rendered.textContent?.length).toBeLessThanOrEqual(4096);
+    const message = rendered.querySelector('code')?.textContent ?? '';
+    expect(message.startsWith(prefix)).toBe(true);
+    expect(message.endsWith('…')).toBe(true);
+    expect(message).not.toMatch(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/);
+    expect(rendered.textContent).toContain(alert.siteName);
+    expect(rendered.textContent).toContain(alert.reportNumber);
+    expect(rendered.textContent).toContain('incidentStopWork');
+    expect(rendered.textContent).toContain('27.09.2026, 00:30');
+    expect(rendered.querySelectorAll('code')).toHaveLength(2);
+    expect(rendered.querySelector('Север')).toBeNull();
+    expect(alert.message).toBe(originalMessage);
+  });
+
   it('показывает название объекта и номер отчёта вместо cuid', async () => {
     await telegramNotifier.sendAlert({
       severity: 'medium',

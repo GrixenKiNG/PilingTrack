@@ -40,6 +40,7 @@ vi.mock('@/lib/xlsx-writer', () => ({
 }));
 
 import { exportReportsCsv, exportReportsXlsx, listReportsForReview, listReportsForUserScope, getEditableReport, getReportsByPeriod } from '../report-query.service';
+import { parseCursorPagination } from '@/lib/pagination-cursor';
 
 describe('exportReportsCsv — tenant isolation', () => {
   beforeEach(() => {
@@ -296,6 +297,28 @@ describe('listReportsForReview — устойчивые страницы (F-R140
     expect(findMany).toHaveBeenCalledWith(
       expect.objectContaining({ orderBy: [{ date: 'desc' }, { id: 'desc' }] }),
     );
+  });
+
+  it('листает мои отчёты одной даты без повторов и пропусков', async () => {
+    const query = fakeFindMany(rows);
+    findMany.mockImplementation(async (args) => (await query(args)).map((row) => ({
+      ...row, siteId: 'site-1', site: { name: 'Объект' }, status: 'submitted',
+      piles: [], drillings: [], downtimes: [], createdAt: new Date('2026-09-26'),
+    })));
+    const seen: string[] = [];
+    let cursor: string | null = null;
+    for (let page = 0; page < 10; page++) {
+      const url = new URL('http://localhost/api/reports/my?limit=2');
+      if (cursor) url.searchParams.set('cursor', cursor);
+      const pagination = parseCursorPagination(new Request(url));
+      const reports = await listReportsForUserScope({ id: 'u1', role: 'ADMIN' }, null, pagination);
+      cursor = pagination.getNextCursor(reports);
+      seen.push(...reports.map((report) => report.id));
+      if (!cursor) break;
+    }
+    expect(seen).toHaveLength(rows.length);
+    expect(new Set(seen).size).toBe(rows.length);
+    expect([...seen].sort()).toEqual(rows.map((row) => row.id).sort());
   });
 });
 

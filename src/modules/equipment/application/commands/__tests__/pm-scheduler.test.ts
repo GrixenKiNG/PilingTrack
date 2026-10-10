@@ -94,6 +94,20 @@ describe('runPmScheduler', () => {
     expect(auditMock).not.toHaveBeenCalled();
   });
 
+  it('не создаёт ТО и оповещение для активного регламента списанной машины (AU151)', async () => {
+    const retiredPlan = {...overduePlan, equipment: {...overduePlan.equipment, isActive: false}};
+    findManyMock.mockImplementation(async ({where}: {where: {equipment?: {isActive?: boolean}}}) =>
+      where.equipment?.isActive === true ? [] : [retiredPlan]);
+    findFirstMock.mockResolvedValue(null);
+
+    const result = await runPmScheduler('orion', new Date('2026-09-27T00:00:00.000Z'));
+
+    expect(result).toEqual({evaluated: 0, due: 0, created: 0, overdue: []});
+    expect(createMock).not.toHaveBeenCalled();
+    expect(readinessMock).not.toHaveBeenCalled();
+    expect(auditMock).not.toHaveBeenCalled();
+  });
+
   it('берёт advisory-замок на «установка + тип» в организации до проверки дубля', async () => {
     findFirstMock.mockResolvedValue(null);
     await runPmScheduler('orion', new Date('2026-09-27T00:00:00.000Z'));

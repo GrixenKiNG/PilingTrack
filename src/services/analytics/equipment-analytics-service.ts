@@ -201,11 +201,11 @@ export async function getEquipmentAnalytics(params: EquipmentAnalyticsParams) {
     totalEquipment: equipment.length,
     activeCount: equipment.filter((e) => e.reportCount > 0).length,
     piles: equipment.reduce((s, e) => s + e.piles, 0),
-    pileMeters: round1(equipment.reduce((s, e) => s + e.pileMeters, 0)),
+    pileMeters: round1(rows.reduce((s, e) => s + e.pileMeters, 0)),
     drillingCount: equipment.reduce((s, e) => s + e.drillingCount, 0),
-    drillingMeters: round1(equipment.reduce((s, e) => s + e.drillingMeters, 0)),
-    downtimeHours: round1(equipment.reduce((s, e) => s + e.downtimeHours, 0)),
-    fuelLiters: round1(equipment.reduce((s, e) => s + e.fuelLiters, 0)),
+    drillingMeters: round1(rows.reduce((s, e) => s + e.drillingMeters, 0)),
+    downtimeHours: round1(rows.reduce((s, e) => s + e.downtimeHours, 0)),
+    fuelLiters: round1(rows.reduce((s, e) => s + (fuelByEquipment.get(e.equipmentId) ?? 0), 0)),
     maintenanceDueCount: equipment.filter((e) => e.maintenanceDue).length,
   };
 

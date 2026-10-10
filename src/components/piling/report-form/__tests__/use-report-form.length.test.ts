@@ -117,6 +117,31 @@ function okJson(body: unknown) {
 
 const GRADE = { id: 'g1', name: 'С 100-35', isActive: true, lengthMm: 10000 };
 
+describe('useReportForm — бурение сохраняется без раннего округления (AU124)', () => {
+  beforeEach(() => {
+    storeState.selectedSiteId = 'site-1';
+    authFetchMock.mockReset();
+    authFetchMock.mockImplementation(() => Promise.resolve(okJson({ data: [] })));
+  });
+  afterEach(() => { storeState.selectedSiteId = ''; });
+
+  it.each(['confirmed', 'pending'] as const)('сохраняет точные метры строки %s', async (entryState) => {
+    const { result } = renderHook(() => useReportForm());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    if (entryState === 'confirmed') {
+      act(() => { result.current.addDrilling('type-1', 3, 16.66); });
+    }
+    await act(async () => {
+      await result.current.handleSubmit(entryState === 'pending'
+        ? { drilling: { typeId: 'type-1', count: 3, metersPerUnit: 16.66 } }
+        : undefined);
+    });
+    const [, request] = authFetchMock.mock.calls.find(([url]) => url === '/api/reports/upsert') || [];
+    expect(request).toBeDefined();
+    expect(JSON.parse(request.body).drillings[0].meters).toBeCloseTo(49.98, 10);
+  });
+});
+
 describe('useReportForm — pile metres come from lengthMm, not the name', () => {
   beforeEach(() => {
     authFetchMock.mockReset();

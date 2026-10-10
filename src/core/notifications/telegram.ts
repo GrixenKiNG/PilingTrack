@@ -157,8 +157,8 @@ function buildAlertMessage(alert: AlertPayload): { text: string; parse_mode: str
   const emoji = severityEmoji[alert.severity] || '📋';
   const label = severityLabel[alert.severity] || alert.severity;
 
-  let text = `${emoji} <b>${label}</b>\n\n`;
-  text += `<code>${escapeHtml(alert.message)}</code>\n\n`;
+  const header = `${emoji} <b>${label}</b>\n\n`;
+  let text = '';
 
   // Название объекта и номер отчёта вместо внутренних cuid, если вызывающий
   // их загрузил. Строки с id — фолбэк для остальных вызывающих (webhook
@@ -188,7 +188,19 @@ function buildAlertMessage(alert: AlertPayload): { text: string; parse_mode: str
   });
   text += `\n⏰ ${now}`;
 
-  return { text, parse_mode: 'HTML' };
+  // Лимит Telegram относится к видимому тексту: теги и длина entities не входят.
+  // Режем только сообщение до экранирования; метаданные и исходный payload остаются.
+  const overhead = (header + '\n\n' + text)
+    .replace(/<\/?(?:b|code)>/g, '').replace(/&(?:amp|lt|gt);/g, 'x').length;
+  const messageLimit = Math.max(0, 4096 - overhead);
+  let message = alert.message;
+  if (message.length > messageLimit) {
+    message = messageLimit > 0
+      ? message.slice(0, messageLimit - 1).replace(/[\uD800-\uDBFF]$/, '') + '…'
+      : '';
+  }
+
+  return { text: header + `<code>${escapeHtml(message)}</code>\n\n` + text, parse_mode: 'HTML' };
 }
 
 function escapeHtml(text: string): string {

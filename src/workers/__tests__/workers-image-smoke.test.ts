@@ -99,41 +99,32 @@ describe('CI и ручная выкладка workers', () => {
     expect(pkg.scripts['test:unit']).toBe('vitest run');
   });
 
-  it('проверяет именно построенный compose-образ до перезапуска сервисов', () => {
+  it('проверяет построенный SHA-образ на runner до первого SSH', () => {
     const deploy = fs.readFileSync(path.join(root, '.github/workflows/deploy.yml'), 'utf8');
     const smoke = deploy.indexOf('bash scripts/smoke-workers-image.sh');
-    expect(smoke).toBeGreaterThan(deploy.indexOf('docker compose build'));
+    const build = deploy.indexOf('docker build -f Dockerfile.workers --target runner');
+    expect(build).toBeGreaterThan(-1);
+    expect(smoke).toBeGreaterThan(build);
+    expect(smoke).toBeLessThan(deploy.indexOf('ssh -i'));
     const barrier = deploy.indexOf('bash scripts/replace-worker-generation.sh app workers');
     expect(barrier).toBeGreaterThan(smoke);
     expect(deploy).not.toContain('docker compose up -d');
+    expect(deploy).not.toContain('docker compose build');
+    expect(deploy).not.toContain('docker builder prune');
     expect(deploy).toContain('WORKER_GENERATION_EXTERNAL_STOPPED=1');
-    expect(deploy).toContain('docker compose config --images workers');
-    expect(deploy).toContain('case \\" \\$SVCS \\" in');
+    expect(deploy).toContain('bash scripts/smoke-workers-image.sh "pilingtrack-workers:$DEPLOY_SHA"');
+    expect(deploy).toContain('docker build -f Dockerfile --target migrate');
     expect(deploy.slice(smoke).split('\n')[0]).not.toContain('|| true');
   });
 });
 
-describe('выбор compose-образа workers', () => {
-  it.each([true, false])('отбирает только образ с меткой workers (%s)', (found) => {
+describe('защита ручной выкладки', () => {
+  it.each(['PROD_DEPLOY_OWNER', 'PROD_SSH_KNOWN_HOSTS'])('требует настройку %s', (setting) => {
     const deploy = fs.readFileSync(path.join(root, '.github/workflows/deploy.yml'), 'utf8');
-    const resolver = deploy.slice(deploy.indexOf('WORKERS_IMAGE='), deploy.indexOf('bash scripts/smoke-workers-image.sh'))
-      .replaceAll('\\"', '"').replaceAll('\\$', '$');
-    const commands = [
-      'set -e',
-      'docker() {',
-      '  if [ "$1" = compose ]; then printf "postgres:16-alpine\\ncodex-config-workers\\n"; return 0; fi',
-      '  for arg in "$@"; do last="$arg"; done',
-      '  if [ "$last" = codex-config-workers ]; then printf "%s" "$WORKERS_LABEL"; else printf postgres; fi',
-      '}',
-      resolver,
-      'printf "%s" "$WORKERS_IMAGE"',
-    ].join('\n');
-    const result = spawnSync(bash, ['-c', commands], {
-      cwd: root, encoding: 'utf8', timeout: 5000,
-      env: { ...process.env, WORKERS_LABEL: found ? 'workers' : 'unknown' },
-    });
-    expect(result.error).toBeUndefined();
-    expect(result.status, result.stderr).toBe(found ? 0 : 1);
-    if (found) expect(result.stdout).toBe('codex-config-workers');
+    expect(deploy).toContain(setting);
+    expect(deploy).toContain("github.ref == 'refs/heads/main'");
+    expect(deploy).toContain('github.actor == vars.PROD_DEPLOY_OWNER');
+    expect(deploy).toContain('github.triggering_actor == vars.PROD_DEPLOY_OWNER');
+    expect(deploy).not.toContain('ssh-keyscan');
   });
 });

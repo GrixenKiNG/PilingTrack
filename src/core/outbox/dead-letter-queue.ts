@@ -17,6 +17,10 @@ import { db } from '@/lib/db';
 import { logger } from '@/lib/logger';
 import { getRequestTenantId } from '@/core/security/tenant-context';
 
+function escapeHtml(value: string): string {
+  return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
 export interface DlqEntry {
   id: string;
   eventType: string;
@@ -99,9 +103,9 @@ export async function moveToDlq(
       }
       const { telegramNotifier } = await import('@/core/notifications/telegram');
       await telegramNotifier.sendMessage(
-        `⚠️ <b>Dead Letter Queue</b>\n\nСобытие <code>${eventType}</code> исчерпало ${attempts} попыток.\n` +
-        (aggregateId ? `aggregateId: <code>${aggregateId}</code>\n` : '') +
-        `Ошибка: <code>${errorMessage.substring(0, 200)}</code>`
+        `⚠️ <b>Dead Letter Queue</b>\n\nСобытие <code>${escapeHtml(eventType)}</code> исчерпало ${attempts} попыток.\n` +
+        (aggregateId ? `aggregateId: <code>${escapeHtml(aggregateId)}</code>\n` : '') +
+        `Ошибка: <code>${escapeHtml(errorMessage.substring(0, 200))}</code>`
       );
     })().catch(() => {/* ignore */});
   } catch (dlqError) {
