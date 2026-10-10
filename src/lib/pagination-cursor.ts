@@ -43,7 +43,9 @@ export function parseCursorPagination(
   const url = new URL(request.url);
   const cursor = url.searchParams.get('cursor') || null;
   const limitParam = url.searchParams.get('limit');
-  const take = Math.min(parseInt(limitParam || String(defaultLimit), 10), maxLimit);
+  const requestedLimit = Number(limitParam ?? defaultLimit);
+  const limit = Number.isInteger(requestedLimit) && requestedLimit > 0 ? requestedLimit : defaultLimit;
+  const take = Math.min(limit, maxLimit);
 
   return {
     cursor,

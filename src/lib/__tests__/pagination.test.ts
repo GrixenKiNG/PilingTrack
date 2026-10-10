@@ -6,6 +6,20 @@
 
 import { describe, it, expect, vi } from 'vitest';
 import { paginateQuery, buildPaginationResponse } from '@/lib/pagination';
+import { parseCursorPagination } from '@/lib/pagination-cursor';
+
+describe('parseCursorPagination — untrusted query limit', () => {
+  it.each([
+    [null, 50], ['abc', 50], ['0', 50], ['-5', 50], ['1.5', 50],
+    ['Infinity', 50], ['10', 10], ['1000', 100],
+  ])('limit %s produces a positive integer page size %i', (limit, expected) => {
+    const url = new URL('http://localhost/api/reports/my?cursor=report-1');
+    if (limit !== null) url.searchParams.set('limit', String(limit));
+    const pagination = parseCursorPagination(new Request(url));
+    expect(pagination.take).toBe(expected);
+    expect(pagination.cursor).toBe('report-1');
+  });
+});
 
 describe('paginateQuery', () => {
   const createMockQuery = (items: Array<{ id: string }>) =>
