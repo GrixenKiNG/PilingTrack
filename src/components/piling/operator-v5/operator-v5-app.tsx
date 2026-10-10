@@ -1031,7 +1031,6 @@ export function OperatorV5App() {
   }, []);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- первое чтение состояния при монтировании
     void reload();
   }, [reload]);
 
