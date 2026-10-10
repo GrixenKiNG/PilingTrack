@@ -183,6 +183,7 @@ async function runStorm() {
   console.log('');
 
   const redis = new Redis(config.redisUrl, {
+    protocol: 2,
     lazyConnect: false,
     retryStrategy: (times) => Math.min(times * 100, 3000),
     maxRetriesPerRequest: 3,

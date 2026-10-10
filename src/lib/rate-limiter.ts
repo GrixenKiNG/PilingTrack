@@ -123,6 +123,7 @@ class RateLimiter {
       }
 
       this.redis = new Redis(redisUrl, {
+        protocol: 2,
         maxRetriesPerRequest: 2,
         connectTimeout: 3000,
         lazyConnect: true,

@@ -26,6 +26,7 @@ const mocks = vi.hoisted(() => ({
   mockStartProjectionWorker: vi.fn(),
 
   // PDF
+  mockRedisOptions: vi.fn(),
   mockBullMQWorker: vi.fn(),
   // Один и тот же объект воркера на все тесты: фабрика vi.mock('bullmq')
   // выполняется заново после каждого resetModules и перезаписала бы
@@ -148,7 +149,7 @@ vi.mock('bullmq', () => ({
 
 vi.mock('ioredis', () => ({
   default: class MockRedis {
-    constructor() {}
+    constructor(url: string, options: unknown) { mocks.mockRedisOptions(url, options); }
     async quit() {}
   },
 }));
@@ -434,6 +435,10 @@ describe('Unified Worker Service', { timeout: 30_000 }, () => {
         await vi.waitFor(() => {
           expect(process.listeners('SIGTERM').length).toBeGreaterThan(listenersBefore);
         });
+
+        expect(mocks.mockRedisOptions).toHaveBeenCalledWith(
+          expect.any(String), expect.objectContaining({ protocol: 2, maxRetriesPerRequest: null })
+        );
 
         const clearTimeoutsBefore = clearTimeoutSpy.mock.calls.length;
         const clearIntervalsBefore = clearIntervalSpy.mock.calls.length;

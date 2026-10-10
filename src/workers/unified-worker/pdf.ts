@@ -20,6 +20,7 @@ export async function startPdf(): Promise<void> {
 
   try {
     const redisConnection = new Redis(REDIS_URL, {
+      protocol: 2,
       maxRetriesPerRequest: null,
       connectTimeout: 10_000,
       lazyConnect: true,

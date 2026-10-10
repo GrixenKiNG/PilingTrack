@@ -8,8 +8,9 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 // Mock Redis class globally before any imports
+const { redisOptionsMock } = vi.hoisted(() => ({ redisOptionsMock: vi.fn() }));
 class MockRedis {
-  constructor() {}
+  constructor(url: string, options: unknown) { redisOptionsMock(url, options); }
   async quit() {}
 }
 
@@ -130,6 +131,13 @@ describe('PDF Worker', () => {
         concurrency: expect.any(Number),
         autorun: true,
       })
+    );
+  });
+
+  it('keeps Redis replies on RESP2 for BullMQ', async () => {
+    await import('@/workers/pdf-worker');
+    expect(redisOptionsMock).toHaveBeenCalledWith(
+      expect.any(String), expect.objectContaining({ protocol: 2, maxRetriesPerRequest: null })
     );
   });
 
