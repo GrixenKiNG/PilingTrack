@@ -13,7 +13,7 @@ import { NextRequest } from 'next/server';
 
 const {
   requireAuthMock, assertCanMock, buildPeriodPdfDataMock, enqueuePdfGenerationMock,
-  generatePeriodPdfMock, getPdfJobStatusMock, downloadPdfMock, rateLimiterCheckMock,
+  generatePeriodPdfMock, getPdfJobStatusMock, downloadPdfMock, rateLimiterCheckMock, pdfJobFromIdMock,
 } = vi.hoisted(() => ({
   requireAuthMock: vi.fn(),
   assertCanMock: vi.fn(),
@@ -22,6 +22,7 @@ const {
   generatePeriodPdfMock: vi.fn(),
   getPdfJobStatusMock: vi.fn(),
   downloadPdfMock: vi.fn(),
+  pdfJobFromIdMock: vi.fn(),
   // По умолчанию запрос разрешён: POST/статус-ветки ходят в тот же лимитер.
   rateLimiterCheckMock: vi.fn(async (_key: string, _config: { maxAttempts: number }) => ({
     allowed: true,
@@ -38,6 +39,11 @@ vi.mock('@/lib/pdf-queue', () => ({
   downloadPdf: downloadPdfMock,
 }));
 vi.mock('@/lib/pdf-generator', () => ({ generatePeriodPdf: generatePeriodPdfMock }));
+vi.mock('bullmq', () => ({
+  Queue: class {}, QueueEvents: class {}, Job: { fromId: pdfJobFromIdMock },
+}));
+vi.mock('ioredis', () => ({ Redis: class { on() { return this; } } }));
+vi.mock('@/lib/logger', () => ({ logger: { error: vi.fn(), info: vi.fn(), warn: vi.fn() } }));
 vi.mock('@/services/feedback/feedback-event-service', () => ({ recordFeedbackEvent: vi.fn() }));
 vi.mock('@/lib/csrf-protection', () => ({ withCsrf: () => null }));
 vi.mock('@/lib/rate-limiter', () => ({
@@ -223,4 +229,22 @@ describe('GET /api/reports/pdf — общий лимит статуса и ск�
     expect((await GET(jobReq('download'))).status).toBe(429);
     expect(downloadPdfMock).toHaveBeenCalledTimes(1);
   });
+});
+
+describe('GET PDF download — реальное состояние очереди без Redis', () => {
+  it.each([['failed', 500], ['waiting', 202], ['active', 202]])(
+    'задача %s возвращает HTTP %i', async (state, expectedStatus) => {
+      vi.clearAllMocks();
+      requireAuthMock.mockResolvedValue({ user: ADMIN, error: null });
+      rateLimiterCheckMock.mockImplementation(async () => ({ allowed: true, remaining: 59 }));
+      pdfJobFromIdMock.mockResolvedValue({ getState: async () => state, failedReason: 'internal worker error' });
+      const queue = await vi.importActual<typeof import('@/lib/pdf-queue')>('@/lib/pdf-queue');
+      downloadPdfMock.mockImplementation(queue.downloadPdf);
+      const res = await GET(new NextRequest(
+        'http://localhost/api/reports/pdf?jobId=aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa&action=download',
+      ));
+      expect(res.status).toBe(expectedStatus);
+      expect(JSON.stringify(await res.json())).not.toContain('internal worker error');
+    },
+  );
 });

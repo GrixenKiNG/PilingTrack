@@ -232,6 +232,8 @@ export async function getPdfJobStatus(
 export async function downloadPdf(jobId: string): Promise<Buffer> {
   const { status, result } = await getPdfJobStatus(jobId);
 
+  if (status === 'failed') throw new Error('PDF generation failed');
+
   if (status !== 'completed' || !result) {
     throw new Error(`PDF not ready yet. Status: ${status}`);
   }
