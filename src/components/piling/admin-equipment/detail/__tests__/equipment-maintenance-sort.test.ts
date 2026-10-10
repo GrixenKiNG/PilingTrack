@@ -111,6 +111,7 @@ describe('EquipmentMaintenance — понятный текст отказа (AU7
     authFetchMock.mockImplementation(async (url: unknown, init?: RequestInit) => {
       if (init?.method === 'PUT') return { ok: false, status: 500, json: async () => ({}) };
       if (String(url) === '/api/maintenance/assignees') return { ok: true, status: 200, json: async () => ({ users: [] }) };
+      if (String(url).endsWith('/operator-checklists')) return { ok: true, status: 200, json: async () => ({ records: [] }) };
       return { ok: true, status: 200, json: async () => ({ records: [row({ id: 'm1', status: 'PLANNED', title: 'Замена масла' })] }) };
     });
 
