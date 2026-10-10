@@ -15,6 +15,7 @@
 
 import * as Sentry from '@sentry/node';
 import { logger } from '@/lib/logger';
+import { sentryDataCollection } from '@/lib/sentry-data-collection';
 
 let initialized = false;
 
@@ -31,8 +32,11 @@ export async function initWorkerSentry(): Promise<void> {
       dsn: process.env.SENTRY_DSN,
       enabled: process.env.NODE_ENV === 'production',
       tracesSampleRate: 0.1,
-      sendDefaultPii: false,
-      enableLogs: false,
+      dataCollection: sentryDataCollection,
+      // This process has no separate application-owned OTel provider.
+      enableOpenTelemetrySetup: true,
+      traceLifecycle: 'static',
+      beforeSendLog: () => null,
     });
   } catch (error) {
     // Инициализация наблюдаемости не должна ронять процесс воркера.

@@ -3,6 +3,7 @@
 // https://docs.sentry.io/platforms/javascript/guides/nextjs/
 
 import * as Sentry from "@sentry/nextjs";
+import { sentryDataCollection } from './lib/sentry-data-collection';
 
 Sentry.init({
   dsn: "https://3954e54e43b52d272c06941e5180dff0@o4511443929530368.ingest.de.sentry.io/4511443960332368",
@@ -21,8 +22,11 @@ Sentry.init({
     `tracesSampleRate`.
   */
   integrations: (defaults) => defaults.filter((integration) => integration.name !== 'BrowserTracing'),
-  sendDefaultPii: false,
-  enableLogs: false,
+  dataCollection: sentryDataCollection,
+  tracesSampleRate: 0,
+  traceLifecycle: 'static',
+  // v11 removed enableLogs; discard logs to preserve the previous policy.
+  beforeSendLog: () => null,
 
   // Filter out noise that swamps the dashboard without indicating real bugs.
   ignoreErrors: [
