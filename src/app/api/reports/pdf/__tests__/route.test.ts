@@ -170,3 +170,57 @@ describe('GET /api/reports/pdf — лимит на синхронную гене
     expect(generatePeriodPdfMock).toHaveBeenCalledTimes(20);
   });
 });
+
+describe('GET /api/reports/pdf — общий лимит статуса и скачивания задачи', () => {
+  const windows = new Map<string, number>();
+  const jobIds = ['aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'];
+  function jobReq(action: string, jobId = jobIds[0]): NextRequest {
+    return new NextRequest(`http://localhost/api/reports/pdf?jobId=${jobId}&action=${action}`);
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    windows.clear();
+    requireAuthMock.mockResolvedValue({ user: ADMIN, error: null });
+    getPdfJobStatusMock.mockResolvedValue({ status: 'completed' });
+    downloadPdfMock.mockResolvedValue(Buffer.from('%PDF-1.4'));
+    rateLimiterCheckMock.mockImplementation(async (key: string, config: { maxAttempts: number }) => {
+      const used = (windows.get(key) ?? 0) + 1;
+      windows.set(key, used);
+      return used > config.maxAttempts
+        ? { allowed: false, remaining: 0, retryAfter: 60 }
+        : { allowed: true, remaining: config.maxAttempts - used };
+    });
+  });
+
+  it.each(['status', 'download'])('429 для %s возвращается до чтения очереди и файла', async (action) => {
+    rateLimiterCheckMock.mockImplementation(async () => ({ allowed: false, remaining: 0, retryAfter: 37 }));
+    const res = await GET(jobReq(action));
+
+    expect(res.status).toBe(429);
+    expect(res.headers.get('retry-after')).toBe('37');
+    expect(getPdfJobStatusMock).not.toHaveBeenCalled();
+    expect(downloadPdfMock).not.toHaveBeenCalled();
+  });
+
+  it('61-й запрос блокируется, даже если менять действие и UUID задачи', async () => {
+    for (let i = 0; i < 60; i++) {
+      expect((await GET(jobReq(i % 2 ? 'download' : 'status', jobIds[i % 2]))).status).toBe(200);
+    }
+    expect((await GET(jobReq('status', jobIds[1]))).status).toBe(429);
+    expect(getPdfJobStatusMock).toHaveBeenCalledTimes(30);
+    expect(downloadPdfMock).toHaveBeenCalledTimes(30);
+    expect(rateLimiterCheckMock).toHaveBeenCalledWith('pdf:job:user-1', {
+      maxAttempts: 60, windowMs: 60 * 1000, blockDurationMs: 60 * 1000,
+    });
+  });
+
+  it('исчерпание бюджета одного пользователя не ограничивает другого', async () => {
+    for (let i = 0; i < 60; i++) await GET(jobReq('status'));
+    requireAuthMock.mockResolvedValue({ user: { ...ADMIN, id: 'user-2' }, error: null });
+    expect((await GET(jobReq('download'))).status).toBe(200);
+    requireAuthMock.mockResolvedValue({ user: ADMIN, error: null });
+    expect((await GET(jobReq('download'))).status).toBe(429);
+    expect(downloadPdfMock).toHaveBeenCalledTimes(1);
+  });
+});
