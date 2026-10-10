@@ -147,6 +147,22 @@ describe('getEquipmentAnalytics — maintenance flags delegate to checkMaintenan
     expect(res.fleet.maintenanceDueCount).toBe(1);
   });
 
+  it('sums raw fleet values before rounding and includes fuel only for selected equipment (AU124)', async () => {
+    const rows = Array.from({ length: 40 }, (_, index) => equipmentRow({
+      equipmentId: `e${index}`, pileMeters: 12.05, drillingMeters: 12.05, downtimeHours: 0.05,
+    }));
+    queryRaw.mockResolvedValueOnce(rows).mockResolvedValueOnce([]);
+    groupBy.mockResolvedValue([
+      ...rows.map((row) => ({ equipmentId: row.equipmentId, _min: { value: 0 }, _max: { value: 0.05 } })),
+      { equipmentId: 'outside-fleet', _min: { value: 0 }, _max: { value: 100 } },
+    ]);
+
+    const result = await getEquipmentAnalytics({ dateFrom: '2026-01-01', dateTo: '2026-12-31', tenantId: 'orion' });
+
+    expect(result.equipment[0]).toMatchObject({ pileMeters: 12.1, drillingMeters: 12.1, downtimeHours: 0.1, fuelLiters: 0.1 });
+    expect(result.fleet).toMatchObject({ pileMeters: 482, drillingMeters: 482, downtimeHours: 2, fuelLiters: 2 });
+  });
+
   it('marks a service date inside the soon window as soon, not overdue', async () => {
     // Проверяем общий порог checkMaintenanceDue (SOON_DAYS = 7), а не старую
     // 14-дневную эвристику этого экрана.
