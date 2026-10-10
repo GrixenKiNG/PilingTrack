@@ -22,6 +22,6 @@ describe('listInspections', () => {
 describe('getInspection', () => {
   it('throws 404 cross-tenant', async () => {
     findUniqueMock.mockResolvedValue({ id: 'i1', tenantId: 'other' });
-    await expect(getInspection('i1', 'orion')).rejects.toThrow('not found');
+    await expect(getInspection('i1', 'orion')).rejects.toThrow('Осмотр не найден — обновите список.');
   });
 });

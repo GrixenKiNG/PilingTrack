@@ -36,6 +36,6 @@ describe('getTemplate', () => {
   });
   it('throws 404 on cross-tenant', async () => {
     findUniqueMock.mockResolvedValue({ id: 't1', tenantId: 'other' });
-    await expect(getTemplate('t1', 'orion')).rejects.toThrow('not found');
+    await expect(getTemplate('t1', 'orion')).rejects.toThrow('Шаблон не найден — обновите список.');
   });
 });

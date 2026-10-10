@@ -85,7 +85,7 @@ export function UserDocumentTypesDialog({ open, onOpenChange }: {
     const response = await authFetch('/api/user-document-types?scope=all');
     if (!response.ok) {
       const body = await response.json().catch(() => ({}));
-      toast.error(body.error || 'Не удалось загрузить виды документов');
+      toast.error(body.error || 'Не удалось загрузить виды документов. Проверьте связь и повторите.');
       return;
     }
     setRows(((await response.json()).types ?? []) as TypeRow[]);
@@ -108,7 +108,7 @@ export function UserDocumentTypesDialog({ open, onOpenChange }: {
     setBusy(false);
     if (!response.ok) {
       const body = await response.json().catch(() => ({}));
-      return toast.error(body.error || 'Не удалось создать вид документа');
+      return toast.error(body.error || 'Не удалось создать вид документа. Проверьте связь и повторите.');
     }
     toast.success('Вид документа добавлен');
     setName(''); setMonths(''); setLeadDays(String(DEFAULT_LEAD_DAYS));
@@ -123,7 +123,7 @@ export function UserDocumentTypesDialog({ open, onOpenChange }: {
     });
     if (!response.ok) {
       const payload = await response.json().catch(() => ({}));
-      toast.error(payload.error || 'Не удалось сохранить');
+      toast.error(payload.error || 'Не удалось сохранить вид документа. Проверьте связь и повторите.');
       return false;
     }
     await load();
@@ -153,7 +153,7 @@ export function UserDocumentTypesDialog({ open, onOpenChange }: {
     const response = await authFetch(`/api/user-document-types/${row.id}`, { method: 'DELETE' });
     if (!response.ok) {
       const body = await response.json().catch(() => ({}));
-      return toast.error(body.error || 'Не удалось удалить');
+      return toast.error(body.error || 'Не удалось удалить вид документа. Проверьте связь и повторите.');
     }
     toast.success('Вид документа удалён');
     await load();

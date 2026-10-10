@@ -109,7 +109,7 @@ describe('регламенты ТО: цели нажатия на телефон
 
 describe('блок отказа загрузки: цель нажатия на телефоне (R73 №57)', () => {
   it('«Повторить» — не ниже 44px, на десктопе прежние 32px', () => {
-    render(<LoadFailure message="Не удалось загрузить: сервер вернул 500" onRetry={() => {}} />);
+    render(<LoadFailure message="Не удалось загрузить. Повторите позже (код 500)." onRetry={() => {}} />);
 
     // `sm:min-h-8` возвращает десктопу штатные 32px кнопки `size="sm"`.
     expect(screen.getByRole('button', { name: 'Повторить' })).toHaveClass('min-h-11', 'shrink-0', 'sm:min-h-8');
@@ -192,7 +192,7 @@ describe('панели ТО: отказ загрузки не дублирует
     failOnRead();
     render(<FuelPanel equipmentId="eq-1" />);
 
-    expect(await screen.findByText('Не удалось загрузить: сервер вернул 500')).toBeInTheDocument();
+    expect(await screen.findByText('Не удалось загрузить. Повторите позже (код 500).')).toBeInTheDocument();
     expect(toast.error).not.toHaveBeenCalledWith('Не удалось загрузить журнал топлива');
   });
 
@@ -200,7 +200,7 @@ describe('панели ТО: отказ загрузки не дублирует
     failOnRead();
     render(<MeterReadingsPanel equipmentId="eq-1" />);
 
-    expect(await screen.findByText('Не удалось загрузить: сервер вернул 500')).toBeInTheDocument();
+    expect(await screen.findByText('Не удалось загрузить. Повторите позже (код 500).')).toBeInTheDocument();
     expect(toast.error).not.toHaveBeenCalledWith('Не удалось загрузить показания');
   });
 
@@ -208,7 +208,7 @@ describe('панели ТО: отказ загрузки не дублирует
     failOnRead();
     render(<MaintenancePlansPanel equipmentId="eq-1" />);
 
-    expect(await screen.findByText('Не удалось загрузить: сервер вернул 500')).toBeInTheDocument();
+    expect(await screen.findByText('Не удалось загрузить. Повторите позже (код 500).')).toBeInTheDocument();
     expect(toast.error).not.toHaveBeenCalledWith('Не удалось загрузить регламенты');
   });
 });

@@ -358,3 +358,28 @@ describe('CrewFormDialog — защита несохранённых право�
     vi.unstubAllGlobals();
   });
 });
+
+/**
+ * AU76: тосты отказов писали обезличенное «Ошибка деактивации бригады» — человек
+ * не понимал, что произошло и что делать. Теперь текст называет действие и советует
+ * повторить.
+ */
+describe('AdminCrews — понятный текст отказа деактивации (AU76)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.hook.current = baseHook();
+  });
+
+  it('сбой деактивации даёт понятный текст с советом повторить', async () => {
+    mocks.deleteCrew.mockRejectedValue(new Error(''));
+    render(<AdminCrews />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Деактивировать' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Подтвердить деактивацию' }));
+
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith('Не удалось деактивировать бригаду. Проверьте связь и повторите.'),
+    );
+    expect(toast.error).not.toHaveBeenCalledWith('Ошибка деактивации бригады');
+  });
+});

@@ -48,7 +48,7 @@ describe('updateSiteWithPlans safety', () => {
   it('rejects a site outside the tenant', async () => {
     m.siteFindFirst.mockResolvedValue(null);
     await expect(updateSiteWithPlans('s1', { pilePlans: [] }, { tenantId: 'other', actorId: 'a1' }))
-      .rejects.toThrow('Site not found');
+      .rejects.toThrow('Объект не найден — возможно, удалён. Обновите список.');
     expect(m.transaction).not.toHaveBeenCalled();
   });
 

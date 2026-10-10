@@ -16,7 +16,7 @@ export class EquipmentAggregate {
   private constructor(state: EquipmentInfo) { this.state = { ...state }; }
 
   static create(data: EquipmentCreateData, userId?: string): EquipmentAggregate {
-    if (!data.name?.trim()) throw new Error('Equipment name is required');
+    if (!data.name?.trim()) throw new Error('Укажите название установки');
     const now = new Date().toISOString();
     const state: EquipmentInfo = {
       id: crypto.randomUUID(), name: data.name.trim(), model: data.model || '', qty: data.qty || 1,
@@ -31,7 +31,7 @@ export class EquipmentAggregate {
   static reconstitute(state: EquipmentInfo): EquipmentAggregate { return new EquipmentAggregate(state); }
 
   update(data: { name?: string; model?: string; qty?: number; description?: string; isActive?: boolean }, userId?: string): void {
-    if (data.name !== undefined) { if (!data.name.trim()) throw new Error('Name required'); this.state.name = data.name.trim(); }
+    if (data.name !== undefined) { if (!data.name.trim()) throw new Error('Укажите название установки'); this.state.name = data.name.trim(); }
     if (data.model !== undefined) this.state.model = data.model;
     if (data.qty !== undefined) this.state.qty = data.qty;
     if (data.description !== undefined) this.state.description = data.description;

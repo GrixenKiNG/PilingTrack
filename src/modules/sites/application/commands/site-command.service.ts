@@ -36,7 +36,7 @@ export async function updateSite(command: UpdateSiteCommand, ctx: SiteCommandCon
   if (!ctx.tenantId) throw new ServiceError('tenantId is required', 400);
   const repo = getSiteRepository();
   const aggregate = await repo.findById(command.siteId, ctx.tenantId);
-  if (!aggregate) throw new ServiceError('Site not found', 404);
+  if (!aggregate) throw new ServiceError('Объект не найден — возможно, удалён. Обновите список.', 404);
 
   const prev = aggregate.getState();
   const before = { name: prev.name, plannedPiles: prev.plannedPiles, plannedDrilling: prev.plannedDrilling };
@@ -77,7 +77,7 @@ export async function updateSite(command: UpdateSiteCommand, ctx: SiteCommandCon
 export async function activateSite(siteId: string, ctx: SiteCommandContext) {
   const repo = getSiteRepository();
   const aggregate = await repo.findById(siteId, ctx.tenantId);
-  if (!aggregate) throw new ServiceError('Site not found', 404);
+  if (!aggregate) throw new ServiceError('Объект не найден — возможно, удалён. Обновите список.', 404);
 
   // Already active — no-op. The edit form always sends `isActive`, so without
   // this guard every save would emit a phantom `site.activated` audit entry.
@@ -92,7 +92,7 @@ export async function activateSite(siteId: string, ctx: SiteCommandContext) {
 export async function deactivateSite(siteId: string, ctx: SiteCommandContext) {
   const repo = getSiteRepository();
   const aggregate = await repo.findById(siteId, ctx.tenantId);
-  if (!aggregate) throw new ServiceError('Site not found', 404);
+  if (!aggregate) throw new ServiceError('Объект не найден — возможно, удалён. Обновите список.', 404);
 
   // Already inactive — no-op (skip the draft guard, write, and audit entry).
   if (!aggregate.getState().isActive) return;

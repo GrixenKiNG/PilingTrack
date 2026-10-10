@@ -116,12 +116,12 @@ export function EquipmentMaintenance({ equipmentId }: { equipmentId: string }) {
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || 'Не удалось обновить статус');
+        throw new Error(err.error || 'Не удалось изменить статус записи ТО. Проверьте связь и повторите.');
       }
       await load();
     } catch (err) {
       // Обрыв сети fetch бросает TypeError с английским «Failed to fetch» (F-R112-1).
-      toast.error(catchText(err, 'Ошибка'));
+      toast.error(catchText(err, 'Не удалось изменить статус записи ТО. Проверьте связь и повторите.'));
     } finally {
       setPendingId(null);
     }
@@ -131,12 +131,12 @@ export function EquipmentMaintenance({ equipmentId }: { equipmentId: string }) {
     setPendingId(r.id);
     try {
       const res = await authFetch(`/api/equipment/${equipmentId}/maintenance/${r.id}`, { method: 'DELETE' });
-      if (!res.ok) throw new Error('Удаление не удалось');
+      if (!res.ok) throw new Error('Не удалось удалить запись ТО. Проверьте связь и повторите.');
       toast.success('Запись удалена');
       await load();
     } catch (err) {
       // Обрыв сети fetch бросает TypeError с английским «Failed to fetch» (F-R112-1).
-      toast.error(catchText(err, 'Ошибка'));
+      toast.error(catchText(err, 'Не удалось удалить запись ТО. Проверьте связь и повторите.'));
     } finally {
       setPendingId(null);
       setPendingDelete(null);

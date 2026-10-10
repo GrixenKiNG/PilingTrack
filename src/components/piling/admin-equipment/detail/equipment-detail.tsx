@@ -70,7 +70,7 @@ export function EquipmentDetail({ equipmentId, embedded = false, onSaved }: Prop
     try {
       const res = await authFetch(`/api/equipment/${equipmentId}/details`);
       if (!res.ok) {
-        setError(`Сервер вернул ${res.status}`);
+        setError(`повторите позже (код ${res.status})`);
         return;
       }
       setDetails(await res.json());

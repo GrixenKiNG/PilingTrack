@@ -184,7 +184,7 @@ export function UserDocuments({ userId }: { userId: string }) {
           }),
         },
       );
-      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Ошибка сохранения');
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Не удалось сохранить документ. Проверьте связь и повторите.');
       toast.success(editing ? 'Документ обновлён' : 'Документ добавлен');
       setDialogOpen(false);
       setEditing(null);
@@ -192,7 +192,7 @@ export function UserDocuments({ userId }: { userId: string }) {
       await load();
     } catch (err) {
       // Обрыв сети fetch бросает TypeError с английским «Failed to fetch» (F-R112-1).
-      toast.error(catchText(err, 'Ошибка'));
+      toast.error(catchText(err, 'Не удалось сохранить документ. Проверьте связь и повторите.'));
     } finally {
       setBusy(false);
     }
@@ -201,12 +201,12 @@ export function UserDocuments({ userId }: { userId: string }) {
   const remove = async (doc: DocumentRow) => {
     try {
       const res = await authFetch(`/api/users/${userId}/documents/${doc.id}`, { method: 'DELETE' });
-      if (!res.ok) throw new Error('Удаление не удалось');
+      if (!res.ok) throw new Error('Не удалось удалить документ. Проверьте связь и повторите.');
       toast.success('Документ удалён');
       await load();
     } catch (err) {
       // Обрыв сети fetch бросает TypeError с английским «Failed to fetch» (F-R112-1).
-      toast.error(catchText(err, 'Ошибка'));
+      toast.error(catchText(err, 'Не удалось удалить документ. Проверьте связь и повторите.'));
     }
   };
 

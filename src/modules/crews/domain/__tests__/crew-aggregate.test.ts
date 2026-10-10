@@ -55,7 +55,7 @@ describe('CrewAggregate', () => {
           equipmentId: 'equip-1',
           siteId: 'site-1',
         }, 'user-1')
-      ).toThrow('Crew name is required');
+      ).toThrow('Укажите название бригады');
     });
 
     it('should require an operator', () => {
@@ -66,7 +66,7 @@ describe('CrewAggregate', () => {
           equipmentId: 'equip-1',
           siteId: 'site-1',
         }, 'user-1')
-      ).toThrow('Operator is required');
+      ).toThrow('Выберите машиниста');
     });
 
     it('should require equipment', () => {
@@ -77,7 +77,7 @@ describe('CrewAggregate', () => {
           equipmentId: '',
           siteId: 'site-1',
         }, 'user-1')
-      ).toThrow('Equipment is required');
+      ).toThrow('Выберите установку');
     });
 
     it('should require a site', () => {
@@ -88,7 +88,7 @@ describe('CrewAggregate', () => {
           equipmentId: 'equip-1',
           siteId: '',
         }, 'user-1')
-      ).toThrow('Site is required');
+      ).toThrow('Выберите объект');
     });
   });
 
@@ -118,13 +118,13 @@ describe('CrewAggregate', () => {
     it('should reject empty name', () => {
       const crew = createTestCrew();
       expect(() => crew.update({ name: '' }, 'user-1'))
-        .toThrow('Crew name cannot be empty');
+        .toThrow('Название бригады не может быть пустым');
     });
 
     it('should reject whitespace-only name', () => {
       const crew = createTestCrew();
       expect(() => crew.update({ name: '   ' }, 'user-1'))
-        .toThrow('Crew name cannot be empty');
+        .toThrow('Название бригады не может быть пустым');
     });
   });
 
@@ -148,7 +148,7 @@ describe('CrewAggregate', () => {
       crew.deactivate('user-1');
 
       expect(() => crew.deactivate('user-1'))
-        .toThrow('Crew is already deactivated');
+        .toThrow('Бригада уже расформирована');
     });
 
     it('should generate CrewDeactivated event', () => {
@@ -179,7 +179,7 @@ describe('CrewAggregate', () => {
       const crew = createTestCrew();
 
       expect(() => crew.reactivate('user-1'))
-        .toThrow('Crew is already active');
+        .toThrow('Бригада уже активна');
     });
 
     it('should generate CrewReactivated event', () => {

@@ -97,7 +97,7 @@ describe('createSiteHierarchyItem — привязка к объекту', () =>
 
     await expect(
       createSiteHierarchyItem({ siteId: 's1', type: 'cluster', name: 'Куст 1', parentId: 'foreign-field' }, ctx),
-    ).rejects.toThrow('Parent not found');
+    ).rejects.toThrow('Родительский элемент не найден — обновите схему.');
     expect(m.clusterCreate).not.toHaveBeenCalled();
   });
 
@@ -116,7 +116,7 @@ describe('createSiteHierarchyItem — привязка к объекту', () =>
 
     await expect(
       createSiteHierarchyItem({ siteId: 's1', type: 'picket', name: 'Пикет 1', parentId: 'foreign-cluster' }, ctx),
-    ).rejects.toThrow('Parent not found');
+    ).rejects.toThrow('Родительский элемент не найден — обновите схему.');
     expect(m.picketCreate).not.toHaveBeenCalled();
   });
 
@@ -132,7 +132,7 @@ describe('createSiteHierarchyItem — привязка к объекту', () =>
 
     await expect(
       createSiteHierarchyItem({ siteId: 's1', type: 'field', name: 'Поле А' }, ctx),
-    ).rejects.toThrow('Site not found');
+    ).rejects.toThrow('Объект не найден — возможно, удалён. Обновите список.');
     expect(m.pileFieldCreate).not.toHaveBeenCalled();
   });
 });
@@ -198,7 +198,7 @@ describe('deleteSiteHierarchyItem — выработка в поддереве',
   it('узел чужого объекта не удаляется (404) — транзакция не открывается', async () => {
     m.siteFindFirst.mockResolvedValue(null);
 
-    await expect(deleteSiteHierarchyItem('s1', 'picket', 'p1', ctx)).rejects.toThrow('Site not found');
+    await expect(deleteSiteHierarchyItem('s1', 'picket', 'p1', ctx)).rejects.toThrow('Объект не найден — возможно, удалён. Обновите список.');
     expect(m.transaction).not.toHaveBeenCalled();
   });
 });

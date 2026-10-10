@@ -97,22 +97,22 @@ export function PhotoSection({ reportId, canEdit = true }: Props) {
           entityId: reportId,
         }),
       });
-      if (!presign.ok) throw new Error((await presign.json()).error || 'Не удалось получить ссылку для загрузки');
+      if (!presign.ok) throw new Error((await presign.json()).error || 'Не удалось загрузить фото. Проверьте связь и повторите.');
       const { mediaId, uploadUrl } = await presign.json();
 
       // 2. PUT directly to R2 — must match the contentType used in the
       // presign, otherwise R2 rejects the signature.
       const put = await fetch(uploadUrl, { method: 'PUT', body: file, headers: { 'Content-Type': contentType } });
-      if (!put.ok) throw new Error('Загрузка не удалась');
+      if (!put.ok) throw new Error('Не удалось загрузить фото. Проверьте связь и повторите.');
 
       // 3. confirm (server downloads + builds thumbnail)
       const confirm = await authFetch(`/api/media/${mediaId}/confirm`, { method: 'POST' });
-      if (!confirm.ok) throw new Error((await confirm.json()).error || 'Подтверждение не удалось');
+      if (!confirm.ok) throw new Error((await confirm.json()).error || 'Не удалось загрузить фото. Проверьте связь и повторите.');
 
       toast.success('Фото загружено');
       await refresh();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Ошибка загрузки');
+      toast.error(err instanceof Error ? err.message : 'Не удалось загрузить фото. Проверьте связь и повторите.');
     } finally {
       setBusy(false);
       if (inputRef.current) inputRef.current.value = '';
@@ -124,13 +124,13 @@ export function PhotoSection({ reportId, canEdit = true }: Props) {
     setBusy(true);
     try {
       const res = await authFetch(`/api/media/${photo.id}`, { method: 'DELETE' });
-      if (!res.ok) throw new Error('Удаление не удалось');
+      if (!res.ok) throw new Error('Не удалось удалить фото. Проверьте связь и повторите.');
       toast.success('Фото удалено');
       setPhoto(null);
       setThumbUrl(null);
       setDeleteOpen(false);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Ошибка удаления');
+      toast.error(err instanceof Error ? err.message : 'Не удалось удалить фото. Проверьте связь и повторите.');
     } finally {
       setBusy(false);
     }

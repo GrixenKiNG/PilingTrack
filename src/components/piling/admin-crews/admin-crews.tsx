@@ -153,7 +153,7 @@ export function AdminCrews() {
       setCrews((prev) => [...prev, crew]);
       setShowCreate(false);
       toast.success('Бригада создана');
-    } catch (err) { toast.error(catchText(err, 'Ошибка создания бригады')); }
+    } catch (err) { toast.error(catchText(err, 'Не удалось создать бригаду. Проверьте связь и повторите.')); }
     finally { setSubmitting(false); }
   };
 
@@ -165,7 +165,7 @@ export function AdminCrews() {
       setCrews((prev) => prev.map((c) => (c.id === editItem.id ? crew : c)));
       setEditItem(null);
       toast.success('Бригада сохранена');
-    } catch (err) { toast.error(catchText(err, 'Ошибка сохранения')); }
+    } catch (err) { toast.error(catchText(err, 'Не удалось сохранить бригаду. Проверьте связь и повторите.')); }
     finally { setSubmitting(false); }
   };
 
@@ -179,7 +179,7 @@ export function AdminCrews() {
       setCrews((prev) => prev.map((c) => (c.id === deleteItem.id ? { ...c, isActive: false } : c)));
       setDeleteItem(null);
       toast.success('Бригада деактивирована — её можно активировать снова');
-    } catch (err) { toast.error(catchText(err, 'Ошибка деактивации бригады')); }
+    } catch (err) { toast.error(catchText(err, 'Не удалось деактивировать бригаду. Проверьте связь и повторите.')); }
     finally { setSubmitting(false); }
   };
 

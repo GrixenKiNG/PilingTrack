@@ -213,13 +213,13 @@ export function TemplateEditor({ templateId }: TemplateEditorProps) {
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error((err as { error?: string }).error || 'Ошибка сохранения');
+        throw new Error((err as { error?: string }).error || 'Не удалось сохранить шаблон. Повторите.');
       }
       toast.success(isNew ? 'Шаблон создан' : 'Шаблон обновлён');
       router.push('/admin/checklists');
     } catch (err) {
       // Обрыв сети fetch бросает TypeError с английским «Failed to fetch» (F-R112-2).
-      toast.error(catchText(err, 'Ошибка'));
+      toast.error(catchText(err, 'Не удалось сохранить шаблон. Повторите.'));
       // Правка упала: прежняя версия на сервере уже снята, а новая не создана —
       // говорим об этом строкой, а не только общим тостом (R123 №1).
       if (!isNew) setSaveProblem('failed');

@@ -39,7 +39,7 @@ vi.mock('@/lib/xlsx-writer', () => ({
   },
 }));
 
-import { exportReportsCsv, exportReportsXlsx, listReportsForReview } from '../report-query.service';
+import { exportReportsCsv, exportReportsXlsx, listReportsForReview, listReportsForUserScope, getEditableReport, getReportsByPeriod } from '../report-query.service';
 
 describe('exportReportsCsv — tenant isolation', () => {
   beforeEach(() => {
@@ -72,6 +72,41 @@ describe('listReportsForReview — tenant isolation', () => {
     findMany.mockReset();
     await expect(listReportsForReview({ id: 'u1', role: 'OPERATOR', tenantId: null })).rejects.toThrow(/организац/);
     expect(findMany).not.toHaveBeenCalled();
+  });
+});
+
+// V1 (AUDIT-INDEP-HERMES): у listReportsForUserScope фильтр организации ставился
+// только при непустом tenantId — при пустом выборка `{ userId }` уходила без
+// организации (fail-open), расходясь с правилом «нет tenantId — отказ» и с
+// соседней listReportsForReview выше. Платформенные роли (ADMIN/DISPATCHER)
+// видят все организации по решению владельца и под правило не попадают.
+describe('listReportsForUserScope — tenant isolation (V1)', () => {
+  beforeEach(() => {
+    findMany.mockReset();
+    findMany.mockResolvedValue([]);
+  });
+
+  it('refuses an operator without a tenant instead of listing every tenant', async () => {
+    await expect(
+      listReportsForUserScope({ id: 'u1', role: 'OPERATOR', tenantId: null }),
+    ).rejects.toThrow(/организац/);
+    expect(findMany).not.toHaveBeenCalled();
+  });
+
+  it('scopes the query to the caller tenant with strict equality', async () => {
+    await listReportsForUserScope({ id: 'u1', role: 'OPERATOR', tenantId: 'orion' });
+
+    expect(findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ userId: 'u1', tenantId: 'orion' }),
+      }),
+    );
+  });
+
+  it('lets a platform admin through without a tenant filter', async () => {
+    await listReportsForUserScope({ id: 'a1', role: 'ADMIN', tenantId: null });
+
+    expect(findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { userId: 'a1' } }));
   });
 });
 
@@ -261,5 +296,20 @@ describe('listReportsForReview — устойчивые страницы (F-R140
     expect(findMany).toHaveBeenCalledWith(
       expect.objectContaining({ orderBy: [{ date: 'desc' }, { id: 'desc' }] }),
     );
+  });
+});
+
+// AU70: отказы при нехватке параметров показывались по-английски и с именами
+// полей (siteId, dateFrom). Тексты переведены, поведение (400 и порядок
+// проверок до обращения к базе) не менялось.
+describe('русские тексты отказов при нехватке параметров (AU70)', () => {
+  it('getEditableReport без объекта и даты говорит, что выбрать', async () => {
+    await expect(
+      getEditableReport({ id: 'u1', role: 'OPERATOR' }, null, null, null),
+    ).rejects.toThrow('Выберите объект и дату.');
+  });
+
+  it('getReportsByPeriod без начала и конца периода просит указать период', async () => {
+    await expect(getReportsByPeriod(null, null)).rejects.toThrow('Укажите начало и конец периода.');
   });
 });

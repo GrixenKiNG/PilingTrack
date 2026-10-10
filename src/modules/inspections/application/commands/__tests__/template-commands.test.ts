@@ -67,7 +67,7 @@ describe('updateTemplate — атомарная замена действующ�
     ]);
   });
   it('чужая организация по-прежнему не может заменить шаблон', async () => {
-    await expect(updateTemplate('old-1', { name: 'Чужой осмотр', level: 'EO', sections: [] }, { ...ctx, tenantId: 'other' })).rejects.toThrow('not found');
+    await expect(updateTemplate('old-1', { name: 'Чужой осмотр', level: 'EO', sections: [] }, { ...ctx, tenantId: 'other' })).rejects.toThrow('Шаблон не найден — обновите список.');
     expect(stored).toHaveLength(1);
     expect(stored[0].isActive).toBe(true);
   });
@@ -106,6 +106,6 @@ describe('deleteTemplate', () => {
   });
   it('throws 404 cross-tenant', async () => {
     findUniqueMock.mockResolvedValue({ id: 't1', tenantId: 'other' });
-    await expect(deleteTemplate('t1', 'orion')).rejects.toThrow('not found');
+    await expect(deleteTemplate('t1', 'orion')).rejects.toThrow('Шаблон не найден — обновите список.');
   });
 });

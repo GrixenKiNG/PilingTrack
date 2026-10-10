@@ -82,6 +82,6 @@ export async function deleteTemplate(id: string, tenantId: string) {
 async function deactivateTemplateUsing(client: TemplateClient, id: string, tenantId: string) {
   if (!tenantId) throw new ServiceError('tenantId is required', 400);
   const existing = await client.checklistTemplate.findUnique({ where: { id }, select: { id: true, tenantId: true } });
-  if (!existing || existing.tenantId !== tenantId) throw new ServiceError('Template not found', 404);
+  if (!existing || existing.tenantId !== tenantId) throw new ServiceError('Шаблон не найден — обновите список.', 404);
   return client.checklistTemplate.update({ where: { id }, data: { isActive: false } });
 }

@@ -6,6 +6,7 @@ const authFetchMock = vi.fn();
 vi.mock('@/lib/api', () => ({ authFetch: (...args: unknown[]) => authFetchMock(...args) }));
 vi.mock('sonner', () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 
+import { toast } from 'sonner';
 import { EquipmentMaintenance, sortMaintenanceRecords, type MaintenanceRow } from '../equipment-maintenance';
 
 function row(p: Pick<MaintenanceRow, 'id'> & Partial<MaintenanceRow>): MaintenanceRow {
@@ -96,5 +97,29 @@ describe('EquipmentMaintenance — подтверждение «Выполнен
     await waitFor(() =>
       expect(authFetchMock.mock.calls.some(([, init]) => (init as RequestInit | undefined)?.method === 'PUT')).toBe(true),
     );
+  });
+});
+
+/*
+  AU73: сбой смены статуса без поля `error` в теле показывал обезличенное
+  «Ошибка» — человек не понимал, что произошло и что делать. Теперь тост
+  называет действие.
+*/
+describe('EquipmentMaintenance — понятный текст отказа (AU73)', () => {
+  it('сбой смены статуса без поля error → тост объясняет действие', async () => {
+    authFetchMock.mockReset();
+    authFetchMock.mockImplementation(async (url: unknown, init?: RequestInit) => {
+      if (init?.method === 'PUT') return { ok: false, status: 500, json: async () => ({}) };
+      if (String(url) === '/api/maintenance/assignees') return { ok: true, status: 200, json: async () => ({ users: [] }) };
+      return { ok: true, status: 200, json: async () => ({ records: [row({ id: 'm1', status: 'PLANNED', title: 'Замена масла' })] }) };
+    });
+
+    render(createElement(EquipmentMaintenance, { equipmentId: 'eq-1' }));
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Перевести «Замена масла» в работу' }));
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith(
+      'Не удалось изменить статус записи ТО. Проверьте связь и повторите.',
+    ));
   });
 });

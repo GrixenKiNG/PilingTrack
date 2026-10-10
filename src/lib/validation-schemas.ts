@@ -27,8 +27,8 @@ export const paginationSchema = z.object({
 // ============================================================
 
 export const loginSchema = z.object({
-  email: z.string().email('Invalid email format').max(255),
-  password: z.string().min(1, 'Password is required').max(100),
+  email: z.string().email('Некорректный email').max(255),
+  password: z.string().min(1, 'Укажите пароль').max(100),
 });
 
 // ============================================================
@@ -36,8 +36,8 @@ export const loginSchema = z.object({
 // ============================================================
 
 const userBaseSchema = z.object({
-  email: z.string().email('Invalid email format').max(255),
-  name: z.string().min(1, 'Name is required').max(200),
+  email: z.string().email('Некорректный email').max(255),
+  name: z.string().min(1, 'Укажите имя').max(200),
   role: z.enum(['ADMIN', 'DISPATCHER', 'OPERATOR', 'ASSISTANT', 'MECHANIC', 'FOREMAN', 'SAFETY_ENGINEER']),
   phone: z.string().max(30).optional(),
   password: z.string().trim().min(8, 'Password must contain at least 8 characters').max(100).optional(),
@@ -47,12 +47,12 @@ const userBaseSchema = z.object({
 export const createUserSchema = userBaseSchema
   .extend({ isActive: z.boolean().default(true) })
   .refine((value) => Boolean(value.password?.trim()), {
-    message: 'Password is required',
+    message: 'Укажите пароль',
     path: ['password'],
   });
 
 export const updateUserSchema = userBaseSchema.partial().extend({
-  id: z.string().min(1, 'User ID is required'),
+  id: z.string().min(1, 'Не указан пользователь'),
 });
 
 export const userAssignSchema = z.object({
@@ -65,7 +65,7 @@ export const userAssignSchema = z.object({
 // ============================================================
 
 export const createSiteSchema = z.object({
-  name: z.string().min(1, 'Site name is required').max(200),
+  name: z.string().min(1, 'Укажите название объекта').max(200),
   plannedPiles: z.number().int().min(0).max(999999).optional(),
   plannedDrilling: z.number().int().min(0).max(999999).optional(),
   // Координаты площадки. Нужны погоде на экране оператора, когда телефон не
@@ -184,7 +184,7 @@ const equipmentMetadataSchema = z.object({
 });
 
 export const createEquipmentSchema = z.object({
-  name: z.string().min(1, 'Equipment name is required').max(200),
+  name: z.string().min(1, 'Укажите название установки').max(200),
   // Через optStr, как и остальные 26 полей установки: пустое поле формы
   // приходит как null, и голый z.string().optional() отвечал на него
   // «expected string, received null» — установку нельзя было завести, не
@@ -215,7 +215,7 @@ export const createCrewSchema = z.object({
 });
 
 export const updateCrewSchema = z.object({
-  name: z.string().min(1, 'Crew name is required').max(200).optional(),
+  name: z.string().min(1, 'Укажите название бригады').max(200).optional(),
   operatorId: internalIdSchema.optional(),
   equipmentId: internalIdSchema.optional(),
   siteId: internalIdSchema.optional(),
@@ -335,7 +335,7 @@ export const analyticsQuerySchema = z.object({
 // ============================================================
 
 export const recognizeImageSchema = z.object({
-  image: z.string().min(1, 'Image data is required'),
+  image: z.string().min(1, 'Не удалось получить изображение — выберите файл заново'),
   type: z.enum(['report', 'document', 'plan']).default('report'),
 });
 
@@ -349,7 +349,7 @@ export const recognizeImageSchema = z.object({
 
 export const equipmentManageSchema = z.object({
   id: z.string().uuid().optional(),
-  name: z.string().min(1, 'Equipment name is required').max(200),
+  name: z.string().min(1, 'Укажите название установки').max(200),
   model: optStr(200),
   description: optStr(2000),
   qty: z.coerce.number().int().min(1).max(100).default(1),
@@ -373,7 +373,7 @@ export const equipmentIdSchema = z.object({
 export const dictionaryManageSchema = z.object({
   id: internalIdSchema.optional(),
   type: z.enum(['PileGrade', 'DrillingType', 'DowntimeReason']),
-  name: z.string().min(1, 'Name is required').max(200),
+  name: z.string().min(1, 'Укажите название').max(200),
   code: z.string().max(50).optional().or(z.literal('')),
   isActive: z.boolean().default(true),
 });
@@ -388,7 +388,7 @@ export const dictionaryIdSchema = z.object({
 
 export const siteManageSchema = z.object({
   id: internalIdSchema,
-  name: z.string().min(1, 'Site name is required').max(200).optional(),
+  name: z.string().min(1, 'Укажите название объекта').max(200).optional(),
   plannedPiles: z.coerce.number().int().min(0).max(999999).optional(),
   plannedDrilling: z.coerce.number().min(0).max(999999).optional(),
   description: z.string().max(2000).optional(),
@@ -419,7 +419,7 @@ export const reportAdminUpsertSchema = reportUpsertSchema.extend({
 
 export const siteHierarchyItemSchema = z.object({
   parentId: internalIdSchema.optional(),
-  name: z.string().min(1, 'Name is required').max(200),
+  name: z.string().min(1, 'Укажите название элемента').max(200),
   type: z.enum(['field', 'cluster', 'picket']),
   sortOrder: z.coerce.number().int().min(0).default(0),
 });
@@ -434,7 +434,7 @@ export const siteHierarchyDeleteSchema = z.object({
 // ============================================================
 
 export const recognizeImageDataSchema = z.object({
-  image: z.string().min(1, 'Image data is required'),
+  image: z.string().min(1, 'Не удалось получить изображение — выберите файл заново'),
   type: z.enum(['report', 'document', 'plan']).default('report'),
 });
 

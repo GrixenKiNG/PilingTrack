@@ -216,6 +216,36 @@ describe('AdminDlq: защита от двойного нажатия', () => {
 });
 
 /**
+ * AU76: тост отказа действия печатал обезличенное «Ошибка». Теперь он называет
+ * действие и советует повторить.
+ */
+describe('AdminDlq: понятный текст отказа действия (AU76)', () => {
+  beforeEach(() => {
+    mocks.authFetch.mockReset();
+    mocks.confirm.mockReset();
+    mocks.confirm.mockReturnValue(true);
+    window.confirm = mocks.confirm;
+    vi.mocked(toast.error).mockReset();
+  });
+
+  it('сервер отбил действие без текста → понятный текст, а не «Ошибка»', async () => {
+    mocks.authFetch.mockImplementation((_url: string, init?: RequestInit) => {
+      if (init?.method === 'POST') return Promise.resolve(json({}, 500));
+      return Promise.resolve(json({ entries: [makeEntry()], stats }));
+    });
+    render(<AdminDlq />);
+    await screen.findByText('Доставка PDF отчёта');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Повтор' }));
+
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith('Не удалось выполнить действие с событием. Повторите.'),
+    );
+    expect(vi.mocked(toast.error).mock.calls[0][0]).not.toBe('Ошибка');
+  });
+});
+
+/**
  * F-R112-4: обрыв связи `fetch` бросает `TypeError` с английским «Failed to
  * fetch», а экран печатал `e.message` как есть — при «Повтор»/«Отбросить» без
  * сети админ видел чужую английскую строку вместо объяснения.

@@ -171,13 +171,13 @@ export function StartInspectionForm() {
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || 'Ошибка создания осмотра');
+        throw new Error(err.error || 'Не удалось начать осмотр. Повторите.');
       }
       const { inspection } = await res.json();
       router.push(`/inspections/${inspection.id}`);
     } catch (err) {
       // Обрыв сети fetch бросает TypeError с английским «Failed to fetch» (F-R112-2).
-      toast.error(catchText(err, 'Ошибка'));
+      toast.error(catchText(err, 'Не удалось начать осмотр. Повторите.'));
     } finally {
       setBusy(false);
     }

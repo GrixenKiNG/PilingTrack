@@ -147,7 +147,7 @@ export function AdminReports() {
       const response = await authFetch(`/api/reports/export?${params.toString()}`);
       if (!response.ok) {
         const body = await response.json().catch(() => ({}));
-        throw new Error(body.error || `Сервер ответил ${response.status}`);
+        throw new Error(body.error || `Не удалось выгрузить отчёты. Повторите позже (код ${response.status}).`);
       }
 
       const blob = await response.blob();

@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button';
 /** Отказ загрузки словами. 403 — прав нет (повтор не поможет), null — запрос не дошёл. */
 export function loadFailureText(status: number | null): string {
   if (status === 403) return 'Нет доступа';
-  if (status !== null) return `Не удалось загрузить: сервер вернул ${status}`;
+  if (status !== null) return `Не удалось загрузить. Повторите позже (код ${status}).`;
   return navigator.onLine
     ? 'Не удалось загрузить: сервер не ответил'
     : 'Не удалось загрузить: нет подключения к сети';

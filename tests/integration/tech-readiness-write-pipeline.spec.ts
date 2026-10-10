@@ -73,7 +73,7 @@ describe.skipIf(!enabled)('Tech Readiness real source → outbox → snapshot �
   });
   it('rejects another tenant and leaves its source unchanged', async () => {
     const other = fixture.tenants[1];
-    await expect(scoped(() => complete(fixture.id(other, 'Inspection'), { tenantId: tenant(), signedByName: 'Disposable operator' }))).rejects.toThrow('Inspection not found');
+    await expect(scoped(() => complete(fixture.id(other, 'Inspection'), { tenantId: tenant(), signedByName: 'Disposable operator' }))).rejects.toThrow('Осмотр не найден — обновите список.');
     expect((await fixture.owner.query('SELECT status FROM "Inspection" WHERE id = $1', [fixture.id(other, 'Inspection')])).rows).toEqual([{ status: 'DRAFT' }]);
   });
   it('does not commit a snapshot or projected marker when the database rejects the read model', async () => {

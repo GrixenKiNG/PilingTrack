@@ -29,6 +29,18 @@ const PDF_GET_RATE_LIMIT: RateLimitConfig = {
   blockDurationMs: 5 * 60 * 1000,
 };
 
+// Лимит на опрос/скачивание задачи PDF по jobId (аудит M5, ключ pdf:job —
+// отдельный от pdf:get, чтобы частый опрос статуса не съедал бюджет обычных
+// выгрузок). Ветка статуса дёргается из интерфейса часто — примерно раз в 2
+// секунды до готовности файла. Поэтому окно короче (минута): 60 запросов в
+// минуту дают двукратный запас к темпу опроса и не меньше утроенного
+// PDF_GET_RATE_LIMIT.
+const PDF_JOB_RATE_LIMIT: RateLimitConfig = {
+  maxAttempts: 60,
+  windowMs: 60 * 1000,
+  blockDurationMs: 60 * 1000,
+};
+
 // FeedbackEvent messages are rendered verbatim in the feedback feed, so a
 // non-ServiceError (Prisma/English internals) must never reach it — the real
 // text goes to the log instead.
@@ -180,6 +192,18 @@ export const GET = withApi(async (request: NextRequest) => {
 
   if (!UUID_RE.test(jobId)) {
     return NextResponse.json({ error: 'Некорректный jobId' }, { status: 400 });
+  }
+
+  // Лимит на ветку задачи — до обращения к очереди (аудит M5). Ключ отдельный
+  // (pdf:job), чтобы опрос статуса и скачивание ограничивались независимо от
+  // синхронных выгрузок.
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
+  const rl = await rateLimiter.check(`pdf:job:${user!.id}`, PDF_JOB_RATE_LIMIT);
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: 'Слишком много запросов к задаче. Подождите минуту.' },
+      { status: 429, headers: { 'Retry-After': String(rl.retryAfter || 60) } }
+    );
   }
 
   // A single-report PDF belongs to the operator who triggered it — only
