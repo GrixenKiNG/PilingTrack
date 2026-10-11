@@ -6,6 +6,8 @@
  */
 import {enqueueAlert} from '@/core/notifications/durable-alert';
 import type {Prisma} from '@/generated/postgres-client/client';
+import {logger} from '@/lib/logger';
+import {describeAuditEvent, type AuditEvent} from '@/modules/system';
 import {withReadinessTenantTransaction} from '@/modules/readiness/server';
 import {requestReadinessSnapshot} from '@/modules/readiness/server';
 import {classifyObservedHazard, validateIncident, type IncidentCategory, type IncidentSign} from '../../domain/incidents';
@@ -54,7 +56,7 @@ export async function reportIncident(input: {
     observedSigns: input.signs, injured: input.injured,
   });
 
-  return withReadinessTenantTransaction(input.tenantId, async (tx) => {
+  const outcome = await withReadinessTenantTransaction(input.tenantId, async (tx) => {
     const shift = await requireOpenShift(tx, input.tenantId, input.shiftId, input.operatorId);
     const crew = await requireCrew(tx, input.tenantId, input.operatorId, shift.equipmentId);
 
@@ -65,11 +67,11 @@ export async function reportIncident(input: {
       select: {id: true, severity: true, stopRequired: true},
     });
     if (duplicate) {
-      return {
+      return {result: {
         incidentId: duplicate.id,
         severity: duplicate.severity,
         stopRequired: duplicate.stopRequired,
-      };
+      }, audit: null};
     }
 
     const mediaIds = await confirmedIncidentImages(
@@ -103,6 +105,32 @@ export async function reportIncident(input: {
       select: {id: true},
     });
 
+    const audit: AuditEvent = {
+      action: 'incident.reported', scope: 'safety', actorId: input.operatorId,
+      targetId: incident.id, tenantId: input.tenantId,
+      metadata: {
+        tenantId: input.tenantId, shiftId: input.shiftId,
+        equipmentId: shift.equipmentId, siteId: crew.siteId,
+        category: input.category, observedSigns: input.signs, injured: input.injured,
+        description: input.description.trim(), severity: classification.severity,
+        stopRequired: classification.stopRequired, clientCommandId: input.clientCommandId,
+        occurredAt: now.toISOString(),
+      },
+    };
+    const description = describeAuditEvent(audit);
+    const actor = await tx.user.findUnique({
+      where: {id: input.operatorId}, select: {name: true, role: true},
+    });
+    // След сохраняется вместе с происшествием: отказ записи откатывает команду.
+    await tx.feedbackEvent.create({data: {
+      level: description.level, priority: description.level === 'warn' ? 'HIGH' : 'MEDIUM',
+      scope: audit.scope, action: audit.action, title: description.title,
+      message: description.message, audience: 'OPERATIONS',
+      actorId: input.operatorId, actorName: actor?.name ?? null, actorRole: actor?.role ?? null,
+      targetId: incident.id, requestId: null,
+      metadata: audit.metadata as Prisma.InputJsonValue,
+    }});
+
     // Готовность пересчитываем: происшествие — такой же факт о машине, как
     // осмотр, и центр готовности должен узнать о нём без ручного обновления.
     await requestReadinessSnapshot(tx as unknown as Parameters<typeof requestReadinessSnapshot>[0], {
@@ -126,12 +154,15 @@ export async function reportIncident(input: {
       ruleId: classification.stopRequired ? 'incidentStopWork' : 'incident',
       message: (classification.stopRequired ? 'Происшествие: требуется прекратить работы. ' : 'Происшествие: ') + input.description,
     }});
-    return {
+    return {result: {
       incidentId: incident.id,
       severity: classification.severity,
       stopRequired: classification.stopRequired,
-    };
+    }, audit};
   });
+  // Транзакция уже завершена; повтор clientCommandId не создаёт новый след.
+  if (outcome.audit) logger.info('audit', outcome.audit as unknown as Record<string, unknown>);
+  return outcome.result;
 }
 
 /**
