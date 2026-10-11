@@ -897,6 +897,31 @@ describe('ReportsScreen — Парето не выдаёт отказ за от�
     render(<ReportsScreen {...props} />);
   }
 
+  it.each([
+    ['DENIED', 'BLOCKED', [], 'Запуск запрещён', 'text-destructive-strong'],
+    ['RETURN_TO_OPERATOR', 'BLOCKED', [], 'Возврат оператору', 'text-warning-strong'],
+    ['CONFIRMATION_REQUIRED', 'BLOCKED', [], 'Требуется подтверждение', 'text-warning-strong'],
+    ['ALLOWED', 'READY', [], 'Готова к работе', 'text-success-strong'],
+    ['ALLOWED', 'READY', ['Замечание'], 'Готова с замечанием', 'text-warning-strong'],
+    [null, 'READY', [], 'Готово', 'text-success-strong'],
+    [null, 'BLOCKED', [], 'Заблокировано', 'text-destructive-strong'],
+  ] as const)('журнал сохраняет исход %s/%s, даже без исторических facts', (verdict, status, warnings, label, tone) => {
+    renderReports({
+      filters: {from: '2026-10-01', to: '2026-10-01'},
+      readinessHistory: [{
+        id: 'history-1', equipmentId: 'eq-1', shiftId: null, triggerId: 'inspection-1',
+        verdict, status, score: 80, calculatedAt: '2026-10-01T06:00:00.000Z',
+        blockers: [{condition: 'INSPECTION_BELOW_80', label: 'Осмотр за сегодня не завершён', action: 'RETURN_TO_OPERATOR'}],
+        warnings: [...warnings], evidence: null, facts: null, triggerType: 'INSPECTION_COMPLETED',
+        ruleSetVersion: 'v1', factsHash: '00'.repeat(32),
+      }],
+    });
+    expect(screen.getAllByText(label)).toHaveLength(2);
+    for (const badge of screen.getAllByText(label)) expect(badge).toHaveClass(tone);
+    const needsReason = verdict ? verdict !== 'ALLOWED' : status === 'BLOCKED';
+    expect(screen.queryAllByText(/Осмотр за сегодня не завершён.*оператор/)).toHaveLength(needsReason ? 2 : 0);
+  });
+
   /** Факты с единственной сработавшей причиной — «Критический дефект». */
   const criticalDefectFacts: CurrentReadinessDto['facts'] = {
     inspectionCompleted: true,

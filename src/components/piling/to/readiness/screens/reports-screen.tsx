@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { formatDateTimeInTimezone } from '@/lib/timezone';
 import { cn } from '@/lib/utils';
-import { READINESS_READY_THRESHOLD } from '@/modules/readiness';
+import { OUTCOME_LABELS, READINESS_READY_THRESHOLD, resolveReadinessOutcome, VERDICT_LABELS } from '@/modules/readiness';
 import type { ReadinessShiftDto } from '../api/contracts';
 import { type ReadinessUrlFilters } from '../api/client';
 import { describeBlockers } from './blocker-guidance';
@@ -204,19 +204,30 @@ export function ReportsScreen(props: ReferenceUiProps) {
   const siteByEquipment = new Map(props.fleetCards.map((card) => [card.id, card.assignedSiteName ?? null]));
   const nameByEquipment = new Map(props.equipment.map((item) => [item.id, item.name]));
 
-  const snapshotRows = periodSnapshots.map((snapshot) => ({
-    id: snapshot.id,
-    at: snapshot.calculatedAt,
-    event: 'Снимок готовности',
-    // Что именно держит установку и кто это снимает. Без этой строки журнал
-    // сообщал «Заблокировано» и молчал о причине и адресате.
-    reason: snapshot.status === 'READY' ? null : describeBlockers(snapshot.blockers),
-    equipmentId: snapshot.equipmentId,
-    actor: 'Система (расчёт по правилам)',
-    outcome: snapshot.status === 'READY'
-      ? { label: 'Готово', tone: 'success' as const }
-      : { label: 'Заблокировано', tone: 'danger' as const },
-  }));
+  const snapshotRows = periodSnapshots.map((snapshot) => {
+    const outcome = snapshot.verdict ? resolveReadinessOutcome({
+      verdict: snapshot.verdict,
+      warningCount: Array.isArray(snapshot.warnings) ? snapshot.warnings.length : 0,
+    }) : null;
+    return {
+      id: snapshot.id,
+      at: snapshot.calculatedAt,
+      event: 'Снимок готовности',
+      // Что именно держит установку и кто это снимает. Без этой строки журнал
+      // сообщал «Заблокировано» и молчал о причине и адресате.
+      reason: snapshot.verdict ? snapshot.verdict === 'ALLOWED' ? null : describeBlockers(snapshot.blockers)
+        : snapshot.status === 'READY' ? null : describeBlockers(snapshot.blockers),
+      equipmentId: snapshot.equipmentId,
+      actor: 'Система (расчёт по правилам)',
+      outcome: outcome ? {
+        label: snapshot.verdict && snapshot.verdict !== 'ALLOWED' ? VERDICT_LABELS[snapshot.verdict] : OUTCOME_LABELS[outcome],
+        tone: outcome === 'BLOCKED' ? 'danger' as const
+          : outcome === 'READY' ? 'success' as const : 'warning' as const,
+      } : snapshot.status === 'READY'
+        ? { label: 'Готово', tone: 'success' as const }
+        : { label: 'Заблокировано', tone: 'danger' as const },
+    };
+  });
   const decisionRows = periodAudit
     .filter((event) => ['WorkPermit', 'ShiftHandover', 'Shift'].includes(event.entity.type))
     .map((event) => ({
@@ -559,7 +570,7 @@ export function ReportsScreen(props: ReferenceUiProps) {
               <span className="min-w-0">
                 <span className="block truncate" title={record.event}>{record.event}</span>
                 {record.reason && (
-                  <span className="mt-0.5 block text-3xs text-destructive-strong" title={record.reason}>{record.reason}</span>
+                  <span className={cn('mt-0.5 block text-3xs', record.outcome.tone === 'danger' ? 'text-destructive-strong' : 'text-warning-strong')} title={record.reason}>{record.reason}</span>
                 )}
               </span>
               <span className="truncate font-semibold">{record.equipmentId ? nameByEquipment.get(record.equipmentId) ?? '—' : '—'}</span>
@@ -569,6 +580,7 @@ export function ReportsScreen(props: ReferenceUiProps) {
                 <span className={cn('rounded px-2 py-1 text-3xs font-semibold',
                   record.outcome.tone === 'success' ? 'bg-success/10 text-success-strong'
                     : record.outcome.tone === 'danger' ? 'bg-destructive/10 text-destructive-strong'
+                      : record.outcome.tone === 'warning' ? 'bg-warning/10 text-warning-strong'
                       : 'bg-info/10 text-info-strong')}>
                   {record.outcome.label}
                 </span>
@@ -584,12 +596,13 @@ export function ReportsScreen(props: ReferenceUiProps) {
                 <span className={cn('shrink-0 rounded px-2 py-1 text-3xs font-semibold',
                   record.outcome.tone === 'success' ? 'bg-success/10 text-success-strong'
                     : record.outcome.tone === 'danger' ? 'bg-destructive/10 text-destructive-strong'
+                      : record.outcome.tone === 'warning' ? 'bg-warning/10 text-warning-strong'
                       : 'bg-info/10 text-info-strong')}>
                   {record.outcome.label}
                 </span>
               </div>
               <div className="mt-2 font-medium">{record.equipmentId ? nameByEquipment.get(record.equipmentId) ?? '—' : '—'}</div>
-              {record.reason && <div className="mt-1 text-2xs text-destructive-strong">{record.reason}</div>}
+              {record.reason && <div className={cn('mt-1 text-2xs', record.outcome.tone === 'danger' ? 'text-destructive-strong' : 'text-warning-strong')}>{record.reason}</div>}
               <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-2xs text-muted-foreground">
                 <span>{formatDateTimeInTimezone(record.at, props.bootstrap?.tenant.timezone)}</span>
                 <span>{record.actor}</span>

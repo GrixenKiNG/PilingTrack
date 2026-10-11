@@ -290,6 +290,36 @@ describe('ReportFormDialog — построчные ошибки сервера'
 });
 
 describe('ReportFormDialog — непрочитанные справочники', () => {
+  it.each([null, 'Марки не загрузились'])('показывает ошибку списков независимо от ошибки справочников %s', (dictionaryError) => {
+    render(<ReportFormDialog open onClose={vi.fn()} editReport={null} loadingReferenceData={false}
+      filterError="Не удалось загрузить установки и пользователей" dictionaryError={dictionaryError}
+      operators={[]} sites={[]} pileGrades={[]} drillingTypes={[]} downtimeReasons={[]}
+      equipment={[{id: 'available-equipment', name: 'Доступная установка'}]} onSuccess={vi.fn()} />);
+    expect(screen.getByText('Не удалось загрузить установки и пользователей')).toHaveAttribute('role', 'alert');
+    expect(screen.getByText('Доступная установка')).toBeInTheDocument();
+    expect(screen.getAllByRole('alert')).toHaveLength(dictionaryError ? 2 : 1);
+  });
+
+  it('изменение ошибки и частичных списков сохраняет дату и старые edit id при сохранении', async () => {
+    authFetchMock.mockReset();
+    authFetchMock.mockResolvedValue(new Response('{}', {status: 200}));
+    const edited = {...editReport, equipment: {id: 'old-equipment', name: 'Прежняя установка'}} as ReportDTO;
+    const props = {open: true, onClose: vi.fn(), editReport: edited, loadingReferenceData: false,
+      dictionaryError: null, operators: [], sites: [], pileGrades: [], drillingTypes: [], downtimeReasons: [],
+      equipment: [{id: 'available-equipment', name: 'Доступная установка'}], onSuccess: vi.fn()};
+    const {rerender} = render(<ReportFormDialog {...props} filterError={null} />);
+    fireEvent.change(screen.getByLabelText('Дата'), {target: {value: '2026-10-02'}});
+    rerender(<ReportFormDialog {...props} filterError="Пользователи не загрузились" dictionaryError="Марки не загрузились" />);
+    expect(screen.getByLabelText('Дата')).toHaveValue('2026-10-02');
+    expect(screen.getAllByRole('alert')).toHaveLength(2);
+    expect(screen.getByText('Доступная установка')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', {name: /Сохранить/}));
+    await waitFor(() => expect(authFetchMock).toHaveBeenCalledTimes(1));
+    expect(JSON.parse(authFetchMock.mock.calls[0][1].body)).toMatchObject({
+      userId: 'u1', siteId: 's1', equipmentId: 'old-equipment', date: '2026-10-02',
+    });
+  });
+
   it('показывает причину над полями, а не пустые списки без объяснения', () => {
     render(
       <ReportFormDialog

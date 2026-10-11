@@ -158,6 +158,60 @@ const singleReportWithPiles = (
 });
 
 describe('pdf-generator', () => {
+  it('F-R28-3: period detail retains shift, equipment, pile metres and downtime comment', async () => {
+    const { generatePeriodPdf } = await import('@/lib/pdf-generator');
+    const report = {
+      ...singleReportWithPiles([
+        { pileGrade: { name: 'Марка 12 м', lengthMm: 12000 }, count: 3 },
+        { pileGrade: { name: 'Без длины', lengthMm: null }, count: 2 },
+      ]),
+      shiftType: 'NIGHT',
+      downtimes: [{ reason: { name: 'Погода' }, duration: 1.25, comment: 'Грунт размыло после дождя' }],
+    };
+    const rendered = await capturePdfText(async () => {
+      await generatePeriodPdf({dateFrom: report.date, dateTo: report.date, siteId: '', reports: [report], totalPiles: 5, totalDrilling: 0, totalDowntime: 1.25});
+    });
+    const detail = rendered.slice(rendered.indexOf('Детализация работ') + 1);
+    expect(detail.join(' ')).toContain('Ночная');
+    expect(detail.join(' ')).toContain('LRH 100');
+    expect(detail).toContain('Всего м.п.');
+    expect(detail).toContain('36,0');
+    expect(detail).toContain('длина марки не задана');
+    expect(detail.join(' ')).toContain('Грунт размыло после дождя');
+    expect(detail).toContain('1 ч 15 мин');
+    expect(detail).not.toContain('0,0');
+  }, 30_000);
+
+  it.each([1, 2, undefined])('F-R28-3: distinguishes corrected single PDF version %s', async (version) => {
+    const { generateSinglePdf } = await import('@/lib/pdf-generator');
+    const data = {...singleReportWithPiles([]), version};
+    const rendered = await capturePdfText(async () => { await generateSinglePdf(data); });
+    const text = rendered.join(' ');
+    if (version === 2) expect(text).toContain('Корректировка, ред. №2');
+    else expect(text).not.toContain('Корректировка');
+  }, 30_000);
+
+  it('F-R28-3: renders long downtime comments as unrestricted flow text', async () => {
+    const { generatePeriodPdf } = await import('@/lib/pdf-generator');
+    const { CONTENT_WIDTH } = await import('@/lib/pdf-generator/constants');
+    const PDFDocument = (await import('pdfkit')).default;
+    const text = vi.spyOn(PDFDocument.prototype, 'text');
+    const comment = 'Проливной дождь размыл грунт, мастер распорядился остановить работы до восстановления площадки. '.repeat(6);
+    const report = {...singleReportWithPiles([]), downtimes: [{reason: {name: 'Погода'}, duration: 2, comment}]};
+    try {
+      const pdf = await generatePeriodPdf({dateFrom: report.date, dateTo: report.date, siteId: '', reports: [report], totalPiles: 0, totalDrilling: 0, totalDowntime: 2});
+      expect(pdf.subarray(0, 4).toString()).toBe('%PDF');
+      const commentCall = text.mock.calls.find(([value]) => typeof value === 'string' && value.includes(comment.trim()));
+      expect(commentCall).toBeDefined();
+      expect(commentCall?.[3]).toMatchObject({width: CONTENT_WIDTH});
+      expect(commentCall?.[3]).not.toHaveProperty('height');
+      expect(commentCall?.[3]).not.toHaveProperty('ellipsis');
+      expect(commentCall?.[0]).toContain('Погода');
+    } finally {
+      text.mockRestore();
+    }
+  }, 30_000);
+
   it('X6: prints ending readings in single and period PDFs, including zero', async () => {
     const { generateSinglePdf, generatePeriodPdf } = await import('@/lib/pdf-generator');
     const report = { ...singleReportWithPiles([]), endingEngineHours: 1234, endingFuelPercent: 0 };

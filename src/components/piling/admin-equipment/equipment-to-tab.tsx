@@ -7,20 +7,22 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { z } from 'zod';
 import { authFetch } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { PilingIcon } from '@/components/piling/icons';
 
-interface JournalRecord {
-  id: string;
-  type: string;
-  status: string;
-  title: string;
-  scheduledAt: string | null;
-  completedAt: string | null;
-  createdAt: string;
-  inspection: { id: string; healthScore: number | null } | null;
-}
+const journalRecordSchema = z.looseObject({
+  id: z.string(),
+  type: z.string(),
+  status: z.string(),
+  title: z.string(),
+  scheduledAt: z.iso.datetime({offset: true}).nullable(),
+  completedAt: z.iso.datetime({offset: true}).nullable(),
+  createdAt: z.iso.datetime({offset: true}),
+  inspection: z.looseObject({id: z.string(), healthScore: z.number().nullable()}).nullable(),
+});
+type JournalRecord = z.infer<typeof journalRecordSchema>;
 
 const TYPE_LABEL: Record<string, string> = {
   // F-R131 №9: «ЕО» без расшифровки.
@@ -38,17 +40,38 @@ const scoreColor = (n: number) => (n >= 90 ? 'text-success-strong' : n >= 75 ? '
 export function EquipmentToTab({ equipmentId }: { equipmentId: string }) {
   const [records, setRecords] = useState<JournalRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [retry, setRetry] = useState(0);
 
   useEffect(() => {
     let active = true;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- новое чтение не должно показывать старый контекст
+    setLoading(true);
+    setRecords([]);
+    setError(null);
     (async () => {
       try {
         const res = await authFetch(`/api/to/journal?equipmentId=${encodeURIComponent(equipmentId)}`);
-        if (res.ok && active) setRecords(((await res.json()).records ?? []) as JournalRecord[]);
-      } catch { /* ignore */ } finally { if (active) setLoading(false); }
+        if (!active) return;
+        if (!res.ok) {
+          setError(res.status === 403 ? 'Нет прав на просмотр журнала ТО. Обратитесь к администратору.'
+            : 'Не удалось загрузить журнал ТО. Повторите загрузку.');
+          return;
+        }
+        const body: unknown = await res.json();
+        if (!active) return;
+        const parsed = z.object({records: z.array(journalRecordSchema)}).safeParse(body);
+        if (!parsed.success) {
+          setError('Не удалось загрузить журнал ТО: некорректный ответ сервера.');
+          return;
+        }
+        setRecords(parsed.data.records);
+      } catch {
+        if (active) setError('Не удалось загрузить журнал ТО. Проверьте связь и повторите загрузку.');
+      } finally { if (active) setLoading(false); }
     })();
     return () => { active = false; };
-  }, [equipmentId]);
+  }, [equipmentId, retry]);
 
   return (
     <div className="space-y-3">
@@ -63,6 +86,11 @@ export function EquipmentToTab({ equipmentId }: { equipmentId: string }) {
 
       {loading ? (
         <div className="flex justify-center py-6 text-muted-foreground"><PilingIcon name="refresh" size={20} decorative className="animate-spin" /></div>
+      ) : error ? (
+        <div role="alert" className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-3 text-sm text-destructive-strong">
+          <p>{error}</p>
+          <button type="button" className="mt-2 underline" onClick={() => setRetry((value) => value + 1)}>Повторить</button>
+        </div>
       ) : records.length === 0 ? (
         <p className="rounded-lg bg-muted px-3 py-6 text-center text-sm text-muted-foreground">Записей ТО по этой установке пока нет</p>
       ) : (

@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { NextRequest } from 'next/server';
 import { ZodError } from 'zod';
 import {
   READINESS_ABILITIES,
@@ -8,6 +9,26 @@ import {
 } from '../contracts';
 import { READINESS_ABILITIES as SERVER_ABILITIES } from '@/modules/readiness/application/capabilities';
 import { bootstrapEnvelope } from './fixtures';
+
+const historyMocks = vi.hoisted(() => ({
+  findMany: vi.fn(),
+}));
+vi.mock('@/core/api-wrapper', () => ({
+  withApi: <T,>(handler: T) => handler,
+}));
+vi.mock('@/app/api/readiness/_shared/request-context', () => ({
+  resolveReadinessRequestContext: async () => ({context: {
+    tenantId: 'tenant-1', correlationId: 'history-correlation', requestId: 'history-request',
+    capabilities: new Set(['readiness.read']),
+  }}),
+}));
+vi.mock('@/modules/readiness/infrastructure/tenant-transaction', () => ({
+  withReadinessRequestTransaction: async (_tenantId: string, callback: (tx: unknown) => unknown) => callback({
+    tenantSettings: {findUnique: async () => ({timezone: 'Europe/Moscow'})},
+    readinessScoreSnapshot: {findMany: historyMocks.findMany},
+  }),
+}));
+import { GET } from '@/app/api/readiness/history/route';
 
 describe('readiness bootstrap contract', () => {
   it('accepts the complete server envelope', () => {
@@ -61,6 +82,19 @@ const currentItem = (facts: unknown) => ({
 });
 
 describe('authoritative readiness response contracts', () => {
+  it('actual history GET preserves saved verdicts and legacy null through the parser', async () => {
+    const verdicts = ['DENIED', 'RETURN_TO_OPERATOR', 'CONFIRMATION_REQUIRED', 'ALLOWED', null];
+    historyMocks.findMany.mockResolvedValue(verdicts.map((verdict, index) => ({
+      ...currentItem(null), id: `snapshot-${index}`, shiftId: null, triggerId: `inspection-${index}`,
+      verdict, status: verdict === 'ALLOWED' ? 'READY' : 'BLOCKED',
+      calculatedAt: new Date('2026-08-08T12:00:00.000Z'), factsHash: Buffer.alloc(32),
+    })));
+    const response = await GET(new NextRequest('http://localhost/api/readiness/history'));
+    expect(response.status).toBe(200);
+    const snapshots = parseReadinessHistoryResponse(await response.json());
+    expect(snapshots.map((snapshot) => snapshot.verdict)).toEqual(verdicts);
+    expect(snapshots.every((snapshot) => snapshot.facts === null)).toBe(true);
+  });
   it('accepts complete facts and nullable legacy facts', () => {
     expect(parseCurrentReadinessResponse({data: [currentItem(completeFacts)]})[0]?.facts)
       .toEqual(completeFacts);

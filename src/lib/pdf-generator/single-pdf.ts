@@ -23,7 +23,7 @@ import { formatDowntimeHours } from '@/lib/downtime-hours';
 import { pileLengthMeters } from '@/lib/pile-length';
 import type { SingleReportData } from './types';
 
-export async function generateSinglePdf(data: SingleReportData): Promise<Buffer> {
+export async function generateSinglePdf(data: SingleReportData & {version?: number}): Promise<Buffer> {
   return renderPdf((doc) => {
     const pileMetersOf = (pile: { pileGrade?: { lengthMm?: number | null } }) =>
       pileLengthMeters({ gradeLengthMm: pile.pileGrade?.lengthMm });
@@ -37,7 +37,8 @@ export async function generateSinglePdf(data: SingleReportData): Promise<Buffer>
     const totalDowntime = data.downtimes.reduce((sum, downtime) => sum + (downtime.duration || 0), 0);
     const hasPilesWithoutLength = data.piles.some((pile) => pileMetersOf(pile) === 0);
 
-    addHeader(doc, 'РАБОЧИЙ ОТЧЁТ ПО СВАЙНЫМ РАБОТАМ', `№ ${shortId(data.reportId)} | ${formatRuDate(data.date)}`, data.companyName);
+    const revision = (data.version ?? 1) > 1 ? `\nКорректировка, ред. №${data.version}` : '';
+    addHeader(doc, 'РАБОЧИЙ ОТЧЁТ ПО СВАЙНЫМ РАБОТАМ', `№ ${shortId(data.reportId)} | ${formatRuDate(data.date)}${revision}`, data.companyName);
     addInfoGrid(doc, [
       ['Объект', data.site?.name || '—', 'Дата', formatRuDate(data.date)],
       ['Оператор', data.user?.name || '—', 'Смена', `${shiftLabel(data.shiftType)} ${data.shiftStart || ''}-${data.shiftEnd || ''}`],

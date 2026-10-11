@@ -8,7 +8,7 @@
  * <button>, видимая дорожка остаётся 40×24 (образец — workspace-settings.tsx).
  * На десктопе (sm и шире) вид не меняется.
  */
-import { fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { toast } from 'sonner';
 
@@ -43,10 +43,118 @@ import { DEFAULT_EQUIPMENT_CARD_TEMPLATE } from '../equipment-card-template';
 import { HistoryTable, Section, type TimelineRow } from '../detail/equipment-detail-parts';
 import { EquipmentPhotos } from '../detail/equipment-photos';
 import { EquipmentReportExport } from '../detail/equipment-report-export';
+import { EquipmentToTab } from '../equipment-to-tab';
 import type { FleetCard } from '../fleet-types';
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
+
+describe('EquipmentToTab — ошибки чтения (F-N1005-EQUIPMENT-TO-ERROR)', () => {
+  beforeEach(() => { mocks.authFetch.mockReset(); });
+  const record = {
+    id: 'to-1', type: 'EO', status: 'DONE', title: 'Осмотр установки',
+    scheduledAt: null, completedAt: null, createdAt: '2026-10-01T06:00:00.000Z',
+    inspection: {id: 'inspection-1', healthScore: 0, status: 'COMPLETED', level: 'EO'},
+    equipmentId: 'eq-1',
+  };
+  function deferred<T>() {
+    let resolve!: (value: T) => void;
+    let reject!: (error: unknown) => void;
+    const promise = new Promise<T>((res, rej) => { resolve = res; reject = rej; });
+    return {promise, resolve, reject};
+  }
+
+  it('успешные записи сохраняют нулевую оценку и дополнительные поля ответа', async () => {
+    mocks.authFetch.mockResolvedValue(json({records: [record, {
+      ...record, id: 'to-2', type: 'FUTURE_TYPE', status: 'FUTURE_STATUS', title: 'Запись нового типа', inspection: null,
+    }]}));
+    render(<EquipmentToTab equipmentId="eq-1" />);
+    expect(await screen.findByText('Осмотр установки')).toBeInTheDocument();
+    expect(screen.getByTitle('Оценка осмотра: 0/100')).toHaveTextContent('0');
+    expect(screen.getByText('FUTURE_TYPE')).toBeInTheDocument();
+    expect(screen.getByText('FUTURE_STATUS')).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('успешный пустой журнал показывает отсутствие записей', async () => {
+    mocks.authFetch.mockResolvedValue(json({records: []}));
+    render(<EquipmentToTab equipmentId="eq-1" />);
+    expect(await screen.findByText('Записей ТО по этой установке пока нет')).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it.each(['403', '500', 'network', 'bad-json', 'missing-records', 'records-object', 'null-record', 'bad-field', 'bad-date'] as const)(
+    'отказ %s показан ошибкой и повтор успешно читает журнал', async (failure) => {
+      if (failure === 'network') mocks.authFetch.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+      else if (failure === 'bad-json') mocks.authFetch.mockResolvedValueOnce(new Response('not json'));
+      else if (failure === '403' || failure === '500') mocks.authFetch.mockResolvedValueOnce(json({}, Number(failure)));
+      else mocks.authFetch.mockResolvedValueOnce(json(failure === 'missing-records' ? {}
+        : {records: failure === 'records-object' ? {} : failure === 'null-record' ? [null]
+          : failure === 'bad-date' ? [{...record, createdAt: 'не дата'}] : [{...record, title: {name: 'bad'}}]}));
+      mocks.authFetch.mockResolvedValueOnce(json({records: [record]}));
+      render(<EquipmentToTab equipmentId="eq-1" />);
+      expect(await screen.findByRole('alert')).toHaveTextContent(failure === '403' ? /прав/ : /Не удалось загрузить журнал ТО/);
+      expect(screen.queryByText('Записей ТО по этой установке пока нет')).toBeNull();
+      fireEvent.click(screen.getByRole('button', {name: 'Повторить'}));
+      expect(await screen.findByText('Осмотр установки')).toBeInTheDocument();
+      expect(screen.queryByRole('alert')).toBeNull();
+      expect(mocks.authFetch).toHaveBeenCalledTimes(2);
+    },
+  );
+
+  it.each(['success', 'failure'] as const)('поздний JSON %s старой установки не меняет новую', async (result) => {
+    const body = deferred<unknown>();
+    const response = json({});
+    const readBody = vi.spyOn(response, 'json').mockReturnValue(body.promise);
+    mocks.authFetch.mockResolvedValueOnce(response).mockResolvedValueOnce(json({records: [{...record, title: 'Новое ТО'}]}));
+    const {rerender} = render(<EquipmentToTab equipmentId="eq-1" />);
+    await waitFor(() => expect(readBody).toHaveBeenCalledTimes(1));
+    rerender(<EquipmentToTab equipmentId="eq-2" />);
+    await screen.findByText('Новое ТО');
+    await act(async () => {
+      if (result === 'success') body.resolve({records: [record]});
+      else body.reject(new TypeError('JSON старой установки'));
+    });
+    expect(screen.getByText('Новое ТО')).toBeInTheDocument();
+    expect(screen.queryByText('Осмотр установки')).toBeNull();
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('смена id показывает загрузку, а старые HTTP-ошибка и finally её не снимают', async () => {
+    const old = deferred<Response>();
+    const current = deferred<Response>();
+    mocks.authFetch.mockReturnValueOnce(old.promise).mockReturnValueOnce(current.promise);
+    const {rerender, container} = render(<EquipmentToTab equipmentId="eq-1" />);
+    rerender(<EquipmentToTab equipmentId="eq-2" />);
+    await act(async () => { old.resolve(json({}, 500)); });
+    expect(container.querySelector('.animate-spin')).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).toBeNull();
+    await act(async () => { current.resolve(json({records: []})); });
+    expect(screen.getByText('Записей ТО по этой установке пока нет')).toBeInTheDocument();
+  });
+
+  it('новый контекст скрывает записи прежней установки до ответа', async () => {
+    const current = deferred<Response>();
+    mocks.authFetch.mockResolvedValueOnce(json({records: [record]})).mockReturnValueOnce(current.promise);
+    const {rerender, container} = render(<EquipmentToTab equipmentId="eq-1" />);
+    await screen.findByText('Осмотр установки');
+    rerender(<EquipmentToTab equipmentId="eq-2" />);
+    expect(screen.queryByText('Осмотр установки')).toBeNull();
+    expect(container.querySelector('.animate-spin')).toBeInTheDocument();
+    await act(async () => { current.resolve(json({records: []})); });
+  });
+
+  it('после unmount не читает тело позднего ответа', async () => {
+    const request = deferred<Response>();
+    const response = json({records: [record]});
+    const readBody = vi.spyOn(response, 'json');
+    mocks.authFetch.mockReturnValueOnce(request.promise);
+    const {unmount} = render(<EquipmentToTab equipmentId="eq-1" />);
+    unmount();
+    await act(async () => { request.resolve(response); });
+    expect(readBody).not.toHaveBeenCalled();
+  });
+});
 
 function card(over: Partial<FleetCard> = {}): FleetCard {
   return {
