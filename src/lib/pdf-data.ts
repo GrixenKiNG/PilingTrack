@@ -8,6 +8,7 @@ type PeriodReportRecord = RawReportRow;
 
 interface SingleReportContextReport {
   reportId: string;
+  version?: number;
   userId: string;
   siteId: string;
   tenantId: string | null;
@@ -34,7 +35,7 @@ interface SingleReportContextReport {
 
 export interface SingleReportPdfContext {
   report: SingleReportContextReport;
-  pdfData: SingleReportData;
+  pdfData: SingleReportData & {version?: number};
 }
 
 async function getDbClient() {
@@ -204,12 +205,13 @@ function toSingleReportPdfData(
   report: SingleReportContextReport,
   fallbackCrew: unknown,
   companyName: string | undefined
-): SingleReportData {
+): SingleReportData & {version?: number} {
   const effectiveCrew = report.crew || fallbackCrew;
   const crewData = normalizeCrewData(effectiveCrew);
 
   return {
     reportId: report.reportId,
+    version: report.version,
     date: report.date,
     shiftStart: report.shiftStart,
     shiftEnd: report.shiftEnd,

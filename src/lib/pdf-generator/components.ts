@@ -1,7 +1,8 @@
 import { COLORS, CONTENT_WIDTH, PAGE } from './constants';
-import { formatNumber, formatRuDate, safeText, statusLabel } from './format';
+import { formatMeters, formatNumber, formatRuDate, safeText, shiftLabel, statusLabel } from './format';
 import { sumDowntime, sumDrilling, sumPiles } from './period-row';
 import { formatDowntimeHours } from '@/lib/downtime-hours';
+import { pileLengthMeters } from '@/lib/pile-length';
 import type { PdfDoc, PeriodReportRow } from './types';
 
 /** Метраж сваи неизвестен: у марки не задана длина (PileGrade.lengthMm = null). */
@@ -218,6 +219,8 @@ export function addReportBreakdown(doc: PdfDoc, report: PeriodReportRow, index: 
   const title = `${index}. ${formatRuDate(report.date || '')} | ${report.site?.name || 'Объект'} | ${report.user?.name || 'Оператор'} | ${statusLabel(report.status || '')}`;
   doc.font('Bold').fontSize(9.5).fillColor(COLORS.dark);
   doc.text(title, PAGE.left, doc.y, { width: CONTENT_WIDTH });
+  doc.font('Regular').fontSize(8.2);
+  doc.text(`Смена: ${shiftLabel(report.shiftType || '')} | Установка: ${report.equipmentName || '—'}`, PAGE.left, doc.y, { width: CONTENT_WIDTH });
   doc.moveDown(0.25);
   addTable(doc, ['Моточасы на конец', 'Топливо на конец'], [[
     report.endingEngineHours == null ? 'не указано' : `${report.endingEngineHours} м/ч`,
@@ -227,9 +230,13 @@ export function addReportBreakdown(doc: PdfDoc, report: PeriodReportRow, index: 
   if ((report.piles || []).length > 0) {
     addTable(
       doc,
-      ['Свайные работы', 'Кол-во, шт.'],
-      (report.piles || []).map((pile) => [pile.pileGrade?.name || '—', formatNumber(pile.count || 0)]),
-      [0.72, 0.28],
+      ['Свайные работы', 'Кол-во, шт.', 'Всего м.п.'],
+      (report.piles || []).map((pile) => {
+        const length = pileLengthMeters({gradeLengthMm: pile.pileGrade?.lengthMm});
+        return [pile.pileGrade?.name || '—', formatNumber(pile.count || 0),
+          length > 0 ? formatMeters((pile.count || 0) * length) : PILE_LENGTH_UNKNOWN_LABEL];
+      }),
+      [0.46, 0.2, 0.34],
       true
     );
   }
@@ -252,6 +259,14 @@ export function addReportBreakdown(doc: PdfDoc, report: PeriodReportRow, index: 
       [0.72, 0.28],
       true
     );
+    for (const downtime of report.downtimes || []) {
+      if (!downtime.comment) continue;
+      const comment = `${downtime.reason?.name || 'Простой'}: ${downtime.comment}`;
+      doc.font('Regular').fontSize(8.2).fillColor(COLORS.text);
+      ensureSpace(doc, doc.heightOfString(comment, {width: CONTENT_WIDTH}) + 8);
+      doc.text(comment, PAGE.left, doc.y, {width: CONTENT_WIDTH});
+      doc.moveDown(0.25);
+    }
   }
 
   doc.y += 8;
