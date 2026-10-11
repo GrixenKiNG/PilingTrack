@@ -234,7 +234,7 @@ describe('EquipmentDetail — актуальность загрузки (F-N1005
     let refresh!: () => void | Promise<void>;
     const child = vi.spyOn(documentsModule, 'EquipmentDocuments').mockImplementation((props) => {
       refresh = props.onChanged;
-      return null;
+      return <></>;
     });
     try {
       mocks.authFetch.mockResolvedValueOnce(json(detailsResponse('eq-1', 'Исходная установка')))
@@ -275,7 +275,7 @@ describe('EquipmentDetail — актуальность загрузки (F-N1005
     let refresh!: () => void | Promise<void>;
     const child = vi.spyOn(documentsModule, 'EquipmentDocuments').mockImplementation((props) => {
       refresh = props.onChanged;
-      return null;
+      return <></>;
     });
     try {
       mocks.authFetch.mockResolvedValueOnce(json(detailsResponse('eq-1', 'Старая установка')))
