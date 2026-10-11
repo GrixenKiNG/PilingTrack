@@ -1,4 +1,5 @@
 import { db } from '@/lib/db';
+import { enqueueCriticalDefects } from '@/core/notifications/durable-alert';
 // eslint-disable-next-line no-restricted-imports -- W117: shared best-effort audit after the committed mutation; no audit module facade exists
 import { recordAuditEvent } from '@/services/audit/audit-service';
 import type { Prisma } from '@/generated/postgres-client/client';
@@ -496,6 +497,10 @@ export async function completeInspectionWithOutcome(
           }],
         });
       }
+      await enqueueCriticalDefects(tx, {
+        tenantId: ctx.tenantId, aggregateId: id, equipmentId: ins.equipmentId,
+        reportedBy: ins.performedById, defects: toCreate,
+      });
     }
     // Осмотр — четверть балла готовности и условие запуска смены, поэтому его
     // завершение обязано пересчитать снимок. Раньше снимок заказывали только

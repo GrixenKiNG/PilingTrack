@@ -4,7 +4,7 @@ const m = vi.hoisted(() => ({
   insCreate: vi.fn(), insFindUnique: vi.fn(), insUpdate: vi.fn(),
   insUpdateMany: vi.fn(), insFindUniqueOrThrow: vi.fn(),
   ansDeleteMany: vi.fn(), ansCreateMany: vi.fn(),
-  recCreate: vi.fn(), recUpdateMany: vi.fn(), outboxCreate: vi.fn(),
+  recCreate: vi.fn(), recUpdateMany: vi.fn(), outboxCreate: vi.fn(), outboxAlertCreate: vi.fn(),
   crewFindFirst: vi.fn(),
   defectFindMany: vi.fn(), defectCreate: vi.fn(),
   // Снимки к пунктам осмотра считаются по Media, а не по числу из запроса.
@@ -29,7 +29,7 @@ vi.mock('@/lib/db', () => {
     maintenanceRecord: { create: m.recCreate, updateMany: m.recUpdateMany },
     equipmentDefect: { findMany: m.defectFindMany, create: m.defectCreate },
     crew: { findFirst: m.crewFindFirst },
-    outboxEvent: { createMany: m.outboxCreate },
+    outboxEvent: { createMany: m.outboxCreate, create: m.outboxAlertCreate },
     media: { groupBy: m.mediaGroupBy },
     $executeRaw: m.executeRaw,
     $queryRaw: m.queryRaw,
@@ -41,6 +41,7 @@ vi.mock('@/lib/db', () => {
   return { db: client };
 });
 import { startInspection, startToInspection, saveAnswers, completeInspectionWithOutcome } from '../inspection-commands';
+import { inspectionDefectKey } from '../../../domain/defect-rules';
 
 /** SQL тегированного шаблона с `?` вместо параметров — для проверки формы запроса. */
 const sqlOf = (call: unknown[]): string => (call[0] as TemplateStringsArray).join('?');
@@ -246,6 +247,37 @@ describe('saveAnswers', () => {
 });
 
 describe('completeInspection', () => {
+  it.each(['HIGH', 'CRITICAL', 'NORMAL'])('queues only new dangerous %s defects in the completion transaction', async (severity) => {
+    m.insFindUnique.mockResolvedValue({
+      id: 'ins1', tenantId: 'orion', status: 'DRAFT', equipmentId: 'eq1', performedById: 'u1',
+      templateSnapshot: [{ id: 'i1', text: 'Течь гидравлики', answerType: 'YES_NO', required: true,
+        photoRequired: false, createsDefect: true, defectSeverity: severity }],
+      answers: [{ itemId: 'i1', result: 'NO', photoCount: 0 }],
+    });
+    m.insFindUniqueOrThrow.mockResolvedValue({ id: 'ins1', status: 'COMPLETED' });
+    m.defectCreate.mockResolvedValue({ id: 'd1' });
+    await completeInspectionWithOutcome('ins1', { tenantId: 'orion', signedByName: 'Иванов' });
+    expect(m.transaction).toHaveBeenCalledTimes(1);
+    if (severity === 'NORMAL') {
+      expect(m.outboxAlertCreate).not.toHaveBeenCalled();
+    } else {
+      expect(m.outboxAlertCreate).toHaveBeenCalledTimes(1);
+      expect(m.outboxAlertCreate).toHaveBeenCalledWith({ data: expect.objectContaining({
+        type: 'NotificationDeliveryRequested', tenantId: 'orion', aggregateId: 'ins1',
+        payload: expect.objectContaining({ severity: severity.toLowerCase(), ruleId: 'criticalDefect' }),
+      }) });
+    }
+    m.outboxAlertCreate.mockClear();
+    m.defectCreate.mockClear();
+    m.defectFindMany.mockResolvedValue([{ sourceKey: inspectionDefectKey('eq1', 'i1') }]);
+    await completeInspectionWithOutcome('ins1', { tenantId: 'orion', signedByName: 'Иванов' });
+    expect(m.defectCreate).not.toHaveBeenCalled();
+    expect(m.outboxAlertCreate).not.toHaveBeenCalled();
+    m.insUpdateMany.mockResolvedValue({ count: 0 });
+    await completeInspectionWithOutcome('ins1', { tenantId: 'orion', signedByName: 'Иванов' });
+    expect(m.defectCreate).not.toHaveBeenCalled();
+    expect(m.outboxAlertCreate).not.toHaveBeenCalled();
+  });
   it('rejects when required items unanswered (no status change)', async () => {
     m.insFindUnique.mockResolvedValue({
       id: 'ins1', tenantId: 'orion', status: 'DRAFT',
