@@ -57,6 +57,14 @@ import {
   listEquipmentCatalog,
 } from '../equipment-query.service';
 
+describe('A4 — порядок техники при одинаковых названиях', () => {
+  it('добавляет уникальный порядок для курсора', async () => {
+    findManyMock.mockResolvedValue([]);
+    await listAllEquipment('orion');
+    expect(findManyMock.mock.lastCall?.[0].orderBy).toEqual([{ name: 'asc' }, { id: 'asc' }]);
+  });
+});
+
 describe('listAllEquipment — operator scope', () => {
   beforeEach(() => {
     findManyMock.mockReset();

@@ -27,6 +27,24 @@ vi.mock('sonner', () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 
 import { useCrewsData } from '../use-crews-data';
 
+describe('A4 — полные данные бригад и формы', () => {
+  it('добирает бригады, работников и технику до последней страницы', async () => {
+    authFetchMock.mockImplementation(async (url: string) => {
+      if (url === '/api/sites/all') return json({ sites: [] });
+      const parsed = new URL(url, 'http://localhost');
+      const key = parsed.pathname === '/api/users' ? 'users' : parsed.pathname === '/api/equipment' ? 'equipment' : 'crews';
+      const page = parsed.searchParams.has('cursor') ? 2 : 1;
+      return json({ [key]: [{ id: `${key}${page}` }], nextCursor: page === 1 ? `${key}1` : null });
+    });
+    const { result } = renderHook(() => useCrewsData());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    await act(async () => { await result.current.loadReferenceData(); });
+    expect(result.current.crews.map((item) => item.id)).toEqual(['crews1', 'crews2']);
+    expect(result.current.users.map((item) => item.id)).toEqual(['users1', 'users2']);
+    expect(result.current.equipmentList.map((item) => item.id)).toEqual(['equipment1', 'equipment2']);
+  });
+});
+
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
 

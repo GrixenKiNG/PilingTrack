@@ -65,6 +65,14 @@ import {
   updateUser,
 } from '../user-service';
 
+describe('A4 — порядок пользователей при одинаковых именах', () => {
+  it('добавляет уникальный порядок для курсора', async () => {
+    findManyUserMock.mockResolvedValue([]);
+    await listUsers('tenant-a', null);
+    expect(findManyUserMock.mock.lastCall?.[0].orderBy).toEqual([{ name: 'asc' }, { id: 'asc' }]);
+  });
+});
+
 const existingUser = {
   id: 'user-b',
   email: 'user-b@example.com',

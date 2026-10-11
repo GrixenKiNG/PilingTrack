@@ -76,7 +76,7 @@ export async function listUsers(
         select: { updatedAt: true },
       },
     },
-    orderBy: { name: 'asc' },
+    orderBy: [{ name: 'asc' }, { id: 'asc' }],
     cursor: cursor ? { id: cursor } : undefined,
     take: take + 1,
     skip: cursor ? 1 : 0,

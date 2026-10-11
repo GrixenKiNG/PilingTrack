@@ -9,6 +9,14 @@ vi.mock('@/services/auth/resource-access-service', () => ({
 
 import { getAccessibleSites, getSiteWithHierarchy, listAllSitesForAdmin } from '../site-query.service';
 
+describe('A4 — порядок объектов при одинаковых названиях', () => {
+  it.each(['ADMIN', 'OPERATOR'])('стабильный курсор для %s', async (role) => {
+    findMany.mockResolvedValue([]);
+    await getAccessibleSites({ id: 'a', role }, 'tenant-a');
+    expect(findMany.mock.lastCall?.[0].orderBy).toEqual([{ name: 'asc' }, { id: 'asc' }]);
+  });
+});
+
 describe('tenant-scoped site queries', () => {
   beforeEach(() => findMany.mockReset().mockResolvedValue([]));
 

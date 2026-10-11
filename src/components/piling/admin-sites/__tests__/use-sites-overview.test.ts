@@ -4,13 +4,37 @@
  * Проверяем, что причина разбирается и текст — понятный русский.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { renderHook, waitFor } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 
 const { authFetchMock } = vi.hoisted(() => ({ authFetchMock: vi.fn() }));
 
-vi.mock('@/lib/api', () => ({ authFetch: authFetchMock }));
+vi.mock('@/lib/api', () => ({
+  authFetch: authFetchMock,
+  loadJson: async (url: string, options?: RequestInit) => {
+    const res = await authFetchMock(url, options);
+    if (!res.ok) throw new Error(`load failed ${res.status}`);
+    return res.json();
+  },
+  isAbort: (cause: unknown) => cause instanceof Error && cause.name === 'AbortError',
+  loadErrorMessage: () => 'Не удалось загрузить данные',
+}));
 
 import { useSitesOverview } from '../use-sites-overview';
+import { useSitesData } from '../use-sites-data';
+
+describe('A4 — все работники в форме назначения', () => {
+  it('добирает работников после первой страницы', async () => {
+    authFetchMock.mockImplementation(async (url: string) => {
+      if (url === '/api/sites/all') return jsonResponse(200, { sites: [] });
+      if (url === '/api/users') return jsonResponse(200, { users: [{ id: 'u1' }], nextCursor: 'u1' });
+      return jsonResponse(200, { users: [{ id: 'u2' }], nextCursor: null });
+    });
+    const { result } = renderHook(() => useSitesData());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    await act(async () => { await result.current.loadUsers(); });
+    expect(result.current.users.map((user) => user.id)).toEqual(['u1', 'u2']);
+  });
+});
 
 function jsonResponse(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {

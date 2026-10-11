@@ -6,7 +6,34 @@
 
 import { describe, it, expect, vi } from 'vitest';
 import { paginateQuery, buildPaginationResponse } from '@/lib/pagination';
-import { parseCursorPagination } from '@/lib/pagination-cursor';
+import { parseCursorPagination, loadAllPages } from '@/lib/pagination-cursor';
+
+describe('A4 — complete cursor lists', () => {
+  it('keeps filters and encodes the cursor across both response shapes', async () => {
+    const load = vi.fn().mockResolvedValueOnce({ users: ['first'], nextCursor: 'u/ +?' })
+      .mockResolvedValueOnce({ data: ['second'], nextCursor: null });
+    expect(await loadAllPages('/api/users?role=OPERATOR', 'users', load)).toEqual(['first', 'second']);
+    const next = new URL(load.mock.calls[1][0], 'http://localhost');
+    expect(next.searchParams.get('role')).toBe('OPERATOR');
+    expect(next.searchParams.get('cursor')).toBe('u/ +?');
+  });
+
+  it('stops a repeated cursor instead of requesting forever', async () => {
+    const load = vi.fn().mockResolvedValue({ users: [], nextCursor: 'same' });
+    await expect(loadAllPages('/api/users', 'users', load)).rejects.toThrow('следующую страницу');
+    expect(load).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not request another page after cancellation', async () => {
+    const controller = new AbortController();
+    const load = vi.fn().mockImplementation(async () => {
+      controller.abort();
+      return { users: ['first'], nextCursor: 'next' };
+    });
+    await expect(loadAllPages('/api/users', 'users', load, controller.signal)).rejects.toThrow();
+    expect(load).toHaveBeenCalledTimes(1);
+  });
+});
 
 describe('parseCursorPagination — untrusted query limit', () => {
   it.each([

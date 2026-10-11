@@ -531,7 +531,7 @@ export async function listAllEquipment(
       engineHoursTotal: true, nextMaintenanceAtHours: true, nextMaintenanceDate: true,
       crews: { where: { isActive: true }, select: { id: true } },
     },
-    orderBy: { name: 'asc' },
+    orderBy: [{ name: 'asc' }, { id: 'asc' }],
     cursor: cursor ? { id: cursor } : undefined,
     take: take + 1,
     skip: cursor ? 1 : 0,

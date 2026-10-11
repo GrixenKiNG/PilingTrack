@@ -63,7 +63,7 @@ export async function getAccessibleSites(
     return db.site.findMany({
       where: { tenantId, isActive: true },
       select: { id: true, name: true, plannedPiles: true, plannedDrilling: true },
-      orderBy: { name: 'asc' },
+      orderBy: [{ name: 'asc' }, { id: 'asc' }],
       cursor: cursor ? { id: cursor } : undefined,
       take: take + 1,
       skip: cursor ? 1 : 0,
@@ -75,7 +75,7 @@ export async function getAccessibleSites(
   return db.site.findMany({
     where: { tenantId, isActive: true, users: { some: { userId: targetUserId } } },
     select: { id: true, name: true, plannedPiles: true, plannedDrilling: true },
-    orderBy: { name: 'asc' },
+    orderBy: [{ name: 'asc' }, { id: 'asc' }],
     cursor: cursor ? { id: cursor } : undefined,
     take: take + 1,
     skip: cursor ? 1 : 0,
@@ -132,6 +132,6 @@ export async function listAllSitesForAdmin(tenantId: string, includeInactive = t
         },
       },
     },
-    orderBy: { name: 'asc' },
+    orderBy: [{ name: 'asc' }, { id: 'asc' }],
   });
 }
