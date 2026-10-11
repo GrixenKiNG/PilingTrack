@@ -67,6 +67,8 @@ export async function createMaintenance(
   if (!equipment) throw new ServiceError('Установка не найдена', 404);
 
   const status = input.status ?? 'PLANNED';
+  if (status === 'DONE') assertWorkDescribed(input.workDone);
+  if (status === 'CANCELLED') assertCancelExplained(input.cancelReason);
   const completedAt = toDate(input.completedAt) ?? (status === 'DONE' ? new Date() : null);
   const startedAt = toDate(input.startedAt) ?? (status === 'IN_PROGRESS' ? new Date() : null);
 
@@ -92,6 +94,7 @@ export async function createMaintenance(
         faultCause: input.faultCause?.trim() || null,
         workDone: input.workDone?.trim() ?? '',
         partsUsedText: input.partsUsedText?.trim() ?? '',
+        cancelReason: input.cancelReason?.trim() || null,
       },
     });
     await requestMaintenanceSnapshot(tx as typeof db, record, ctx.tenantId, 'created');
@@ -206,6 +209,10 @@ export async function updateMaintenance(
   if (existing.acceptedById) {
     throw new ServiceError('Запись уже принята, изменения недоступны', 409);
   }
+  if (input.status !== undefined && input.status !== existing.status &&
+      (existing.status === 'DONE' || existing.status === 'CANCELLED')) {
+    throw new ServiceError('Статус закрытого наряда нельзя изменить', 409);
+  }
 
   const data: Record<string, unknown> = {};
   if (input.type !== undefined) data.type = input.type;
@@ -292,6 +299,7 @@ export async function acceptMaintenance(
     throw new ServiceError('Запись ТО не найдена', 404);
   }
   if (existing.acceptedById) throw new ServiceError('Запись уже принята', 409);
+  if (existing.status === 'CANCELLED') throw new ServiceError('Отменённый наряд нельзя принять', 409);
   // Приёмка переводит наряд в DONE напрямую, минуя updateMaintenance, — без
   // этой проверки пустой наряд закрывался бы через приёмку в обход правила.
   assertWorkDescribed(existing.workDone);

@@ -247,6 +247,21 @@ describe('saveAnswers', () => {
 });
 
 describe('completeInspection', () => {
+  it.each(['CANCELLED', 'DONE', 'IN_PROGRESS'])('completes only open linked maintenance (%s)', async (initialStatus) => {
+    let status = initialStatus;
+    m.insFindUnique.mockResolvedValue({ id: 'ins1', tenantId: 'orion', status: 'DRAFT',
+      equipmentId: 'eq1', performedById: 'u1', maintenanceRecordId: 'rec1',
+      templateSnapshot: [], answers: [] });
+    m.insFindUniqueOrThrow.mockResolvedValue({ id: 'ins1', status: 'COMPLETED' });
+    m.recUpdateMany.mockImplementation(({ where, data }) => {
+      const matches = where.status.in ? where.status.in.includes(status) : status !== where.status.not;
+      if (matches) status = data.status;
+      return Promise.resolve({ count: matches ? 1 : 0 });
+    });
+    await completeInspectionWithOutcome('ins1', { tenantId: 'orion', signedByName: 'Иванов' });
+    expect(status).toBe(initialStatus === 'IN_PROGRESS' ? 'DONE' : initialStatus);
+    expect(m.recUpdateMany.mock.calls[0][0].where).toMatchObject({ id: 'rec1', tenantId: 'orion' });
+  });
   it.each(['HIGH', 'CRITICAL', 'NORMAL'])('queues only new dangerous %s defects in the completion transaction', async (severity) => {
     m.insFindUnique.mockResolvedValue({
       id: 'ins1', tenantId: 'orion', status: 'DRAFT', equipmentId: 'eq1', performedById: 'u1',

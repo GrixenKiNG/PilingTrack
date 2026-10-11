@@ -5,7 +5,7 @@ import { recordAuditEvent } from '@/services/audit/audit-service';
 import type { Prisma } from '@/generated/postgres-client/client';
 import { ServiceError } from '@/lib/service-error';
 import { recordMeterReadingInTx } from '@/modules/equipment';
-import { requestReadinessSnapshot } from '@/modules/readiness/server';
+import { OPEN_MAINTENANCE, requestReadinessSnapshot } from '@/modules/readiness/server';
 import { computeHealthScore, findMissing, type SnapItem, type AnswerLike } from '../../domain/inspection-logic';
 import { inspectionDefectKey, planDefectsFromInspection, type DefectRuleItem } from '../../domain/defect-rules';
 import {
@@ -433,7 +433,7 @@ export async function completeInspectionWithOutcome(
     // считала машину требующей внимания сразу после успешного осмотра.
     if (ins.maintenanceRecordId) {
       await tx.maintenanceRecord.updateMany({
-        where: { id: ins.maintenanceRecordId, tenantId: ctx.tenantId, status: { not: 'DONE' } },
+        where: { id: ins.maintenanceRecordId, tenantId: ctx.tenantId, status: { in: [...OPEN_MAINTENANCE] } },
         data: { status: 'DONE', completedAt: now, engineHoursAtService: ins.engineHours ?? undefined },
       });
     }

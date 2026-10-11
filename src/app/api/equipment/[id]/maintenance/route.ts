@@ -34,6 +34,7 @@ const createSchema = z.object({
   faultCause: z.string().max(2000).optional().nullable(),
   workDone: z.string().max(4000).optional().nullable(),
   partsUsedText: z.string().max(2000).optional().nullable(),
+  cancelReason: z.string().max(2000).optional().nullable(),
 });
 
 export const GET = withApi(

@@ -56,6 +56,15 @@ describe('POST /api/equipment/[id]/maintenance — след создания (F-
     recordAuditEventMock.mockResolvedValue(undefined);
   });
 
+  it('передаёт причину отмены из createSchema в доменную команду', async () => {
+    const res = await POST(createReq({ type: 'REPAIR', title: 'x', status: 'CANCELLED',
+      cancelReason: 'отменён заказчиком' }), params());
+    expect(res.status).toBe(201);
+    expect(createMaintenanceMock).toHaveBeenCalledWith('eq-1', expect.objectContaining({
+      status: 'CANCELLED', cancelReason: 'отменён заказчиком',
+    }), { tenantId: 'tenant-a', createdById: 'admin-1' });
+  });
+
   it('пишет maintenance.created с названием, видом и статусом наряда', async () => {
     const res = await POST(createReq({ type: 'REPAIR', title: 'Замена РВД' }), params());
 
