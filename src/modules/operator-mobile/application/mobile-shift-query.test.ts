@@ -25,6 +25,22 @@ const shift = {
 };
 const read = () => queryOperatorMobileState({tenantId: 't', operatorId: 'me', operatorName: 'Машинист', now});
 
+describe('AU164 — вывод разбора происшествия', () => {
+  it.each(['Заменили шланг. Работы разрешены.', null])('передаёт вывод %s без потери старых записей', async (reviewNote) => {
+    database.shift.findFirst.mockResolvedValue({...shift, starter: {id: 'me', role: 'OPERATOR'}});
+    database.safetyIncident.findMany.mockResolvedValue([{
+      id: 'inc-1', category: 'PEOPLE', severity: 'HIGH', state: 'REPORTED',
+      description: 'Происшествие на площадке', observedSigns: [], injured: false, stopRequired: false,
+      occurredAt: now, evidenceMediaIds: [], reviewedAt: now, reviewNote,
+    }]);
+    const result = await read();
+    expect(database.safetyIncident.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      select: expect.objectContaining({reviewNote: true}),
+    }));
+    expect(result.incidents[0]).toMatchObject({id: 'inc-1', reviewedAt: now.toISOString(), reviewNote});
+  });
+});
+
 beforeEach(() => {
   database.user.findFirst.mockResolvedValue({timezone: 'Europe/Moscow'});
   database.userDocumentType.findMany.mockResolvedValue([]);

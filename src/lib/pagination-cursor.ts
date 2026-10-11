@@ -69,3 +69,29 @@ export interface PaginatedResponse<T> {
   nextCursor: string | null;
   total?: number;
 }
+
+/** Полный список для форм: курсор ответа, а не размер страницы, определяет конец. */
+export async function loadAllPages<T>(
+  url: string,
+  collection: string,
+  loadPage: (url: string) => Promise<{ data?: T[]; nextCursor?: string | null; [key: string]: unknown }>,
+  signal?: AbortSignal,
+): Promise<T[]> {
+  const items: T[] = [];
+  const seen = new Set<string>();
+  let nextUrl = url;
+  for (;;) {
+    signal?.throwIfAborted();
+    const page = await loadPage(nextUrl);
+    const rows = page.data ?? page[collection] ?? [];
+    if (!Array.isArray(rows)) throw new Error('Не удалось прочитать список');
+    items.push(...rows as T[]);
+    if (!page.nextCursor) return items;
+    if (seen.has(page.nextCursor)) throw new Error('Не удалось загрузить следующую страницу');
+    seen.add(page.nextCursor);
+    const [pathname, search] = url.split('?');
+    const params = new URLSearchParams(search);
+    params.set('cursor', page.nextCursor);
+    nextUrl = `${pathname}?${params.toString()}`;
+  }
+}

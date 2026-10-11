@@ -138,7 +138,10 @@ export function IncidentsTab({state, busy, error, commandId, onReport}: {
                     </p>
                   ) : null}
                   {open ? null : (
-                    <p className="mt-2 text-2xs font-semibold text-success">Разобрано диспетчером</p>
+                    <>
+                      <p className="mt-2 text-2xs font-semibold text-success">Разобрано</p>
+                      {incident.reviewNote ? <p className="mt-1 whitespace-pre-wrap text-sm">{incident.reviewNote}</p> : null}
+                    </>
                   )}
                 </div>
               </div>

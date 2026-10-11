@@ -88,6 +88,8 @@ function rangeFor(mode: PeriodMode, from: string, to: string): { from: string; t
 }
 
 export function AdminDashboard() {
+  const canManageUsers = useAbility('users.manage');
+  const canManageDictionaries = useAbility('dictionary.manage');
   useDocumentTitle('Дашборд');
   const canReadMaintenance = useAbility('maintenance.manage');
   // Роль без `equipment.read` (мастер) на этом дашборде — не редкость: `/admin` —
@@ -463,7 +465,7 @@ export function AdminDashboard() {
             Система пока пустая. Заполните разделы по порядку — от справочников к бригадам.
           </p>
           <ol className="mt-2 grid gap-1 sm:grid-cols-2">
-            {ONBOARDING_STEPS.map((s, i) => (
+            {ONBOARDING_STEPS.filter(s => (s.href !== '/admin/users' || canManageUsers) && (s.href !== '/admin/dictionaries' || canManageDictionaries)).map((s, i) => (
               <li key={s.href}>
                 <button
                   type="button"

@@ -13,6 +13,7 @@
 import { useState } from 'react';
 import type { FleetCard } from '@/components/piling/admin-equipment/fleet-types';
 import { usePilingStore } from '@/lib/store';
+import { resolveEffectiveRole } from '@/lib/types';
 import { LayoutEditor } from '@/components/piling/layout-editor/layout-editor';
 import { EquipmentTileBlockContent } from './equipment-tile-block';
 import type { EquipmentTileBlock, EquipmentTileDataKey } from './equipment-tile-template';
@@ -42,7 +43,7 @@ export function EquipmentTileEditor({
   onClose?: () => void;
 }) {
   const [selectedCardId, setSelectedCardId] = useState(() => cards[0]?.id ?? '');
-  const isAdmin = usePilingStore((state) => state.currentUser?.role) === 'ADMIN';
+  const isAdmin = usePilingStore((state) => resolveEffectiveRole(state.currentUser?.role ?? '', state.actingAs)) === 'ADMIN';
   const selectedCard = cards.find((card) => card.id === selectedCardId) ?? cards[0] ?? null;
 
   if (!selectedCard) return null;

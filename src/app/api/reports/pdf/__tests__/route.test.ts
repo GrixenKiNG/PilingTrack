@@ -14,6 +14,7 @@ import { NextRequest } from 'next/server';
 const {
   requireAuthMock, assertCanMock, buildPeriodPdfDataMock, enqueuePdfGenerationMock,
   generatePeriodPdfMock, getPdfJobStatusMock, downloadPdfMock, rateLimiterCheckMock, pdfJobFromIdMock,
+  redisPingMock, redisDisconnectMock, queueAddMock,
 } = vi.hoisted(() => ({
   requireAuthMock: vi.fn(),
   assertCanMock: vi.fn(),
@@ -23,6 +24,7 @@ const {
   getPdfJobStatusMock: vi.fn(),
   downloadPdfMock: vi.fn(),
   pdfJobFromIdMock: vi.fn(),
+  redisPingMock: vi.fn(), redisDisconnectMock: vi.fn(), queueAddMock: vi.fn(),
   // По умолчанию запрос разрешён: POST/статус-ветки ходят в тот же лимитер.
   rateLimiterCheckMock: vi.fn(async (_key: string, _config: { maxAttempts: number }) => ({
     allowed: true,
@@ -40,9 +42,9 @@ vi.mock('@/lib/pdf-queue', () => ({
 }));
 vi.mock('@/lib/pdf-generator', () => ({ generatePeriodPdf: generatePeriodPdfMock }));
 vi.mock('bullmq', () => ({
-  Queue: class {}, QueueEvents: class {}, Job: { fromId: pdfJobFromIdMock },
+  Queue: class { add = queueAddMock; }, QueueEvents: class {}, Job: { fromId: pdfJobFromIdMock },
 }));
-vi.mock('ioredis', () => ({ Redis: class { on() { return this; } } }));
+vi.mock('ioredis', () => ({ Redis: class { ping = redisPingMock; disconnect = redisDisconnectMock; quit = vi.fn(); on() { return this; } } }));
 vi.mock('@/lib/logger', () => ({ logger: { error: vi.fn(), info: vi.fn(), warn: vi.fn() } }));
 vi.mock('@/services/feedback/feedback-event-service', () => ({ recordFeedbackEvent: vi.fn() }));
 vi.mock('@/lib/csrf-protection', () => ({ withCsrf: () => null }));
@@ -54,6 +56,27 @@ vi.mock('@/lib/rate-limiter', () => ({
 import { GET, POST } from '../route';
 
 const ADMIN = { id: 'user-1', name: 'Мастер', role: 'ADMIN', tenantId: 'tenant-a' };
+
+it('повторяет проверку Redis после временного отказа и закрывает пробные соединения', async () => {
+  vi.resetModules();
+  redisPingMock.mockReset().mockRejectedValueOnce(new Error('offline')).mockResolvedValue('PONG');
+  redisDisconnectMock.mockReset();
+  queueAddMock.mockReset().mockResolvedValue({ id: 'job-after-recovery' });
+  const now = vi.spyOn(Date, 'now').mockReturnValue(1_000);
+  try {
+    const queue = await vi.importActual<typeof import('@/lib/pdf-queue')>('@/lib/pdf-queue');
+    const data = { dateFrom: '2026-10-01', dateTo: '2026-10-01', siteId: '', type: 'period' as const, userId: 'user-1' };
+    expect(await queue.enqueuePdfGeneration(data)).toBeNull();
+    expect.soft(redisDisconnectMock).toHaveBeenCalledTimes(1);
+    expect(await queue.enqueuePdfGeneration(data)).toBeNull();
+    expect(redisPingMock).toHaveBeenCalledTimes(1);
+    now.mockReturnValue(31_001);
+    expect(await queue.enqueuePdfGeneration(data)).toBe('job-after-recovery');
+    expect(redisPingMock).toHaveBeenCalledTimes(2);
+    expect(redisDisconnectMock).toHaveBeenCalledTimes(2);
+    expect(queueAddMock).toHaveBeenCalledTimes(1);
+  } finally { now.mockRestore(); }
+});
 
 function postReq(body: unknown): NextRequest {
   return new NextRequest('http://localhost/api/reports/pdf', {

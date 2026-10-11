@@ -33,6 +33,27 @@ import {OperatorV10App} from '../operator-v10-app';
 
 const STAGES = ['PRESHIFT_INSPECTION', 'SITE_READY', 'EO_BEFORE', 'EO_AFTER'] as const;
 
+describe('AU164 — вывод разбора в v10', () => {
+  it.each(['Заменили шланг. <img src=x>', null])('показывает вывод %s и старый статус', async (reviewNote) => {
+    const state = makeState('WORK', ['PRESHIFT_INSPECTION', 'SITE_READY', 'EO_BEFORE']);
+    state.incidents = [{
+      id: 'inc-review', category: 'PEOPLE', severity: 'HIGH', state: 'REPORTED', description: 'Запись происшествия',
+      signs: [], injured: false, stopRequired: false, photos: 0,
+      occurredAt: '2026-09-28T08:15:00Z', reviewedAt: '2026-09-28T09:00:00Z', reviewNote,
+    } as OperatorMobileState['incidents'][number]];
+    api.fetchState.mockResolvedValue(state);
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
+      clearance: {cleared: true, blockers: [], documents: []}, briefings: {pending: [], overdue: []}, history: [],
+    }), {status: 200})));
+    const {container} = render(<OperatorV10App />);
+    await screen.findByRole('button', {name: 'Дальше: Работа: сваи, бурение, простой'});
+    fireEvent.click(screen.getByRole('button', {name: 'ТБ'}));
+    fireEvent.click(await screen.findByRole('button', {name: /Происшествия смены/}));
+    expect(container).toHaveTextContent(reviewNote ?? 'Разобрано');
+    expect(container.querySelector('img[src="x"]')).toBeNull();
+  });
+});
+
 function checklist(stage: string, done: boolean) {
   return {
     stage, title: {PRESHIFT_INSPECTION: 'Предсменный осмотр', SITE_READY: 'Готовность площадки',

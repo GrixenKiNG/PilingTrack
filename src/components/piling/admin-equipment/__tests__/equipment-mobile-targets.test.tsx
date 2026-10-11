@@ -24,6 +24,21 @@ import { EquipmentFilters, EMPTY_FILTERS } from '../equipment-filters';
 import { EquipmentTable } from '../equipment-table';
 import { EquipmentForm, EMPTY_EQUIPMENT_FORM } from '../equipment-form';
 import { useEquipmentList } from '../use-equipment-list';
+
+describe('A4 — полные списки техники и бригад', () => {
+  it('добирает страницы и учитывает бригаду со второй страницы', async () => {
+    mocks.authFetch.mockImplementation(async (url: string) => {
+      if (url === '/api/equipment') return json({ equipment: [{ id: 'eq1' }], nextCursor: 'eq1' });
+      if (url === '/api/equipment?cursor=eq1') return json({ equipment: [{ id: 'eq2' }], nextCursor: null });
+      if (url === '/api/crews') return json({ data: [{ id: 'c1', equipmentId: 'eq1', isActive: true }], nextCursor: 'c1' });
+      return json({ data: [{ id: 'c2', equipmentId: 'eq2', isActive: true }], nextCursor: null });
+    });
+    const { result } = renderHook(() => useEquipmentList());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.equipment.map((item) => item.id)).toEqual(['eq1', 'eq2']);
+    expect(result.current.crewsByEquipment).toEqual({ eq1: 1, eq2: 1 });
+  });
+});
 import { DEFAULT_EQUIPMENT_CARD_TEMPLATE } from '../equipment-card-template';
 import { HistoryTable, Section, type TimelineRow } from '../detail/equipment-detail-parts';
 import { EquipmentPhotos } from '../detail/equipment-photos';

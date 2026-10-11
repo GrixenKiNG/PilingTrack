@@ -2,12 +2,13 @@
 
 import Link from 'next/link';
 import { toast } from 'sonner';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ElementType } from 'react';
 import { PilingIcon, type PilingIconName } from '@/components/piling/icons';
 import { AlertTriangle, CheckCircle2, ChevronRight, Search } from '@/components/piling/icons/unified-icons';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { authFetch } from '@/lib/api';
+import { useAbility } from '@/lib/use-ability';
 import { formatNumber } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { HAMMER_LABEL, type EquipmentOption } from '../../to-module-bits';
@@ -55,6 +56,7 @@ const CATEGORY_HREF: Record<CategoryKey, string> = {
 };
 
 export function DictionariesSettings({ equipment, bootstrap, onExport }: DictionariesSettingsProps) {
+  const canManageDictionaries = useAbility('dictionary.manage');
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState<'ALL' | 'ACTIVE' | 'ARCHIVED'>('ALL');
   const [dictionaries, setDictionaries] = useState<{ pileGrades: DictionaryEntry[]; drillingTypes: DictionaryEntry[]; downtimeReasons: DictionaryEntry[] } | null>(null);
@@ -129,7 +131,7 @@ export function DictionariesSettings({ equipment, bootstrap, onExport }: Diction
       <ScreenTitle
         heading="Справочники"
         subtitle="Единые нормативные данные для техники, объектов и отчётности"
-        actions={<Button asChild className="bg-signal-strong hover:bg-signal-strong"><Link href="/admin/dictionaries">Открыть все справочники</Link></Button>}
+        actions={canManageDictionaries && <Button asChild className="bg-signal-strong hover:bg-signal-strong"><Link href="/admin/dictionaries">Открыть все справочники</Link></Button>}
       />
       <SettingsKpis items={[
         { icon: 'documents', label: 'Справочников', value: filledCategories },
@@ -207,10 +209,12 @@ export function DictionariesSettings({ equipment, bootstrap, onExport }: Diction
         <aside className={cn(card, 'overflow-hidden')}>
           <div className="border-b border-border p-4"><h2 className="font-bold">Категории справочников</h2></div>
           <div className="divide-y divide-border">
-            {(Object.keys(CATEGORY_LABEL) as CategoryKey[]).map((key) => (
-              <Link
+            {(Object.keys(CATEGORY_LABEL) as CategoryKey[]).map((key) => {
+              const canOpen = !CATEGORY_HREF[key].startsWith('/admin/dictionaries') || canManageDictionaries;
+              const CategoryRow = (canOpen ? Link : 'div') as ElementType;
+              return <CategoryRow
                 key={key}
-                href={CATEGORY_HREF[key]}
+                href={canOpen ? CATEGORY_HREF[key] : undefined}
                 className={cn(
                   'flex min-h-11 items-center gap-2 border-l-2 px-4 py-2 text-xs hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-signal',
                   key === 'equipment' ? 'border-signal bg-signal/10 font-semibold text-signal-strong' : 'border-transparent',
@@ -223,8 +227,8 @@ export function DictionariesSettings({ equipment, bootstrap, onExport }: Diction
                   {archivedCounts[key] ? <span className="text-3xs text-muted-foreground">в архиве: {archivedCounts[key]}</span> : null}
                 </span>
                 <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
-              </Link>
-            ))}
+              </CategoryRow>;
+            })}
           </div>
         </aside>
       </div>

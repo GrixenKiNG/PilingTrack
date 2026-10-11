@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useAbility } from '@/lib/use-ability';
 import { useState } from 'react';
 import {
   AlertTriangle,
@@ -521,6 +522,8 @@ export function ReadinessReportsView({
 }
 
 export function ReadinessSettingsView() {
+  const canManageUsers = useAbility('users.manage');
+  const canManageDictionaries = useAbility('dictionary.manage');
   const rules = [
     ['Осмотр текущей смены', 'Обязательное подтверждение', 'Блокирует'],
     ['Показание моточасов', 'Актуальная наработка', 'Блокирует'],
@@ -543,7 +546,7 @@ export function ReadinessSettingsView() {
         <aside className="rounded-xl border border-border bg-card p-3 shadow-sm">
           <h3 className="px-2 text-xs font-bold uppercase tracking-wide text-muted-foreground">Разделы</h3>
           <nav className="mt-2 space-y-1">
-            {links.map(([href, label, Icon], index) => (
+            {links.filter(([href]) => (href !== '/admin/users' || canManageUsers) && (href !== '/admin/dictionaries' || canManageDictionaries)).map(([href, label, Icon], index) => (
               <Link key={href} href={href} className={cn('flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-semibold', index === 0 ? 'bg-signal/10 text-signal-strong' : 'text-muted-foreground hover:bg-muted')}>
                 <Icon className="h-4 w-4" />{label}
               </Link>

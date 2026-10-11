@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { authFetch, isAbort, loadErrorMessage, loadJson } from '@/lib/api';
+import { loadAllPages } from '@/lib/pagination-cursor';
 import type { PileGradeDTO } from '@/lib/types';
 import type { SiteListItem } from './types';
 
@@ -75,11 +76,13 @@ export function useSitesData() {
 
     setLoadingUsers(true);
 
-    const promise = authFetch('/api/users')
-      .then(async (res) => {
-        if (!res.ok) throw new Error('Failed to load users');
-        const data = await res.json();
-        setUsers(data.data || data.users || []);
+    const promise = loadAllPages<AdminSitesUser>('/api/users', 'users', async (url) => {
+      const res = await authFetch(url);
+      if (!res.ok) throw new Error('Failed to load users');
+      return res.json();
+    })
+      .then((data) => {
+        setUsers(data);
         usersLoadedRef.current = true;
       })
       .catch(() => {

@@ -19,6 +19,14 @@ vi.mock('@/lib/db', () => ({
   get db() { return mockDb; },
 }));
 
+describe('A4 — порядок бригад при одинаковых названиях', () => {
+  it('добавляет уникальный порядок для курсора', async () => {
+    mockDb.crew.findMany.mockResolvedValue([]);
+    await getAccessibleCrews('orion');
+    expect(mockDb.crew.findMany.mock.lastCall?.[0].orderBy).toEqual([{ name: 'asc' }, { id: 'asc' }]);
+  });
+});
+
 describe('getAccessibleCrews', () => {
   beforeEach(() => {
     vi.clearAllMocks();

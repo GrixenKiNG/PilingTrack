@@ -481,6 +481,7 @@ export function IncidentsScreen({incidents}: {incidents: IncidentView[]}) {
               INCIDENT_CATEGORY_LABELS[incident.category] ?? incident.category,
               formatRuDate(incident.occurredAt),
               incident.photos > 0 ? `фото: ${incident.photos}` : null,
+              incident.reviewedAt && incident.reviewNote ? `Вывод разбора: ${incident.reviewNote}` : null,
             ].filter(Boolean).join(' · ')}
             chip={(
               <Chip tone={incident.injured || incident.stopRequired ? 'bad' : 'warn'}>

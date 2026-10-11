@@ -35,24 +35,30 @@ export const RESULTS_TTL = 60 * 60; // 1 hour (seconds, for Redis key expiry)
 
 let redisConnection: Redis | null = null;
 let redisAvailable: boolean | null = null;
+let redisCheckedAt = 0;
+const REDIS_UNAVAILABLE_TTL_MS = 30_000;
 
 async function checkRedisAvailability(): Promise<boolean> {
-  if (redisAvailable !== null) return redisAvailable;
+  if (redisAvailable === true) return true;
+  if (redisAvailable === false && Date.now() - redisCheckedAt < REDIS_UNAVAILABLE_TTL_MS) return false;
 
+  let testConn: Redis | undefined;
   try {
-    const testConn = new Redis(REDIS_URL, {
+    testConn = new Redis(REDIS_URL, {
       protocol: 2,
       maxRetriesPerRequest: 1,
       connectTimeout: 2000,
       lazyConnect: false,
     });
     await testConn.ping();
-    await testConn.quit();
     redisAvailable = true;
     return true;
   } catch {
     redisAvailable = false;
     return false;
+  } finally {
+    redisCheckedAt = Date.now();
+    testConn?.disconnect();
   }
 }
 
@@ -67,6 +73,7 @@ function createRedisConnection(): Redis {
 
     redisConnection.on('error', () => {
       redisAvailable = false;
+      redisCheckedAt = Date.now();
     });
     redisConnection.on('ready', () => {
       redisAvailable = true;

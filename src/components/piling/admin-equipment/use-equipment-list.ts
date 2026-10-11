@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { authFetch } from '@/lib/api';
+import { loadAllPages } from '@/lib/pagination-cursor';
 import { extractApiError } from '@/components/piling/admin-crews/crew-messages';
 import type { EquipmentDTO } from '@/lib/types';
 import { withoutUnchangedHours } from './equipment-form';
@@ -25,27 +26,23 @@ export function useEquipmentList() {
     (async () => {
       setLoading(true);
       try {
-        const [equipRes, crewsRes] = await Promise.all([
-          authFetch('/api/equipment', { signal: abort.signal }),
-          authFetch('/api/crews', { signal: abort.signal }),
+        const loadPage = async (url: string) => {
+          const res = await authFetch(url, { signal: abort.signal });
+          if (!res.ok) throw new Error('Не удалось загрузить данные');
+          return res.json();
+        };
+        const [equipmentRows, crews] = await Promise.all([
+          loadAllPages<EquipmentDTO>('/api/equipment', 'equipment', loadPage, abort.signal),
+          loadAllPages<{ equipmentId: string; isActive: boolean }>('/api/crews', 'crews', loadPage, abort.signal),
         ]);
         if (!mounted) return;
 
-        if (equipRes.ok) {
-          const data = await equipRes.json();
-          setEquipment(data.data || data.equipment || []);
-        }
-        if (crewsRes.ok) {
-          const data = await crewsRes.json();
-          const crews = data.data || data.crews || [];
-          const counts: Record<string, number> = {};
-          crews.forEach((c: { equipmentId: string; isActive: boolean }) => {
-            if (c.isActive) {
-              counts[c.equipmentId] = (counts[c.equipmentId] || 0) + 1;
-            }
-          });
-          setCrewsByEquipment(counts);
-        }
+        setEquipment(equipmentRows);
+        const counts: Record<string, number> = {};
+        crews.forEach((c) => {
+          if (c.isActive) counts[c.equipmentId] = (counts[c.equipmentId] || 0) + 1;
+        });
+        setCrewsByEquipment(counts);
       } catch (error: unknown) {
         if (mounted && !(error instanceof Error && error.name === 'AbortError')) {
           toast.error('Ошибка загрузки данных');

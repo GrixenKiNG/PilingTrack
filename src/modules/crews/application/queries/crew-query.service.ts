@@ -24,7 +24,7 @@ export async function getAccessibleCrews(tenantId: string, siteId?: string, pagi
       site: { select: { id: true, name: true } },
       assistants: { select: { id: true, name: true, userId: true } },
     },
-    orderBy: { name: 'asc' },
+    orderBy: [{ name: 'asc' }, { id: 'asc' }],
     cursor: cursor ? { id: cursor } : undefined,
     take: take + 1,
     skip: cursor ? 1 : 0,

@@ -83,6 +83,7 @@ export interface UseReportFormReturn {
 
 interface LoadedReportRow {
   reportId?: string;
+  shiftId?: string | null;
   version?: number;
   shiftStart?: string;
   shiftEnd?: string;
@@ -100,6 +101,10 @@ export function useReportForm(): UseReportFormReturn {
   // Pre-generate so the photo widget can attach a file before the report
   // is submitted; loadReport replaces this with the persisted id when editing.
   const [reportId, setReportId] = useState(() => crypto.randomUUID());
+  const [reportShiftId, setReportShiftId] = useState<string | null>(null);
+  const loadSequence = useRef(0);
+  const loadedReportIdentity = useRef<{ reportId: string; shiftId: string | null } | null>(null);
+  const conflictingDraftKey = useRef<string | null>(null);
   const [date, setDate] = useState('');
   const [shiftStart, setShiftStart] = useState('07:00');
   const [shiftEnd, setShiftEnd] = useState('19:00');
@@ -159,20 +164,26 @@ export function useReportForm(): UseReportFormReturn {
   // Load data
   const loadData = useCallback(async () => {
     if (!user) return;
+    const sequence = ++loadSequence.current;
+    loadedReportIdentity.current = null;
     let loaded = false;
     setLoading(true);
+    setLoadingReport(false);
     setLoadError(false);
     try {
       const [sitesRes, dictRes] = await Promise.all([
         authFetch(`/api/sites?userId=${user.id}`),
         authFetch('/api/dictionary/all'),
       ]);
+      if (sequence !== loadSequence.current) return;
       if (!sitesRes.ok || !dictRes.ok) {
         throw new Error(`load failed: sites=${sitesRes.status} dict=${dictRes.status}`);
       }
       const sitesData = await sitesRes.json();
+      if (sequence !== loadSequence.current) return;
       setSites(sitesData.data || sitesData.sites || []);
       const dictData = await dictRes.json();
+      if (sequence !== loadSequence.current) return;
       setPileGrades(dictData.pileGrades || []);
       setDrillingTypes(dictData.drillingTypes || []);
       setDowntimeReasons(dictData.downtimeReasons || []);
@@ -182,13 +193,16 @@ export function useReportForm(): UseReportFormReturn {
       // не совпадал с объектом бригады оператора.
       try {
         const eqRes = await authFetch('/api/equipment');
+        if (sequence !== loadSequence.current) return;
         if (eqRes.ok) {
           const data = await eqRes.json();
+          if (sequence !== loadSequence.current) return;
           setEquipment((data.data || data.equipment || []).map((e: { id: string; name: string }) => ({ id: e.id, name: e.name })));
         } else {
           toast.error('Не удалось загрузить список установок');
         }
       } catch {
+        if (sequence !== loadSequence.current) return;
         toast.error('Не удалось загрузить список установок');
       }
       // Load existing report
@@ -196,11 +210,16 @@ export function useReportForm(): UseReportFormReturn {
         setLoadingReport(true);
         try {
           const reportRes = await authFetch(`/api/reports/edit?userId=${user.id}&siteId=${selectedSiteId}&date=${date}`);
+          if (sequence !== loadSequence.current) return;
+          if (!reportRes.ok) throw new Error('report load failed');
           if (reportRes.ok) {
             const data = await reportRes.json();
+            if (sequence !== loadSequence.current) return;
             if (data.report) {
               const r = data.report as LoadedReportRow;
+              loadedReportIdentity.current = { reportId: r.reportId || '', shiftId: r.shiftId ?? null };
               setReportId(r.reportId || '');
+              setReportShiftId(r.shiftId ?? null);
               setBaseVersion(typeof r.version === 'number' ? r.version : undefined);
               if (r.shiftStart) setShiftStart(r.shiftStart);
               if (r.shiftEnd) setShiftEnd(r.shiftEnd);
@@ -217,15 +236,18 @@ export function useReportForm(): UseReportFormReturn {
               }
             }
           }
-        } finally { setLoadingReport(false); }
+        } finally { if (sequence === loadSequence.current) setLoadingReport(false); }
       }
       loaded = true;
     } catch {
+      if (sequence !== loadSequence.current) return;
       setLoadError(true);
       toast.error('Не удалось загрузить данные формы');
     } finally {
-      setLoadedDraftKey(loaded ? `report-draft-${user.id}-${selectedSiteId}-${date}` : '');
-      setLoading(false);
+      if (sequence === loadSequence.current) {
+        setLoadedDraftKey(loaded ? `report-draft-${user.id}-${selectedSiteId}-${date}` : '');
+        setLoading(false);
+      }
     }
   }, [user, selectedSiteId, date]);
 
@@ -240,6 +262,7 @@ export function useReportForm(): UseReportFormReturn {
     reportKeyRef.current = key;
      
     setReportId(crypto.randomUUID());
+    setReportShiftId(null);
     setBaseVersion(undefined);
     setPiles([]);
     setDrillings([]);
@@ -287,12 +310,14 @@ export function useReportForm(): UseReportFormReturn {
   // Preserve committed rows and values currently being typed. A field
   // operator should not lose work because the final "+" tap was missed.
   const draftSnapshotRef = useRef({
+    reportId, shiftId: reportShiftId, baseVersion,
     piles, drillings, downtimes, shiftStart, shiftEnd, selectedEquipmentId,
     selectedFieldId, selectedClusterId, selectedPicketId, engineHours,
     quickMode, showDowntime, temp: draftTempState,
   });
   useEffect(() => {
     draftSnapshotRef.current = {
+      reportId, shiftId: reportShiftId, baseVersion,
       piles, drillings, downtimes, shiftStart, shiftEnd, selectedEquipmentId,
       selectedFieldId, selectedClusterId, selectedPicketId, engineHours,
       quickMode, showDowntime, temp: draftTempState,
@@ -315,6 +340,7 @@ export function useReportForm(): UseReportFormReturn {
     const saveDraft = () => {
       clearTimers();
       if (draftSubmitted.current) return;
+      if (conflictingDraftKey.current === draftKey) return;
       const s = draftSnapshotRef.current;
       const hasTypedValues = Object.values(s.temp).some((value) => value.trim() !== '');
       const hasWork = s.piles.length > 0 || s.drillings.length > 0 || s.downtimes.length > 0
@@ -323,7 +349,7 @@ export function useReportForm(): UseReportFormReturn {
         || s.shiftStart !== '07:00' || s.shiftEnd !== '19:00' || s.showDowntime || !s.quickMode;
       if (!hasWork) return;
       const savedAt = new Date().toISOString();
-      localStorage.setItem(draftKey, JSON.stringify({ ...s, savedAt, schemaVersion: 2 }));
+      localStorage.setItem(draftKey, JSON.stringify({ ...s, savedAt, schemaVersion: 3 }));
       setDraftSavedAt(savedAt);
       return true;
     };
@@ -363,7 +389,7 @@ export function useReportForm(): UseReportFormReturn {
     draftTimers.current.maxWait ??= window.setTimeout(flush, 2_000);
     return () => { window.clearTimeout(draftTimers.current.debounce); };
   }, [
-    user, selectedSiteId, date, loading, loadedDraftKey, submittedAt, piles, drillings, downtimes,
+    user, selectedSiteId, date, loading, loadedDraftKey, submittedAt, reportId, reportShiftId, baseVersion, piles, drillings, downtimes,
     shiftStart, shiftEnd, selectedEquipmentId, selectedFieldId,
     selectedClusterId, selectedPicketId, engineHours, quickMode,
     showDowntime, draftTempState,
@@ -371,16 +397,28 @@ export function useReportForm(): UseReportFormReturn {
 
   // Restore draft
   useEffect(() => {
-    if (!user || !selectedSiteId || !date) return;
+    if (!user || !selectedSiteId || !date || loading) return;
     const draftKey = `report-draft-${user.id}-${selectedSiteId}-${date}`;
+    if (loadedDraftKey !== draftKey) return;
     const draftStr = localStorage.getItem(draftKey);
     if (!draftStr) return;
     try {
       const draft = JSON.parse(draftStr);
       const savedAt = new Date(draft.savedAt);
       if ((Date.now() - savedAt.getTime()) / (1000 * 60 * 60) > 24) { localStorage.removeItem(draftKey); return; }
+      const serverIdentity = loadedReportIdentity.current;
+      if (draft.schemaVersion !== 3 || typeof draft.reportId !== 'string' || !draft.reportId
+        || (serverIdentity && (draft.reportId !== serverIdentity.reportId || draft.shiftId !== serverIdentity.shiftId))) {
+        conflictingDraftKey.current = draftKey;
+        toast.error('Не удалось связать черновик с отчётом. Он сохранён на устройстве.');
+        return;
+      }
+      conflictingDraftKey.current = null;
       if (piles.length === 0 && drillings.length === 0 && downtimes.length === 0) {
         // eslint-disable-next-line react-hooks/set-state-in-effect -- syncs local state to the source prop/dependency when it changes
+        setReportId(draft.reportId);
+        setReportShiftId(typeof draft.shiftId === 'string' ? draft.shiftId : null);
+        setBaseVersion(typeof draft.baseVersion === 'number' ? draft.baseVersion : undefined);
         if (draft.piles?.length) setPiles(draft.piles);
         if (draft.drillings?.length) setDrillings(draft.drillings);
         if (draft.downtimes?.length) { setDowntimes(draft.downtimes); setShowDowntime(true); }
@@ -400,8 +438,8 @@ export function useReportForm(): UseReportFormReturn {
         toast.info('Восстановлен черновик', { description: `Сохранён ${savedAt.toLocaleString('ru-RU')}` });
       }
     } catch { localStorage.removeItem(draftKey); }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- restore runs once per (user, site, date); piles/drillings/downtimes are read only as an initial-empty guard and must not retrigger it
-  }, [user, selectedSiteId, date]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- restore follows the loaded key; rows are read only as an initial-empty guard and must not retrigger it
+  }, [user, selectedSiteId, date, loading, loadedDraftKey]);
 
   // Helpers
   const getPicketPath = (picketId: string): string => {
@@ -520,7 +558,8 @@ export function useReportForm(): UseReportFormReturn {
       pushClientFeedback({ level: 'success', scope: 'reports', action: 'report.submit.client_succeeded', title: 'Отчёт отправлен', message: 'Сменный отчёт был успешно сохранён.', requestId: result?.requestId || res.headers.get('x-request-id') });
       draftSubmitted.current = true;
       if (user && selectedSiteId && date) {
-        localStorage.removeItem(`report-draft-${user.id}-${selectedSiteId}-${date}`);
+        const draftKey = `report-draft-${user.id}-${selectedSiteId}-${date}`;
+        if (conflictingDraftKey.current !== draftKey) localStorage.removeItem(draftKey);
         setDraftSavedAt(null);
       }
       // Show the confirmation screen instead of redirecting silently; its

@@ -312,6 +312,10 @@ function autoSubmitted(meta: Meta): boolean {
  * уедет в общий default и в ленте появится машинный код.
  */
 const AUDIT_DESCRIPTIONS: Record<string, AuditDescription> = {
+  'incident.reported': {
+    level: (m) => m.stopRequired === true ? 'warn' : 'audit',
+    title: 'Происшествие заявлено', message: 'Сообщение о происшествии сохранено.',
+  },
   'incident.reviewed': {
     level: 'audit', title: 'Происшествие разобрано', message: 'Вывод разбора происшествия сохранён.',
   },

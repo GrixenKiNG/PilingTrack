@@ -52,6 +52,7 @@ beforeEach(() => {
 
 describe('W117 — понятные события в ленте владельца', () => {
   it.each([
+    ['incident.reported', 'Происшествие заявлено'],
     ['incident.reviewed', 'Происшествие разобрано'],
     ['inspection.template.created', 'Шаблон осмотра создан'],
     ['inspection.template.replaced', 'Шаблон осмотра заменён'],

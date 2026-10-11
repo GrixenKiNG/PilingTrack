@@ -82,6 +82,19 @@ describe('createMaintenance — work order fields', () => {
     createRecMock.mockResolvedValue({ id: 'rec_1', equipmentId: 'eq_1', updatedAt: new Date('2026-08-12T00:00:00Z') });
   });
 
+  it.each(['DONE', 'CANCELLED'] as const)('rejects creating %s without its completion details', async (status) => {
+    await expect(createMaintenance('eq_1', { type: 'REPAIR', title: 'x', status,
+      workDone: ' ', cancelReason: ' ' }, { tenantId: 'orion' })).rejects.toMatchObject({ status: 422 });
+    expect(createRecMock).not.toHaveBeenCalled();
+    expect(outboxCreateManyMock).not.toHaveBeenCalled();
+  });
+
+  it('persists the trimmed reason when creating a cancelled order', async () => {
+    await createMaintenance('eq_1', { type: 'REPAIR', title: 'x', status: 'CANCELLED',
+      cancelReason: '  отменён заказчиком  ' }, { tenantId: 'orion' });
+    expect(createRecMock.mock.calls[0][0].data.cancelReason).toBe('отменён заказчиком');
+  });
+
   it('checks equipment existence scoped by tenantId', async () => {
     await createMaintenance('eq_1', { type: 'REPAIR', title: 'Ремонт насоса' }, { tenantId: 'orion' });
     expect(findUniqueEquipmentMock.mock.calls[0][0].where).toEqual({ id: 'eq_1', tenantId: 'orion' });
@@ -139,6 +152,20 @@ describe('updateMaintenance — lifecycle transitions', () => {
     // workDone заполнен: закрытие пустого наряда запрещено отдельным правилом,
     // и наборы про startedAt/closedById не про него.
     findUniqueRecMock.mockResolvedValue({ id: 'rec_1', equipmentId: 'eq_1', completedAt: null, startedAt: null, tenantId: 'orion', status: 'PLANNED', workDone: 'заменили фильтр' });
+  });
+
+  it.each([
+    ['DONE', 'IN_PROGRESS'], ['DONE', 'CANCELLED'],
+    ['CANCELLED', 'DONE'], ['CANCELLED', 'PLANNED'],
+  ] as const)('rejects terminal transition %s → %s', async (status, nextStatus) => {
+    findUniqueRecMock.mockResolvedValue({ id: 'rec_1', equipmentId: 'eq_1', tenantId: 'orion',
+      status, acceptedById: null, workDone: 'ремонт выполнен', cancelReason: 'отмена' });
+    await expect(updateMaintenance('eq_1', 'rec_1', { status: nextStatus },
+      { tenantId: 'orion', userId: 'usr_9' })).rejects.toMatchObject({ status: 409 });
+    expect(updateRecMock).not.toHaveBeenCalled();
+    expect(updatePlanMock).not.toHaveBeenCalled();
+    expect(createReadingMock).not.toHaveBeenCalled();
+    expect(outboxCreateManyMock).not.toHaveBeenCalled();
   });
 
   it('sets startedAt when status moves to IN_PROGRESS', async () => {
@@ -220,6 +247,16 @@ describe('updateMaintenance — lifecycle transitions', () => {
 });
 
 describe('acceptMaintenance — приёмка', () => {
+  it('rejects accepting a cancelled order with otherwise complete work details', async () => {
+    findUniqueRecMock.mockResolvedValue({ id: 'rec_1', tenantId: 'orion', status: 'CANCELLED',
+      acceptedById: null, workDone: 'ремонт выполнен' });
+    await expect(acceptMaintenance('rec_1', { tenantId: 'orion', userId: 'admin_1' }))
+      .rejects.toMatchObject({ status: 409 });
+    expect(updateRecMock).not.toHaveBeenCalled();
+    expect(updatePlanMock).not.toHaveBeenCalled();
+    expect(createReadingMock).not.toHaveBeenCalled();
+    expect(outboxCreateManyMock).not.toHaveBeenCalled();
+  });
   beforeEach(() => {
     findUniqueRecMock.mockReset();
     updateRecMock.mockReset();

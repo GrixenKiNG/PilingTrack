@@ -13,6 +13,7 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 
 const mocks = vi.hoisted(() => ({
   authFetch: vi.fn(),
+  denyDirectoryLinks: false,
   // Плитки KPI рендерит PageLayoutRenderer по раскладке; по умолчанию её нет,
   // отдельные наборы включаются в тестах (F-R127 №2).
   layoutWidgets: [] as { id: string; visible: boolean; size: string; order: number }[],
@@ -20,7 +21,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('@/lib/api', () => ({ authFetch: mocks.authFetch }));
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }));
-vi.mock('@/lib/use-ability', () => ({ useAbility: () => true }));
+vi.mock('@/lib/use-ability', () => ({ useAbility: (ability: string) => !mocks.denyDirectoryLinks || !['users.manage', 'dictionary.manage'].includes(ability) }));
 vi.mock('@/components/piling/main-dashboard/dashboard-layout', () => ({
   useMainDashboardLayout: () => ({ template: { id: 'main-dashboard', version: 1, widgets: mocks.layoutWidgets } }),
 }));
@@ -31,6 +32,18 @@ vi.mock('@/components/piling/layout-editor/page-layout-renderer', () => ({
   ),
 }));
 import { AdminDashboard } from '../admin-dashboard';
+
+it('A5 — первый запуск скрывает шаги закрытых страниц', async () => {
+  mocks.denyDirectoryLinks = true;
+  mockFetch(json({ analytics: [] }));
+  try {
+    render(<AdminDashboard />);
+    expect(await screen.findByText('С чего начать')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Пользователи' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Справочники' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Объекты' })).toBeInTheDocument();
+  } finally { mocks.denyDirectoryLinks = false; }
+});
 
 describe('AdminDashboard — срок ТО по дню Москвы (W126 №16)', () => {
   beforeEach(() => {

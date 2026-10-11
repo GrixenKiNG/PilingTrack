@@ -42,6 +42,14 @@ const propsFor = (overrides: Partial<ReferenceUiProps> = {}): ReferenceUiProps =
   ...overrides,
 } as ReferenceUiProps);
 
+it('уведомления недоступны администратору за диспетчера', async () => {
+  const bootstrap = bootstrapEnvelope().data;
+  bootstrap.actor = { ...bootstrap.actor, role: 'ADMIN', actingAs: 'DISPATCHER' };
+  authFetch.mockResolvedValue(new Response(JSON.stringify({ notifications: {} })));
+  render(<SettingsWorkspace {...propsFor({ bootstrap, settingsSection: 'notifications' })} />);
+  expect(await screen.findByText('Изменять правила может только администратор.')).toBeInTheDocument();
+});
+
 afterEach(() => {
   cleanup();
   authFetch.mockReset();

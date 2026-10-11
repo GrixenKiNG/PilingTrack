@@ -84,6 +84,9 @@ export class MediaService {
   private config: MediaServiceConfig;
 
   constructor(config: MediaServiceConfig) {
+    if (!Number.isSafeInteger(config.maxFileSize) || config.maxFileSize <= 0) {
+      throw new ServiceError('Некорректный лимит размера файла в конфигурации', 500);
+    }
     this.config = config;
 
     this.s3Client = new S3Client({
@@ -505,7 +508,7 @@ export function getMediaService(): MediaService {
       accessKeyId: process.env.S3_ACCESS_KEY_ID || '',
       secretAccessKey: process.env.S3_SECRET_ACCESS_KEY || '',
       cdnBaseUrl: process.env.CDN_BASE_URL || undefined,
-      maxFileSize: parseInt(process.env.MEDIA_MAX_FILE_SIZE || '10485760', 10),
+      maxFileSize: Number(process.env.MEDIA_MAX_FILE_SIZE ?? '10485760'),
       // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null invariant established earlier in this function
       allowedContentTypes: DEFAULT_MEDIA_CONFIG.allowedContentTypes!,
       // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null invariant established earlier in this function

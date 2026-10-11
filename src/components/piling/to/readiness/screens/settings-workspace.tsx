@@ -13,6 +13,7 @@ import { AuditSettings } from '../settings/audit-section';
 import { auditActionLabel, auditEntityLabel } from '../settings/audit-labels';
 import { Button } from '@/components/ui/button';
 import { authFetch } from '@/lib/api';
+import { resolveEffectiveRole } from '@/lib/types';
 import { formatDateTimeInTimezone } from '@/lib/timezone';
 import { cn } from '@/lib/utils';
 import { BLOCKER_ACTIONS, BLOCKER_ACTION_LABELS, BLOCKER_LABELS, CRITERION_LABELS, SYSTEM_SAFETY_BLOCKERS, computeReadinessScore, describeRuleSetChanges, normalizeWeights, type BlockerAction, type ReadinessCriterionKey, type ReadinessRuleSet, type ReadinessRulesState } from '@/modules/readiness';
@@ -108,7 +109,7 @@ export function SettingsWorkspace(props: ReferenceUiProps) {
             }}
           />
         )}
-        {props.settingsSection === 'notifications' && <NotificationsSettings isAdmin={props.bootstrap?.actor.role === 'ADMIN'} />}
+        {props.settingsSection === 'notifications' && <NotificationsSettings isAdmin={resolveEffectiveRole(props.bootstrap?.actor.role ?? '', props.bootstrap?.actor.actingAs) === 'ADMIN'} />}
         {props.settingsSection === 'integrations' && (
           <IntegrationsSettings
             devices={Object.values(props.details).flatMap((detail) => detail.telematicsDevices ?? [])}

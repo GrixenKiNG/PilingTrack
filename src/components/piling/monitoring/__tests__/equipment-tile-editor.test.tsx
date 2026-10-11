@@ -9,7 +9,7 @@ vi.mock('next/image', () => ({
   default: ({ alt, ...props }: React.ImgHTMLAttributes<HTMLImageElement>) => <img alt={alt ?? ''} {...props} />,
 }));
 
-const storeState = vi.hoisted(() => ({ role: 'ADMIN' as string | null }));
+const storeState = vi.hoisted(() => ({ role: 'ADMIN' as string | null, actingAs: null as string | null }));
 vi.mock('@/lib/store', () => ({
   /*
     Заглушка отдаёт и селектор, и статический getState.
@@ -19,9 +19,9 @@ vi.mock('@/lib/store', () => ({
     a function», и все пять проверок редактора плитки валились разом.
   */
   usePilingStore: Object.assign(
-    (selector: (state: { currentUser: { role: string } | null }) => unknown) =>
-      selector({ currentUser: storeState.role ? { role: storeState.role } : null }),
-    { getState: () => ({ actingAs: null as string | null }) },
+    (selector: (state: { currentUser: { role: string } | null; actingAs: string | null }) => unknown) =>
+      selector({ currentUser: storeState.role ? { role: storeState.role } : null, actingAs: storeState.actingAs }),
+    { getState: () => ({ actingAs: storeState.actingAs }) },
   ),
 }));
 
@@ -112,6 +112,7 @@ describe('EquipmentTileEditor', () => {
     window.history.replaceState({}, '', '/monitoring');
     calls = stubFetch();
     storeState.role = 'ADMIN';
+    storeState.actingAs = null;
   });
 
   /*
@@ -132,6 +133,13 @@ describe('EquipmentTileEditor', () => {
     render(<Harness />);
 
     await waitFor(() => expect(screen.queryByRole('button', { name: 'Редактировать шаблон' })).not.toBeInTheDocument());
+  });
+
+  it('не показывает редактор администратору за механика', async () => {
+    storeState.actingAs = 'MECHANIC';
+    render(<Harness />);
+    await waitFor(() => expect(calls.some((call) => call.method === 'GET')).toBe(true));
+    expect(screen.queryByRole('button', { name: 'Редактировать шаблон' })).not.toBeInTheDocument();
   });
 
   it('adds and edits arbitrary text, then saves it to the server', async () => {

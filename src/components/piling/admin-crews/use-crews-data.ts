@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { authFetch, isAbort, loadErrorMessage, loadJson } from '@/lib/api';
+import { loadAllPages } from '@/lib/pagination-cursor';
 import { catchText, extractApiError } from './crew-messages';
 import type { CrewDTO, EquipmentDTO, SiteDTO, UserDTO } from '@/lib/types';
 
@@ -79,16 +80,16 @@ export function useCrewsData(): UseCrewsDataReturn {
       */
       const missing: string[] = [];
       const [usersRes, equipmentRes, sitesRes] = await Promise.allSettled([
-        loadJson<{ data?: UserDTO[]; users?: UserDTO[] }>('/api/users'),
-        loadJson<{ data?: EquipmentDTO[]; equipment?: EquipmentDTO[] }>('/api/equipment'),
+        loadAllPages<UserDTO>('/api/users', 'users', (url) => loadJson(url)),
+        loadAllPages<EquipmentDTO>('/api/equipment', 'equipment', (url) => loadJson(url)),
         loadJson<{ sites?: SiteDTO[] }>('/api/sites/all'),
       ]);
 
-      if (usersRes.status === 'fulfilled') setUsers(usersRes.value.data || usersRes.value.users || []);
+      if (usersRes.status === 'fulfilled') setUsers(usersRes.value);
       else missing.push('сотрудники');
 
       if (equipmentRes.status === 'fulfilled') {
-        setEquipmentList(equipmentRes.value.data || equipmentRes.value.equipment || []);
+        setEquipmentList(equipmentRes.value);
       } else missing.push('техника');
 
       if (sitesRes.status === 'fulfilled') setSites(sitesRes.value.sites || []);
@@ -120,15 +121,14 @@ export function useCrewsData(): UseCrewsDataReturn {
       setLoading(true);
 
       try {
-        const data = await loadJson<{ data?: CrewDTO[]; crews?: CrewDTO[] }>('/api/crews', {
-          signal: abortController.signal,
-        });
+        const data = await loadAllPages<CrewDTO>('/api/crews', 'crews',
+          (url) => loadJson(url, { signal: abortController.signal }), abortController.signal);
 
         if (!isMounted) {
           return;
         }
 
-        setCrews(data.data || data.crews || []);
+        setCrews(data);
         setLoadError(null);
       } catch (error: unknown) {
         if (isMounted && !isAbort(error)) {

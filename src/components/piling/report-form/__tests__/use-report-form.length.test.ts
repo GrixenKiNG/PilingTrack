@@ -41,6 +41,78 @@ describe('X2/X3: report draft lifecycle', () => {
   });
   afterEach(() => { vi.useRealTimers(); storeState.selectedSiteId = ''; localStorage.clear(); });
 
+  it('восстанавливает идентификатор отчёта после повторного открытия', async () => {
+    const first = renderHook(() => useReportForm());
+    await waitFor(() => expect(first.result.current.loading).toBe(false));
+    const reportId = first.result.current.reportId;
+    act(() => first.result.current.setEngineHours('43'));
+    first.unmount();
+    const next = renderHook(() => useReportForm());
+    await waitFor(() => expect(next.result.current.loading).toBe(false));
+    expect(next.result.current.reportId).toBe(reportId);
+    expect(next.result.current.engineHours).toBe('43');
+  });
+
+  it('сохраняет смену и исходную версию восстановленного отчёта', async () => {
+    let version = 1;
+    authFetchMock.mockImplementation((url: string) => Promise.resolve(okJson(url.startsWith('/api/reports/edit') ? { report: { reportId: 'server-report', shiftId: 'shift-1', version } } : {})));
+    const first = renderHook(() => useReportForm());
+    await waitFor(() => expect(first.result.current.loading).toBe(false));
+    const key = `report-draft-op1-site-1-${first.result.current.date}`;
+    act(() => first.result.current.setEngineHours('43'));
+    first.unmount();
+    expect(JSON.parse(localStorage.getItem(key) || '{}')).toMatchObject({ reportId: 'server-report', shiftId: 'shift-1', baseVersion: 1 });
+    version = 2;
+    const next = renderHook(() => useReportForm());
+    await waitFor(() => expect(next.result.current.engineHours).toBe('43'));
+    next.unmount();
+    expect(JSON.parse(localStorage.getItem(key) || '{}')).toMatchObject({ reportId: 'server-report', shiftId: 'shift-1', baseVersion: 1 });
+  });
+
+  it('сохраняет старый черновик без идентификатора и не смешивает его с отчётом', async () => {
+    const date = new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Moscow' });
+    const key = `report-draft-op1-site-1-${date}`;
+    const draft = JSON.stringify({ schemaVersion: 2, savedAt: new Date().toISOString(), engineHours: '43' });
+    localStorage.setItem(key, draft);
+    const form = renderHook(() => useReportForm());
+    await waitFor(() => expect(form.result.current.loading).toBe(false));
+    expect(form.result.current.engineHours).toBe('');
+    form.unmount();
+    expect(localStorage.getItem(key)).toBe(draft);
+  });
+
+  it.each([
+    ['другой отчёт', 'other-report', 'shift-1'],
+    ['другая смена', 'server-report', 'shift-2'],
+  ])('не восстанавливает черновик: %s', async (_case, draftReportId, draftShiftId) => {
+    const date = new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Moscow' });
+    const key = `report-draft-op1-site-1-${date}`;
+    const draft = JSON.stringify({ schemaVersion: 3, reportId: draftReportId, shiftId: draftShiftId, baseVersion: 1, savedAt: new Date().toISOString(), engineHours: '43' });
+    localStorage.setItem(key, draft);
+    authFetchMock.mockImplementation((url: string) => Promise.resolve(okJson(url.startsWith('/api/reports/edit') ? { report: { reportId: 'server-report', shiftId: 'shift-1', version: 2 } } : {})));
+    const form = renderHook(() => useReportForm());
+    await waitFor(() => expect(form.result.current.loading).toBe(false));
+    expect(form.result.current.reportId).toBe('server-report');
+    expect(form.result.current.engineHours).toBe('');
+    form.unmount();
+    expect(localStorage.getItem(key)).toBe(draft);
+  });
+
+  it('не переносит поздний ответ предыдущего объекта в текущий отчёт', async () => {
+    let finishOld: (value: Response) => void = () => {};
+    authFetchMock.mockImplementation((url: string) => {
+      if (url.startsWith('/api/reports/edit') && url.includes('siteId=site-1')) return new Promise<Response>((resolve) => { finishOld = resolve; });
+      return Promise.resolve(okJson(url.startsWith('/api/reports/edit') ? { report: { reportId: 'site-2-report' } } : {}));
+    });
+    const form = renderHook(() => useReportForm());
+    await waitFor(() => expect(form.result.current.loadingReport).toBe(true));
+    storeState.selectedSiteId = 'site-2';
+    form.rerender();
+    await waitFor(() => expect(form.result.current.reportId).toBe('site-2-report'));
+    await act(async () => { finishOld(okJson({ report: { reportId: 'site-1-late' } }) as Response); });
+    expect(form.result.current.reportId).toBe('site-2-report');
+  });
+
   it('flushes the latest input on client navigation before the debounce expires', async () => {
     const { result, unmount } = renderHook(() => useReportForm());
     await waitFor(() => expect(result.current.loading).toBe(false));
