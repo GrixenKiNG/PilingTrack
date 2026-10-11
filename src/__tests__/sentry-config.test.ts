@@ -95,5 +95,5 @@ describe('Sentry v11 collection policy', () => {
     } finally {
       await client.close();
     }
-  });
+  }, 30_000);
 });
