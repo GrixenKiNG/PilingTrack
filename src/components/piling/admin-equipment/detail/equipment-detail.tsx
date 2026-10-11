@@ -12,7 +12,7 @@
  *   5. Телематика + Документы (empty states for now)
  */
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pencil, Wrench, MapPin, Users, Radio, FileText, Activity, Camera, History, Gauge, Printer, Timer, ClipboardList } from '@/components/piling/icons/unified-icons';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -65,21 +65,29 @@ export function EquipmentDetail({ equipmentId, embedded = false, onSaved }: Prop
   const [error, setError] = useState<string | null>(null);
   const [editOpen, setEditOpen] = useState(false);
   const [tab, setTab] = useState<TabKey>('overview');
+  const requestGeneration = useRef(0);
+  const activeEquipmentId = useRef<string | null>(null);
 
   const refresh = useCallback(async () => {
+    if (activeEquipmentId.current !== equipmentId) return;
+    const generation = ++requestGeneration.current;
     try {
       const res = await authFetch(`/api/equipment/${equipmentId}/details`);
+      if (generation !== requestGeneration.current) return;
       if (!res.ok) {
         setError(`повторите позже (код ${res.status})`);
         return;
       }
-      setDetails(await res.json());
+      const nextDetails = await res.json();
+      if (generation !== requestGeneration.current) return;
+      setDetails(nextDetails);
       setError(null);
     } catch (err) {
+      if (generation !== requestGeneration.current) return;
       // Обрыв сети fetch бросает TypeError с английским «Failed to fetch» (F-R112-1).
       setError(catchText(err, 'Не удалось загрузить установку'));
     } finally {
-      setLoading(false);
+      if (generation === requestGeneration.current) setLoading(false);
     }
   }, [equipmentId]);
 
@@ -88,8 +96,13 @@ export function EquipmentDetail({ equipmentId, embedded = false, onSaved }: Prop
     // (R119 №13) — до этого loading выставлялся только при монтировании.
     // eslint-disable-next-line react-hooks/set-state-in-effect -- сброс состояния на смену зависимости; данные затем загрузит refresh
     setLoading(true);
+    activeEquipmentId.current = equipmentId;
     void refresh();
-  }, [refresh]);
+    return () => {
+      activeEquipmentId.current = null;
+      requestGeneration.current += 1;
+    };
+  }, [equipmentId, refresh]);
 
   /**
    * Вкладка из адреса: `/admin/equipment/{id}#documents`.

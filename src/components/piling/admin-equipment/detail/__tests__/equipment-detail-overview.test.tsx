@@ -7,7 +7,7 @@
  * в поясе западнее UTC.
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
+import { act, render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 
 const mocks = vi.hoisted(() => ({ authFetch: vi.fn() }));
 
@@ -21,6 +21,7 @@ import { toast } from 'sonner';
 import { OverviewTiles } from '../equipment-detail-overview';
 import { EquipmentDetail } from '../equipment-detail';
 import { EquipmentDocuments } from '../equipment-documents';
+import * as documentsModule from '../equipment-documents';
 import { usePilingStore } from '@/lib/store';
 import { MaintenanceBlock, type TimelineRow } from '../equipment-detail-parts';
 import { KIND_LABEL } from '../../equipment-status';
@@ -161,6 +162,145 @@ describe('EquipmentDetail — смена установки (F-R119-13)', () => 
     rerender(<EquipmentDetail equipmentId="eq-2" embedded />);
 
     expect(screen.queryAllByText('СГ-1')).toHaveLength(0);
+  });
+});
+
+describe('EquipmentDetail — актуальность загрузки (F-N1005-EQUIPMENT-DETAIL-RACE)', () => {
+  beforeEach(() => {
+    mocks.authFetch.mockReset();
+    usePilingStore.setState({ currentUser: { role: 'ADMIN' } as never });
+  });
+
+  function deferred<T>() {
+    let resolve!: (value: T) => void;
+    let reject!: (reason: unknown) => void;
+    const promise = new Promise<T>((res, rej) => { resolve = res; reject = rej; });
+    return { promise, resolve, reject };
+  }
+
+  it('старый success не снимает скелетон новой установки', async () => {
+    const old = deferred<Response>();
+    const current = deferred<Response>();
+    mocks.authFetch.mockReturnValueOnce(old.promise).mockReturnValueOnce(current.promise);
+    const { rerender, container } = render(<EquipmentDetail equipmentId="eq-1" embedded />);
+    rerender(<EquipmentDetail equipmentId="eq-2" embedded />);
+
+    await act(async () => { old.resolve(json(detailsResponse('eq-1', 'Старая установка'))); });
+    expect(screen.queryAllByText('Старая установка')).toHaveLength(0);
+    expect(container.querySelector('[data-slot="skeleton"]')).toBeInTheDocument();
+    await act(async () => { current.resolve(json(detailsResponse('eq-2', 'Новая установка'))); });
+    expect(screen.getAllByText('Новая установка').length).toBeGreaterThan(0);
+    expect(container.querySelector('[data-slot="skeleton"]')).toBeNull();
+  });
+
+  it.each(['HTTP', 'network'] as const)('старый %s отказ не скрывает новую карточку', async (kind) => {
+    const old = deferred<Response>();
+    mocks.authFetch.mockReturnValueOnce(old.promise)
+      .mockResolvedValueOnce(json(detailsResponse('eq-2', 'Новая установка')));
+    const { rerender } = render(<EquipmentDetail equipmentId="eq-1" embedded />);
+    rerender(<EquipmentDetail equipmentId="eq-2" embedded />);
+    await screen.findAllByText('Новая установка');
+
+    await act(async () => {
+      if (kind === 'HTTP') old.resolve(json({}, 500));
+      else old.reject(new TypeError('Failed to fetch'));
+    });
+    expect(screen.getAllByText('Новая установка').length).toBeGreaterThan(0);
+    expect(screen.queryByText(/Не удалось загрузить установку/)).toBeNull();
+  });
+
+  it.each(['success', 'failure'] as const)('поздний JSON %s старой установки игнорируется', async (kind) => {
+    const body = deferred<ReturnType<typeof detailsResponse>>();
+    const response = json({});
+    const readBody = vi.spyOn(response, 'json').mockReturnValue(body.promise);
+    mocks.authFetch.mockResolvedValueOnce(response)
+      .mockResolvedValueOnce(json(detailsResponse('eq-2', 'Новая установка')));
+    const { rerender } = render(<EquipmentDetail equipmentId="eq-1" embedded />);
+    await waitFor(() => expect(readBody).toHaveBeenCalledTimes(1));
+    rerender(<EquipmentDetail equipmentId="eq-2" embedded />);
+    await screen.findAllByText('Новая установка');
+
+    await act(async () => {
+      if (kind === 'success') body.resolve(detailsResponse('eq-1', 'Старая установка'));
+      else body.reject(new Error('JSON устаревшей установки'));
+    });
+    expect(screen.getAllByText('Новая установка').length).toBeGreaterThan(0);
+    expect(screen.queryByText(/Не удалось загрузить установку/)).toBeNull();
+  });
+
+  it('из двух refresh одного id сохраняет последний, даже когда первый завершается позже', async () => {
+    const old = deferred<Response>();
+    const latest = deferred<Response>();
+    let refresh!: () => void | Promise<void>;
+    const child = vi.spyOn(documentsModule, 'EquipmentDocuments').mockImplementation((props) => {
+      refresh = props.onChanged;
+      return null;
+    });
+    try {
+      mocks.authFetch.mockResolvedValueOnce(json(detailsResponse('eq-1', 'Исходная установка')))
+        .mockReturnValueOnce(old.promise).mockReturnValueOnce(latest.promise);
+      render(<EquipmentDetail equipmentId="eq-1" embedded />);
+      await screen.findAllByText('Исходная установка');
+      fireEvent.click(screen.getByRole('button', { name: 'Документы' }));
+      let first!: void | Promise<void>;
+      let second!: void | Promise<void>;
+      act(() => { first = refresh(); second = refresh(); });
+      await act(async () => {
+        latest.resolve(json(detailsResponse('eq-1', 'Последняя версия')));
+        await second;
+      });
+      await act(async () => {
+        old.resolve(json(detailsResponse('eq-1', 'Устаревшая версия')));
+        await first;
+      });
+      expect(screen.getByRole('heading', { name: 'Последняя версия' })).toBeInTheDocument();
+      expect(screen.queryByText('Устаревшая версия')).toBeNull();
+    } finally {
+      child.mockRestore();
+    }
+  });
+
+  it('после unmount не читает тело запоздавшего ответа', async () => {
+    const request = deferred<Response>();
+    const response = json(detailsResponse('eq-1', 'Старая установка'));
+    const readBody = vi.spyOn(response, 'json');
+    mocks.authFetch.mockReturnValueOnce(request.promise);
+    const { unmount } = render(<EquipmentDetail equipmentId="eq-1" embedded />);
+    unmount();
+    await act(async () => { request.resolve(response); });
+    expect(readBody).not.toHaveBeenCalled();
+  });
+
+  it('старый callback refresh не начинает запрос после смены id или unmount', async () => {
+    let refresh!: () => void | Promise<void>;
+    const child = vi.spyOn(documentsModule, 'EquipmentDocuments').mockImplementation((props) => {
+      refresh = props.onChanged;
+      return null;
+    });
+    try {
+      mocks.authFetch.mockResolvedValueOnce(json(detailsResponse('eq-1', 'Старая установка')))
+        .mockResolvedValueOnce(json(detailsResponse('eq-2', 'Новая установка')));
+      const { rerender, unmount } = render(<EquipmentDetail equipmentId="eq-1" embedded />);
+      await screen.findAllByText('Старая установка');
+      fireEvent.click(screen.getByRole('button', { name: 'Документы' }));
+      const oldRefresh = refresh;
+      rerender(<EquipmentDetail equipmentId="eq-2" embedded />);
+      await screen.findAllByText('Новая установка');
+      await act(async () => { await oldRefresh(); });
+      expect(mocks.authFetch).toHaveBeenCalledTimes(2);
+      expect(screen.getByRole('heading', { name: 'Новая установка' })).toBeInTheDocument();
+      unmount();
+      await act(async () => { await refresh(); });
+      expect(mocks.authFetch).toHaveBeenCalledTimes(2);
+    } finally {
+      child.mockRestore();
+    }
+  });
+
+  it('показывает отказ актуального запроса', async () => {
+    mocks.authFetch.mockResolvedValueOnce(json({}, 503));
+    render(<EquipmentDetail equipmentId="eq-1" embedded />);
+    expect(await screen.findByText(/повторите позже \(код 503\)/)).toBeInTheDocument();
   });
 });
 
