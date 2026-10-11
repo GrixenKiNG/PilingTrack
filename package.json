@@ -123,7 +123,10 @@
     },
     "postcss": "^8.5.10",
     "@hono/node-server": "^1.19.13",
-    "sharp": "$sharp"
+    "sharp": "$sharp",
+    "mysql2": "3.24.5",
+    "deepmerge-ts": "8.0.2",
+    "source-map-js": "1.2.2"
   },
   "devDependencies": {
     "@playwright/test": "^1.64.0",
