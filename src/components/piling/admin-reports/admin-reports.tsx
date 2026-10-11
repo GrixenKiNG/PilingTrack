@@ -615,6 +615,7 @@ export function AdminReports() {
         open={showCreateDialog} onClose={() => { setShowCreateDialog(false); setEditReport(null); }}
         editReport={editReport}
         loadingReferenceData={loadingReferenceData}
+        filterError={filterError}
         dictionaryError={dictionaryError}
         operators={operators} sites={sites} pileGrades={pileGrades}
         drillingTypes={drillingTypes} downtimeReasons={downtimeReasons} equipment={equipment}
