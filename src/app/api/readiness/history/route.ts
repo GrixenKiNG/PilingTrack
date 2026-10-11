@@ -48,6 +48,7 @@ async function handleGet(request: NextRequest) {
           shiftId: item.shiftId,
           triggerId: item.triggerId,
           status: item.status,
+          verdict: item.verdict ?? null,
           score: item.score,
           blockers: item.blockers,
           warnings: item.warnings,
