@@ -137,15 +137,32 @@ function mockDownload(bytes: Buffer, contentLength?: number) {
   });
 }
 
-function makeService() {
+function makeService(maxFileSize = 10 * 1024 * 1024) {
   return new MediaService({
     bucket: 'test-bucket', region: 'us-east-1',
     accessKeyId: 'test', secretAccessKey: 'test',
-    maxFileSize: 10 * 1024 * 1024,
+    maxFileSize,
     allowedContentTypes: ['image/jpeg', 'image/png', 'application/pdf'],
     thumbnailWidth: 400, urlExpiresIn: 3600,
   });
 }
+
+describe('MediaService — upload limit configuration', () => {
+  afterEach(() => vi.unstubAllEnvs());
+
+  it.each([NaN, Infinity, -Infinity, 0, -1, 1.5, Number.MAX_SAFE_INTEGER + 1])(
+    'rejects invalid maxFileSize %s as a configuration error', (maxFileSize) => {
+      expect(() => makeService(maxFileSize)).toThrow(expect.objectContaining({ status: 500 }));
+    },
+  );
+
+  it('rejects a factory limit with a unit suffix instead of parsing its numeric prefix', async () => {
+    vi.stubEnv('MEDIA_MAX_FILE_SIZE', '10MB');
+    vi.resetModules();
+    const { getMediaService } = await import('../media-service');
+    expect(() => getMediaService()).toThrow(expect.objectContaining({ status: 500 }));
+  });
+});
 
 describe('MediaService.confirmUpload — content validation', () => {
   beforeEach(() => {
