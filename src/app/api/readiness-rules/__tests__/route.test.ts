@@ -25,6 +25,24 @@ const { saveTemplateMock } = vi.hoisted(() => ({ saveTemplateMock: vi.fn() }));
 vi.mock('@/modules/monitoring', () => ({ getTemplate: vi.fn(), saveTemplate: saveTemplateMock }));
 import { PUT as putMonitoringTemplate } from '../../monitoring/template/route';
 
+const { saveLayoutMock, deleteLayoutMock } = vi.hoisted(() => ({ saveLayoutMock: vi.fn(), deleteLayoutMock: vi.fn() }));
+vi.mock('@/modules/layout', () => ({
+  getLayout: vi.fn(), getLayoutSet: vi.fn(), saveLayout: saveLayoutMock, deleteLayout: deleteLayoutMock,
+  BASE_ENTITY: '', UnknownSurfaceError: class extends Error {},
+}));
+import { PUT as putLayout, DELETE as deleteLayout } from '../../layout/[surfaceId]/route';
+
+it.each(['PUT', 'DELETE'])('администратор за механика не изменяет раскладку мониторинга через %s', async (method) => {
+  saveLayoutMock.mockReset().mockResolvedValue({});
+  deleteLayoutMock.mockReset().mockResolvedValue({});
+  requireAuthMock.mockResolvedValue({ user: { id: 'admin', role: 'ADMIN', actingAs: 'MECHANIC', tenantId: 'tenant-1' }, error: null });
+  const handler = method === 'PUT' ? putLayout : deleteLayout;
+  const response = await handler(request(method, method === 'PUT' ? '{}' : undefined), { params: Promise.resolve({ surfaceId: 'monitoring-equipment-tile' }) });
+  expect(response.status).toBe(403);
+  expect(saveLayoutMock).not.toHaveBeenCalled();
+  expect(deleteLayoutMock).not.toHaveBeenCalled();
+});
+
 it('администратор за механика не сохраняет шаблон мониторинга', async () => {
   saveTemplateMock.mockReset().mockResolvedValue({});
   requireAuthMock.mockResolvedValue({ user: { id: 'admin', role: 'ADMIN', actingAs: 'MECHANIC', tenantId: 'tenant-1' }, error: null });
