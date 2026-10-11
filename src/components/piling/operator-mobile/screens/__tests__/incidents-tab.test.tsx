@@ -2,8 +2,38 @@ import {fireEvent, render, screen} from '@testing-library/react';
 import {describe, expect, it, vi} from 'vitest';
 import type {IncidentView, OperatorMobileState} from '@/modules/operator-mobile/contracts';
 import {IncidentsTab} from '../incidents-tab';
+import {IncidentsScreen} from '../../v7/v7-screens';
+vi.mock('../../operator-concept.css', () => ({}));
 
 const state = {incidents: []} as unknown as OperatorMobileState;
+
+describe('AU164 — вывод разбора на общих экранах и v7', () => {
+  const note = 'Заменили шланг. <img src=x>';
+  const views = [
+    ['общий экран', (incident: IncidentView) => <IncidentsTab state={{incidents: [incident]} as OperatorMobileState} busy={false} error={null} commandId="review" onReport={vi.fn()} />],
+    ['v7', (incident: IncidentView) => <IncidentsScreen incidents={[incident]} />],
+  ] as const;
+  it.each(views)('%s показывает вывод простым текстом', (_name, view) => {
+    const incident = {
+      id: 'reviewed', category: 'PEOPLE', severity: 'HIGH', state: 'REPORTED', description: 'Запись происшествия',
+      signs: [], injured: false, stopRequired: false, photos: 0,
+      occurredAt: '2026-10-01T08:15:00Z', reviewedAt: '2026-10-01T09:00:00Z', reviewNote: note,
+    } as IncidentView;
+    const {container} = render(view(incident));
+    expect(screen.getByText((text) => text.includes(note))).toBeInTheDocument();
+    expect(container.querySelector('img[src="x"]')).toBeNull();
+  });
+  it.each(views)('%s оставляет статус для старого NULL вывода', (_name, view) => {
+    const incident = {
+      id: 'old', category: 'PEOPLE', severity: 'HIGH', state: 'REPORTED', description: 'Старая запись',
+      signs: [], injured: false, stopRequired: false, photos: 0,
+      occurredAt: '2026-10-01T08:15:00Z', reviewedAt: '2026-10-01T09:00:00Z', reviewNote: null,
+    } as IncidentView;
+    render(view(incident));
+    expect(screen.getByText('Разобрано')).toBeInTheDocument();
+    expect(screen.getByText('Старая запись')).toBeInTheDocument();
+  });
+});
 
 function openForm() {
   const onReport = vi.fn();
@@ -57,6 +87,7 @@ describe('журнал происшествий', () => {
       occurredAt: '2026-10-01T08:15:00.000Z',
       photos: 2,
       reviewedAt: null,
+      reviewNote: null,
     };
 
     render(

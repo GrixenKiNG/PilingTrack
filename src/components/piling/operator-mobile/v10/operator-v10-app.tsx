@@ -1001,7 +1001,9 @@ function ScreenIncidents({state, busy, onReport}: {
               icon="warn"
               tone={incident.reviewedAt ? 'ok' : 'warn'}
               title={INCIDENT_CATEGORY_LABELS[incident.category]}
-              note={`${timeRu(incident.occurredAt)} · ${incident.description}`}
+              note={[`${timeRu(incident.occurredAt)} · ${incident.description}`,
+                incident.reviewedAt ? `Разобрано${incident.reviewNote ? `: ${incident.reviewNote}` : ''}` : null,
+              ].filter(Boolean).join(' · ')}
             />
           ))}
       </Card>

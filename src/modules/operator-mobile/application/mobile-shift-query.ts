@@ -470,7 +470,7 @@ export async function queryOperatorMobileState(input: {
         select: {
           id: true, category: true, severity: true, state: true, description: true,
           observedSigns: true, injured: true, stopRequired: true, occurredAt: true,
-          evidenceMediaIds: true, reviewedAt: true,
+          evidenceMediaIds: true, reviewedAt: true, reviewNote: true,
         },
         take: 20,
       }),
@@ -491,6 +491,7 @@ export async function queryOperatorMobileState(input: {
     occurredAt: incident.occurredAt.toISOString(),
     photos: Array.isArray(incident.evidenceMediaIds) ? incident.evidenceMediaIds.length : 0,
     reviewedAt: incident.reviewedAt?.toISOString() ?? null,
+    reviewNote: incident.reviewNote ?? null,
   }));
 
   // Красное гаснет только после разбора диспетчером, а не после того, как

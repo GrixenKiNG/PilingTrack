@@ -131,6 +131,8 @@ export interface IncidentView {
   photos: number;
   /** Когда разобрали. null — ещё на виду у машиниста и диспетчера. */
   reviewedAt: string | null;
+  /** Вывод разбора. null — у старой записи вывода нет. */
+  reviewNote: string | null;
 }
 
 /** Открытая неисправность машины — вкладка «Техника». */
