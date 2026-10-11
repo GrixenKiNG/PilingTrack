@@ -1,12 +1,13 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ElementType } from 'react';
 import { toast } from 'sonner';
 import { roleIcon } from '@/components/piling/icons';
 import { AlertTriangle, CheckCircle2, ChevronRight } from '@/components/piling/icons/unified-icons';
 import { Button } from '@/components/ui/button';
 import { authFetch } from '@/lib/api';
+import { useAbility } from '@/lib/use-ability';
 import { pluralizeRu } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import {
@@ -75,6 +76,8 @@ interface RolesSettingsProps {
 }
 
 export function RolesSettings({ bootstrap }: RolesSettingsProps) {
+  const canManageUsers = useAbility('users.manage');
+  const UserRow = (canManageUsers ? Link : 'div') as ElementType;
   const actors = bootstrap?.selectors.actors ?? [];
   const [selectedRole, setSelectedRole] = useState<string>(bootstrap?.actor.role ?? 'DISPATCHER');
   // Контур доступа приходит только из справочника пользователей: в bootstrap
@@ -197,7 +200,7 @@ export function RolesSettings({ bootstrap }: RolesSettingsProps) {
       <ScreenTitle
         heading="Роли и доступы"
         subtitle="Полномочия ролей в контуре технической готовности"
-        actions={<Button asChild className="bg-signal-strong hover:bg-signal-strong"><Link href="/admin/users">Управление пользователями</Link></Button>}
+        actions={canManageUsers && <Button asChild className="bg-signal-strong hover:bg-signal-strong"><Link href="/admin/users">Управление пользователями</Link></Button>}
       />
       <SettingsKpis items={[
         { icon: 'crew', label: 'Пользователей', value: actors.length },
@@ -335,7 +338,7 @@ export function RolesSettings({ bootstrap }: RolesSettingsProps) {
               {selectedUsers.map((user) => {
                 const scope = scopeOf(user.id, user.role);
                 return (
-                  <Link key={user.id} href="/admin/users" className="flex min-h-11 items-center gap-3 px-4 py-2 text-xs hover:bg-signal/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-signal">
+                  <UserRow key={user.id} href={canManageUsers ? '/admin/users' : undefined} className="flex min-h-11 items-center gap-3 px-4 py-2 text-xs hover:bg-signal/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-signal">
                     <span aria-hidden="true" className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-muted text-3xs font-bold text-muted-foreground">{(user.name || '?').slice(0, 1).toLocaleUpperCase('ru-RU')}</span>
                     <span className="min-w-0 flex-1">
                       <span className="block truncate">{user.name || 'Без имени'}</span>
@@ -344,7 +347,7 @@ export function RolesSettings({ bootstrap }: RolesSettingsProps) {
                     {scope.tone === 'warning'
                       ? <StatusPill tone="warning">Нет объектов</StatusPill>
                       : <StatusPill tone="success">Активен</StatusPill>}
-                  </Link>
+                  </UserRow>
                 );
               })}
               {selectedUsers.length === 0 && <div className="p-6 text-center text-xs text-muted-foreground">В этой роли нет действующих пользователей.</div>}
@@ -357,7 +360,7 @@ export function RolesSettings({ bootstrap }: RolesSettingsProps) {
               </p>
             )}
             <div className="border-t border-border p-3">
-              <Button asChild variant="outline" className="w-full"><Link href="/admin/users">Добавить пользователя</Link></Button>
+              {canManageUsers && <Button asChild variant="outline" className="w-full"><Link href="/admin/users">Добавить пользователя</Link></Button>}
             </div>
           </section>
         </aside>

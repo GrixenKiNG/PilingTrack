@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { BellRing, Building2, Database, LayoutGrid, LayoutTemplate, Pencil, Save, Send, Settings2, ShieldCheck, UsersRound } from '@/components/piling/icons/unified-icons';
 import { toast } from 'sonner';
 import { authFetch } from '@/lib/api';
+import { useAbility } from '@/lib/use-ability';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { usePilingStore } from '@/lib/store';
@@ -92,6 +93,7 @@ function Row({ label, value }: { label: string; value: string }) {
 }
 
 export function WorkspaceSettings() {
+  const canManageUsers = useAbility('users.manage');
   // Заголовок вкладки браузера. Соседние экраны /admin/* ставят его через
   // useDocumentTitle; «Настройки» его не ставили и вкладка называлась
   // заголовком корневого layout («PilingTrack - Управление свайными работами»).
@@ -267,7 +269,7 @@ export function WorkspaceSettings() {
           <Card>
             <CardHeader className="flex-row items-center justify-between space-y-0">
               <CardTitle className="flex items-center gap-2 text-base"><ShieldCheck className="h-4 w-4 text-signal-strong" />Доступ по ролям</CardTitle>
-              <Button variant="outline" size="sm" asChild><a href="/admin/users">Управление ролями</a></Button>
+              {canManageUsers && <Button variant="outline" size="sm" asChild><a href="/admin/users">Управление ролями</a></Button>}
             </CardHeader>
             <CardContent>
               <div className="flex items-center justify-between border-b border-border pb-2 text-xs text-muted-foreground"><span>Роль</span><span>Пользователей</span></div>
@@ -277,7 +279,7 @@ export function WorkspaceSettings() {
                   <span className="font-medium text-foreground">{roleCountLabel(role)}</span>
                 </div>
               ))}
-              <a href="/admin/users" className="mt-3 inline-block text-sm font-medium text-info-strong hover:underline">Все роли и права доступа →</a>
+              {canManageUsers && <a href="/admin/users" className="mt-3 inline-block text-sm font-medium text-info-strong hover:underline">Все роли и права доступа →</a>}
             </CardContent>
           </Card>
 
@@ -332,7 +334,7 @@ export function WorkspaceSettings() {
                 <span className="text-muted-foreground">{roleCountLabel(role)}</span>
               </div>
             ))}
-            <Button variant="outline" className="w-full justify-start" asChild><a href="/admin/users"><ShieldCheck className="mr-2 h-4 w-4" />Управление ролями</a></Button>
+            {canManageUsers && <Button variant="outline" className="w-full justify-start" asChild><a href="/admin/users"><ShieldCheck className="mr-2 h-4 w-4" />Управление ролями</a></Button>}
           </CardContent>
         </Card>
       )}
