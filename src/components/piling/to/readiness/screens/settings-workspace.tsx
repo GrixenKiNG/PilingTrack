@@ -337,14 +337,31 @@ function RulesSettings(props: ReferenceUiProps) {
       {rulesUnavailable && (
         <div role="alert" className="mb-3 flex flex-col gap-3 rounded-xl border border-signal/30 bg-signal/10 p-3 text-sm sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <p className="font-semibold text-signal-strong">Редактирование правил временно заблокировано</p>
-            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-              Действующая версия не загрузилась. Базовые значения показаны только для просмотра, чтобы не перезаписать актуальную конфигурацию.
-            </p>
+            {props.rulesAvailable
+              ? (
+                <>
+                  <p className="font-semibold text-signal-strong">Правила доступны только для чтения</p>
+                  <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                    Действующая версия загружена, но вашей роли не выдано право управлять правилами готовности.
+                    Показаны актуальные значения; повтор загрузки права не изменит.
+                  </p>
+                </>
+              )
+              : (
+                <>
+                  <p className="font-semibold text-signal-strong">Редактирование правил временно заблокировано</p>
+                  <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                    Действующая версия не загрузилась. Показаны базовые значения только для просмотра,
+                    чтобы не перезаписать актуальную конфигурацию.
+                  </p>
+                </>
+              )}
           </div>
-          <Button type="button" variant="outline" disabled={props.loading} onClick={props.onRetry} className="shrink-0">
-            {props.loading ? 'Проверяем…' : 'Повторить'}
-          </Button>
+          {!props.rulesAvailable
+            ? <Button type="button" variant="outline" disabled={props.loading} onClick={props.onRetry} className="shrink-0">
+              {props.loading ? 'Проверяем…' : 'Повторить'}
+            </Button>
+            : null}
         </div>
       )}
       <div className="grid grid-cols-1 gap-2 xl:grid-cols-[minmax(0,1fr)_320px]">

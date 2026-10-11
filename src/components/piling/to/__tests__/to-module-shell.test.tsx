@@ -28,6 +28,7 @@ vi.mock('sonner', () => ({
   toast: {
     error: vi.fn(),
     warning: vi.fn(),
+    success: vi.fn(),
   },
 }));
 vi.mock('@/modules/readiness', async (original) => ({
@@ -1288,5 +1289,141 @@ describe('SettingsWorkspace — предпросмотр называет чес
     expect(document.body.textContent).toContain('База сравнения');
     expect(screen.queryByText(/нет авторитетных фактов/)).not.toBeInTheDocument();
     expect(screen.queryByText(/не прошёл проверку контракта доказательств/)).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * F-N1005-RULES-READONLY-CAUSE: `rulesUnavailable` сливал две разные причины —
+ * «версия не загрузилась» (повтор реально помогает) и «версия загружена, но
+ * роли нет права управлять» (повтор права не изменит). Баннер во втором случае
+ * называл причину неверно и обещал то, что повтор не даст: честный режим
+ * чтения. Запрет редактирования, disabled-контролы и запрет на мутацию — те
+ * же в обоих случаях, различается только объяснение.
+ */
+describe('SettingsWorkspace — баннер различает незагруженную версию и только чтение (F-N1005-RULES-READONLY-CAUSE)', () => {
+  async function renderRules(overrides: Partial<ReferenceUiProps> & { manageOverride?: boolean } = {}) {
+    const bootstrap = bootstrapEnvelope('rules-cause').data;
+    const manage = overrides.manageOverride;
+    delete overrides.manageOverride;
+    bootstrap.capabilities.entities.rules.manage = manage ?? true;
+    const props = {
+      view: 'settings', onViewChange: () => {}, settingsSection: 'rules', onSettingsSectionChange: () => {},
+      equipment: [{ id: 'equipment-1', name: 'Rig 1', model: null, hammerKind: 'NONE', isCombined: false, isActive: true, crewCount: 0 }],
+      selectedId: 'equipment-1', onSelect: () => {}, readinessByEquipment: {}, factsByEquipment: {},
+      scoresByEquipment: {},
+      rulesState: {
+        published: {
+          version: 'v1', status: 'PUBLISHED',
+          criteria: [
+            { key: 'INSPECTION', weight: 40, locked: false },
+            { key: 'ENGINE_HOURS', weight: 20, locked: false },
+            { key: 'PERMIT', weight: 0, locked: false },
+            { key: 'MAINTENANCE', weight: 27, locked: false },
+            { key: 'ACCEPTANCE', weight: 13, locked: false },
+          ],
+          blockers: [{ condition: 'CRITICAL_DEFECT' as const, action: 'DENY_START' as const, isActive: true }],
+        },
+        draft: null, pendingChanges: 0, publishedInDb: true,
+      },
+      onRulesStateChange: () => {}, journals: {}, crews: [], maintenance: [], fleetCards: [], details: {},
+      loading: false, workspaceError: null, workspaceIssues: [], outOfRoleSources: [], rulesAvailable: true,
+      bootstrap, shifts: [], permits: [], defects: [], defectsError: null, currentReadiness: [],
+      authoritativeReadinessError: null, readinessHistoryError: null, readinessHistory: [], audit: null, auditFailed: false,
+      filters: {}, onFiltersChange: () => {}, showInternalNavigation: false, onRetry: () => {},
+      ...overrides,
+    } satisfies ReferenceUiProps;
+    const manageNow = bootstrap.capabilities.entities.rules.manage;
+    const rulesAvailable = props.rulesAvailable;
+    render(<SettingsWorkspace {...props} />);
+    return { manageNow, rulesAvailable };
+  }
+
+  function disabledCount(selector: string): number {
+    return [...document.querySelectorAll(selector)].filter((el) => ((el as HTMLInputElement).disabled ?? false) === true).length;
+  }
+
+  afterEach(() => {
+    cleanup();
+    mocks.authFetch.mockClear();
+  });
+
+  it('версия не загрузилась, manage есть: баннер «не загрузилась», повтор, контролы отключены', async () => {
+    const { rulesAvailable, manageNow } = await renderRules({ rulesAvailable: false, manageOverride: true });
+    expect(rulesAvailable).toBe(false);
+    expect(manageNow).toEqual(true);
+
+    // Причина — незагруженная версия; повтор показан (он реально помогает).
+    expect(screen.getByText('Редактирование правил временно заблокировано')).toBeInTheDocument();
+    expect(screen.getByText(/Действующая версия не загрузилась/)).toBeInTheDocument();
+    expect(screen.queryByText('Правила доступны только для чтения')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Повторить' })).not.toBeDisabled();
+    // Редактирование и публикация запрещены: контролы формы отключены —
+    // клик по ним невозможен, мутация не уйдёт (guard сохранён как раньше).
+    const numberInputs = document.querySelectorAll('input[type="number"]');
+    expect(numberInputs.length).toBeGreaterThan(0);
+    expect(disabledCount('input[type="number"]')).toBe(numberInputs.length);
+    expect(disabledCount('input')).toBe(document.querySelectorAll('input').length);
+    expect(screen.getByRole('button', { name: 'Сохранить черновик' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Опубликовать изменения' })).toBeDisabled();
+    // К правилам обращались только GET при загрузке снимка — мутаций не было.
+    const rulesCalls = mocks.authFetch.mock.calls.filter(([input]) => typeof input === 'string' && input.includes('/api/readiness-rules'));
+    expect(rulesCalls.every(([, init]) => !(init?.method ?? 'GET').toUpperCase().match(/PUT|POST/))).toBe(true);
+  });
+
+  it('версия не загрузилась и manage нет: обе причины, причина не искажена', async () => {
+    const { rulesAvailable, manageNow } = await renderRules({ rulesAvailable: false, manageOverride: false });
+    expect(rulesAvailable).toBe(false);
+    expect(manageNow).toEqual(false);
+
+    // Незагруженная версия — первичная причина; сообщение остаётся честным.
+    expect(screen.getByText('Редактирование правил временно заблокировано')).toBeInTheDocument();
+    expect(screen.getByText(/Действующая версия не загрузилась/)).toBeInTheDocument();
+    expect(screen.queryByText('Правила доступны только для чтения')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Повторить' })).not.toBeDisabled();
+    // Запрет редактирования не ослаблен: контролы отключены, мутация невозможна.
+    const numberInputs = document.querySelectorAll('input[type="number"]');
+    expect(disabledCount('input[type="number"]')).toBe(numberInputs.length);
+    expect(disabledCount('input')).toBe(document.querySelectorAll('input').length);
+    expect(screen.getByRole('button', { name: 'Сохранить черновик' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Опубликовать изменения' })).toBeDisabled();
+  });
+
+  it('версия загружена, manage нет: честный режим чтения, повтор не обещает исправить права', async () => {
+    const { rulesAvailable, manageNow } = await renderRules({ rulesAvailable: true, manageOverride: false });
+    expect(rulesAvailable).toBe(true);
+    expect(manageNow).toEqual(false);
+
+    // Сообщение честное: версия загружена, но права управлять не выдано.
+    expect(screen.getByText('Правила доступны только для чтения')).toBeInTheDocument();
+    expect(screen.getByText(/Действующая версия загружена, но вашей роли не выдано право управлять правилами/)).toBeInTheDocument();
+    expect(screen.queryByText(/Действующая версия не загрузилась/)).not.toBeInTheDocument();
+    expect(screen.queryByText('Редактирование правил временно заблокировано')).not.toBeInTheDocument();
+    // Повтор права не изменит — кнопки «Повторить» нет.
+    expect(screen.queryByRole('button', { name: 'Повторить' })).not.toBeInTheDocument();
+    // Актуальные значения видны; редактирование запрещено: контролы отключены.
+    const numberInputs = document.querySelectorAll('input[type="number"]');
+    expect(numberInputs.length).toBeGreaterThan(0);
+    expect(disabledCount('input[type="number"]')).toBe(numberInputs.length);
+    expect(disabledCount('input')).toBe(document.querySelectorAll('input').length);
+    expect(screen.getByRole('button', { name: 'Сохранить черновик' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Опубликовать изменения' })).toBeDisabled();
+    // Мутация не ушла: к правилам — только GET, сохранение/публикация невозможны.
+    const rulesCalls = mocks.authFetch.mock.calls.filter(([input]) => typeof input === 'string' && input.includes('/api/readiness-rules'));
+    expect(rulesCalls.every(([, init]) => !(init?.method ?? 'GET').toUpperCase().match(/PUT|POST/))).toBe(true);
+  });
+
+  it('версия загружена, manage есть: без баннера, контролы активны', async () => {
+    const { rulesAvailable, manageNow } = await renderRules({ rulesAvailable: true, manageOverride: true });
+    expect(rulesAvailable).toBe(true);
+    expect(manageNow).toEqual(true);
+
+    // Никакого баннера и причины нет.
+    expect(screen.queryByText('Редактирование правил временно заблокировано')).not.toBeInTheDocument();
+    expect(screen.queryByText('Правила доступны только для чтения')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Повторить' })).not.toBeInTheDocument();
+    // Контролы активны; сохранение запрещено, пока форма не изменена.
+    const numberInput = document.querySelector('input[type="number"]') as HTMLInputElement;
+    expect(numberInput).not.toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Сохранить черновик' })).toBeDisabled();
   });
 });
