@@ -4,11 +4,13 @@
 // https://docs.sentry.io/platforms/javascript/guides/nextjs/
 
 import * as Sentry from "@sentry/nextjs";
+import { sentryDataCollection } from './src/lib/sentry-data-collection';
 
 Sentry.init({
   dsn: "https://3954e54e43b52d272c06941e5180dff0@o4511443929530368.ingest.de.sentry.io/4511443960332368",
   enabled: process.env.NODE_ENV === "production",
   tracesSampleRate: 0.1,
-  sendDefaultPii: false,
-  enableLogs: false,
+  dataCollection: sentryDataCollection,
+  traceLifecycle: 'static',
+  beforeSendLog: () => null,
 });

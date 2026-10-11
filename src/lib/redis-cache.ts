@@ -51,6 +51,7 @@ const CACHE_CONNECT_TIMEOUT = 5000;
 
 function getRedisOptions(): RedisOptions {
   return {
+    protocol: 2,
     maxRetriesPerRequest: CACHE_MAX_RETRIES,
     connectTimeout: CACHE_CONNECT_TIMEOUT,
     retryStrategy: (times: number) => {

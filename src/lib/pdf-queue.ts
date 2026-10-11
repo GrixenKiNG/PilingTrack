@@ -41,6 +41,7 @@ async function checkRedisAvailability(): Promise<boolean> {
 
   try {
     const testConn = new Redis(REDIS_URL, {
+      protocol: 2,
       maxRetriesPerRequest: 1,
       connectTimeout: 2000,
       lazyConnect: false,
@@ -58,6 +59,7 @@ async function checkRedisAvailability(): Promise<boolean> {
 function createRedisConnection(): Redis {
   if (!redisConnection) {
     redisConnection = new Redis(REDIS_URL, {
+      protocol: 2,
       maxRetriesPerRequest: 3,
       connectTimeout: 10000,
       lazyConnect: true,

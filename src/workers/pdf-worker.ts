@@ -35,6 +35,7 @@ function createRedisConnection(): Redis {
   // BullMQ rejects ioredis `keyPrefix` (it manages keys itself). Use the
   // BullMQ-level `prefix` option on Worker/Queue instead.
   return new Redis(REDIS_URL, {
+    protocol: 2,
     maxRetriesPerRequest: null,
     connectTimeout: 10000,
     lazyConnect: true,

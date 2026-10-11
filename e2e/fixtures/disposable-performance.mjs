@@ -7,7 +7,7 @@ const base = new URL(process.env.BASE_URL || 'http://invalid');
 const redisUrl = new URL(process.env.REDIS_URL_CACHE || 'http://invalid');
 if(owner.hostname!=='127.0.0.1'||owner.pathname!=='/codex_test'||owner.username!=='piling'||base.hostname!=='127.0.0.1'||redisUrl.hostname!=='127.0.0.1'||!/^codex-pg-[a-f0-9]+$/.test(process.env.INTEGRATION_DB_CONTAINER||'')) throw Error('Disposable stand only');
 const db=new pg.Client({connectionString:owner.toString()});
-const redis=new Redis(redisUrl.toString());
+const redis=new Redis(redisUrl.toString(), { protocol: 2 });
 let prefix='codex-perf-'+randomBytes(6).toString('hex'); const tenant='codex-e1-a';
 await db.connect();
 try {

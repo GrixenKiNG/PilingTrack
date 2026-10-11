@@ -84,6 +84,7 @@ async function testCache() {
   try {
     const Redis = require('ioredis');
     cache = new Redis('redis://localhost:6379', {
+      protocol: 2,
       maxRetriesPerRequest: 1,
       connectTimeout: 2000,
       lazyConnect: true,

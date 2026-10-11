@@ -339,6 +339,7 @@ async function testFailover(redis) {
 
   for (let i = 0; i < 50; i++) {
     const client = new Redis(REDIS_URL, {
+      protocol: 2,
       maxRetriesPerRequest: 3,
       retryStrategy: (times) => Math.min(times * 50, 500),
       lazyConnect: true,
@@ -481,6 +482,7 @@ async function main() {
 
   // Connect to Redis
   const redis = new Redis(REDIS_URL, {
+    protocol: 2,
     maxRetriesPerRequest: 3,
     retryStrategy: (times) => Math.min(times * 100, 1000),
   });

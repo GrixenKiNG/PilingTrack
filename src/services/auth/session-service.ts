@@ -115,6 +115,7 @@ class RedisRevocationStore implements RevocationStore {
 
     try {
       this.client = new Redis(url, {
+        protocol: 2,
         maxRetriesPerRequest: 2,
         connectTimeout: 3000,
         enableOfflineQueue: false,
