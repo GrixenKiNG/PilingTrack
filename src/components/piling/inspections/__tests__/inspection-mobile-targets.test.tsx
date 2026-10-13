@@ -91,6 +91,18 @@ describe('контролы ответа осмотра: цель нажатия 
 });
 
 describe('экран осмотра: цель нажатия на телефоне (R73)', () => {
+  it('shows completeness instead of a score until all required items are answered', async () => {
+    await renderInspection([item('i1', 'Двигатель', 'YES_NO'), item('i2', 'Двигатель', 'STATUS4')]);
+    const score = screen.getByText('Оценка состояния').parentElement!;
+    expect(score).toHaveTextContent('—');
+    expect(score).toHaveTextContent('заполнено 0 из 2');
+    fireEvent.click(screen.getByRole('button', {name: 'Да'}));
+    expect(score).toHaveTextContent('—');
+    expect(score).toHaveTextContent('заполнено 1 из 2');
+    fireEvent.click(screen.getByRole('button', {name: 'Исправно'}));
+    expect(score).toHaveTextContent('100');
+    expect(score).toHaveTextContent('заполнено 2 из 2');
+  });
   it('шаги разделов, возврат и «+ замечание / фото» — не ниже 44px', async () => {
     await renderInspection([item('i1', 'Двигатель', 'YES_NO'), item('i2', 'Гидравлика', 'STATUS4')]);
 

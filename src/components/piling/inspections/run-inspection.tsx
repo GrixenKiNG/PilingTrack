@@ -160,6 +160,11 @@ export function RunInspection({ inspectionId, onExit }: { inspectionId: string; 
     setAnswers((prev) => ({ ...prev, [itemId]: { ...prev[itemId], ...patch } }));
   };
 
+  const requiredItems = inspection?.templateSnapshot.filter((item) => item.required) ?? [];
+  const answeredRequired = requiredItems.filter((item) => item.answerType === 'MEASURE'
+    ? Boolean(answers[item.id]?.value.trim()) : Boolean(answers[item.id]?.result)).length;
+  const incomplete = answeredRequired < requiredItems.length || !Object.values(answers).some((answer) => answer.result || answer.value.trim());
+
   // Live health score
   const healthScore = useMemo(() => {
     if (!inspection) return 0;
@@ -386,10 +391,11 @@ export function RunInspection({ inspectionId, onExit }: { inspectionId: string; 
 
         {/* Live health score */}
         <div className="text-right">
-          <div className={cn('text-3xl font-bold tabular-nums', healthScoreColor(healthScore))}>
-            {healthScore}
+          <div className={cn('text-3xl font-bold tabular-nums', healthScoreColor(incomplete ? null : healthScore))}>
+            {incomplete ? '—' : healthScore}
           </div>
           <div className="text-xs text-muted-foreground">Оценка состояния</div>
+          <div className="text-xs text-muted-foreground">заполнено {answeredRequired} из {requiredItems.length} обязательных пунктов</div>
         </div>
       </div>
 
