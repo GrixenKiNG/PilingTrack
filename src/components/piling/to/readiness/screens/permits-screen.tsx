@@ -406,11 +406,28 @@ export function PermitsScreen(props: ReferenceUiProps) {
         open={command !== null}
         pending={commandPending}
         title={command?.action === 'submit' ? 'Отправить на согласование' : command?.action === 'approve' ? 'Согласовать наряд' : 'Отозвать наряд'}
-        description={command ? `Версия ${command.permit.version} · риск ${command.permit.risk === 'ELEVATED' ? 'повышенный' : 'обычный'} · ${props.bootstrap?.tenant.timezone ?? 'Europe/Moscow'}` : ''}
+        description={command ? `Версия ${command.permit.version} · риск ${command.permit.risk === 'ELEVATED' ? 'повышенный' : 'обычный'} · ${command.permit.timezone}` : ''}
         onClose={() => { setCommand(null); setCommandText(''); setCommandError(null); }}
         footer={<Button type="button" disabled={commandPending || (command?.action === 'revoke' && !commandText.trim())} onClick={() => command ? void runPermitAction(command.permit, command.action, true) : undefined} className="bg-signal-strong hover:bg-signal-strong">{commandPending ? 'Выполняется…' : 'Подтвердить действие'}</Button>}
       >
         <div className="space-y-3 text-sm">
+          {command && (
+            <dl className="grid gap-2">
+              <div><dt className="font-semibold">Наименование</dt><dd>{command.permit.title || 'Не указано'}</dd></div>
+              <div><dt className="font-semibold">Объект</dt><dd>{command.permit.objectName || 'Не указан'}</dd></div>
+              <div><dt className="font-semibold">Срок действия</dt><dd>{formatDateTimeInTimezone(command.permit.validFrom, command.permit.timezone)} — {formatDateTimeInTimezone(command.permit.validTo, command.permit.timezone)}</dd></div>
+              {command.action === 'approve' && <>
+                <div><dt className="font-semibold">Описание работ</dt><dd className="whitespace-pre-wrap">{command.permit.scope}</dd></div>
+                <div><dt className="font-semibold">Место</dt><dd>{command.permit.location || 'Не указано'}</dd></div>
+                <div><dt className="font-semibold">Вид работ</dt><dd>{command.permit.workTypeName || 'Не указан'}</dd></div>
+                <div><dt className="font-semibold">Опасные факторы</dt><dd>{command.permit.hazards.length ? <ul>{command.permit.hazards.map((hazard) => <li key={hazard}>{hazard}</li>)}</ul> : 'Не указаны'}</dd></div>
+                <div><dt className="font-semibold">Производитель работ</dt><dd>{command.permit.producerName || 'Не назначен'}</dd></div>
+                <div><dt className="font-semibold">Наблюдающий</dt><dd>{command.permit.observerName || 'Не назначен'}</dd></div>
+                <div><dt className="font-semibold">Ответственный ОТ</dt><dd>{command.permit.safetyName || 'Не назначен'}</dd></div>
+                <div><dt className="font-semibold">Требуемые подписи</dt><dd>{command.permit.requiredApprovals?.length ? <ul>{command.permit.requiredApprovals.map((role) => <li key={role}>{handoverRoleLabel(role)} · {command.permit.approvals.some((approval) => approval.role === role && approval.valid && approval.permitVersion === command.permit.version) ? 'подписано' : 'ожидается'}</li>)}</ul> : 'Требования не загружены'}</dd></div>
+              </>}
+            </dl>
+          )}
           <p>{command?.action === 'approve' ? 'Решение попадёт в доказательный журнал и вызовет новый снимок готовности.' : command?.action === 'submit' ? 'После отправки содержание нельзя менять без сброса согласований.' : 'Отзыв немедленно прекращает действие наряда и может заблокировать запуск смены.'}</p>
           {command?.action === 'revoke' && (
             <label className="grid gap-1 font-medium">Причина отзыва

@@ -27,6 +27,7 @@ type PermitRow = Awaited<ReturnType<WorkPermitRepository['get']>>;
 export const serializePermit = (row: PermitRow) => ({
   id: row.id, equipmentId: row.equipmentId, shiftId: row.shiftId, risk: row.risk,
   workTypeId: row.workTypeId, title: row.title, location: row.location,
+  workTypeName: row.workType?.name ?? null, requiredApprovals: row.requiredApprovals,
   objectName: row.objectName, hazards: row.hazards,
   producerUserId: row.producerUserId, producerName: row.producerName,
   observerUserId: row.observerUserId, observerName: row.observerName,

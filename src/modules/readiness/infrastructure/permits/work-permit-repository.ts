@@ -9,7 +9,7 @@ import type {
   WorkPermitRecord,
 } from '../../domain/permits/types';
 
-const includeApprovals = {approvals: {orderBy: {approvedAt: 'asc' as const}}};
+const includeApprovals = {approvals: {orderBy: {approvedAt: 'asc' as const}}, workType: {select: {name: true}}};
 
 type PermitRow = Prisma.WorkPermitGetPayload<{include: typeof includeApprovals}>;
 

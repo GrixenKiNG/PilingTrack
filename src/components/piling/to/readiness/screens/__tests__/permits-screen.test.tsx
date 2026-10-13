@@ -9,10 +9,14 @@ import type { ReferenceUiProps } from '../types';
 
 import { PermitsScreen } from '../permits-screen';
 import type { WorkPermitDto } from '../../api/contracts';
+import { bootstrapEnvelope } from '../../api/__tests__/fixtures';
+
+vi.mock('@/lib/api', () => ({ authFetch: vi.fn().mockResolvedValue({ ok: true, json: async () => ({}) }) }));
 
 const pendingPermit: WorkPermitDto = {
   id: 'permit-new12345', equipmentId: 'equipment-1', shiftId: null,
   risk: 'ELEVATED', state: 'PENDING_APPROVAL', workTypeId: null,
+  workTypeName: 'Свайные работы', requiredApprovals: ['DISPATCHER', 'ADMIN'],
   title: 'Забивка свай', scope: 'Работа у действующей линии', location: 'Куст 7',
   objectName: 'Объект наряда', hazards: ['Падение груза'],
   producerUserId: null, producerName: 'Производитель', observerUserId: null,
@@ -91,4 +95,17 @@ describe('Журнал выбранного наряда', () => {
     expect(journal.getAllByText(/^Согласовано ·/)).toHaveLength(2);
     expect(journal.queryByText('НД-OLD12345')).not.toBeInTheDocument();
   });
+});
+
+it('показывает содержание и фактические требования в окне согласования', async () => {
+  const bootstrap = bootstrapEnvelope().data;
+  bootstrap.capabilities.entities.permit.approveDispatcher = true;
+  render(<PermitsScreen {...makeProps({ bootstrap, permits: [pendingPermit] })} />);
+  fireEvent.click(screen.getByRole('button', { name: 'Проверить и согласовать' }));
+  const dialog = within(await screen.findByRole('dialog'));
+  for (const text of ['Забивка свай', 'Работа у действующей линии', 'Падение груза', 'Куст 7', 'Объект наряда', 'Производитель', 'Наблюдающий', 'Ответственный ОТ']) {
+    expect(dialog.getByText(text, { selector: 'dd, li' })).toBeInTheDocument();
+  }
+  expect(dialog.getByText(/Диспетчер · подписано/)).toBeInTheDocument();
+  expect(dialog.getByText(/Администратор · подписано/)).toBeInTheDocument();
 });
