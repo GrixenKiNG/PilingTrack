@@ -17,7 +17,7 @@ concurrency:
 jobs:
   integration:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 45
     services:
       postgres:
         image: postgres:18
@@ -103,6 +103,48 @@ jobs:
         run: npx --no-install vitest run --config vitest.integration.config.ts --reporter=default --reporter=json --outputFile=integration-results.json
       - name: Reject skipped or missing integration scenarios
         run: node scripts/check-integration-results.cjs integration-results.json
+      # Сквозные браузерные тесты идут на том же одноразовом стенде (порт 3100, роль pilingtrack_app,
+      # RLS включён). Учётки codex-<роль> создают disposable-сиды, пароли — одноразовые.
+      - name: Create disposable E2E accounts
+        shell: bash
+        run: |
+          set -euo pipefail
+          for role in ADMIN DISPATCHER OPERATOR ASSISTANT OPERATOR_B; do
+            pw="$(node -e "process.stdout.write(require('node:crypto').randomBytes(20).toString('hex'))")"
+            echo "::add-mask::$pw"
+            echo "E2E_${role}_EMAIL=codex-$(echo "$role" | tr 'A-Z' 'a-z')@example.invalid" >> "$GITHUB_ENV"
+            echo "E2E_${role}_PASSWORD=$pw" >> "$GITHUB_ENV"
+          done
+      - name: Seed E2E fixtures
+        run: |
+          set -euo pipefail
+          node e2e/fixtures/disposable-seed.mjs
+          node e2e/fixtures/disposable-to-seed.mjs
+          node e2e/fixtures/disposable-extra-seed.mjs
+      - name: Install Playwright (chromium only)
+        run: npx playwright install --with-deps chromium
+      - name: Run E2E (golden path subset, chromium only)
+        env:
+          BASE_URL: 'http://127.0.0.1:3100'
+        run: |
+          npx playwright test \
+            --project=chromium \
+            e2e/app.spec.ts \
+            e2e/admin-users.spec.ts \
+            e2e/admin-dictionaries.spec.ts \
+            e2e/operator-report-smoke.spec.ts \
+            e2e/report-creation-flow.spec.ts
+      - name: Seven real role accounts
+        env:
+          BASE_URL: 'http://127.0.0.1:3100'
+        run: npx playwright test e2e/role-audit.spec.js --project=chromium --workers=1
+      - name: Upload Playwright report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
       - name: Upload integration evidence
         if: always()
         uses: actions/upload-artifact@v4
