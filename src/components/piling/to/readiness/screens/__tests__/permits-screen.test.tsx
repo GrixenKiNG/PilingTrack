@@ -133,3 +133,9 @@ it('показывает содержание и фактические треб
   expect(dialog.getByText(/Диспетчер · подписано/)).toBeInTheDocument();
   expect(dialog.getByText(/Администратор · подписано/)).toBeInTheDocument();
 });
+
+it('показывает собственный объект наряда в реестре, мобильной карточке и очереди', () => {
+  render(<PermitsScreen {...makeProps({permits: [pendingPermit]})} />);
+  expect(screen.getAllByText(/Объект наряда/)).toHaveLength(3);
+  expect(screen.queryByText(/Объект не назначен/)).not.toBeInTheDocument();
+});
