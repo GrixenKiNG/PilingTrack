@@ -17,7 +17,7 @@ concurrency:
 jobs:
   integration:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     services:
       postgres:
         image: postgres:18
@@ -35,7 +35,27 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 12
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 127.0.0.1:6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     env:
+      # Окружение стенда для HTTP-спеков (disposable-idor, disposable-report-race): собранное
+      # приложение поднимается на этой же одноразовой базе. Значения одноразовые, не боевые.
+      DATABASE_PROVIDER: postgres
+      DB_IDENTITY_ROLE: pilingtrack_identity
+      REDIS_URL: 'redis://127.0.0.1:6379'
+      SESSION_SECRET: 'ci-session-secret-32-bytes-minimum-length-for-validation-xx'
+      ENCRYPTION_KEY: '11111111111111111111111111111111111111111111111111111111111111ab'
+      DEVICE_KEY_LOOKUP_SECRET: 'ci-device-secret-base64-padding-here-1234567890abcdefghijklmn=='
+      DEFAULT_TENANT_ID: 'ci'
+      TRUST_PROXY: 'true'
+      NEXT_TELEMETRY_DISABLED: '1'
       INTEGRATION_DATABASE_URL_OWNER: postgresql://piling:codex-${{ github.run_id }}-${{ github.run_attempt }}@127.0.0.1:5432/codex_test
     steps:
       - uses: actions/checkout@v4
@@ -64,8 +84,21 @@ jobs:
           echo "INTEGRATION_DATABASE_URL_APP=postgresql://pilingtrack_app:$app_password@127.0.0.1:5432/codex_test" >> "$GITHUB_ENV"
           # Спеки E4/E5/J8 вызывают код приложения, а src/lib/db.ts читает только DATABASE_URL.
           echo "DATABASE_URL=postgresql://pilingtrack_app:$app_password@127.0.0.1:5432/codex_test" >> "$GITHUB_ENV"
+          echo "DATABASE_URL_POSTGRES=postgresql://pilingtrack_app:$app_password@127.0.0.1:5432/codex_test" >> "$GITHUB_ENV"
       - name: Typecheck
         run: npx --no-install tsc --noEmit
+      - name: Build application for HTTP stand specs
+        run: npm run build
+      - name: Start disposable application stand
+        run: |
+          set -euo pipefail
+          nohup npx --no-install next start -p 3100 -H 127.0.0.1 > stand-app.log 2>&1 &
+          for i in $(seq 1 90); do
+            if curl -fsS http://127.0.0.1:3100/api/health >/dev/null 2>&1; then break; fi
+            sleep 1
+          done
+          if ! curl -fsS http://127.0.0.1:3100/api/health >/dev/null; then cat stand-app.log; exit 1; fi
+          echo "CODEX_STAND_URL=http://127.0.0.1:3100" >> "$GITHUB_ENV"
       - name: Real RLS, write pipeline and synthetic restore drill
         run: npx --no-install vitest run --config vitest.integration.config.ts --reporter=default --reporter=json --outputFile=integration-results.json
       - name: Reject skipped or missing integration scenarios
@@ -75,5 +108,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: disposable-integration-results
-          path: integration-results.json
+          path: |
+            integration-results.json
+            stand-app.log
           if-no-files-found: warn
