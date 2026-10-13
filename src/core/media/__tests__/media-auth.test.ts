@@ -198,6 +198,25 @@ describe('inspection evidence read access', () => {
 
 
 describe('maintenance evidence access', () => {
+  it.each(['read', 'mutate'] as const)('allows completed-work photos for the mechanic: %s', async (action) => {
+    const actor = { id: 'mechanic', role: 'MECHANIC', tenantId: 'orion' };
+    maintenanceFindUniqueMock.mockImplementation(async ({ where }: { where: { id: string } }) =>
+      where.id === 'record-1' ? { tenantId: 'orion' } : null);
+    await expect(assertCanAccessMediaEntity(actor, 'maintenance', 'record-1__work', action)).resolves.toBeUndefined();
+    for (const denied of [{ ...actor, tenantId: 'other' }, { ...actor, role: 'OPERATOR' }]) {
+      await expect(assertCanAccessMediaEntity(denied, 'maintenance', 'record-1__work', action)).rejects.toMatchObject({ status: 403 });
+    }
+  });
+
+  it.each(['record-1__unknown', 'record-1__work__extra', '__work'])('rejects unknown maintenance blocks throughout the media lifecycle: %s', async (entityId) => {
+    const actor = { id: 'mechanic', role: 'MECHANIC', tenantId: 'orion' };
+    maintenanceFindUniqueMock.mockResolvedValue({ tenantId: 'orion' });
+    for (const action of ['read', 'mutate'] as const) {
+      await expect(assertCanAccessMediaEntity(actor, 'maintenance', entityId, action)).rejects.toMatchObject({ status: 403 });
+      expect(() => assertCanAccessMedia(actor, { userId: actor.id, tenantId: 'orion', entityType: 'maintenance', entityId }, action)).toThrow();
+    }
+  });
+
   it.each(['MECHANIC', 'SAFETY_ENGINEER'])('lets %s read and attach same-tenant maintenance evidence', async (role) => {
     const actor = { id: 'reviewer', role, tenantId: 'orion' };
     const media = { userId: 'other-uploader', entityType: 'maintenance', entityId: 'record-1', tenantId: 'orion' };
