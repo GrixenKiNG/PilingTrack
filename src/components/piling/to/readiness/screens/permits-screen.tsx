@@ -55,7 +55,7 @@ export function PermitsScreen(props: ReferenceUiProps) {
   const [composing, setComposing] = useState(false);
   const [permitQuery, setPermitQuery] = useState('');
   const [selectedPermitId, setSelectedPermitId] = useState<string | null>(null);
-  const [permitFilter, setPermitFilter] = useState<'ALL' | 'APPROVED' | 'PENDING_APPROVAL' | 'OVERDUE'>('ALL');
+  const [permitFilter, setPermitFilter] = useState<'ALL' | 'APPROVED' | 'PENDING_APPROVAL' | 'OVERDUE' | 'CLOSED'>('ALL');
   // Ссылка с дашборда («Требует решения сейчас») открывает сразу просроченные.
   // eslint-disable-next-line react-hooks/set-state-in-effect -- initial filter comes from the URL deep link
   useEffect(() => { if (new URLSearchParams(window.location.search).get('filter') === 'overdue') setPermitFilter('OVERDUE'); }, []);
@@ -142,7 +142,8 @@ export function PermitsScreen(props: ReferenceUiProps) {
     // «Все» не показывает истёкшие и отозванные: они закрыты и только
     // загромождали реестр. Просроченные — отдельный фильтр со счётчиком.
     if (permitFilter === 'ALL' && (permit.state === 'EXPIRED' || permit.state === 'REVOKED' || isOverduePermit(permit, new Date(nowMs)))) return false;
-    if (permitFilter === 'OVERDUE') { if (!isOverduePermit(permit, new Date(nowMs))) return false; }
+    if (permitFilter === 'CLOSED') { if (permit.state !== 'EXPIRED' && permit.state !== 'REVOKED') return false; }
+    else if (permitFilter === 'OVERDUE') { if (!isOverduePermit(permit, new Date(nowMs))) return false; }
     else if (permitFilter !== 'ALL' && (permit.state !== permitFilter || isOverduePermit(permit, new Date(nowMs)))) return false;
     const equipmentName = props.equipment.find((item) => item.id === permit.equipmentId)?.name ?? '';
     const query = normalizeSearch(permitQuery);
@@ -205,7 +206,7 @@ export function PermitsScreen(props: ReferenceUiProps) {
         <RefKpi icon="documents" label="Всего нарядов" tone="info" value={props.permits.length} />
         <RefKpi icon="accepted" label="Действуют" tone="success" value={active} />
         <RefKpi icon="history" label="На согласовании" tone="warning" value={pending} alert={pending > 0} />
-        <RefKpi icon="defect" label="Заблокированы" tone="danger" value={blocked} alert={blocked > 0} />
+        <RefKpi icon="defect" label="Заблокированы" tone="danger" value={blocked} alert={blocked > 0} pressed={permitFilter === 'CLOSED'} onClick={() => { setPermitQuery(''); setPermitFilter('CLOSED'); }} />
       </section>
       <section className={cn(card, 'mt-2 p-3')}>
         <div className="flex items-center gap-2"><CheckCircle2 className="h-6 w-6 text-success-strong" /><h2 className="font-bold">Условия допуска подтверждены для {active} из {props.permits.length} нарядов</h2></div>
@@ -279,7 +280,7 @@ export function PermitsScreen(props: ReferenceUiProps) {
       </section>
       <div className="mt-2 grid grid-cols-1 gap-2 xl:grid-cols-[minmax(0,1fr)_300px]">
         <section className={cn(card, 'overflow-x-auto')}>
-          <div className="p-3"><h2 className="font-bold">Реестр нарядов-допусков</h2><div className="mt-2 flex flex-wrap gap-2"><div className="relative min-w-[220px] flex-1"><Search className="absolute left-3 top-3.5 h-4 w-4 text-muted-foreground" /><Input aria-label="Поиск нарядов" value={permitQuery} onChange={(event) => setPermitQuery(event.target.value)} placeholder="Номер, установка, объект" className="min-h-11 bg-muted pl-9 text-xs" /></div>{([['ALL', 'Все'], ['APPROVED', 'Действующие'], ['PENDING_APPROVAL', 'На согласовании'], ['OVERDUE', `Просроченные (${overduePermits.length})`]] as const).map(([value, label]) => <button key={value} type="button" aria-pressed={permitFilter === value} onClick={() => setPermitFilter(value)} className={cn('min-h-11 rounded border px-3 text-2xs', permitFilter === value ? 'border-info bg-info/10 text-info-strong' : 'border-border text-muted-foreground')}>{label}</button>)}</div></div>
+          <div className="p-3"><h2 className="font-bold">Реестр нарядов-допусков</h2><div className="mt-2 flex flex-wrap gap-2"><div className="relative min-w-[220px] flex-1"><Search className="absolute left-3 top-3.5 h-4 w-4 text-muted-foreground" /><Input aria-label="Поиск нарядов" value={permitQuery} onChange={(event) => setPermitQuery(event.target.value)} placeholder="Номер, установка, объект" className="min-h-11 bg-muted pl-9 text-xs" /></div>{([['ALL', 'Все'], ['APPROVED', 'Действующие'], ['PENDING_APPROVAL', 'На согласовании'], ['OVERDUE', `Просроченные (${overduePermits.length})`], ['CLOSED', `Закрытые (${blocked})`]] as const).map(([value, label]) => <button key={value} type="button" aria-pressed={permitFilter === value} onClick={() => setPermitFilter(value)} className={cn('min-h-11 rounded border px-3 text-2xs', permitFilter === value ? 'border-info bg-info/10 text-info-strong' : 'border-border text-muted-foreground')}>{label}</button>)}</div></div>
           <div className="hidden min-w-[880px] grid-cols-[125px_minmax(120px,1.2fr)_minmax(110px,1fr)_70px_100px_80px_110px_120px] border-y border-border bg-muted px-3 py-2 text-3xs uppercase tracking-wide text-muted-foreground md:grid"><span>№ наряда</span><span>Установка</span><span>Объект</span><span>Смена</span><span>Действует до</span><span>Готовность</span><span>Статус</span><span>Действие</span></div>
           <div className="hidden max-h-[230px] min-w-[760px] divide-y divide-border overflow-y-auto md:block">
             {filteredPermits.map((permit) => {

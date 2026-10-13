@@ -139,3 +139,14 @@ it('показывает собственный объект наряда в р�
   expect(screen.getAllByText(/Объект наряда/)).toHaveLength(3);
   expect(screen.queryByText(/Объект не назначен/)).not.toBeInTheDocument();
 });
+
+it('открывает закрытые наряды из плитки со совпадающим счётчиком', () => {
+  render(<PermitsScreen {...makeProps({permits: [{...pendingPermit, state: 'REVOKED'}]})} />);
+  fireEvent.change(screen.getByRole('textbox', {name: 'Поиск нарядов'}), {target: {value: 'не совпадает'}});
+  const tile = screen.getByRole('button', {name: /Заблокированы/});
+  expect(tile).toHaveTextContent('1');
+  fireEvent.click(tile);
+  expect(screen.getByRole('button', {name: 'Закрытые (1)'})).toHaveAttribute('aria-pressed', 'true');
+  expect(screen.getAllByRole('button', {name: 'Открыть наряд НД-NEW12345'})).toHaveLength(2);
+  expect(screen.getAllByText('Отозван')).toHaveLength(2);
+});
