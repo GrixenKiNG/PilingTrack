@@ -2,7 +2,7 @@
 
 import { PermittedEntityHistory } from '@/components/piling/ops-shell/permitted-entity-history';
 import { useAbility } from '@/lib/use-ability';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Plus, Users, UserCog, Wrench, MapPin, Pencil, Power, PowerOff } from '@/components/piling/icons/unified-icons';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -65,6 +65,7 @@ export function AdminCrews() {
   const [quick, setQuick] = useState<QuickKey>('all');
   const [activeId, setActiveId] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
+  const createButtonRef = useRef<HTMLButtonElement>(null);
   const [editItem, setEditItem] = useState<Crew | null>(null);
   const [deleteItem, setDeleteItem] = useState<Crew | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -208,7 +209,7 @@ export function AdminCrews() {
       countLabel={loadError ? '—' : `${filtered.length} ${pluralizeRu(filtered.length, ['бригада', 'бригады', 'бригад'])}`}
       subtitle="Сменные назначения: оператор, помощники, установка, объект"
       actions={canManage &&
-        <Button onClick={() => setShowCreate(true)} className="h-11 bg-signal text-white hover:bg-signal-strong sm:h-10">
+        <Button ref={createButtonRef} onClick={() => setShowCreate(true)} className="h-11 bg-signal text-white hover:bg-signal-strong sm:h-10">
           <Plus className="mr-1.5 h-4 w-4" />Добавить бригаду
         </Button>
       }
@@ -258,6 +259,7 @@ export function AdminCrews() {
       </OpsPage>
 
       <CrewFormDialog open={showCreate} onClose={() => setShowCreate(false)} mode="create"
+        returnFocusRef={createButtonRef}
         editItem={null} operators={availableOperators} equipment={activeEquipment} sites={activeSites}
         assistants={assistantUsers}
         loadingReferenceData={loadingReferenceData} referenceError={referenceError} onSubmit={handleCreate} submitting={submitting} />
