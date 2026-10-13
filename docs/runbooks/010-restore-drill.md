@@ -44,8 +44,10 @@ bash scripts/restore-drill.sh /path/approved.sql.gz /path/approved.manifest.json
 Runner проверяет gzip и SHA-256/manifest до создания цели. Затем создаёт
 новый контейнер `codex-pg-<12 hex>` с меткой `pilingtrack.codex.test-db=1`,
 без опубликованных портов; URL или существующее имя цели передать нельзя.
-Текущий runner использует `postgres:16`: совместимость версии с конкретным
-внешним дампом проверяется отдельно, успех синтетического учения её не доказывает.
+Runner использует `postgres:18-alpine` — ту же версию, что прод (18.3) и CI.
+До 13.10.2026 стоял `postgres:16`, и `pg_restore` 16 не читал дамп 18
+(`unsupported version (1.16) in file header`). При смене версии на проде
+менять образ здесь и в `scripts/test-db-up.sh` вместе с ней.
 
 Восстановление: `gzip -dc` → `pg_restore --no-owner --no-acl --exit-on-error
 --single-transaction`. Затем runner применяет существующие
