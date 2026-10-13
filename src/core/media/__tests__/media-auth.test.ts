@@ -198,6 +198,14 @@ describe('inspection evidence read access', () => {
 
 
 describe('maintenance evidence access', () => {
+  it.each(['read', 'mutate'] as const)('does not let ownership bypass tenant and mechanic permission for maintenance %s', (action) => {
+    const actor = {id: 'mechanic', role: 'MECHANIC', tenantId: 'orion'};
+    const media = {userId: actor.id, entityType: 'maintenance', entityId: 'record-1__work', tenantId: 'orion'};
+    expect(() => assertCanAccessMedia({...actor, role: 'OPERATOR'}, media, action)).toThrow();
+    expect(() => assertCanAccessMedia({...actor, tenantId: 'other'}, media, action)).toThrow();
+    expect(() => assertCanAccessMedia({...actor, tenantId: undefined}, media, action)).toThrow();
+    expect(() => assertCanAccessMedia(actor, media, action)).not.toThrow();
+  });
   it.each(['read', 'mutate'] as const)('allows completed-work photos for the mechanic: %s', async (action) => {
     const actor = { id: 'mechanic', role: 'MECHANIC', tenantId: 'orion' };
     maintenanceFindUniqueMock.mockImplementation(async ({ where }: { where: { id: string } }) =>

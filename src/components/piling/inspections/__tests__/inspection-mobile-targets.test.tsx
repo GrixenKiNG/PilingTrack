@@ -93,7 +93,7 @@ describe('контролы ответа осмотра: цель нажатия 
 describe('экран осмотра: цель нажатия на телефоне (R73)', () => {
   it('shows completeness instead of a score until all required items are answered', async () => {
     await renderInspection([item('i1', 'Двигатель', 'YES_NO'), item('i2', 'Двигатель', 'STATUS4')]);
-    const score = screen.getByText('Оценка состояния').parentElement!;
+    const score = screen.getByText('Оценка состояния').parentElement;
     expect(score).toHaveTextContent('—');
     expect(score).toHaveTextContent('заполнено 0 из 2');
     fireEvent.click(screen.getByRole('button', {name: 'Да'}));

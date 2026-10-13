@@ -201,6 +201,10 @@ export function assertCanAccessMedia(
   }
 
   if (isPrivilegedRole(resolveEffectiveRole(actor.role, actor.actingAs))) return;
+  if (media.entityType === 'maintenance'
+    && (!actor.tenantId || actor.tenantId !== media.tenantId || !can(actor, 'maintenance.manage'))) {
+    throw new ServiceError('Нет доступа', 403);
+  }
   if (media.userId === actor.id) return;
   if (action === 'read' && actor.tenantId && media.tenantId === actor.tenantId) {
     if ((media.entityType === 'inspection' || media.entityType === 'maintenance') && can(actor, 'maintenance.manage')) return;
