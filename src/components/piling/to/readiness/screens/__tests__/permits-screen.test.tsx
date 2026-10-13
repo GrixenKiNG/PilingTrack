@@ -140,6 +140,14 @@ it('показывает собственный объект наряда в р�
   expect(screen.queryByText(/Объект не назначен/)).not.toBeInTheDocument();
 });
 
+it('журнал берёт требуемую роль из наряда, а не категории риска', () => {
+  render(<PermitsScreen {...makeProps({permits: [{...pendingPermit, risk: 'NORMAL', requiredApprovals: ['ADMIN'], approvals: []}]})} />);
+  fireEvent.click(screen.getAllByRole('button', {name: 'Открыть наряд НД-NEW12345'})[0]);
+  const journal = within(screen.getByRole('region', {name: 'Журнал согласования'}));
+  expect(journal.getByText('Ожидает подписей: Администратор')).toBeInTheDocument();
+  expect(journal.queryByText('Ожидает решения диспетчера')).not.toBeInTheDocument();
+});
+
 it('открывает закрытые наряды из плитки со совпадающим счётчиком', () => {
   render(<PermitsScreen {...makeProps({permits: [{...pendingPermit, state: 'REVOKED'}]})} />);
   fireEvent.change(screen.getByRole('textbox', {name: 'Поиск нарядов'}), {target: {value: 'не совпадает'}});
@@ -173,4 +181,37 @@ it('повторяет загрузку справочников после сб
   fireEvent.click(screen.getByRole('button', {name: '+ Создать наряд'}));
   expect(await screen.findByText('Обновлённые работы')).toBeInTheDocument();
   expect(attempts).toBe(3);
+});
+
+it('исправляет отказанный черновик и отправляет тот же наряд с новой версией', async () => {
+  const bootstrap = bootstrapEnvelope().data;
+  bootstrap.actor.role = 'MECHANIC';
+  bootstrap.tenant.timezone = 'Asia/Tokyo';
+  bootstrap.capabilities.entities.permit.edit = true;
+  const rejected = {...pendingPermit, workTypeId: 'work-1', state: 'DRAFT' as const, version: 3,
+    rejectedAt: '2099-01-01T03:00:00Z', rejectedById: 'dispatcher', rejectReason: 'Нет ограждения'};
+  const requests: Array<{url: string; method?: string; body: unknown}> = [];
+  vi.mocked(authFetch).mockImplementation(async (url, init) => {
+    if (String(url).endsWith('/permit-form-options')) return new Response(JSON.stringify({
+      workTypes: [{id: 'work-1', name: 'Свайные работы', hint: '', icon: 'other', defaultRisk: 'ELEVATED',
+        hazardPresets: [], requiredApprovals: ['DISPATCHER', 'ADMIN'], allowAuthorApproval: false}],
+      people: [], placePresets: [], objectNames: [],
+    }), {status: 200});
+    requests.push({url: String(url), method: init?.method, body: JSON.parse(String(init?.body))});
+    return new Response(JSON.stringify({data: {id: rejected.id, version: 4}}), {status: 200});
+  });
+  render(<PermitsScreen {...makeProps({bootstrap, permits: [rejected], equipment: [{
+    id: 'equipment-1', name: 'QA-установка', model: null, hammerKind: 'HYDRAULIC', isCombined: false, isActive: true, crewCount: 1,
+  }]})} />);
+  fireEvent.click(screen.getAllByRole('button', {name: 'Исправить наряд'})[0]);
+  await screen.findByRole('radio', {name: /Свайные работы/});
+  expect(screen.getByLabelText(/^Описание работ/)).toHaveValue(rejected.scope);
+  expect(screen.getByLabelText(/^Время начала/)).toHaveValue('03:00');
+  fireEvent.change(screen.getByLabelText(/^Описание работ/), {target: {value: 'Работа с установленным ограждением'}});
+  fireEvent.click(screen.getByRole('button', {name: 'Сохранить и отправить'}));
+  await waitFor(() => expect(requests).toHaveLength(2));
+  expect(requests[0]).toMatchObject({url: `/api/readiness/work-permits/${rejected.id}`, method: 'PATCH',
+    body: {expectedVersion: 3, scope: 'Работа с установленным ограждением', validFrom: new Date(rejected.validFrom).toISOString(), validTo: new Date(rejected.validTo).toISOString()}});
+  expect(requests[0].body).not.toHaveProperty('shiftId');
+  expect(requests[1]).toEqual({url: `/api/readiness/work-permits/${rejected.id}/submit`, method: 'POST', body: {expectedVersion: 4}});
 });

@@ -2,6 +2,7 @@ import {beforeEach, describe, expect, it, vi} from 'vitest';
 import {rejectWorkPermitCommand, type PermitCommandContext} from './commands';
 import {rejectWorkPermitSchema} from './schemas';
 import type {ReadinessTransaction} from '../../infrastructure/tenant-transaction';
+import {DEFAULT_ACCESS_MATRIX} from '../../domain/access-matrix';
 
 const mocks = vi.hoisted(() => ({audit: vi.fn(), claim: vi.fn(), complete: vi.fn(), find: vi.fn()}));
 vi.mock('../../infrastructure/audit/record-audit', () => ({recordChainedReadinessAudit: mocks.audit}));
@@ -90,6 +91,17 @@ describe('отказ в согласовании', () => {
   it('не допускает согласующего, чья роль не требуется', async () => {
     const {run} = fixture({requiredApprovals: ['ADMIN']});
     await expect(run()).rejects.toMatchObject({status: 403});
+  });
+
+  it('разрешает второму согласующему ADMIN отказать после первой подписи', async () => {
+    const {run} = fixture({approvals: [{role: 'DISPATCHER', approvedById: 'dispatcher', approvedAt: new Date(), valid: true, permitVersion: 2}]});
+    await expect(run({context: {...context, actorId: 'admin', actorRole: 'ADMIN'}})).resolves.toMatchObject({status: 200});
+  });
+
+  it('читает снятое право согласования из опубликованной матрицы', async () => {
+    const {run} = fixture();
+    await expect(run({context: {...context, accessMatrix: {...DEFAULT_ACCESS_MATRIX,
+      grants: {...DEFAULT_ACCESS_MATRIX.grants, DISPATCHER: ['readiness.read']}}}})).rejects.toMatchObject({status: 403});
   });
 
   it('повторяет сохранённый результат без повторного отказа и аудита', async () => {

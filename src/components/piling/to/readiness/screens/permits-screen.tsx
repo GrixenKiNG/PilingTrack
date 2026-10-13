@@ -53,6 +53,7 @@ export function PermitsScreen(props: ReferenceUiProps) {
     протаскивать через всю навигацию ради одной формы.
   */
   const [composing, setComposing] = useState(false);
+  const [editingPermit, setEditingPermit] = useState<WorkPermitDto | null>(null);
   const [permitQuery, setPermitQuery] = useState('');
   const [selectedPermitId, setSelectedPermitId] = useState<string | null>(null);
   const [permitFilter, setPermitFilter] = useState<'ALL' | 'APPROVED' | 'PENDING_APPROVAL' | 'OVERDUE' | 'CLOSED'>('ALL');
@@ -135,9 +136,9 @@ export function PermitsScreen(props: ReferenceUiProps) {
     && item.facts.maintenanceOverdueHours === 0
     && item.facts.maintenanceOverdueDays === 0).length;
   const journalPermit = props.permits.find((item) => item.id === selectedPermitId) ?? null;
-  const validApprovals = journalPermit
-    ? journalPermit.approvals.filter((item) => item.valid && item.permitVersion === journalPermit.version).length
-    : 0;
+  const missingApprovalRoles = journalPermit?.requiredApprovals?.filter((role) => !journalPermit.approvals.some(
+    (item) => item.role === role && item.valid && item.permitVersion === journalPermit.version,
+  ));
   const filteredPermits = props.permits.filter((permit) => {
     // «Все» не показывает истёкшие и отозванные: они закрыты и только
     // загромождали реестр. Просроченные — отдельный фильтр со счётчиком.
@@ -190,6 +191,7 @@ export function PermitsScreen(props: ReferenceUiProps) {
         fleetCards={props.fleetCards}
         selectedEquipmentId={props.selectedId}
         bootstrap={props.bootstrap}
+        initialPermit={editingPermit}
         onCancel={() => setComposing(false)}
         onCreated={() => { setComposing(false); props.onRetry(); }}
       />
@@ -201,7 +203,7 @@ export function PermitsScreen(props: ReferenceUiProps) {
       <ScreenTitle heading="Наряд-допуски" subtitle="Проверка условий и разрешений на выполнение работ" actions={<div className="flex gap-2"><Button variant="outline" disabled={exportPending} onClick={() => void exportPermits()}>{exportPending ? 'Готовим файл…' : 'Экспорт'}</Button>{/* Установку выбирают в самой форме, поэтому кнопка больше не ждёт
                 выделенной строки в списке — раньше она была недоступна, пока
                 пользователь не догадается кликнуть установку. */}
-            <Button type="button" disabled={!props.bootstrap?.capabilities.entities.permit.edit} onClick={() => setComposing(true)} className="min-h-11 bg-signal-strong hover:bg-signal-strong">+ Создать наряд</Button></div>} />
+            <Button type="button" disabled={!props.bootstrap?.capabilities.entities.permit.edit} onClick={() => { setEditingPermit(null); setComposing(true); }} className="min-h-11 bg-signal-strong hover:bg-signal-strong">+ Создать наряд</Button></div>} />
       <section className={COMPACT_KPI_GRID} style={kpiGridStyle(4)}>
         <RefKpi icon="documents" label="Всего нарядов" tone="info" value={props.permits.length} />
         <RefKpi icon="accepted" label="Действуют" tone="success" value={active} />
@@ -289,7 +291,7 @@ export function PermitsScreen(props: ReferenceUiProps) {
               const current = props.currentReadiness.find((entry) => entry.equipmentId === permit.equipmentId);
               return (
                 <div key={permit.id} className={cn('grid grid-cols-[125px_minmax(120px,1.2fr)_minmax(110px,1fr)_70px_100px_80px_110px_120px] items-center px-3 py-2 text-2xs hover:bg-signal/5', selectedPermitId === permit.id && 'bg-signal/5 ring-1 ring-inset ring-signal/25')}>
-                  <button type="button" aria-label={`Открыть наряд НД-${permit.id.slice(-8).toUpperCase()}`} aria-pressed={selectedPermitId === permit.id} onClick={() => setSelectedPermitId(permit.id)} className="min-h-11 text-left font-bold">НД-{permit.id.slice(-8).toUpperCase()}</button><span>{item?.name || 'Установка'}</span><span>{permit.objectName.trim() || crew?.site?.name || 'Не назначен'}</span><span>{permit.shiftId ? permit.shiftId.slice(-6) : '—'}</span><span>{formatDateInTimezone(permit.validTo, props.bootstrap?.tenant.timezone, { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</span><span className="pr-2"><b className={cn(current?.score != null && current.score >= READINESS_READY_THRESHOLD ? 'text-success-strong' : 'text-signal-strong')}>{current?.score ?? '—'}%</b><span className="mt-1 block h-1 overflow-hidden rounded-full bg-border"><span className={cn('block h-full rounded-full', current?.score != null && current.score >= READINESS_READY_THRESHOLD ? 'bg-success-strong' : 'bg-signal')} style={{ width: `${current?.score ?? 0}%` }} /></span></span><span className={cn('font-semibold', permit.state === 'APPROVED' ? 'text-success-strong' : permit.state === 'PENDING_APPROVAL' ? 'text-signal-strong' : 'text-muted-foreground')}>{PERMIT_STATE_LABEL[permit.state]}</span><span>{permit.state === 'DRAFT' && props.bootstrap?.capabilities.entities.permit.edit && <button type="button" onClick={() => void runPermitAction(permit, 'submit')} className="min-h-11 rounded border border-signal/30 px-2 font-semibold text-signal-strong">Отправить</button>}{permit.state === 'PENDING_APPROVAL' && (props.bootstrap?.capabilities.entities.permit.approveDispatcher || props.bootstrap?.capabilities.entities.permit.approveAdmin) && <button type="button" onClick={() => void runPermitAction(permit, 'approve')} className="min-h-11 rounded border border-success/30 px-2 font-semibold text-success-strong">Согласовать</button>}{permit.state === 'APPROVED' && props.bootstrap?.capabilities.entities.permit.edit && <button type="button" onClick={() => void runPermitAction(permit, 'revoke')} className="min-h-11 rounded border border-destructive/30 px-2 font-semibold text-destructive-strong">Отозвать</button>}</span>
+                  <button type="button" aria-label={`Открыть наряд НД-${permit.id.slice(-8).toUpperCase()}`} aria-pressed={selectedPermitId === permit.id} onClick={() => setSelectedPermitId(permit.id)} className="min-h-11 text-left font-bold">НД-{permit.id.slice(-8).toUpperCase()}</button><span>{item?.name || 'Установка'}</span><span>{permit.objectName.trim() || crew?.site?.name || 'Не назначен'}</span><span>{permit.shiftId ? permit.shiftId.slice(-6) : '—'}</span><span>{formatDateInTimezone(permit.validTo, props.bootstrap?.tenant.timezone, { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</span><span className="pr-2"><b className={cn(current?.score != null && current.score >= READINESS_READY_THRESHOLD ? 'text-success-strong' : 'text-signal-strong')}>{current?.score ?? '—'}%</b><span className="mt-1 block h-1 overflow-hidden rounded-full bg-border"><span className={cn('block h-full rounded-full', current?.score != null && current.score >= READINESS_READY_THRESHOLD ? 'bg-success-strong' : 'bg-signal')} style={{ width: `${current?.score ?? 0}%` }} /></span></span><span className={cn('font-semibold', permit.state === 'APPROVED' ? 'text-success-strong' : permit.state === 'PENDING_APPROVAL' ? 'text-signal-strong' : 'text-muted-foreground')}>{PERMIT_STATE_LABEL[permit.state]}</span><span>{permit.state === 'DRAFT' && permit.rejectedAt && props.bootstrap?.capabilities.entities.permit.edit && <Button type="button" variant="outline" onClick={() => { setSelectedPermitId(permit.id); setEditingPermit(permit); setComposing(true); }}>Исправить наряд</Button>}{permit.state === 'DRAFT' && props.bootstrap?.capabilities.entities.permit.edit && <button type="button" onClick={() => void runPermitAction(permit, 'submit')} className="min-h-11 rounded border border-signal/30 px-2 font-semibold text-signal-strong">Отправить</button>}{permit.state === 'PENDING_APPROVAL' && (props.bootstrap?.capabilities.entities.permit.approveDispatcher || props.bootstrap?.capabilities.entities.permit.approveAdmin) && <button type="button" onClick={() => void runPermitAction(permit, 'approve')} className="min-h-11 rounded border border-success/30 px-2 font-semibold text-success-strong">Согласовать</button>}{permit.state === 'APPROVED' && props.bootstrap?.capabilities.entities.permit.edit && <button type="button" onClick={() => void runPermitAction(permit, 'revoke')} className="min-h-11 rounded border border-destructive/30 px-2 font-semibold text-destructive-strong">Отозвать</button>}</span>
                   {permit.state === 'DRAFT' && <div className="col-span-8 mt-1"><PermitRejection permit={permit} actors={props.bootstrap?.selectors.actors ?? []} /></div>}
                 </div>
               );
@@ -308,6 +310,7 @@ export function PermitsScreen(props: ReferenceUiProps) {
               return <article key={permit.id} className="rounded-lg border border-border p-3 text-xs">
                 <div className="flex items-start justify-between gap-2"><div className="min-w-0"><button type="button" aria-label={`Открыть наряд НД-${permit.id.slice(-8).toUpperCase()}`} aria-pressed={selectedPermitId === permit.id} onClick={() => setSelectedPermitId(permit.id)} className="block min-h-11 truncate text-left font-bold">НД-{permit.id.slice(-8).toUpperCase()}</button><span className="mt-1 block truncate text-muted-foreground">{item?.name || 'Установка'} · {permit.objectName.trim() || crew?.site?.name || 'Объект не назначен'}</span></div><span className={cn('shrink-0 rounded px-2 py-1 text-3xs font-semibold', permit.state === 'APPROVED' ? 'bg-success/10 text-success-strong' : permit.state === 'PENDING_APPROVAL' ? 'bg-signal/10 text-signal-strong' : 'bg-muted text-muted-foreground')}>{PERMIT_STATE_LABEL[permit.state]}</span></div>
                 <div className="mt-3 grid grid-cols-2 gap-2 text-2xs"><span className="text-muted-foreground">Действует до<br /><b className="text-foreground">{formatDateTimeInTimezone(permit.validTo, props.bootstrap?.tenant.timezone)}</b></span><span className="text-muted-foreground">Готовность<br /><b className="text-signal-strong">{current?.score ?? '—'}%</b></span></div>
+                {permit.state === 'DRAFT' && permit.rejectedAt && props.bootstrap?.capabilities.entities.permit.edit && <Button type="button" variant="outline" className="mt-3 min-h-11 w-full" onClick={() => { setSelectedPermitId(permit.id); setEditingPermit(permit); setComposing(true); }}>Исправить наряд</Button>}
                 {permit.state === 'DRAFT' && <PermitRejection permit={permit} actors={props.bootstrap?.selectors.actors ?? []} />}
                 {action && canAct && <Button type="button" variant="outline" className="mt-3 min-h-11 w-full text-xs" onClick={() => void runPermitAction(permit, action)}>{action === 'submit' ? 'Отправить' : action === 'approve' ? 'Согласовать' : 'Отозвать'}</Button>}
               </article>;
@@ -383,9 +386,9 @@ export function PermitsScreen(props: ReferenceUiProps) {
                     <li className="flex items-start gap-2">
                       <span className="mt-0.5 h-3 w-3 shrink-0 rounded-full border-2 border-signal" />
                       <div className="text-3xs font-semibold text-signal-strong">
-                        {journalPermit.risk === 'ELEVATED' && validApprovals < 2
-                          ? `Ожидает ещё ${2 - validApprovals} решения (повышенный риск)`
-                          : 'Ожидает решения диспетчера'}
+                        {!missingApprovalRoles ? 'Требования к подписям не загружены'
+                          : missingApprovalRoles.length ? `Ожидает подписей: ${missingApprovalRoles.map(handoverRoleLabel).join(', ')}`
+                            : 'Подписи собраны, наряд ещё на согласовании'}
                       </div>
                     </li>
                   )}
