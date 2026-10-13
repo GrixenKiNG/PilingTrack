@@ -1492,6 +1492,9 @@ model WorkPermit {
   revokedAt      DateTime?            @db.Timestamptz(3)
   revokedById    String?
   revokeReason   String?
+  rejectedAt     DateTime?            @db.Timestamptz(3)
+  rejectedById   String?
+  rejectReason   String?
   expiredAt      DateTime?            @db.Timestamptz(3)
   version        Int                  @default(1)
   createdAt      DateTime             @default(now()) @db.Timestamptz(3)

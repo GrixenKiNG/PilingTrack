@@ -39,6 +39,12 @@ function EvidenceState({ state }: { state: string }) {
   );
 }
 
+function PermitRejection({permit, actors}: {permit: WorkPermitDto; actors: Array<{id: string; name: string}>}) {
+  if (!permit.rejectedAt || !permit.rejectReason) return null;
+  const name = actors.find((actor) => actor.id === permit.rejectedById)?.name ?? permit.rejectedById ?? 'Неизвестно';
+  return <p className="text-xs text-destructive-strong">Отказ · {name} · {formatDateTimeInTimezone(permit.rejectedAt, permit.timezone)}: {permit.rejectReason}</p>;
+}
+
 export function PermitsScreen(props: ReferenceUiProps) {
   /*
     Оформление наряда — полноэкранная форма, а не диалог (макет владельца от
@@ -59,7 +65,7 @@ export function PermitsScreen(props: ReferenceUiProps) {
     окошко умещало весь наряд в одно поле «состав и границы работ», риск и срок
     жизни, чего для наряда-допуска мало.
   */
-  const [command, setCommand] = useState<{permit: WorkPermitDto; action: 'submit' | 'approve' | 'revoke'} | null>(null);
+  const [command, setCommand] = useState<{permit: WorkPermitDto; action: 'submit' | 'approve' | 'revoke' | 'reject'} | null>(null);
   const [commandText, setCommandText] = useState('');
   const [commandError, setCommandError] = useState<string | null>(null);
   const [commandPending, setCommandPending] = useState(false);
@@ -142,9 +148,10 @@ export function PermitsScreen(props: ReferenceUiProps) {
     const query = normalizeSearch(permitQuery);
     return !query || normalizeSearch(permit.id).includes(query) || normalizeSearch(equipmentName).includes(query) || normalizeSearch(permit.scope).includes(query);
   });
-  const runPermitAction = async (permit: WorkPermitDto, action: 'submit' | 'approve' | 'revoke', confirmed = false) => {
+  const runPermitAction = async (permit: WorkPermitDto, action: 'submit' | 'approve' | 'revoke' | 'reject', confirmed = false) => {
     if (!confirmed) { setSelectedPermitId(permit.id); setCommand({permit, action}); setCommandText(''); setCommandError(null); return; }
     if (action === 'revoke' && !commandText.trim()) { setCommandError('Укажите причину отзыва наряда.'); return; }
+    if (action === 'reject' && commandText.trim().length < 3) { setCommandError('Укажите причину отказа (3–1000 символов).'); return; }
     setCommandPending(true);
     const response = await authFetch(`/api/readiness/work-permits/${permit.id}/${action}`, {
       method: 'POST',
@@ -157,13 +164,13 @@ export function PermitsScreen(props: ReferenceUiProps) {
         // подписывает наряд обычного риска именно как диспетчер, а правило
         // «автор не согласует свой наряд» остаётся на сервере.
       },
-      body: JSON.stringify(action === 'revoke'
+      body: JSON.stringify(action === 'revoke' || action === 'reject'
         ? { expectedVersion: permit.version, reason: commandText.trim() }
         : { expectedVersion: permit.version }),
     });
     setCommandPending(false);
     if (!response.ok) { setCommandError(await commandFailure(response)); if (response.status === 409) props.onRetry(); return; }
-    toast.success(action === 'submit' ? 'Наряд отправлен на согласование' : action === 'approve' ? 'Наряд согласован' : 'Наряд отозван');
+    toast.success(action === 'submit' ? 'Наряд отправлен на согласование' : action === 'approve' ? 'Наряд согласован' : action === 'reject' ? 'Наряд возвращён в черновик с причиной отказа' : 'Наряд отозван');
     setCommand(null);
     props.onRetry();
   };
@@ -282,6 +289,7 @@ export function PermitsScreen(props: ReferenceUiProps) {
               return (
                 <div key={permit.id} className={cn('grid grid-cols-[125px_minmax(120px,1.2fr)_minmax(110px,1fr)_70px_100px_80px_110px_120px] items-center px-3 py-2 text-2xs hover:bg-signal/5', selectedPermitId === permit.id && 'bg-signal/5 ring-1 ring-inset ring-signal/25')}>
                   <button type="button" aria-label={`Открыть наряд НД-${permit.id.slice(-8).toUpperCase()}`} aria-pressed={selectedPermitId === permit.id} onClick={() => setSelectedPermitId(permit.id)} className="min-h-11 text-left font-bold">НД-{permit.id.slice(-8).toUpperCase()}</button><span>{item?.name || 'Установка'}</span><span>{crew?.site?.name || 'Не назначен'}</span><span>{permit.shiftId ? permit.shiftId.slice(-6) : '—'}</span><span>{formatDateInTimezone(permit.validTo, props.bootstrap?.tenant.timezone, { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</span><span className="pr-2"><b className={cn(current?.score != null && current.score >= READINESS_READY_THRESHOLD ? 'text-success-strong' : 'text-signal-strong')}>{current?.score ?? '—'}%</b><span className="mt-1 block h-1 overflow-hidden rounded-full bg-border"><span className={cn('block h-full rounded-full', current?.score != null && current.score >= READINESS_READY_THRESHOLD ? 'bg-success-strong' : 'bg-signal')} style={{ width: `${current?.score ?? 0}%` }} /></span></span><span className={cn('font-semibold', permit.state === 'APPROVED' ? 'text-success-strong' : permit.state === 'PENDING_APPROVAL' ? 'text-signal-strong' : 'text-muted-foreground')}>{PERMIT_STATE_LABEL[permit.state]}</span><span>{permit.state === 'DRAFT' && props.bootstrap?.capabilities.entities.permit.edit && <button type="button" onClick={() => void runPermitAction(permit, 'submit')} className="min-h-11 rounded border border-signal/30 px-2 font-semibold text-signal-strong">Отправить</button>}{permit.state === 'PENDING_APPROVAL' && (props.bootstrap?.capabilities.entities.permit.approveDispatcher || props.bootstrap?.capabilities.entities.permit.approveAdmin) && <button type="button" onClick={() => void runPermitAction(permit, 'approve')} className="min-h-11 rounded border border-success/30 px-2 font-semibold text-success-strong">Согласовать</button>}{permit.state === 'APPROVED' && props.bootstrap?.capabilities.entities.permit.edit && <button type="button" onClick={() => void runPermitAction(permit, 'revoke')} className="min-h-11 rounded border border-destructive/30 px-2 font-semibold text-destructive-strong">Отозвать</button>}</span>
+                  {permit.state === 'DRAFT' && <div className="col-span-8 mt-1"><PermitRejection permit={permit} actors={props.bootstrap?.selectors.actors ?? []} /></div>}
                 </div>
               );
             })}
@@ -299,6 +307,7 @@ export function PermitsScreen(props: ReferenceUiProps) {
               return <article key={permit.id} className="rounded-lg border border-border p-3 text-xs">
                 <div className="flex items-start justify-between gap-2"><div className="min-w-0"><button type="button" aria-label={`Открыть наряд НД-${permit.id.slice(-8).toUpperCase()}`} aria-pressed={selectedPermitId === permit.id} onClick={() => setSelectedPermitId(permit.id)} className="block min-h-11 truncate text-left font-bold">НД-{permit.id.slice(-8).toUpperCase()}</button><span className="mt-1 block truncate text-muted-foreground">{item?.name || 'Установка'} · {crew?.site?.name || 'Объект не назначен'}</span></div><span className={cn('shrink-0 rounded px-2 py-1 text-3xs font-semibold', permit.state === 'APPROVED' ? 'bg-success/10 text-success-strong' : permit.state === 'PENDING_APPROVAL' ? 'bg-signal/10 text-signal-strong' : 'bg-muted text-muted-foreground')}>{PERMIT_STATE_LABEL[permit.state]}</span></div>
                 <div className="mt-3 grid grid-cols-2 gap-2 text-2xs"><span className="text-muted-foreground">Действует до<br /><b className="text-foreground">{formatDateTimeInTimezone(permit.validTo, props.bootstrap?.tenant.timezone)}</b></span><span className="text-muted-foreground">Готовность<br /><b className="text-signal-strong">{current?.score ?? '—'}%</b></span></div>
+                {permit.state === 'DRAFT' && <PermitRejection permit={permit} actors={props.bootstrap?.selectors.actors ?? []} />}
                 {action && canAct && <Button type="button" variant="outline" className="mt-3 min-h-11 w-full text-xs" onClick={() => void runPermitAction(permit, action)}>{action === 'submit' ? 'Отправить' : action === 'approve' ? 'Согласовать' : 'Отозвать'}</Button>}
               </article>;
             })}
@@ -347,9 +356,10 @@ export function PermitsScreen(props: ReferenceUiProps) {
               <>
                 <div className="mt-1 text-3xs text-muted-foreground">НД-{journalPermit.id.slice(-8).toUpperCase()}</div>
                 <ol className="mt-2 space-y-2">
-                  {journalPermit.approvals.length === 0 && (
+                  {journalPermit.approvals.length === 0 && !journalPermit.rejectedAt && (
                     <li className="text-3xs text-muted-foreground">Решений пока нет.</li>
                   )}
+                  {journalPermit.rejectedAt && <li><PermitRejection permit={journalPermit} actors={props.bootstrap?.selectors.actors ?? []} /></li>}
                   {journalPermit.approvals.map((approval) => {
                     // Аннулированное решение и решение по прежней версии наряда
                     // не подтверждают ничего — показываем это, а не галочку.
@@ -405,10 +415,12 @@ export function PermitsScreen(props: ReferenceUiProps) {
       <CommandDialog
         open={command !== null}
         pending={commandPending}
-        title={command?.action === 'submit' ? 'Отправить на согласование' : command?.action === 'approve' ? 'Согласовать наряд' : 'Отозвать наряд'}
+        title={command?.action === 'submit' ? 'Отправить на согласование' : command?.action === 'approve' ? 'Согласовать наряд' : command?.action === 'reject' ? 'Отказать в согласовании' : 'Отозвать наряд'}
         description={command ? `Версия ${command.permit.version} · риск ${command.permit.risk === 'ELEVATED' ? 'повышенный' : 'обычный'} · ${command.permit.timezone}` : ''}
         onClose={() => { setCommand(null); setCommandText(''); setCommandError(null); }}
-        footer={<Button type="button" disabled={commandPending || (command?.action === 'revoke' && !commandText.trim())} onClick={() => command ? void runPermitAction(command.permit, command.action, true) : undefined} className="bg-signal-strong hover:bg-signal-strong">{commandPending ? 'Выполняется…' : 'Подтвердить действие'}</Button>}
+        footer={<>
+          {command?.action === 'approve' && <Button type="button" variant="outline" disabled={commandPending} onClick={() => { setCommand({...command, action: 'reject'}); setCommandText(''); setCommandError(null); }}>Отказать</Button>}
+          <Button type="button" disabled={commandPending || (command?.action === 'revoke' && !commandText.trim()) || (command?.action === 'reject' && commandText.trim().length < 3)} onClick={() => command ? void runPermitAction(command.permit, command.action, true) : undefined} className="bg-signal-strong hover:bg-signal-strong">{commandPending ? 'Выполняется…' : 'Подтвердить действие'}</Button></>}
       >
         <div className="space-y-3 text-sm">
           {command && (
@@ -416,7 +428,7 @@ export function PermitsScreen(props: ReferenceUiProps) {
               <div><dt className="font-semibold">Наименование</dt><dd>{command.permit.title || 'Не указано'}</dd></div>
               <div><dt className="font-semibold">Объект</dt><dd>{command.permit.objectName || 'Не указан'}</dd></div>
               <div><dt className="font-semibold">Срок действия</dt><dd>{formatDateTimeInTimezone(command.permit.validFrom, command.permit.timezone)} — {formatDateTimeInTimezone(command.permit.validTo, command.permit.timezone)}</dd></div>
-              {command.action === 'approve' && <>
+              {(command.action === 'approve' || command.action === 'reject') && <>
                 <div><dt className="font-semibold">Описание работ</dt><dd className="whitespace-pre-wrap">{command.permit.scope}</dd></div>
                 <div><dt className="font-semibold">Место</dt><dd>{command.permit.location || 'Не указано'}</dd></div>
                 <div><dt className="font-semibold">Вид работ</dt><dd>{command.permit.workTypeName || 'Не указан'}</dd></div>
@@ -428,12 +440,16 @@ export function PermitsScreen(props: ReferenceUiProps) {
               </>}
             </dl>
           )}
-          <p>{command?.action === 'approve' ? 'Решение попадёт в доказательный журнал и вызовет новый снимок готовности.' : command?.action === 'submit' ? 'После отправки содержание нельзя менять без сброса согласований.' : 'Отзыв немедленно прекращает действие наряда и может заблокировать запуск смены.'}</p>
+          {command && <PermitRejection permit={command.permit} actors={props.bootstrap?.selectors.actors ?? []} />}
+          <p>{command?.action === 'approve' ? 'Решение попадёт в доказательный журнал и вызовет новый снимок готовности.' : command?.action === 'submit' ? 'После отправки содержание нельзя менять без сброса согласований.' : command?.action === 'reject' ? 'Наряд вернётся в черновик. Подписи текущей версии будут аннулированы, причина останется в журнале.' : 'Отзыв немедленно прекращает действие наряда и может заблокировать запуск смены.'}</p>
           {command?.action === 'revoke' && (
             <label className="grid gap-1 font-medium">Причина отзыва
               <textarea value={commandText} onChange={(event) => setCommandText(event.target.value)} className="min-h-24 rounded-md border border-input bg-background p-3 font-normal" />
             </label>
           )}
+          {command?.action === 'reject' && <label className="grid gap-1 font-medium">Причина отказа
+            <textarea required minLength={3} maxLength={1000} value={commandText} onChange={(event) => setCommandText(event.target.value)} className="min-h-24 rounded-md border border-input bg-background p-3 font-normal" />
+          </label>}
           {commandError && <p role="alert" className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-destructive-strong">{commandError}</p>}
         </div>
       </CommandDialog>

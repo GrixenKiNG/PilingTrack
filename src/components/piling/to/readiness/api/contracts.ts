@@ -141,6 +141,9 @@ export interface WorkPermitDto {
   workTypeId: string | null;
   workTypeName?: string | null;
   requiredApprovals?: Array<'DISPATCHER' | 'ADMIN'>;
+  rejectedAt?: string | null;
+  rejectedById?: string | null;
+  rejectReason?: string | null;
   /** Наименование работ — короткая строка для реестра. */
   title: string;
   /** Описание работ. Историческое имя поля: раньше это был единственный текст. */

@@ -12,7 +12,7 @@ import {assertPermitTransition} from '../../domain/permits/transitions';
 import {PrismaCommandIdempotencyRepository} from '../../infrastructure/command-pipeline/idempotency-repository';
 import type {ReadinessTransaction} from '../../infrastructure/tenant-transaction';
 import {toWorkPermitRecord, WorkPermitRepository} from '../../infrastructure/permits/work-permit-repository';
-import type {CreateWorkPermitPayload, UpdateWorkPermitPayload} from './schemas';
+import {rejectWorkPermitSchema, type CreateWorkPermitPayload, type UpdateWorkPermitPayload} from './schemas';
 
 export interface PermitCommandContext {
   tenantId: string; actorId: string; actorName: string; actorRole: string;
@@ -38,6 +38,8 @@ export const serializePermit = (row: PermitRow) => ({
   submittedAt: row.submittedAt?.toISOString() ?? null,
   approvedAt: row.approvedAt?.toISOString() ?? null,
   revokedAt: row.revokedAt?.toISOString() ?? null, revokeReason: row.revokeReason,
+  rejectedAt: row.rejectedAt?.toISOString() ?? null, rejectedById: row.rejectedById,
+  rejectReason: row.rejectReason,
   createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString(),
   approvals: row.approvals.map((item) => ({
     role: item.role, approvedById: item.approvedById,
@@ -207,13 +209,13 @@ export async function updateWorkPermitCommand(input: {
 
 async function versionedAction(input: {
   tx: ReadinessTransaction; context: PermitCommandContext; id: string; key: string | null;
-  ifMatch: string | null; expectedVersion?: number; action: 'submit' | 'approve' | 'revoke';
+  ifMatch: string | null; expectedVersion?: number; action: 'submit' | 'approve' | 'revoke' | 'reject';
   reason?: string;
 }): Promise<CommandHttpResult> {
-  if (input.action !== 'approve') assertPermitEditor(input.context);
+  if (input.action !== 'approve' && input.action !== 'reject') assertPermitEditor(input.context);
   const expected = resolveExpectedVersion({ifMatch: input.ifMatch,
     expectedVersion: input.expectedVersion, kind: 'work-permit', id: input.id});
-  const body = input.action === 'revoke'
+  const body = input.action === 'revoke' || input.action === 'reject'
     ? {expectedVersion: input.expectedVersion ?? null, reason: input.reason}
     : {expectedVersion: input.expectedVersion ?? null};
   return runCommand({tx: input.tx, context: input.context, method: 'POST',
@@ -222,6 +224,7 @@ async function versionedAction(input: {
     execute: async (key) => {
       const repository = new WorkPermitRepository(input.tx);
       await repository.requireActor(input.context.tenantId, input.context.actorId);
+      if (input.action === 'reject') await repository.lockForApproval(input.context.tenantId, input.id);
       const beforeRow = await repository.get(input.context.tenantId, input.id);
       const before = serializePermit(beforeRow);
       if (beforeRow.version !== expected) throw new ReadinessCommandError('VERSION_CONFLICT', 409, 'Наряд изменился. Обновите страницу и повторите действие');
@@ -242,6 +245,17 @@ async function versionedAction(input: {
         row = await repository.revoke({tenantId: input.context.tenantId,
           id: input.id, version: expected, actorId: input.context.actorId,
           reason: input.reason});
+      } else if (input.action === 'reject') {
+        assertPermitTransition(beforeRow.state, 'reject');
+        const parsed = rejectWorkPermitSchema.safeParse({expectedVersion: input.expectedVersion, reason: input.reason});
+        if (!parsed.success) throw new ReadinessCommandError('VALIDATION_ERROR', 422, 'Укажите причину отказа (3–1000 символов)');
+        if (beforeRow.authorId === input.context.actorId) throw new ReadinessCommandError('VALIDATION_ERROR', 403, 'Автор не может отказать своему наряду');
+        const permit = toWorkPermitRecord(beforeRow);
+        assertCanApprovePermit({permit, actorId: input.context.actorId,
+          role: input.context.actingAs ?? input.context.actorRole, approvals: permit.approvals,
+          abilities: effectiveReadinessCapabilities(input.context.actorRole, input.context.actingAs, input.context.accessMatrix)});
+        row = await repository.reject({tenantId: input.context.tenantId, id: input.id,
+          version: expected, actorId: input.context.actorId, reason: parsed.data.reason});
       } else {
         // Строку наряда захватываем до чтения подписей: две одновременные
         // подписи двух согласующих идут по очереди, а не наслаиваются друг на
@@ -288,3 +302,5 @@ export const approveWorkPermitCommand = (input: Omit<Parameters<typeof versioned
   versionedAction({...input, action: 'approve'});
 export const revokeWorkPermitCommand = (input: Omit<Parameters<typeof versionedAction>[0], 'action'> & {reason: string}) =>
   versionedAction({...input, action: 'revoke'});
+export const rejectWorkPermitCommand = (input: Omit<Parameters<typeof versionedAction>[0], 'action'> & {reason: string}) =>
+  versionedAction({...input, action: 'reject'});

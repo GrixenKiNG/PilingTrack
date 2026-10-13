@@ -3,13 +3,14 @@
  * заголовок и текст говорили о разном. Плитка названа по содержимому:
  * «Обслуживание (ТО)».
  */
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { ReferenceUiProps } from '../types';
 
 import { PermitsScreen } from '../permits-screen';
 import type { WorkPermitDto } from '../../api/contracts';
 import { bootstrapEnvelope } from '../../api/__tests__/fixtures';
+import { authFetch } from '@/lib/api';
 
 vi.mock('@/lib/api', () => ({ authFetch: vi.fn().mockResolvedValue({ ok: true, json: async () => ({}) }) }));
 
@@ -80,6 +81,29 @@ describe('PermitsScreen — подпись плитки доказательст
     expect(tile).toHaveTextContent('Регламент ТО соблюдён');
     expect(screen.queryByText('Документы')).toBeNull();
   });
+});
+
+it('требует причину отказа, отправляет версию и показывает решение у черновика', async () => {
+  const bootstrap = bootstrapEnvelope().data;
+  bootstrap.capabilities.entities.permit.approveDispatcher = true;
+  const props = makeProps({ bootstrap, permits: [pendingPermit] });
+  const {rerender} = render(<PermitsScreen {...props} />);
+  fireEvent.click(screen.getByRole('button', { name: 'Проверить и согласовать' }));
+  let dialog = within(await screen.findByRole('dialog'));
+  fireEvent.click(dialog.getByRole('button', {name: 'Отказать'}));
+  dialog = within(screen.getByRole('dialog'));
+  expect(dialog.getByRole('button', {name: 'Подтвердить действие'})).toBeDisabled();
+  fireEvent.change(dialog.getByLabelText('Причина отказа'), {target: {value: 'Нет ограждения'}});
+  fireEvent.click(dialog.getByRole('button', {name: 'Подтвердить действие'}));
+  await waitFor(() => expect(authFetch).toHaveBeenCalledWith(`/api/readiness/work-permits/${pendingPermit.id}/reject`, expect.objectContaining({
+    method: 'POST', body: JSON.stringify({expectedVersion: 2, reason: 'Нет ограждения'}),
+  })));
+  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+  rerender(<PermitsScreen {...props} permits={[{...pendingPermit, state: 'DRAFT', version: 3,
+    rejectedAt: '2099-01-01T03:00:00Z', rejectedById: 'dispatcher', rejectReason: 'Нет ограждения'}]} />);
+  expect(screen.getAllByText(/Нет ограждения/).length).toBeGreaterThanOrEqual(3);
+  const journal = within(screen.getByRole('region', {name: 'Журнал согласования'}));
+  expect(journal.getByText(/Отказ ·/)).toHaveTextContent('dispatcher');
 });
 
 describe('Журнал выбранного наряда', () => {

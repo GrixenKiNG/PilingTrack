@@ -261,4 +261,19 @@ export class WorkPermitRepository {
     if (updated.count !== 1) throw new ReadinessCommandError('VERSION_CONFLICT', 409, 'Наряд изменился. Обновите страницу и повторите действие');
     return this.get(input.tenantId, input.id);
   }
+
+  async reject(input: {tenantId: string; id: string; version: number; actorId: string; reason: string}): Promise<PermitRow> {
+    const now = new Date();
+    const updated = await this.tx.workPermit.updateMany({
+      where: {tenantId: input.tenantId, id: input.id, version: input.version, state: 'PENDING_APPROVAL'},
+      data: {state: 'DRAFT', version: input.version + 1, submittedAt: null, approvedAt: null,
+        rejectedAt: now, rejectedById: input.actorId, rejectReason: input.reason},
+    });
+    if (updated.count !== 1) throw new ReadinessCommandError('VERSION_CONFLICT', 409, 'Наряд изменился. Обновите страницу и повторите действие');
+    await this.tx.workPermitApproval.updateMany({
+      where: {tenantId: input.tenantId, permitId: input.id, permitVersion: input.version, valid: true},
+      data: {valid: false, invalidatedAt: now, invalidationReason: `Отказ: ${input.reason}`},
+    });
+    return this.get(input.tenantId, input.id);
+  }
 }
