@@ -5,8 +5,10 @@ describe('formatRuDate', () => {
   it('formats a date-only string as DD.MM.YYYY', () => {
     expect(formatRuDate('2026-06-20')).toBe('20.06.2026');
   });
-  it('uses only the date part of an ISO timestamp (timezone-safe)', () => {
-    expect(formatRuDate('2026-06-20T23:00:00.000Z')).toBe('20.06.2026');
+  it('shows timestamps on the Moscow calendar day', () => {
+    expect(formatRuDate('2026-06-20T23:00:00.000Z')).toBe('21.06.2026');
+    expect(formatRuDate('2026-10-11T23:42:00.000Z')).toBe('12.10.2026');
+    expect(formatRuDate('2026-10-12T00:00:00.000Z')).toBe('12.10.2026');
   });
   it('returns "—" for null/undefined/empty/malformed', () => {
     expect(formatRuDate(null)).toBe('—');

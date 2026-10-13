@@ -177,8 +177,8 @@ export function EquipmentMaintenance({ equipmentId }: { equipmentId: string }) {
                   <div className="mt-0.5 flex flex-wrap items-center gap-x-3 text-xs text-muted-foreground">
                     <span className="font-medium text-muted-foreground">{TYPE_LABEL[r.type as MaintenanceType] ?? r.type}</span>
                     <span>исполнитель: {r.assigneeId ? resolveAssigneeName(r.assigneeId, names) : (r.performedBy || '—')}</span>
-                    {r.scheduledAt && <span>план {formatRuDate(r.scheduledAt.slice(0, 10))}</span>}
-                    {r.completedAt && <span>факт {formatRuDate(r.completedAt.slice(0, 10))}</span>}
+                    {r.scheduledAt && <span>план {formatRuDate(r.scheduledAt)}</span>}
+                    {r.completedAt && <span>факт {formatRuDate(r.completedAt)}</span>}
                     {r.engineHoursAtService != null && <span>{r.engineHoursAtService} м/ч</span>}
                     {r.cost != null && <span>{formatCost(r.cost)}</span>}
                   </div>
