@@ -38,6 +38,7 @@ const tx = {
   report: {findFirst: vi.fn(), findUniqueOrThrow: vi.fn()},
   pileWork: {findUnique: vi.fn(), findFirst: vi.fn(), aggregate: vi.fn(), create: vi.fn()},
   reportAudit: {create: vi.fn()},
+  user: {findFirst: vi.fn().mockResolvedValue({name: 'Иванов', role: 'OPERATOR'})},
 };
 
 beforeEach(() => {
@@ -85,6 +86,7 @@ describe('correctProduction — след поправки в истории от
     expect(data).toEqual(expect.objectContaining({
       reportId: 'RM-shift-12-2026-09-26',
       actorId: 'operator-a',
+      actorName: 'Иванов', actorRole: 'OPERATOR',
       action: 'updated',
     }));
     expect(JSON.stringify(data.diff)).toContain('было');

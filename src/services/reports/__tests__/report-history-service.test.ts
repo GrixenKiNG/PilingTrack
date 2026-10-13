@@ -81,7 +81,7 @@ describe('getReportHistory', () => {
     (db.report.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue({ tenantId: 'orion' });
     (db.reportAudit.findMany as ReturnType<typeof vi.fn>).mockResolvedValue([
       { id: 'a1', action: 'updated', actorName: 'Админ', actorRole: 'ADMIN', createdAt: new Date('2026-05-02'), diff: { status: { old: 'draft', new: 'submitted' } } },
-      { id: 'a0', action: 'created', actorName: 'Иванов', actorRole: 'OPERATOR', createdAt: new Date('2026-05-01'), diff: null },
+      { id: 'a0', action: 'created', actorId: 'u2', actorName: null, actorRole: 'OPERATOR', createdAt: new Date('2026-05-01'), diff: null },
     ]);
     (db.reportVersion.findMany as ReturnType<typeof vi.fn>).mockResolvedValue([
       { version: 2, actorId: 'u1', createdAt: new Date('2026-05-02') },
@@ -90,7 +90,9 @@ describe('getReportHistory', () => {
       (m.findMany as ReturnType<typeof vi.fn>).mockResolvedValue([]);
     }
 
+    vi.mocked(db.user.findMany).mockResolvedValue([{id: 'u2', name: 'Иванов'}] as Awaited<ReturnType<typeof db.user.findMany>>);
     const res = await getReportHistory('rep-1', viewer);
+    expect(res.events[1].actorName).toBe('Иванов');
     expect(db.reportAudit.findMany).toHaveBeenCalledWith({ where: { reportId: 'rep-1' }, orderBy: { createdAt: 'desc' } });
     expect(res.events[0]).toMatchObject({ id: 'a1', actionLabel: 'Изменён', actorName: 'Админ' });
     expect(res.events[0].changes).toEqual([{ label: 'Статус', before: 'Черновик', after: 'Отправлен' }]);
