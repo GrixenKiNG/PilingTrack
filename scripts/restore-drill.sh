@@ -23,7 +23,7 @@ cleanup() {
 trap cleanup EXIT
 started=$SECONDS
 docker run -d --name "$name" --label pilingtrack.codex.test-db=1 \
-  -e POSTGRES_USER=piling -e POSTGRES_DB=codex_test -e POSTGRES_PASSWORD postgres:16 >/dev/null
+  -e POSTGRES_USER=piling -e POSTGRES_DB=codex_test -e POSTGRES_PASSWORD postgres:18-alpine >/dev/null
 created=1
 unset POSTGRES_PASSWORD
 ready=0

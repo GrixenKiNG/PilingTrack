@@ -62,6 +62,8 @@ jobs:
           echo "::add-mask::$app_password"
           printf "ALTER ROLE pilingtrack_app PASSWORD '%s';\n" "$app_password" | docker exec -i "$name" psql -v ON_ERROR_STOP=1 -U piling -d codex_test
           echo "INTEGRATION_DATABASE_URL_APP=postgresql://pilingtrack_app:$app_password@127.0.0.1:5432/codex_test" >> "$GITHUB_ENV"
+          # Спеки E4/E5/J8 вызывают код приложения, а src/lib/db.ts читает только DATABASE_URL.
+          echo "DATABASE_URL=postgresql://pilingtrack_app:$app_password@127.0.0.1:5432/codex_test" >> "$GITHUB_ENV"
       - name: Typecheck
         run: npx --no-install tsc --noEmit
       - name: Real RLS, write pipeline and synthetic restore drill
