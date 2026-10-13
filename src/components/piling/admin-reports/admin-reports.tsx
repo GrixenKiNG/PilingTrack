@@ -114,6 +114,9 @@ export function AdminReports() {
   const [filterEquipmentId, setFilterEquipmentId] = useState('all');
   const [search, setSearch] = useState('');
   const [exporting, setExporting] = useState<'csv' | 'xlsx' | null>(null);
+  const exportSearchHint = mayExport && search.trim() ? (
+    <p className="text-sm text-warning-strong">Поиск по тексту в выгрузку не входит. Сузьте выгрузку фильтрами объекта, установки или машиниста</p>
+  ) : null;
 
   // Export the same filters as the visible list. An unbounded history needs
   // an explicit period because the export endpoint is limited to 92 days.
@@ -358,6 +361,7 @@ export function AdminReports() {
             message={error}
             onRetry={errorForbidden ? undefined : loadReports}
           />
+          {exportSearchHint}
         </div>
       ) : (
         <div className="space-y-4">
@@ -373,6 +377,7 @@ export function AdminReports() {
           />
 
           {/* Неполный отбор молчал: пустой фильтр объекта читался как «объектов нет». */}
+          {exportSearchHint}
           {filterError ? <QueryErrorBanner title="Отбор загружен не полностью" message={filterError} /> : null}
 
           <EvidenceSummary
