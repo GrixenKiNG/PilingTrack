@@ -48,6 +48,7 @@ export function PermitsScreen(props: ReferenceUiProps) {
   */
   const [composing, setComposing] = useState(false);
   const [permitQuery, setPermitQuery] = useState('');
+  const [selectedPermitId, setSelectedPermitId] = useState<string | null>(null);
   const [permitFilter, setPermitFilter] = useState<'ALL' | 'APPROVED' | 'PENDING_APPROVAL' | 'OVERDUE'>('ALL');
   // Ссылка с дашборда («Требует решения сейчас») открывает сразу просроченные.
   // eslint-disable-next-line react-hooks/set-state-in-effect -- initial filter comes from the URL deep link
@@ -127,14 +128,7 @@ export function PermitsScreen(props: ReferenceUiProps) {
     && item.facts.maintenanceConfigured
     && item.facts.maintenanceOverdueHours === 0
     && item.facts.maintenanceOverdueDays === 0).length;
-  /**
-   * Чей журнал согласования показываем: наряд выбранной установки, иначе
-   * первый ожидающий решения. Журнал строится из его approvals[].
-   */
-  const journalPermit = props.permits.find((item) => item.equipmentId === props.selectedId)
-    ?? awaitingApproval[0]
-    ?? props.permits[0]
-    ?? null;
+  const journalPermit = props.permits.find((item) => item.id === selectedPermitId) ?? null;
   const validApprovals = journalPermit
     ? journalPermit.approvals.filter((item) => item.valid && item.permitVersion === journalPermit.version).length
     : 0;
@@ -149,7 +143,7 @@ export function PermitsScreen(props: ReferenceUiProps) {
     return !query || normalizeSearch(permit.id).includes(query) || normalizeSearch(equipmentName).includes(query) || normalizeSearch(permit.scope).includes(query);
   });
   const runPermitAction = async (permit: WorkPermitDto, action: 'submit' | 'approve' | 'revoke', confirmed = false) => {
-    if (!confirmed) { setCommand({permit, action}); setCommandText(''); setCommandError(null); return; }
+    if (!confirmed) { setSelectedPermitId(permit.id); setCommand({permit, action}); setCommandText(''); setCommandError(null); return; }
     if (action === 'revoke' && !commandText.trim()) { setCommandError('Укажите причину отзыва наряда.'); return; }
     setCommandPending(true);
     const response = await authFetch(`/api/readiness/work-permits/${permit.id}/${action}`, {
@@ -281,13 +275,13 @@ export function PermitsScreen(props: ReferenceUiProps) {
           <div className="p-3"><h2 className="font-bold">Реестр нарядов-допусков</h2><div className="mt-2 flex flex-wrap gap-2"><div className="relative min-w-[220px] flex-1"><Search className="absolute left-3 top-3.5 h-4 w-4 text-muted-foreground" /><Input aria-label="Поиск нарядов" value={permitQuery} onChange={(event) => setPermitQuery(event.target.value)} placeholder="Номер, установка, объект" className="min-h-11 bg-muted pl-9 text-xs" /></div>{([['ALL', 'Все'], ['APPROVED', 'Действующие'], ['PENDING_APPROVAL', 'На согласовании'], ['OVERDUE', `Просроченные (${overduePermits.length})`]] as const).map(([value, label]) => <button key={value} type="button" aria-pressed={permitFilter === value} onClick={() => setPermitFilter(value)} className={cn('min-h-11 rounded border px-3 text-2xs', permitFilter === value ? 'border-info bg-info/10 text-info-strong' : 'border-border text-muted-foreground')}>{label}</button>)}</div></div>
           <div className="hidden min-w-[880px] grid-cols-[125px_minmax(120px,1.2fr)_minmax(110px,1fr)_70px_100px_80px_110px_120px] border-y border-border bg-muted px-3 py-2 text-3xs uppercase tracking-wide text-muted-foreground md:grid"><span>№ наряда</span><span>Установка</span><span>Объект</span><span>Смена</span><span>Действует до</span><span>Готовность</span><span>Статус</span><span>Действие</span></div>
           <div className="hidden max-h-[230px] min-w-[760px] divide-y divide-border overflow-y-auto md:block">
-            {filteredPermits.map((permit, index) => {
+            {filteredPermits.map((permit) => {
               const item = props.equipment.find((entry) => entry.id === permit.equipmentId);
               const crew = crewByEquipment.get(permit.equipmentId);
               const current = props.currentReadiness.find((entry) => entry.equipmentId === permit.equipmentId);
               return (
-                <div key={permit.id} className={cn('grid grid-cols-[125px_minmax(120px,1.2fr)_minmax(110px,1fr)_70px_100px_80px_110px_120px] items-center px-3 py-2 text-2xs hover:bg-signal/5', index === 0 && 'bg-signal/5 ring-1 ring-inset ring-signal/25')}>
-                  <span className="font-bold">НД-{permit.id.slice(-8).toUpperCase()}</span><span>{item?.name || 'Установка'}</span><span>{crew?.site?.name || 'Не назначен'}</span><span>{permit.shiftId ? permit.shiftId.slice(-6) : '—'}</span><span>{formatDateInTimezone(permit.validTo, props.bootstrap?.tenant.timezone, { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</span><span className="pr-2"><b className={cn(current?.score != null && current.score >= READINESS_READY_THRESHOLD ? 'text-success-strong' : 'text-signal-strong')}>{current?.score ?? '—'}%</b><span className="mt-1 block h-1 overflow-hidden rounded-full bg-border"><span className={cn('block h-full rounded-full', current?.score != null && current.score >= READINESS_READY_THRESHOLD ? 'bg-success-strong' : 'bg-signal')} style={{ width: `${current?.score ?? 0}%` }} /></span></span><span className={cn('font-semibold', permit.state === 'APPROVED' ? 'text-success-strong' : permit.state === 'PENDING_APPROVAL' ? 'text-signal-strong' : 'text-muted-foreground')}>{PERMIT_STATE_LABEL[permit.state]}</span><span>{permit.state === 'DRAFT' && props.bootstrap?.capabilities.entities.permit.edit && <button type="button" onClick={() => void runPermitAction(permit, 'submit')} className="min-h-11 rounded border border-signal/30 px-2 font-semibold text-signal-strong">Отправить</button>}{permit.state === 'PENDING_APPROVAL' && (props.bootstrap?.capabilities.entities.permit.approveDispatcher || props.bootstrap?.capabilities.entities.permit.approveAdmin) && <button type="button" onClick={() => void runPermitAction(permit, 'approve')} className="min-h-11 rounded border border-success/30 px-2 font-semibold text-success-strong">Согласовать</button>}{permit.state === 'APPROVED' && props.bootstrap?.capabilities.entities.permit.edit && <button type="button" onClick={() => void runPermitAction(permit, 'revoke')} className="min-h-11 rounded border border-destructive/30 px-2 font-semibold text-destructive-strong">Отозвать</button>}</span>
+                <div key={permit.id} className={cn('grid grid-cols-[125px_minmax(120px,1.2fr)_minmax(110px,1fr)_70px_100px_80px_110px_120px] items-center px-3 py-2 text-2xs hover:bg-signal/5', selectedPermitId === permit.id && 'bg-signal/5 ring-1 ring-inset ring-signal/25')}>
+                  <button type="button" aria-label={`Открыть наряд НД-${permit.id.slice(-8).toUpperCase()}`} aria-pressed={selectedPermitId === permit.id} onClick={() => setSelectedPermitId(permit.id)} className="min-h-11 text-left font-bold">НД-{permit.id.slice(-8).toUpperCase()}</button><span>{item?.name || 'Установка'}</span><span>{crew?.site?.name || 'Не назначен'}</span><span>{permit.shiftId ? permit.shiftId.slice(-6) : '—'}</span><span>{formatDateInTimezone(permit.validTo, props.bootstrap?.tenant.timezone, { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</span><span className="pr-2"><b className={cn(current?.score != null && current.score >= READINESS_READY_THRESHOLD ? 'text-success-strong' : 'text-signal-strong')}>{current?.score ?? '—'}%</b><span className="mt-1 block h-1 overflow-hidden rounded-full bg-border"><span className={cn('block h-full rounded-full', current?.score != null && current.score >= READINESS_READY_THRESHOLD ? 'bg-success-strong' : 'bg-signal')} style={{ width: `${current?.score ?? 0}%` }} /></span></span><span className={cn('font-semibold', permit.state === 'APPROVED' ? 'text-success-strong' : permit.state === 'PENDING_APPROVAL' ? 'text-signal-strong' : 'text-muted-foreground')}>{PERMIT_STATE_LABEL[permit.state]}</span><span>{permit.state === 'DRAFT' && props.bootstrap?.capabilities.entities.permit.edit && <button type="button" onClick={() => void runPermitAction(permit, 'submit')} className="min-h-11 rounded border border-signal/30 px-2 font-semibold text-signal-strong">Отправить</button>}{permit.state === 'PENDING_APPROVAL' && (props.bootstrap?.capabilities.entities.permit.approveDispatcher || props.bootstrap?.capabilities.entities.permit.approveAdmin) && <button type="button" onClick={() => void runPermitAction(permit, 'approve')} className="min-h-11 rounded border border-success/30 px-2 font-semibold text-success-strong">Согласовать</button>}{permit.state === 'APPROVED' && props.bootstrap?.capabilities.entities.permit.edit && <button type="button" onClick={() => void runPermitAction(permit, 'revoke')} className="min-h-11 rounded border border-destructive/30 px-2 font-semibold text-destructive-strong">Отозвать</button>}</span>
                 </div>
               );
             })}
@@ -303,7 +297,7 @@ export function PermitsScreen(props: ReferenceUiProps) {
                 : action === 'approve' ? (props.bootstrap?.capabilities.entities.permit.approveDispatcher || props.bootstrap?.capabilities.entities.permit.approveAdmin)
                   : action === 'revoke' ? props.bootstrap?.capabilities.entities.permit.edit : false;
               return <article key={permit.id} className="rounded-lg border border-border p-3 text-xs">
-                <div className="flex items-start justify-between gap-2"><div className="min-w-0"><b className="block truncate">НД-{permit.id.slice(-8).toUpperCase()}</b><span className="mt-1 block truncate text-muted-foreground">{item?.name || 'Установка'} · {crew?.site?.name || 'Объект не назначен'}</span></div><span className={cn('shrink-0 rounded px-2 py-1 text-3xs font-semibold', permit.state === 'APPROVED' ? 'bg-success/10 text-success-strong' : permit.state === 'PENDING_APPROVAL' ? 'bg-signal/10 text-signal-strong' : 'bg-muted text-muted-foreground')}>{PERMIT_STATE_LABEL[permit.state]}</span></div>
+                <div className="flex items-start justify-between gap-2"><div className="min-w-0"><button type="button" aria-label={`Открыть наряд НД-${permit.id.slice(-8).toUpperCase()}`} aria-pressed={selectedPermitId === permit.id} onClick={() => setSelectedPermitId(permit.id)} className="block min-h-11 truncate text-left font-bold">НД-{permit.id.slice(-8).toUpperCase()}</button><span className="mt-1 block truncate text-muted-foreground">{item?.name || 'Установка'} · {crew?.site?.name || 'Объект не назначен'}</span></div><span className={cn('shrink-0 rounded px-2 py-1 text-3xs font-semibold', permit.state === 'APPROVED' ? 'bg-success/10 text-success-strong' : permit.state === 'PENDING_APPROVAL' ? 'bg-signal/10 text-signal-strong' : 'bg-muted text-muted-foreground')}>{PERMIT_STATE_LABEL[permit.state]}</span></div>
                 <div className="mt-3 grid grid-cols-2 gap-2 text-2xs"><span className="text-muted-foreground">Действует до<br /><b className="text-foreground">{formatDateTimeInTimezone(permit.validTo, props.bootstrap?.tenant.timezone)}</b></span><span className="text-muted-foreground">Готовность<br /><b className="text-signal-strong">{current?.score ?? '—'}%</b></span></div>
                 {action && canAct && <Button type="button" variant="outline" className="mt-3 min-h-11 w-full text-xs" onClick={() => void runPermitAction(permit, action)}>{action === 'submit' ? 'Отправить' : action === 'approve' ? 'Согласовать' : 'Отозвать'}</Button>}
               </article>;
@@ -319,7 +313,7 @@ export function PermitsScreen(props: ReferenceUiProps) {
                 || props.bootstrap?.capabilities.entities.permit.approveAdmin;
               return (
                 <div key={permit.id} className={cn('rounded-lg border p-2.5', index === 0 ? 'border-signal bg-signal/5' : 'border-border')}>
-                  <div className="text-xs font-bold">НД-{permit.id.slice(-8).toUpperCase()}</div>
+                  <button type="button" aria-label={`Открыть наряд НД-${permit.id.slice(-8).toUpperCase()}`} aria-pressed={selectedPermitId === permit.id} onClick={() => setSelectedPermitId(permit.id)} className="min-h-11 text-left text-xs font-bold">НД-{permit.id.slice(-8).toUpperCase()}</button>
                   <div className="mt-1 text-3xs text-muted-foreground">{props.equipment.find((item) => item.id === permit.equipmentId)?.name || 'Установка'} · {crewByEquipment.get(permit.equipmentId)?.site?.name || 'Объект не назначен'}</div>
                   <div className="mt-1 line-clamp-2 text-3xs text-signal-strong">{permit.risk === 'ELEVATED' ? 'Повышенный риск · требуется два согласования' : 'Ожидает решения диспетчера'}</div>
                   {/* Действие прямо в панели: раньше карточка только называла
@@ -347,7 +341,7 @@ export function PermitsScreen(props: ReferenceUiProps) {
             approvals[]. Даты не показывались, потому что их неоткуда было
             взять: этапы были выдуманы.
           */}
-          <div className="mt-3 border-t border-border pt-3">
+          <div role="region" aria-label="Журнал согласования" className="mt-3 border-t border-border pt-3">
             <h3 className="text-xs font-bold">Журнал согласования</h3>
             {journalPermit ? (
               <>
