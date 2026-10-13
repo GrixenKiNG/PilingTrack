@@ -32,6 +32,14 @@ const snapshot: FleetSnapshot = {
 };
 
 describe('FleetDashboard shared equipment template', () => {
+  it('labels report-based day counts without calling them open shifts', async () => {
+    render(<FleetDashboard />);
+    expect(await screen.findByText('Бригады: сдали отчёт сегодня')).toBeInTheDocument();
+    expect(screen.getByText('Операторы: сдали отчёт сегодня')).toBeInTheDocument();
+    expect(screen.getByText('из 2 с отчётом сегодня')).toBeInTheDocument();
+    expect(screen.queryByText('Бригад на смене')).not.toBeInTheDocument();
+    expect(screen.queryByText('включая несданные смены')).not.toBeInTheDocument();
+  });
   /** Шаблон, который «уже сохранён на сервере» к моменту отрисовки. */
   let serverTemplate: unknown;
   const savedTemplate = (template: unknown) => { serverTemplate = template; };
