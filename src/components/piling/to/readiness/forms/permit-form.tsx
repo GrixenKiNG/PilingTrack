@@ -120,6 +120,7 @@ export function PermitForm({
   const timezone = bootstrap?.tenant.timezone ?? 'Europe/Moscow';
   const [options, setOptions] = useState<FormOptions | null>(null);
   const [optionsError, setOptionsError] = useState<string | null>(null);
+  const [optionsAttempt, setOptionsAttempt] = useState(0);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -152,7 +153,7 @@ export function PermitForm({
       })
       .catch(() => { if (!cancelled) setOptionsError('Не удалось загрузить справочники формы.'); });
     return () => { cancelled = true; };
-  }, []);
+  }, [optionsAttempt]);
 
   const workType = options?.workTypes.find((item) => item.id === workTypeId) ?? null;
 
@@ -286,9 +287,10 @@ export function PermitForm({
       </>}
     >
       {optionsError && (
-        <p role="alert" className={cn(card, 'border-destructive/40 bg-destructive/10 p-3 text-xs text-destructive-strong')}>
+        <div role="alert" className={cn(card, 'border-destructive/40 bg-destructive/10 p-3 text-xs text-destructive-strong')}>
           {optionsError}
-        </p>
+          <Button type="button" variant="outline" className="ml-3 min-h-11" onClick={() => { setOptionsError(null); setOptionsAttempt((attempt) => attempt + 1); }}>Повторить</Button>
+        </div>
       )}
 
       <FormSection title="Тип работ">

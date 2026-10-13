@@ -150,3 +150,27 @@ it('открывает закрытые наряды из плитки со со
   expect(screen.getAllByRole('button', {name: 'Открыть наряд НД-NEW12345'})).toHaveLength(2);
   expect(screen.getAllByText('Отозван')).toHaveLength(2);
 });
+
+it('повторяет загрузку справочников после сбоя и обновляет их при новом открытии формы', async () => {
+  const bootstrap = bootstrapEnvelope().data;
+  bootstrap.actor.role = 'MECHANIC';
+  bootstrap.capabilities.entities.permit.edit = true;
+  let attempts = 0;
+  vi.mocked(authFetch).mockImplementation(async () => {
+    attempts += 1;
+    if (attempts === 1) throw new Error('network');
+    return new Response(JSON.stringify({workTypes: [{id: 'work-1', name: attempts === 2 ? 'Работы после повтора' : 'Обновлённые работы',
+      hint: '', icon: 'other', defaultRisk: 'NORMAL', hazardPresets: [], requiredApprovals: ['DISPATCHER'], allowAuthorApproval: false}],
+      people: [], placePresets: [], objectNames: []}), {status: 200});
+  });
+  render(<PermitsScreen {...makeProps({bootstrap})} />);
+  fireEvent.click(screen.getByRole('button', {name: '+ Создать наряд'}));
+  expect(await screen.findByText('Не удалось загрузить справочники формы.')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', {name: 'Повторить'}));
+  expect(await screen.findByText('Работы после повтора')).toBeInTheDocument();
+  expect(screen.queryByText('Не удалось загрузить справочники формы.')).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', {name: 'Отмена'}));
+  fireEvent.click(screen.getByRole('button', {name: '+ Создать наряд'}));
+  expect(await screen.findByText('Обновлённые работы')).toBeInTheDocument();
+  expect(attempts).toBe(3);
+});
