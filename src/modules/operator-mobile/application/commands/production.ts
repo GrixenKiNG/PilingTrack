@@ -19,7 +19,7 @@ import {SHIFT_WINDOW} from '../../domain/shift-window';
 import {validateDowntimeWithinShift} from '@/modules/reports';
 import type {ReadWeather} from '../../domain/view-contracts';
 import {
-  OperatorCommandError, requireCrew, requireOpenShift, ensureReport, businessReportId,
+  OperatorCommandError, requireCrew, requireOpenShift, ensureReport, businessReportId, reportAuditActor,
   requireDowntimeReason, requireDrillingType, requirePileGrade, requireProductionPermit,
 } from './shared';
 import type {Tx} from './shared';
@@ -567,6 +567,7 @@ export async function logProduction(input: {
       action: 'updated',
       userId: input.operatorId,
       diff: auditDiff,
+      ...await reportAuditActor(tx, input.tenantId, input.operatorId),
     }, tx as unknown as Parameters<typeof writeReportAuditRow>[1]);
 
     return {reportId};

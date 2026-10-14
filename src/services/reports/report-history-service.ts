@@ -67,7 +67,7 @@ export async function getReportHistory(
     id: row.id,
     action: row.action,
     actionLabel: actionLabel(row.action),
-    actorName: row.actorName ?? null,
+    actorName: row.actorName ?? (row.actorId ? lookups.user[row.actorId] ?? null : null),
     actorRole: row.actorRole ?? null,
     createdAt: row.createdAt.toISOString(),
     changes: row.diff ? humanizeDiff(row.diff as Record<string, unknown>, lookups) : [],

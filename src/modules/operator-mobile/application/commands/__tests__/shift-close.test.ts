@@ -37,6 +37,7 @@ const tx = {
   meterReading: {findFirst: vi.fn()},
   operatorShiftEvidence: {findFirst: vi.fn()},
   outboxEvent: {create: vi.fn()},
+  user: {findFirst: vi.fn().mockResolvedValue({name: 'Иванов', role: 'OPERATOR'})},
 };
 
 beforeEach(() => {
@@ -92,6 +93,7 @@ describe('closeShift — след сдачи в истории отчёта', ()
     expect(record).toEqual(expect.objectContaining({
       action: 'submitted',
       userId: input.operatorId,
+      userName: 'Иванов', userRole: 'OPERATOR',
     }));
     // Второй аргумент — клиент транзакции: след обязан быть атомарным со статусом.
     expect(client).toBe(tx);

@@ -49,12 +49,16 @@ export function formatRelative(iso: string): string {
 
 /**
  * Date string → "DD.MM.YYYY" (ru). Accepts a date-only `YYYY-MM-DD` or a full
- * ISO timestamp (only the date part is used). Timezone-safe: it slices the date
- * portion rather than going through `new Date()`, so an evening-UTC timestamp
- * never shifts a day. null/undefined/empty/malformed → "—".
+ * ISO timestamp (calendar day in Europe/Moscow). Date-only values keep their
+ * day. null/undefined/empty/malformed → "—".
  */
 export function formatRuDate(value: string | null | undefined): string {
   if (!value) return '—';
+  if (/^\d{4}-\d{2}-\d{2}T/.test(value)) {
+    const timestamp = new Date(value);
+    if (Number.isNaN(timestamp.getTime())) return '—';
+    return timestamp.toLocaleDateString('ru-RU', { timeZone: 'Europe/Moscow' });
+  }
   const [y, m, d] = value.slice(0, 10).split('-');
   return y && m && d ? `${d}.${m}.${y}` : '—';
 }

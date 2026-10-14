@@ -17,6 +17,14 @@ interface MediaContext {
   tenantId?: string | null;
 }
 
+function maintenanceRecordId(entityId: string): string {
+  const [recordId, suffix, ...extra] = entityId.split('__');
+  if (!recordId || (suffix !== undefined && suffix !== 'work') || extra.length > 0) {
+    throw new ServiceError('Нет доступа', 403);
+  }
+  return recordId;
+}
+
 /**
  * Whether the actor may attach/list media for the given entity.
  *
@@ -33,6 +41,7 @@ export async function assertCanAccessMediaEntity(
   entityId: string | null | undefined,
   action: 'read' | 'mutate' = 'mutate',
 ): Promise<void> {
+  const maintenanceId = entityType === 'maintenance' && entityId ? maintenanceRecordId(entityId) : null;
   if (entityType === 'equipment') {
     if (action === 'read' && actor.tenantId && can(actor, 'equipment.read')) return;
     if (resolveEffectiveRole(actor.role, actor.actingAs) !== 'ADMIN') throw new ServiceError('Только администратор может управлять фото установок', 403);
@@ -76,7 +85,7 @@ export async function assertCanAccessMediaEntity(
   // что и сам осмотр.
   if (entityType === 'maintenance') {
     const { db } = await import('@/lib/db');
-    const record = await db.maintenanceRecord.findUnique({ where: { id: entityId }, select: { tenantId: true } });
+    const record = await db.maintenanceRecord.findUnique({ where: { id: maintenanceId ?? entityId }, select: { tenantId: true } });
     if (!actor.tenantId || record?.tenantId !== actor.tenantId || !can(actor, 'maintenance.manage')) {
       throw new ServiceError('Нет доступа', 403);
     }
@@ -179,6 +188,7 @@ export function assertCanAccessMedia(
   media: MediaContext,
   action: 'read' | 'mutate' = 'mutate',
 ): void {
+  if (media.entityType === 'maintenance' && media.entityId) maintenanceRecordId(media.entityId);
   if (media.entityType === 'equipment') {
     if (action === 'read') {
       if (!actor.tenantId || !media.tenantId || actor.tenantId !== media.tenantId) {
@@ -191,6 +201,10 @@ export function assertCanAccessMedia(
   }
 
   if (isPrivilegedRole(resolveEffectiveRole(actor.role, actor.actingAs))) return;
+  if (media.entityType === 'maintenance'
+    && (!actor.tenantId || actor.tenantId !== media.tenantId || !can(actor, 'maintenance.manage'))) {
+    throw new ServiceError('Нет доступа', 403);
+  }
   if (media.userId === actor.id) return;
   if (action === 'read' && actor.tenantId && media.tenantId === actor.tenantId) {
     if ((media.entityType === 'inspection' || media.entityType === 'maintenance') && can(actor, 'maintenance.manage')) return;

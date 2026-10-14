@@ -26,6 +26,13 @@ export class OperatorCommandError extends Error {
 
 export type Tx = Prisma.TransactionClient;
 
+export async function reportAuditActor(tx: Tx, tenantId: string, userId: string) {
+  const actor = await tx.user.findFirst({
+    where: {tenantId, id: userId}, select: {name: true, role: true},
+  });
+  return {userName: actor?.name ?? undefined, userRole: actor?.role};
+}
+
 export const DAY_MS = 86_400_000;
 
 export async function requireCrew(tx: Tx, tenantId: string, operatorId: string, equipmentId: string) {

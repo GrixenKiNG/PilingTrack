@@ -94,6 +94,17 @@ function baseState(overrides: Record<string, unknown> = {}) {
 }
 
 describe('AdminReports — ошибки источников формы (F-N1005-REPORT-FORM-SOURCE)', () => {
+  it('explains the export scope only while text search is active', () => {
+    reportsState.current = baseState();
+    render(<AdminReports />);
+    const hint = 'Поиск по тексту в выгрузку не входит. Сузьте выгрузку фильтрами объекта, установки или машиниста';
+    expect(screen.queryByText(hint)).not.toBeInTheDocument();
+    const search = screen.getByRole('textbox', {name: 'Поиск по оператору, объекту или установке'});
+    fireEvent.change(search, {target: {value: 'Иван'}});
+    expect(screen.getByText(hint)).toBeInTheDocument();
+    fireEvent.change(search, {target: {value: '  '}});
+    expect(screen.queryByText(hint)).not.toBeInTheDocument();
+  });
   it('передаёт в открытую форму ошибку списков отдельно от ошибки справочников', () => {
     reportsState.current = baseState({filterError: 'Установки не загрузились', dictionaryError: 'Марки не загрузились'});
     render(<AdminReports />);

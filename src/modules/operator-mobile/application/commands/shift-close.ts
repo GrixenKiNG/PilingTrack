@@ -9,7 +9,7 @@ import type {Prisma} from '@/generated/postgres-client/client';
 import {withReadinessTenantTransaction} from '@/modules/readiness/server';
 // eslint-disable-next-line no-restricted-imports -- legacy cross-layer import pending the parked services<->modules migration (CLAUDE.md); behavior-neutral
 import {writeReportAuditRow} from '@/services/reports/audit-service';
-import {OperatorCommandError, requireCrew, requireOpenShift, ensureReport, businessReportId} from './shared';
+import {OperatorCommandError, requireCrew, requireOpenShift, ensureReport, businessReportId, reportAuditActor} from './shared';
 import type {Tx} from './shared';
 
 /** Оператор объявил, что работа закончена: дальше только ЕО после работы. */
@@ -206,6 +206,7 @@ export async function submitShiftReport(tx: Tx, input: {
     reportId: submittedReportId,
     action: 'submitted',
     userId: input.operatorId,
+    ...await reportAuditActor(tx, input.tenantId, input.operatorId),
     newData: {
       status: 'submitted',
       submittedAt: input.now.toISOString(),
