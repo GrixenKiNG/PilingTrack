@@ -6,11 +6,52 @@
  * никто не увидит.
  */
 import type {Prisma} from '@/generated/postgres-client/client';
+import {downtimeExceedsShift, formatDowntimeHoursOnly} from '@/lib/downtime-hours';
 import {withReadinessTenantTransaction} from '@/modules/readiness/server';
 // eslint-disable-next-line no-restricted-imports -- legacy cross-layer import pending the parked services<->modules migration (CLAUDE.md); behavior-neutral
 import {writeReportAuditRow} from '@/services/reports/audit-service';
 import {OperatorCommandError, requireCrew, requireOpenShift, ensureReport, businessReportId, reportAuditActor} from './shared';
 import type {Tx} from './shared';
+
+/** Часы и минуты «ЧЧ:ММ» в поясе смены — так время смены попадает в отчёт. */
+function clockIn(timezone: string, at: Date | null | undefined) {
+  return at
+    ? new Intl.DateTimeFormat('ru-RU', {timeZone: timezone, hour: '2-digit', minute: '2-digit', hour12: false}).format(at)
+    : null;
+}
+
+/**
+ * Простой не длиннее самой смены — то же правило, что у правки отчёта
+ * администратором (`shiftHoursFromClock`).
+ *
+ * ПОЧЕМУ ЗДЕСЬ. Машинист закрывал смену с простоем больше смены, а администратор
+ * потом не мог сохранить этот отчёт: правило отчёта отклоняло его целиком
+ * (аудит 11–13.10.2026, пункт 5). Теперь отказ приходит раньше, пока смена
+ * открыта и запись можно поправить («Поправить» в записях смены).
+ *
+ * СУТКИ И БОЛЕЕ НЕ СУДИМ. Отметки «ЧЧ:ММ» не различают 4 часа и 28: смену,
+ * забытую до утра, правило отчёта оценило бы по остатку от суток и заставило бы
+ * занизить простой. Честнее промолчать, чем просить неправду.
+ */
+async function requireDowntimeFitsShift(tx: Tx, input: {
+  tenantId: string; shiftId: string; startedAt: Date | null; timezone: string | null; now: Date;
+}) {
+  if (!input.startedAt || input.now.getTime() - input.startedAt.getTime() >= 86_400_000) return;
+  const timezone = input.timezone ?? 'Europe/Moscow';
+  const {_sum} = await tx.reportDowntime.aggregate({
+    _sum: {duration: true},
+    where: {tenantId: input.tenantId, shiftId: input.shiftId},
+  });
+  const total = _sum.duration ?? 0;
+  const over = downtimeExceedsShift(total, clockIn(timezone, input.startedAt), clockIn(timezone, input.now));
+  if (over) {
+    throw new OperatorCommandError(
+      409,
+      `Простой за смену (${formatDowntimeHoursOnly(total)}) больше самой смены (${formatDowntimeHoursOnly(over.shiftHours)}). `
+      + 'Поправьте простой в записях смены и закройте её снова.',
+    );
+  }
+}
 
 /** Оператор объявил, что работа закончена: дальше только ЕО после работы. */
 export async function finishWork(input: {tenantId: string; operatorId: string; shiftId: string}) {
@@ -67,6 +108,11 @@ export async function closeShift(input: {
     if (!done) {
       throw new OperatorCommandError(409, 'Сначала выполните ЕО после работы');
     }
+
+    await requireDowntimeFitsShift(tx, {
+      tenantId: input.tenantId, shiftId: input.shiftId,
+      startedAt: started?.startedAt ?? null, timezone: started?.timezone ?? null, now,
+    });
 
     const {reportId} = await submitShiftReport(tx, {
       tenantId: input.tenantId,
@@ -163,11 +209,7 @@ export async function submitShiftReport(tx: Tx, input: {
   // указана» и не знает, во сколько машина вышла и во сколько встала.
   // Часы берём из самой смены, а не из телефона: она их и так помнит.
   const timezone = input.timezone ?? 'Europe/Moscow';
-  const clock = (at: Date | null | undefined) => (at
-    ? new Intl.DateTimeFormat('ru-RU', {
-      timeZone: timezone, hour: '2-digit', minute: '2-digit', hour12: false,
-    }).format(at)
-    : null);
+  const clock = (at: Date | null | undefined) => clockIn(timezone, at);
 
   const submitted = await tx.report.updateMany({
     where: {id: reportId, status: 'draft'},

@@ -27,6 +27,7 @@ import {OfflineQueueBanner} from '../offline-queue-banner';
 import {useOfflineQueue} from '../use-offline-queue';
 import type {ProductionEntryInput} from '../api';
 import {PilePassportForm} from '../screens/pile-passport-form';
+import {V10Entries, type CorrectionInput} from './v10-entries';
 import {formatNumber} from '@/lib/format';
 import {
   Badge, Banner, Card, Icon, Metric, Navbar, Nodata, Pair, Row, Tabbar,
@@ -541,10 +542,11 @@ function ProductionForm({state, busy, onLog, initialKind = 'PILES'}: {
   );
 }
 
-function ScreenWork({state, busy, onLog, go}: {
+function ScreenWork({state, busy, onLog, onCorrect, go}: {
   state: OperatorMobileState;
   busy: boolean;
   onLog: (entry: ProductionEntryInput) => Promise<boolean>;
+  onCorrect: (input: CorrectionInput) => Promise<boolean>;
   go: Go;
 }) {
   const [entry, setEntry] = useState<WorkAction | null>(null);
@@ -556,13 +558,19 @@ function ScreenWork({state, busy, onLog, go}: {
     return (
       <>
         <ProductionForm state={state} busy={busy} onLog={onLog} />
+        <V10Entries entries={state.entries} busy={busy} onCorrect={onCorrect} />
         <button type="button" className="ov10-btn ghost" onClick={() => go(state.shift && state.shift.productionDate < state.productionDate ? 'closing' : 'step')}>{state.shift && state.shift.productionDate < state.productionDate ? 'К сдаче смены' : 'К ЕО после работы и закрытию'}</button>
       </>
     );
   }
   if (entry) return <><button type="button" className="oc-form-back" onClick={()=>setEntry(null)}>← К смене</button><ProductionForm key={entry} state={state} busy={busy} onLog={onLog} initialKind={entry} /></>;
-  return <OperatorWorkOverview state={state} variant="v10" busy={busy} onAction={setEntry}
-    onIncident={()=>go('incidents')} onFinish={()=>go('closing')} />;
+  return (
+    <>
+      <OperatorWorkOverview state={state} variant="v10" busy={busy} onAction={setEntry}
+        onIncident={()=>go('incidents')} onFinish={()=>go('closing')} />
+      <V10Entries entries={state.entries} busy={busy} onCorrect={onCorrect} />
+    </>
+  );
 }
 
 /**
@@ -1556,6 +1564,18 @@ export function OperatorV10App() {
     );
   }, [commandId, run, state]);
 
+  const correctProduction = useCallback(async (input: CorrectionInput): Promise<boolean> => {
+    const shiftId = state?.shift?.id;
+    if (!shiftId) {
+      setActionError('Смена не начата: поправлять нечего.');
+      return false;
+    }
+    return run(
+      () => sendCommand({command: 'correct-production', clientCommandId: commandId, shiftId, ...input}),
+      'Поправка записана.',
+    );
+  }, [commandId, run, state]);
+
   /** Работа закончена: сервер переводит смену в сдачу, дальше ЕО после работы. */
   const finishWork = useCallback(() => {
     const shiftId = state?.shift?.id;
@@ -1613,7 +1633,7 @@ export function OperatorV10App() {
         />
       );
     }
-    if (current.phase === 'WORK' && !oldShift) return <ScreenWork state={current} busy={busy} onLog={logProduction} go={setActive} />;
+    if (current.phase === 'WORK' && !oldShift) return <ScreenWork state={current} busy={busy} onLog={logProduction} onCorrect={correctProduction} go={setActive} />;
     return <ScreenClosing state={current} busy={busy} onFinish={finishWork} onClose={closeShift} go={goFromClosing}
       unsent={queued.length} onFlush={() => void flushQueued()} />;
   };
@@ -1674,7 +1694,7 @@ export function OperatorV10App() {
         <ScreenClosing state={state} busy={busy} onFinish={finishWork} onClose={closeShift} go={goFromClosing}
           unsent={queued.length} onFlush={() => void flushQueued()} />
       ) : <>
-        <ScreenWork state={state} busy={busy} onLog={logProduction} go={goFromClosing} />
+        <ScreenWork state={state} busy={busy} onLog={logProduction} onCorrect={correctProduction} go={goFromClosing} />
         {oldShift && state.phase === 'WORK' ? <button type="button" className="ov10-btn ghost" onClick={() => goFromClosing('closing')}>К сдаче смены</button> : null}
       </>;
       case 'maint': return <ScreenMaint state={state} go={setActive} />;

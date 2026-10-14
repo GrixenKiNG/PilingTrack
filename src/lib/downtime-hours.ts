@@ -127,3 +127,38 @@ export function formatDowntimeHours(hours: number | null | undefined): string {
   if (minutes === 0) return `${wholeHours} ч`;
   return `${wholeHours} ч ${minutes} мин`;
 }
+
+/**
+ * Длительность смены в часах по отметкам «ЧЧ:ММ» в отчёте.
+ *
+ * ОДНО ПРАВИЛО НА ДВА ПУТИ. Правка отчёта администратором (`report.aggregate.ts`)
+ * и закрытие смены машинистом (`shift-close.ts`) сравнивают простой со сменой
+ * одной и той же функцией: пока каждый считал по-своему, машинист закрывал
+ * смену с простоем, который администратор потом не мог сохранить (аудит
+ * 11–13.10.2026, пункт 5). Конец раньше начала — смена через полночь.
+ * Нет одной из отметок — длительность неизвестна (`null`), простой не судим.
+ */
+export function shiftHoursFromClock(
+  start: string | null | undefined,
+  end: string | null | undefined,
+): number | null {
+  if (!start || !end) return null;
+  const [startH, startM] = start.split(':').map(Number);
+  const [endH, endM] = end.split(':').map(Number);
+  let hours = (endH * 60 + endM - startH * 60 - startM) / 60;
+  if (hours < 0) hours += 24;
+  return hours;
+}
+
+/**
+ * Больше ли суммарный простой самой смены. `null` — нет оснований возражать:
+ * длительность неизвестна либо равна нулю (пустой интервал не судим, как и раньше).
+ */
+export function downtimeExceedsShift(
+  totalHours: number,
+  start: string | null | undefined,
+  end: string | null | undefined,
+): {shiftHours: number} | null {
+  const shiftHours = shiftHoursFromClock(start, end);
+  return shiftHours && totalHours > shiftHours ? {shiftHours} : null;
+}

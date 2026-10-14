@@ -496,3 +496,54 @@ describe('v10: кнопка «Следующий шаг»', () => {
     expect(screen.getByRole('button', {name: 'Записать простой'})).toBeInTheDocument();
   });
 });
+
+/* ---------------------------------- поправка простоя на экране v10 --- */
+
+describe('v10: поправка записи выработки (аудит 11–13.10, пункт 5)', () => {
+  const withDowntime = () => {
+    const state = workState();
+    state.entries = [{
+      id: 'dt-1', kind: 'DOWNTIME', label: 'Ремонт установки', value: 7, meters: null,
+      occurredAt: '2026-09-28T09:00:00.000Z', corrections: [],
+    }] as typeof state.entries;
+    return state;
+  };
+
+  const openCorrection = async () => {
+    api.fetchState.mockResolvedValue(withDowntime());
+    api.sendCommand.mockResolvedValue({ok: true});
+    render(<OperatorV10App />);
+    fireEvent.click(await screen.findByRole('button', {name: /^6. Работа/}));
+    fireEvent.click(await screen.findByRole('button', {name: 'Поправить'}));
+  };
+
+  it('показывает записанный простой и отправляет поправку с итогом, а не разницей', async () => {
+    await openCorrection();
+    fireEvent.change(screen.getByLabelText('Сколько часов простоя было на самом деле'), {target: {value: '3,5'}});
+    fireEvent.change(screen.getByLabelText('Что случилось'), {target: {value: 'Ошибся при вводе'}});
+    fireEvent.click(screen.getByRole('button', {name: 'Записать поправку'}));
+
+    await waitFor(() => expect(api.sendCommand).toHaveBeenCalledWith(expect.objectContaining({
+      command: 'correct-production', shiftId: 'shift-1', kind: 'DOWNTIME',
+      entryId: 'dt-1', actual: 3.5, reason: 'Ошибся при вводе',
+    })));
+  });
+
+  it('без причины и без числа кнопка записи закрыта: пустая строка — не ноль', async () => {
+    await openCorrection();
+    const send = screen.getByRole('button', {name: 'Записать поправку'});
+    expect(send).toBeDisabled();
+    fireEvent.change(screen.getByLabelText('Что случилось'), {target: {value: 'Ошибся при вводе'}});
+    expect(send).toBeDisabled();
+    fireEvent.click(send);
+    expect(api.sendCommand).not.toHaveBeenCalled();
+  });
+
+  it('без записей блок не рисуется', async () => {
+    api.fetchState.mockResolvedValue(workState());
+    render(<OperatorV10App />);
+    fireEvent.click(await screen.findByRole('button', {name: 'Следующий шаг: Записать выработку'}));
+    await screen.findByRole('button', {name: 'Добавить сваю'});
+    expect(screen.queryByText('Записано за смену')).not.toBeInTheDocument();
+  });
+});

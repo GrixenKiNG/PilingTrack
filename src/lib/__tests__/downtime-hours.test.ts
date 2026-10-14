@@ -3,6 +3,8 @@ import {
   downtimeHoursBetween,
   formatDowntimeHours,
   DOWNTIME_MAX_HOURS,
+  downtimeExceedsShift,
+  shiftHoursFromClock,
 } from '@/lib/downtime-hours';
 
 /**
@@ -84,5 +86,34 @@ describe('formatDowntimeHours', () => {
 
   it('крупное значение (выше суток) форматируется, а не обрезается', () => {
     expect(formatDowntimeHours(24.5)).toBe('24 ч 30 мин');
+  });
+});
+
+describe('shiftHoursFromClock / downtimeExceedsShift — одно правило для отчёта и закрытия смены', () => {
+  it('считает длительность по отметкам «ЧЧ:ММ»', () => {
+    expect(shiftHoursFromClock('08:00', '20:00')).toBe(12);
+    expect(shiftHoursFromClock('08:30', '09:00')).toBe(0.5);
+  });
+
+  it('конец раньше начала — смена через полночь', () => {
+    expect(shiftHoursFromClock('19:00', '07:00')).toBe(12);
+  });
+
+  it('нет одной из отметок — длительность неизвестна', () => {
+    expect(shiftHoursFromClock(null, '07:00')).toBeNull();
+    expect(shiftHoursFromClock('07:00', undefined)).toBeNull();
+    expect(shiftHoursFromClock('', '07:00')).toBeNull();
+  });
+
+  it('простой больше смены возвращает длительность смены', () => {
+    expect(downtimeExceedsShift(13, '08:00', '20:00')).toEqual({shiftHours: 12});
+    expect(downtimeExceedsShift(0.5, '08:00', '08:17')).toEqual({shiftHours: 17 / 60});
+  });
+
+  it('простой равный смене, меньший, неизвестная смена и пустой интервал не возражают', () => {
+    expect(downtimeExceedsShift(12, '08:00', '20:00')).toBeNull();
+    expect(downtimeExceedsShift(3, '08:00', '20:00')).toBeNull();
+    expect(downtimeExceedsShift(99, null, '20:00')).toBeNull();
+    expect(downtimeExceedsShift(1, '08:00', '08:00')).toBeNull();
   });
 });
