@@ -161,6 +161,7 @@ export const POST = withApi(async (request: NextRequest) => {
           latitude: d.latitude ?? undefined,
           longitude: d.longitude ?? undefined,
           metadata: d.metadata ?? undefined,
+          timestamp: d.timestamp ? new Date(d.timestamp) : undefined,
         }))
       );
       return NextResponse.json({
