@@ -31,6 +31,7 @@ export const ACTION_LABEL: Record<string, string> = {
   // Планировщик техготовности (`runReadinessScheduler`) — код выдаёт только он,
   // в журнале показывался сырым.
   'shift.auto-closed': 'Смена закрыта автоматически',
+  'shift.auto-cancelled': 'Неначатая смена отменена автоматически',
   'handover.submitted': 'Смена передана диспетчеру',
   'handover.resubmitted': 'Передача сдана повторно',
   'handover.accepted': 'Передача принята',
@@ -120,6 +121,7 @@ const ACTION_MARK: Record<string, AuditActionMark> = {
   // кода не было — срабатывала запасная ветка и ночной инцидент рисовался
   // зелёной галочкой «успешно» (R125 №3).
   'shift.auto-closed': { icon: XCircle, tone: 'warning' },
+  'shift.auto-cancelled': { icon: XCircle, tone: 'warning' },
   'handover.submitted': { icon: Send, tone: 'info' },
   'handover.resubmitted': { icon: Send, tone: 'info' },
   'handover.accepted': { icon: Lock, tone: 'success' },

@@ -21,8 +21,24 @@ export function isOverduePermit(permit: Pick<WorkPermitDto, 'state' | 'validTo'>
   return new Date(permit.validTo).getTime() <= now.getTime();
 }
 
+/**
+ * Просроченные наряды, по которым ещё нужно действие. Просроченный наряд
+ * установки, у которой уже есть замена (черновик, наряд на согласовании или
+ * действующий с неистёкшим сроком), решён: новый наряд его заменил. Иначе
+ * истёкший наряд оставался в счётчике навсегда, и убрать его было нечем.
+ */
+export function actionableOverduePermits<T extends Pick<WorkPermitDto, 'state' | 'validTo' | 'equipmentId'>>(
+  permits: readonly T[],
+  now: Date,
+): T[] {
+  const replaced = new Set(permits
+    .filter((permit) => ['DRAFT', 'PENDING_APPROVAL', 'APPROVED'].includes(permit.state) && !isOverduePermit(permit, now))
+    .map((permit) => permit.equipmentId));
+  return permits.filter((permit) => isOverduePermit(permit, now) && !replaced.has(permit.equipmentId));
+}
+
 export function buildPermitRoleSteps({permits, now}: {permits: readonly WorkPermitDto[]; now: Date}): PermitRoleSteps[] {
-  const overdue = permits.filter((permit) => isOverduePermit(permit, now));
+  const overdue = actionableOverduePermits(permits, now);
   const livePending = permits.filter((permit) => permit.state === 'PENDING_APPROVAL' && !isOverduePermit(permit, now));
   const drafts = permits.filter((permit) => permit.state === 'DRAFT');
   const elevatedPending = livePending.filter((permit) => permit.risk === 'ELEVATED');

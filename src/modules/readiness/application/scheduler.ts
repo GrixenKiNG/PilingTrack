@@ -41,6 +41,7 @@ const SCHEDULER_ACTOR = {id: null, name: 'Планировщик техгото�
 export interface ReadinessSchedulerResult {
   permitsExpired: number;
   shiftsAutoClosed: number;
+  shiftsAutoCancelled: number;
   recalcRequested: number;
 }
 
@@ -242,6 +243,38 @@ export async function runReadinessScheduler(
       });
     }
 
+    // 2б. Неначатые смены прошедших суток (PLANNED, PENDING_ACCEPTANCE) —
+    //     несостоявшийся план. Работа не шла, поэтому не «закрываем», а
+    //     отменяем с причиной: иначе смена вечно висела на дашборде как
+    //     «ждёт допуска», хотя допускать уже нечего — сутки кончились.
+    const unstarted = await tx.shift.findMany({
+      where: {tenantId, state: {in: ['PLANNED', 'PENDING_ACCEPTANCE']}},
+      select: {id: true, productionDate: true, timezone: true, version: true, state: true},
+    });
+    const lapsed = unstarted.filter((shift) => tenantProductionDate(now, shift.timezone).getTime() > shift.productionDate.getTime());
+    const lapsedIds = lapsed.map((shift) => shift.id);
+    const cancelled = lapsedIds.length === 0 ? {count: 0} : await tx.shift.updateMany({
+      where: {tenantId, id: {in: lapsedIds}, state: {in: ['PLANNED', 'PENDING_ACCEPTANCE']}},
+      data: {state: 'CANCELLED', cancelledAt: now, cancelReason: 'Смену не начали до конца производственных суток', version: {increment: 1}},
+    });
+    for (const shift of lapsed) {
+      await recordChainedReadinessAudit(tx, {
+        tenantId,
+        action: 'shift.auto-cancelled',
+        entityType: 'Shift',
+        entityId: shift.id,
+        entityVersion: shift.version + 1,
+        actor: SCHEDULER_ACTOR,
+        requestId: runId,
+        correlationId: runId,
+        occurredAt: now,
+        before: {state: shift.state, version: shift.version,
+          productionDate: shift.productionDate.toISOString().slice(0, 10)},
+        after: {state: 'CANCELLED', version: shift.version + 1, cancelledAt: now.toISOString()},
+        metadata: {trigger: 'SCHEDULER', reason: 'NOT_STARTED_PRODUCTION_DAY_ELAPSED', timezone: shift.timezone},
+      });
+    }
+
     // 3. Пересчёт готовности на новые сутки.
     //
     // Это лечит главную ложь экрана: `CurrentReadiness` пересчитывался ТОЛЬКО
@@ -278,6 +311,7 @@ export async function runReadinessScheduler(
     return {
       permitsExpired: expired.count,
       shiftsAutoClosed: closed.count,
+      shiftsAutoCancelled: cancelled.count,
       recalcRequested: fleet.length,
     };
   });

@@ -19,7 +19,7 @@ import type { WorkPermitDto } from '../api/contracts';
 import { CommandDialog } from '../shared/command-dialog';
 import { PermitForm } from '../forms/permit-form';
 import { ProcessRoleStrip, RefKpi, commandFailure, downloadReadinessExport } from './shared';
-import { buildPermitRoleSteps, isOverduePermit } from './permit-role-steps';
+import { actionableOverduePermits, buildPermitRoleSteps, isOverduePermit } from './permit-role-steps';
 import { normalizeSearch } from '../shared/text-search';
 import type { ReferenceUiProps } from './types';
 
@@ -108,7 +108,7 @@ export function PermitsScreen(props: ReferenceUiProps) {
     раз в сутки; до тех пор экран показывает их как просроченные.
   */
   const nowMs = Date.now();
-  const overduePermits = props.permits.filter((item) => isOverduePermit(item, new Date(nowMs)));
+  const overduePermits = actionableOverduePermits(props.permits, new Date(nowMs));
   const awaitingApproval = props.permits.filter((item) => item.state === 'PENDING_APPROVAL' && !isOverduePermit(item, new Date(nowMs)));
   const pending = awaitingApproval.length;
   const roleSteps = buildPermitRoleSteps({permits: props.permits, now: new Date(nowMs)});
@@ -144,7 +144,7 @@ export function PermitsScreen(props: ReferenceUiProps) {
     // загромождали реестр. Просроченные — отдельный фильтр со счётчиком.
     if (permitFilter === 'ALL' && (permit.state === 'EXPIRED' || permit.state === 'REVOKED' || isOverduePermit(permit, new Date(nowMs)))) return false;
     if (permitFilter === 'CLOSED') { if (permit.state !== 'EXPIRED' && permit.state !== 'REVOKED') return false; }
-    else if (permitFilter === 'OVERDUE') { if (!isOverduePermit(permit, new Date(nowMs))) return false; }
+    else if (permitFilter === 'OVERDUE') { if (!overduePermits.includes(permit)) return false; }
     else if (permitFilter !== 'ALL' && (permit.state !== permitFilter || isOverduePermit(permit, new Date(nowMs)))) return false;
     const equipmentName = props.equipment.find((item) => item.id === permit.equipmentId)?.name ?? '';
     const query = normalizeSearch(permitQuery);

@@ -28,7 +28,17 @@ vi.mock('@/lib/db', () => {
     // Каждый читает своё поле.
     $queryRaw: vi.fn(async () => [{tenant_id: 'orion', lastSequence: BigInt(0), headHash: null}]),
     workPermit: {findMany: permitFindMany, updateMany: permitUpdateMany},
-    shift: {findMany: shiftFindMany, updateMany: shiftUpdateMany},
+    // Мок отдаёт одни строки на оба запроса планировщика; отбор по состоянию
+    // делаем здесь, как сделала бы база.
+    shift: {
+      findMany: async (args: {where: {state: {in: string[]}}}) => {
+        const rows = await shiftFindMany(args);
+        const wanted = args.where.state.in;
+        // Строка без состояния — старые тесты про STARTED.
+        return rows.filter((row: {state?: string}) => row.state ? wanted.includes(row.state) : wanted.includes('STARTED'));
+      },
+      updateMany: shiftUpdateMany,
+    },
     equipment: {findMany: equipmentFindMany},
     outboxEvent: {createMany: outboxCreateMany, create: outboxCreate},
     report: {findMany: reportFindMany, updateMany: reportUpdateMany},
@@ -123,6 +133,19 @@ describe('суточный сброс техготовности', () => {
 
   // Главная защита: закрыть смену текущих суток — значит оборвать работу,
   // которая идёт прямо сейчас.
+  it('неначатая смена прошедших суток отменяется, сегодняшняя — нет', async () => {
+    shiftFindMany.mockResolvedValue([
+      {id: 'old', productionDate: new Date('2026-08-14T00:00:00.000Z'), timezone: MSK, version: 2, state: 'PENDING_ACCEPTANCE'},
+      {id: 'today', productionDate: new Date('2026-08-15T00:00:00.000Z'), timezone: MSK, version: 1, state: 'PLANNED'},
+    ]);
+    shiftUpdateMany.mockResolvedValue({count: 1});
+    const result = await runReadinessScheduler('orion', NOW);
+    expect(shiftUpdateMany).toHaveBeenCalledTimes(1);
+    expect(shiftUpdateMany.mock.calls[0][0].where.id).toEqual({in: ['old']});
+    expect(shiftUpdateMany.mock.calls[0][0].data.state).toBe('CANCELLED');
+    expect(result.shiftsAutoCancelled).toBe(1);
+  });
+
   it('сегодняшняя смена не закрывается', async () => {
     shiftFindMany.mockResolvedValue([
       {id: 'today', productionDate: new Date('2026-08-15T00:00:00.000Z'), timezone: MSK},

@@ -1,5 +1,5 @@
 import type { CurrentReadinessDto, DefectDto, ReadinessShiftDto, WorkPermitDto } from './to/readiness/api/contracts';
-import { isOverduePermit } from './to/readiness/screens/permit-role-steps';
+import { actionableOverduePermits } from './to/readiness/screens/permit-role-steps';
 
 /** Строка в блоке «Требует решения сейчас»: что случилось, кто решает, что сделать, куда идти. */
 export interface AttentionItem {
@@ -38,7 +38,7 @@ export function buildAttentionItems(input: AttentionInput): AttentionItem[] {
   const items: AttentionItem[] = [];
 
   if (input.permits) {
-    const overdue = input.permits.filter((permit) => isOverduePermit(permit, input.now));
+    const overdue = actionableOverduePermits(input.permits, input.now);
     if (overdue.length > 0) {
       items.push({
         id: 'permits-overdue',
