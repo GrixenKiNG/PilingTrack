@@ -156,15 +156,12 @@ export const POST = withApi(async (request: NextRequest) => {
         validated.data.map((d) => ({
           ...d,
           tenantId,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any -- telemetry enum/Prisma cast at the ingestion boundary
-          type: d.type as any,
           siteId: d.siteId ?? undefined,
           unit: d.unit ?? undefined,
           latitude: d.latitude ?? undefined,
           longitude: d.longitude ?? undefined,
           metadata: d.metadata ?? undefined,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- telemetry enum/Prisma cast at the ingestion boundary
-        })) as any
+        }))
       );
       return NextResponse.json({
         success: true,
@@ -192,8 +189,7 @@ export const POST = withApi(async (request: NextRequest) => {
     }
 
     const id = await ingestTelemetry({
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- telemetry enum/Prisma cast at the ingestion boundary
-      type: validated.data.type as any,
+      type: validated.data.type,
       tenantId,
       equipmentId: validated.data.equipmentId,
       value: validated.data.value,
@@ -205,8 +201,7 @@ export const POST = withApi(async (request: NextRequest) => {
       timestamp: validated.data.timestamp
         ? new Date(validated.data.timestamp)
         : undefined,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- telemetry enum/Prisma cast at the ingestion boundary
-    } as any);
+    });
 
     const isSampledOut = id.startsWith('sampled-out-');
 
@@ -276,8 +271,7 @@ export const GET = withApi(async (request: NextRequest) => {
       const owned = await listAllEquipment(
         // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
         requireTenantId(user!),
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- telemetry enum/Prisma cast at the ingestion boundary
-        { limit: 200, getNextCursor: () => null } as any,
+        { cursor: null, take: 200, getNextCursor: () => null },
         null,
         // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
         user!.id
@@ -351,14 +345,12 @@ export const GET = withApi(async (request: NextRequest) => {
       tenantId,
       equipmentId,
       siteId,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- telemetry enum/Prisma cast at the ingestion boundary
-      type: type as any,
+      type,
       from: fromDate,
       to: toDate,
       limit,
       ...(allowedEquipmentIds && !equipmentId ? { equipmentIds: allowedEquipmentIds } : {}),
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- telemetry enum/Prisma cast at the ingestion boundary
-    } as any);
+    });
 
     return NextResponse.json({ records });
 }, { domain: 'telemetry' });

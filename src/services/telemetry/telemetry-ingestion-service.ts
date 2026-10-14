@@ -32,17 +32,8 @@ import { logger } from '@/lib/logger';
 // Re-export buffer for API layer access
 export { telemetryBuffer };
 
-export type TelemetryType =
-  | 'pile_strike'
-  | 'drilling_depth'
-  | 'equipment_gps'
-  | 'cycle_time'
-  | 'pressure'
-  | 'vibration'
-  | 'temperature';
-
 export interface TelemetryRecord {
-  type: TelemetryType;
+  type: string;
   tenantId: string;
   equipmentId: string;
   siteId?: string;
@@ -281,7 +272,7 @@ export async function findForeignEquipmentIds(
 export async function getLatestTelemetry(
   equipmentId: string,
   tenantId: string,
-  type?: TelemetryType
+  type?: string
 ) {
   if (!tenantId) {
     throw new Error('getLatestTelemetry: tenantId is required');
@@ -305,7 +296,7 @@ export async function getTelemetryByRange(params: {
   equipmentId?: string;
   equipmentIds?: string[]; // restrict to this set — used for operator-scoped reads
   siteId?: string;
-  type?: TelemetryType;
+  type?: string;
   from: Date;
   to: Date;
   limit?: number;

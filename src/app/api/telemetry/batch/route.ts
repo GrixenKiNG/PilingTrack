@@ -139,15 +139,12 @@ export const POST = withApi(async (request: NextRequest) => {
       validated.data.map((d) => ({
         ...d,
         tenantId,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- telemetry enum/Prisma cast at the ingestion boundary
-        type: d.type as any,
         siteId: d.siteId ?? undefined,
         unit: d.unit ?? undefined,
         latitude: d.latitude ?? undefined,
         longitude: d.longitude ?? undefined,
         metadata: d.metadata ?? undefined,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- telemetry enum/Prisma cast at the ingestion boundary
-      })) as any
+      }))
     );
 
     return NextResponse.json({
