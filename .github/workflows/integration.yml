@@ -89,9 +89,42 @@ jobs:
         run: npx --no-install tsc --noEmit
       - name: Build application for HTTP stand specs
         run: npm run build
+      # Одноразовое S3 для спека редактора плиток. Боевая CSP разрешает в connect-src только https:,
+      # поэтому MinIO сразу поднимается с TLS (самоподписанный сертификат на час). Playwright уже
+      # работает с ignoreHTTPSErrors, а Node доверяет сертификату через NODE_EXTRA_CA_CERTS.
+      # Переменные S3_* получает только процесс стенда: на другие шаги они не попадают.
+      - name: Start disposable S3 (MinIO over TLS)
+        shell: bash
+        run: |
+          set -euo pipefail
+          certs="$RUNNER_TEMP/minio-certs"
+          mkdir -p "$certs"
+          openssl req -x509 -newkey rsa:2048 -nodes -days 1 -subj '/CN=localhost'             -addext 'subjectAltName=IP:127.0.0.1,DNS:localhost'             -keyout "$certs/private.key" -out "$certs/public.crt"
+          chmod 644 "$certs/private.key" "$certs/public.crt"
+          s3_user="codex$(node -e "process.stdout.write(require('node:crypto').randomBytes(5).toString('hex'))")"
+          s3_password="$(node -e "process.stdout.write(require('node:crypto').randomBytes(24).toString('hex'))")"
+          echo "::add-mask::$s3_password"
+          docker run -d --name "codex-minio-${{ github.run_id }}"             --label pilingtrack.codex.test-s3=1             -p 127.0.0.1:9000:9000             -v "$certs:/root/.minio/certs:ro"             -e MINIO_ROOT_USER="$s3_user" -e MINIO_ROOT_PASSWORD="$s3_password"             -e MINIO_API_CORS_ALLOW_ORIGIN='*'             minio/minio:RELEASE.2024-09-13T20-26-02Z server /data
+          for i in $(seq 1 30); do
+            if curl -fsS --cacert "$certs/public.crt" https://127.0.0.1:9000/minio/health/live >/dev/null 2>&1; then break; fi
+            sleep 1
+          done
+          curl -fsS --cacert "$certs/public.crt" https://127.0.0.1:9000/minio/health/live >/dev/null
+          {
+            echo "export S3_ENDPOINT='https://127.0.0.1:9000'"
+            echo "export S3_REGION='us-east-1'"
+            echo "export S3_BUCKET='codex-photos'"
+            echo "export S3_ACCESS_KEY_ID='$s3_user'"
+            echo "export S3_SECRET_ACCESS_KEY='$s3_password'"
+            echo "export NODE_EXTRA_CA_CERTS='$certs/public.crt'"
+          } > "$RUNNER_TEMP/s3.env"
+          chmod 600 "$RUNNER_TEMP/s3.env"
+          ( set -a; . "$RUNNER_TEMP/s3.env"; set +a; node e2e/fixtures/disposable-s3.mjs )
+          echo "E2E_S3_READY=true" >> "$GITHUB_ENV"
       - name: Start disposable application stand
         run: |
           set -euo pipefail
+          set -a; . "$RUNNER_TEMP/s3.env"; set +a
           nohup npx --no-install next start -p 3100 -H 127.0.0.1 > stand-app.log 2>&1 &
           for i in $(seq 1 90); do
             if curl -fsS http://127.0.0.1:3100/api/health >/dev/null 2>&1; then break; fi
@@ -138,6 +171,10 @@ jobs:
         env:
           BASE_URL: 'http://127.0.0.1:3100'
         run: npx playwright test e2e/role-audit.spec.js --project=chromium --workers=1
+      - name: Monitoring tile editor with disposable S3
+        env:
+          BASE_URL: 'http://127.0.0.1:3100'
+        run: npx playwright test e2e/monitoring-tile-editor.spec.ts --project=chromium --workers=1
       - name: Upload Playwright report on failure
         if: failure()
         uses: actions/upload-artifact@v4
