@@ -24,9 +24,33 @@ export interface PileGrade { id: string; name: string; lengthMm: number | null }
 export interface DowntimeReason { id: string; name: string }
 export interface DrillingType { id: string; name: string }
 
+/**
+ * Отказ записи внутри формы. Всплывающее сообщение рисуется под полноэкранной
+ * панелью или гаснет за секунды, и машинист не видит, почему запись не прошла
+ * (аудит 13.10: отказ бурения без чек-листа ТБ). Если сервер требует чек-лист ТБ (его сообщение: «срок чек-листа ТБ…»),
+ * рядом стоит кнопка перехода на вкладку ТБ.
+ */
+export function SheetError({ message, onOpenSafety }: {
+  message: string | null; onOpenSafety?: () => void;
+}) {
+  if (!message) return null;
+  return (
+    <div role="alert" className="space-y-2 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2.5">
+      <p className="text-base text-destructive">{message}</p>
+      {onOpenSafety && /чек-лист\S*\s+ТБ/.test(message) && (
+        <button type="button" onClick={onOpenSafety}
+          className="min-h-11 text-base font-semibold text-signal-strong">
+          Открыть вкладку ТБ
+        </button>
+      )}
+    </div>
+  );
+}
+
 /** Панель поверх экрана: шапка, содержимое, кнопка внизу. */
-function Sheet({ title, onClose, children, footer }: {
+function Sheet({ title, onClose, children, footer, error = null, onOpenSafety }: {
   title: string; onClose: () => void; children: ReactNode; footer: ReactNode;
+  error?: string | null; onOpenSafety?: () => void;
 }) {
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-background">
@@ -38,7 +62,10 @@ function Sheet({ title, onClose, children, footer }: {
         <p className="text-2xl font-semibold">{title}</p>
       </header>
       <div className="flex-1 space-y-4 overflow-y-auto p-4">{children}</div>
-      <div className="border-t border-border bg-card p-3">{footer}</div>
+      <div className="space-y-2 border-t border-border bg-card p-3">
+        <SheetError message={error} onOpenSafety={onOpenSafety} />
+        {footer}
+      </div>
     </div>
   );
 }
@@ -55,10 +82,12 @@ function Field({ label, htmlFor, children }: { label: string; htmlFor?: string; 
 const control = 'h-11 w-full rounded-lg border border-border bg-card px-3 text-base';
 
 /** Добавить сваи: марка и количество. */
-export function PileSheet({ open, grades, busy, onClose, onAdd }: {
+export function PileSheet({ open, grades, busy, error, onOpenSafety, onClose, onAdd }: {
   open: boolean;
   grades: PileGrade[];
   busy: boolean;
+  error?: string | null;
+  onOpenSafety?: () => void;
   onClose: () => void;
   onAdd: (gradeId: string, count: number) => void;
 }) {
@@ -71,6 +100,8 @@ export function PileSheet({ open, grades, busy, onClose, onAdd }: {
     <Sheet
       title="Новая свая"
       onClose={onClose}
+      error={error}
+      onOpenSafety={onOpenSafety}
       footer={
         <StepButton
           label={count > 1 ? `Добавить ${count} шт` : 'Добавить'}
@@ -133,10 +164,12 @@ export function PileSheet({ open, grades, busy, onClose, onAdd }: {
  * Метры спрашиваем на ОДНУ скважину, а не итогом: глубину машинист знает по
  * проходке, а общий метраж считает в уме и ошибается на кратное число.
  */
-export function DrillingSheet({ open, types, busy, onClose, onAdd }: {
+export function DrillingSheet({ open, types, busy, error, onOpenSafety, onClose, onAdd }: {
   open: boolean;
   types: DrillingType[];
   busy: boolean;
+  error?: string | null;
+  onOpenSafety?: () => void;
   onClose: () => void;
   onAdd: (typeId: string, count: number, metersPerUnit: number) => void;
 }) {
@@ -152,6 +185,8 @@ export function DrillingSheet({ open, types, busy, onClose, onAdd }: {
     <Sheet
       title="Лидерное бурение"
       onClose={onClose}
+      error={error}
+      onOpenSafety={onOpenSafety}
       footer={
         <StepButton
           label={metersOk ? `Записать ${(count * metersPerUnit).toFixed(1)} м` : 'Записать бурение'}
@@ -211,10 +246,11 @@ export function DrillingSheet({ open, types, busy, onClose, onAdd }: {
  * Только часы, без привязки ко времени работы в программе (решение владельца
  * 07.10.2026): машинист может внести простой и после работы.
  */
-export function DowntimeSheet({ open, reasons, busy, onClose, onAdd }: {
+export function DowntimeSheet({ open, reasons, busy, error, onClose, onAdd }: {
   open: boolean;
   reasons: DowntimeReason[];
   busy: boolean;
+  error?: string | null;
   onClose: () => void;
   onAdd: (reasonId: string, hours: number, comment: string) => void;
 }) {
@@ -231,6 +267,7 @@ export function DowntimeSheet({ open, reasons, busy, onClose, onAdd }: {
     <Sheet
       title="Простой"
       onClose={onClose}
+      error={error}
       footer={
         <StepButton
           label="Записать простой"

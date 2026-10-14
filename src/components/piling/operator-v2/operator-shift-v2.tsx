@@ -50,7 +50,7 @@ import type { OperatorShiftFacts } from '@/modules/readiness/application/operato
 import type { ClearanceDocument } from '@/modules/users';
 import { WeatherCard } from './weather-card';
 import { DefectSheet } from './defect-sheet';
-import { DowntimeSheet, DrillingSheet, PileSheet } from './sheets';
+import { DowntimeSheet, DrillingSheet, PileSheet, SheetError } from './sheets';
 import { PilePassportForm } from '@/components/piling/operator-mobile/screens/pile-passport-form';
 import { IncidentsTab } from '@/components/piling/operator-mobile/screens/incidents-tab';
 import {
@@ -555,12 +555,16 @@ export function OperatorShiftV2() {
   // Ключ переживает нажатие: двойное касание в перчатке не должно давать две
   // записи. Новый ключ — только после принятой записи.
   const [productionCommandId, setProductionCommandId] = useState(() => crypto.randomUUID());
+  // Причина отказа остаётся в открытой форме: всплывающее сообщение лежит под ней.
+  const [productionError, setProductionError] = useState<string | null>(null);
   const logProduction = useCallback(async (entry: ProductionEntryInput) => {
     const shiftId = mobile?.shift?.id ?? facts?.shift?.id;
     if (!shiftId) {
+      setProductionError('Смена не найдена — записать некуда');
       toast.error('Смена не найдена — записать некуда');
       return false;
     }
+    setProductionError(null);
     setBusy(true);
     try {
       await sendCommand({
@@ -581,12 +585,20 @@ export function OperatorShiftV2() {
         toast.info(cause.message);
         return true;
       }
-      toast.error(cause instanceof Error ? cause.message : 'Запись не прошла');
+      const message = cause instanceof Error ? cause.message : 'Запись не прошла';
+      setProductionError(message);
+      toast.error(message);
       return false;
     } finally {
       setBusy(false);
     }
   }, [mobile?.shift?.id, facts?.shift?.id, productionCommandId, loadMobile]);
+
+  const closeProductionSheets = () => {
+    setPileOpen(false); setPassportOpen(false); setDrillingOpen(false); setDowntimeOpen(false);
+    setProductionError(null);
+  };
+  const openSafetyFromSheet = () => { closeProductionSheets(); setTab('safety'); };
 
   /**
    * Принять машину.
@@ -757,7 +769,12 @@ export function OperatorShiftV2() {
     );
   }
   if (!facts || !state) {
-    return <p className="p-8 text-center text-base text-muted-foreground">Смена недоступна</p>;
+    return (
+      <div className="mx-auto max-w-md space-y-4 p-8 text-center">
+        <p className="text-base text-muted-foreground">Смена недоступна</p>
+        <StepButton label="Повторить" onClick={() => void load()} />
+      </div>
+    );
   }
 
   const { step } = state;
@@ -1147,7 +1164,9 @@ export function OperatorShiftV2() {
           open={pileOpen}
           grades={grades}
           busy={busy}
-          onClose={() => setPileOpen(false)}
+          error={productionError}
+          onOpenSafety={openSafetyFromSheet}
+          onClose={closeProductionSheets}
           onAdd={(gradeId, count) => void (async () => {
             if (await logProduction({ kind: 'PILES', pileGradeId: gradeId, count })) {
               setPileOpen(false);
@@ -1159,7 +1178,9 @@ export function OperatorShiftV2() {
           open={drillingOpen}
           types={drillingTypes}
           busy={busy}
-          onClose={() => setDrillingOpen(false)}
+          error={productionError}
+          onOpenSafety={openSafetyFromSheet}
+          onClose={closeProductionSheets}
           onAdd={(typeId, count, metersPerUnit) => void (async () => {
             if (await logProduction({ kind: 'DRILLING', typeId, count, metersPerUnit })) {
               setDrillingOpen(false);
@@ -1170,13 +1191,14 @@ export function OperatorShiftV2() {
         {passportOpen && (
           <div className="fixed inset-0 z-50 flex flex-col bg-background">
             <header className="flex items-center gap-2 border-b border-border bg-card px-3 py-3 text-foreground">
-              <button type="button" onClick={() => setPassportOpen(false)}
+              <button type="button" onClick={closeProductionSheets}
                 className="-ml-1 flex h-11 w-11 items-center justify-center rounded-lg text-signal-strong hover:bg-secondary">
                 ✕<span className="sr-only">Закрыть</span>
               </button>
               <p className="text-2xl font-semibold">Свая с паспортом</p>
             </header>
-            <div className="flex-1 overflow-y-auto p-4">
+            <div className="flex-1 space-y-3 overflow-y-auto p-4">
+              <SheetError message={productionError} onOpenSafety={openSafetyFromSheet} />
               <PilePassportForm
                 grades={grades}
                 busy={busy}
@@ -1196,7 +1218,8 @@ export function OperatorShiftV2() {
           open={downtimeOpen}
           reasons={reasons}
           busy={busy}
-          onClose={() => setDowntimeOpen(false)}
+          error={productionError}
+          onClose={closeProductionSheets}
           onAdd={(reasonId, hours, comment) => void (async () => {
             if (await logProduction({
               kind: 'DOWNTIME', reasonId, hours, comment: comment || undefined,

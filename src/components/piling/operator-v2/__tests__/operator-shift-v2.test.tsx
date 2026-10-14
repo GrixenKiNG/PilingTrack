@@ -332,3 +332,51 @@ describe('I1: ручная сдача HANDOVER_PENDING в v2', () => {
     expect(screen.queryByRole('button', {name: 'Добавить сваю'})).not.toBeInTheDocument();
   });
 });
+
+describe('V2: сбой загрузки и отказ записи', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    api.queued = [];
+    api.sendCommand.mockResolvedValue({ok: true});
+  });
+
+  it('при сбое загрузки смены даёт кнопку «Повторить» и после неё открывает смену', async () => {
+    authFetch
+      .mockResolvedValueOnce({ok: false, json: async () => ({})})
+      .mockResolvedValue({ok: true, json: async () => ({...facts,
+        clearance: {...facts.clearance, warnings: []},
+      })});
+    api.fetchState.mockResolvedValue(workStateFixture());
+    render(<OperatorShiftV2 />);
+
+    expect(await screen.findByText('Смена недоступна')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', {name: 'Повторить'}));
+
+    expect(await screen.findByRole('button', {name: 'Ещё'})).toBeInTheDocument();
+    expect(screen.queryByText('Смена недоступна')).not.toBeInTheDocument();
+  });
+
+  it('показывает причину отказа бурения внутри формы и ведёт на вкладку ТБ', async () => {
+    authFetch.mockResolvedValue({ok: true, json: async () => ({...facts,
+      clearance: {...facts.clearance, warnings: []},
+    })});
+    api.fetchState.mockResolvedValue(workStateFixture({dictionaries: {
+      pileGrades: [], drillingTypes: [{id: 'dt-1', name: 'Лидерное 200'}], downtimeReasons: [],
+    }}));
+    const refusal = 'Подошёл срок чек-листа ТБ по лидерному бурению — пройдите его';
+    api.sendCommand.mockRejectedValue(new Error(refusal));
+    render(<OperatorShiftV2 />);
+
+    fireEvent.click(await screen.findByRole('button', {name: 'Добавить бурение'}));
+    fireEvent.change(await screen.findByLabelText('Тип бурения'), {target: {value: 'dt-1'}});
+    fireEvent.change(screen.getByPlaceholderText('Например, 9,5'), {target: {value: '9,5'}});
+    fireEvent.click(screen.getByRole('button', {name: 'Записать 9.5 м'}));
+
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent(refusal);
+
+    fireEvent.click(screen.getByRole('button', {name: 'Открыть вкладку ТБ'}));
+    expect(screen.queryByLabelText('Тип бурения')).not.toBeInTheDocument();
+    expect(await screen.findByText('Техника безопасности')).toBeInTheDocument();
+  });
+});
