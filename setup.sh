@@ -77,7 +77,6 @@ DEFAULT_TENANT_ID=default
 SENTRY_ORG=
 SENTRY_PROJECT=pilingtrack
 SENTRY_AUTH_TOKEN=
-OTEL_ENABLED=false
 
 # pgAdmin (--profile dev)
 PGADMIN_EMAIL=admin@pilingtrack.local
