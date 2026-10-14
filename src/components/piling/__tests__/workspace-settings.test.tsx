@@ -17,6 +17,7 @@ vi.mock('@/components/piling/analytics-dashboard/kpi-widgets', () => ({ Analytic
 vi.mock('@/components/piling/main-dashboard/dashboard-layout', () => ({ MainDashboardLayoutEditor: () => null }));
 vi.mock('@/components/piling/admin-telegram', () => ({ AdminTelegram: () => null }));
 vi.mock('@/components/piling/admin-dlq', () => ({ AdminDlq: () => null }));
+vi.mock('@/components/piling/admin-orion-leads', () => ({ AdminOrionLeads: () => null }));
 vi.mock('@/components/piling/monitoring/equipment-tile-template-settings', () => ({ EquipmentTileTemplateSettings: () => null }));
 
 import { WorkspaceSettings } from '../workspace-settings';

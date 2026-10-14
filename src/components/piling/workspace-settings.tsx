@@ -19,6 +19,7 @@ import { AnalyticsDashboardLayoutEditor } from '@/components/piling/analytics-da
 import { MainDashboardLayoutEditor } from '@/components/piling/main-dashboard/dashboard-layout';
 import { AdminTelegram } from '@/components/piling/admin-telegram';
 import { AdminDlq } from '@/components/piling/admin-dlq';
+import { AdminOrionLeads } from '@/components/piling/admin-orion-leads';
 import { EquipmentTileTemplateSettings } from '@/components/piling/monitoring/equipment-tile-template-settings';
 import { useDocumentTitle } from '@/components/piling/ops-shell';
 
@@ -367,7 +368,12 @@ export function WorkspaceSettings() {
         : <p className="text-sm text-muted-foreground">Только администратор может настраивать Telegram-бота.</p>)}
 
       {activeTab === 'dlq' && (isAdmin
-        ? <AdminDlq />
+        ? (
+            <div className="space-y-8">
+              <AdminDlq />
+              <AdminOrionLeads />
+            </div>
+          )
         : <p className="text-sm text-muted-foreground">Только администратор может просматривать очередь недоставленных сообщений.</p>)}
     </div>
   );
