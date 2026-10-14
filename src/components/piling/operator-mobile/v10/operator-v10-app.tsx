@@ -358,11 +358,24 @@ function ScreenAccept({state, busy, onAccept, go}: {
       </Card>
       {accepted
         ? <Banner tone="info" title="Установка уже принята" />
-        : (
-          <button type="button" className="ov10-btn" disabled={busy} onClick={onAccept}>
-            {busy ? 'Принимаем…' : 'Принять установку'}
-          </button>
-        )}
+        : !state.identity.ppe.confirmed
+          // Сервер не откроет смену без отметки о проверке СИЗ (решение владельца
+          // 14.10.2026): ведём на нужный шаг, а не на отказ.
+          ? (
+            <>
+              <Banner tone="warn" title="Сначала проверьте средства защиты">
+                Без этой отметки смену начать нельзя.
+              </Banner>
+              <button type="button" className="ov10-btn" onClick={() => go('ppe')}>
+                Проверить средства защиты
+              </button>
+            </>
+          )
+          : (
+            <button type="button" className="ov10-btn" disabled={busy} onClick={onAccept}>
+              {busy ? 'Принимаем…' : 'Принять установку'}
+            </button>
+          )}
       <button type="button" className="ov10-btn ghost" onClick={() => go('today')}>К порядку смены</button>
     </>
   );

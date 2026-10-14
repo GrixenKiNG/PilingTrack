@@ -70,6 +70,29 @@ export async function acceptEquipment(input: {
       select: {id: true, state: true, productionDate: true, plannedStartAt: true, plannedEndAt: true},
     });
 
+    // Смена не открывается, пока работник не отметил проверку СИЗ за эти сутки.
+    //
+    // ЗАПИСЬ ФАКТА, А НЕ ПОЛНОТЫ. Нужна сама отметка (`PpeCheck`), нехватка
+    // предмета в ней остаётся предупреждением и запрещает только выработку
+    // (`requireProductionPermit`): запертый работник отметит, что каска есть
+    // (см. `domain/ppe.ts`). Раньше экран v10 принимал установку мимо шага СИЗ,
+    // а сервер этого не спрашивал; решение владельца 14.10.2026.
+    //
+    // Уже открытую смену не трогаем: повтор команды после потерянного ответа
+    // обязан пройти, как и раньше.
+    if (existing?.state !== 'STARTED') {
+      const ppeCheck = await tx.ppeCheck.findFirst({
+        where: {tenantId: input.tenantId, userId: input.operatorId, productionDate},
+        select: {id: true},
+      });
+      if (!ppeCheck) {
+        throw new OperatorCommandError(
+          409,
+          'Сначала отметьте проверку средств защиты. Без неё смену начать нельзя.',
+        );
+      }
+    }
+
     const planned = shiftWindow(productionDate, input.shiftType, timezone);
     const shiftId = existing?.id ?? randomUUID();
     if (existing) {

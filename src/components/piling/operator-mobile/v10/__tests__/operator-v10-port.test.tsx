@@ -170,9 +170,23 @@ describe('v10: итог подтверждения СИЗ', () => {
     expect(screen.queryByText('препятствий к работе нет')).not.toBeInTheDocument();
   });
 
-  it('P1: приёмка доступна через карточку объекта до подтверждения СИЗ — правило не меняем', async () => {
+  it('до подтверждения СИЗ вместо приёмки — переход к проверке СИЗ (сервер смену не откроет)', async () => {
     const state = makeState('IDENTITY');
     state.identity.ppe.confirmed = false;
+    state.shift = null;
+    api.fetchState.mockResolvedValue(state);
+    api.sendCommand.mockResolvedValue({ok: true});
+    render(<OperatorV10App />);
+    fireEvent.click(await screen.findByRole('button', {name: /Объект.*Объект А/}));
+    expect(await screen.findByText('Сначала проверьте средства защиты')).toBeInTheDocument();
+    expect(screen.queryByRole('button', {name: 'Принять установку'})).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', {name: 'Проверить средства защиты'}));
+    expect(api.sendCommand).not.toHaveBeenCalled();
+  });
+
+  it('после подтверждения СИЗ приёмка через карточку объекта отправляет команду', async () => {
+    const state = makeState('IDENTITY');
+    state.identity.ppe.confirmed = true;
     state.shift = null;
     api.fetchState.mockResolvedValue(state);
     api.sendCommand.mockResolvedValue({ok: true});
@@ -181,6 +195,7 @@ describe('v10: итог подтверждения СИЗ', () => {
     fireEvent.click(await screen.findByRole('button', {name: 'Принять установку'}));
     await waitFor(() => expect(api.sendCommand).toHaveBeenCalledWith(expect.objectContaining({command: 'accept-equipment', equipmentId: 'eq-1'})));
   });
+
   it('объявляет подтверждение и ведёт к следующему шагу допуска', () => {
     expect(ppeOutcome(identity())).toEqual({
       title: 'СИЗ подтверждены',
