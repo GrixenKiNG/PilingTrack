@@ -22,10 +22,14 @@ describe('«Требует решения сейчас»', () => {
   });
 
   it('просроченные наряды: одна строка с числом, роль и действие, ссылка на фильтр просроченных', () => {
-    const items = buildAttentionItems({ ...base, permits: [permit('PENDING_APPROVAL', PAST), permit('EXPIRED', PAST), permit('APPROVED', FUTURE, 'eq-2')] });
+    const items = buildAttentionItems({ ...base, permits: [permit('PENDING_APPROVAL', PAST), permit('APPROVED', PAST, 'eq-3'), permit('APPROVED', FUTURE, 'eq-2')] });
     expect(items).toHaveLength(1);
     expect(items[0]).toMatchObject({ role: 'Инженер ОТ', action: 'Оформить новые', href: '/admin/safety?view=permits&filter=overdue' });
     expect(items[0].problem).toContain('просрочено 2');
+  });
+
+  it('наряды, уже переведённые в «истёк», — история: в «требует решения» не попадают', () => {
+    expect(buildAttentionItems({ ...base, permits: [permit('EXPIRED', PAST), permit('EXPIRED', PAST, 'eq-2')] })).toEqual([]);
   });
 
   it('просроченный наряд установки, у которой есть действующий новый, не в счёте', () => {

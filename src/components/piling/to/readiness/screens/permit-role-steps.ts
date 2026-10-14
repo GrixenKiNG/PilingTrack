@@ -26,6 +26,12 @@ export function isOverduePermit(permit: Pick<WorkPermitDto, 'state' | 'validTo'>
  * установки, у которой уже есть замена (черновик, наряд на согласовании или
  * действующий с неистёкшим сроком), решён: новый наряд его заменил. Иначе
  * истёкший наряд оставался в счётчике навсегда, и убрать его было нечем.
+ *
+ * Наряд, который планировщик уже перевёл в «истёк», — закрытая история, а не
+ * задача: с ним ничего нельзя сделать, и вешать его на дашборд значит держать
+ * вечную красную строку. Он остаётся в реестре. В счёт идут только наряды
+ * «на согласовании» и «согласован» с прошедшим сроком: человек ещё может
+ * оформить замену до ночного перевода в «истёк».
  */
 export function actionableOverduePermits<T extends Pick<WorkPermitDto, 'state' | 'validTo' | 'equipmentId'>>(
   permits: readonly T[],
@@ -34,7 +40,7 @@ export function actionableOverduePermits<T extends Pick<WorkPermitDto, 'state' |
   const replaced = new Set(permits
     .filter((permit) => ['DRAFT', 'PENDING_APPROVAL', 'APPROVED'].includes(permit.state) && !isOverduePermit(permit, now))
     .map((permit) => permit.equipmentId));
-  return permits.filter((permit) => isOverduePermit(permit, now) && !replaced.has(permit.equipmentId));
+  return permits.filter((permit) => permit.state !== 'EXPIRED' && isOverduePermit(permit, now) && !replaced.has(permit.equipmentId));
 }
 
 export function buildPermitRoleSteps({permits, now}: {permits: readonly WorkPermitDto[]; now: Date}): PermitRoleSteps[] {

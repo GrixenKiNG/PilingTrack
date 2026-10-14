@@ -43,11 +43,16 @@ describe('шаги ролей на вкладке «Наряд-допуски»'
     expect(engineer.steps.find((step) => step.title === 'Отправить на согласование')?.done).toBe(false);
   });
 
-  it('инженер ОТ: просроченные требуют нового наряда', () => {
-    const engineer = role('Инженер ОТ или механик', [permit('EXPIRED', PAST)]);
+  it('инженер ОТ: согласованный наряд с прошедшим сроком требует нового наряда', () => {
+    const engineer = role('Инженер ОТ или механик', [permit('APPROVED', PAST)]);
     const step = engineer.steps.find((item) => item.title === 'Переоформить просроченные');
     expect(step?.done).toBe(false);
     expect(step?.hint).toContain('новый наряд');
+  });
+
+  it('инженер ОТ: истёкший наряд — история, переоформлять нечего', () => {
+    const engineer = role('Инженер ОТ или механик', [permit('EXPIRED', PAST)]);
+    expect(engineer.steps.find((item) => item.title === 'Переоформить просроченные')?.done).toBe(true);
   });
 
   it('администратор: повышенный риск с одним решением — второе решение за ним', () => {
