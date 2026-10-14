@@ -181,8 +181,7 @@ export async function exportReportsCsv(filters: ReportExportFilters) {
       endingFuelPercent: report.endingFuelPercent == null ? '' : csvDecimal(report.endingFuelPercent),
     };
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
-    const pileRows = report.piles.map((pile: any) => {
+    const pileRows = report.piles.map((pile) => {
       const meters = pileRowMeters(pile);
       return {
         ...base,
@@ -199,8 +198,7 @@ export async function exportReportsCsv(filters: ReportExportFilters) {
       };
     });
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
-    const drillingRows = report.drillings.map((drilling: any) => ({
+    const drillingRows = report.drillings.map((drilling) => ({
       ...base,
       pileGrade: '',
       pileCount: '',
@@ -212,8 +210,7 @@ export async function exportReportsCsv(filters: ReportExportFilters) {
       dtComment: '',
     }));
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
-    const downtimeRows = report.downtimes.map((downtime: any) => ({
+    const downtimeRows = report.downtimes.map((downtime) => ({
       ...base,
       pileGrade: '',
       pileCount: '',
@@ -326,18 +323,15 @@ export async function exportReportsXlsx(filters: ReportExportFilters): Promise<B
     // Справочники (марка/тип/причина) — через `?.`: у старых строк ссылка на
     // словарь может не разрешиться (дрейф после переноса базы), и без защиты
     // весь экспорт падает из-за одной такой строки.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
-    for (const p of r.piles as any[]) {
+    for (const p of r.piles) {
       const meters = pileRowMeters(p);
       // Колонка «Свай, м.п.» — числовая: без длины марки её оставляем пустой,
       // а пояснение печатаем в «Примечании» (находка 14) — иначе текст в
       // числовой колонке делает её текстовой и лист не суммируется.
       detail.push([...base, p.pileGrade?.name ?? '', p.count, meters > 0 ? meters : null, '', null, '', null, '', meters > 0 ? '' : PILE_LENGTH_UNKNOWN_LABEL]);
     }
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
-    for (const d of r.drillings as any[]) detail.push([...base, '', null, '', d.type?.name ?? '', d.meters, '', null, '', '']);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
-    for (const d of r.downtimes as any[]) detail.push([...base, '', null, '', '', null, d.reason?.name ?? '', d.duration, d.comment || '', '']);
+    for (const d of r.drillings) detail.push([...base, '', null, '', d.type?.name ?? '', d.meters, '', null, '', '']);
+    for (const d of r.downtimes) detail.push([...base, '', null, '', '', null, d.reason?.name ?? '', d.duration, d.comment || '', '']);
     if (!r.piles.length && !r.drillings.length && !r.downtimes.length) {
       detail.push([...base, '', null, '', '', null, '', null, '', '']);
     }
@@ -350,19 +344,13 @@ export async function exportReportsXlsx(filters: ReportExportFilters): Promise<B
   ]];
   const drafts: (string | number | null)[][] = [totals[0]];
   for (const r of reports) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
-    const piles = (r.piles as any[]).reduce((s, p) => s + p.count, 0);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
-    const pileMeters = (r.piles as any[]).reduce((s, p) => s + pileRowMeters(p), 0);
+    const piles = r.piles.reduce((s, p) => s + p.count, 0);
+    const pileMeters = r.piles.reduce((s, p) => s + pileRowMeters(p), 0);
     // Марка без длины: м.п. неполные, и по файлу это должно быть видно.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
-    const pilesWithoutLength = (r.piles as any[]).some((p) => pileRowMeters(p) === 0);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
-    const wells = (r.drillings as any[]).reduce((s, d) => s + d.count, 0);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
-    const meters = (r.drillings as any[]).reduce((s, d) => s + d.meters, 0);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
-    const downtime = (r.downtimes as any[]).reduce((s, d) => s + d.duration, 0);
+    const pilesWithoutLength = r.piles.some((p) => pileRowMeters(p) === 0);
+    const wells = r.drillings.reduce((s, d) => s + d.count, 0);
+    const meters = r.drillings.reduce((s, d) => s + d.meters, 0);
+    const downtime = r.downtimes.reduce((s, d) => s + d.duration, 0);
     (isSubmittedReport(r) ? totals : drafts).push([
       r.reportId, formatRuDate(r.date), shiftLabel(r.shiftType), r.site.name, r.user.name, r.equipment?.name || r.crew?.equipment?.name || '',
       piles, pileMeters, wells, meters, downtime, r.endingFuelPercent ?? null,

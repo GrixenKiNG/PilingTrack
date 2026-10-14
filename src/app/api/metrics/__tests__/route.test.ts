@@ -1,14 +1,9 @@
 /**
- * GET /api/metrics — service-to-service scrape token (M-10b).
+ * GET /api/metrics — service-to-service scrape token.
  *
- * /api/metrics required a real user session (requireAuth + assertCan
- * 'system.read'), but Prometheus's static scrape_configs can't do session
- * login — there's no cookie jar, no JWT refresh flow. Production shipped
- * with the 'pilingtrack-app' scrape job commented out in
- * observability/prometheus/prometheus-prod.yml specifically because of
- * this (see the TODO M-10b left there), so metrics were never collected.
- *
- * Fix: a separate static secret (METRICS_SCRAPE_TOKEN) checked via
+ * Prometheus's static scrape_configs can't do session login (no cookie jar,
+ * no JWT refresh flow), so /api/metrics also accepts a separate static
+ * secret (METRICS_SCRAPE_TOKEN) checked via
  * Authorization: Bearer, constant-time compared (mirrors the existing
  * pattern in /api/alerts/webhook and auth-service.ts's constantTimeEquals —
  * this is the same secret-comparison class of bug). A valid token bypasses
