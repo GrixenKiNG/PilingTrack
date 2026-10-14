@@ -10,9 +10,7 @@ import {POST as approvePermit} from '@/app/api/readiness/work-permits/[id]/appro
 import {ROLE_ABILITIES} from '@/modules/readiness/domain/capability-defaults';
 import {
   TECH_READINESS_ENTITIES,
-  TECH_READINESS_FILTERS,
   TECH_READINESS_FOREIGN_TENANT,
-  TECH_READINESS_TEST_TENANT,
   TECH_READINESS_USERS,
 } from '../fixtures/tech-readiness.fixture';
 
@@ -34,16 +32,14 @@ interface ApiContractHarness {
     query?: Record<string, string>;
     body?: unknown;
   }): Promise<ContractResponse>;
-  seedFixture(): Promise<void>;
-  resetFixture(): Promise<void>;
 }
 
 const api = {
   request: async (input): Promise<ContractResponse> => {
-    // Only the existing matching scenario is bound. Auth/DB are replaced;
-    // the real route, strict schema and error adapter produce the response.
+    // Only the approve route is bound. Auth/DB are replaced; the real route,
+    // strict schema and error adapter produce the response.
     const match = input.path.match(/^\/api\/readiness\/work-permits\/([^/]+)\/approve$/);
-    if (input.method !== 'POST' || !match) throw new Error('Unbound, skipped API contract scenario');
+    if (input.method !== 'POST' || !match) throw new Error('Unbound API contract scenario');
     mocks.context.mockResolvedValue({context: {
       tenantId: input.actor.tenantId, actorId: input.actor.id, actorRole: input.actor.role,
       actorName: input.actor.id, actingAs: null, requestId: 'contract-request', correlationId: 'contract-correlation',
@@ -54,123 +50,9 @@ const api = {
     }), {params: Promise.resolve({id: match[1]})});
     return {status: response.status, headers: Object.fromEntries(response.headers), body: await response.json()};
   },
-  seedFixture: async () => {
-    throw new Error('Bind isolated test tenant seed');
-  },
-  resetFixture: async () => {
-    throw new Error('Bind isolated test tenant cleanup');
-  },
 } satisfies ApiContractHarness;
 
-const commandHeaders = (version = 1) => ({
-  'Idempotency-Key': `test-readiness-command-${version}`.padEnd(24, 'x'),
-  'If-Match': `"shift-${TECH_READINESS_ENTITIES.shiftId}-v${version}"`,
-});
-
 describe('Tech Readiness API contract [PRD §8, backend design §10]', () => {
-  // Current list has no sort/cursor/exact total contract.
-  it.skip('returns list envelope, exact page total, normalized filters and opaque cursor', async () => {
-    const response = await api.request({
-      method: 'GET',
-      path: '/api/readiness/shifts',
-      actor: TECH_READINESS_USERS.dispatcher,
-      query: {
-        equipmentId: TECH_READINESS_FILTERS.equipmentId,
-        status: 'STARTED',
-        limit: '1',
-        sort: 'updatedAt.desc',
-      },
-    });
-
-    expect(response.status).toBe(200);
-    expect(response.body).toMatchObject({
-      data: expect.any(Array),
-      page: {
-        limit: 1,
-        nextCursor: expect.anything(),
-        hasMore: expect.any(Boolean),
-        total: expect.any(Number),
-      },
-      meta: {
-        timezone: TECH_READINESS_TEST_TENANT.timezone,
-        correlationId: expect.any(String),
-        filters: {
-          equipmentId: TECH_READINESS_ENTITIES.equipmentId,
-          status: 'STARTED',
-          sort: 'updatedAt.desc',
-        },
-      },
-    });
-    expect(JSON.stringify(response.body)).not.toContain(TECH_READINESS_FOREIGN_TENANT.id);
-  });
-
-  // MECHANIC cannot start a shift; the original scenario expects 428/400.
-  it.skip('returns a strong ETag and rejects weak/missing/mismatched preconditions', async () => {
-    const detail = await api.request({
-      method: 'GET',
-      path: `/api/readiness/shifts/${TECH_READINESS_ENTITIES.shiftId}`,
-      actor: TECH_READINESS_USERS.dispatcher,
-    });
-    expect(detail.headers.etag).toMatch(/^"shift-.+-v\d+"$/);
-    expect(detail.headers.etag).not.toMatch(/^W\//);
-
-    const missing = await api.request({
-      method: 'POST',
-      path: `/api/readiness/shifts/${TECH_READINESS_ENTITIES.shiftId}/start`,
-      actor: TECH_READINESS_USERS.mechanic,
-      headers: {'Idempotency-Key': 'test-readiness-missing-precondition'},
-      body: {},
-    });
-    expect(missing).toMatchObject({
-      status: 428,
-      body: {error: {code: 'PRECONDITION_REQUIRED', correlationId: expect.any(String)}},
-    });
-
-    const weak = await api.request({
-      method: 'POST',
-      path: `/api/readiness/shifts/${TECH_READINESS_ENTITIES.shiftId}/start`,
-      actor: TECH_READINESS_USERS.mechanic,
-      headers: {
-        'Idempotency-Key': 'test-readiness-weak-etag',
-        'If-Match': `W/"shift-${TECH_READINESS_ENTITIES.shiftId}-v1"`,
-      },
-      body: {expectedVersion: 1},
-    });
-    expect(weak).toMatchObject({
-      status: 400,
-      body: {error: {code: 'INVALID_PRECONDITION'}},
-    });
-  });
-
-  // Current handover: ADMIN/MECHANIC return 201, OPERATOR is allowed;
-  // DISPATCHER is denied with VALIDATION_ERROR, not FORBIDDEN.
-  it.skip.each([
-    ['ADMIN', 200],
-    ['MECHANIC', 200],
-    ['DISPATCHER', 403],
-    ['OPERATOR', 403],
-  ] as const)('enforces mechanic command RBAC for %s', async (role, expectedStatus) => {
-    const actor = {
-      id: `test-user-rbac-${role.toLowerCase()}`,
-      role,
-      tenantId: TECH_READINESS_TEST_TENANT.id,
-    };
-    const response = await api.request({
-      method: 'POST',
-      path: `/api/readiness/shifts/${TECH_READINESS_ENTITIES.shiftId}/handover`,
-      actor,
-      headers: commandHeaders(),
-      body: {expectedVersion: 1, summary: 'Test handover'},
-    });
-
-    expect(response.status).toBe(expectedStatus);
-    if (expectedStatus === 403) {
-      expect(response.body).toMatchObject({
-        error: {code: 'FORBIDDEN', correlationId: expect.any(String)},
-      });
-    }
-  });
-
   it('does not trust tenantId, timezone, actor, or approval role from input', async () => {
     mocks.transaction.mockClear();
     const response = await api.request({
@@ -195,164 +77,5 @@ describe('Tech Readiness API contract [PRD §8, backend design §10]', () => {
       body: {error: {code: expect.stringMatching(/VALIDATION|UNKNOWN_FIELD/)}},
     });
     expect(mocks.transaction).not.toHaveBeenCalled();
-  });
-
-  // /readiness/equipment/:id/current does not exist; current is a query route.
-  it.skip('returns the same safe 404 for missing and cross-tenant resources', async () => {
-    const missing = await api.request({
-      method: 'GET',
-      path: '/api/readiness/shifts/test-shift-missing',
-      actor: TECH_READINESS_USERS.admin,
-    });
-    const foreign = await api.request({
-      method: 'GET',
-      path: `/api/readiness/equipment/${TECH_READINESS_ENTITIES.foreignEquipmentId}/current`,
-      actor: TECH_READINESS_USERS.admin,
-    });
-
-    expect(missing.status).toBe(404);
-    expect(foreign.status).toBe(404);
-    expect(foreign.body).toEqual(missing.body);
-    expect(JSON.stringify(foreign.body)).not.toContain(TECH_READINESS_FOREIGN_TENANT.id);
-  });
-
-  // Current error is VERSION_CONFLICT with current, without the proposed actions/version fields.
-  it.skip('returns a current safe resource on stale handover accept conflict', async () => {
-    const response = await api.request({
-      method: 'POST',
-      path: `/api/readiness/handovers/${TECH_READINESS_ENTITIES.handoverId}/accept`,
-      actor: TECH_READINESS_USERS.secondDispatcher,
-      headers: {
-        'Idempotency-Key': 'test-readiness-stale-handover',
-        'If-Match': `"handover-${TECH_READINESS_ENTITIES.handoverId}-v1"`,
-      },
-      body: {expectedVersion: 1},
-    });
-
-    expect(response).toMatchObject({
-      status: 409,
-      body: {
-        error: {
-          code: expect.stringMatching(/HANDOVER_(VERSION_CONFLICT|ALREADY_ACCEPTED)/),
-          details: {
-            submittedVersion: 1,
-            currentVersion: expect.any(Number),
-            current: expect.objectContaining({state: 'ACCEPTED'}),
-            actions: expect.any(Array),
-          },
-          correlationId: expect.any(String),
-        },
-      },
-    });
-  });
-
-  // MECHANIC has no shift.authorize and receives 403 before blocker evaluation.
-  it.skip('returns explainable 422 blockers and correcting actions', async () => {
-    const response = await api.request({
-      method: 'POST',
-      path: `/api/readiness/shifts/${TECH_READINESS_ENTITIES.shiftId}/start`,
-      actor: TECH_READINESS_USERS.mechanic,
-      headers: commandHeaders(),
-      body: {expectedVersion: 1},
-    });
-
-    expect(response).toMatchObject({
-      status: 422,
-      body: {
-        error: {
-          code: 'SHIFT_START_BLOCKED',
-          details: {
-            blockers: [
-              expect.objectContaining({
-                code: 'VALID_WORK_PERMIT_REQUIRED',
-                action: expect.anything(),
-              }),
-            ],
-            actions: expect.any(Array),
-          },
-          correlationId: expect.any(String),
-        },
-      },
-    });
-  });
-
-  // submit is strict: the mismatch body contains unsupported scope (422 before replay).
-  it.skip('replays identical idempotent command and rejects key reuse with another payload', async () => {
-    const headers = {
-      'Idempotency-Key': 'test-readiness-idempotency-replay',
-      'If-Match': `"work-permit-${TECH_READINESS_ENTITIES.normalPermitId}-v1"`,
-    };
-    const request = {
-      method: 'POST' as const,
-      path: `/api/readiness/work-permits/${TECH_READINESS_ENTITIES.normalPermitId}/submit`,
-      actor: TECH_READINESS_USERS.mechanic,
-      headers,
-      body: {expectedVersion: 1},
-    };
-    const first = await api.request(request);
-    const replay = await api.request(request);
-    const mismatch = await api.request({...request, body: {expectedVersion: 1, scope: 'changed'}});
-
-    expect(replay).toEqual(first);
-    expect(mismatch).toMatchObject({
-      status: 409,
-      body: {error: {code: 'IDEMPOTENCY_KEY_REUSED'}},
-    });
-  });
-
-  // /api/audit is legacy entity history requiring scope + targetId, not a cursor list.
-  it.skip('rejects a cursor generated for different canonical filters', async () => {
-    const response = await api.request({
-      method: 'GET',
-      path: '/api/audit',
-      actor: TECH_READINESS_USERS.admin,
-      query: {
-        equipmentId: TECH_READINESS_ENTITIES.equipmentId,
-        status: 'REVOKED',
-        cursor: 'opaque-cursor-for-other-filter-hash',
-      },
-    });
-
-    expect(response).toMatchObject({
-      status: 400,
-      body: {error: {code: 'CURSOR_FILTER_MISMATCH'}},
-    });
-  });
-
-  // /api/audit/export.csv does not exist; readiness audit/export have another contract.
-  it.skip('keeps JSON audit filters and CSV export filter hash in parity', async () => {
-    const query = {...TECH_READINESS_FILTERS};
-    const json = await api.request({
-      method: 'GET',
-      path: '/api/audit',
-      actor: TECH_READINESS_USERS.admin,
-      query,
-    });
-    const csv = await api.request({
-      method: 'GET',
-      path: '/api/audit/export.csv',
-      actor: TECH_READINESS_USERS.admin,
-      query,
-    });
-
-    expect(json.status).toBe(200);
-    expect(json.body).toMatchObject({
-      meta: {
-        filters: query,
-        filterHash: expect.any(String),
-        timezone: TECH_READINESS_TEST_TENANT.timezone,
-      },
-    });
-    expect(csv.status).toBe(200);
-    expect(csv.headers['content-type']).toBe('text/csv; charset=utf-8');
-    expect(csv.headers['x-filter-hash']).toBe(
-      (json.body as {meta: {filterHash: string}}).meta.filterHash,
-    );
-    expect(csv.headers['x-timezone']).toBe(TECH_READINESS_TEST_TENANT.timezone);
-    expect(csv.headers['x-content-type-options']).toBe('nosniff');
-    expect(csv.text?.charCodeAt(0)).toBe(0xfeff);
-    expect(csv.text).toContain('\r\n');
-    expect(csv.text).not.toContain('=HYPERLINK(');
-    expect(csv.text).toContain(`"'=HYPERLINK(`);
   });
 });
