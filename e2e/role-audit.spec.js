@@ -27,9 +27,10 @@ test.describe('seven real roles',()=>{
   await settled();
   await page.goto('/admin/users');
   if(role==='ADMIN'){await expect(page).toHaveURL(/\/admin\/users$/);await expect(page.getByText('QA OPERATOR',{exact:true}).first()).toBeVisible()}
-  else await expect(page).toHaveURL(new RegExp(home+'$'));
+  // С 07.10.2026 отказ в админке ведёт на «Нет доступа» (W17/W22), а не на домашнюю страницу роли.
+  else await expect(page).toHaveURL(/\/no-access$/);
   await settled();
-  if(role==='ADMIN')await page.goto(home);
+  await page.goto(home);
   if(role==='OPERATOR'||role==='ASSISTANT'){
    if(role==='OPERATOR'){
     await page.getByRole('button',{name:'Проверить средства защиты',exact:true}).click();
