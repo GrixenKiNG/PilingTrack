@@ -92,6 +92,8 @@ jobs:
       # Одноразовое S3 для спека редактора плиток. Боевая CSP разрешает в connect-src только https:,
       # поэтому MinIO сразу поднимается с TLS (самоподписанный сертификат на час). Playwright уже
       # работает с ignoreHTTPSErrors, а Node доверяет сертификату через NODE_EXTRA_CA_CERTS.
+      # Образ minio/minio снят с Docker Hub и Quay (проверено 14.10.2026, pull access denied), поэтому
+      # берём chainguard/minio по digest: это тот же MinIO, собранный из исходников, работает не от root.
       # Переменные S3_* получает только процесс стенда: на другие шаги они не попадают.
       - name: Start disposable S3 (MinIO over TLS)
         shell: bash
@@ -104,7 +106,7 @@ jobs:
           s3_user="codex$(node -e "process.stdout.write(require('node:crypto').randomBytes(5).toString('hex'))")"
           s3_password="$(node -e "process.stdout.write(require('node:crypto').randomBytes(24).toString('hex'))")"
           echo "::add-mask::$s3_password"
-          docker run -d --name "codex-minio-${{ github.run_id }}"             --label pilingtrack.codex.test-s3=1             -p 127.0.0.1:9000:9000             -v "$certs:/root/.minio/certs:ro"             -e MINIO_ROOT_USER="$s3_user" -e MINIO_ROOT_PASSWORD="$s3_password"             -e MINIO_API_CORS_ALLOW_ORIGIN='*'             minio/minio:RELEASE.2024-09-13T20-26-02Z server /data
+          docker run -d --name "codex-minio-${{ github.run_id }}"             --label pilingtrack.codex.test-s3=1             -p 127.0.0.1:9000:9000             -v "$certs:/certs:ro"             -e MINIO_ROOT_USER="$s3_user" -e MINIO_ROOT_PASSWORD="$s3_password"             -e MINIO_API_CORS_ALLOW_ORIGIN='*'             chainguard/minio@sha256:2136d593beacf4461187035eca949fe49abd589d5079735025c711ca58fee0c8 server /tmp/data --certs-dir /certs
           for i in $(seq 1 30); do
             if curl -fsS --cacert "$certs/public.crt" https://127.0.0.1:9000/minio/health/live >/dev/null 2>&1; then break; fi
             sleep 1
