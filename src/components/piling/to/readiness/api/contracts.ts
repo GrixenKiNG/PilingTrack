@@ -139,6 +139,11 @@ export interface WorkPermitDto {
   state: 'DRAFT' | 'PENDING_APPROVAL' | 'APPROVED' | 'EXPIRED' | 'REVOKED';
   /** Вид работ из справочника. null — у нарядов, выписанных до 16.08.2026. */
   workTypeId: string | null;
+  workTypeName?: string | null;
+  requiredApprovals?: Array<'DISPATCHER' | 'ADMIN'>;
+  rejectedAt?: string | null;
+  rejectedById?: string | null;
+  rejectReason?: string | null;
   /** Наименование работ — короткая строка для реестра. */
   title: string;
   /** Описание работ. Историческое имя поля: раньше это был единственный текст. */

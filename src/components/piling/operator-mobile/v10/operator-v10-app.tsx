@@ -915,9 +915,9 @@ function ScreenSafety({state, view, error, go}: {
       <>
       <Card>
         <Row icon="shield" tone={view.clearance.cleared ? 'ok' : 'bad'}
-          title={view.clearance.cleared ? 'Допуск в порядке' : 'Допуск не оформлен'}
+          title={view.clearance.cleared ? 'Допуск по документам' : 'Допуск не оформлен'}
           note={view.clearance.cleared
-            ? 'препятствий к работе нет'
+            ? state && left.length === 0 ? 'все шаги допуска пройдены' : 'по документам препятствий нет; завершите шаги допуска выше'
             : `препятствий: ${view.clearance.blockers.length}`} />
         <Row icon="inspect" tone={pending > 0 ? 'warn' : 'ok'} title="Инструктажи"
           note={pending > 0 ? `ожидают: ${pending}` : 'пройдены'} />

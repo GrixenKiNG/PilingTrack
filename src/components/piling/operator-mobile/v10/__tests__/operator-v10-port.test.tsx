@@ -156,6 +156,31 @@ function identity(patch: {
 }
 
 describe('v10: итог подтверждения СИЗ', () => {
+  it('не обещает отсутствие препятствий при неподтверждённых СИЗ', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
+      clearance: {cleared: true, blockers: [], documents: []}, briefings: {pending: [], overdue: []}, history: [],
+    }), {status: 200})));
+    const state = makeState('IDENTITY');
+    state.identity.ppe.confirmed = false;
+    api.fetchState.mockResolvedValue(state);
+    render(<OperatorV10App />);
+    fireEvent.click(await screen.findByRole('button', {name: 'ТБ'}));
+    expect(await screen.findByText(/Осталось:.*СИЗ/)).toBeInTheDocument();
+    expect(await screen.findByText('Допуск по документам')).toBeInTheDocument();
+    expect(screen.queryByText('препятствий к работе нет')).not.toBeInTheDocument();
+  });
+
+  it('P1: приёмка доступна через карточку объекта до подтверждения СИЗ — правило не меняем', async () => {
+    const state = makeState('IDENTITY');
+    state.identity.ppe.confirmed = false;
+    state.shift = null;
+    api.fetchState.mockResolvedValue(state);
+    api.sendCommand.mockResolvedValue({ok: true});
+    render(<OperatorV10App />);
+    fireEvent.click(await screen.findByRole('button', {name: /Объект.*Объект А/}));
+    fireEvent.click(await screen.findByRole('button', {name: 'Принять установку'}));
+    await waitFor(() => expect(api.sendCommand).toHaveBeenCalledWith(expect.objectContaining({command: 'accept-equipment', equipmentId: 'eq-1'})));
+  });
   it('объявляет подтверждение и ведёт к следующему шагу допуска', () => {
     expect(ppeOutcome(identity())).toEqual({
       title: 'СИЗ подтверждены',

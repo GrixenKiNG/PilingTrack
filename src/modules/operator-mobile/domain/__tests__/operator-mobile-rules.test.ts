@@ -639,4 +639,12 @@ describe('приём установки не присваивает чужую �
     expect(tx.shift.create).toHaveBeenCalledWith(expect.objectContaining({data: expect.objectContaining({startedById: 'me'})}));
     expect(tx.shift.findFirst).toHaveBeenNthCalledWith(2, expect.objectContaining({where: expect.objectContaining({state: {in: ['PLANNED', 'PENDING_ACCEPTANCE']}})}));
   });
+
+  it('P1: acceptEquipment создаёт STARTED без записанного подтверждения СИЗ', async () => {
+    const {tx, run} = acceptance({id: 'me', role: 'OPERATOR'}, null);
+    tx.shift.findFirst.mockResolvedValue(null);
+    // Ни одной записи допуска в этой транзакции нет. Команда СИЗ не читает.
+    await expect(run()).resolves.toHaveProperty('shiftId');
+    expect(tx.shift.create).toHaveBeenCalledWith(expect.objectContaining({data: expect.objectContaining({state: 'STARTED'})}));
+  });
 });

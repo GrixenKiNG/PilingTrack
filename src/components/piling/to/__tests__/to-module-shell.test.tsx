@@ -1179,7 +1179,7 @@ describe('PermitsScreen — осмотры и ТО не подтверждают
   it('отказ текущего снимка: осмотры и ТО непроверены, а наряд сохранён', () => {
     renderPermits({
       authoritativeReadinessError: 'Снимок недоступен',
-      permits: [approvedPermit],
+      permits: [{...approvedPermit, validTo: '2099-01-02T00:00:00.000Z'}],
     });
 
     expect(screen.getByText(/Осмотрено: не проверено — авторитетный снимок недоступен/)).toBeInTheDocument();
