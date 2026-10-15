@@ -37,6 +37,7 @@
  */
 
 import {OperatorWorkOverview} from '../operator-mobile/operator-work-overview';
+import type {CorrectionInput} from '../operator-mobile/screens/entries-list';
 import { formatDowntimeHoursOnly } from '@/lib/downtime-hours';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
@@ -570,6 +571,31 @@ export function OperatorShiftV2() {
   const [productionCommandId, setProductionCommandId] = useState(() => crypto.randomUUID());
   // Причина отказа остаётся в открытой форме: всплывающее сообщение лежит под ней.
   const [productionError, setProductionError] = useState<string | null>(null);
+  const correctProduction = useCallback(async (input: CorrectionInput) => {
+    const shiftId = mobile?.shift?.id ?? facts?.shift?.id;
+    if (!shiftId) {
+      setProductionError('Смена не найдена — записать некуда');
+      return false;
+    }
+    setProductionError(null);
+    setBusy(true);
+    try {
+      await sendCommand({command: 'correct-production', clientCommandId: productionCommandId, shiftId, ...input});
+      setProductionCommandId(crypto.randomUUID());
+      await loadMobile();
+      return true;
+    } catch (cause) {
+      if (cause instanceof QueuedOffline) {
+        setProductionCommandId(crypto.randomUUID());
+        toast.info(cause.message);
+        return true;
+      }
+      setProductionError(cause instanceof Error ? cause.message : 'Поправка не прошла');
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  }, [mobile?.shift?.id, facts?.shift?.id, productionCommandId, loadMobile]);
   const logProduction = useCallback(async (entry: ProductionEntryInput) => {
     const shiftId = mobile?.shift?.id ?? facts?.shift?.id;
     if (!shiftId) {
@@ -1088,6 +1114,7 @@ export function OperatorShiftV2() {
             </button>
           ) : null}
           {tab === 'shift' && mobile && <OperatorWorkOverview state={mobile} variant="v2" busy={busy}
+            onCorrect={correctProduction} correctionError={productionError}
             onAction={(kind)=>{if(kind==='PILES')setPileOpen(true);else if(kind==='PASSPORT')setPassportOpen(true);else if(kind==='DRILLING')setDrillingOpen(true);else setDowntimeOpen(true);}}
             hideFinish={editingProduction}
             onIncident={()=>setTab('safety')} onDefect={()=>setDefectOpen(true)} onFinish={()=>setFinishing(true)} />}

@@ -3,7 +3,7 @@
 import {useState} from 'react';
 import type {ProductionEntryView} from '@/modules/operator-mobile/contracts';
 import {formatDowntimeHoursOnly} from '@/lib/downtime-hours';
-import {BigButton, Panel, PanelTitle} from '../ui';
+import {BigButton, ErrorNote, Panel, PanelTitle} from '../ui';
 
 const KIND_UNIT: Record<ProductionEntryView['kind'], string> = {
   PILES: 'шт',
@@ -18,6 +18,48 @@ const KIND_QUESTION: Record<ProductionEntryView['kind'], string> = {
   DOWNTIME: 'Сколько часов простоя было на самом деле',
 };
 
+export type CorrectionInput = {
+  entryId: string; kind: ProductionEntryView['kind']; actual: number; reason: string;
+};
+
+export function EntryCorrectionForm({entry, busy, onCorrect, onClose, error}: {
+  entry: ProductionEntryView;
+  busy: boolean;
+  onCorrect: (input: CorrectionInput) => Promise<boolean>;
+  onClose: () => void;
+  error?: string | null;
+}) {
+  const [actual, setActual] = useState('');
+  const [reason, setReason] = useState('');
+  const submit = async () => {
+    // Пустая строка — это не ноль.
+    if (busy || actual.trim() === '' || reason.trim().length < 3) return;
+    if (await onCorrect({entryId: entry.id, kind: entry.kind,
+      actual: Number(actual.replace(',', '.')), reason: reason.trim()})) onClose();
+  };
+  return (
+    <div className="mt-2 space-y-2" role="group" aria-label="Поправка записи">
+      <label className="block">
+        <span className="text-2xs font-medium text-muted-foreground">{KIND_QUESTION[entry.kind]}</span>
+        <input inputMode="decimal" value={actual} disabled={busy}
+          onChange={(event) => setActual(event.target.value)}
+          className="mt-1 h-12 w-full rounded-md border bg-card px-3 text-base shadow-xs" />
+      </label>
+      <label className="block">
+        <span className="text-2xs font-medium text-muted-foreground">Что случилось</span>
+        <input value={reason} disabled={busy} onChange={(event) => setReason(event.target.value)}
+          placeholder="Ошибся при вводе"
+          className="mt-1 h-12 w-full rounded-md border bg-card px-3 text-base shadow-xs" />
+      </label>
+      <ErrorNote message={error ?? null} />
+      <BigButton onClick={() => void submit()} disabled={busy || actual.trim() === '' || reason.trim().length < 3}>
+        {busy ? 'Записываем…' : 'Записать поправку'}
+      </BigButton>
+      <BigButton tone="ghost" disabled={busy} onClick={onClose}>Отмена</BigButton>
+    </div>
+  );
+}
+
 /**
  * Записанное за смену — и возможность поправить ошибку.
  *
@@ -29,37 +71,15 @@ const KIND_QUESTION: Record<ProductionEntryView['kind'], string> = {
  * пятёрку. Разницу посчитает сервер — просить машиниста вычитать в уме значит
  * получить вторую ошибку поверх первой.
  */
-export function EntriesList({entries, busy, onCorrect}: {
+export function EntriesList({entries, busy, onCorrect, error}: {
   entries: ProductionEntryView[];
   busy: boolean;
-  onCorrect: (input: {
-    entryId: string; kind: ProductionEntryView['kind']; actual: number; reason: string;
-  }) => Promise<boolean>;
+  onCorrect: (input: CorrectionInput) => Promise<boolean>;
+  error?: string | null;
 }) {
   const [openId, setOpenId] = useState<string | null>(null);
-  const [actual, setActual] = useState('');
-  const [reason, setReason] = useState('');
 
   if (entries.length === 0) return null;
-
-  const close = () => {
-    setOpenId(null);
-    setActual('');
-    setReason('');
-  };
-
-  const submit = async (entry: ProductionEntryView) => {
-    // Пустая строка — это не ноль. Number('') даёт 0, и без этой проверки
-    // «ничего не ввёл» превращалось бы в «на самом деле нисколько».
-    if (actual.trim() === '' || reason.trim().length < 3) return;
-    const fixed = await onCorrect({
-      entryId: entry.id,
-      kind: entry.kind,
-      actual: Number(actual.replace(',', '.')),
-      reason: reason.trim(),
-    });
-    if (fixed) close();
-  };
 
   return (
     <Panel>
@@ -86,39 +106,13 @@ export function EntriesList({entries, busy, onCorrect}: {
             ))}
 
             {openId === entry.id ? (
-              <div className="mt-2 space-y-2">
-                <label className="block">
-                  <span className="text-2xs font-medium text-muted-foreground">
-                    {KIND_QUESTION[entry.kind]}
-                  </span>
-                  <input
-                    inputMode="decimal"
-                    value={actual}
-                    onChange={(event) => setActual(event.target.value)}
-                    className="mt-1 h-12 w-full rounded-md border bg-card px-3 text-base shadow-xs"
-                  />
-                </label>
-                <label className="block">
-                  <span className="text-2xs font-medium text-muted-foreground">Что случилось</span>
-                  <input
-                    value={reason}
-                    onChange={(event) => setReason(event.target.value)}
-                    placeholder="Ошибся при вводе"
-                    className="mt-1 h-12 w-full rounded-md border bg-card px-3 text-base shadow-xs"
-                  />
-                </label>
-                <BigButton
-                  onClick={() => void submit(entry)}
-                  disabled={busy || actual.trim() === '' || reason.trim().length < 3}
-                >
-                  {busy ? 'Записываем…' : 'Записать поправку'}
-                </BigButton>
-                <BigButton tone="ghost" onClick={close}>Отмена</BigButton>
-              </div>
+              <EntryCorrectionForm entry={entry} busy={busy} onCorrect={onCorrect}
+                onClose={() => setOpenId(null)} error={error} />
             ) : (
               <button
                 type="button"
-                onClick={() => {setOpenId(entry.id); setActual(''); setReason('');}}
+                disabled={busy}
+                onClick={() => setOpenId(entry.id)}
                 className="mt-1 min-h-11 text-2xs font-semibold text-signal underline-offset-2 hover:underline"
               >
                 Поправить

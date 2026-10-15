@@ -4,6 +4,7 @@ import {useCallback, useEffect, useMemo, useRef, useState, type ReactNode} from 
 import {useLocalFormDraft} from '../operator-mobile/use-local-form-draft';
 import {PilingIcon, type PilingIconName} from '@/components/piling/icons';
 import {OperatorWorkOverview} from '../operator-mobile/operator-work-overview';
+import type {CorrectionInput} from '../operator-mobile/screens/entries-list';
 import {
   DOWNTIME_QUICK_HOURS, downtimeHoursProblem, formatDowntimeHoursOnly, parseDowntimeHours,
 } from '@/lib/downtime-hours';
@@ -665,7 +666,7 @@ function IncidentScreen({state, busy, onReport}: {
 }
 
 /** F. Работа: плитки выработки и запись — экраны F1–F5 макета. */
-export function WorkScreen({state, busy, onLog, onFinish, onOpenSafety, onIncident, afterFinish = false}: {
+export function WorkScreen({state, busy, onLog, onFinish, onOpenSafety, onIncident, afterFinish = false, onCorrect, correctionError}: {
   state: OperatorMobileState;
   busy: boolean;
   /** Признак успеха: по нему форма решает, чистить ли поля. */
@@ -676,6 +677,8 @@ export function WorkScreen({state, busy, onLog, onFinish, onOpenSafety, onIncide
   onOpenSafety: (stage: ChecklistStage) => void;
   /** Работа завершена, смена ждёт сдачи: выработку и простой дописывают, «Завершить работу» нет. */
   afterFinish?: boolean;
+  onCorrect?: (input: CorrectionInput) => Promise<boolean>;
+  correctionError?: string | null;
 }) {
   const localDraft = useLocalFormDraft(state.operator?.id, state.shift?.id && `production:v5:${state.shift.id}`, {
     kind: 'PILES' as 'PILES' | 'DRILLING' | 'DOWNTIME' | 'PASSPORT', optionId: '', count: '', meters: '', hoursText: '',
@@ -744,6 +747,7 @@ export function WorkScreen({state, busy, onLog, onFinish, onOpenSafety, onIncide
   };
 
   if (!formOpen) return <div className="scr"><OperatorWorkOverview state={state} variant="v5" busy={busy}
+    onCorrect={onCorrect} correctionError={correctionError}
     onAction={(next)=>{pick(next);setFormOpen(true);}} onFinish={onFinish} hideFinish={afterFinish} onIncident={onIncident}>
     {safety.filter(c=>c.period?.due||c.period?.warn).map(c=><button key={c.stage} type="button" className="oc-form-back" onClick={()=>onOpenSafety(c.stage)}>{c.title} · пройти проверку</button>)}
   </OperatorWorkOverview></div>;
@@ -983,6 +987,7 @@ export function OperatorV5App() {
    */
   const [forbidden, setForbidden] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [tab, setTab] = useState<Tab>('SHIFT');
   const stepScreen = useRef<HTMLDivElement>(null);
@@ -1065,6 +1070,7 @@ export function OperatorV5App() {
   const run = useCallback(async (fn: () => Promise<unknown>, done: string): Promise<boolean> => {
     setBusy(true);
     setNotice(null);
+    setActionError(null);
     try {
       await fn();
       setCommandId(newCommandId());
@@ -1085,6 +1091,7 @@ export function OperatorV5App() {
         setBusy(false);
         return true;
       } else {
+        setActionError(cause instanceof Error ? cause.message : 'Действие не выполнено');
         setNotice(cause instanceof Error ? cause.message : 'Действие не выполнено');
         setBusy(false);
         return false;
@@ -1216,6 +1223,13 @@ export function OperatorV5App() {
       () => sendCommand({command: 'log-production', clientCommandId: commandId, shiftId, entry}),
       'Записано.',
     );
+  }, [commandId, run, state]);
+
+  const correctProduction = useCallback(async (input: CorrectionInput): Promise<boolean> => {
+    const shiftId = state?.shift?.id;
+    if (!shiftId) return false;
+    return run(() => sendCommand({command: 'correct-production', clientCommandId: commandId, shiftId, ...input}),
+      'Поправка записана.');
   }, [commandId, run, state]);
 
   if (forbidden) {
@@ -1417,6 +1431,8 @@ export function OperatorV5App() {
           state={state}
           busy={busy}
           onLog={logProduction}
+          onCorrect={correctProduction}
+          correctionError={actionError}
           onOpenSafety={setSafetyStage}
           afterFinish={state.phase !== 'WORK' || Boolean(oldShift)}
           onIncident={()=>setTab('EVENTS')}

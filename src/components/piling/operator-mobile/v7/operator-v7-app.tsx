@@ -18,6 +18,7 @@ import {admissionSteps} from '../safety/admission-steps';
 import {AdmissionResult, BriefingFlow, KnowledgeFlow, PpeFlow} from './v7-identity';
 import {AcceptFlow, ChecklistFlow, CloseFlow, IncidentFlow, ProductionFlow} from './v7-shift';
 import {nextStep} from '../shift-next-step';
+import type {CorrectionInput} from '../screens/entries-list';
 import {NextStepDock, NextStepTab} from '../step-bar';
 import {
   EquipmentScreen, HomeScreen, IncidentsScreen, JournalScreen, MoreScreen, TasksScreen,
@@ -173,11 +174,12 @@ export function OperatorV7App() {
       } else {
         setActionError(cause instanceof Error ? cause.message : 'Команда не прошла');
       }
-    } finally {
-      setBusy(false);
     }
 
-    if (!accepted) return false;
+    if (!accepted) {
+      setBusy(false);
+      return false;
+    }
 
     setCommandId(newCommandId());
     if (options.close !== false) setDetour(null);
@@ -186,6 +188,8 @@ export function OperatorV7App() {
     } catch {
       // Перечитывание состояния не отменяет принятую запись: о своей неудаче
       // `reload` сообщает сам текстом ошибки состояния.
+    } finally {
+      setBusy(false);
     }
     return true;
   }, [reload]);
@@ -225,6 +229,10 @@ export function OperatorV7App() {
   const equipmentId = state.assignment?.equipmentId ?? null;
   const openIncidents = state.incidents.filter((incident) => incident.reviewedAt === null).length;
   const pending = queued.filter((item) => item.state === 'PENDING').length;
+  const correctProduction = (input: CorrectionInput) => {
+    if (!shiftId) return Promise.resolve(false);
+    return run({command: 'correct-production', clientCommandId: commandId, shiftId, ...input}, {close: false});
+  };
 
   const messages = (
     <>
@@ -483,6 +491,8 @@ export function OperatorV7App() {
           <HomeScreen
             state={state}
             busy={busy}
+            onCorrect={correctProduction}
+            correctionError={actionError}
             onStep={(step) => setDetour(step)}
             onFinishWork={() => {
               if (!shiftId) return;
@@ -508,7 +518,7 @@ export function OperatorV7App() {
         {tab === 'EQUIP' ? <EquipmentScreen defects={state.defects} /> : null}
         {tab === 'MORE' ? (
           <>
-            <JournalScreen state={state} />
+            <JournalScreen state={state} busy={busy} onCorrect={correctProduction} correctionError={actionError} />
             <IncidentsScreen incidents={state.incidents} />
             <MoreScreen state={state} onResult={() => setDetour({kind: 'RESULT'})} />
           </>
