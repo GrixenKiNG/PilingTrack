@@ -91,6 +91,22 @@ describe('Sentry в процессе воркера', () => {
     for (const key of ENV_KEYS) delete process.env[key];
   });
 
+  it('закрытие наряда по сроку появляется в отдельном счётчике журнала воркера', async () => {
+    vi.useFakeTimers();
+    process.env.READINESS_SCHEDULER_STARTUP_DELAY_MS = '1';
+    process.env.READINESS_SCHEDULER_INTERVAL_MS = '60000';
+    mocks.runReadinessScheduler.mockResolvedValue({permitsClosed: 1, permitsExpired: 0, shiftsAutoClosed: 0});
+    const stop = (await import('../readiness-scheduler')).startReadinessScheduler();
+    try {
+      await vi.advanceTimersByTimeAsync(1);
+      expect(mocks.logger.info).toHaveBeenCalledWith('Readiness scheduler pass', {
+        tenantId: 'tenant-1', permitsClosed: 1, permitsExpired: 0, shiftsAutoClosed: 0,
+      });
+    } finally {
+      stop();
+    }
+  });
+
   it('без SENTRY_DSN не инициализирует Sentry', async () => {
     const { initWorkerSentry } = await import('@/workers/unified-worker/sentry');
 

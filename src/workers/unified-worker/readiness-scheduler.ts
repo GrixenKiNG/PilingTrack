@@ -33,10 +33,11 @@ async function runOnce(): Promise<void> {
     // forEachTenant заводит контекст на каждую организацию отдельно.
     await forEachTenant(async (tenantId) => {
       const result = await runReadinessScheduler(tenantId);
-      if (result.permitsExpired > 0 || result.shiftsAutoClosed > 0) {
+      if (result.permitsExpired > 0 || result.permitsClosed > 0 || result.shiftsAutoClosed > 0) {
         logger.info('Readiness scheduler pass', {
           tenantId,
           permitsExpired: result.permitsExpired,
+          permitsClosed: result.permitsClosed,
           shiftsAutoClosed: result.shiftsAutoClosed,
         });
       }
