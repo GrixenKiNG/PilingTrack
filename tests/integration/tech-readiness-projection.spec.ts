@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import {readFile} from 'node:fs/promises';
 import {resolve} from 'node:path';
 import {PrismaPg} from '@prisma/adapter-pg';
@@ -12,10 +13,7 @@ import {createDeduplicatedSnapshot} from '../../src/modules/readiness/infrastruc
 import {advanceCurrentReadiness} from '../../src/modules/readiness/application/projection/current-read-model';
 import {ReadinessBackfillProgressRepository} from '../../src/modules/readiness/application/backfill/progress-repository';
 
-// Явное включение, как у остальных интеграционных наборов: одноразовая база из
-// scripts/test-db-up.sh (CI и локально). .env не читаем — иначе набор мог бы
-// молча выбрать рабочую базу разработчика. Набор создаёт и удаляет СВОИ базы.
-const connectionString = process.env.INTEGRATION_DATABASE_URL_OWNER;
+const connectionString = process.env.DATABASE_URL_POSTGRES;
 const migrationPaths = [
   resolve(process.cwd(), 'prisma/migrations/20260730105500_readiness_snapshot_immutability/migration.sql'),
   resolve(process.cwd(), 'prisma/migrations/20260730106000_readiness_backfill_progress/migration.sql'),
@@ -34,7 +32,7 @@ describe.runIf(Boolean(connectionString))('readiness snapshot projection on disp
     maintenanceOverdueDays: 0, accepted: true, criticalDefect: false, findings: 0} as const;
 
   beforeAll(async () => {
-    if (!connectionString) throw new Error("INTEGRATION_DATABASE_URL_OWNER is required");
+    if (!connectionString) throw new Error("DATABASE_URL_POSTGRES is required");
     await admin.connect(); await admin.query(`CREATE DATABASE "${database}"`);
     const url = new URL(connectionString); url.pathname = `/${database}`;
     sql = new Client({connectionString: url.toString()}); await sql.connect();

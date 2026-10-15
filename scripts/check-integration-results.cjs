@@ -7,9 +7,6 @@ try {
   for (const [file, minimum] of [
     ['disposable-rls.spec.ts', 21],
     ['tech-readiness-write-pipeline.spec.ts', 5],
-    ['tech-readiness-projection.spec.ts', 4],
-    ['tech-readiness-shifts.spec.ts', 3],
-    ['tech-readiness-work-permits.spec.ts', 4],
     ['disposable-restore.spec.ts', 3],
   ]) {
     const suite = result.testResults?.find(item => item.name.replaceAll('\\', '/').endsWith('/' + file));

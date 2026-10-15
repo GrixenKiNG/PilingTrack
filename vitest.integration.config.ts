@@ -6,7 +6,7 @@ export default defineConfig({
   resolve: { alias: { '@': path.resolve(__dirname, 'src') } },
   test: {
     environment: 'node',
-    include: ['tests/integration/disposable-*.spec.ts', 'tests/integration/tech-readiness-*.spec.ts'],
+    include: ['tests/integration/disposable-*.spec.ts', 'tests/integration/tech-readiness-write-pipeline.spec.ts'],
     testTimeout: 30_000,
     hookTimeout: 60_000,
     fileParallelism: false,

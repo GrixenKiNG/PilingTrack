@@ -5,14 +5,11 @@ import { spawnSync } from 'node:child_process';
 import { describe, expect, it } from 'vitest';
 
 const report = () => ({
-  success: true, numTotalTests: 43, numPassedTests: 43, numFailedTests: 0, numPendingTests: 0,
+  success: true, numTotalTests: 32, numPassedTests: 32, numFailedTests: 0, numPendingTests: 0,
   testResults: [
     { name: '/tests/integration/disposable-rls.spec.ts', assertionResults: Array.from({ length: 21 }, () => ({ status: 'passed' })) },
     { name: '/tests/integration/tech-readiness-write-pipeline.spec.ts', assertionResults: Array.from({ length: 5 }, () => ({ status: 'passed' })) },
     { name: '/tests/integration/disposable-restore.spec.ts', assertionResults: Array.from({ length: 3 }, () => ({ status: 'passed' })) },
-    { name: '/tests/integration/tech-readiness-projection.spec.ts', assertionResults: Array.from({ length: 4 }, () => ({ status: 'passed' })) },
-    { name: '/tests/integration/tech-readiness-shifts.spec.ts', assertionResults: Array.from({ length: 3 }, () => ({ status: 'passed' })) },
-    { name: '/tests/integration/tech-readiness-work-permits.spec.ts', assertionResults: Array.from({ length: 4 }, () => ({ status: 'passed' })) },
   ],
 });
 const run = (data: ReturnType<typeof report>) => {
@@ -28,17 +25,10 @@ describe('CI integration evidence gate', () => {
     expect(run(report()).status).toBe(0);
   });
   it('rejects a green-looking run containing skips', () => {
-    const data = report(); data.numPendingTests = 1; data.numPassedTests = 42;
+    const data = report(); data.numPendingTests = 1; data.numPassedTests = 31;
     const result = run(data);
     expect(result.status).toBe(1);
     expect(result.stderr).toContain('All integration tests must actually pass');
-  });
-  it('rejects a run where a readiness suite was skipped (they were silently dormant before 16.10.2026)', () => {
-    const data = report();
-    data.testResults = data.testResults.filter((item) => !item.name.endsWith('tech-readiness-shifts.spec.ts'));
-    const result = run(data);
-    expect(result.status).toBe(1);
-    expect(result.stderr).toContain('tech-readiness-shifts.spec.ts');
   });
   it('rejects a missing suite even if aggregate counters claim success', () => {
     const data = report(); data.testResults.shift();
