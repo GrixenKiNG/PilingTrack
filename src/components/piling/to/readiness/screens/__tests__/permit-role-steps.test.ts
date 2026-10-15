@@ -1,6 +1,6 @@
 import {describe, expect, it} from 'vitest';
 import type {WorkPermitDto} from '../../api/contracts';
-import {buildPermitRoleSteps, isOverduePermit} from '../permit-role-steps';
+import {buildPermitRoleSteps, isOverduePermit, permitSigningBlock} from '../permit-role-steps';
 
 const NOW = new Date('2026-10-10T09:00:00.000Z');
 const permit = (state: WorkPermitDto['state'], validTo: string, extra: Partial<WorkPermitDto> = {}) =>
@@ -63,5 +63,32 @@ describe('шаги ролей на вкладке «Наряд-допуски»'
   it('нарядов нет — у диспетчера делать нечего', () => {
     const dispatcher = role('Диспетчер', []);
     expect(dispatcher.steps.map((step) => step.done)).toEqual([true, true]);
+  });
+});
+
+describe('permitSigningBlock — кто уже подписал, тот вторую подпись не поставит', () => {
+  const twoSigns = (approvals: WorkPermitDto['approvals'], extra: Partial<WorkPermitDto> = {}) =>
+    permit('PENDING_APPROVAL', FUTURE, {risk: 'ELEVATED', requiredApprovals: ['DISPATCHER', 'ADMIN'], version: 1, approvals, ...extra});
+  const sign = (role: 'DISPATCHER' | 'ADMIN', approvedById: string, over: Partial<WorkPermitDto['approvals'][number]> = {}) =>
+    ({role, approvedById, approvedAt: '2026-10-15T17:56:00.000Z', valid: true, permitVersion: 1, ...over});
+  const actor = (id: string) => ({id, role: 'ADMIN', actingAs: null});
+
+  it('объясняет подписавшему, что остальные подписи нужны от других людей', () => {
+    const text = permitSigningBlock(twoSigns([sign('DISPATCHER', 'admin-1')]), actor('admin-1'));
+    expect(text).toContain('«Диспетчер»');
+    expect(text).toContain('Администратор');
+  });
+
+  it('другому человеку подпись не запрещает', () => {
+    expect(permitSigningBlock(twoSigns([sign('DISPATCHER', 'admin-1')]), actor('admin-2'))).toBeNull();
+  });
+
+  it('при одной обязательной подписи ограничения нет', () => {
+    expect(permitSigningBlock(twoSigns([sign('DISPATCHER', 'admin-1')], {requiredApprovals: ['DISPATCHER']}), actor('admin-1'))).toBeNull();
+  });
+
+  it('подпись прежней версии или аннулированная не считается', () => {
+    expect(permitSigningBlock(twoSigns([sign('DISPATCHER', 'admin-1', {permitVersion: 0})]), actor('admin-1'))).toBeNull();
+    expect(permitSigningBlock(twoSigns([sign('DISPATCHER', 'admin-1', {valid: false})]), actor('admin-1'))).toBeNull();
   });
 });

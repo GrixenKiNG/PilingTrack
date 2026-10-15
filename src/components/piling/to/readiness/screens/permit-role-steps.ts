@@ -43,6 +43,32 @@ export function actionableOverduePermits<T extends Pick<WorkPermitDto, 'state' |
   return permits.filter((permit) => permit.state !== 'EXPIRED' && isOverduePermit(permit, now) && !replaced.has(permit.equipmentId));
 }
 
+const SIGN_ROLE_LABEL = {DISPATCHER: 'Диспетчер', ADMIN: 'Администратор'} as const;
+
+/**
+ * Почему человеку не стоит предлагать «Согласовать» (null — стоит).
+ *
+ * Наряд с несколькими обязательными подписями (повышенный риск: «Диспетчер» и
+ * «Администратор») подписывают РАЗНЫЕ люди; сервер отказывает второй раз тому,
+ * кто уже подписал, фразой «требует согласования разными людьми». Раньше экран
+ * всё равно звал нажать «Согласовать» (администратор мог подписать как
+ * диспетчер через «Действую как» и потом упирался в отказ без выхода), теперь
+ * вместо кнопки — объяснение, чья подпись нужна. Правило сервера не дублируем
+ * целиком: остальные отказы (роль, автор, срок) сервер объяснит сам.
+ */
+export function permitSigningBlock(
+  permit: Pick<WorkPermitDto, 'requiredApprovals' | 'approvals' | 'version'>,
+  actor: {id: string | null},
+): string | null {
+  const required = permit.requiredApprovals ?? [];
+  if (required.length < 2 || !actor.id) return null;
+  const current = permit.approvals.filter((item) => item.valid && item.permitVersion === permit.version);
+  const mine = current.find((item) => item.approvedById === actor.id);
+  if (!mine) return null;
+  const left = required.filter((role) => !current.some((item) => item.role === role)).map((role) => SIGN_ROLE_LABEL[role]);
+  return `Вы уже подписали этот наряд как «${SIGN_ROLE_LABEL[mine.role]}». ${left.length ? `Остальные подписи (${left.join(', ')}) должны поставить другие люди.` : ''}`.trim();
+}
+
 export function buildPermitRoleSteps({permits, now}: {permits: readonly WorkPermitDto[]; now: Date}): PermitRoleSteps[] {
   const overdue = actionableOverduePermits(permits, now);
   const livePending = permits.filter((permit) => permit.state === 'PENDING_APPROVAL' && !isOverduePermit(permit, now));

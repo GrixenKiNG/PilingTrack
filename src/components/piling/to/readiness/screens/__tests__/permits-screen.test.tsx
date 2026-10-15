@@ -215,3 +215,30 @@ it('исправляет отказанный черновик и отправл
   expect(requests[0].body).not.toHaveProperty('shiftId');
   expect(requests[1]).toEqual({url: `/api/readiness/work-permits/${rejected.id}/submit`, method: 'POST', body: {expectedVersion: 4}});
 });
+
+describe('Наряд с двумя обязательными подписями: кто уже подписал, не видит кнопку', () => {
+  const signedByAdmin: WorkPermitDto = {
+    ...pendingPermit,
+    approvals: [{ role: 'DISPATCHER', approvedById: 'admin-1', approvedAt: '2099-01-01T01:00:00Z', valid: true, permitVersion: 2 }],
+  };
+  const asAdmin = (id: string) => {
+    const bootstrap = bootstrapEnvelope().data;
+    bootstrap.actor.id = id;
+    bootstrap.actor.role = 'ADMIN';
+    bootstrap.capabilities.entities.permit.approveAdmin = true;
+    return bootstrap;
+  };
+
+  it('подписавшему вместо кнопки показано, почему вторую подпись ставит другой человек', () => {
+    render(<PermitsScreen {...makeProps({ bootstrap: asAdmin('admin-1'), permits: [signedByAdmin] })} />);
+    expect(screen.getAllByText(/Вы уже подписали этот наряд как «Диспетчер»/).length).toBeGreaterThan(0);
+    expect(screen.queryByRole('button', { name: 'Проверить и согласовать' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Согласовать' })).toBeNull();
+  });
+
+  it('другому администратору кнопка остаётся', () => {
+    render(<PermitsScreen {...makeProps({ bootstrap: asAdmin('admin-2'), permits: [signedByAdmin] })} />);
+    expect(screen.getByRole('button', { name: 'Проверить и согласовать' })).toBeInTheDocument();
+    expect(screen.queryByText(/Вы уже подписали/)).toBeNull();
+  });
+});
