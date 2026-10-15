@@ -16,6 +16,7 @@ const PERMIT_STATE_TEXT: Record<WorkPermitState, string> = {
   APPROVED: 'согласован',
   EXPIRED: 'истёк',
   REVOKED: 'отозван',
+  CLOSED: 'закрыт',
 };
 
 const PERMIT_COMMAND_TEXT: Record<string, string> = {

@@ -29,6 +29,7 @@ const migrationPaths = [
   'prisma/migrations/20260816130000_permit_form_fields/migration.sql',
   'prisma/migrations/20260816150000_permit_approval_rules/migration.sql',
   'prisma/migrations/20261013200000_add_work_permit_rejection/migration.sql',
+  'prisma/migrations/20261015090000_work_permit_close/migration.sql',
 ].map((path) => resolve(process.cwd(), path));
 
 type DbError = {code?: string; meta?: {code?: string}};
