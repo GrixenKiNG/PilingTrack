@@ -314,7 +314,26 @@ test('v1 (КБУРГ-16.02 №1, ka@): завершение и сдача сме
   expect(t3).toMatch(/RM-/);
 });
 
+/**
+ * D-20260930-001, точная проверка (15.10.2026). Слов «Допуск» и «Принять установку»
+ * достаточно, чтобы пройти и на экране-тупике, поэтому тест нажимает «Принять
+ * установку» и требует одно из двух: шаг продвинулся или экран объяснил отказ.
+ * Сервер на такой клик отвечает 409 «Сдайте её, прежде чем открывать новую»,
+ * а v2 не показывает ничего.
+ */
+async function acceptAdvancesOrExplains(page: Page, label: string): Promise<string> {
+  const accept = page.getByRole('button', { name: 'Принять установку' });
+  if (await accept.count()) { await tap(page, accept.first(), 'Принять установку'); await page.waitForTimeout(4500); }
+  return dump(page, label);
+}
+const NEXT_STEP_OR_REASON = /Шаг [2-5] из 5|Сдайте её|не закрыта смена|сдать смену/i;
+
+function hasPendingShift(email: string): boolean {
+  return db(`SELECT count(*) FROM "Shift" s JOIN "User" u ON u.id=s."createdById" WHERE u.email='${email}' AND s.state='HANDOVER_PENDING'`) !== '0';
+}
+
 test('D-20260930-001: v2 (apj@piling.ru) — после HANDOVER_PENDING открывается новый цикл', async ({ page }) => {
+  test.skip(!hasPendingShift('apj@piling.ru'), 'у apj нет смены в HANDOVER_PENDING (27.09 закрыта 09.10): сценарий дефекта не воспроизводится');
   test.fail(true, 'D-20260930-001: смена зависла в HANDOVER_PENDING с 27.09, новый цикл не начинается');
   const apis = apiWatch(page);
   await login(page, 'apj@piling.ru');
@@ -323,13 +342,15 @@ test('D-20260930-001: v2 (apj@piling.ru) — после HANDOVER_PENDING отк�
   const before = await dump(page, 'apj-01-состояние');
   const home = page.getByRole('button', { name: /На главную/ });
   if (await home.count()) { await tap(page, home.first(), 'На главную'); await page.waitForTimeout(3500); }
-  const after = await dump(page, 'apj-02-после-главной');
+  await dump(page, 'apj-02-после-главной');
+  const after = await acceptAdvancesOrExplains(page, 'apj-03-после-приёма');
   record({ step: 'D-20260930-001', before: before.replace(/\s+/g, ' ').slice(0, 300), after: after.replace(/\s+/g, ' ').slice(0, 300), apis: apis.slice(-8) });
-  expect(after, 'новый цикл смены (допуск, приём или осмотр)').toMatch(/Допуск|Принять установку|Приём|осмотр/i);
+  expect(after, 'после «Принять установку» шаг продвинулся или экран объяснил отказ').toMatch(NEXT_STEP_OR_REASON);
 });
 
 test('D-20261001-001: v5 (mag@piling.ru) — баннер о незакрытой смене 30.09 и новая смена', async ({ page }) => {
-  test.fail(true, 'D-20261001-001: v5 продолжает смену 30.09, выработка уходит в отчёт вчерашней даты');
+  // D-20261001-001 закрыт 15.10.2026 (5580bed9): вместо тихого продолжения вчерашней смены v5 требует явной досдачи.
+  test.skip(!hasPendingShift('mag@piling.ru'), 'у mag нет смены в HANDOVER_PENDING: баннера о незакрытой смене не будет');
   const apis = apiWatch(page);
   await login(page, 'mag@piling.ru');
   await page.goto('/operator/v5', { waitUntil: 'domcontentloaded' });
@@ -350,7 +371,7 @@ test('D-20261001-001: v5 (mag@piling.ru) — баннер о незакрыто�
   }
   const after = await dump(page, 'mag-04-дальше');
   record({ step: 'D-20261001-001', before: before.replace(/\s+/g, ' ').slice(0, 300), after: after.replace(/\s+/g, ' ').slice(0, 400), apis: apis.slice(-10) });
-  expect(before + ' ' + after, 'баннер о незакрытой смене 30.09 (или её закрытие)').toMatch(/незакрыт|закрыть|передать|30\.09/i);
+  expect(before + ' ' + after, 'баннер о несданной смене 30.09 с пояснением, что работа — после новой смены').toMatch(/Не сдана смена за 30\.09\.2026[\s\S]*после открытия новой смены/);
 });
 
 test('v1 (Bauer RTG RM20, operator@): полная смена от допуска до отчёта', async ({ page }) => {
@@ -508,6 +529,7 @@ test('v10 (Woltman-PVE 50PR, ivv@): продолжает смену 04.10 под
 });
 
 test('D-20260930-001: v2 (gea@piling.ru) — вторая бригада того же дефекта', async ({ page }) => {
+  test.skip(!hasPendingShift('gea@piling.ru'), 'у gea нет смены в HANDOVER_PENDING: сценарий дефекта не воспроизводится');
   test.fail(true, 'D-20260930-001: смена зависла в HANDOVER_PENDING с 27.09 (бригада КБУРГ-16.02 №2)');
   const apis = apiWatch(page);
   await login(page, 'gea@piling.ru');
@@ -516,9 +538,10 @@ test('D-20260930-001: v2 (gea@piling.ru) — вторая бригада тог�
   const before = await dump(page, 'gea-01-состояние');
   const home = page.getByRole('button', { name: /На главную/ });
   if (await home.count()) { await tap(page, home.first(), 'На главную'); await page.waitForTimeout(3500); }
-  const after = await dump(page, 'gea-02-после-главной');
+  await dump(page, 'gea-02-после-главной');
+  const after = await acceptAdvancesOrExplains(page, 'gea-03-после-приёма');
   record({ step: 'D-20260930-001 (gea)', before: before.replace(/\s+/g, ' ').slice(0, 300), after: after.replace(/\s+/g, ' ').slice(0, 300), apis: apis.slice(-8) });
-  expect(after, 'новый цикл смены (допуск, приём или осмотр)').toMatch(/Допуск|Принять установку|Приём|осмотр/i);
+  expect(after, 'после «Принять установку» шаг продвинулся или экран объяснил отказ').toMatch(NEXT_STEP_OR_REASON);
 });
 
 test('D-20260930-003: помощник v5 (kn@) — «экран доступен только машинисту» (не воспроизводится)', async ({ page }) => {
