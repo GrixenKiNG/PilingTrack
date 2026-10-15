@@ -318,8 +318,8 @@ test('v1 (КБУРГ-16.02 №1, ka@): завершение и сдача сме
  * D-20260930-001, точная проверка (15.10.2026). Слов «Допуск» и «Принять установку»
  * достаточно, чтобы пройти и на экране-тупике, поэтому тест нажимает «Принять
  * установку» и требует одно из двух: шаг продвинулся или экран объяснил отказ.
- * Сервер на такой клик отвечает 409 «Сдайте её, прежде чем открывать новую»,
- * а v2 не показывает ничего.
+ * Сервер на такой клик отвечает 409 «Сдайте её, прежде чем открывать новую».
+ * Теперь экран держит причину и кнопку «Сдать смену за …» (не мелькающее сообщение).
  */
 async function acceptAdvancesOrExplains(page: Page, label: string): Promise<string> {
   const accept = page.getByRole('button', { name: 'Принять установку' });
@@ -334,7 +334,7 @@ function hasPendingShift(email: string): boolean {
 
 test('D-20260930-001: v2 (apj@piling.ru) — после HANDOVER_PENDING открывается новый цикл', async ({ page }) => {
   test.skip(!hasPendingShift('apj@piling.ru'), 'у apj нет смены в HANDOVER_PENDING (27.09 закрыта 09.10): сценарий дефекта не воспроизводится');
-  test.fail(true, 'D-20260930-001: смена зависла в HANDOVER_PENDING с 27.09, новый цикл не начинается');
+  // D-20260930-001 исправлен 15.10.2026: на приёме v2 висит «Не сдана смена…» и кнопка «Сдать смену за …».
   const apis = apiWatch(page);
   await login(page, 'apj@piling.ru');
   await page.goto('/operator/v2', { waitUntil: 'domcontentloaded' });
@@ -530,7 +530,7 @@ test('v10 (Woltman-PVE 50PR, ivv@): продолжает смену 04.10 под
 
 test('D-20260930-001: v2 (gea@piling.ru) — вторая бригада того же дефекта', async ({ page }) => {
   test.skip(!hasPendingShift('gea@piling.ru'), 'у gea нет смены в HANDOVER_PENDING: сценарий дефекта не воспроизводится');
-  test.fail(true, 'D-20260930-001: смена зависла в HANDOVER_PENDING с 27.09 (бригада КБУРГ-16.02 №2)');
+  // D-20260930-001 исправлен 15.10.2026 (см. тест apj выше).
   const apis = apiWatch(page);
   await login(page, 'gea@piling.ru');
   await page.goto('/operator/v2', { waitUntil: 'domcontentloaded' });

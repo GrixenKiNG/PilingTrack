@@ -380,3 +380,56 @@ describe('V2: сбой загрузки и отказ записи', () => {
     expect(await screen.findByText('Техника безопасности')).toBeInTheDocument();
   });
 });
+
+describe('D-20260930-001: несданная смена прошлых суток на приёме v2', () => {
+  const oldShift = {id: 'old-1', productionDate: '2026-09-27', startedAt: '2026-09-27T01:09:26.751Z', state: 'HANDOVER_PENDING'};
+  const withOldShift = () => workStateFixture({phase: 'IDENTITY', productionDate: '2026-10-15', shift: oldShift});
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    api.queued = [];
+    api.sendCommand.mockResolvedValue({ok: true});
+    authFetch.mockResolvedValue({ok: true, json: async () => ({...facts, shift: null,
+      clearance: {...facts.clearance, warnings: []},
+    })});
+  });
+
+  it('объясняет на экране, почему нельзя принять установку, и даёт сдать прошлую смену', async () => {
+    api.fetchState.mockResolvedValue(withOldShift());
+    render(<OperatorShiftV2 />);
+
+    expect(await screen.findByText(/Не сдана смена за 27\.09\.2026/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', {name: 'Сдать смену за 27.09.2026'}));
+    await waitFor(() => expect(api.sendCommand).toHaveBeenCalledWith({command: 'close-shift', shiftId: 'old-1', comment: ''}));
+  });
+
+  it('после сдачи перечитывает состояние и убирает предупреждение', async () => {
+    api.fetchState
+      .mockResolvedValueOnce(withOldShift())
+      .mockResolvedValue(workStateFixture({phase: 'IDENTITY', productionDate: '2026-10-15', shift: null}));
+    render(<OperatorShiftV2 />);
+
+    fireEvent.click(await screen.findByRole('button', {name: 'Сдать смену за 27.09.2026'}));
+    await waitFor(() => expect(screen.queryByText(/Не сдана смена за 27\.09\.2026/)).not.toBeInTheDocument());
+  });
+
+  it('при отказе сервера оставляет причину на экране, а не только во всплывающем сообщении', async () => {
+    api.fetchState.mockResolvedValue(withOldShift());
+    api.sendCommand.mockRejectedValue(new Error('Сначала выполните ЕО после работы'));
+    render(<OperatorShiftV2 />);
+
+    fireEvent.click(await screen.findByRole('button', {name: 'Сдать смену за 27.09.2026'}));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Сначала выполните ЕО после работы');
+  });
+
+  it('не предупреждает о смене сегодняшних суток', async () => {
+    api.fetchState.mockResolvedValue(workStateFixture({
+      phase: 'IDENTITY', productionDate: '2026-10-15',
+      shift: {...oldShift, id: 'today-1', productionDate: '2026-10-15', state: 'STARTED'},
+    }));
+    render(<OperatorShiftV2 />);
+
+    expect(await screen.findByRole('button', {name: 'Принять установку'})).toBeInTheDocument();
+    expect(screen.queryByText(/Не сдана смена/)).not.toBeInTheDocument();
+  });
+});

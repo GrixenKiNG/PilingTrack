@@ -720,6 +720,35 @@ export function OperatorShiftV2() {
     }
   }, [mobile?.shift?.id, facts?.shift?.id, loadMobile, load]);
 
+  /*
+    Смена прошлых суток не сдана (D-20260930-001). Сервер не открывает новую смену
+    на той же установке, пока старая не закрыта, и отвечает 409 «Сдайте её…».
+    Раньше причина мелькала всплывающим сообщением, а сдать было нечем: экран
+    приёмки стоял как есть. Теперь причина висит на экране вместе с кнопкой сдачи.
+  */
+  const oldShift = mobile?.shift
+    && mobile.shift.productionDate < mobile.productionDate
+    && (mobile.shift.state === 'STARTED' || mobile.shift.state === 'HANDOVER_PENDING')
+    ? mobile.shift : null;
+  const oldShiftDate = oldShift ? oldShift.productionDate.split('-').reverse().join('.') : '';
+  const [oldShiftError, setOldShiftError] = useState<string | null>(null);
+  const closeOldShift = async () => {
+    if (!oldShift) return;
+    setBusy(true);
+    setOldShiftError(null);
+    try {
+      await sendCommand({command: 'close-shift', shiftId: oldShift.id, comment: ''});
+      await Promise.all([loadMobile(), load()]);
+      toast.success(`Смена за ${oldShiftDate} сдана`);
+    } catch (cause) {
+      const reason = cause instanceof Error ? cause.message : 'Смена не сдана';
+      setOldShiftError(reason);
+      toast.error(reason);
+    } finally {
+      setBusy(false);
+    }
+  };
+
   if (safetyStep && mobile) {
     /*
       Шаги допуска показываются во весь экран поверх смены: у каждого свой
@@ -905,6 +934,15 @@ export function OperatorShiftV2() {
             )
         ) : (
         <>
+        {oldShift ? (
+          <div className="space-y-2 rounded-xl border border-warning/40 bg-warning/10 px-3 py-3">
+            <p className="text-base text-warning-strong">
+              Не сдана смена за {oldShiftDate}. Пока она не сдана, новую смену на этой установке открыть нельзя.
+            </p>
+            {oldShiftError ? <p role="alert" className="text-base text-destructive">{oldShiftError}</p> : null}
+            <StepButton label={`Сдать смену за ${oldShiftDate}`} onClick={() => void closeOldShift()} busy={busy} />
+          </div>
+        ) : null}
         <ClearanceRow
           cleared={cleared}
           operatorName={user?.name?.trim() || 'Оператор'}
