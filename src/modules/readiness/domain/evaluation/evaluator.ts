@@ -79,7 +79,9 @@ export function evaluateReadiness(input: {
   // сообщение «наряд не оформлен» рядом с ним противоречило бы первому.
   const permitWarnings = permitConsidered
     && input.facts.permitValid !== true && !input.facts.permitExpired && !permitRequired
-    ? [{code: 'WORK_PERMIT_MISSING_OPTIONAL', message: 'Наряд-допуск не оформлен (по правилам не обязателен)'}]
+    ? [{code: 'WORK_PERMIT_MISSING_OPTIONAL', message: input.facts.permitCloseReason === 'WORK_DONE'
+      ? 'Наряд-допуск закрыт после работ; новый допуск не оформлен (по правилам не обязателен)'
+      : 'Наряд-допуск не оформлен (по правилам не обязателен)'}]
     : [];
   // Сработавшее правило с действием WARN_ONLY — это замечание, а не блокировка.
   // Держим их врозь, иначе интерфейс посчитает предупреждение критическим блокером.

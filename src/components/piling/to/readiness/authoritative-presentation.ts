@@ -245,7 +245,10 @@ export function buildAuthoritativeReadinessPresentation(
       key: 'PERMIT', label: 'Допуск',
       value: facts.permitValid === null
         ? 'Не требуется правилами'
-        : facts.permitValid && !facts.permitExpired ? 'Действует' : facts.permitExpired ? 'Просрочен' : 'Не подтверждён',
+        : facts.permitValid && !facts.permitExpired ? 'Действует'
+          : facts.permitCloseReason === 'WORK_DONE' ? 'Закрыт после работ'
+            : facts.permitCloseReason === 'VALIDITY_ELAPSED' ? 'Срок вышел — наряд закрыт'
+              : facts.permitExpired ? 'Просрочен' : 'Не подтверждён',
       state: facts.permitValid === null ? 'pass' : facts.permitValid && !facts.permitExpired ? 'pass' : 'fail',
     },
     {

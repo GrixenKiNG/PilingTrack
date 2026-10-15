@@ -64,13 +64,22 @@ export async function evaluateAuthoritativeReadiness(input: {
     where: {tenantId: input.tenantId, equipmentId: input.equipmentId, status: {in: [...OPEN_MAINTENANCE]}},
     select: {id: true, type: true, priority: true},
   });
-  const permit = await input.tx.workPermit.findFirst({
+  const permitScope = {
+    tenantId: input.tenantId, equipmentId: input.equipmentId,
+    validFrom: {lte: now},
+    OR: input.shiftId ? [{shiftId: null}, {shiftId: input.shiftId}] : [{shiftId: null}],
+  };
+  const permitSelect = {id: true, state: true, validFrom: true, validTo: true, closeReason: true} as const;
+  // Закрытый наряд с длинным сроком не должен скрывать новый действующий допуск.
+  const activePermit = await input.tx.workPermit.findFirst({
+    where: {...permitScope, state: 'APPROVED', validTo: {gt: now}},
+    orderBy: {validTo: 'desc'}, select: permitSelect,
+  });
+  const permit = activePermit ?? await input.tx.workPermit.findFirst({
     where: {
-      tenantId: input.tenantId, equipmentId: input.equipmentId, state: {in: ['APPROVED', 'EXPIRED']},
-      validFrom: {lte: now},
-      OR: input.shiftId ? [{shiftId: null}, {shiftId: input.shiftId}] : [{shiftId: null}],
+      ...permitScope, state: {in: ['APPROVED', 'EXPIRED', 'CLOSED']},
     },
-    orderBy: {validTo: 'desc'}, select: {id: true, state: true, validFrom: true, validTo: true},
+    orderBy: {validTo: 'desc'}, select: permitSelect,
   });
   const publishedRow = await input.tx.readinessRuleSet.findFirst({
     where: {tenantId: input.tenantId, status: 'PUBLISHED'}, orderBy: {updatedAt: 'desc'},
@@ -185,7 +194,10 @@ export async function evaluateAuthoritativeReadiness(input: {
       ? Boolean(permit && permit.state === 'APPROVED' && permit.validFrom <= now && permit.validTo > now)
       : null,
     permitExpired: permitsInUse
-      && Boolean(permit && (permit.state === 'EXPIRED' || permit.validTo <= now)),
+      && Boolean(permit && (permit.state === 'EXPIRED'
+        || (permit.state === 'APPROVED' && permit.validTo <= now)
+        || (permit.state === 'CLOSED' && permit.closeReason === 'VALIDITY_ELAPSED'))),
+    permitCloseReason: permitsInUse && permit?.state === 'CLOSED' ? permit.closeReason : null,
     maintenanceConfigured: equipment.nextMaintenanceAtHours != null || equipment.nextMaintenanceDate != null,
     maintenanceOverdueHours: overdueHours,
     maintenanceOverdueDays: overdueDays,

@@ -227,6 +227,7 @@ export const authoritativeReadinessFactsSchema = z.object({
   meterKnown: z.boolean(),
   permitValid: z.boolean().nullable(),
   permitExpired: z.boolean(),
+  permitCloseReason: z.enum(['WORK_DONE', 'VALIDITY_ELAPSED']).nullable().optional(),
   maintenanceConfigured: z.boolean(),
   maintenanceOverdueHours: z.number().min(0),
   maintenanceOverdueDays: z.number().min(0),

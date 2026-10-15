@@ -82,6 +82,16 @@ const currentItem = (facts: unknown) => ({
 });
 
 describe('authoritative readiness response contracts', () => {
+  it('accepts closure reasons and null while retaining legacy facts without the field', () => {
+    for (const permitCloseReason of ['WORK_DONE', 'VALIDITY_ELAPSED', null]) {
+      const facts = {...completeFacts, permitValid: false, permitCloseReason};
+      expect(parseCurrentReadinessResponse({data: [currentItem(facts)]})[0]?.facts).toEqual(facts);
+    }
+    expect(parseCurrentReadinessResponse({data: [currentItem(completeFacts)]})[0]?.facts).toEqual(completeFacts);
+    expect(() => parseCurrentReadinessResponse({data: [currentItem({...completeFacts, permitCloseReason: 'UNKNOWN'})]}))
+      .toThrow(ZodError);
+  });
+
   it('actual history GET preserves saved verdicts and legacy null through the parser', async () => {
     const verdicts = ['DENIED', 'RETURN_TO_OPERATOR', 'CONFIRMATION_REQUIRED', 'ALLOWED', null];
     historyMocks.findMany.mockResolvedValue(verdicts.map((verdict, index) => ({
