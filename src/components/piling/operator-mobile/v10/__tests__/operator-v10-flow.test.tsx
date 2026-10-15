@@ -99,6 +99,7 @@ function makeState(phase: string, doneStages: string[] = []): OperatorMobileStat
 }
 
 beforeEach(() => {
+  window.localStorage.clear();
   api.fetchState.mockReset();
   api.sendCommand.mockReset();
   vi.stubGlobal('fetch', vi.fn(async () => new Response('{}', {status: 200})));
@@ -208,6 +209,20 @@ describe('v10: порядок смены', () => {
 });
 
 describe('v10: отказ сервера виден, введённое не пропадает', () => {
+  it('после перезагрузки восстанавливает неотправленный простой', async () => {
+    api.fetchState.mockResolvedValue(makeState('WORK', ['PRESHIFT_INSPECTION', 'SITE_READY', 'EO_BEFORE']));
+    const view = render(<OperatorV10App />);
+    fireEvent.click(await screen.findByRole('button', {name: 'Дальше: Работа: сваи, бурение, простой'}));
+    fireEvent.click(screen.getByRole('button', {name: 'Записать простой'}));
+    fireEvent.change(screen.getByRole('combobox'), {target: {value: 'r1'}});
+    fireEvent.change(screen.getByLabelText('Простой, часов'), {target: {value: '1.5'}});
+    view.unmount();
+    render(<OperatorV10App />);
+    fireEvent.click(await screen.findByRole('button', {name: 'Дальше: Работа: сваи, бурение, простой'}));
+    fireEvent.click(screen.getByRole('button', {name: 'Записать простой'}));
+    expect(screen.getByRole('combobox')).toHaveValue('r1');
+    expect(screen.getByLabelText('Простой, часов')).toHaveValue(1.5);
+  });
   it('простой отвергнут — красная полоса с причиной, поля на месте', async () => {
     api.fetchState.mockResolvedValue(makeState('WORK', ['PRESHIFT_INSPECTION', 'SITE_READY', 'EO_BEFORE']));
     api.sendCommand.mockRejectedValue(new ApiError(400, 'Простой длиннее суток (25 ч). Проверьте часы.'));

@@ -1,6 +1,6 @@
 'use client';
 
-import {useState} from 'react';
+import {useLocalFormDraft} from '../use-local-form-draft';
 import {
   DEFAULT_SET_BLOWS, journalRefusalMm, REFUSAL_SET_WINDOW, refusalExceedsDesign,
   setRefusalMm, validatePassport,
@@ -116,7 +116,7 @@ function toMeasuredSets(drafts: SetDraft[]) {
   return measured;
 }
 
-export function PilePassportForm({grades, busy, error, errorDetails, onSubmit}: {
+export function PilePassportForm({grades, busy, error, errorDetails, onSubmit, draftUserId, draftShiftId}: {
   grades: {id: string; name: string; lengthMm: number | null}[];
   busy: boolean;
   /**
@@ -128,23 +128,30 @@ export function PilePassportForm({grades, busy, error, errorDetails, onSubmit}: 
   /** Подробности отказа — какие поля паспорта не заполнены. */
   errorDetails?: string[];
   onSubmit: (pileGradeId: string, passport: PilePassportInput) => Promise<boolean>;
+  draftUserId?: string;
+  draftShiftId?: string;
 }) {
-  const [pileGradeId, setPileGradeId] = useState('');
-  const [pileNumber, setPileNumber] = useState('');
-  const [designHead, setDesignHead] = useState('');
-  const [actualHead, setActualHead] = useState('');
-  const [depth, setDepth] = useState('');
-  const [sets, setSets] = useState<SetDraft[]>([emptySet()]);
-  const [designRefusal, setDesignRefusal] = useState('');
-  const [totalBlows, setTotalBlows] = useState('');
-  const [blowsLastMeter, setBlowsLastMeter] = useState('');
-  const [planDeviation, setPlanDeviation] = useState('');
-  const [tilt, setTilt] = useState('');
-  const [dropHeight, setDropHeight] = useState('');
-  const [redriven, setRedriven] = useState(false);
-  const [followerUsed, setFollowerUsed] = useState(false);
-  const [headCutOff, setHeadCutOff] = useState(false);
-  const [note, setNote] = useState('');
+  const localDraft = useLocalFormDraft(draftUserId, draftShiftId && `passport:${draftShiftId}`, {
+    pileGradeId: '', pileNumber: '', designHead: '', actualHead: '', depth: '', sets: [emptySet()],
+    designRefusal: '', totalBlows: '', blowsLastMeter: '', planDeviation: '', tilt: '', dropHeight: '',
+    redriven: false, followerUsed: false, headCutOff: false, note: '',
+  });
+  const [pileGradeId, setPileGradeId] = localDraft.field('pileGradeId');
+  const [pileNumber, setPileNumber] = localDraft.field('pileNumber');
+  const [designHead, setDesignHead] = localDraft.field('designHead');
+  const [actualHead, setActualHead] = localDraft.field('actualHead');
+  const [depth, setDepth] = localDraft.field('depth');
+  const [sets, setSets] = localDraft.field('sets');
+  const [designRefusal, setDesignRefusal] = localDraft.field('designRefusal');
+  const [totalBlows, setTotalBlows] = localDraft.field('totalBlows');
+  const [blowsLastMeter, setBlowsLastMeter] = localDraft.field('blowsLastMeter');
+  const [planDeviation, setPlanDeviation] = localDraft.field('planDeviation');
+  const [tilt, setTilt] = localDraft.field('tilt');
+  const [dropHeight, setDropHeight] = localDraft.field('dropHeight');
+  const [redriven, setRedriven] = localDraft.field('redriven');
+  const [followerUsed, setFollowerUsed] = localDraft.field('followerUsed');
+  const [headCutOff, setHeadCutOff] = localDraft.field('headCutOff');
+  const [note, setNote] = localDraft.field('note');
 
   // Отказ считаем тем же правилом, что и журнал: экран машиниста и экран
   // мастера обязаны показывать одно число.
@@ -219,6 +226,9 @@ export function PilePassportForm({grades, busy, error, errorDetails, onSubmit}: 
     setFollowerUsed(false);
     setHeadCutOff(false);
     setNote('');
+    localDraft.clear({...localDraft.value, pileNumber: '', actualHead: '', depth: '', sets: [emptySet()],
+      totalBlows: '', blowsLastMeter: '', planDeviation: '', tilt: '', redriven: false,
+      followerUsed: false, headCutOff: false, note: ''});
   };
 
   return (

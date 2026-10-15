@@ -12,6 +12,7 @@ import {BigButton, ErrorNote, Fact, Panel, PanelTitle, Screen, VolumeFact} from 
 import {PermitPanel, WarningsPanel} from '../warnings-panel';
 import {EntriesList} from './entries-list';
 import {PilePassportForm} from './pile-passport-form';
+import {useLocalFormDraft} from '../use-local-form-draft';
 
 type Tab = 'PILES' | 'DRILLING' | 'DOWNTIME';
 
@@ -75,8 +76,12 @@ export function WorkScreen({
     entryId: string; kind: 'PILES' | 'DRILLING' | 'DOWNTIME'; actual: number; reason: string;
   }) => Promise<boolean>;
 }) {
-  const [formOpen, setFormOpen] = useState(afterFinish);
-  const [tab, setTab] = useState<Tab>('PILES');
+  const localDraft = useLocalFormDraft(state.operator?.id, state.shift?.id && `production:base:${state.shift.id}`, {
+    tab: 'PILES' as Tab, pileMode: (afterFinish ? 'BATCH' : 'PASSPORT') as 'PASSPORT' | 'BATCH',
+    reference: '', count: '', metersPerUnit: '', hoursText: '', comment: '',
+  }, (value) => !value.reference && !value.count && !value.metersPerUnit && !value.hoursText && !value.comment);
+  const [formOpen, setFormOpen] = useState(afterFinish || localDraft.restored);
+  const [tab, setTab] = localDraft.field('tab');
   /**
    * Как записывают сваи.
    *
@@ -86,12 +91,12 @@ export function WorkScreen({
    * работу» (дописывание до сдачи смены) по умолчанию включена пачка: именно
    * так добирают записи задним числом.
    */
-  const [pileMode, setPileMode] = useState<'PASSPORT' | 'BATCH'>(afterFinish ? 'BATCH' : 'PASSPORT');
-  const [reference, setReference] = useState('');
-  const [count, setCount] = useState('');
-  const [metersPerUnit, setMetersPerUnit] = useState('');
-  const [hoursText, setHoursText] = useState('');
-  const [comment, setComment] = useState('');
+  const [pileMode, setPileMode] = localDraft.field('pileMode');
+  const [reference, setReference] = localDraft.field('reference');
+  const [count, setCount] = localDraft.field('count');
+  const [metersPerUnit, setMetersPerUnit] = localDraft.field('metersPerUnit');
+  const [hoursText, setHoursText] = localDraft.field('hoursText');
+  const [comment, setComment] = localDraft.field('comment');
   // Завершение работы обратного хода не имеет: смена уходит в сдачу, и
   // записать сваю после этого уже нельзя. Кнопка стоит вплотную к «Записать»,
   // и промах по ней в перчатке заканчивал смену досрочно. Второе нажатие
@@ -207,6 +212,7 @@ export function WorkScreen({
     setMetersPerUnit('');
     setHoursText('');
     setComment('');
+    localDraft.clear({...localDraft.value, count: '', metersPerUnit: '', hoursText: '', comment: ''});
   };
 
   const overviewScreen = (
@@ -372,6 +378,8 @@ export function WorkScreen({
             error={formOpen ? error : null}
             errorDetails={formOpen ? errorDetails : undefined}
             onSubmit={(pileGradeId, passport) => onLog({kind: 'PILE_PASSPORT', pileGradeId, passport})}
+            draftUserId={state.operator?.id}
+            draftShiftId={state.shift?.id}
           />
           {/*
             Список записанного стоит ОДИН раз — ниже, общим для всех режимов.

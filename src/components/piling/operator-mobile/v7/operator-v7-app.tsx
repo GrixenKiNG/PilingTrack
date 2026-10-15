@@ -354,13 +354,13 @@ export function OperatorV7App() {
             stage={detour.stage}
             busy={busy}
             onBack={back}
-            onSubmit={(answers) => {
+            onSubmit={(answers, restoredCommandId) => {
               if (!shiftId || !equipmentId) {
                 setActionError('Смена не начата: сначала примите установку');
-                return;
+                return false;
               }
-              void run({
-                command: 'submit-checklist', clientCommandId: commandId,
+              return run({
+                command: 'submit-checklist', clientCommandId: restoredCommandId ?? commandId,
                 shiftId, equipmentId, stage: detour.stage, answers,
               });
             }}
@@ -576,7 +576,7 @@ function ChecklistDetour({state, stage, busy, onSubmit, onBack, commandId}: {
   state: OperatorMobileState;
   stage: ChecklistStage;
   busy: boolean;
-  onSubmit: (answers: ChecklistAnswer[]) => void;
+  onSubmit: (answers: ChecklistAnswer[], restoredCommandId?: string) => boolean | Promise<boolean>;
   onBack: () => void;
 }) {
   const checklist = state.checklists.find((item) => item.stage === stage);
@@ -593,6 +593,8 @@ function ChecklistDetour({state, stage, busy, onSubmit, onBack, commandId}: {
   }
   return (
     <ChecklistFlow
+      draftUserId={state.operator?.id}
+      draftShiftId={state.shift?.id}
       key={`${state.shift?.id}:${state.assignment?.equipmentId}:${checklist.stage}`}
       commandId={commandId}
       checklist={checklist} warnings={state.warnings}

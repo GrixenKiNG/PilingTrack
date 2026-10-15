@@ -8,7 +8,8 @@
  * шага: человек не теряет место в смене и возвращается туда же.
  */
 
-import { useState, type ReactNode } from 'react';
+import { type ReactNode } from 'react';
+import {useLocalFormDraft} from '../operator-mobile/use-local-form-draft';
 import { StepButton } from './ui';
 import {
   DOWNTIME_QUICK_HOURS, downtimeHoursProblem, formatDowntimeHoursOnly, parseDowntimeHours,
@@ -82,17 +83,20 @@ function Field({ label, htmlFor, children }: { label: string; htmlFor?: string; 
 const control = 'h-11 w-full rounded-lg border border-border bg-card px-3 text-base';
 
 /** Добавить сваи: марка и количество. */
-export function PileSheet({ open, grades, busy, error, onOpenSafety, onClose, onAdd }: {
+export function PileSheet({ open, grades, busy, error, onOpenSafety, onClose, onAdd, draftUserId, draftShiftId }: {
   open: boolean;
   grades: PileGrade[];
   busy: boolean;
   error?: string | null;
   onOpenSafety?: () => void;
   onClose: () => void;
-  onAdd: (gradeId: string, count: number) => void;
+  onAdd: (gradeId: string, count: number) => void | Promise<boolean>;
+  draftUserId?: string;
+  draftShiftId?: string;
 }) {
-  const [gradeId, setGradeId] = useState('');
-  const [count, setCount] = useState(1);
+  const localDraft = useLocalFormDraft(draftUserId, draftShiftId && `production:v2:${draftShiftId}:PILES`, {gradeId: '', count: 1});
+  const [gradeId, setGradeId] = localDraft.field('gradeId');
+  const [count, setCount] = localDraft.field('count');
   if (!open) return null;
   const grade = grades.find((item) => item.id === gradeId) ?? null;
 
@@ -105,7 +109,7 @@ export function PileSheet({ open, grades, busy, error, onOpenSafety, onClose, on
       footer={
         <StepButton
           label={count > 1 ? `Добавить ${count} шт` : 'Добавить'}
-          onClick={() => onAdd(gradeId, count)}
+          onClick={async () => { if (await onAdd(gradeId, count)) localDraft.clear(); }}
           disabled={!gradeId}
           busy={busy}
         />
@@ -164,18 +168,21 @@ export function PileSheet({ open, grades, busy, error, onOpenSafety, onClose, on
  * Метры спрашиваем на ОДНУ скважину, а не итогом: глубину машинист знает по
  * проходке, а общий метраж считает в уме и ошибается на кратное число.
  */
-export function DrillingSheet({ open, types, busy, error, onOpenSafety, onClose, onAdd }: {
+export function DrillingSheet({ open, types, busy, error, onOpenSafety, onClose, onAdd, draftUserId, draftShiftId }: {
   open: boolean;
   types: DrillingType[];
   busy: boolean;
   error?: string | null;
   onOpenSafety?: () => void;
   onClose: () => void;
-  onAdd: (typeId: string, count: number, metersPerUnit: number) => void;
+  onAdd: (typeId: string, count: number, metersPerUnit: number) => void | Promise<boolean>;
+  draftUserId?: string;
+  draftShiftId?: string;
 }) {
-  const [typeId, setTypeId] = useState('');
-  const [count, setCount] = useState(1);
-  const [meters, setMeters] = useState('');
+  const localDraft = useLocalFormDraft(draftUserId, draftShiftId && `production:v2:${draftShiftId}:DRILLING`, {typeId: '', count: 1, meters: ''});
+  const [typeId, setTypeId] = localDraft.field('typeId');
+  const [count, setCount] = localDraft.field('count');
+  const [meters, setMeters] = localDraft.field('meters');
   if (!open) return null;
 
   const metersPerUnit = Number(meters.replace(',', '.'));
@@ -190,7 +197,7 @@ export function DrillingSheet({ open, types, busy, error, onOpenSafety, onClose,
       footer={
         <StepButton
           label={metersOk ? `Записать ${(count * metersPerUnit).toFixed(1)} м` : 'Записать бурение'}
-          onClick={() => onAdd(typeId, count, metersPerUnit)}
+          onClick={async () => { if (await onAdd(typeId, count, metersPerUnit)) localDraft.clear(); }}
           disabled={!typeId || !metersOk}
           busy={busy}
         />
@@ -246,17 +253,20 @@ export function DrillingSheet({ open, types, busy, error, onOpenSafety, onClose,
  * Только часы, без привязки ко времени работы в программе (решение владельца
  * 07.10.2026): машинист может внести простой и после работы.
  */
-export function DowntimeSheet({ open, reasons, busy, error, onClose, onAdd }: {
+export function DowntimeSheet({ open, reasons, busy, error, onClose, onAdd, draftUserId, draftShiftId }: {
   open: boolean;
   reasons: DowntimeReason[];
   busy: boolean;
   error?: string | null;
   onClose: () => void;
-  onAdd: (reasonId: string, hours: number, comment: string) => void;
+  onAdd: (reasonId: string, hours: number, comment: string) => void | Promise<boolean>;
+  draftUserId?: string;
+  draftShiftId?: string;
 }) {
-  const [reasonId, setReasonId] = useState('');
-  const [hoursText, setHoursText] = useState('');
-  const [comment, setComment] = useState('');
+  const localDraft = useLocalFormDraft(draftUserId, draftShiftId && `production:v2:${draftShiftId}:DOWNTIME`, {reasonId: '', hoursText: '', comment: ''});
+  const [reasonId, setReasonId] = localDraft.field('reasonId');
+  const [hoursText, setHoursText] = localDraft.field('hoursText');
+  const [comment, setComment] = localDraft.field('comment');
 
   // Хук обязан вызываться до любого раннего возврата, поэтому часы
   // разбираются здесь, а не после проверки `open`.
@@ -271,7 +281,7 @@ export function DowntimeSheet({ open, reasons, busy, error, onClose, onAdd }: {
       footer={
         <StepButton
           label="Записать простой"
-          onClick={() => hours !== null && onAdd(reasonId, hours, comment.trim())}
+          onClick={async () => { if (hours !== null && await onAdd(reasonId, hours, comment.trim())) localDraft.clear(); }}
           disabled={!reasonId || hours === null}
           busy={busy}
         />

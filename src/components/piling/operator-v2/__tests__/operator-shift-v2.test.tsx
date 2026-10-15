@@ -1,5 +1,7 @@
 import {fireEvent, render, screen, waitFor} from '@testing-library/react';
 import {beforeEach, describe, expect, it, vi} from 'vitest';
+
+beforeEach(() => window.localStorage.clear());
 import type {OperatorMobileState} from '@/modules/operator-mobile/contracts';
 
 // Экран тянет рабочий обзор оператора, а тот — стили PostCSS; в тесте они не нужны.
@@ -35,6 +37,7 @@ vi.mock('@/lib/api', async (importOriginal) => ({
 }));
 
 import {OperatorShiftV2} from '../operator-shift-v2';
+import {PileSheet, DrillingSheet, DowntimeSheet} from '../sheets';
 import {workStateFixture} from '@/components/piling/operator-mobile/__tests__/fixtures';
 
 /**
@@ -71,6 +74,23 @@ const facts = {
 };
 
 const closeButton = () => screen.findByRole('button', {name: 'Закрыть смену и отправить отчёт'});
+
+describe('V2: локальный ввод листов выработки', () => {
+  it.each(['PILES', 'DRILLING', 'DOWNTIME'] as const)('%s восстанавливает ввод после перезагрузки', (kind) => {
+    const props = {open: true, busy: false, onClose: vi.fn(), onAdd: vi.fn().mockResolvedValue(false), draftUserId: 'operator', draftShiftId: 'shift'};
+    const form = () => kind === 'PILES' ? <PileSheet {...props} grades={[{id: 'g', name: 'Марка', lengthMm: 3000}]} />
+      : kind === 'DRILLING' ? <DrillingSheet {...props} types={[{id: 'g', name: 'Тип'}]} />
+        : <DowntimeSheet {...props} reasons={[{id: 'g', name: 'Причина'}]} />;
+    const view = render(form());
+    fireEvent.change(screen.getByRole('combobox'), {target: {value: 'g'}});
+    const label = kind === 'PILES' ? 'Количество свай' : kind === 'DRILLING' ? 'Глубина одной скважины, м' : 'Простой, часов';
+    fireEvent.change(screen.getByLabelText(label), {target: {value: '12'}});
+    view.unmount();
+    render(form());
+    expect(screen.getByRole('combobox')).toHaveValue('g');
+    expect((screen.getByLabelText(label) as HTMLInputElement).value).toBe('12');
+  });
+});
 
 describe('T12: следующий шаг v2 выполняет общий переход', () => {
   beforeEach(() => {

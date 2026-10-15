@@ -1,5 +1,5 @@
 import {fireEvent, render, screen, waitFor} from '@testing-library/react';
-import {describe, expect, it, vi} from 'vitest';
+import {beforeEach, describe, expect, it, vi} from 'vitest';
 import type {OperatorMobileState} from '@/modules/operator-mobile/contracts';
 // Экран тянет рабочий обзор оператора, а тот — стили PostCSS; в тесте они не нужны.
 vi.mock('@/components/piling/operator-mobile/operator-concept.css', () => ({}));
@@ -30,6 +30,8 @@ vi.mock('@/components/piling/operator-mobile/api', () => ({
 import {ApiError, QueuedOffline} from '@/components/piling/operator-mobile/api';
 import {CloseScreen, OperatorV5App, WorkScreen} from '../operator-v5-app';
 import {workStateFixture} from '../../operator-mobile/__tests__/fixtures';
+
+beforeEach(() => window.localStorage.clear());
 
 describe('T12: следующий шаг v5 открывает действие и фокусирует его', () => {
   function open(value: Partial<OperatorMobileState>) {
@@ -197,6 +199,22 @@ describe('v5: вердикты осмотра и подтверждение за
 });
 
 describe('v5: явная замена счётчика моточасов', () => {
+  it('восстанавливает ответы, замер и замену счётчика после перезагрузки', async () => {
+    api.fetchState.mockReset().mockResolvedValue(workStateFixture({phase: 'CLOSING', operator: {id: 'draft-operator', name: 'Машинист'},
+      checklists: [{stage: 'EO_AFTER', title: 'ЕО после работы', purpose: '', version: '1', done: false, period: null,
+        sections: [{id: 'meter', title: 'Счётчик', items: [{id: 'hours', text: 'Снять показание', severity: 'NOTE', measure: {key: 'engineHours', label: 'Моточасы', unit: 'м/ч'}}]}]}],
+    }));
+    const view = render(<OperatorV5App />);
+    fireEvent.click(await screen.findByRole('button', {name: /^норма$/i}));
+    fireEvent.change(screen.getByRole('textbox'), {target: {value: '99'}});
+    fireEvent.click(screen.getByRole('checkbox', {name: 'Счётчик заменён'}));
+    view.unmount();
+    render(<OperatorV5App />);
+    await screen.findByRole('button', {name: /^норма$/i});
+    expect(screen.getByRole('textbox')).toHaveValue('99');
+    expect(screen.getByRole('checkbox', {name: 'Счётчик заменён'})).toBeChecked();
+    expect(screen.getByRole('button', {name: 'Завершить'})).toBeEnabled();
+  });
   it('посылает новое меньшее показание с пометкой, не отмечая неисправность', async () => {
     const assignment = working.assignment;
     if (!assignment) throw new Error('Для проверки нужна назначенная установка');
@@ -348,6 +366,18 @@ function fillPiles(container: HTMLElement) {
 }
 
 describe('запись выработки v5 и отказ сервера', () => {
+  it('восстанавливает открытую форму и количество после перезагрузки', () => {
+    const props = {state: {...working, operator: {id: 'operator', name: 'Машинист'}}, busy: false,
+      onLog: vi.fn().mockResolvedValue(false), onFinish: vi.fn(), onIncident: vi.fn(), onOpenSafety: vi.fn()};
+    const view = render(<WorkScreen {...props} />);
+    fireEvent.click(screen.getByRole('button', {name: 'Добавить сваю'}));
+    fireEvent.change(screen.getByRole('combobox'), {target: {value: 'grade-1'}});
+    fireEvent.change(screen.getByRole('textbox'), {target: {value: '12'}});
+    view.unmount();
+    render(<WorkScreen {...props} />);
+    expect(screen.getByRole('combobox')).toHaveValue('grade-1');
+    expect(screen.getByRole('textbox')).toHaveValue('12');
+  });
   it('оставляет введённое число, когда сервер отказал', async () => {
     const onLog = vi.fn().mockResolvedValue(false);
     const {container} = renderWork(onLog);

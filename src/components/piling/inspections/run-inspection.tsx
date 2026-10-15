@@ -26,6 +26,7 @@ import { healthScoreColor, LEVEL_LABEL, STATUS_LABEL, STATUS_STYLE, type Inspect
 import { InspectionItemPhotos } from './inspection-item-photos';
 import { YesNoControl, Status4Control, DoneControl, MeasureControl } from './inspection-controls';
 import { InspectionLoadError, catchText, extractApiError, isRetryableLoadError, loadErrorText } from './inspection-api-error';
+import {useLocalFormDraft} from '../operator-mobile/use-local-form-draft';
 
 // ---------- types ----------
 
@@ -93,7 +94,13 @@ export function RunInspection({ inspectionId, onExit }: { inspectionId: string; 
   const [loadError, setLoadError] = useState<InspectionLoadError | null>(null);
 
   // answers keyed by itemId
-  const [answers, setAnswers] = useState<Record<string, ItemAnswer>>({});
+  const [savedAnswers, setSavedAnswers] = useState<Record<string, ItemAnswer>>({});
+  const localDraft = useLocalFormDraft(currentUser?.id, `inspection:${inspectionId}`, {} as Record<string, ItemAnswer>);
+  const clearLocalDraft = localDraft.clear;
+  const unsavedAnswers = localDraft.value;
+  const answers = useMemo(() => inspection?.status === 'COMPLETED' ? savedAnswers : {...savedAnswers,
+    ...Object.fromEntries(Object.entries(unsavedAnswers).filter(([itemId]) => inspection?.templateSnapshot.some((item) => item.id === itemId))),
+  }, [inspection, savedAnswers, unsavedAnswers]);
   // photo counts keyed by itemId
   const [photoCounts, setPhotoCounts] = useState<Record<string, number>>({});
   // expanded extras (note + photos) keyed by itemId — компактный вид: по умолчанию скрыто
@@ -142,7 +149,8 @@ export function RunInspection({ inspectionId, onExit }: { inspectionId: string; 
         };
         initPhotos[item.id] = saved?.photoCount ?? 0;
       }
-      setAnswers(init);
+      setSavedAnswers(init);
+      if (data.status === 'COMPLETED') clearLocalDraft();
       setPhotoCounts(initPhotos);
       setSignedByName(currentUser?.name ?? '');
     } catch {
@@ -151,13 +159,14 @@ export function RunInspection({ inspectionId, onExit }: { inspectionId: string; 
     } finally {
       setLoading(false);
     }
-  }, [inspectionId, currentUser]);
+  }, [inspectionId, currentUser, clearLocalDraft]);
 
   // eslint-disable-next-line react-hooks/set-state-in-effect -- loads data on mount / dependency change; the async loader sets state
   useEffect(() => { void load(); }, [load]);
 
   const setAnswer = (itemId: string, patch: Partial<ItemAnswer>) => {
-    setAnswers((prev) => ({ ...prev, [itemId]: { ...prev[itemId], ...patch } }));
+    if (completing) return;
+    localDraft.update((prev) => ({ ...prev, [itemId]: { ...answers[itemId], ...patch } }));
   };
 
   const requiredItems = inspection?.templateSnapshot.filter((item) => item.required) ?? [];
@@ -209,6 +218,9 @@ export function RunInspection({ inspectionId, onExit }: { inspectionId: string; 
       // Текст отказа разбирается по статусу: 401/CSRF-403 приходят английскими,
       // не-JSON тело (прокси) давало браузерное «Unexpected end of JSON input».
       if (!res.ok) throw new Error(await extractApiError(res, 'Не удалось сохранить черновик'));
+      setSavedAnswers(answers);
+      localDraft.update((current) => Object.fromEntries(Object.entries(current).filter(([itemId, answer]) =>
+        answer.result !== answers[itemId]?.result || answer.value !== answers[itemId]?.value || answer.note !== answers[itemId]?.note)));
       if (!options?.silent) toast.success('Черновик сохранён');
     } catch (err) {
       toast.error(catchText(err, 'Ошибка сохранения'));
@@ -231,6 +243,8 @@ export function RunInspection({ inspectionId, onExit }: { inspectionId: string; 
         body: JSON.stringify({ answers: buildAnswerPayload() }),
       });
       if (!putRes.ok) throw new Error(await extractApiError(putRes, 'Не удалось сохранить осмотр'));
+      setSavedAnswers(answers);
+      clearLocalDraft();
 
       // Complete
       const res = await authFetch(`/api/inspections/${inspectionId}/complete`, {
@@ -298,7 +312,7 @@ export function RunInspection({ inspectionId, onExit }: { inspectionId: string; 
   // Переход между разделами сохраняет черновик молча: сто ответов, потерянных
   // из-за уснувшего телефона, — это сто ответов заново.
   const goToStep = async (next: number) => {
-    if (next === current || next < 0 || next >= sections.length) return;
+    if (isBusy || next === current || next < 0 || next >= sections.length) return;
     setStep(next);
     window.scrollTo({ top: 0, behavior: 'smooth' });
     await saveDraft({ silent: true });
@@ -345,6 +359,7 @@ export function RunInspection({ inspectionId, onExit }: { inspectionId: string; 
   }
 
   return (
+    <fieldset disabled={completing} className="contents">
     <div className="mx-auto w-full max-w-2xl px-4 py-6 pb-28 field-type">
       {/* Header */}
       <div className="mb-4 flex items-center gap-2">
@@ -418,6 +433,7 @@ export function RunInspection({ inspectionId, onExit }: { inspectionId: string; 
                 key={section.title || index}
                 type="button"
                 onClick={() => void goToStep(index)}
+                disabled={isBusy}
                 aria-current={index === current ? 'step' : undefined}
                 aria-label={`${section.title || `Раздел ${index + 1}`}: ${
                   section.remaining === 0 ? 'заполнен' : `осталось ${section.remaining}`}`}
@@ -633,5 +649,6 @@ export function RunInspection({ inspectionId, onExit }: { inspectionId: string; 
         </div>
       )}
     </div>
+    </fieldset>
   );
 }

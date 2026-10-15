@@ -117,6 +117,7 @@ it('v10: кнопки выбора записи называют действи�
 });
 
 beforeEach(() => {
+  window.localStorage.clear();
   api.fetchState.mockReset();
   api.sendCommand.mockReset();
   device.queued = [];
