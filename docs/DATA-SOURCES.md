@@ -22,7 +22,7 @@
 
 | Модуль / экран | Эндпоинт | Реальный источник |
 |---|---|---|
-| Аналитика объектов | `getSiteAnalytics` (`src/services/analytics/site-analytics-service.ts`) | живой SQL по `Report`/`PileWork`/`LeaderDrilling`/`ReportDowntime` (+ планы `SitePilePlan`/`SiteDrillingPlan`); проекции НЕ читаются |
+| Аналитика объектов | `getSiteAnalytics` (`src/modules/analytics/application/queries/site-analytics-service.ts`) | живой SQL по `Report`/`PileWork`/`LeaderDrilling`/`ReportDowntime` (+ планы `SitePilePlan`/`SiteDrillingPlan`); проекции НЕ читаются |
 | Аналитика техники | `equipment-analytics-service` | Prisma: `Report`, `ReportDowntime`, `Equipment` (реальные `groupBy`/`aggregate`) |
 | Флот-мониторинг | `/api/monitoring/fleet` → `fleet-monitoring.service` | Prisma: `Equipment`, `Report`, `ReportAnalytics` |
 | Карточка техники → телеметрия | `/api/telemetry?equipmentId=` → `telemetry-ingestion-service` | Prisma: `TelemetryRecord` (пусто, пока нет бокса) |

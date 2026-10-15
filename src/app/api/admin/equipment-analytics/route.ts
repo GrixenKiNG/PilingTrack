@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { assertCan } from '@/services/auth/authorization-service';
 import { withApi } from '@/core/api-wrapper';
-import { getEquipmentAnalytics } from '@/services/analytics/equipment-analytics-service';
+import { getEquipmentAnalytics } from '@/modules/analytics';
 import { getSettings } from '@/modules/settings';
 
 export const runtime = 'nodejs';

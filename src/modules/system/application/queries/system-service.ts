@@ -1,5 +1,6 @@
 import { db, getDatabaseProvider } from '@/lib/db';
 import { rateLimiter } from '@/lib/rate-limiter';
+// eslint-disable-next-line no-restricted-imports -- определение организации остаётся в services/tenancy (auth/tenancy вне этого переноса, CLAUDE.md «Безопасность»)
 import { resolveTenantContext } from '@/services/tenancy/tenant-context-service';
 
 export interface ReadinessStatus {

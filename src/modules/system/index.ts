@@ -1,12 +1,10 @@
 /**
- * System Module — DDD Bounded Context
+ * System Module — публичный вход.
  *
- * Re-exports from services layer during migration.
- * Future: Move to full DDD structure (domain/application/infrastructure).
+ * Диагностика среды выполнения живёт в `application/queries/`; снаружи
+ * импортируют только отсюда (`@/modules/system`).
  */
-
-// eslint-disable-next-line no-restricted-imports -- intentional public re-export facade; implementation stays in services/ until the services->modules migration completes (CLAUDE.md)
-export { getRuntimeDiagnostics } from '@/services/system/system-service';
+export { getRuntimeDiagnostics } from './application/queries/system-service';
 
 // eslint-disable-next-line no-restricted-imports -- intentional public re-export facade; audit implementation stays in services/
 export { describeAuditEvent, type AuditEvent } from '@/services/audit/audit-service';

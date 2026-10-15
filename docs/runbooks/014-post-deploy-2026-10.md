@@ -308,7 +308,7 @@ alert could not be delivered"), а на бою о реальном сбое до
 | Переменная | Кто читает (файл) | Что молчит без неё | Нужна контейнеру |
 |---|---|---|---|
 | `BACKUP_ENABLED` | гейт `isBackupMonitoringEnabled()` — `src/core/observability/health-tracker/checkers/backup.ts:15-19`; предупреждение сборки — `scripts/validate-env.ts:140-142` | мониторинг бэкапов выключен: `checkBackupStatus()` отдаёт `{status:'up', source:'disabled'}` без возраста и `s3Synced` (`backup.ts:76-78`), а `/api/metrics` печатает жёсткие `backup_age_hours 0` и `backup_s3_synced 0` (`src/app/api/metrics/route.ts:111-112`); правило `OffsiteBackupNotSynced` (`backup_s3_synced == 0 and on() backup_age_hours > 0`, `observability/prometheus/alerts.yml:296-307`) сработать не может — о том, что облачной копии нет, никто не узнает | `app` |
-| `SENTRY_DSN` | воркер — `src/workers/unified-worker/sentry.ts:24,31`; флаг «настроено» — `src/services/system/system-service.ts:63` | ошибки процесса воркера (outbox / projection / pdf) в Sentry **не уходят**: без DSN `initWorkerSentry()` сразу возвращается, и SDK остаётся no-op (`sentry.ts:13`). Приложение этим не задето — его DSN зашит в коде (`sentry.server.config.ts:8`) | `workers` (приложению не нужна) |
+| `SENTRY_DSN` | воркер — `src/workers/unified-worker/sentry.ts:24,31`; флаг «настроено» — `src/modules/system/application/queries/system-service.ts:64` | ошибки процесса воркера (outbox / projection / pdf) в Sentry **не уходят**: без DSN `initWorkerSentry()` сразу возвращается, и SDK остаётся no-op (`sentry.ts:13`). Приложение этим не задето — его DSN зашит в коде (`sentry.server.config.ts:8`) | `workers` (приложению не нужна) |
 
 Что важно понимать про «что молчит»:
 
