@@ -408,9 +408,22 @@ export function OperatorShiftV2() {
    * Ветер выше порога ответа не получает: там решает человек на площадке.
    */
 
+  /*
+    Несданная смена прошлых суток (D-20260930-001). Сервер считает фазу по
+    СЕГОДНЯШНИМ суткам: пока допуск на сегодня не пройден, это IDENTITY, и экран
+    застревал на приёме, хотя сдать надо вчерашнюю смену. Сервер принимает ЕО и
+    закрытие старой смены без сегодняшнего допуска, поэтому ведём её теми же
+    шагами, что и обычную сдачу: ЕО после работы → отчёт → закрытие.
+  */
+  const oldShift = mobile?.shift
+    && mobile.shift.productionDate < mobile.productionDate
+    && (mobile.shift.state === 'STARTED' || mobile.shift.state === 'HANDOVER_PENDING')
+    ? mobile.shift : null;
+  const oldShiftDate = oldShift ? oldShift.productionDate.split('-').reverse().join('.') : '';
+  const flowMobile = mobile && oldShift ? { ...mobile, phase: 'CLOSING' as const } : mobile;
   const postDone = mobile?.checklists.find((item) => item.stage === 'EO_AFTER')?.done ?? false;
   const state = facts
-    ? resolveV2State(facts, mobile?.phase ?? null, postDone, { accepted, finishing })
+    ? resolveV2State(facts, flowMobile?.phase ?? null, postDone, { accepted: accepted || Boolean(oldShift), finishing })
     : null;
   const elapsed = useElapsed(facts?.shift?.startedAt ?? null);
 
@@ -726,11 +739,6 @@ export function OperatorShiftV2() {
     Раньше причина мелькала всплывающим сообщением, а сдать было нечем: экран
     приёмки стоял как есть. Теперь причина висит на экране вместе с кнопкой сдачи.
   */
-  const oldShift = mobile?.shift
-    && mobile.shift.productionDate < mobile.productionDate
-    && (mobile.shift.state === 'STARTED' || mobile.shift.state === 'HANDOVER_PENDING')
-    ? mobile.shift : null;
-  const oldShiftDate = oldShift ? oldShift.productionDate.split('-').reverse().join('.') : '';
   const [oldShiftError, setOldShiftError] = useState<string | null>(null);
   const closeOldShift = async () => {
     if (!oldShift) return;
@@ -822,7 +830,7 @@ export function OperatorShiftV2() {
     setPileOpen(false); setPassportOpen(false); setDrillingOpen(false); setDowntimeOpen(false);
     setSafetyStep(null); setTab('shift');
   };
-  const next = mobile ? nextStep(mobile) : null;
+  const next = flowMobile ? nextStep(flowMobile) : null;
   const focusNext = (target: 'accept' | 'checklist' | 'close') => {
     setNextFocus((previous) => ({target, count: (previous?.count ?? 0) + 1}));
   };
@@ -859,6 +867,11 @@ export function OperatorShiftV2() {
     },
   } : null;
   const nextNoticeNode = nextNotice ? <p role="status" className="p-3 text-sm text-muted-foreground">{nextNotice}</p> : null;
+  const oldShiftNotice = oldShift ? (
+    <p className="rounded-xl border border-warning/40 bg-warning/10 px-3 py-2 text-base text-warning-strong">
+      Сдача смены за {oldShiftDate}. Новую смену можно открыть после сдачи.
+    </p>
+  ) : null;
   // Одна кнопка внизу — на экранах без нижних вкладок.
   const stepBar = nextStepProps ? (
     <>
@@ -1078,6 +1091,7 @@ export function OperatorShiftV2() {
     }
     return (
       <StepShell bar={stepBar} screenRef={screenRef} title={V2_STEP_TITLE[step]} subtitle={stepLabel}>
+        {oldShiftNotice}
         <ChecklistScreen
           key={`${mobile.shift?.id}:${mobile.assignment?.equipmentId}:${list.stage}`}
           checklist={list}
@@ -1299,6 +1313,7 @@ export function OperatorShiftV2() {
           />
         }
       >
+        {oldShiftNotice}
         {unsent > 0 && (
           /*
             Записи, лежащие на телефоне, — те же выработка и простой. После

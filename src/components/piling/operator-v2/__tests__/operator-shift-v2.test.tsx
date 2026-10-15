@@ -433,3 +433,65 @@ describe('D-20260930-001: несданная смена прошлых суто�
     expect(screen.queryByText(/Не сдана смена/)).not.toBeInTheDocument();
   });
 });
+
+describe('D-20260930-001: ЕО после работы и сдача для смены прошлых суток', () => {
+  const oldShift = {id: 'old-1', productionDate: '2026-09-27', startedAt: '2026-09-27T01:09:26.751Z', state: 'HANDOVER_PENDING'};
+  let current: OperatorMobileState;
+  let oldShiftOpen: boolean;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    api.queued = [];
+    oldShiftOpen = true;
+    // Сервер считает фазу по сегодняшним суткам: допуск на сегодня не пройден — IDENTITY,
+    // хотя у машины висит несданная смена прошлых суток без ЕО после работы.
+    current = workStateFixture({
+      phase: 'IDENTITY', productionDate: '2026-10-15', receipt: null, shift: oldShift,
+      checklists: [{
+        stage: 'EO_AFTER', title: 'ЕО после работы', purpose: 'Проверить машину', version: 'test-1',
+        done: false, period: null,
+        sections: [{id: 'cab', title: 'Кабина', items: [{id: 'glass', text: 'Стёкла и зеркала', severity: 'NOTE'}]}],
+      }],
+    });
+    api.fetchState.mockImplementation(async () => current);
+    authFetch.mockImplementation(async () => ({ok: true, json: async () => ({
+      ...facts,
+      shift: oldShiftOpen ? {...facts.shift, id: 'old-1', state: 'HANDOVER_PENDING'} : null,
+      clearance: {...facts.clearance, warnings: []},
+    })}));
+    api.sendCommand.mockImplementation(async ({command}) => {
+      if (command === 'submit-checklist') current = {
+        ...current, checklists: current.checklists.map((list) => list.stage === 'EO_AFTER' ? {...list, done: true} : list),
+      };
+      if (command === 'close-shift') {
+        oldShiftOpen = false;
+        current = workStateFixture({phase: 'IDENTITY', productionDate: '2026-10-15', shift: null});
+      }
+      return {ok: true};
+    });
+  });
+
+  it('ведёт не на приёмку, а на ЕО после работы и подписывает, за какую смену сдача', async () => {
+    render(<OperatorShiftV2 />);
+
+    expect(await screen.findByRole('button', {name: /Кабина/, expanded: false})).toBeInTheDocument();
+    expect(screen.getByText(/Сдача смены за 27\.09\.2026/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', {name: 'Принять установку'})).not.toBeInTheDocument();
+  });
+
+  it('записывает ЕО на старую смену и закрывает её, после чего открывается приёмка', async () => {
+    render(<OperatorShiftV2 />);
+
+    fireEvent.click(await screen.findByRole('button', {name: /Кабина/, expanded: false}));
+    fireEvent.click(screen.getByRole('button', {name: 'Весь раздел «Кабина» в норме'}));
+    fireEvent.click(screen.getByRole('button', {name: 'Завершить'}));
+    await waitFor(() => expect(api.sendCommand).toHaveBeenCalledWith(expect.objectContaining({
+      command: 'submit-checklist', shiftId: 'old-1', equipmentId: 'eq-1', stage: 'EO_AFTER',
+    })));
+
+    fireEvent.click(await closeButton());
+    await waitFor(() => expect(api.sendCommand).toHaveBeenCalledWith({command: 'close-shift', shiftId: 'old-1', comment: ''}));
+    expect(await screen.findByRole('button', {name: 'Принять установку'})).toBeInTheDocument();
+    expect(screen.queryByText(/Сдача смены за 27\.09\.2026/)).not.toBeInTheDocument();
+  });
+});
