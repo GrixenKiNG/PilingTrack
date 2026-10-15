@@ -48,6 +48,7 @@ export const ACTION_LABEL: Record<string, string> = {
   // Планировщик техготовности (`runReadinessScheduler`) — код выдаёт только он,
   // в журнале показывался сырым.
   'work-permit.expired': 'Наряд-допуск истёк',
+  'work-permit.closed': 'Наряд-допуск закрыт',
   'defect.reported': 'Зафиксировано замечание',
   'defect.triage': 'Замечание разобрано',
   'defect.resolve': 'Замечание закрыто',
@@ -135,6 +136,7 @@ const ACTION_MARK: Record<string, AuditActionMark> = {
   // Планировщик помечает наряд истёкшим: допуск потерян. Значка не было, и
   // истечение рисовалось зелёной галочкой «успешно» (R125 №3).
   'work-permit.expired': { icon: AlertTriangle, tone: 'danger' },
+  'work-permit.closed': { icon: Lock, tone: 'neutral' },
   'defect.reported': { icon: AlertTriangle, tone: 'danger' },
   'defect.triage': { icon: Search, tone: 'info' },
   'defect.resolve': { icon: CheckCircle2, tone: 'success' },

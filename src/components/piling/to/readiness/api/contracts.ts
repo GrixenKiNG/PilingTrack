@@ -136,7 +136,10 @@ export interface WorkPermitDto {
   equipmentId: string;
   shiftId: string | null;
   risk: 'NORMAL' | 'ELEVATED';
-  state: 'DRAFT' | 'PENDING_APPROVAL' | 'APPROVED' | 'EXPIRED' | 'REVOKED';
+  state: 'DRAFT' | 'PENDING_APPROVAL' | 'APPROVED' | 'EXPIRED' | 'REVOKED' | 'CLOSED';
+  closedAt?: string | null;
+  closedById?: string | null;
+  closeReason?: 'WORK_DONE' | 'VALIDITY_ELAPSED' | null;
   /** Вид работ из справочника. null — у нарядов, выписанных до 16.08.2026. */
   workTypeId: string | null;
   workTypeName?: string | null;
