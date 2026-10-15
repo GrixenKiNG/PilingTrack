@@ -47,6 +47,16 @@ beforeEach(() => {
 });
 
 describe('v1: загрузка состояния не удалась', () => {
+  it('после 503 текстовый повтор открывает восстановленную смену', async () => {
+    api.fetchState.mockRejectedValueOnce(new ApiError(503, 'Сервис временно недоступен')).mockResolvedValue(workStateFixture());
+    render(<OperatorMobileApp />);
+    expect(await screen.findByText('Сервер не отвечает')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', {name: 'Повторить'}));
+    expect(await screen.findByRole('button', {name: 'Добавить сваю'})).toBeInTheDocument();
+    expect(screen.queryByText('Сервер не отвечает')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', {name: 'Повторить'})).not.toBeInTheDocument();
+    expect(api.fetchState).toHaveBeenCalledTimes(2);
+  });
   it('503 показывает «Сервер не отвечает» и не велит восстанавливать связь', async () => {
     api.fetchState.mockRejectedValue(new ApiError(503, 'Сервис временно недоступен'));
 

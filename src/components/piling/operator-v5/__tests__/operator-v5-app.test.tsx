@@ -535,6 +535,17 @@ describe('запись ушла в офлайн-очередь', () => {
  * ничего. Показываем текст про роль сам по себе, как в v1/v10.
  */
 describe('отказ по роли при загрузке состояния', () => {
+  it('после 503 текстовый повтор открывает восстановленную смену', async () => {
+    api.fetchState.mockReset().mockRejectedValueOnce(new ApiError(503, 'Сервис временно недоступен'))
+      .mockResolvedValue(workStateFixture({operator: {id: 'operator', name: 'Машинист'}, options: []}));
+    render(<OperatorV5App />);
+    expect(await screen.findByText('Нет связи с сервером')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', {name: 'Повторить'}));
+    expect(await screen.findByRole('button', {name: 'Добавить сваю'})).toBeInTheDocument();
+    expect(screen.queryByText('Нет связи с сервером')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', {name: 'Повторить'})).not.toBeInTheDocument();
+    expect(api.fetchState).toHaveBeenCalledTimes(2);
+  });
   it('при 403 показывает текст про роль, без «Повторить» и без обещания отправки', async () => {
     vi.mocked(api.fetchState).mockRejectedValue(new ApiError(403, 'Экран доступен только машинисту'));
     render(<OperatorV5App />);

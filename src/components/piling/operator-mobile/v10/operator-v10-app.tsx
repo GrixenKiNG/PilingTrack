@@ -1686,7 +1686,7 @@ export function OperatorV10App() {
     if (!state) {
       return (
         <Card>
-          <Nodata>{loadError ?? 'Состояние смены недоступно'}</Nodata>
+          <Nodata>Состояние смены недоступно</Nodata>
         </Card>
       );
     }
@@ -1736,7 +1736,9 @@ export function OperatorV10App() {
       </div>
       <div className="ov10-content" ref={contentRef}>
         {oldShift && state?.shift ? <Banner tone="warn" title={`Не сдана смена за ${dateRu(state.shift.productionDate)}`}>Дописать можно только работу этой смены. Сегодняшняя работа — после открытия новой смены.</Banner> : null}
-        {loadError && state ? <Banner tone="warn" title={loadError} /> : null}
+        {loadError ? <Banner tone="warn" title={loadError}>
+          <button type="button" className="ov10-btn" onClick={() => void reload()}>Повторить</button>
+        </Banner> : null}
         {actionError ? <Banner tone="bad" title={`Не записано: ${actionError}`} /> : null}
         {notice ? <Banner tone="info" title={notice} /> : null}
         <OfflineQueueBanner items={queued} onRetry={retryQueued} onDiscard={discardQueued} className="space-y-1" />

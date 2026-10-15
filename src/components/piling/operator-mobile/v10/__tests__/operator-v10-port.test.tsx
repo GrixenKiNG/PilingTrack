@@ -131,6 +131,29 @@ beforeEach(() => {
   }), {status: 200})));
 });
 
+describe('v10: повтор загрузки состояния', () => {
+  it('оставляет ошибку и текстовый повтор доступными на вкладке ТБ', async () => {
+    api.fetchState.mockRejectedValueOnce(new ApiError(503, 'Сервис временно недоступен')).mockResolvedValue(workState());
+    render(<OperatorV10App />);
+    await screen.findByRole('button', {name: 'Повторить'});
+    fireEvent.click(screen.getByRole('button', {name: 'ТБ'}));
+    expect(screen.getByText('Сервис временно недоступен')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', {name: 'Повторить'}));
+    expect(await screen.findByRole('button', {name: 'Следующий шаг: Записать выработку'})).toBeInTheDocument();
+    expect(screen.queryByText('Сервис временно недоступен')).not.toBeInTheDocument();
+  });
+  it.each([new ApiError(503, 'Сервис временно недоступен'), new Error('Нет связи')])('после сбоя даёт текстовый повтор и открывает восстановленную смену: %s', async (error) => {
+    api.fetchState.mockRejectedValueOnce(error).mockResolvedValue(workState());
+    render(<OperatorV10App />);
+    expect(await screen.findByText(error.message)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', {name: 'Повторить'}));
+    expect(await screen.findByRole('button', {name: 'Следующий шаг: Записать выработку'})).toBeInTheDocument();
+    expect(screen.queryByText(error.message)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', {name: 'Повторить'})).not.toBeInTheDocument();
+    expect(api.fetchState).toHaveBeenCalledTimes(2);
+  });
+});
+
 /* ------------------------------------------- 1. итог подтверждения СИЗ --- */
 
 /**

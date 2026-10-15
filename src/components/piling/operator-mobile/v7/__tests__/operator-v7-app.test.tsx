@@ -82,6 +82,17 @@ describe('v7: поправка выработки', () => {
 });
 
 describe('отказ по роли на экране v7', () => {
+  it('после 503 текстовый повтор открывает восстановленную смену', async () => {
+    api.fetchState.mockReset().mockRejectedValueOnce(new ApiError(503, 'Сервис временно недоступен'))
+      .mockResolvedValue(workStateFixture({operator: {id: 'operator', name: 'Машинист'}}));
+    render(<OperatorV7App />);
+    expect(await screen.findByText('Состояние смены недоступно')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', {name: 'Повторить'}));
+    expect(await screen.findByRole('button', {name: 'Добавить сваю'})).toBeInTheDocument();
+    expect(screen.queryByText('Состояние смены недоступно')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', {name: 'Повторить'})).not.toBeInTheDocument();
+    expect(api.fetchState).toHaveBeenCalledTimes(2);
+  });
   it('403 — текст про роль, без повтора и обещания отправки', async () => {
     api.fetchState.mockRejectedValueOnce(new ApiError(403, 'Экран доступен только машинисту'));
     render(<OperatorV7App />);
