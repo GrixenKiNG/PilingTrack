@@ -3,7 +3,7 @@ import { requireTenantId } from '@/lib/tenant';
 import { requireAuth } from '@/lib/auth';
 import { withCsrf } from '@/lib/csrf-protection';
 import { rateLimiter, getRateLimitIdentifier } from '@/lib/rate-limiter';
-import { ingestTelemetryBatch, telemetryBuffer, findForeignEquipmentIds } from '@/services/telemetry/telemetry-ingestion-service';
+import { ingestTelemetryBatch, telemetryBuffer, findForeignEquipmentIds } from '@/modules/telemetry';
 import { databaseCircuitBreaker, CircuitOpenError } from '@/core/infrastructure/circuit-breakers';
 import { logger } from '@/lib/logger';
 import { withApi, readJsonBody } from '@/core/api-wrapper';

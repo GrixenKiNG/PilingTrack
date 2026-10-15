@@ -7,3 +7,5 @@
 
 // eslint-disable-next-line no-restricted-imports -- intentional public re-export facade; implementation stays in services/ until the services->modules migration completes (CLAUDE.md)
 export { getSiteAnalytics } from '@/services/analytics/site-analytics-service';
+// eslint-disable-next-line no-restricted-imports -- intentional public re-export facade; implementation stays in services/ until the services->modules migration completes (CLAUDE.md)
+export { getEquipmentAnalytics } from '@/services/analytics/equipment-analytics-service';
