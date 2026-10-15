@@ -72,5 +72,10 @@ export const rejectWorkPermitSchema = z.object({
   reason: z.string().trim().min(3).max(1000),
 }).strict();
 
+export const closeWorkPermitSchema = z.object({
+  expectedVersion: z.number().int().positive().optional(),
+  reason: z.string().trim().max(500).optional(),
+}).strict();
+
 export type CreateWorkPermitPayload = z.infer<typeof createWorkPermitSchema>;
 export type UpdateWorkPermitPayload = z.infer<typeof updateWorkPermitSchema>;

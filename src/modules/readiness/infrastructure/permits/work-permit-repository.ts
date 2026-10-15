@@ -262,6 +262,17 @@ export class WorkPermitRepository {
     return this.get(input.tenantId, input.id);
   }
 
+  async close(input: {tenantId: string; id: string; version: number; actorId: string; closedAt: Date}): Promise<PermitRow> {
+    if (!input.tenantId) throw new ReadinessCommandError('VALIDATION_ERROR', 403, 'Организация не определена');
+    const updated = await this.tx.workPermit.updateMany({
+      where: {tenantId: input.tenantId, id: input.id, version: input.version, state: 'APPROVED', validFrom: {lte: input.closedAt}},
+      data: {state: 'CLOSED', version: input.version + 1, closedAt: input.closedAt,
+        closedById: input.actorId, closeReason: 'WORK_DONE'},
+    });
+    if (updated.count !== 1) throw new ReadinessCommandError('VERSION_CONFLICT', 409, 'Наряд изменился. Обновите страницу и повторите действие');
+    return this.get(input.tenantId, input.id);
+  }
+
   async reject(input: {tenantId: string; id: string; version: number; actorId: string; reason: string}): Promise<PermitRow> {
     const now = new Date();
     const updated = await this.tx.workPermit.updateMany({
