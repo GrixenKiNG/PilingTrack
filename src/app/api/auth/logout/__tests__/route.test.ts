@@ -140,10 +140,12 @@ describe('X1: bounded client requests', () => {
   });
   afterEach(() => vi.useRealTimers());
 
-  it('a hanging session probe becomes unknown after 20 seconds', async () => {
+  it('a hanging session probe becomes unknown after 15 seconds', async () => {
     const pending = probeSession();
-    await vi.advanceTimersByTimeAsync(20_000);
-    expect(await pending).toEqual({ status: 'unknown' });
+    await vi.advanceTimersByTimeAsync(14_999);
+    expect(vi.mocked(fetch).mock.calls[0][1]?.signal?.aborted).toBe(false);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(await Promise.race([pending, Promise.resolve('still pending')])).toEqual({ status: 'unknown' });
     expect(vi.getTimerCount()).toBe(0);
   });
 
@@ -178,7 +180,7 @@ describe('X1: bounded client requests', () => {
   it('X1 follow-up: session JSON cannot hang after headers arrive', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new NextResponse(new ReadableStream(), { headers: { 'Content-Type': 'application/json' } })));
     const pending = probeSession();
-    await vi.advanceTimersByTimeAsync(20_000);
+    await vi.advanceTimersByTimeAsync(15_000);
     expect(await Promise.race([pending, Promise.resolve('still pending')])).toEqual({ status: 'unknown' });
     expect(vi.getTimerCount()).toBe(0);
   });
