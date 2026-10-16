@@ -21,8 +21,49 @@ export function isOverduePermit(permit: Pick<WorkPermitDto, 'state' | 'validTo'>
   return new Date(permit.validTo).getTime() <= now.getTime();
 }
 
+/**
+ * Задачи до закрытия планировщиком: согласованный нужно закрыть, ожидающий
+ * согласования — переоформить. Наличие замены не закрывает старый наряд.
+ * EXPIRED и CLOSED — история; решение владельца cb8fc697 для EXPIRED сохранено.
+ */
+export function actionableOverduePermits<T extends Pick<WorkPermitDto, 'state' | 'validTo' | 'equipmentId'>>(
+  permits: readonly T[],
+  now: Date,
+): T[] {
+  return permits.filter((permit) => (permit.state === 'APPROVED' || permit.state === 'PENDING_APPROVAL')
+    && isOverduePermit(permit, now));
+}
+
+const SIGN_ROLE_LABEL = {DISPATCHER: 'Диспетчер', ADMIN: 'Администратор'} as const;
+
+/**
+ * Почему человеку не стоит предлагать «Согласовать» (null — стоит).
+ *
+ * Наряд с несколькими обязательными подписями (повышенный риск: «Диспетчер» и
+ * «Администратор») подписывают РАЗНЫЕ люди; сервер отказывает второй раз тому,
+ * кто уже подписал, фразой «требует согласования разными людьми». Раньше экран
+ * всё равно звал нажать «Согласовать» (администратор мог подписать как
+ * диспетчер через «Действую как» и потом упирался в отказ без выхода), теперь
+ * вместо кнопки — объяснение, чья подпись нужна. Правило сервера не дублируем
+ * целиком: остальные отказы (роль, автор, срок) сервер объяснит сам.
+ */
+export function permitSigningBlock(
+  permit: Pick<WorkPermitDto, 'requiredApprovals' | 'approvals' | 'version'>,
+  actor: {id: string | null},
+): string | null {
+  const required = permit.requiredApprovals ?? [];
+  if (required.length < 2 || !actor.id) return null;
+  const current = permit.approvals.filter((item) => item.valid && item.permitVersion === permit.version);
+  const mine = current.find((item) => item.approvedById === actor.id);
+  if (!mine) return null;
+  const left = required.filter((role) => !current.some((item) => item.role === role)).map((role) => SIGN_ROLE_LABEL[role]);
+  return `Вы уже подписали этот наряд как «${SIGN_ROLE_LABEL[mine.role]}». ${left.length ? `Остальные подписи (${left.join(', ')}) должны поставить другие люди.` : ''}`.trim();
+}
+
 export function buildPermitRoleSteps({permits, now}: {permits: readonly WorkPermitDto[]; now: Date}): PermitRoleSteps[] {
-  const overdue = permits.filter((permit) => isOverduePermit(permit, now));
+  const overdue = actionableOverduePermits(permits, now);
+  const overduePending = overdue.filter((permit) => permit.state === 'PENDING_APPROVAL');
+  const awaitingClosure = overdue.filter((permit) => permit.state === 'APPROVED' && new Date(permit.validFrom) <= now);
   const livePending = permits.filter((permit) => permit.state === 'PENDING_APPROVAL' && !isOverduePermit(permit, now));
   const drafts = permits.filter((permit) => permit.state === 'DRAFT');
   const elevatedPending = livePending.filter((permit) => permit.risk === 'ELEVATED');
@@ -43,8 +84,13 @@ export function buildPermitRoleSteps({permits, now}: {permits: readonly WorkPerm
         },
         {
           title: 'Переоформить просроченные',
-          done: overdue.length === 0,
+          done: overduePending.length === 0,
           hint: 'У просроченного наряда срок вышел, согласовать его нельзя. Создайте новый наряд-допуск на нужный срок.',
+        },
+        {
+          title: 'Закрыть наряды завершённых работ',
+          done: awaitingClosure.length === 0,
+          hint: 'У согласованного наряда с завершёнными работами нажмите «Закрыть наряд». Закрытый наряд больше не даёт допуска.',
         },
       ],
     },
@@ -58,8 +104,8 @@ export function buildPermitRoleSteps({permits, now}: {permits: readonly WorkPerm
         },
         {
           title: 'Решить по просроченным',
-          done: overdue.length === 0,
-          hint: 'Просроченный наряд не согласуется. Попросите инженера ОТ или механика оформить новый.',
+          done: overduePending.length === 0,
+          hint: 'Наряд с вышедшим окном согласования не согласуется. Попросите инженера ОТ или механика оформить новый.',
         },
       ],
     },

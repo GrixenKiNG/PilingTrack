@@ -8,7 +8,8 @@
 | **Owned by** | Whoever holds prod SSH |
 
 > **Стек:** одиночный VPS, Docker Compose (`/opt/pilingtrack`). НЕ Kubernetes.
-> Все команды ниже — для этого окружения.
+> Команды ниже — примеры диагностики чтением для уполномоченного оператора.
+> Они не разрешают агенту подключаться к production или запускать их.
 
 Чтобы не повторять длинный префикс, в начале сессии задайте алиас:
 
@@ -33,13 +34,21 @@ alias dc='docker compose --env-file .env -f docker-compose.yml -f docker-compose
 - `projected` — read-side (CQRS-проекции: OperatorPerformance и т.п.)
 
 Они продвигаются отдельно, поэтому backlog может быть на одной стороне,
-а не на другой.
+а не на другой. Pending projection включает все строки `projected=false`,
+независимо от `published`, типа события и срока `nextRetryAt`. Отложенный
+retry остаётся pending; возраст считается от `createdAt`, а не времени
+следующей попытки. Попадание в DLQ завершает только соответствующего
+consumer; состояние другого может оставаться pending. DLQ считается отдельно.
 
 Логика повторов на одно событие:
 ```
 attempts < 5  → повтор с экспоненциальной задержкой (nextRetryAt)
-attempts >= 5 → переезд в DeadLetterQueue, строка outbox помечается consumed
+attempts >= 5 → переезд в DeadLetterQueue, флаг текущего consumer становится true
+               (published либо projected); другой флаг не меняется
 ```
+
+Флаги consumer независимы, но `attempts`, `nextRetryAt` и `lastError`
+общие для строки события; отдельных счётчиков повторов у них нет.
 
 **Воркеры выбирают лидера (leader election).** Outbox и projection
 обрабатывает РОВНО ОДИН процесс. Наращивание реплик `workers` НЕ ускоряет
@@ -54,150 +63,99 @@ attempts >= 5 → переезд в DeadLetterQueue, строка outbox пом�
   `metrics.outboxPending` большой и растёт
 - Проекции (OperatorPerformance, аналитика) не обновляются
 - Realtime-уведомления не приходят
-- В Grafana — рост `outbox_lag`
+- В Grafana — рост `outbox_lag_seconds` или `projection_lag_seconds`
 
 ---
 
+## Метрики и свежесть измерения
+
+Принятый exporter: [lag-monitor.ts](../../src/core/observability/lag-monitor.ts).
+
+| Метрика | Что измеряет |
+|---|---|
+| `outbox_lag_seconds` | Возраст самой старой строки `published=false`, от `createdAt` |
+| `outbox_pending_count` | Количество строк `published=false` |
+| `projection_lag_seconds` | Возраст самой старой строки `projected=false`, от `createdAt` |
+| `projection_pending_count` | Количество всех строк `projected=false` |
+| `dlq_pending_count` | Число записей DeadLetterQueue со статусом `pending` |
+| `lag_snapshot_timestamp_seconds` | Unix-время последнего успешного сбора; 0 — измерение недоступно |
+
+При отсутствии ожидающих строк возраст равен 0. Publication и projection
+могут иметь разные нули: `published=true/projected=false` уже опубликовано,
+но ещё не спроецировано. Нельзя заменять второй сигнал первым.
+
+Ошибка сбора publication/projection не создаёт новый успешный снимок: предыдущие значения и
+`timestamp` сохраняются. До первого успешного сбора exporter отдаёт только
+`lag_snapshot_timestamp_seconds 0`, без выдуманных нулевых backlog gauges.
+Устаревший снимок, нулевая/некорректная отметка времени или отсутствующая
+серия — неизвестное состояние, а не здоровая пустая очередь.
+
+Для DLQ есть отдельное ограничение: при отказе чтения `getDlqPendingCount`
+возвращает 0, не прерывая общий сбор и обновление timestamp. Поэтому даже
+свежий `dlq_pending_count=0` требует подтверждения запросом DLQ из диагностики
+ниже; ошибка этого запроса означает неизвестное состояние DLQ.
+
+Принятые [alert rules](../../observability/prometheus/alerts.yml): publication
+и projection предупреждают при возрасте >60 с в течение 10 мин, critical
+при >300 с в течение 5 мин. `LagSnapshotStale` проверяет возраст успешного
+снимка >60 с либо timestamp=0 в течение 2 мин. Отсутствующая серия требует
+отдельной проверки scrape/target; это правило само её не обнаруживает.
+
 ## Диагностика
 
+Только чтение: оба pending-фильтра независимы, без ограничения по типу
+события, публикации другого consumer или eligibility повтора.
+
 ```bash
-# 1. Размер backlog по обеим сторонам consumer'а
+# 1. Количество и возраст publication/projection отдельно
 dc exec postgres psql -U piling -d pilingtrack -c \
   'SELECT
-     count(*) FILTER (WHERE published = false)  AS unpublished,
-     count(*) FILTER (WHERE projected = false)  AS unprojected
+     count(*) FILTER (WHERE published = false) AS unpublished,
+     coalesce(greatest(0, extract(epoch FROM (now() - min("createdAt") FILTER (WHERE published = false)))), 0) AS publication_age_seconds,
+     count(*) FILTER (WHERE projected = false) AS unprojected,
+     coalesce(greatest(0, extract(epoch FROM (now() - min("createdAt") FILTER (WHERE projected = false)))), 0) AS projection_age_seconds
    FROM "OutboxEvent";'
 
-# 2. Самые старые необработанные события (что застряло первым)
+# 2. Старые события: флаги и отложенные повторы видны вместе
 dc exec postgres psql -U piling -d pilingtrack -c \
-  'SELECT id, type, attempts, left("lastError", 80) AS error, "createdAt"
+  'SELECT id, type, published, projected, attempts, "nextRetryAt",
+          left("lastError", 80) AS error, "createdAt"
    FROM "OutboxEvent"
    WHERE published = false OR projected = false
    ORDER BY "createdAt" ASC LIMIT 10;'
 
-# 3. Жив ли worker, что в логах
+# 3. Состояние и журнал worker — без перезапуска
 dc ps workers
 dc logs workers --tail 80
 
-# 4. Размер DLQ
+# 4. DLQ отдельно от основной очереди
 dc exec postgres psql -U piling -d pilingtrack -c \
   'SELECT status, count(*) FROM "DeadLetterQueue" GROUP BY status;'
-
-# 5. Что именно упало в DLQ (тексты ошибок)
-dc exec postgres psql -U piling -d pilingtrack -c \
-  'SELECT "eventType", attempts, left("errorMessage", 100) AS error, "createdAt"
-   FROM "DeadLetterQueue"
-   WHERE status = '"'"'pending'"'"'
-   ORDER BY "createdAt" DESC LIMIT 10;'
 ```
 
-**Здоровое состояние:** `unpublished` и `unprojected` близки к нулю и не
-растут; DLQ `pending = 0`.
+**Здоровое состояние** подтверждается свежим успешным измерением: оба
+возраста и количества не растут, pending близок к нулю, DLQ pending=0.
+При ошибке DB/scrape эти условия не подтверждены даже старым нулевым графиком.
 
----
+## Действия после диагностики
 
-## Восстановление
-
-### Вариант 1 — worker завис: перезапуск (первое что пробуем)
-
-```bash
-dc restart workers
-dc logs workers --tail 100 -f
-# Ctrl-C когда увидите что события обрабатываются (processedCount растёт)
-```
-
-Через минуту повторите диагностику №1 — backlog должен падать.
-
-### Вариант 2 — «ядовитое» событие блокирует очередь
-
-Если в логах один и тот же `id` падает снова и снова и backlog за ним не
-двигается — это событие отравляет очередь. Оно само уедет в DLQ после 5
-попыток, но если ждать некогда — отправьте его туда вручную (пометить
-consumed, чтобы перестало retry'иться):
-
-```bash
-# Сначала ПОСМОТРИТЕ что именно пометите (dry-run)
-dc exec postgres psql -U piling -d pilingtrack -c \
-  'SELECT id, type, attempts, left("lastError",100) AS error
-   FROM "OutboxEvent"
-   WHERE (published = false OR projected = false) AND attempts >= 5
-   ORDER BY "createdAt" ASC LIMIT 20;'
-
-# Если согласны — пометить consumed на ОБЕИХ сторонах
-dc exec postgres psql -U piling -d pilingtrack -c \
-  'UPDATE "OutboxEvent"
-   SET published = true, projected = true,
-       "lastError" = '"'"'Skipped — manual intervention'"'"'
-   WHERE (published = false OR projected = false) AND attempts >= 5;'
-
-dc restart workers
-```
-
-> ⚠️ Это пропускает события **безвозвратно для основной очереди**. Они НЕ
-> попадут в DLQ автоматически (DLQ заполняет только сам worker при
-> attempts>=5). Перед таким шагом убедитесь что понимаете что теряете —
-> например пропущенная проекция = неверная аналитика, пока не сделаете
-> rebuild через `/api/admin/projections/rebuild`.
-
-### Вариант 3 — разобрать накопившийся DLQ
-
-DLQ-записями управляют через админский API (нужно право `dlq.manage`):
-
-```bash
-# Посмотреть pending (через приложение, не БД — нужен admin-токен)
-curl -s -H "Cookie: <admin-session>" \
-  https://orionpiling.ru/api/admin/dlq?status=pending | jq
-
-# Переотправить запись обратно в очередь (после фикса причины)
-curl -s -X POST -H "Cookie: <admin-session>" -H "Content-Type: application/json" \
-  -d '{"id":"<dlq-id>","action":"retry"}' \
-  https://orionpiling.ru/api/admin/dlq
-
-# Выкинуть запись насовсем
-curl -s -X POST -H "Cookie: <admin-session>" -H "Content-Type: application/json" \
-  -d '{"id":"<dlq-id>","action":"discard"}' \
-  https://orionpiling.ru/api/admin/dlq
-```
-
-Проще — из админ-панели в UI, если там есть раздел DLQ (дёргает тот же
-endpoint). `retry` пере-вставляет событие в `OutboxEvent` с attempts=0;
-`discard` помечает запись `discarded` и забывает.
-
----
+Зафиксировать, какой consumer отстал, возраст события, время последнего
+успешного снимка, ошибку worker и состояние DLQ. Устранение причины и
+любые изменения очереди согласуются отдельно с владельцем. Этот runbook
+не содержит команд перезапуска, массового пропуска, replay, retry/discard
+или пересборки проекций: выставить оба флага вручную означает потерять
+обработку, а не восстановить её.
 
 ## Проверка восстановления
 
-```bash
-# Backlog должен уменьшаться при повторных запусках
-dc exec postgres psql -U piling -d pilingtrack -c \
-  'SELECT
-     count(*) FILTER (WHERE published = false) AS unpublished,
-     count(*) FILTER (WHERE projected = false) AS unprojected
-   FROM "OutboxEvent";'
+Повторить диагностику чтением: publication/projection pending и возраст
+должны уменьшаться независимо; успешный snapshot обновляется; DLQ pending
+не растёт. Не считать отложенный retry исчезнувшим из pending. Проверить
+реальное обновление соответствующей проекции или доставки, если оно входило
+в инцидент: само уменьшение backlog не доказывает правильность данных.
 
-# DLQ pending не растёт
-dc exec postgres psql -U piling -d pilingtrack -c \
-  'SELECT status, count(*) FROM "DeadLetterQueue" GROUP BY status;'
-```
-
-Если проекции пропускались (Вариант 2) — пересоберите их:
-`POST /api/admin/projections/rebuild` (см. бэкфилл-скрипты).
-
----
-
-## Post-Incident
-
-- [ ] Почему backlog вырос? (worker падал? событие отравляло? медленный handler?)
-- [ ] Если в DLQ осели события одного типа — баг в его handler'е, чинить код
-- [ ] Проверить что после фикса DLQ-записи либо retry'нуты, либо discard'нуты
-
----
-
-## Prevention
-
-- **Early alerting:** алерт при `outboxPending > 1000` (а не 10K)
-- **DLQ-алерт:** уведомление при `DeadLetterQueue.pending > 0` — даже одно
-  застрявшее событие = что-то стабильно падает
-- **Leader election** уже защищает от дублей; масштабировать `workers`
-  репликами для скорости БЕСПОЛЕЗНО (лишние простаивают) — вместо этого
-  оптимизировать медленный handler или увеличить частоту polling'а
+Принятый [тест I01](../../src/core/observability/__tests__/lag-monitor.test.ts)
+покрывает опубликованное, но не спроецированное событие, backoff, пустую
+очередь, ошибку сбора с сохранением timestamp и exporter. Это локальная
+проверка контракта; запуск/reload правил и scrape на сервере проверяются
+отдельно, исходный файл не доказывает их применение.

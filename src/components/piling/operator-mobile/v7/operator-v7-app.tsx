@@ -18,6 +18,7 @@ import {admissionSteps} from '../safety/admission-steps';
 import {AdmissionResult, BriefingFlow, KnowledgeFlow, PpeFlow} from './v7-identity';
 import {AcceptFlow, ChecklistFlow, CloseFlow, IncidentFlow, ProductionFlow} from './v7-shift';
 import {nextStep} from '../shift-next-step';
+import type {CorrectionInput} from '../screens/entries-list';
 import {NextStepDock, NextStepTab} from '../step-bar';
 import {
   EquipmentScreen, HomeScreen, IncidentsScreen, JournalScreen, MoreScreen, TasksScreen,
@@ -173,11 +174,12 @@ export function OperatorV7App() {
       } else {
         setActionError(cause instanceof Error ? cause.message : 'Команда не прошла');
       }
-    } finally {
-      setBusy(false);
     }
 
-    if (!accepted) return false;
+    if (!accepted) {
+      setBusy(false);
+      return false;
+    }
 
     setCommandId(newCommandId());
     if (options.close !== false) setDetour(null);
@@ -186,6 +188,8 @@ export function OperatorV7App() {
     } catch {
       // Перечитывание состояния не отменяет принятую запись: о своей неудаче
       // `reload` сообщает сам текстом ошибки состояния.
+    } finally {
+      setBusy(false);
     }
     return true;
   }, [reload]);
@@ -225,6 +229,10 @@ export function OperatorV7App() {
   const equipmentId = state.assignment?.equipmentId ?? null;
   const openIncidents = state.incidents.filter((incident) => incident.reviewedAt === null).length;
   const pending = queued.filter((item) => item.state === 'PENDING').length;
+  const correctProduction = (input: CorrectionInput) => {
+    if (!shiftId) return Promise.resolve(false);
+    return run({command: 'correct-production', clientCommandId: commandId, shiftId, ...input}, {close: false});
+  };
 
   const messages = (
     <>
@@ -354,13 +362,13 @@ export function OperatorV7App() {
             stage={detour.stage}
             busy={busy}
             onBack={back}
-            onSubmit={(answers) => {
+            onSubmit={(answers, restoredCommandId) => {
               if (!shiftId || !equipmentId) {
                 setActionError('Смена не начата: сначала примите установку');
-                return;
+                return false;
               }
-              void run({
-                command: 'submit-checklist', clientCommandId: commandId,
+              return run({
+                command: 'submit-checklist', clientCommandId: restoredCommandId ?? commandId,
                 shiftId, equipmentId, stage: detour.stage, answers,
               });
             }}
@@ -483,6 +491,8 @@ export function OperatorV7App() {
           <HomeScreen
             state={state}
             busy={busy}
+            onCorrect={correctProduction}
+            correctionError={actionError}
             onStep={(step) => setDetour(step)}
             onFinishWork={() => {
               if (!shiftId) return;
@@ -508,7 +518,7 @@ export function OperatorV7App() {
         {tab === 'EQUIP' ? <EquipmentScreen defects={state.defects} /> : null}
         {tab === 'MORE' ? (
           <>
-            <JournalScreen state={state} />
+            <JournalScreen state={state} busy={busy} onCorrect={correctProduction} correctionError={actionError} />
             <IncidentsScreen incidents={state.incidents} />
             <MoreScreen state={state} onResult={() => setDetour({kind: 'RESULT'})} />
           </>
@@ -576,7 +586,7 @@ function ChecklistDetour({state, stage, busy, onSubmit, onBack, commandId}: {
   state: OperatorMobileState;
   stage: ChecklistStage;
   busy: boolean;
-  onSubmit: (answers: ChecklistAnswer[]) => void;
+  onSubmit: (answers: ChecklistAnswer[], restoredCommandId?: string) => boolean | Promise<boolean>;
   onBack: () => void;
 }) {
   const checklist = state.checklists.find((item) => item.stage === stage);
@@ -593,6 +603,8 @@ function ChecklistDetour({state, stage, busy, onSubmit, onBack, commandId}: {
   }
   return (
     <ChecklistFlow
+      draftUserId={state.operator?.id}
+      draftShiftId={state.shift?.id}
       key={`${state.shift?.id}:${state.assignment?.equipmentId}:${checklist.stage}`}
       commandId={commandId}
       checklist={checklist} warnings={state.warnings}

@@ -1,5 +1,7 @@
-import {fireEvent, render, screen, waitFor} from '@testing-library/react';
+import {fireEvent, render, screen, waitFor, within} from '@testing-library/react';
 import {beforeEach, describe, expect, it, vi} from 'vitest';
+
+beforeEach(() => window.localStorage.clear());
 import type {OperatorMobileState} from '@/modules/operator-mobile/contracts';
 
 // Экран тянет рабочий обзор оператора, а тот — стили PostCSS; в тесте они не нужны.
@@ -35,7 +37,9 @@ vi.mock('@/lib/api', async (importOriginal) => ({
 }));
 
 import {OperatorShiftV2} from '../operator-shift-v2';
+import {PileSheet, DrillingSheet, DowntimeSheet} from '../sheets';
 import {workStateFixture} from '@/components/piling/operator-mobile/__tests__/fixtures';
+import {ApiError} from '@/components/piling/operator-mobile/api';
 
 /**
  * D-20260927-005: у бригады нет сменщиков, и передача смены в v2 оставляла
@@ -71,6 +75,51 @@ const facts = {
 };
 
 const closeButton = () => screen.findByRole('button', {name: 'Закрыть смену и отправить отчёт'});
+
+describe('v2: поправка выработки', () => {
+  it('при 409 оставляет ввод и причину внутри формы, повторяет тот же ключ команды', async () => {
+    api.queued = [];
+    authFetch.mockReset().mockResolvedValue({ok: true, json: async () => ({...facts,
+      clearance: {...facts.clearance, warnings: []},
+    })});
+    api.fetchState.mockReset().mockResolvedValue(workStateFixture({operator: {id: 'operator', name: 'Машинист'}, entries: [{
+      id: 'entry-1', kind: 'DOWNTIME', label: 'Ожидание', value: 2, meters: null,
+      occurredAt: '2026-09-20T08:00:00.000Z', corrections: [],
+    }]}));
+    api.sendCommand.mockReset().mockRejectedValueOnce(new ApiError(409, 'Смена уже закрыта')).mockResolvedValue({ok: true});
+    render(<OperatorShiftV2 />);
+    fireEvent.click(await screen.findByRole('button', {name: 'Поправить'}));
+    const form = within(screen.getByRole('group', {name: 'Поправка записи'}));
+    fireEvent.change(form.getByLabelText('Сколько часов простоя было на самом деле'), {target: {value: '1,5'}});
+    fireEvent.change(form.getByLabelText('Что случилось'), {target: {value: 'Ошибка ввода'}});
+    fireEvent.click(form.getByRole('button', {name: 'Записать поправку'}));
+    await waitFor(() => expect(form.getByRole('alert')).toHaveTextContent('Смена уже закрыта'));
+    expect(form.getByLabelText('Сколько часов простоя было на самом деле')).toHaveValue('1,5');
+    expect(api.sendCommand).toHaveBeenLastCalledWith({command: 'correct-production', clientCommandId: expect.any(String),
+      shiftId: 'shift-1', entryId: 'entry-1', kind: 'DOWNTIME', actual: 1.5, reason: 'Ошибка ввода'});
+    const first = api.sendCommand.mock.calls[0][0];
+    fireEvent.click(form.getByRole('button', {name: 'Записать поправку'}));
+    await waitFor(() => expect(screen.queryByRole('group', {name: 'Поправка записи'})).not.toBeInTheDocument());
+    expect(api.sendCommand.mock.calls[1][0]).toEqual(first);
+  });
+});
+
+describe('V2: локальный ввод листов выработки', () => {
+  it.each(['PILES', 'DRILLING', 'DOWNTIME'] as const)('%s восстанавливает ввод после перезагрузки', (kind) => {
+    const props = {open: true, busy: false, onClose: vi.fn(), onAdd: vi.fn().mockResolvedValue(false), draftUserId: 'operator', draftShiftId: 'shift'};
+    const form = () => kind === 'PILES' ? <PileSheet {...props} grades={[{id: 'g', name: 'Марка', lengthMm: 3000}]} />
+      : kind === 'DRILLING' ? <DrillingSheet {...props} types={[{id: 'g', name: 'Тип'}]} />
+        : <DowntimeSheet {...props} reasons={[{id: 'g', name: 'Причина'}]} />;
+    const view = render(form());
+    fireEvent.change(screen.getByRole('combobox'), {target: {value: 'g'}});
+    const label = kind === 'PILES' ? 'Количество свай' : kind === 'DRILLING' ? 'Глубина одной скважины, м' : 'Простой, часов';
+    fireEvent.change(screen.getByLabelText(label), {target: {value: '12'}});
+    view.unmount();
+    render(form());
+    expect(screen.getByRole('combobox')).toHaveValue('g');
+    expect((screen.getByLabelText(label) as HTMLInputElement).value).toBe('12');
+  });
+});
 
 describe('T12: следующий шаг v2 выполняет общий переход', () => {
   beforeEach(() => {
@@ -330,5 +379,218 @@ describe('I1: ручная сдача HANDOVER_PENDING в v2', () => {
     fireEvent.click(screen.getByRole('button', {name: 'К сдаче смены'}));
     expect(await closeButton()).toBeEnabled();
     expect(screen.queryByRole('button', {name: 'Добавить сваю'})).not.toBeInTheDocument();
+  });
+});
+
+describe('V2: сбой загрузки и отказ записи', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    api.queued = [];
+    api.sendCommand.mockResolvedValue({ok: true});
+  });
+
+  it('при сбое загрузки смены даёт кнопку «Повторить» и после неё открывает смену', async () => {
+    authFetch
+      .mockResolvedValueOnce({ok: false, json: async () => ({})})
+      .mockResolvedValue({ok: true, json: async () => ({...facts,
+        clearance: {...facts.clearance, warnings: []},
+      })});
+    api.fetchState.mockResolvedValue(workStateFixture());
+    render(<OperatorShiftV2 />);
+
+    expect(await screen.findByText('Смена недоступна')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', {name: 'Повторить'}));
+
+    expect(await screen.findByRole('button', {name: 'Ещё'})).toBeInTheDocument();
+    expect(screen.queryByText('Смена недоступна')).not.toBeInTheDocument();
+  });
+
+  it('показывает причину отказа бурения внутри формы и ведёт на вкладку ТБ', async () => {
+    authFetch.mockResolvedValue({ok: true, json: async () => ({...facts,
+      clearance: {...facts.clearance, warnings: []},
+    })});
+    api.fetchState.mockResolvedValue(workStateFixture({dictionaries: {
+      pileGrades: [], drillingTypes: [{id: 'dt-1', name: 'Лидерное 200'}], downtimeReasons: [],
+    }}));
+    const refusal = 'Подошёл срок чек-листа ТБ по лидерному бурению — пройдите его';
+    api.sendCommand.mockRejectedValue(new Error(refusal));
+    render(<OperatorShiftV2 />);
+
+    fireEvent.click(await screen.findByRole('button', {name: 'Добавить бурение'}));
+    fireEvent.change(await screen.findByLabelText('Тип бурения'), {target: {value: 'dt-1'}});
+    fireEvent.change(screen.getByPlaceholderText('Например, 9,5'), {target: {value: '9,5'}});
+    fireEvent.click(screen.getByRole('button', {name: 'Записать 9.5 м'}));
+
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent(refusal);
+
+    fireEvent.click(screen.getByRole('button', {name: 'Открыть вкладку ТБ'}));
+    expect(screen.queryByLabelText('Тип бурения')).not.toBeInTheDocument();
+    expect(await screen.findByText('Техника безопасности')).toBeInTheDocument();
+  });
+});
+
+describe('D-20260930-001: несданная смена прошлых суток на приёме v2', () => {
+  const oldShift = {id: 'old-1', productionDate: '2026-09-27', startedAt: '2026-09-27T01:09:26.751Z', state: 'HANDOVER_PENDING'};
+  const withOldShift = () => workStateFixture({phase: 'IDENTITY', productionDate: '2026-10-15', shift: oldShift});
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    api.queued = [];
+    api.sendCommand.mockResolvedValue({ok: true});
+    authFetch.mockResolvedValue({ok: true, json: async () => ({...facts, shift: null,
+      clearance: {...facts.clearance, warnings: []},
+    })});
+  });
+
+  it('объясняет на экране, почему нельзя принять установку, и даёт сдать прошлую смену', async () => {
+    api.fetchState.mockResolvedValue(withOldShift());
+    render(<OperatorShiftV2 />);
+
+    expect(await screen.findByText(/Не сдана смена за 27\.09\.2026/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', {name: 'Сдать смену за 27.09.2026'}));
+    await waitFor(() => expect(api.sendCommand).toHaveBeenCalledWith({command: 'close-shift', shiftId: 'old-1', comment: ''}));
+  });
+
+  it('после сдачи перечитывает состояние и убирает предупреждение', async () => {
+    api.fetchState
+      .mockResolvedValueOnce(withOldShift())
+      .mockResolvedValue(workStateFixture({phase: 'IDENTITY', productionDate: '2026-10-15', shift: null}));
+    render(<OperatorShiftV2 />);
+
+    fireEvent.click(await screen.findByRole('button', {name: 'Сдать смену за 27.09.2026'}));
+    await waitFor(() => expect(screen.queryByText(/Не сдана смена за 27\.09\.2026/)).not.toBeInTheDocument());
+  });
+
+  it('при отказе сервера оставляет причину на экране, а не только во всплывающем сообщении', async () => {
+    api.fetchState.mockResolvedValue(withOldShift());
+    api.sendCommand.mockRejectedValue(new Error('Сначала выполните ЕО после работы'));
+    render(<OperatorShiftV2 />);
+
+    fireEvent.click(await screen.findByRole('button', {name: 'Сдать смену за 27.09.2026'}));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Сначала выполните ЕО после работы');
+  });
+
+  it('не предупреждает о смене сегодняшних суток', async () => {
+    api.fetchState.mockResolvedValue(workStateFixture({
+      phase: 'IDENTITY', productionDate: '2026-10-15',
+      shift: {...oldShift, id: 'today-1', productionDate: '2026-10-15', state: 'STARTED'},
+    }));
+    render(<OperatorShiftV2 />);
+
+    expect(await screen.findByRole('button', {name: 'Принять установку'})).toBeInTheDocument();
+    expect(screen.queryByText(/Не сдана смена/)).not.toBeInTheDocument();
+  });
+});
+
+describe('D-20260930-001: ЕО после работы и сдача для смены прошлых суток', () => {
+  const oldShift = {id: 'old-1', productionDate: '2026-09-27', startedAt: '2026-09-27T01:09:26.751Z', state: 'HANDOVER_PENDING'};
+  let current: OperatorMobileState;
+  let oldShiftOpen: boolean;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    api.queued = [];
+    oldShiftOpen = true;
+    // Сервер считает фазу по сегодняшним суткам: допуск на сегодня не пройден — IDENTITY,
+    // хотя у машины висит несданная смена прошлых суток без ЕО после работы.
+    current = workStateFixture({
+      phase: 'IDENTITY', productionDate: '2026-10-15', receipt: null, shift: oldShift,
+      checklists: [{
+        stage: 'EO_AFTER', title: 'ЕО после работы', purpose: 'Проверить машину', version: 'test-1',
+        done: false, period: null,
+        sections: [{id: 'cab', title: 'Кабина', items: [{id: 'glass', text: 'Стёкла и зеркала', severity: 'NOTE'}]}],
+      }],
+    });
+    api.fetchState.mockImplementation(async () => current);
+    authFetch.mockImplementation(async () => ({ok: true, json: async () => ({
+      ...facts,
+      shift: oldShiftOpen ? {...facts.shift, id: 'old-1', state: 'HANDOVER_PENDING'} : null,
+      clearance: {...facts.clearance, warnings: []},
+    })}));
+    api.sendCommand.mockImplementation(async ({command}) => {
+      if (command === 'submit-checklist') current = {
+        ...current, checklists: current.checklists.map((list) => list.stage === 'EO_AFTER' ? {...list, done: true} : list),
+      };
+      if (command === 'close-shift') {
+        oldShiftOpen = false;
+        current = workStateFixture({phase: 'IDENTITY', productionDate: '2026-10-15', shift: null});
+      }
+      return {ok: true};
+    });
+  });
+
+  it('ведёт не на приёмку, а на ЕО после работы и подписывает, за какую смену сдача', async () => {
+    render(<OperatorShiftV2 />);
+
+    expect(await screen.findByRole('button', {name: /Кабина/, expanded: false})).toBeInTheDocument();
+    expect(screen.getByText(/Сдача смены за 27\.09\.2026/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', {name: 'Принять установку'})).not.toBeInTheDocument();
+  });
+
+  it('записывает ЕО на старую смену и закрывает её, после чего открывается приёмка', async () => {
+    render(<OperatorShiftV2 />);
+
+    fireEvent.click(await screen.findByRole('button', {name: /Кабина/, expanded: false}));
+    fireEvent.click(screen.getByRole('button', {name: 'Весь раздел «Кабина» в норме'}));
+    fireEvent.click(screen.getByRole('button', {name: 'Завершить'}));
+    await waitFor(() => expect(api.sendCommand).toHaveBeenCalledWith(expect.objectContaining({
+      command: 'submit-checklist', shiftId: 'old-1', equipmentId: 'eq-1', stage: 'EO_AFTER',
+    })));
+
+    fireEvent.click(await closeButton());
+    await waitFor(() => expect(api.sendCommand).toHaveBeenCalledWith({command: 'close-shift', shiftId: 'old-1', comment: ''}));
+    expect(await screen.findByRole('button', {name: 'Принять установку'})).toBeInTheDocument();
+    expect(screen.queryByText(/Сдача смены за 27\.09\.2026/)).not.toBeInTheDocument();
+  });
+
+  it('у несданной смены прошлых суток счётчик «Время работы» не бежит', async () => {
+    current = {...current, checklists: current.checklists.map((list) => list.stage === 'EO_AFTER' ? {...list, done: true} : list)};
+    render(<OperatorShiftV2 />);
+    await closeButton();
+    // Первый тик счётчика приходит через setTimeout(0): ждём его, иначе проверка обгонит баг.
+    await new Promise((resolve) => setTimeout(resolve, 60));
+    const row = screen.getByText('Время работы').parentElement as HTMLElement;
+    expect(row).toHaveTextContent(/^Время работы—$/);
+  });
+});
+
+describe('закрытая смена v2: благодарность', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    api.queued = [];
+    authFetch.mockResolvedValue({ok: true, json: async () => ({...facts, shift: null,
+      clearance: {...facts.clearance, warnings: []},
+    })});
+    api.fetchState.mockResolvedValue(workStateFixture({
+      phase: 'CLOSED', productionDate: '2026-10-16',
+      operator: {id: 'op-1', name: 'Митрофанов Алексей Геннадьевич'},
+      shift: {id: 'shift-1', productionDate: '2026-10-16', startedAt: '2026-10-16T04:00:00.000Z', state: 'CLOSED'},
+    }));
+  });
+
+  it('вместо мелкого «Спасибо!» показывает «Спасибо за работу!» с обращением по имени и отчеству', async () => {
+    render(<OperatorShiftV2 />);
+
+    expect(await screen.findByText('Спасибо за работу!')).toBeInTheDocument();
+    expect(screen.getByText(/Алексей Геннадьевич, смена закрыта, отчёт ушёл диспетчеру. Хорошего отдыха./)).toBeInTheDocument();
+    expect(screen.queryByText('Спасибо!')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', {name: 'На главную'})).toBeInTheDocument();
+  });
+});
+
+describe('закрытая смена v2: время работы', () => {
+  it('останавливается на отметке сдачи и не идёт дальше', async () => {
+    authFetch.mockResolvedValue({ok: true, json: async () => ({...facts,
+      shift: {id: 'shift-1', state: 'CLOSED', version: 3, type: 'DAY', productionDate: '2026-10-16', startedAt: '2026-10-16T04:00:00.000Z'},
+      clearance: {...facts.clearance, warnings: []},
+    })});
+    api.fetchState.mockResolvedValue(workStateFixture({
+      phase: 'CLOSED', productionDate: '2026-10-16',
+      shift: {id: 'shift-1', productionDate: '2026-10-16', startedAt: '2026-10-16T04:00:00.000Z', state: 'CLOSED'},
+      receipt: {reportId: 'RM-1', submittedAt: '2026-10-16T06:05:09.000Z', closedAt: '2026-10-16T06:05:09.000Z', timezone: 'Europe/Moscow'},
+    }));
+    render(<OperatorShiftV2 />);
+    expect(await screen.findByText('02:05:09')).toBeInTheDocument();
   });
 });

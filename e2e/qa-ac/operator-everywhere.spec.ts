@@ -60,6 +60,8 @@ const REPORTS = [
 ];
 
 test('админка: три сегодняшних отчёта — список, карточка, PDF', async ({ page }) => {
+  // Устарел 16.10.2026: ждёт три конкретных отчёта 06.10 (RM-673a209d…), которых в сегодняшней QA-базе нет. Не удаляем — переписать под текущие данные.
+  test.fixme(true, "ждёт три конкретных отчёта 06.10 (RM-673a209d…), которых в сегодняшней QA-базе нет");
   test.setTimeout(8 * 60_000);
   await login(page, 'dispatch@piling.ru');
   await page.goto('/admin/reports', { waitUntil: 'domcontentloaded' });
@@ -106,6 +108,8 @@ test('админка: три сегодняшних отчёта — списо�
 });
 
 test('журнал забивки: NEW-5 — реальные сваи 04.10 против только AC-QA', async ({ page }) => {
+  // Устарел 16.10.2026: ждёт записи свай за 04.10 с метками QA_HERMES QA-20261004, которых в QA-базе уже нет. Не удаляем — переписать под текущие данные.
+  test.fixme(true, "ждёт записи свай за 04.10 с метками QA_HERMES QA-20261004, которых в QA-базе уже нет");
   test.setTimeout(8 * 60_000);
   await login(page, 'dispatch@piling.ru');
   await page.goto('/admin/reports?view=piles', { waitUntil: 'domcontentloaded' });

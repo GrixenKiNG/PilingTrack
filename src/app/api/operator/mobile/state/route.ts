@@ -1,6 +1,7 @@
 import {NextRequest, NextResponse} from 'next/server';
 import {withApi} from '@/core/api-wrapper';
 import {requireAuth} from '@/lib/auth';
+import {authFailureResponse} from '@/lib/auth-failure';
 import {queryOperatorMobileState} from '@/modules/operator-mobile';
 import {getWeatherAt} from '@/services/weather/weather-client';
 
@@ -17,7 +18,7 @@ export const GET = withApi(
   async (request: NextRequest) => {
     const {user, error} = await requireAuth(request);
     if (error || !user) {
-      return NextResponse.json({error: 'Войдите в систему'}, {status: 401});
+      return authFailureResponse(error);
     }
     if (user.role !== 'OPERATOR') {
       return NextResponse.json({error: 'Экран доступен только машинисту'}, {status: 403});

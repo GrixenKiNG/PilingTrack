@@ -37,6 +37,7 @@
  */
 
 import {OperatorWorkOverview} from '../operator-mobile/operator-work-overview';
+import type {CorrectionInput} from '../operator-mobile/screens/entries-list';
 import { formatDowntimeHoursOnly } from '@/lib/downtime-hours';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
@@ -50,11 +51,11 @@ import type { OperatorShiftFacts } from '@/modules/readiness/application/operato
 import type { ClearanceDocument } from '@/modules/users';
 import { WeatherCard } from './weather-card';
 import { DefectSheet } from './defect-sheet';
-import { DowntimeSheet, DrillingSheet, PileSheet } from './sheets';
+import { DowntimeSheet, DrillingSheet, PileSheet, SheetError } from './sheets';
 import { PilePassportForm } from '@/components/piling/operator-mobile/screens/pile-passport-form';
 import { IncidentsTab } from '@/components/piling/operator-mobile/screens/incidents-tab';
 import {
-  BigCheck, BottomTabs, CheckRow, RowList, StepButton, StepShell, ValueRow, type V2Tab,
+  BottomTabs, CheckRow, RowList, StepButton, StepShell, ValueRow, type V2Tab,
 } from './ui';
 import type {
   ChecklistAnswer, ChecklistStage, OperatorMobileState,
@@ -71,6 +72,7 @@ import { ChecklistScreen } from '@/components/piling/operator-mobile/screens/che
 import { knownAnswers } from '@/components/piling/operator-mobile/safety/known-answers';
 import { V2_STEP_STAGE, V2_STEP_TITLE, resolveV2State, stepCaption } from './shift-flow';
 import { NextStepDock, NextStepTab } from '../operator-mobile/step-bar';
+import { ShiftThanks } from '../operator-mobile/shift-thanks';
 import { nextStep } from '../operator-mobile/shift-next-step';
 
 /**
@@ -230,18 +232,26 @@ function Blockers({ items }: { items: string[] }) {
   );
 }
 
-function useElapsed(startedAt: string | null): string | null {
+/*
+  Время работы. Пока смена идёт — бежит от пуска. Когда сервер записал сдачу
+  (`endedAt`), счёт останавливается на этой отметке: закрытая смена не должна
+  «работать» дальше, пока экран открыт.
+*/
+function useElapsed(startedAt: string | null, endedAt: string | null = null): string | null {
+  const fixedEnd = endedAt ? new Date(endedAt).getTime() : Number.NaN;
+  const frozen = !Number.isNaN(fixedEnd);
   const [now, setNow] = useState<number | null>(null);
   useEffect(() => {
-    if (!startedAt) return;
+    if (!startedAt || frozen) return;
     const first = setTimeout(() => setNow(Date.now()), 0);
     const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => { clearTimeout(first); clearInterval(timer); };
-  }, [startedAt]);
-  if (!startedAt || now === null) return null;
+  }, [startedAt, frozen]);
+  const reference = frozen ? fixedEnd : now;
+  if (!startedAt || reference === null) return null;
   const started = new Date(startedAt).getTime();
   if (Number.isNaN(started)) return null;
-  const seconds = Math.max(0, Math.floor((now - started) / 1000));
+  const seconds = Math.max(0, Math.floor((reference - started) / 1000));
   const pad = (value: number) => String(value).padStart(2, '0');
   return `${pad(Math.floor(seconds / 3600))}:${pad(Math.floor(seconds / 60) % 60)}:${pad(seconds % 60)}`;
 }
@@ -408,11 +418,29 @@ export function OperatorShiftV2() {
    * Ветер выше порога ответа не получает: там решает человек на площадке.
    */
 
+  /*
+    Несданная смена прошлых суток (D-20260930-001). Сервер считает фазу по
+    СЕГОДНЯШНИМ суткам: пока допуск на сегодня не пройден, это IDENTITY, и экран
+    застревал на приёме, хотя сдать надо вчерашнюю смену. Сервер принимает ЕО и
+    закрытие старой смены без сегодняшнего допуска, поэтому ведём её теми же
+    шагами, что и обычную сдачу: ЕО после работы → отчёт → закрытие.
+  */
+  const oldShift = mobile?.shift
+    && mobile.shift.productionDate < mobile.productionDate
+    && (mobile.shift.state === 'STARTED' || mobile.shift.state === 'HANDOVER_PENDING')
+    ? mobile.shift : null;
+  const oldShiftDate = oldShift ? oldShift.productionDate.split('-').reverse().join('.') : '';
+  const flowMobile = mobile && oldShift ? { ...mobile, phase: 'CLOSING' as const } : mobile;
   const postDone = mobile?.checklists.find((item) => item.stage === 'EO_AFTER')?.done ?? false;
   const state = facts
-    ? resolveV2State(facts, mobile?.phase ?? null, postDone, { accepted, finishing })
+    ? resolveV2State(facts, flowMobile?.phase ?? null, postDone, { accepted: accepted || Boolean(oldShift), finishing })
     : null;
-  const elapsed = useElapsed(facts?.shift?.startedAt ?? null);
+  // У несданной смены прошлых суток «время работы» растёт без предела и ничего не
+  // значит (72 часа и счёт идёт), поэтому для неё счётчик не показываем.
+  const elapsed = useElapsed(
+    oldShift ? null : facts?.shift?.startedAt ?? null,
+    mobile?.receipt?.closedAt ?? mobile?.receipt?.submittedAt ?? null,
+  );
 
   /**
    * Пока контур готовности держит машину — перечитываем факты.
@@ -517,31 +545,44 @@ export function OperatorShiftV2() {
    * и откажет раньше, чем это сделает экран. Вторая копия правила здесь рано
    * или поздно разошлась бы с первой и начала разрешать запрещённое.
    */
-  const submitChecklist = useCallback(async (stage: ChecklistStage, answers: ChecklistAnswer[]) => {
+  const submitChecklist = useCallback(async (stage: ChecklistStage, answers: ChecklistAnswer[], restoredCommandId?: string) => {
     const shiftId = mobile?.shift?.id ?? facts?.shift?.id;
     const equipmentId = mobile?.assignment?.equipmentId ?? facts?.equipment?.id;
     if (!shiftId || !equipmentId) {
       setChecklistError('Смена не найдена — осмотр не к чему приложить');
-      return;
+      return false;
     }
     setBusy(true);
     setChecklistError(null);
     try {
       await sendCommand({
         command: 'submit-checklist',
-        clientCommandId: checklistCommandId,
+        clientCommandId: restoredCommandId ?? checklistCommandId,
         shiftId,
         equipmentId,
         stage,
         answers,
       });
       setChecklistCommandId(crypto.randomUUID());
-      await Promise.all([loadMobile(), load()]);
     } catch (cause) {
-      setChecklistError(cause instanceof Error ? cause.message : 'Осмотр не принят');
+      if (!(cause instanceof QueuedOffline)) {
+        setChecklistError(cause instanceof Error ? cause.message : 'Осмотр не принят');
+        setBusy(false);
+        return false;
+      }
+      setChecklistCommandId(crypto.randomUUID());
+      toast.success(cause.message);
+      setBusy(false);
+      return true;
+    }
+    try {
+      await Promise.all([loadMobile(), load()]);
+    } catch {
+      toast.info('Осмотр принят. Не удалось обновить экран — нажмите «Обновить».');
     } finally {
       setBusy(false);
     }
+    return true;
   }, [mobile?.shift?.id, mobile?.assignment?.equipmentId, facts?.shift?.id, facts?.equipment?.id,
     checklistCommandId, loadMobile, load]);
 
@@ -555,12 +596,41 @@ export function OperatorShiftV2() {
   // Ключ переживает нажатие: двойное касание в перчатке не должно давать две
   // записи. Новый ключ — только после принятой записи.
   const [productionCommandId, setProductionCommandId] = useState(() => crypto.randomUUID());
+  // Причина отказа остаётся в открытой форме: всплывающее сообщение лежит под ней.
+  const [productionError, setProductionError] = useState<string | null>(null);
+  const correctProduction = useCallback(async (input: CorrectionInput) => {
+    const shiftId = mobile?.shift?.id ?? facts?.shift?.id;
+    if (!shiftId) {
+      setProductionError('Смена не найдена — записать некуда');
+      return false;
+    }
+    setProductionError(null);
+    setBusy(true);
+    try {
+      await sendCommand({command: 'correct-production', clientCommandId: productionCommandId, shiftId, ...input});
+      setProductionCommandId(crypto.randomUUID());
+      await loadMobile();
+      return true;
+    } catch (cause) {
+      if (cause instanceof QueuedOffline) {
+        setProductionCommandId(crypto.randomUUID());
+        toast.info(cause.message);
+        return true;
+      }
+      setProductionError(cause instanceof Error ? cause.message : 'Поправка не прошла');
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  }, [mobile?.shift?.id, facts?.shift?.id, productionCommandId, loadMobile]);
   const logProduction = useCallback(async (entry: ProductionEntryInput) => {
     const shiftId = mobile?.shift?.id ?? facts?.shift?.id;
     if (!shiftId) {
+      setProductionError('Смена не найдена — записать некуда');
       toast.error('Смена не найдена — записать некуда');
       return false;
     }
+    setProductionError(null);
     setBusy(true);
     try {
       await sendCommand({
@@ -581,12 +651,20 @@ export function OperatorShiftV2() {
         toast.info(cause.message);
         return true;
       }
-      toast.error(cause instanceof Error ? cause.message : 'Запись не прошла');
+      const message = cause instanceof Error ? cause.message : 'Запись не прошла';
+      setProductionError(message);
+      toast.error(message);
       return false;
     } finally {
       setBusy(false);
     }
   }, [mobile?.shift?.id, facts?.shift?.id, productionCommandId, loadMobile]);
+
+  const closeProductionSheets = () => {
+    setPileOpen(false); setPassportOpen(false); setDrillingOpen(false); setDowntimeOpen(false);
+    setProductionError(null);
+  };
+  const openSafetyFromSheet = () => { closeProductionSheets(); setTab('safety'); };
 
   /**
    * Принять машину.
@@ -708,6 +786,30 @@ export function OperatorShiftV2() {
     }
   }, [mobile?.shift?.id, facts?.shift?.id, loadMobile, load]);
 
+  /*
+    Смена прошлых суток не сдана (D-20260930-001). Сервер не открывает новую смену
+    на той же установке, пока старая не закрыта, и отвечает 409 «Сдайте её…».
+    Раньше причина мелькала всплывающим сообщением, а сдать было нечем: экран
+    приёмки стоял как есть. Теперь причина висит на экране вместе с кнопкой сдачи.
+  */
+  const [oldShiftError, setOldShiftError] = useState<string | null>(null);
+  const closeOldShift = async () => {
+    if (!oldShift) return;
+    setBusy(true);
+    setOldShiftError(null);
+    try {
+      await sendCommand({command: 'close-shift', shiftId: oldShift.id, comment: ''});
+      await Promise.all([loadMobile(), load()]);
+      toast.success(`Смена за ${oldShiftDate} сдана`);
+    } catch (cause) {
+      const reason = cause instanceof Error ? cause.message : 'Смена не сдана';
+      setOldShiftError(reason);
+      toast.error(reason);
+    } finally {
+      setBusy(false);
+    }
+  };
+
   if (safetyStep && mobile) {
     /*
       Шаги допуска показываются во весь экран поверх смены: у каждого свой
@@ -757,7 +859,12 @@ export function OperatorShiftV2() {
     );
   }
   if (!facts || !state) {
-    return <p className="p-8 text-center text-base text-muted-foreground">Смена недоступна</p>;
+    return (
+      <div className="mx-auto max-w-md space-y-4 p-8 text-center">
+        <p className="text-base text-muted-foreground">Смена недоступна</p>
+        <StepButton label="Повторить" onClick={() => void load()} />
+      </div>
+    );
   }
 
   const { step } = state;
@@ -776,7 +883,7 @@ export function OperatorShiftV2() {
     setPileOpen(false); setPassportOpen(false); setDrillingOpen(false); setDowntimeOpen(false);
     setSafetyStep(null); setTab('shift');
   };
-  const next = mobile ? nextStep(mobile) : null;
+  const next = flowMobile ? nextStep(flowMobile) : null;
   const focusNext = (target: 'accept' | 'checklist' | 'close') => {
     setNextFocus((previous) => ({target, count: (previous?.count ?? 0) + 1}));
   };
@@ -813,6 +920,11 @@ export function OperatorShiftV2() {
     },
   } : null;
   const nextNoticeNode = nextNotice ? <p role="status" className="p-3 text-sm text-muted-foreground">{nextNotice}</p> : null;
+  const oldShiftNotice = oldShift ? (
+    <p className="rounded-xl border border-warning/40 bg-warning/10 px-3 py-2 text-base text-warning-strong">
+      Сдача смены за {oldShiftDate}. Новую смену можно открыть после сдачи.
+    </p>
+  ) : null;
   // Одна кнопка внизу — на экранах без нижних вкладок.
   const stepBar = nextStepProps ? (
     <>
@@ -888,6 +1000,15 @@ export function OperatorShiftV2() {
             )
         ) : (
         <>
+        {oldShift ? (
+          <div className="space-y-2 rounded-xl border border-warning/40 bg-warning/10 px-3 py-3">
+            <p className="text-base text-warning-strong">
+              Не сдана смена за {oldShiftDate}. Пока она не сдана, новую смену на этой установке открыть нельзя.
+            </p>
+            {oldShiftError ? <p role="alert" className="text-base text-destructive">{oldShiftError}</p> : null}
+            <StepButton label={`Сдать смену за ${oldShiftDate}`} onClick={() => void closeOldShift()} busy={busy} />
+          </div>
+        ) : null}
         <ClearanceRow
           cleared={cleared}
           operatorName={user?.name?.trim() || 'Оператор'}
@@ -1023,7 +1144,10 @@ export function OperatorShiftV2() {
     }
     return (
       <StepShell bar={stepBar} screenRef={screenRef} title={V2_STEP_TITLE[step]} subtitle={stepLabel}>
+        {oldShiftNotice}
         <ChecklistScreen
+          draftUserId={user?.id}
+          draftShiftId={mobile?.shift?.id ?? facts.shift?.id}
           key={`${mobile.shift?.id}:${mobile.assignment?.equipmentId}:${list.stage}`}
           checklist={list}
           warnings={mobile.warnings}
@@ -1032,7 +1156,7 @@ export function OperatorShiftV2() {
           commandId={checklistCommandId}
           lastMeter={mobile.assignment?.lastMeter ?? null}
           known={knownAnswers(catalogStage, mobile)}
-          onSubmit={(answers) => void submitChecklist(catalogStage, answers)}
+          onSubmit={(answers, restoredCommandId) => submitChecklist(catalogStage, answers, restoredCommandId)}
         />
       </StepShell>
     );
@@ -1056,6 +1180,7 @@ export function OperatorShiftV2() {
             </button>
           ) : null}
           {tab === 'shift' && mobile && <OperatorWorkOverview state={mobile} variant="v2" busy={busy}
+            onCorrect={correctProduction} correctionError={productionError}
             onAction={(kind)=>{if(kind==='PILES')setPileOpen(true);else if(kind==='PASSPORT')setPassportOpen(true);else if(kind==='DRILLING')setDrillingOpen(true);else setDowntimeOpen(true);}}
             hideFinish={editingProduction}
             onIncident={()=>setTab('safety')} onDefect={()=>setDefectOpen(true)} onFinish={()=>setFinishing(true)} />}
@@ -1144,40 +1269,55 @@ export function OperatorShiftV2() {
         </StepShell>
 
         <PileSheet
+          draftUserId={user?.id}
+          draftShiftId={mobile?.shift?.id ?? facts.shift?.id}
           open={pileOpen}
           grades={grades}
           busy={busy}
-          onClose={() => setPileOpen(false)}
-          onAdd={(gradeId, count) => void (async () => {
-            if (await logProduction({ kind: 'PILES', pileGradeId: gradeId, count })) {
+          error={productionError}
+          onOpenSafety={openSafetyFromSheet}
+          onClose={closeProductionSheets}
+          onAdd={async (gradeId, count) => {
+            const accepted = await logProduction({ kind: 'PILES', pileGradeId: gradeId, count });
+            if (accepted) {
               setPileOpen(false);
               toast.success(`Записано: ${count} шт`);
             }
-          })()}
+            return accepted;
+          }}
         />
         <DrillingSheet
+          draftUserId={user?.id}
+          draftShiftId={mobile?.shift?.id ?? facts.shift?.id}
           open={drillingOpen}
           types={drillingTypes}
           busy={busy}
-          onClose={() => setDrillingOpen(false)}
-          onAdd={(typeId, count, metersPerUnit) => void (async () => {
-            if (await logProduction({ kind: 'DRILLING', typeId, count, metersPerUnit })) {
+          error={productionError}
+          onOpenSafety={openSafetyFromSheet}
+          onClose={closeProductionSheets}
+          onAdd={async (typeId, count, metersPerUnit) => {
+            const accepted = await logProduction({ kind: 'DRILLING', typeId, count, metersPerUnit });
+            if (accepted) {
               setDrillingOpen(false);
               toast.success(`Записано: ${count} скв`);
             }
-          })()}
+            return accepted;
+          }}
         />
         {passportOpen && (
           <div className="fixed inset-0 z-50 flex flex-col bg-background">
             <header className="flex items-center gap-2 border-b border-border bg-card px-3 py-3 text-foreground">
-              <button type="button" onClick={() => setPassportOpen(false)}
+              <button type="button" onClick={closeProductionSheets}
                 className="-ml-1 flex h-11 w-11 items-center justify-center rounded-lg text-signal-strong hover:bg-secondary">
                 ✕<span className="sr-only">Закрыть</span>
               </button>
               <p className="text-2xl font-semibold">Свая с паспортом</p>
             </header>
-            <div className="flex-1 overflow-y-auto p-4">
+            <div className="flex-1 space-y-3 overflow-y-auto p-4">
+              <SheetError message={productionError} onOpenSafety={openSafetyFromSheet} />
               <PilePassportForm
+                draftUserId={user?.id}
+                draftShiftId={mobile?.shift?.id ?? facts.shift?.id}
                 grades={grades}
                 busy={busy}
                 onSubmit={async (pileGradeId, passport) => {
@@ -1193,18 +1333,23 @@ export function OperatorShiftV2() {
           </div>
         )}
         <DowntimeSheet
+          draftUserId={user?.id}
+          draftShiftId={mobile?.shift?.id ?? facts.shift?.id}
           open={downtimeOpen}
           reasons={reasons}
           busy={busy}
-          onClose={() => setDowntimeOpen(false)}
-          onAdd={(reasonId, hours, comment) => void (async () => {
-            if (await logProduction({
+          error={productionError}
+          onClose={closeProductionSheets}
+          onAdd={async (reasonId, hours, comment) => {
+            const accepted = await logProduction({
               kind: 'DOWNTIME', reasonId, hours, comment: comment || undefined,
-            })) {
+            });
+            if (accepted) {
               setDowntimeOpen(false);
               toast.success('Простой записан');
             }
-          })()}
+            return accepted;
+          }}
         />
         <DefectSheet
           open={defectOpen}
@@ -1238,6 +1383,7 @@ export function OperatorShiftV2() {
           />
         }
       >
+        {oldShiftNotice}
         {unsent > 0 && (
           /*
             Записи, лежащие на телефоне, — те же выработка и простой. После
@@ -1326,13 +1472,8 @@ export function OperatorShiftV2() {
         />
       }
     >
-      <div className="pt-8 text-center">
-        <BigCheck tone="purple" />
-        <p className="mt-4 text-xl font-bold text-foreground">Спасибо!</p>
-        <p className="mt-1 text-base text-muted-foreground">Смена успешно завершена</p>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Смена закрыта, отчёт отправлен диспетчеру
-        </p>
+      <div className="pt-4">
+        <ShiftThanks operatorName={mobile?.operator?.name ?? user?.name} />
       </div>
       {/* Итог смены показываем здесь же: уводить за ним на чужой экран истории
           значит выкидывать человека из модуля на последнем шаге. */}

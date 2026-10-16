@@ -45,7 +45,13 @@ export async function listEquipmentChecklistHistory(input: {
     db.operatorChecklistAnswerRecord.groupBy({
       by: ['executionId', 'result'],
       _count: {_all: true},
-      where: {tenantId: input.tenantId, executionId: {in: executions.map((item) => item.id)}},
+      // «Долил за смену» (`topup-*`) — запись литров, а не вердикт осмотра: в «норму»
+      // он не считается.
+      where: {
+        tenantId: input.tenantId,
+        executionId: {in: executions.map((item) => item.id)},
+        NOT: {itemId: {startsWith: 'topup-'}},
+      },
     }),
     db.user.findMany({
       where: {tenantId: input.tenantId, id: {in: [...new Set(executions.map((item) => item.startedById))]}},

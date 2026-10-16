@@ -14,6 +14,7 @@
  */
 
 import { db } from '@/lib/db';
+import type { Prisma } from '@/generated/postgres-client/client';
 // eslint-disable-next-line no-restricted-imports -- legacy cross-layer import pending the parked services<->modules migration (CLAUDE.md); behavior-neutral
 import { ReportDomainEvent } from '@/modules/reports/domain';
 import { logger } from '@/lib/logger';
@@ -98,8 +99,7 @@ async function consumeOutboxEvents(
         { nextRetryAt: null },
         { nextRetryAt: { lte: now } },
       ],
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
-    } as any,
+    } satisfies Prisma.OutboxEventWhereInput,
     orderBy: { createdAt: 'asc' },
     take: BATCH_SIZE,
   });
@@ -154,13 +154,11 @@ async function consumeOutboxEvents(
       // throwing P2025, which would otherwise land in the catch below and
       // re-schedule retry for an event that's already been processed.
       const claim = await db.outboxEvent.updateMany({
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
-        where: { id: outboxEvent.id, [consumerColumn]: false } as any,
+        where: { id: outboxEvent.id, [consumerColumn]: false } satisfies Prisma.OutboxEventWhereInput,
         data: {
           [consumerColumn]: true,
           ...(consumerColumn === 'published' ? { publishedAt: new Date() } : {}),
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
-        } as any,
+        } satisfies Prisma.OutboxEventUpdateManyMutationInput,
       });
 
       if (claim.count > 0) {
@@ -204,8 +202,7 @@ async function consumeOutboxEvents(
             lastError: `Moved to DLQ: ${errorMessage.substring(0, 500)}`,
             [consumerColumn]: true,
             ...(consumerColumn === 'published' ? { publishedAt: new Date() } : {}),
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
-          } as any,
+          } satisfies Prisma.OutboxEventUpdateInput,
         });
       } else {
         // Schedule next retry with exponential backoff

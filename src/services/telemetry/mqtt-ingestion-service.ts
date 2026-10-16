@@ -104,8 +104,7 @@ async function handleTelemetryMessage(topic: string, payload: Buffer): Promise<v
     }
 
     await ingestTelemetry({
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- telemetry enum/Prisma cast at the ingestion boundary
-      type: message.type as any,
+      type: message.type,
       tenantId: equipment.tenantId,
       equipmentId,
       siteId: (message.metadata?.siteId as string) ?? undefined,

@@ -725,4 +725,8 @@ seed()
   })
   .finally(async () => {
     await Promise.all([db.$disconnect(), serviceDb.$disconnect()]);
+    // Разовый скрипт: модули приложения, подтянутые импортами, держат соединение
+    // с Redis открытым, и без явного выхода процесс висит после «Seed complete»
+    // (CI E2E 13.10.2026 упирался в таймаут шага).
+    process.exit(process.exitCode ?? 0);
   });

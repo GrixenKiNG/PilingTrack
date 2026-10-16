@@ -45,6 +45,17 @@ function snapshot(overrides: Partial<CurrentReadinessDto> = {}): CurrentReadines
 }
 
 describe('buildAuthoritativeReadinessPresentation', () => {
+  it.each([
+    ['WORK_DONE', false, 'Закрыт после работ'],
+    ['VALIDITY_ELAPSED', true, 'Срок вышел — наряд закрыт'],
+  ] as const)('distinguishes closed permit reason %s', (permitCloseReason, permitExpired, value) => {
+    const result = buildAuthoritativeReadinessPresentation(snapshot({
+      facts: {...facts, permitValid: false, permitExpired, permitCloseReason},
+    }));
+    expect(result.mode).toBe('authoritative');
+    expect(result.stages.find((stage) => stage.key === 'PERMIT')).toMatchObject({value, state: 'fail'});
+  });
+
   it('hides the current verdict and score for equipment taken out of service', () => {
     const current = {...snapshot(), equipmentActive: false};
     const result = buildAuthoritativeReadinessPresentation(current);

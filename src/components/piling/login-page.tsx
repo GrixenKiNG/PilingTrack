@@ -24,10 +24,18 @@ export function LoginPage() {
     return () => clearInterval(id);
   }, []);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
-    if (!email || !password) {
+    // Берём то, что стоит в полях сейчас, а не только состояние React: менеджер
+    // паролей или быстрый ввод на медленном телефоне кладут текст в поле раньше,
+    // чем страница «оживает», и состояние остаётся пустым при заполненной форме
+    // (QA D-20261006-001: «Заполните email и пароль» при заполненных полях).
+    const fields = e.currentTarget.elements;
+    const typedEmail = (fields.namedItem('email') as HTMLInputElement | null)?.value ?? email;
+    const typedPassword = (fields.namedItem('password') as HTMLInputElement | null)?.value ?? password;
+
+    if (!typedEmail || !typedPassword) {
       toast.error('Заполните email и пароль');
       return;
     }
@@ -39,7 +47,7 @@ export function LoginPage() {
       res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email.trim().toLowerCase(), password }),
+        body: JSON.stringify({ email: typedEmail.trim().toLowerCase(), password: typedPassword }),
       });
     } catch {
       // Браузер сам пишет «Failed to fetch» — человеку это ни о чём (аудит R41).

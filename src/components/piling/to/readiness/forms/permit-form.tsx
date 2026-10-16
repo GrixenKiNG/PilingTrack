@@ -8,8 +8,9 @@ import {
 import { Button } from '@/components/ui/button';
 import { authFetch } from '@/lib/api';
 import { cn } from '@/lib/utils';
+import { formatDateTimeInTimezone } from '@/lib/timezone';
 import { card } from '../settings/shared-ui';
-import type { ReadinessBootstrap } from '../api/contracts';
+import type { ReadinessBootstrap, WorkPermitDto } from '../api/contracts';
 import type { FleetCard } from '@/components/piling/admin-equipment/fleet-types';
 import type { EquipmentOption } from '../../to-module-bits';
 import { commandFailure } from '../screens/shared';
@@ -105,6 +106,7 @@ const todayInTenant = (timezone: string) => {
 };
 
 interface PermitFormProps {
+  initialPermit?: WorkPermitDto | null;
   equipment: EquipmentOption[];
   /** Карточки техники — единственный источник фотографии установки. */
   fleetCards: FleetCard[];
@@ -115,29 +117,38 @@ interface PermitFormProps {
 }
 
 export function PermitForm({
-  equipment, fleetCards, selectedEquipmentId, bootstrap, onCancel, onCreated,
+  equipment, fleetCards, selectedEquipmentId, bootstrap, onCancel, onCreated, initialPermit,
 }: PermitFormProps) {
-  const timezone = bootstrap?.tenant.timezone ?? 'Europe/Moscow';
+  const timezone = initialPermit?.timezone ?? bootstrap?.tenant.timezone ?? 'Europe/Moscow';
+  const scopeLimit = initialPermit ? 4000 : SCOPE_LIMIT;
+  const initialDateTime = (value: string) => {
+    const parts = Object.fromEntries(new Intl.DateTimeFormat('en-CA', {
+      timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+    }).formatToParts(new Date(value)).map((part) => [part.type, part.value]));
+    return {date: `${parts.year}-${parts.month}-${parts.day}`, time: `${parts.hour}:${parts.minute}`};
+  };
   const [options, setOptions] = useState<FormOptions | null>(null);
   const [optionsError, setOptionsError] = useState<string | null>(null);
+  const [optionsAttempt, setOptionsAttempt] = useState(0);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [workTypeId, setWorkTypeId] = useState<string | null>(null);
-  const [risk, setRisk] = useState<'NORMAL' | 'ELEVATED'>('NORMAL');
-  const [equipmentId, setEquipmentId] = useState(selectedEquipmentId);
-  const [location, setLocation] = useState('');
-  const [objectName, setObjectName] = useState('');
-  const [title, setTitle] = useState('');
-  const [scope, setScope] = useState('');
-  const [hazards, setHazards] = useState<string[]>([]);
-  const [dateFrom, setDateFrom] = useState(() => todayInTenant(timezone));
-  const [timeFrom, setTimeFrom] = useState('08:00');
-  const [dateTo, setDateTo] = useState(() => todayInTenant(timezone));
-  const [timeTo, setTimeTo] = useState('17:00');
-  const [producer, setProducer] = useState<{ userId: string | null; name: string }>({ userId: null, name: '' });
-  const [observer, setObserver] = useState<{ userId: string | null; name: string }>({ userId: null, name: '' });
-  const [safety, setSafety] = useState<{ userId: string | null; name: string }>({ userId: null, name: '' });
+  const [workTypeId, setWorkTypeId] = useState<string | null>(initialPermit?.workTypeId ?? null);
+  const [risk, setRisk] = useState<'NORMAL' | 'ELEVATED'>(initialPermit?.risk ?? 'NORMAL');
+  const [equipmentId, setEquipmentId] = useState(initialPermit?.equipmentId ?? selectedEquipmentId);
+  const [location, setLocation] = useState(initialPermit?.location ?? '');
+  const [objectName, setObjectName] = useState(initialPermit?.objectName ?? '');
+  const [title, setTitle] = useState(initialPermit?.title ?? '');
+  const [scope, setScope] = useState(initialPermit?.scope ?? '');
+  const [hazards, setHazards] = useState<string[]>(initialPermit?.hazards ?? []);
+  const [dateFrom, setDateFrom] = useState(() => initialPermit ? initialDateTime(initialPermit.validFrom).date : todayInTenant(timezone));
+  const [timeFrom, setTimeFrom] = useState(() => initialPermit ? initialDateTime(initialPermit.validFrom).time : '08:00');
+  const [dateTo, setDateTo] = useState(() => initialPermit ? initialDateTime(initialPermit.validTo).date : todayInTenant(timezone));
+  const [timeTo, setTimeTo] = useState(() => initialPermit ? initialDateTime(initialPermit.validTo).time : '17:00');
+  const [producer, setProducer] = useState<{ userId: string | null; name: string }>({ userId: initialPermit?.producerUserId ?? null, name: initialPermit?.producerName ?? '' });
+  const [observer, setObserver] = useState<{ userId: string | null; name: string }>({ userId: initialPermit?.observerUserId ?? null, name: initialPermit?.observerName ?? '' });
+  const [safety, setSafety] = useState<{ userId: string | null; name: string }>({ userId: initialPermit?.safetyUserId ?? null, name: initialPermit?.safetyName ?? '' });
 
   useEffect(() => {
     let cancelled = false;
@@ -152,7 +163,7 @@ export function PermitForm({
       })
       .catch(() => { if (!cancelled) setOptionsError('Не удалось загрузить справочники формы.'); });
     return () => { cancelled = true; };
-  }, []);
+  }, [optionsAttempt]);
 
   const workType = options?.workTypes.find((item) => item.id === workTypeId) ?? null;
 
@@ -183,7 +194,7 @@ export function PermitForm({
   const ready = Boolean(
     workTypeId && equipmentId
     && title.trim().length >= 3 && title.length <= TITLE_LIMIT
-    && scope.trim().length >= 3 && scope.length <= SCOPE_LIMIT
+    && scope.trim().length >= 3 && scope.length <= scopeLimit
     && location.trim().length >= 2
     && producer.name.trim().length > 0
     && validFrom && validTo && !periodInvalid,
@@ -209,11 +220,14 @@ export function PermitForm({
     setPending(true);
     setError(null);
 
-    const created = await authFetch('/api/readiness/work-permits', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', 'idempotency-key': crypto.randomUUID() },
+    const created = await authFetch(initialPermit ? `/api/readiness/work-permits/${initialPermit.id}` : '/api/readiness/work-permits', {
+      method: initialPermit ? 'PATCH' : 'POST',
+      headers: { 'content-type': 'application/json', 'idempotency-key': crypto.randomUUID(),
+        ...(initialPermit ? {'if-match': `"work-permit-${initialPermit.id}-v${initialPermit.version}"`} : {}),
+      },
       body: JSON.stringify({
-        equipmentId, shiftId: null, workTypeId, risk,
+        equipmentId, workTypeId, risk,
+        ...(initialPermit ? {expectedVersion: initialPermit.version} : {shiftId: null}),
         title: title.trim(), scope: scope.trim(),
         location: location.trim(), objectName: objectName.trim(),
         hazards,
@@ -254,7 +268,7 @@ export function PermitForm({
       onCreated();
       return;
     }
-    toast.success('Наряд создан и отправлен на согласование');
+    toast.success(initialPermit ? 'Наряд исправлен и отправлен на согласование' : 'Наряд создан и отправлен на согласование');
     onCreated();
   };
 
@@ -268,8 +282,8 @@ export function PermitForm({
 
   return (
     <FormPage
-      title="Создание наряда-допуска"
-      subtitle="Оформите наряд-допуск на выполнение работ"
+      title={initialPermit ? 'Исправление наряда-допуска' : 'Создание наряда-допуска'}
+      subtitle={initialPermit ? 'Исправьте замечания и отправьте наряд повторно' : 'Оформите наряд-допуск на выполнение работ'}
       onBack={onCancel}
       footer={<>
         <Button type="button" variant="ghost" className="min-h-11" disabled={pending} onClick={onCancel}>
@@ -281,14 +295,18 @@ export function PermitForm({
         </Button>
         <Button type="button" className="min-h-11 bg-signal-strong hover:bg-signal-strong"
           disabled={pending || !ready} onClick={() => void submit(true)}>
-          {pending ? 'Сохраняем…' : 'Создать наряд'}
+          {pending ? 'Сохраняем…' : initialPermit ? 'Сохранить и отправить' : 'Создать наряд'}
         </Button>
       </>}
     >
+      {initialPermit?.rejectedAt && <p className={cn(card, 'border-destructive/40 p-3 text-xs text-destructive-strong')}>
+        Причина отказа: {initialPermit.rejectReason} · {bootstrap?.selectors.actors.find((actor) => actor.id === initialPermit.rejectedById)?.name ?? initialPermit.rejectedById} · {formatDateTimeInTimezone(initialPermit.rejectedAt, timezone)}
+      </p>}
       {optionsError && (
-        <p role="alert" className={cn(card, 'border-destructive/40 bg-destructive/10 p-3 text-xs text-destructive-strong')}>
+        <div role="alert" className={cn(card, 'border-destructive/40 bg-destructive/10 p-3 text-xs text-destructive-strong')}>
           {optionsError}
-        </p>
+          <Button type="button" variant="outline" className="ml-3 min-h-11" onClick={() => { setOptionsError(null); setOptionsAttempt((attempt) => attempt + 1); }}>Повторить</Button>
+        </div>
       )}
 
       <FormSection title="Тип работ">
@@ -375,7 +393,7 @@ export function PermitForm({
             placeholder="Например: Сварочные работы по ремонту гидравлики" />
         </Field>
         <Field label="Описание работ" required htmlFor="permit-scope">
-          <CountedField id="permit-scope" value={scope} onChange={setScope} limit={SCOPE_LIMIT} multiline
+          <CountedField id="permit-scope" value={scope} onChange={setScope} limit={scopeLimit} multiline
             placeholder="Состав и границы работ: что именно делается и где заканчивается" />
         </Field>
         <Field label="Опасные факторы"

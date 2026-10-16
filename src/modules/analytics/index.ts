@@ -1,9 +1,8 @@
 /**
- * Analytics Module — DDD Bounded Context
+ * Analytics Module — публичный вход.
  *
- * Re-exports from services layer during migration.
- * Future: Move to full DDD structure (domain/application/infrastructure).
+ * Запросы живут в `application/queries/`; снаружи импортируют только отсюда
+ * (`@/modules/analytics`). Модуль зависит только от `@/lib` и `@/lib/db`.
  */
-
-// eslint-disable-next-line no-restricted-imports -- intentional public re-export facade; implementation stays in services/ until the services->modules migration completes (CLAUDE.md)
-export { getSiteAnalytics } from '@/services/analytics/site-analytics-service';
+export { getSiteAnalytics, type SiteAnalyticsOptions } from './application/queries/site-analytics-service';
+export { getEquipmentAnalytics, type EquipmentAnalyticsParams } from './application/queries/equipment-analytics-service';

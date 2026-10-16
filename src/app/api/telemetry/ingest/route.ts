@@ -27,7 +27,7 @@ import { getRequestId, createJsonResponse } from '@/lib/request-context';
 import { rateLimiter, getRateLimitIdentifier } from '@/lib/rate-limiter';
 import { withApi, readJsonBody } from '@/core/api-wrapper';
 import { setRequestTenantId } from '@/core/security/tenant-context';
-import { authenticateDeviceByKey } from '@/services/telemetry/device-key-service';
+import { authenticateDeviceByKey } from '@/modules/telemetry';
 
 export const runtime = 'nodejs';
 

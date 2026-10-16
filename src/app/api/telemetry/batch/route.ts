@@ -3,7 +3,7 @@ import { requireTenantId } from '@/lib/tenant';
 import { requireAuth } from '@/lib/auth';
 import { withCsrf } from '@/lib/csrf-protection';
 import { rateLimiter, getRateLimitIdentifier } from '@/lib/rate-limiter';
-import { ingestTelemetryBatch, telemetryBuffer, findForeignEquipmentIds } from '@/services/telemetry/telemetry-ingestion-service';
+import { ingestTelemetryBatch, telemetryBuffer, findForeignEquipmentIds } from '@/modules/telemetry';
 import { databaseCircuitBreaker, CircuitOpenError } from '@/core/infrastructure/circuit-breakers';
 import { logger } from '@/lib/logger';
 import { withApi, readJsonBody } from '@/core/api-wrapper';
@@ -139,15 +139,13 @@ export const POST = withApi(async (request: NextRequest) => {
       validated.data.map((d) => ({
         ...d,
         tenantId,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- telemetry enum/Prisma cast at the ingestion boundary
-        type: d.type as any,
         siteId: d.siteId ?? undefined,
         unit: d.unit ?? undefined,
         latitude: d.latitude ?? undefined,
         longitude: d.longitude ?? undefined,
         metadata: d.metadata ?? undefined,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- telemetry enum/Prisma cast at the ingestion boundary
-      })) as any
+        timestamp: d.timestamp ? new Date(d.timestamp) : undefined,
+      }))
     );
 
     return NextResponse.json({

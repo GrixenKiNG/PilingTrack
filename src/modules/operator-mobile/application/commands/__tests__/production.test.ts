@@ -159,6 +159,7 @@ describe('logProduction — след записи выработки в исто
     pileGrade: {findFirst: vi.fn()},
     pileWork: {findUnique: vi.fn(), create: vi.fn()},
     reportAudit: {create: vi.fn()},
+    user: {findFirst: vi.fn().mockResolvedValue({name: 'Иванов', role: 'OPERATOR'})},
   };
 
   const pilesInput = {
@@ -212,6 +213,7 @@ describe('logProduction — след записи выработки в исто
     expect(data).toEqual(expect.objectContaining({
       reportId: 'RM-shift-12-2026-09-26',
       actorId: 'operator-a',
+      actorName: 'Иванов', actorRole: 'OPERATOR',
       action: 'updated',
       diff: {'Выработка': {old: null, new: 'сваи: +2 шт (С 120.30)'}},
     }));
@@ -247,6 +249,7 @@ describe('logProduction — после завершения работы выр�
     reportDowntime: {findUnique: vi.fn(), findMany: vi.fn(), create: vi.fn()},
     downtimeReason: {findFirst: vi.fn()},
     reportAudit: {create: vi.fn()},
+    user: {findFirst: vi.fn().mockResolvedValue({name: 'Иванов', role: 'OPERATOR'})},
   };
 
   const shiftRow = (state: string) => ({

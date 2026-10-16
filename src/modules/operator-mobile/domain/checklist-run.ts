@@ -43,6 +43,23 @@ export function validateChecklistRun(
 
   for (const item of items) {
     const answer = byItem.get(item.id);
+
+    // «Долил за смену»: необязательный замер без вердикта. Нет значения — не доливал;
+    // есть — оно обязано быть числом в границах. Описание и фото к нему не нужны.
+    if (item.topUp && item.measure) {
+      const raw = answer?.measures?.[item.measure.key];
+      if (raw === undefined || raw === null) continue;
+      const {min = 0, max, label, unit} = item.measure;
+      if (!Number.isFinite(raw) || raw < min || (max !== undefined && raw > max)) {
+        problems.push({
+          itemId: item.id,
+          message: `${item.text}: допустимо от ${min} до ${max ?? '∞'} ${unit}`,
+          label: item.text || label,
+        });
+      }
+      continue;
+    }
+
     if (!answer) {
       problems.push({itemId: item.id, message: 'Пункт не заполнен', label: item.text});
       continue;

@@ -2,6 +2,7 @@
 
 import {ChecklistScreen as SharedChecklistScreen} from '../screens/checklist-screen';
 import {useState} from 'react';
+import {useLocalFormDraft} from '../use-local-form-draft';
 import type {
   ChecklistAnswer, ChecklistStage, ChecklistView, IncidentSign, OperatorMobileState,
 } from '@/modules/operator-mobile/contracts';
@@ -108,13 +109,16 @@ export function AcceptFlow({state, busy, onAccept, onBack}: {
  * подписывать нечем. Замер спрашиваем только там, где он обязателен при
  * выбранном ответе (`measureRequired`) — долив масла при «норме» не нужен.
  */
-export function ChecklistFlow({checklist, busy, lastMeter, onSubmit, onBack, commandId, warnings}: {
+export function ChecklistFlow({checklist, busy, lastMeter, onSubmit, onBack, commandId, warnings, draftUserId, draftShiftId}: {
   checklist: ChecklistView; busy: boolean; warnings: OperatorMobileState['warnings'];
   lastMeter: {engineHours: number; recordedAt: string} | null;
-  onSubmit: (answers: ChecklistAnswer[]) => void; onBack: () => void; commandId: string;
+  onSubmit: (answers: ChecklistAnswer[], restoredCommandId?: string) => void | boolean | Promise<boolean | void>; onBack: () => void; commandId: string;
+  draftUserId?: string;
+  draftShiftId?: string;
 }) {
   return <div className="oc-inspection"><SharedChecklistScreen checklist={checklist} busy={busy}
-    lastMeter={lastMeter} onSubmit={onSubmit} onBack={onBack} commandId={commandId} error={null} warnings={warnings} /></div>;
+    lastMeter={lastMeter} onSubmit={onSubmit} onBack={onBack} commandId={commandId} error={null} warnings={warnings}
+    draftUserId={draftUserId} draftShiftId={draftShiftId} /></div>;
 }
 
 /* ------------------------------------------------------------ выработка --- */
@@ -152,13 +156,16 @@ export function ProductionFlow({state, busy, kind, onSubmit, onBack}: {
     пишем, что нужно выбрать. Единственное исключение — справочник из одной
     записи: там выбора нет, и подставлять её безопасно.
   */
-  const [id, setId] = useState(options.length === 1 ? options[0].id : '');
+  const localDraft = useLocalFormDraft(state.operator?.id, state.shift?.id && `production:v7:${state.shift.id}:${kind}`, {
+    id: options.length === 1 ? options[0].id : '', amount: '', hoursText: '', meters: '', comment: '',
+  });
+  const [id, setId] = localDraft.field('id');
   const pickLabel = kind === 'DOWNTIME' ? 'Выберите причину простоя'
     : kind === 'DRILLING' ? 'Выберите тип бурения' : 'Выберите марку сваи';
-  const [amount, setAmount] = useState('');
-  const [hoursText, setHoursText] = useState('');
-  const [meters, setMeters] = useState('');
-  const [comment, setComment] = useState('');
+  const [amount, setAmount] = localDraft.field('amount');
+  const [hoursText, setHoursText] = localDraft.field('hoursText');
+  const [meters, setMeters] = localDraft.field('meters');
+  const [comment, setComment] = localDraft.field('comment');
 
   const value = Number(amount);
   const metersValue = Number(meters);
@@ -173,20 +180,20 @@ export function ProductionFlow({state, busy, kind, onSubmit, onBack}: {
         && (kind !== 'DRILLING' || (Number.isFinite(metersValue) && metersValue > 0))
   );
 
-  const submit = () => {
+  const submit = async () => {
     if (kind === 'PILES') {
-      onSubmit({kind: 'PILES', pileGradeId: id, count: value, ...(comment ? {comment} : {})});
+      if (await onSubmit({kind: 'PILES', pileGradeId: id, count: value, ...(comment ? {comment} : {})})) localDraft.clear();
       return;
     }
     if (kind === 'DRILLING') {
-      onSubmit({kind: 'DRILLING', typeId: id, count: value, metersPerUnit: metersValue});
+      if (await onSubmit({kind: 'DRILLING', typeId: id, count: value, metersPerUnit: metersValue})) localDraft.clear();
       return;
     }
     if (downtimeHours === null) return;
-    onSubmit({
+    if (await onSubmit({
       kind: 'DOWNTIME', reasonId: id, hours: downtimeHours,
       ...(comment ? {comment} : {}),
-    });
+    })) localDraft.clear();
   };
 
   if (options.length === 0) {
@@ -215,6 +222,8 @@ export function ProductionFlow({state, busy, kind, onSubmit, onBack}: {
         </Title>
         <div className="body">
           <PilePassportForm
+            draftUserId={state.operator?.id}
+            draftShiftId={state.shift?.id}
             grades={pileGrades}
             busy={busy}
             onSubmit={async (pileGradeId, passport) => onSubmit({

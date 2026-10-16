@@ -50,4 +50,15 @@ describe('история чек-листов машиниста по устан�
     });
     expect(rows[1]).toMatchObject({label: 'Предсменный осмотр', performerName: null, counts: {ok: 0, remark: 0, fault: 0, na: 0}});
   });
+  it('не считает «долил за смену» нормой: ответы пунктов topup-* в счёт не идут', async () => {
+    database.operatorChecklistExecution.findMany.mockResolvedValue([
+      {id: 'e1', shiftId: 's1', startedById: 'u1', completedAt: done, template: {templateKey: 'EO_AFTER'}},
+    ]);
+    database.operatorChecklistAnswerRecord.groupBy.mockResolvedValue([]);
+
+    await listEquipmentChecklistHistory({tenantId: 't', equipmentId: 'eq-1'});
+
+    const args = database.operatorChecklistAnswerRecord.groupBy.mock.calls[0][0];
+    expect(args.where).toMatchObject({tenantId: 't', NOT: {itemId: {startsWith: 'topup-'}}});
+  });
 });

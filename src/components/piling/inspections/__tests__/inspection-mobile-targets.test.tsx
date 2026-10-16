@@ -12,7 +12,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { toast } from 'sonner';
 
-const mocks = vi.hoisted(() => ({ authFetch: vi.fn(), loadJson: vi.fn(), searchParams: '' }));
+const mocks = vi.hoisted(() => ({ authFetch: vi.fn(), loadJson: vi.fn(), searchParams: '', user: null as {id: string; name: string} | null }));
 
 vi.mock('@/lib/api', () => ({ authFetch: mocks.authFetch, loadJson: mocks.loadJson }));
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
@@ -21,7 +21,7 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(mocks.searchParams),
 }));
 vi.mock('@/lib/store', () => ({
-  usePilingStore: (selector: (state: { currentUser: null }) => unknown) => selector({ currentUser: null }),
+  usePilingStore: (selector: (state: { currentUser: typeof mocks.user }) => unknown) => selector({ currentUser: mocks.user }),
 }));
 
 import { DoneControl, MeasureControl, Status4Control, YesNoControl } from '../inspection-controls';
@@ -67,6 +67,8 @@ async function renderInspection(templateSnapshot: unknown[]) {
 }
 
 beforeEach(() => {
+  window.localStorage.clear();
+  mocks.user = null;
   mocks.authFetch.mockReset();
   mocks.loadJson.mockReset();
   mocks.searchParams = '';
@@ -91,6 +93,71 @@ describe('контролы ответа осмотра: цель нажатия 
 });
 
 describe('экран осмотра: цель нажатия на телефоне (R73)', () => {
+  it('блокирует изменение ответов и подписи во время завершения осмотра', async () => {
+    mocks.user = {id: 'operator', name: 'Машинист'};
+    let finishSave: ((response: Response) => void) | undefined;
+    mocks.authFetch.mockImplementation(async (_url: string, init?: RequestInit) => {
+      if (init?.method === 'PUT') return new Promise<Response>((resolve) => {finishSave = resolve;});
+      return json({inspection: detail([item('i1', 'Двигатель', 'YES_NO')])});
+    });
+    render(<RunInspection inspectionId="insp-1" />);
+    fireEvent.click(await screen.findByRole('button', {name: 'Да'}));
+    fireEvent.click(screen.getByRole('button', {name: 'Завершить осмотр'}));
+    fireEvent.click(screen.getByRole('button', {name: 'Подтвердить'}));
+    await waitFor(() => expect(finishSave).toBeTypeOf('function'));
+    expect(screen.getByRole('button', {name: 'Нет'})).toBeDisabled();
+    expect(screen.getByRole('textbox', {name: 'Подписал'})).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', {name: 'Нет'}));
+    finishSave?.(json({ok: true}));
+    await waitFor(() => expect(mocks.authFetch).toHaveBeenCalledWith('/api/inspections/insp-1/complete', expect.objectContaining({method: 'POST'})));
+    expect(screen.getByRole('button', {name: 'Нет'})).not.toHaveClass('border-destructive');
+    expect(Object.keys(window.localStorage).filter((key) => key.startsWith('pilingtrack:form-draft:'))).toEqual([]);
+  });
+  it('сохраняет ввод, изменённый во время медленного PUT, в том числе после перезагрузки', async () => {
+    mocks.user = {id: 'operator', name: 'Машинист'};
+    let finishSave: ((response: Response) => void) | undefined;
+    mocks.authFetch.mockImplementation(async (_url: string, init?: RequestInit) => {
+      if (init?.method === 'PUT') return new Promise<Response>((resolve) => {finishSave = resolve;});
+      return json({inspection: detail([item('i1', 'Двигатель', 'YES_NO')])});
+    });
+    const view = render(<RunInspection inspectionId="insp-1" />);
+    fireEvent.click(await screen.findByRole('button', {name: 'Да'}));
+    fireEvent.click(screen.getByRole('button', {name: /Сохранить черновик/}));
+    await waitFor(() => expect(finishSave).toBeTypeOf('function'));
+    fireEvent.click(screen.getByRole('button', {name: 'Нет'}));
+    finishSave?.(json({ok: true}));
+    await waitFor(() => expect(screen.getByRole('button', {name: /Сохранить черновик/})).toBeEnabled());
+    expect(screen.getByRole('button', {name: 'Нет'})).toHaveClass('border-destructive');
+    view.unmount();
+    render(<RunInspection inspectionId="insp-1" />);
+    await screen.findByRole('button', {name: 'Нет'});
+    expect(screen.getByRole('button', {name: 'Нет'})).toHaveClass('border-destructive');
+  });
+  it('восстанавливает несохранённый ответ после перезагрузки и удаляет локальную копию после PUT', async () => {
+    mocks.user = {id: 'operator', name: 'Машинист'};
+    mocks.authFetch.mockImplementation(async () => json({inspection: detail([item('i1', 'Двигатель', 'YES_NO')])}));
+    const view = render(<RunInspection inspectionId="insp-1" />);
+    fireEvent.click(await screen.findByRole('button', {name: 'Да'}));
+    view.unmount();
+    render(<RunInspection inspectionId="insp-1" />);
+    await screen.findByRole('button', {name: 'Да'});
+    expect(screen.getByText(/заполнено 1 из 1/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', {name: /Сохранить черновик/}));
+    await waitFor(() => expect(mocks.authFetch).toHaveBeenCalledWith('/api/inspections/insp-1', expect.objectContaining({method: 'PUT'})));
+    await waitFor(() => expect(Object.keys(window.localStorage).filter((key) => key.startsWith('pilingtrack:form-draft:'))).toEqual([]));
+  });
+  it('shows completeness instead of a score until all required items are answered', async () => {
+    await renderInspection([item('i1', 'Двигатель', 'YES_NO'), item('i2', 'Двигатель', 'STATUS4')]);
+    const score = screen.getByText('Оценка состояния').parentElement;
+    expect(score).toHaveTextContent('—');
+    expect(score).toHaveTextContent('заполнено 0 из 2');
+    fireEvent.click(screen.getByRole('button', {name: 'Да'}));
+    expect(score).toHaveTextContent('—');
+    expect(score).toHaveTextContent('заполнено 1 из 2');
+    fireEvent.click(screen.getByRole('button', {name: 'Исправно'}));
+    expect(score).toHaveTextContent('100');
+    expect(score).toHaveTextContent('заполнено 2 из 2');
+  });
   it('шаги разделов, возврат и «+ замечание / фото» — не ниже 44px', async () => {
     await renderInspection([item('i1', 'Двигатель', 'YES_NO'), item('i2', 'Гидравлика', 'STATUS4')]);
 

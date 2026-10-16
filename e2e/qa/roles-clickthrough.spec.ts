@@ -16,7 +16,8 @@ for (const acc of ACCOUNTS) {
   test(`роль ${acc.role}: навигация и кнопки`, async ({ page }) => {
     // У администратора разделов в несколько раз больше, чем у любой роли:
     // 28.09 его обход упёрся в общий лимит 10 мин и не дошёл до конца.
-    if (acc.role === 'ADMIN') test.setTimeout(40 * 60_000);
+    // Диспетчер видит почти те же разделы: 15.10 его обход упёрся в тот же лимит.
+    if (acc.role === 'ADMIN' || acc.role === 'DISPATCHER') test.setTimeout(40 * 60_000);
     const errs = watchErrors(page);
     const ctx = { role: acc.role, version: '-', module: 'навигация' };
     try {

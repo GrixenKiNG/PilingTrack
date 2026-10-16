@@ -15,6 +15,7 @@ import {NextRequest, NextResponse} from 'next/server';
 import {z} from 'zod';
 import {withApi, withMutation} from '@/core/api-wrapper';
 import {requireAuth} from '@/lib/auth';
+import {authFailureResponse} from '@/lib/auth-failure';
 import {assertCan} from '@/services/auth/authorization-service';
 import {db} from '@/lib/db';
 import {recordAuditEvent} from '@/services/audit/audit-service';
@@ -25,7 +26,7 @@ const PAGE_SIZE = 100;
 
 export const GET = withApi(async (request: NextRequest) => {
   const {user, error} = await requireAuth(request);
-  if (error || !user) return NextResponse.json({error: 'Войдите в систему'}, {status: 401});
+  if (error || !user) return authFailureResponse(error);
   assertCan(user, 'incidents.read');
   if (!user.tenantId) return NextResponse.json({error: 'Организация не определена'}, {status: 400});
 
@@ -102,7 +103,7 @@ const reviewSchema = z.object({
 
 export const POST = withMutation(async (request: NextRequest) => {
   const {user, error} = await requireAuth(request);
-  if (error || !user) return NextResponse.json({error: 'Войдите в систему'}, {status: 401});
+  if (error || !user) return authFailureResponse(error);
   assertCan(user, 'incidents.review');
   if (!user.tenantId) return NextResponse.json({error: 'Организация не определена'}, {status: 400});
 

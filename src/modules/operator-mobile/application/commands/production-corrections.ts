@@ -8,7 +8,7 @@
 import {withReadinessTenantTransaction} from '@/modules/readiness/server';
 // eslint-disable-next-line no-restricted-imports -- legacy cross-layer import pending the parked services<->modules migration (CLAUDE.md); behavior-neutral
 import {writeReportAuditRow} from '@/services/reports/audit-service';
-import {OperatorCommandError, requireCrew, requireOpenShift, businessReportId} from './shared';
+import {OperatorCommandError, requireCrew, requireOpenShift, businessReportId, reportAuditActor} from './shared';
 import type {Tx} from './shared';
 import {findByCommand} from './production';
 
@@ -23,12 +23,13 @@ import {findByCommand} from './production';
  * («Изменён»): отдельного шага «поправка» в истории отчёта нет.
  */
 async function writeCorrectionAudit(
-  tx: Tx, actorId: string, reportPk: string, before: string, after: string,
+  tx: Tx, tenantId: string, actorId: string, reportPk: string, before: string, after: string,
 ) {
   await writeReportAuditRow({
     reportId: await businessReportId(tx, reportPk),
     action: 'updated',
     userId: actorId,
+    ...await reportAuditActor(tx, tenantId, actorId),
     diff: {'Выработка': {old: before, new: after}},
   }, tx as unknown as Parameters<typeof writeReportAuditRow>[1]);
 }
@@ -124,7 +125,7 @@ export async function correctProduction(input: {
         select: {id: true},
       });
       await writeCorrectionAudit(
-        tx, input.operatorId, original.reportId,
+        tx, input.tenantId, input.operatorId, original.reportId,
         `было ${Math.round(current)}`, `стало ${Math.round(input.actual)}`,
       );
       return {correctionId: created.id, was: current, now: Math.round(input.actual)};
@@ -165,7 +166,7 @@ export async function correctProduction(input: {
         select: {id: true},
       });
       await writeCorrectionAudit(
-        tx, input.operatorId, original.reportId,
+        tx, input.tenantId, input.operatorId, original.reportId,
         `было ${Math.round(current)}`, `стало ${Math.round(input.actual)}`,
       );
       return {correctionId: created.id, was: current, now: Math.round(input.actual)};
@@ -207,7 +208,7 @@ export async function correctProduction(input: {
       select: {id: true},
     });
     await writeCorrectionAudit(
-      tx, input.operatorId, original.reportId,
+      tx, input.tenantId, input.operatorId, original.reportId,
       `было ${current}`, `стало ${actual}`,
     );
     return {correctionId: created.id, was: current, now: actual};

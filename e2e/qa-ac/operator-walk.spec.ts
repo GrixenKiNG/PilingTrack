@@ -128,6 +128,8 @@ function shiftIdOf(email: string, date = '2026-10-06'): string {
 }
 
 test('v7 (Banut 655, r0mix0n): полная смена — допуск, осмотры, 2 сваи, бурение, простой, отчёт', async ({ page }) => {
+  // Устарел 16.10.2026: шаги и даты зашиты под 06.10.2026 и под допуск без «Проверки знаний по ТБ»; сегодняшний цикл v7 покрывает ежедневный прогон Hermes. Не удаляем — переписать под текущие данные.
+  test.fixme(true, "шаги и даты зашиты под 06.10.2026 и под допуск без «Проверки знаний по ТБ»; сегодняшний цикл v7 покрывает ежедневный прогон Hermes");
   test.setTimeout(10 * 60_000);
   const apis = apiWatch(page);
   await login(page, 'r0mix0n@mail.ru');
@@ -261,6 +263,8 @@ test('v7 (Banut 655, r0mix0n): полная смена — допуск, осм�
 });
 
 test('v1 (КБУРГ-16.02 №1, ka@): завершение и сдача смены — NEW-9 не воспроизводится', async ({ page }) => {
+  // Устарел 16.10.2026: нужна открытая смена бригады ka@ на сегодня, её нет; NEW-9 подтверждён полными циклами v1 07.10, 08.10 и 16.10. Не удаляем — переписать под текущие данные.
+  test.fixme(true, "нужна открытая смена бригады ka@ на сегодня, её нет; NEW-9 подтверждён полными циклами v1 07.10, 08.10 и 16.10");
   test.setTimeout(10 * 60_000);
   const apis = apiWatch(page);
   await login(page, 'ka@piling.ru');
@@ -314,8 +318,27 @@ test('v1 (КБУРГ-16.02 №1, ka@): завершение и сдача сме
   expect(t3).toMatch(/RM-/);
 });
 
+/**
+ * D-20260930-001, точная проверка (15.10.2026). Слов «Допуск» и «Принять установку»
+ * достаточно, чтобы пройти и на экране-тупике, поэтому тест нажимает «Принять
+ * установку» и требует одно из двух: шаг продвинулся или экран объяснил отказ.
+ * Сервер на такой клик отвечает 409 «Сдайте её, прежде чем открывать новую».
+ * Теперь экран держит причину и кнопку «Сдать смену за …» (не мелькающее сообщение).
+ */
+async function acceptAdvancesOrExplains(page: Page, label: string): Promise<string> {
+  const accept = page.getByRole('button', { name: 'Принять установку' });
+  if (await accept.count()) { await tap(page, accept.first(), 'Принять установку'); await page.waitForTimeout(4500); }
+  return dump(page, label);
+}
+const NEXT_STEP_OR_REASON = /Шаг [2-5] из 5|Сдайте её|не закрыта смена|сдать смену/i;
+
+function hasPendingShift(email: string): boolean {
+  return db(`SELECT count(*) FROM "Shift" s JOIN "User" u ON u.id=s."createdById" WHERE u.email='${email}' AND s.state='HANDOVER_PENDING'`) !== '0';
+}
+
 test('D-20260930-001: v2 (apj@piling.ru) — после HANDOVER_PENDING открывается новый цикл', async ({ page }) => {
-  test.fail(true, 'D-20260930-001: смена зависла в HANDOVER_PENDING с 27.09, новый цикл не начинается');
+  test.skip(!hasPendingShift('apj@piling.ru'), 'у apj нет смены в HANDOVER_PENDING (27.09 закрыта 09.10): сценарий дефекта не воспроизводится');
+  // D-20260930-001 исправлен 15.10.2026: на приёме v2 висит «Не сдана смена…» и кнопка «Сдать смену за …».
   const apis = apiWatch(page);
   await login(page, 'apj@piling.ru');
   await page.goto('/operator/v2', { waitUntil: 'domcontentloaded' });
@@ -323,13 +346,15 @@ test('D-20260930-001: v2 (apj@piling.ru) — после HANDOVER_PENDING отк�
   const before = await dump(page, 'apj-01-состояние');
   const home = page.getByRole('button', { name: /На главную/ });
   if (await home.count()) { await tap(page, home.first(), 'На главную'); await page.waitForTimeout(3500); }
-  const after = await dump(page, 'apj-02-после-главной');
+  await dump(page, 'apj-02-после-главной');
+  const after = await acceptAdvancesOrExplains(page, 'apj-03-после-приёма');
   record({ step: 'D-20260930-001', before: before.replace(/\s+/g, ' ').slice(0, 300), after: after.replace(/\s+/g, ' ').slice(0, 300), apis: apis.slice(-8) });
-  expect(after, 'новый цикл смены (допуск, приём или осмотр)').toMatch(/Допуск|Принять установку|Приём|осмотр/i);
+  expect(after, 'после «Принять установку» шаг продвинулся или экран объяснил отказ').toMatch(NEXT_STEP_OR_REASON);
 });
 
 test('D-20261001-001: v5 (mag@piling.ru) — баннер о незакрытой смене 30.09 и новая смена', async ({ page }) => {
-  test.fail(true, 'D-20261001-001: v5 продолжает смену 30.09, выработка уходит в отчёт вчерашней даты');
+  // D-20261001-001 закрыт 15.10.2026 (5580bed9): вместо тихого продолжения вчерашней смены v5 требует явной досдачи.
+  test.skip(!hasPendingShift('mag@piling.ru'), 'у mag нет смены в HANDOVER_PENDING: баннера о незакрытой смене не будет');
   const apis = apiWatch(page);
   await login(page, 'mag@piling.ru');
   await page.goto('/operator/v5', { waitUntil: 'domcontentloaded' });
@@ -350,10 +375,12 @@ test('D-20261001-001: v5 (mag@piling.ru) — баннер о незакрыто�
   }
   const after = await dump(page, 'mag-04-дальше');
   record({ step: 'D-20261001-001', before: before.replace(/\s+/g, ' ').slice(0, 300), after: after.replace(/\s+/g, ' ').slice(0, 400), apis: apis.slice(-10) });
-  expect(before + ' ' + after, 'баннер о незакрытой смене 30.09 (или её закрытие)').toMatch(/незакрыт|закрыть|передать|30\.09/i);
+  expect(before + ' ' + after, 'баннер о несданной смене 30.09 с пояснением, что работа — после новой смены').toMatch(/Не сдана смена за 30\.09\.2026[\s\S]*после открытия новой смены/);
 });
 
 test('v1 (Bauer RTG RM20, operator@): полная смена от допуска до отчёта', async ({ page }) => {
+  // Устарел 16.10.2026: шаги и даты зашиты под 06.10.2026 и под допуск без «Проверки знаний по ТБ». Не удаляем — переписать под текущие данные.
+  test.fixme(true, "шаги и даты зашиты под 06.10.2026 и под допуск без «Проверки знаний по ТБ»");
   test.setTimeout(10 * 60_000);
   const apis = apiWatch(page);
   await login(page, 'operator@piling.ru');
@@ -466,6 +493,8 @@ test('v1 (Bauer RTG RM20, operator@): полная смена от допуск�
 });
 
 test('v10 (Woltman-PVE 50PR, ivv@): продолжает смену 04.10 под видом 06.10 (D-20261001-001)', async ({ page }) => {
+  // Устарел 16.10.2026: сценарий воспроизводил смену 04.10 в данных, которых больше нет; дефект D-20261001-001 уже VERIFIED. Не удаляем — переписать под текущие данные.
+  test.fixme(true, "сценарий воспроизводил смену 04.10 в данных, которых больше нет; дефект D-20261001-001 уже VERIFIED");
   test.fail(true, 'D-20261001-001 (v10): после сегодняшнего допуска v10 продолжает старую смену 04.10, записи уходят в вчерашний отчёт');
   test.setTimeout(10 * 60_000);
   const apis = apiWatch(page);
@@ -508,7 +537,8 @@ test('v10 (Woltman-PVE 50PR, ivv@): продолжает смену 04.10 под
 });
 
 test('D-20260930-001: v2 (gea@piling.ru) — вторая бригада того же дефекта', async ({ page }) => {
-  test.fail(true, 'D-20260930-001: смена зависла в HANDOVER_PENDING с 27.09 (бригада КБУРГ-16.02 №2)');
+  test.skip(!hasPendingShift('gea@piling.ru'), 'у gea нет смены в HANDOVER_PENDING: сценарий дефекта не воспроизводится');
+  // D-20260930-001 исправлен 15.10.2026 (см. тест apj выше).
   const apis = apiWatch(page);
   await login(page, 'gea@piling.ru');
   await page.goto('/operator/v2', { waitUntil: 'domcontentloaded' });
@@ -516,9 +546,10 @@ test('D-20260930-001: v2 (gea@piling.ru) — вторая бригада тог�
   const before = await dump(page, 'gea-01-состояние');
   const home = page.getByRole('button', { name: /На главную/ });
   if (await home.count()) { await tap(page, home.first(), 'На главную'); await page.waitForTimeout(3500); }
-  const after = await dump(page, 'gea-02-после-главной');
+  await dump(page, 'gea-02-после-главной');
+  const after = await acceptAdvancesOrExplains(page, 'gea-03-после-приёма');
   record({ step: 'D-20260930-001 (gea)', before: before.replace(/\s+/g, ' ').slice(0, 300), after: after.replace(/\s+/g, ' ').slice(0, 300), apis: apis.slice(-8) });
-  expect(after, 'новый цикл смены (допуск, приём или осмотр)').toMatch(/Допуск|Принять установку|Приём|осмотр/i);
+  expect(after, 'после «Принять установку» шаг продвинулся или экран объяснил отказ').toMatch(NEXT_STEP_OR_REASON);
 });
 
 test('D-20260930-003: помощник v5 (kn@) — «экран доступен только машинисту» (не воспроизводится)', async ({ page }) => {

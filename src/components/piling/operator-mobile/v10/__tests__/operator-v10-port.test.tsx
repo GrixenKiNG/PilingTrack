@@ -117,6 +117,7 @@ it('v10: кнопки выбора записи называют действи�
 });
 
 beforeEach(() => {
+  window.localStorage.clear();
   api.fetchState.mockReset();
   api.sendCommand.mockReset();
   device.queued = [];
@@ -128,6 +129,29 @@ beforeEach(() => {
     briefings: {pending: [], overdue: []},
     history: [],
   }), {status: 200})));
+});
+
+describe('v10: повтор загрузки состояния', () => {
+  it('оставляет ошибку и текстовый повтор доступными на вкладке ТБ', async () => {
+    api.fetchState.mockRejectedValueOnce(new ApiError(503, 'Сервис временно недоступен')).mockResolvedValue(workState());
+    render(<OperatorV10App />);
+    await screen.findByRole('button', {name: 'Повторить'});
+    fireEvent.click(screen.getByRole('button', {name: 'ТБ'}));
+    expect(screen.getByText('Сервис временно недоступен')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', {name: 'Повторить'}));
+    expect(await screen.findByRole('button', {name: 'Следующий шаг: Записать выработку'})).toBeInTheDocument();
+    expect(screen.queryByText('Сервис временно недоступен')).not.toBeInTheDocument();
+  });
+  it.each([new ApiError(503, 'Сервис временно недоступен'), new Error('Нет связи')])('после сбоя даёт текстовый повтор и открывает восстановленную смену: %s', async (error) => {
+    api.fetchState.mockRejectedValueOnce(error).mockResolvedValue(workState());
+    render(<OperatorV10App />);
+    expect(await screen.findByText(error.message)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', {name: 'Повторить'}));
+    expect(await screen.findByRole('button', {name: 'Следующий шаг: Записать выработку'})).toBeInTheDocument();
+    expect(screen.queryByText(error.message)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', {name: 'Повторить'})).not.toBeInTheDocument();
+    expect(api.fetchState).toHaveBeenCalledTimes(2);
+  });
 });
 
 /* ------------------------------------------- 1. итог подтверждения СИЗ --- */
@@ -156,6 +180,46 @@ function identity(patch: {
 }
 
 describe('v10: итог подтверждения СИЗ', () => {
+  it('не обещает отсутствие препятствий при неподтверждённых СИЗ', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
+      clearance: {cleared: true, blockers: [], documents: []}, briefings: {pending: [], overdue: []}, history: [],
+    }), {status: 200})));
+    const state = makeState('IDENTITY');
+    state.identity.ppe.confirmed = false;
+    api.fetchState.mockResolvedValue(state);
+    render(<OperatorV10App />);
+    fireEvent.click(await screen.findByRole('button', {name: 'ТБ'}));
+    expect(await screen.findByText(/Осталось:.*СИЗ/)).toBeInTheDocument();
+    expect(await screen.findByText('Допуск по документам')).toBeInTheDocument();
+    expect(screen.queryByText('препятствий к работе нет')).not.toBeInTheDocument();
+  });
+
+  it('до подтверждения СИЗ вместо приёмки — переход к проверке СИЗ (сервер смену не откроет)', async () => {
+    const state = makeState('IDENTITY');
+    state.identity.ppe.confirmed = false;
+    state.shift = null;
+    api.fetchState.mockResolvedValue(state);
+    api.sendCommand.mockResolvedValue({ok: true});
+    render(<OperatorV10App />);
+    fireEvent.click(await screen.findByRole('button', {name: /Объект.*Объект А/}));
+    expect(await screen.findByText('Сначала проверьте средства защиты')).toBeInTheDocument();
+    expect(screen.queryByRole('button', {name: 'Принять установку'})).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', {name: 'Проверить средства защиты'}));
+    expect(api.sendCommand).not.toHaveBeenCalled();
+  });
+
+  it('после подтверждения СИЗ приёмка через карточку объекта отправляет команду', async () => {
+    const state = makeState('IDENTITY');
+    state.identity.ppe.confirmed = true;
+    state.shift = null;
+    api.fetchState.mockResolvedValue(state);
+    api.sendCommand.mockResolvedValue({ok: true});
+    render(<OperatorV10App />);
+    fireEvent.click(await screen.findByRole('button', {name: /Объект.*Объект А/}));
+    fireEvent.click(await screen.findByRole('button', {name: 'Принять установку'}));
+    await waitFor(() => expect(api.sendCommand).toHaveBeenCalledWith(expect.objectContaining({command: 'accept-equipment', equipmentId: 'eq-1'})));
+  });
+
   it('объявляет подтверждение и ведёт к следующему шагу допуска', () => {
     expect(ppeOutcome(identity())).toEqual({
       title: 'СИЗ подтверждены',
@@ -454,5 +518,56 @@ describe('v10: кнопка «Следующий шаг»', () => {
     expect(await screen.findByRole('button', {name: 'Добавить сваю'})).toBeInTheDocument();
     expect(screen.getByRole('button', {name: 'Добавить бурение'})).toBeInTheDocument();
     expect(screen.getByRole('button', {name: 'Записать простой'})).toBeInTheDocument();
+  });
+});
+
+/* ---------------------------------- поправка простоя на экране v10 --- */
+
+describe('v10: поправка записи выработки (аудит 11–13.10, пункт 5)', () => {
+  const withDowntime = () => {
+    const state = workState();
+    state.entries = [{
+      id: 'dt-1', kind: 'DOWNTIME', label: 'Ремонт установки', value: 7, meters: null,
+      occurredAt: '2026-09-28T09:00:00.000Z', corrections: [],
+    }] as typeof state.entries;
+    return state;
+  };
+
+  const openCorrection = async () => {
+    api.fetchState.mockResolvedValue(withDowntime());
+    api.sendCommand.mockResolvedValue({ok: true});
+    render(<OperatorV10App />);
+    fireEvent.click(await screen.findByRole('button', {name: /^6. Работа/}));
+    fireEvent.click(await screen.findByRole('button', {name: 'Поправить'}));
+  };
+
+  it('показывает записанный простой и отправляет поправку с итогом, а не разницей', async () => {
+    await openCorrection();
+    fireEvent.change(screen.getByLabelText('Сколько часов простоя было на самом деле'), {target: {value: '3,5'}});
+    fireEvent.change(screen.getByLabelText('Что случилось'), {target: {value: 'Ошибся при вводе'}});
+    fireEvent.click(screen.getByRole('button', {name: 'Записать поправку'}));
+
+    await waitFor(() => expect(api.sendCommand).toHaveBeenCalledWith(expect.objectContaining({
+      command: 'correct-production', shiftId: 'shift-1', kind: 'DOWNTIME',
+      entryId: 'dt-1', actual: 3.5, reason: 'Ошибся при вводе',
+    })));
+  });
+
+  it('без причины и без числа кнопка записи закрыта: пустая строка — не ноль', async () => {
+    await openCorrection();
+    const send = screen.getByRole('button', {name: 'Записать поправку'});
+    expect(send).toBeDisabled();
+    fireEvent.change(screen.getByLabelText('Что случилось'), {target: {value: 'Ошибся при вводе'}});
+    expect(send).toBeDisabled();
+    fireEvent.click(send);
+    expect(api.sendCommand).not.toHaveBeenCalled();
+  });
+
+  it('без записей блок не рисуется', async () => {
+    api.fetchState.mockResolvedValue(workState());
+    render(<OperatorV10App />);
+    fireEvent.click(await screen.findByRole('button', {name: 'Следующий шаг: Записать выработку'}));
+    await screen.findByRole('button', {name: 'Добавить сваю'});
+    expect(screen.queryByText('Записано за смену')).not.toBeInTheDocument();
   });
 });

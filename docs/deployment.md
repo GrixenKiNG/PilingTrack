@@ -112,16 +112,29 @@ server {
 
 ## 5. Создание первого админа
 
-После первого запуска БД пустая. Создание админа — через seed (`prisma/seed.ts`) или через psql:
+После первого запуска БД пустая: миграции не создают ни организацию (`Tenant`), ни пользователей. Seed (`prisma/seed.ts`) в проде запрещён (`NODE_ENV=production` → выход с ошибкой, `SKIP_SEED=1`). Поэтому организацию и первого админа создают через psql.
+
+1. Сгенерировать bcrypt-хэш пароля (cost 12, как в `prisma/seed.ts`), на машине с `node_modules` проекта:
 
 ```bash
-docker compose exec postgres psql -U piling -d pilingtrack -c \
-  "INSERT INTO \"User\" (id, email, name, role, \"passwordHash\", \"createdAt\", \"updatedAt\") \
-   VALUES ('admin-seed', 'admin@piling.example.com', 'Admin', 'ADMIN', \
-   '<bcrypt-hash>', NOW(), NOW());"
+node -e "console.log(require('bcryptjs').hashSync(process.argv[1], 12))" '<пароль>'
 ```
 
-Сгенерировать bcrypt-хэш можно через `npx tsx scripts/hash-password.ts <password>` (если такого скрипта нет, используй любой bcrypt-инструмент с cost=10).
+2. Создать организацию и админа. `id` организации должен совпадать с `DEFAULT_TENANT_ID` из `.env` (у нас `orion`):
+
+```bash
+docker compose exec -T postgres psql -U piling -d pilingtrack -v ON_ERROR_STOP=1 <<'SQL'
+BEGIN;
+INSERT INTO "Tenant" (id, slug, name, "createdAt", "updatedAt")
+VALUES ('orion', 'orion', 'ОРИОН', NOW(), NOW());
+INSERT INTO "User" (id, "tenantId", email, name, role, password, "createdAt", "updatedAt")
+VALUES ('admin-seed', 'orion', 'admin@piling.example.com', 'Admin', 'ADMIN',
+        '<bcrypt-hash>', NOW(), NOW());
+COMMIT;
+SQL
+```
+
+Колонка пароля — `password` (не `passwordHash`). Ограничитель `<<'SQL'` обязательно в кавычках: иначе оболочка раскроет знаки `$` в хэше (`$2b$12$…`) и пароль не подойдёт. Вставка проверена 13.10.2026 на локальной копии базы (транзакция с откатом); вход таким админом в полностью пустую базу не проверялся.
 
 ## 6. Backup'ы
 

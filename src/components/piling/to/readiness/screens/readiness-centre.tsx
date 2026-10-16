@@ -7,6 +7,7 @@ import { card } from '../settings/shared-ui';
 import { Button } from '@/components/ui/button';
 import { formatDateTimeInTimezone } from '@/lib/timezone';
 import { cn } from '@/lib/utils';
+import { ResizableColumns } from './resizable-columns';
 import { buildHandoverJournal, handoverRoleLabel, type HandoverEventKind, type HandoverJournalEvent } from '../handover-journal';
 import { isOpenRecord } from '../../to-stats';
 import type { AuthoritativeReadinessFactsDto, ReadinessAbility } from '../api/contracts';
@@ -782,8 +783,12 @@ export function ReadinessCentre(props: ReferenceUiProps) {
 
         Колонки — flex-контейнеры, последняя карточка в каждой тянется, поэтому
         все три заканчиваются на одной линии.
+
+        На широком экране между колонками стоят разделители: границы тянутся
+        мышью или стрелками, размеры помнятся в браузере (`ResizableColumns`).
+        Доли 0.9 / 1.45 / 1 остаются исходными и возвращаются двойным щелчком.
       */}
-      <div className="grid min-h-0 grid-cols-1 items-stretch gap-3 py-3 md:grid-cols-[300px_minmax(0,1fr)] xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.45fr)_minmax(0,1fr)]">
+      <ResizableColumns storageKey="readiness-centre-columns-v1" className="grid min-h-0 grid-cols-1 items-stretch gap-3 py-3 md:grid-cols-[300px_minmax(0,1fr)]">
         <section className={cn(card, 'flex flex-col overflow-hidden')}>
         <div className="border-b border-border p-4">
           <div className={cn(muted, 'text-2xs')}>Выбранная установка</div>
@@ -1345,7 +1350,7 @@ export function ReadinessCentre(props: ReferenceUiProps) {
           </button>
         </section>
         </aside>
-      </div>
+      </ResizableColumns>
       <RoleFlowFooter progress={roleProgress} owner={stageOwner} onViewChange={props.onViewChange} abilities={props.bootstrap?.capabilities.abilities ?? []} />
     </div>
   );

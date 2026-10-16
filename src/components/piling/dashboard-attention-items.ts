@@ -1,5 +1,5 @@
 import type { CurrentReadinessDto, DefectDto, ReadinessShiftDto, WorkPermitDto } from './to/readiness/api/contracts';
-import { isOverduePermit } from './to/readiness/screens/permit-role-steps';
+import { actionableOverduePermits } from './to/readiness/screens/permit-role-steps';
 
 /** Строка в блоке «Требует решения сейчас»: что случилось, кто решает, что сделать, куда идти. */
 export interface AttentionItem {
@@ -38,13 +38,17 @@ export function buildAttentionItems(input: AttentionInput): AttentionItem[] {
   const items: AttentionItem[] = [];
 
   if (input.permits) {
-    const overdue = input.permits.filter((permit) => isOverduePermit(permit, input.now));
+    const overdue = actionableOverduePermits(input.permits, input.now);
     if (overdue.length > 0) {
+      const approved = overdue.filter((permit) => permit.state === 'APPROVED').length;
+      const pending = overdue.length - approved;
       items.push({
         id: 'permits-overdue',
-        problem: `Наряды-допуски: просрочено ${overdue.length}, согласовать нельзя`,
-        role: 'Инженер ОТ',
-        action: 'Оформить новые',
+        problem: `Наряды-допуски: срок вышел, но не закрыты: ${overdue.length}`
+          + (approved && pending ? ` (закрыть: ${approved}; оформить новый: ${pending})`
+            : pending ? ' (ожидал согласования — оформить новый)' : ''),
+        role: 'Инженер ОТ или механик',
+        action: approved && pending ? 'Закрыть / оформить новый' : approved ? 'Закрыть' : 'Оформить новый',
         href: '/admin/safety?view=permits&filter=overdue',
       });
     }

@@ -1,6 +1,7 @@
 'use client';
 
 import {useMemo, useRef, useState} from 'react';
+import {useLocalFormDraft} from '../use-local-form-draft';
 import {
   measureRequired,
   ENGINE_HOURS_REPLACEMENT_NOTE,
@@ -57,7 +58,7 @@ function bulkItems(
   known: Record<string, KnownAnswer>,
 ): ChecklistItem[] {
   return section.items.filter(
-    (item) => !known[item.id] && !item.photoOnIssue && !measureRequired(item, 'OK'),
+    (item) => !item.topUp && !known[item.id] && !item.photoOnIssue && !measureRequired(item, 'OK'),
   );
 }
 
@@ -70,11 +71,13 @@ function bulkItems(
  * Секции по узлам дают ориентир: течь была «где-то в гидравлике».
  */
 export function ChecklistScreen({
-  checklist, warnings, onSubmit, busy, error, errorDetails, commandId, onBack, lastMeter, known = {},
+  checklist, warnings, onSubmit, busy, error, errorDetails, commandId, onBack, lastMeter, known = {}, draftUserId, draftShiftId,
 }: {
   checklist: ChecklistView;
   warnings: WorkWarning[];
-  onSubmit: (answers: ChecklistAnswer[]) => void;
+  onSubmit: (answers: ChecklistAnswer[], restoredCommandId?: string) => void | boolean | Promise<boolean | void>;
+  draftUserId?: string;
+  draftShiftId?: string;
   busy: boolean;
   error: string | null;
   /** Подробности отказа: какие пункты не заполнены (аудит R76, находка 10). */
@@ -95,7 +98,20 @@ export function ChecklistScreen({
    */
   known?: Record<string, KnownAnswer>;
 }) {
-  const [drafts, setDrafts] = useState<Record<string, Draft>>({});
+  const localDraft = useLocalFormDraft(draftUserId, draftShiftId && `checklist:${draftShiftId}:${checklist.stage}:${checklist.version}`, {
+    commandId, drafts: {} as Record<string, Draft>,
+  }, (value) => Object.values(value.drafts).every((draft) => !draft.answer && !draft.note.trim()
+    && !Object.values(draft.measures).some((measure) => measure.trim()) && !draft.mediaIds.length && !draft.meterReplaced));
+  const storedDrafts = localDraft.value.drafts;
+  const [uploading, setUploading] = useState<Record<string, boolean>>({});
+  const drafts = useMemo(() => Object.fromEntries(Object.entries(storedDrafts).map(([itemId, draft]) => [
+    itemId, {...draft, uploading: uploading[itemId] ?? false},
+  ])), [storedDrafts, uploading]);
+  const draftCommandId = Object.keys(drafts).length ? localDraft.value.commandId : commandId;
+  const setDrafts = (next: React.SetStateAction<Record<string, Draft>>) => localDraft.update((current) => ({
+    commandId: Object.keys(current.drafts).length ? current.commandId : commandId,
+    drafts: typeof next === 'function' ? next(current.drafts) : next,
+  }));
   const [showGaps, setShowGaps] = useState(false);
   /**
    * Раскрыт ровно один раздел.
@@ -113,11 +129,17 @@ export function ChecklistScreen({
   );
 
   const update = (itemId: string, patch: Partial<Draft>) => {
-    setDrafts((current) => ({...current, [itemId]: {...(current[itemId] ?? emptyDraft()), ...patch}}));
+    const {uploading: pending, ...input} = patch;
+    if (pending !== undefined) setUploading((current) => ({...current, [itemId]: pending}));
+    if (Object.keys(input).length) {
+      setDrafts((current) => ({...current, [itemId]: {...(current[itemId] ?? emptyDraft()), ...input}}));
+    }
   };
 
-  const answered = items.filter((item) => known[item.id] || drafts[item.id]?.answer).length;
-  const gaps = useMemo(() => collectGaps(items, drafts, known), [items, drafts, known]);
+  /** Обязательные пункты. «Долил за смену» необязателен и в счёт не идёт. */
+  const required = useMemo(() => items.filter((item) => !item.topUp), [items]);
+  const answered = required.filter((item) => known[item.id] || drafts[item.id]?.answer).length;
+  const gaps = useMemo(() => collectGaps(required, drafts, known), [required, drafts, known]);
 
   /** Отметить весь раздел нормой или снять отметку, поставленную галочкой. */
   const answerSection = (section: ChecklistSection, value: OperatorAnswer | undefined) => {
@@ -131,7 +153,7 @@ export function ChecklistScreen({
   };
 
   /** Ответ на все пункты раздела есть — раздел закрыт. */
-  const sectionDone = (section: ChecklistSection) => section.items.every(
+  const sectionDone = (section: ChecklistSection) => section.items.filter((item) => !item.topUp).every(
     (item) => known[item.id] || drafts[item.id]?.answer,
   );
 
@@ -140,15 +162,23 @@ export function ChecklistScreen({
       setShowGaps(true);
       return;
     }
-    onSubmit(items.map((item) => {
+    const answers = items.flatMap((item): ChecklistAnswer[] => {
       const draft = drafts[item.id] ?? emptyDraft();
       const measures = Object.fromEntries(
         Object.entries(draft.measures)
           .filter(([, value]) => filled(value))
           .map(([key, value]) => [key, Number(value)] as const),
       );
+      // «Долил за смену»: пусто — не доливал, ответа по пункту нет вовсе. Есть
+      // литры — уходит «OK» с замером: вердикта у долива нет, а ответ нужен сервером
+      // как носитель значения.
+      if (item.topUp) {
+        return Object.keys(measures).length > 0
+          ? [{itemId: item.id, answer: 'OK' as OperatorAnswer, measures}]
+          : [];
+      }
       const fact = known[item.id];
-      return {
+      return [{
         itemId: item.id,
         answer: fact ? ('OK' as OperatorAnswer) : (draft.answer as OperatorAnswer),
         // Основание системного ответа уходит в журнал: проверяющий через
@@ -157,8 +187,10 @@ export function ChecklistScreen({
           : [draft.meterReplaced ? ENGINE_HOURS_REPLACEMENT_NOTE : '', draft.note.trim()].filter(Boolean).join('; ') || undefined,
         measures: Object.keys(measures).length > 0 ? measures : undefined,
         mediaIds: draft.mediaIds.length > 0 ? draft.mediaIds : undefined,
-      };
-    }));
+      }];
+    });
+    const accepted = draftUserId && draftShiftId ? onSubmit(answers, draftCommandId) : onSubmit(answers);
+    void Promise.resolve(accepted).then((ok) => { if (ok) localDraft.clear(); });
   };
 
   return (
@@ -173,7 +205,7 @@ export function ChecklistScreen({
             </p>
           ) : (
             <p className="text-center text-2xs font-medium text-muted-foreground">
-              Отмечено {answered} из {items.length}
+              Отмечено {answered} из {required.length}
             </p>
           )}
           <BigButton onClick={submit} disabled={busy}>
@@ -198,9 +230,10 @@ export function ChecklistScreen({
         {checklist.sections.map((section, index) => {
           const bulk = bulkItems(section, known);
           const bulkOn = bulk.length > 0 && bulk.every((item) => drafts[item.id]?.answer === 'OK');
-          const apart = section.items.length - bulk.length;
+          const sectionRequired = section.items.filter((item) => !item.topUp);
+          const apart = sectionRequired.length - bulk.length;
           const done = sectionDone(section);
-          const answered = section.items.filter(
+          const answered = sectionRequired.filter(
             (item) => known[item.id] || drafts[item.id]?.answer,
           ).length;
           const open = openSection === section.id;
@@ -274,7 +307,7 @@ export function ChecklistScreen({
                     ) : null}
                   </span>
                   <span className="shrink-0 text-2xs tabular-nums text-muted-foreground">
-                    {answered}/{section.items.length}
+                    {answered}/{sectionRequired.length}
                   </span>
                   <span className="shrink-0 text-muted-foreground">{open ? '⌄' : '›'}</span>
                 </button>
@@ -282,17 +315,30 @@ export function ChecklistScreen({
 
               {open ? (
                 <div className="space-y-2 border-t bg-background/40 p-2.5">
-                  {section.items.map((item) => (
-                    <ItemCard
-                      key={item.id}
-                      item={item}
-                      draft={drafts[item.id] ?? emptyDraft()}
-                      known={known[item.id]}
-                      commandId={commandId}
-                      lastMeter={lastMeter}
-                      onChange={(patch) => update(item.id, patch)}
-                    />
-                  ))}
+                  {section.items.map((item) => {
+                    // Пункты «долил за смену» собираются одним блоком на месте первого из них.
+                    if (item.topUp) {
+                      return section.items.find((candidate) => candidate.topUp) === item ? (
+                        <TopUpCard
+                          key="top-up"
+                          items={section.items.filter((candidate) => candidate.topUp)}
+                          drafts={drafts}
+                          onChange={update}
+                        />
+                      ) : null;
+                    }
+                    return (
+                      <ItemCard
+                        key={item.id}
+                        item={item}
+                        draft={drafts[item.id] ?? emptyDraft()}
+                        known={known[item.id]}
+                        commandId={draftCommandId}
+                        lastMeter={lastMeter}
+                        onChange={(patch) => update(item.id, patch)}
+                      />
+                    );
+                  })}
                 </div>
               ) : null}
             </li>
@@ -302,6 +348,48 @@ export function ChecklistScreen({
 
       <ErrorNote message={error} details={errorDetails} />
     </Screen>
+  );
+}
+
+/**
+ * «Долил за смену»: литры по четырём жидкостям одним блоком. Без кнопок вердикта —
+ * это не осмотр, а запись факта; пустое поле значит «не доливал».
+ */
+function TopUpCard({items, drafts, onChange}: {
+  items: ChecklistItem[];
+  drafts: Record<string, Draft>;
+  onChange: (itemId: string, patch: Partial<Draft>) => void;
+}) {
+  return (
+    <div className="rounded-lg border bg-card p-3 shadow-xs">
+      <p className="text-sm font-medium leading-snug">Долил за смену</p>
+      <p className="mt-1 text-2xs text-muted-foreground">Если не доливали, оставьте пустым</p>
+      <div className="mt-3 space-y-2">
+        {items.map((item) => {
+          const key = item.measure?.key ?? item.id;
+          const draft = drafts[item.id] ?? emptyDraft();
+          return (
+            <label key={item.id} className="flex items-center justify-between gap-3">
+              <span className="text-sm">{item.text}</span>
+              <span className="flex w-28 items-center gap-1.5">
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  min={item.measure?.min ?? 0}
+                  max={item.measure?.max}
+                  aria-label={`${item.text}, ${item.measure?.unit ?? 'л'}`}
+                  placeholder="0"
+                  value={draft.measures[key] ?? ''}
+                  onChange={(event) => onChange(item.id, {measures: {...draft.measures, [key]: event.target.value}})}
+                  className="h-11 w-full rounded-md border bg-card px-2 text-base font-semibold tabular-nums shadow-xs"
+                />
+                <span className="text-2xs text-muted-foreground">{item.measure?.unit ?? 'л'}</span>
+              </span>
+            </label>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 

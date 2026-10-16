@@ -166,6 +166,11 @@ async function briefingRecordedOnDay(tx: Tx, input: {
       documentCode: input.briefing.code,
       documentVersion: input.briefing.version,
       recordedAt: {gte: from, lt: to},
+      // Повтором считается только запись с отметкой РАБОТНИКА. Запись, которую
+      // провёл инструктор и которую работник ещё не подписал, ознакомлением не
+      // является: иначе нажатие «Ознакомлен» молча ничего не писало (аудит
+      // 16.10.2026, P1 R78-41).
+      employeeSignedAt: {not: null},
     },
     select: {id: true},
   });

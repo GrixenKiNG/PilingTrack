@@ -596,6 +596,7 @@ describe('приём установки не присваивает чужую �
       shift: {findFirst: vi.fn(async (): Promise<typeof active | null> => active), update: vi.fn(), create: vi.fn()},
       report: {findFirst: vi.fn(async () => userId ? {userId} : null)},
       site: {findFirst: vi.fn(async () => null)},
+      ppeCheck: {findFirst: vi.fn(async (): Promise<{id: string} | null> => ({id: 'ppe1'}))},
       operatorShiftEvidence: {findUnique: vi.fn(async () => null), create: vi.fn()},
     };
     readiness.transaction.mockImplementation(async (_tenant, action) => action(tx));
@@ -639,4 +640,21 @@ describe('приём установки не присваивает чужую �
     expect(tx.shift.create).toHaveBeenCalledWith(expect.objectContaining({data: expect.objectContaining({startedById: 'me'})}));
     expect(tx.shift.findFirst).toHaveBeenNthCalledWith(2, expect.objectContaining({where: expect.objectContaining({state: {in: ['PLANNED', 'PENDING_ACCEPTANCE']}})}));
   });
+
+  it('смена не открывается без записанной проверки СИЗ (решение владельца 14.10.2026)', async () => {
+    const {tx, run} = acceptance({id: 'me', role: 'OPERATOR'}, null);
+    tx.shift.findFirst.mockResolvedValue(null);
+    tx.ppeCheck.findFirst.mockResolvedValue(null);
+    await expect(run()).rejects.toMatchObject({status: 409, message: expect.stringContaining('средств защиты')});
+    expect(tx.shift.create).not.toHaveBeenCalled();
+    expect(tx.operatorShiftEvidence.create).not.toHaveBeenCalled();
+  });
+
+  it('с записанной проверкой СИЗ создаёт STARTED', async () => {
+    const {tx, run} = acceptance({id: 'me', role: 'OPERATOR'}, null);
+    tx.shift.findFirst.mockResolvedValue(null);
+    await expect(run()).resolves.toHaveProperty('shiftId');
+    expect(tx.shift.create).toHaveBeenCalledWith(expect.objectContaining({data: expect.objectContaining({state: 'STARTED'})}));
+  });
 });
+

@@ -12,7 +12,7 @@ import {assertPermitTransition} from '../../domain/permits/transitions';
 import {PrismaCommandIdempotencyRepository} from '../../infrastructure/command-pipeline/idempotency-repository';
 import type {ReadinessTransaction} from '../../infrastructure/tenant-transaction';
 import {toWorkPermitRecord, WorkPermitRepository} from '../../infrastructure/permits/work-permit-repository';
-import type {CreateWorkPermitPayload, UpdateWorkPermitPayload} from './schemas';
+import {closeWorkPermitSchema, rejectWorkPermitSchema, type CreateWorkPermitPayload, type UpdateWorkPermitPayload} from './schemas';
 
 export interface PermitCommandContext {
   tenantId: string; actorId: string; actorName: string; actorRole: string;
@@ -27,6 +27,7 @@ type PermitRow = Awaited<ReturnType<WorkPermitRepository['get']>>;
 export const serializePermit = (row: PermitRow) => ({
   id: row.id, equipmentId: row.equipmentId, shiftId: row.shiftId, risk: row.risk,
   workTypeId: row.workTypeId, title: row.title, location: row.location,
+  workTypeName: row.workType?.name ?? null, requiredApprovals: row.requiredApprovals,
   objectName: row.objectName, hazards: row.hazards,
   producerUserId: row.producerUserId, producerName: row.producerName,
   observerUserId: row.observerUserId, observerName: row.observerName,
@@ -37,6 +38,10 @@ export const serializePermit = (row: PermitRow) => ({
   submittedAt: row.submittedAt?.toISOString() ?? null,
   approvedAt: row.approvedAt?.toISOString() ?? null,
   revokedAt: row.revokedAt?.toISOString() ?? null, revokeReason: row.revokeReason,
+  rejectedAt: row.rejectedAt?.toISOString() ?? null, rejectedById: row.rejectedById,
+  rejectReason: row.rejectReason,
+  closedAt: row.closedAt?.toISOString() ?? null, closedById: row.closedById ?? null,
+  closeReason: row.closeReason ?? null,
   createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString(),
   approvals: row.approvals.map((item) => ({
     role: item.role, approvedById: item.approvedById,
@@ -69,6 +74,7 @@ function assertPermitEditor(context: PermitCommandContext): void {
 async function emitEffects(input: {
   tx: ReadinessTransaction; context: PermitCommandContext; action: string;
   before?: unknown; row: PermitRow; key: string;
+  metadata?: unknown;
 }) {
   const after = serializePermit(input.row);
   await recordChainedReadinessAudit(input.tx, {
@@ -78,6 +84,7 @@ async function emitEffects(input: {
       role: input.context.actorRole, actingAs: input.context.actingAs},
     requestId: input.context.requestId, correlationId: input.context.correlationId,
     idempotencyKey: input.key, before: input.before, after,
+    ...(input.metadata ? {metadata: input.metadata} : {}),
   });
   const triggerId = `${input.row.id}:v${input.row.version}:${input.action}`;
   await input.tx.outboxEvent.create({data: {
@@ -206,14 +213,14 @@ export async function updateWorkPermitCommand(input: {
 
 async function versionedAction(input: {
   tx: ReadinessTransaction; context: PermitCommandContext; id: string; key: string | null;
-  ifMatch: string | null; expectedVersion?: number; action: 'submit' | 'approve' | 'revoke';
+  ifMatch: string | null; expectedVersion?: number; action: 'submit' | 'approve' | 'revoke' | 'reject' | 'close';
   reason?: string;
 }): Promise<CommandHttpResult> {
-  if (input.action !== 'approve') assertPermitEditor(input.context);
+  if (input.action !== 'approve' && input.action !== 'reject') assertPermitEditor(input.context);
   const expected = resolveExpectedVersion({ifMatch: input.ifMatch,
     expectedVersion: input.expectedVersion, kind: 'work-permit', id: input.id});
-  const body = input.action === 'revoke'
-    ? {expectedVersion: input.expectedVersion ?? null, reason: input.reason}
+  const body = input.action === 'revoke' || input.action === 'reject' || input.action === 'close'
+    ? {expectedVersion: input.expectedVersion ?? null, reason: input.reason ?? null}
     : {expectedVersion: input.expectedVersion ?? null};
   return runCommand({tx: input.tx, context: input.context, method: 'POST',
     routeTemplate: `/api/readiness/work-permits/:id/${input.action}`,
@@ -221,6 +228,7 @@ async function versionedAction(input: {
     execute: async (key) => {
       const repository = new WorkPermitRepository(input.tx);
       await repository.requireActor(input.context.tenantId, input.context.actorId);
+      if (input.action === 'reject') await repository.lockForApproval(input.context.tenantId, input.id);
       const beforeRow = await repository.get(input.context.tenantId, input.id);
       const before = serializePermit(beforeRow);
       if (beforeRow.version !== expected) throw new ReadinessCommandError('VERSION_CONFLICT', 409, 'Наряд изменился. Обновите страницу и повторите действие');
@@ -229,6 +237,15 @@ async function versionedAction(input: {
       if (input.action === 'submit') {
         assertPermitTransition(beforeRow.state, 'submit');
         row = await repository.submit(input.context.tenantId, input.id, expected);
+      } else if (input.action === 'close') {
+        assertPermitTransition(beforeRow.state, 'close');
+        const closedAt = new Date();
+        if (beforeRow.validFrom > closedAt) {
+          throw new ReadinessCommandError('VALIDATION_ERROR', 422, 'Срок наряда ещё не начался. Для отмены нужно отозвать наряд');
+        }
+        row = await repository.close({tenantId: input.context.tenantId, id: input.id,
+          version: expected, actorId: input.context.actorId, closedAt});
+        eventAction = 'closed';
       } else if (input.action === 'revoke') {
         assertPermitTransition(beforeRow.state, 'revoke');
         // Причина отзыва раньше протаскивалась через `input.reason!` —
@@ -241,6 +258,17 @@ async function versionedAction(input: {
         row = await repository.revoke({tenantId: input.context.tenantId,
           id: input.id, version: expected, actorId: input.context.actorId,
           reason: input.reason});
+      } else if (input.action === 'reject') {
+        assertPermitTransition(beforeRow.state, 'reject');
+        const parsed = rejectWorkPermitSchema.safeParse({expectedVersion: input.expectedVersion, reason: input.reason});
+        if (!parsed.success) throw new ReadinessCommandError('VALIDATION_ERROR', 422, 'Укажите причину отказа (3–1000 символов)');
+        if (beforeRow.authorId === input.context.actorId) throw new ReadinessCommandError('VALIDATION_ERROR', 403, 'Автор не может отказать своему наряду');
+        const permit = toWorkPermitRecord(beforeRow);
+        assertCanApprovePermit({permit, actorId: input.context.actorId,
+          role: input.context.actingAs ?? input.context.actorRole, approvals: permit.approvals,
+          abilities: effectiveReadinessCapabilities(input.context.actorRole, input.context.actingAs, input.context.accessMatrix)});
+        row = await repository.reject({tenantId: input.context.tenantId, id: input.id,
+          version: expected, actorId: input.context.actorId, reason: parsed.data.reason});
       } else {
         // Строку наряда захватываем до чтения подписей: две одновременные
         // подписи двух согласующих идут по очереди, а не наслаиваются друг на
@@ -275,7 +303,8 @@ async function versionedAction(input: {
         eventAction = `approved-${role.toLowerCase()}`;
       }
       await emitEffects({tx: input.tx, context: input.context,
-        action: eventAction, before, row, key});
+        action: eventAction, before, row, key,
+        ...(input.action === 'close' ? {metadata: {comment: input.reason || null}} : {})});
       return {status: 200, body: {data: serializePermit(row)},
         headers: {ETag: formatStrongEtag('work-permit', row.id, row.version)}};
     }});
@@ -287,3 +316,14 @@ export const approveWorkPermitCommand = (input: Omit<Parameters<typeof versioned
   versionedAction({...input, action: 'approve'});
 export const revokeWorkPermitCommand = (input: Omit<Parameters<typeof versionedAction>[0], 'action'> & {reason: string}) =>
   versionedAction({...input, action: 'revoke'});
+export const rejectWorkPermitCommand = (input: Omit<Parameters<typeof versionedAction>[0], 'action'> & {reason: string}) =>
+  versionedAction({...input, action: 'reject'});
+
+export const closeWorkPermitCommand = async (input: Omit<Parameters<typeof versionedAction>[0], 'action'>) => {
+  if (!input.context.tenantId) {
+    throw new ReadinessCommandError('VALIDATION_ERROR', 403, 'Организация не определена');
+  }
+  const parsed = closeWorkPermitSchema.safeParse({expectedVersion: input.expectedVersion, reason: input.reason});
+  if (!parsed.success) throw new ReadinessCommandError('VALIDATION_ERROR', 422, 'Комментарий должен быть не длиннее 500 символов');
+  return versionedAction({...input, ...parsed.data, action: 'close'});
+};

@@ -17,36 +17,64 @@
 ⚠️ Файл называется `.sql.gz`, но внутри **custom format** → восстанавливать
 `pg_restore`, не `psql`.
 
-## Процедура (локальная машина, ~5 минут)
+## Процедура изолированного учения
+
+Использовать существующий [runner](../../scripts/restore-drill.sh) и
+[проверку восстановления](../../scripts/restore-drill-verify.cjs). Подготовка
+собственного синтетического стенда и дампа описана в
+[runbook 015](015-disposable-integration-restore.md). Существующие базы и
+контейнеры целью восстановления не служат.
+
+Для внешнего дампа владелец заранее предоставляет разрешённую локальную копию
+и доверенный manifest исходного snapshot. Получение боевых файлов, доступ к
+серверу и секретам в эту процедуру не входят. Без manifest равенство данных
+не подтверждается; runner его требует.
+
+Из корня репозитория в Bash (на Windows — Git Bash), с существующими файлами:
 
 ```bash
-# 1. Забрать свежий дамп с прода
-scp -i $HOME/.ssh/orionpiling user1@87.242.102.125:/var/backups/pilingtrack/pilingtrack-$(date +%Y%m%d)-*.sql.gz .
+# Manifest по умолчанию: /path/approved.sql.gz.manifest.json
+bash scripts/restore-drill.sh /path/approved.sql.gz
 
-# 2. Чистая БД (НЕ трогаем pilingtrack_test!)
-docker exec pilingtrack-postgres psql -U postgres \
-  -c 'DROP DATABASE IF EXISTS pilingtrack_drill;' \
-  -c 'CREATE DATABASE pilingtrack_drill;'
-
-# 3. Восстановить (Git Bash: MSYS_NO_PATHCONV=1)
-gunzip -c pilingtrack-*.sql.gz | MSYS_NO_PATHCONV=1 docker exec -i \
-  pilingtrack-postgres pg_restore -U postgres -d pilingtrack_drill \
-  --no-owner --no-privileges
-
-# 4. Проверки (сверить с известными прод-числами)
-docker exec pilingtrack-postgres psql -U postgres -d pilingtrack_drill \
-  -c "SELECT count(*) FROM information_schema.tables WHERE table_schema='public';" \
-  -c 'SELECT count(*) FROM "Report";' \
-  -c 'SELECT count(*) FROM "Equipment";' \
-  -c "SELECT migration_name FROM _prisma_migrations ORDER BY finished_at DESC NULLS LAST LIMIT 1;"
-
-# 5. Убрать за собой
-docker exec pilingtrack-postgres psql -U postgres -c 'DROP DATABASE pilingtrack_drill;'
+# Альтернатива: явно указать manifest того же дампа
+bash scripts/restore-drill.sh /path/approved.sql.gz /path/approved.manifest.json
 ```
 
-**Критерии успеха:** pg_restore без ошибок; число таблиц соответствует схеме;
-`Report`/`Equipment`/`Crew` совпадают с прод-значениями на утро дампа;
-последняя запись `_prisma_migrations` = последняя задеплоенная миграция.
+Это два альтернативных запуска, а не обязательные последовательные шаги.
+Runner проверяет gzip и SHA-256/manifest до создания цели. Затем создаёт
+новый контейнер `codex-pg-<12 hex>` с меткой `pilingtrack.codex.test-db=1`,
+без опубликованных портов; URL или существующее имя цели передать нельзя.
+Runner использует `postgres:18-alpine` — ту же версию, что прод (18.3) и CI.
+До 13.10.2026 стоял `postgres:16`, и `pg_restore` 16 не читал дамп 18
+(`unsupported version (1.16) in file header`). При смене версии на проде
+менять образ здесь и в `scripts/test-db-up.sh` вместе с ней.
+
+Восстановление: `gzip -dc` → `pg_restore --no-owner --no-acl --exit-on-error
+--single-transaction`. Затем runner применяет существующие
+[гранты приложения](../../scripts/app-role-grants.sql) и
+[гранты роли опознания](../../scripts/identity-role-grants.sql).
+Проверка допускает только собственное имя `codex-pg-*` с указанной меткой;
+очистка через EXIT trap и [test-db-down.sh](../../scripts/test-db-down.sh)
+тоже проверяет имя и метку, удаляет только созданную цель и её volume.
+
+**Критерии успеха:** `RESTORE OK`, совпадение counts всех public-таблиц,
+имён/checksum/состояний миграций, ENABLE/FORCE RLS и определений политик с
+manifest. Числа берутся из snapshot, а не из исторических 84/107/76.
+Проверяются свойства штатных ролей и доступ приложения без tenant:
+Report/Site/Equipment/Inspection/Shift/AuditLog возвращают **0 строк,
+а не ошибку прав**. После успеха и ошибки собственная цель удаляется.
+
+Принятый [тест восстановления](../../tests/integration/disposable-restore.spec.ts)
+проверяет настоящий restore синтетического snapshot, отказ при подменённом
+count и очистку цели. Проверки своей/чужой организации под прикладной ролью
+на исходном одноразовом стенде находятся в
+[disposable-rls.spec.ts](../../tests/integration/disposable-rls.spec.ts): своя
+строка видна, чужая скрыта, чужая запись отклоняется с 42501, без tenant — 0.
+Runner не выполняет эти положительные/межорганизационные проверки на
+восстановленной базе; их повтор для внешнего дампа остаётся отдельной приёмкой.
+
+Синтетическое учение потока 2 заняло около 13 с — это не production RTO.
+Учение 27.09 и его 11 с сохранены ниже как отдельное историческое доказательство.
 
 ## Журнал драйвов
 
@@ -63,29 +91,16 @@ docker exec pilingtrack-postgres psql -U postgres -c 'DROP DATABASE pilingtrack_
   отдельное решение (см. docs/audit.md A-1).
 - Драйв на локальном Docker-Postgres той же мажорной версии; на чужом хосте
   восстановление не репетировалось.
-- ~~Off-site копию из R2 стоит проверить тем же способом~~ — сделано
-  13.08.2026, см. журнал выше. Off-site копия побайтово равна ночному дампу и
-  восстанавливается. Процедура проверки:
-
-  ```bash
-  # на VPS: скачать копию из R2 теми же ключами, что использует backup-postgres.sh
-  ENV_FILE=/opt/pilingtrack/.env
-  export RCLONE_CONFIG_R2_TYPE=s3 RCLONE_CONFIG_R2_PROVIDER=Cloudflare \
-         RCLONE_CONFIG_R2_REGION=auto RCLONE_CONFIG_R2_NO_CHECK_BUCKET=true
-  export RCLONE_CONFIG_R2_ACCESS_KEY_ID="$(grep -E '^S3_ACCESS_KEY_ID=' $ENV_FILE | tail -1 | cut -d= -f2-)"
-  export RCLONE_CONFIG_R2_SECRET_ACCESS_KEY="$(grep -E '^S3_SECRET_ACCESS_KEY=' $ENV_FILE | tail -1 | cut -d= -f2-)"
-  export RCLONE_CONFIG_R2_ENDPOINT="$(grep -E '^S3_ENDPOINT=' $ENV_FILE | tail -1 | cut -d= -f2-)"
-  rclone lsl R2:pilingtrack/db-backups/ | tail -5
-  rclone copy R2:pilingtrack/db-backups/<файл> /tmp/r2pull/
-  sha256sum /tmp/r2pull/<файл> /var/backups/pilingtrack/<файл>   # должны совпасть
-  ```
-
-  Дальше — обычная процедура выше, но `scp` берёт файл из `/tmp/r2pull/`, а
-  не из `/var/backups/`. Не забыть `rm -rf /tmp/r2pull` в конце.
+- Off-site копия из R2 проверена 13.08.2026: побайтовое совпадение и
+  восстановление зафиксированы в историческом журнале выше. Для нового учения
+  владелец предоставляет локальную копию и доверенный manifest; этот runbook
+  не содержит команд доступа к серверу или чтения секретов.
 
 ## ⚠️ Гранты не переживают восстановление (проверено 15.09.2026)
 
-Процедура выше восстанавливает **данные и защиту**, но не **доступ**. Флаги
+Историческая процедура без повторного применения грантов восстанавливала
+**данные и защиту**, но не **доступ**. Текущий runner применяет оба набора
+грантов и проверяет свойства ролей и fail-closed доступ. Флаги
 `--no-owner --no-privileges` нужны, чтобы дамп лёг в базу, где может не быть
 роли-владельца, — но они же выбрасывают все `GRANT`. Замер на реальном дампе:
 
@@ -101,37 +116,23 @@ docker exec pilingtrack-postgres psql -U postgres -c 'DROP DATABASE pilingtrack_
 увидите, что всё сошлось, объявите успех — и получите неподнимающееся
 приложение. Отлаживать `GRANT` вы будете под нагрузкой инцидента.
 
-**Поэтому после каждого restore — обязательный шаг:**
+**После restore обязательны проверки прав, а не только counts.** Текущий
+runner проверяет, что `pilingtrack_app` имеет `rolsuper=false`,
+`rolbypassrls=false`, `rolcanlogin=true`; `pilingtrack_identity` —
+`rolsuper=false`, `rolbypassrls=true`, `rolcanlogin=false`.
+Прикладная роль читает шесть ключевых таблиц без tenant и получает 0 строк;
+`permission denied` означает неуспех, а не правильную изоляцию.
 
-```bash
-# 1. Роль приложения существует и НЕ обходит RLS
-docker exec pilingtrack-postgres psql -U postgres -d <db> \
-  -c "SELECT rolname, rolbypassrls, rolsuper FROM pg_roles WHERE rolname='pilingtrack_app';"
+Положительные проверки своей организации и запрет чужой выполняются
+существующим `disposable-rls.spec.ts` на собственном стенде (см. ссылки выше).
+Приёмка внешнего восстановленного дампа должна дополнительно подтвердить
+эти результаты на его данных. Существующий runner это автоматически не
+проверяет и удаляет цель при завершении; подключение к общей базе вместо
+собственной цели не является частью учения.
 
-# 2. Гранты на месте (0 = база восстановлена, но приложение работать не будет)
-docker exec pilingtrack-postgres psql -U postgres -d <db> \
-  -c "SELECT count(*) FROM information_schema.role_table_grants WHERE grantee='pilingtrack_app';"
-
-# 3. Негативный тест: без тенант-контекста должно быть 0 строк, НЕ ошибка прав
-docker exec pilingtrack-postgres psql -U pilingtrack_app -d <db> \
-  -c 'SELECT count(*) FROM "Report";'
-
-# 4. Положительный тест: с контекстом данные видны, с чужим тенантом — нет
-docker exec pilingtrack-postgres psql -U pilingtrack_app -d <db> \
-  -c "SET app.current_tenant='orion'; SELECT count(*) FROM \"Report\";" \
-  -c "SET app.current_tenant='nobody'; SELECT count(*) FROM \"Report\";"
-```
-
-**Критерии:** шаг 1 — роль есть, `rolbypassrls=false`; шаг 2 — счётчик > 0;
-шаг 3 — **`0`, а не `permission denied`** (ошибка прав = гранты не восстановлены);
-шаг 4 — свой тенант отдаёт строки, чужой отдаёт 0.
-
-Если на шаге 2 ноль — гранты нужно накатить отдельно (см. runbook 011
-«роль приложения»), и только после этого поднимать приложение.
-
-**Хорошая новость:** сами политики, `ENABLE`/`FORCE ROW LEVEL SECURITY` и
-tenant-изоляция переживают восстановление полностью. Сценария «данные вернулись,
-а RLS молча не применяется» — которого мы опасались — не происходит.
+Неуспех сверки ролей, counts, миграций или RLS останавливает учение. Нельзя
+объявлять приложение восстановленным по одному успешному `pg_restore`:
+текущий runner не запускает приложение и не проверяет media/секреты.
 
 ## RPO и RTO — числа
 
@@ -161,7 +162,7 @@ tenant-изоляция переживают восстановление пол
 
 **Как измерить RTO на следующем учении (предложение).**
 1. Зафиксировать момент «аварии» — это `t0`.
-2. Скачать свежий боевой дамп (R2 или `scp` с VPS), отдельно записать время скачивания.
+2. Получить от владельца разрешённую локальную копию дампа и доверенный manifest; отдельно записать время получения.
 3. Восстановить (`pg_restore`), записать время.
 4. Создать роли кластера, если их нет, и накатить `scripts/app-role-grants.sql` + `scripts/identity-role-grants.sql`.
 5. Поднять приложение и дождаться `/api/health` = 200 — это `t1`. **RTO = `t1 − t0`.**

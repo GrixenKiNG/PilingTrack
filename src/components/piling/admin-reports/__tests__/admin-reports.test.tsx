@@ -30,7 +30,10 @@ vi.mock('../use-report-history', () => ({
 }));
 vi.mock('../report-filters', () => ({ ReportFilters: () => null }));
 vi.mock('../report-detail-dialog', () => ({ ReportDetailDialog: () => null }));
-vi.mock('../report-form-dialog', () => ({ ReportFormDialog: () => null }));
+vi.mock('../report-form-dialog', () => ({
+  ReportFormDialog: ({open, filterError, dictionaryError}: {open: boolean; filterError?: string | null; dictionaryError: string | null}) =>
+    open ? <div data-testid="report-form-errors" data-filter-error={filterError ?? ''} data-dictionary-error={dictionaryError ?? ''} /> : null,
+}));
 vi.mock('../report-evidence-preview', () => ({ ReportEvidencePreview: () => null }));
 vi.mock('@/components/piling/pdf-preview-dialog', () => ({ PdfPreviewDialog: () => null }));
 vi.mock('@/components/piling/confirm-action-dialog', () => ({
@@ -43,9 +46,10 @@ vi.mock('@/components/piling/confirm-action-dialog', () => ({
     ) : null,
 }));
 vi.mock('../report-evidence-row', () => ({
-  ReportsHeader: ({ onExport, onExportXlsx, exporting }: { onExport?: () => void; onExportXlsx?: () => void; exporting: 'csv' | 'xlsx' | null }) => (
+  ReportsHeader: ({ onCreate, onExport, onExportXlsx, exporting }: { onCreate?: () => void; onExport?: () => void; onExportXlsx?: () => void; exporting: 'csv' | 'xlsx' | null }) => (
     <div>
       <span data-testid="export-state">{exporting ?? 'idle'}</span>
+      {onCreate ? <button type="button" onClick={onCreate}>Создать отчёт</button> : null}
       <button type="button" onClick={onExport}>CSV</button>
       <button type="button" onClick={onExportXlsx}>Excel</button>
     </div>
@@ -88,6 +92,27 @@ function baseState(overrides: Record<string, unknown> = {}) {
     ...overrides,
   };
 }
+
+describe('AdminReports — ошибки источников формы (F-N1005-REPORT-FORM-SOURCE)', () => {
+  it('explains the export scope only while text search is active', () => {
+    reportsState.current = baseState();
+    render(<AdminReports />);
+    const hint = 'Поиск по тексту в выгрузку не входит. Сузьте выгрузку фильтрами объекта, установки или машиниста';
+    expect(screen.queryByText(hint)).not.toBeInTheDocument();
+    const search = screen.getByRole('textbox', {name: 'Поиск по оператору, объекту или установке'});
+    fireEvent.change(search, {target: {value: 'Иван'}});
+    expect(screen.getByText(hint)).toBeInTheDocument();
+    fireEvent.change(search, {target: {value: '  '}});
+    expect(screen.queryByText(hint)).not.toBeInTheDocument();
+  });
+  it('передаёт в открытую форму ошибку списков отдельно от ошибки справочников', () => {
+    reportsState.current = baseState({filterError: 'Установки не загрузились', dictionaryError: 'Марки не загрузились'});
+    render(<AdminReports />);
+    fireEvent.click(screen.getByRole('button', {name: 'Создать отчёт'}));
+    expect(screen.getByTestId('report-form-errors')).toHaveAttribute('data-filter-error', 'Установки не загрузились');
+    expect(screen.getByTestId('report-form-errors')).toHaveAttribute('data-dictionary-error', 'Марки не загрузились');
+  });
+});
 
 describe('AdminReports — удаление отчёта (F-R93-7)', () => {
   beforeEach(() => {

@@ -1,4 +1,4 @@
-import {fireEvent, render, screen} from '@testing-library/react';
+import {fireEvent, render, screen, waitFor, within} from '@testing-library/react';
 import {describe, expect, it, vi} from 'vitest';
 import type {OperatorMobileState} from '@/modules/operator-mobile/contracts';
 vi.mock('./operator-concept.css', () => ({}));
@@ -18,6 +18,48 @@ function show(value = state, busy = false) {
 }
 
 describe('рабочий обзор оператора', () => {
+  it.each(['v2', 'v5', 'v7'] as const)('%s показывает поправку у последней записи', (variant) => {
+    render(<OperatorWorkOverview state={{...state, entries: [{id: 'entry-1', kind: 'DOWNTIME', label: 'Ожидание', value: 2,
+      meters: null, occurredAt: '2026-09-20T08:00:00.000Z', corrections: []}]}} variant={variant}
+      onAction={vi.fn()} onFinish={vi.fn()} onCorrect={vi.fn().mockResolvedValue(true)} />);
+    expect(screen.getByRole('button', {name: 'Поправить'})).toBeInTheDocument();
+  });
+  it.each(['v2', 'v5', 'v7'] as const)('%s скрывает поправку закрытой смены', (variant) => {
+    render(<OperatorWorkOverview state={{...state, phase: 'CLOSED', entries: [{id: 'entry-1', kind: 'DOWNTIME', label: 'Ожидание', value: 2,
+      meters: null, occurredAt: '2026-09-20T08:00:00.000Z', corrections: []}]}} variant={variant}
+      onAction={vi.fn()} onFinish={vi.fn()} onCorrect={vi.fn()} />);
+    expect(screen.queryByRole('button', {name: 'Поправить'})).not.toBeInTheDocument();
+  });
+  it('не отправляет пустой итог или короткую причину и сохраняет отказ в форме', async () => {
+    const onCorrect = vi.fn().mockResolvedValue(false);
+    render(<OperatorWorkOverview state={{...state, entries: [{id: 'entry-1', kind: 'DOWNTIME', label: 'Ожидание', value: 2,
+      meters: null, occurredAt: '2026-09-20T08:00:00.000Z', corrections: []}]}} variant="v7"
+      onAction={vi.fn()} onFinish={vi.fn()} onCorrect={onCorrect} correctionError="Смена уже закрыта" />);
+    fireEvent.click(screen.getByRole('button', {name: 'Поправить'}));
+    const form = within(screen.getByRole('group', {name: 'Поправка записи'}));
+    expect(form.getByRole('button', {name: 'Записать поправку'})).toBeDisabled();
+    fireEvent.change(form.getByLabelText('Сколько часов простоя было на самом деле'), {target: {value: '1,5'}});
+    expect(form.getByRole('button', {name: 'Записать поправку'})).toBeDisabled();
+    fireEvent.change(form.getByLabelText('Что случилось'), {target: {value: 'Ошибка ввода'}});
+    fireEvent.click(form.getByRole('button', {name: 'Записать поправку'}));
+    expect(onCorrect).toHaveBeenCalledWith({entryId: 'entry-1', kind: 'DOWNTIME', actual: 1.5, reason: 'Ошибка ввода'});
+    expect(form.getByRole('alert')).toHaveTextContent('Смена уже закрыта');
+    expect(form.getByLabelText('Что случилось')).toHaveValue('Ошибка ввода');
+  });
+  it.each([
+    ['PILES', 'Сколько свай было на самом деле'], ['DRILLING', 'Сколько скважин было на самом деле'],
+  ] as const)('передаёт итог и причину поправки %s', async (kind, label) => {
+    const onCorrect = vi.fn().mockResolvedValue(true);
+    render(<OperatorWorkOverview state={{...state, entries: [{id: 'entry-1', kind, label: 'Выработка', value: 2,
+      meters: 12, occurredAt: '2026-09-20T08:00:00.000Z', corrections: []}]}} variant="v2"
+      onAction={vi.fn()} onFinish={vi.fn()} onCorrect={onCorrect} />);
+    fireEvent.click(screen.getByRole('button', {name: 'Поправить'}));
+    fireEvent.change(screen.getByLabelText(label), {target: {value: '1'}});
+    fireEvent.change(screen.getByLabelText('Что случилось'), {target: {value: 'Ошибка ввода'}});
+    fireEvent.click(screen.getByRole('button', {name: 'Записать поправку'}));
+    expect(onCorrect).toHaveBeenCalledWith({entryId: 'entry-1', kind, actual: 1, reason: 'Ошибка ввода'});
+    await waitFor(() => expect(screen.queryByRole('group', {name: 'Поправка записи'})).not.toBeInTheDocument());
+  });
   it('v10 называет действия глаголами и передаёт исходные виды записи', () => {
     const onAction = vi.fn();
     render(<OperatorWorkOverview state={state} variant="v10" onAction={onAction} onFinish={vi.fn()} />);

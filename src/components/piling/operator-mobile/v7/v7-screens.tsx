@@ -2,6 +2,7 @@
 
 import {useRouter} from 'next/navigation';
 import {OperatorWorkOverview} from '../operator-work-overview';
+import {EntriesList, type CorrectionInput} from '../screens/entries-list';
 import type {
   ChecklistStage, DefectView, DocumentVerdict, IncidentView, OperatorMobileState, ProductionPermit, WorkWarning,
 } from '@/modules/operator-mobile/contracts';
@@ -15,6 +16,7 @@ import {
 import {formatNumber, formatRuDate} from '@/lib/format';
 import {formatDowntimeHoursOnly} from '@/lib/downtime-hours';
 import {Banner, Button, Card, CardBody, Chip, Empty, Metric, Pair, Row, type Tone} from './v7-ui';
+import {ShiftThanks} from '../shift-thanks';
 
 /**
  * Обзорные экраны v7: что показывает каждая вкладка нижнего меню.
@@ -85,11 +87,13 @@ export function WarningsBlock({warnings}: {warnings: WorkWarning[]}) {
 
 /* ------------------------------------------------------------- главная --- */
 
-export function HomeScreen({state, busy, onStep, onFinishWork}: {
+export function HomeScreen({state, busy, onStep, onFinishWork, onCorrect, correctionError}: {
   state: OperatorMobileState;
   busy: boolean;
   onStep: (detour: Detour) => void;
   onFinishWork: () => void;
+  onCorrect?: (input: CorrectionInput) => Promise<boolean>;
+  correctionError?: string | null;
 }) {
   return (
     <>
@@ -100,9 +104,11 @@ export function HomeScreen({state, busy, onStep, onFinishWork}: {
         ? <StageBlock state={state} onStep={onStep} />
         : null}
       {state.phase === 'WORK'
-        ? <WorkBlock state={state} busy={busy} onStep={onStep} onFinishWork={onFinishWork} />
+        ? <WorkBlock state={state} busy={busy} onStep={onStep} onFinishWork={onFinishWork}
+            onCorrect={onCorrect} correctionError={correctionError} />
         : null}
       {state.phase === 'CLOSING' ? <ClosingBlock state={state} onStep={onStep} /> : null}
+      {state.phase === 'CLOSING' ? <JournalScreen state={state} busy={busy} onCorrect={onCorrect} correctionError={correctionError} /> : null}
       {state.phase === 'CLOSED' ? <ClosedBlock state={state} /> : null}
     </>
   );
@@ -209,13 +215,16 @@ function StageBlock({state, onStep}: {state: OperatorMobileState; onStep: (detou
   );
 }
 
-function WorkBlock({state, busy, onStep, onFinishWork}: {
+function WorkBlock({state, busy, onStep, onFinishWork, onCorrect, correctionError}: {
   state: OperatorMobileState;
   busy: boolean;
   onStep: (detour: Detour) => void;
   onFinishWork: () => void;
+  onCorrect?: (input: CorrectionInput) => Promise<boolean>;
+  correctionError?: string | null;
 }) {
   return <OperatorWorkOverview state={state} variant="v7" busy={busy}
+    onCorrect={onCorrect} correctionError={correctionError}
     onAction={(entry)=>onStep({kind: 'PRODUCTION', entry})}
     onIncident={()=>onStep({kind: 'INCIDENT'})} onFinish={onFinishWork} />;
 }
@@ -257,8 +266,7 @@ function ClosedBlock({state}: {state: OperatorMobileState}) {
     <>
       <Card>
         <CardBody>
-          <div className="seal" aria-hidden="true">✓</div>
-          <div style={{textAlign: 'center', fontSize: 17, fontWeight: 800}}>Смена закрыта</div>
+          <ShiftThanks operatorName={state.operator?.name} reportSent={Boolean(receipt?.submittedAt)} />
         </CardBody>
         {receipt ? (
           <CardBody>
@@ -417,7 +425,14 @@ export function TasksScreen({state, onEntry}: {
 
 const ENTRY_UNIT: Record<string, string> = {PILES: 'шт.', DRILLING: 'шт.', DOWNTIME: 'ч'};
 
-export function JournalScreen({state}: {state: OperatorMobileState}) {
+export function JournalScreen({state, busy = false, onCorrect, correctionError}: {
+  state: OperatorMobileState; busy?: boolean;
+  onCorrect?: (input: CorrectionInput) => Promise<boolean>;
+  correctionError?: string | null;
+}) {
+  if (onCorrect && (state.phase === 'WORK' || state.phase === 'CLOSING') && state.shift?.state !== 'CLOSED') {
+    return <EntriesList entries={state.entries} busy={busy} onCorrect={onCorrect} error={correctionError} />;
+  }
   return (
     <Card title="Записи смены">
       {state.entries.length === 0

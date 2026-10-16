@@ -27,7 +27,9 @@ services:
       - HOSTNAME=0.0.0.0
       # Cap Node heap so the in-app /api/health memory check doesn't sit
       # at "warn" indefinitely (default Node grows heap toward host RAM).
-      - NODE_OPTIONS=--max-old-space-size=512
+      # --trace-warnings: стек для MaxListenersExceededWarning (F-LOG-1,
+      # вернулось 12.10.2026). Убрать, когда источник найден.
+      - NODE_OPTIONS=--max-old-space-size=512 --trace-warnings
     deploy:
       resources:
         limits:

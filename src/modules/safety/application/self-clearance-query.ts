@@ -34,6 +34,16 @@ export interface SelfBriefingRecord {
   /** «27 из 30». У ознакомления результата нет. */
   result: string | null;
   validUntil: string | null;
+  /** Кто провёл инструктаж. У собственного ознакомления и проверки знаний инструктора нет. */
+  instructorName: string | null;
+  instructorSignedAt: string | null;
+  employeeSignedAt: string | null;
+  /**
+   * Инструктор уже расписался, работник — ещё нет. Только такая запись просит
+   * кнопку: собственное ознакомление и старые записи без инструктора ничего не
+   * ждут, а проверка знаний подписи не имеет.
+   */
+  awaitingEmployeeSignature: boolean;
 }
 
 export interface SelfSafetyView {
@@ -71,6 +81,7 @@ export async function querySelfSafetyView(input: {
       select: {
         id: true, kind: true, recordedAt: true, documentTitle: true,
         documentVersion: true, correct: true, total: true, validUntil: true,
+        instructorId: true, instructorName: true, instructorSignedAt: true, employeeSignedAt: true,
       },
       orderBy: { recordedAt: 'desc' },
       take: HISTORY_LIMIT,
@@ -106,6 +117,13 @@ export async function querySelfSafetyView(input: {
         ? `${record.correct} из ${record.total}`
         : null,
       validUntil: record.validUntil?.toISOString() ?? null,
+      instructorName: record.instructorName ?? null,
+      instructorSignedAt: record.instructorSignedAt?.toISOString() ?? null,
+      employeeSignedAt: record.employeeSignedAt?.toISOString() ?? null,
+      awaitingEmployeeSignature: record.kind === 'INSTRUCTION'
+        && record.instructorId != null
+        && record.instructorSignedAt != null
+        && record.employeeSignedAt == null,
     })),
   };
 }

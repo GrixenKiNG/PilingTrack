@@ -54,6 +54,29 @@ describe('AU164 — вывод разбора в v10', () => {
   });
 });
 
+describe('v10: закрытая смена — благодарность', () => {
+  const closedState = () => {
+    const state = makeState('CLOSED', [...STAGES]);
+    state.operator = {id: 'op', name: 'Митрофанов Алексей Геннадьевич'};
+    state.receipt = {reportId: 'RM-1', submittedAt: '2026-09-28T15:01:00.000Z', closedAt: '2026-09-28T15:00:00.000Z', timezone: 'Europe/Moscow'} as OperatorMobileState['receipt'];
+    return state;
+  };
+
+  it('на главном экране вместо «Смена закрыта» благодарит по имени и отчеству', async () => {
+    api.fetchState.mockResolvedValue(closedState());
+    render(<OperatorV10App />);
+    expect(await screen.findByText('Спасибо за работу!')).toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent('Алексей Геннадьевич, смена закрыта, отчёт ушёл диспетчеру. Хорошего отдыха.');
+  });
+
+  it('пока смена идёт, благодарности нет', async () => {
+    api.fetchState.mockResolvedValue(makeState('WORK', ['PRESHIFT_INSPECTION', 'SITE_READY', 'EO_BEFORE']));
+    render(<OperatorV10App />);
+    await screen.findByRole('button', {name: 'Дальше: Работа: сваи, бурение, простой'});
+    expect(screen.queryByText('Спасибо за работу!')).not.toBeInTheDocument();
+  });
+});
+
 function checklist(stage: string, done: boolean) {
   return {
     stage, title: {PRESHIFT_INSPECTION: 'Предсменный осмотр', SITE_READY: 'Готовность площадки',
@@ -99,6 +122,7 @@ function makeState(phase: string, doneStages: string[] = []): OperatorMobileStat
 }
 
 beforeEach(() => {
+  window.localStorage.clear();
   api.fetchState.mockReset();
   api.sendCommand.mockReset();
   vi.stubGlobal('fetch', vi.fn(async () => new Response('{}', {status: 200})));
@@ -208,6 +232,20 @@ describe('v10: порядок смены', () => {
 });
 
 describe('v10: отказ сервера виден, введённое не пропадает', () => {
+  it('после перезагрузки восстанавливает неотправленный простой', async () => {
+    api.fetchState.mockResolvedValue(makeState('WORK', ['PRESHIFT_INSPECTION', 'SITE_READY', 'EO_BEFORE']));
+    const view = render(<OperatorV10App />);
+    fireEvent.click(await screen.findByRole('button', {name: 'Дальше: Работа: сваи, бурение, простой'}));
+    fireEvent.click(screen.getByRole('button', {name: 'Записать простой'}));
+    fireEvent.change(screen.getByRole('combobox'), {target: {value: 'r1'}});
+    fireEvent.change(screen.getByLabelText('Простой, часов'), {target: {value: '1.5'}});
+    view.unmount();
+    render(<OperatorV10App />);
+    fireEvent.click(await screen.findByRole('button', {name: 'Дальше: Работа: сваи, бурение, простой'}));
+    fireEvent.click(screen.getByRole('button', {name: 'Записать простой'}));
+    expect(screen.getByRole('combobox')).toHaveValue('r1');
+    expect(screen.getByLabelText('Простой, часов')).toHaveValue(1.5);
+  });
   it('простой отвергнут — красная полоса с причиной, поля на месте', async () => {
     api.fetchState.mockResolvedValue(makeState('WORK', ['PRESHIFT_INSPECTION', 'SITE_READY', 'EO_BEFORE']));
     api.sendCommand.mockRejectedValue(new ApiError(400, 'Простой длиннее суток (25 ч). Проверьте часы.'));

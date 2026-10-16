@@ -9,7 +9,7 @@ import type {
   WorkPermitRecord,
 } from '../../domain/permits/types';
 
-const includeApprovals = {approvals: {orderBy: {approvedAt: 'asc' as const}}};
+const includeApprovals = {approvals: {orderBy: {approvedAt: 'asc' as const}}, workType: {select: {name: true}}};
 
 type PermitRow = Prisma.WorkPermitGetPayload<{include: typeof includeApprovals}>;
 
@@ -259,6 +259,32 @@ export class WorkPermitRepository {
       data: {state: 'REVOKED', revokedAt: new Date(), revokedById: input.actorId, revokeReason: input.reason},
     });
     if (updated.count !== 1) throw new ReadinessCommandError('VERSION_CONFLICT', 409, 'Наряд изменился. Обновите страницу и повторите действие');
+    return this.get(input.tenantId, input.id);
+  }
+
+  async close(input: {tenantId: string; id: string; version: number; actorId: string; closedAt: Date}): Promise<PermitRow> {
+    if (!input.tenantId) throw new ReadinessCommandError('VALIDATION_ERROR', 403, 'Организация не определена');
+    const updated = await this.tx.workPermit.updateMany({
+      where: {tenantId: input.tenantId, id: input.id, version: input.version, state: 'APPROVED', validFrom: {lte: input.closedAt}},
+      data: {state: 'CLOSED', version: input.version + 1, closedAt: input.closedAt,
+        closedById: input.actorId, closeReason: 'WORK_DONE'},
+    });
+    if (updated.count !== 1) throw new ReadinessCommandError('VERSION_CONFLICT', 409, 'Наряд изменился. Обновите страницу и повторите действие');
+    return this.get(input.tenantId, input.id);
+  }
+
+  async reject(input: {tenantId: string; id: string; version: number; actorId: string; reason: string}): Promise<PermitRow> {
+    const now = new Date();
+    const updated = await this.tx.workPermit.updateMany({
+      where: {tenantId: input.tenantId, id: input.id, version: input.version, state: 'PENDING_APPROVAL'},
+      data: {state: 'DRAFT', version: input.version + 1, submittedAt: null, approvedAt: null,
+        rejectedAt: now, rejectedById: input.actorId, rejectReason: input.reason},
+    });
+    if (updated.count !== 1) throw new ReadinessCommandError('VERSION_CONFLICT', 409, 'Наряд изменился. Обновите страницу и повторите действие');
+    await this.tx.workPermitApproval.updateMany({
+      where: {tenantId: input.tenantId, permitId: input.id, permitVersion: input.version, valid: true},
+      data: {valid: false, invalidatedAt: now, invalidationReason: `Отказ: ${input.reason}`},
+    });
     return this.get(input.tenantId, input.id);
   }
 }

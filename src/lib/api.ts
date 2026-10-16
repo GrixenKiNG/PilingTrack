@@ -6,7 +6,7 @@ import type { UserRole } from '@/lib/types';
 // Short JSON requests: 20 s, matching operator-mobile. Uploads need more time
 // on field networks. Use a controller so older Safari and caller cancellation
 // work without AbortSignal.any/timeout, and every timer can be cleaned up.
-async function fetchWithTimeout(url: string, options: RequestInit): Promise<Response> {
+async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs?: number): Promise<Response> {
   const controller = new AbortController();
   const external = options.signal;
   const isUpload = (typeof FormData !== 'undefined' && options.body instanceof FormData)
@@ -28,7 +28,7 @@ async function fetchWithTimeout(url: string, options: RequestInit): Promise<Resp
     timedOut = true;
     controller.abort();
     cleanup();
-  }, isUpload ? 120_000 : 20_000);
+  }, timeoutMs ?? (isUpload ? 120_000 : 20_000));
   const cancel = () => { controller.abort(external?.reason); cleanup(); };
   if (external?.aborted) cancel();
   else external?.addEventListener('abort', cancel, { once: true });
@@ -239,7 +239,7 @@ export type SessionProbe =
 export async function probeSession(): Promise<SessionProbe> {
   let res: Response;
   try {
-    res = await fetchWithTimeout('/api/auth/me', { credentials: 'same-origin' });
+    res = await fetchWithTimeout('/api/auth/me', { credentials: 'same-origin' }, 15_000);
   } catch {
     return { status: 'unknown' };
   }

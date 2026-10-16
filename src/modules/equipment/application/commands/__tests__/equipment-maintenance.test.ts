@@ -247,6 +247,13 @@ describe('updateMaintenance — lifecycle transitions', () => {
 });
 
 describe('acceptMaintenance — приёмка', () => {
+  it('keeps the mechanic who closed the order separately from the acceptor', async () => {
+    findUniqueRecMock.mockResolvedValue({ id: 'rec_1', tenantId: 'orion', acceptedById: null,
+      closedById: 'mechanic_1', completedAt: new Date('2026-10-12T10:00:00Z'), workDone: 'ремонт выполнен', status: 'DONE' });
+    updateRecMock.mockResolvedValue({ id: 'rec_1', equipmentId: 'eq_1', updatedAt: new Date() });
+    await acceptMaintenance('rec_1', { tenantId: 'orion', userId: 'admin_1' });
+    expect(updateRecMock.mock.calls.at(-1)?.[0].data).toMatchObject({ closedById: 'mechanic_1', acceptedById: 'admin_1' });
+  });
   it('rejects accepting a cancelled order with otherwise complete work details', async () => {
     findUniqueRecMock.mockResolvedValue({ id: 'rec_1', tenantId: 'orion', status: 'CANCELLED',
       acceptedById: null, workDone: 'ремонт выполнен' });

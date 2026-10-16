@@ -27,6 +27,46 @@ export async function assertUserAssignedToSite(userId: string, siteId: string) {
   }
 }
 
+/**
+ * Владелец отчёта работает на объекте: по прямому назначению ИЛИ по действующей
+ * бригаде этого объекта.
+ *
+ * ПОЧЕМУ НЕ ТОЛЬКО НАЗНАЧЕНИЕ. Мобильный отчёт создаётся по бригаде
+ * (`Crew.siteId`), и у такого машиниста прямого `UserSiteAssignment` может не
+ * быть. Команда правки отчёта требовала именно его, и администратор получал 403
+ * «Нет доступа к этому объекту» на штатный отчёт (аудит 16.10.2026, P1 AU39-04).
+ * Выдавать новое назначение в обход решения владельца нельзя — основанием служит
+ * сама бригада.
+ *
+ * ПОЧЕМУ ОРГАНИЗАЦИЯ ОБЯЗАТЕЛЬНА ДЛЯ БРИГАДЫ. Без неё сверять бригаду не с чем, и
+ * молча пускать нельзя: отсутствие организации бригадой не покрывается, остаётся
+ * только прямое назначение (отказ вместо послабления).
+ */
+export async function assertReportOwnerOnSite(
+  userId: string,
+  siteId: string,
+  tenantId?: string | null
+) {
+  const assignment = await db.userSiteAssignment.findUnique({
+    where: { userId_siteId: { userId, siteId } },
+    select: { id: true },
+  });
+  if (assignment) return;
+
+  if (tenantId) {
+    const crew = await db.crew.findFirst({
+      where: {
+        operatorId: userId, siteId, isActive: true,
+        equipment: { tenantId }, site: { tenantId },
+      },
+      select: { id: true },
+    });
+    if (crew) return;
+  }
+
+  throw new ServiceError('Нет доступа к этому объекту', 403);
+}
+
 export async function assertCanAccessSite(
   sessionUser: SessionActor,
   siteId: string,

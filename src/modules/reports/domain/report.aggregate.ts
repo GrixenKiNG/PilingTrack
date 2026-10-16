@@ -11,6 +11,7 @@
  */
 
 import { ServiceError } from '@/lib/service-error';
+import { shiftHoursFromClock } from '@/lib/downtime-hours';
 import { createReportEvent, ReportDomainEvent } from './report.events';
 
 // ============================================================
@@ -373,14 +374,6 @@ export class ReportAggregate {
   }
 
   private getShiftDurationHours(): number | null {
-    if (!this.state.shiftStart || !this.state.shiftEnd) return null;
-
-    const [startH, startM] = this.state.shiftStart.split(':').map(Number);
-    const [endH, endM] = this.state.shiftEnd.split(':').map(Number);
-
-    let hours = (endH * 60 + endM - startH * 60 - startM) / 60;
-    if (hours < 0) hours += 24;
-
-    return hours;
+    return shiftHoursFromClock(this.state.shiftStart, this.state.shiftEnd);
   }
 }

@@ -18,7 +18,7 @@ trap cleanup EXIT
 export POSTGRES_PASSWORD="$owner_password"
 docker run -d --name "$name" --label pilingtrack.codex.test-db=1 \
   -e POSTGRES_USER=piling -e POSTGRES_DB=codex_test -e POSTGRES_PASSWORD \
-  -p 127.0.0.1::5432 postgres:16 >&2
+  -p 127.0.0.1::5432 postgres:18-alpine >&2
 created=1
 unset POSTGRES_PASSWORD
 ready=0

@@ -7,6 +7,7 @@ import type {OperatorMobileState} from '@/modules/operator-mobile/contracts';
 import {formatDateTimeInTimezone} from '@/lib/timezone';
 import {BigButton, ErrorNote, Fact, Panel, PanelTitle, Screen, VolumeFact} from '../ui';
 import {WarningsPanel} from '../warnings-panel';
+import {ShiftThanks} from '../shift-thanks';
 
 /**
  * Закрытие смены.
@@ -196,6 +197,8 @@ export function ClosedScreen({state, tabs, error = null, errorDetails}: {
   return (
     <Screen title="Смена закрыта" subtitle={state.assignment?.equipmentName} tabs={tabs}>
       <ErrorNote message={error} details={errorDetails} />
+
+      <ShiftThanks operatorName={state.operator?.name} reportSent={reportAccepted} />
 
       <Panel tone={reportAccepted ? 'ok' : 'warning'}>
         <PanelTitle tone={reportAccepted ? 'ok' : 'warning'}>

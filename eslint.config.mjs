@@ -121,6 +121,23 @@ const eslintConfig = [...nextCoreWebVitals, ...nextTypescript, {
     }],
   },
 }, {
+  // Клиентский код не подключает базу: драйвер и клиент Prisma серверные.
+  // Раньше это пытался обеспечить import('server-only') в db.ts, но он глотал
+  // собственную ошибку и не защищал ни от чего — запрет задан здесь.
+  files: ["src/components/**/*.{ts,tsx}"],
+  ignores: ["src/**/__tests__/**", "src/**/*.test.{ts,tsx}"],
+  rules: {
+    "no-restricted-imports": ["error", {
+      patterns: [
+        {
+          group: ["@/lib/db", "@/lib/db/*", "@/generated/postgres-client", "@/generated/postgres-client/*", "@prisma/*", "pg", "pg/*"],
+          allowTypeImports: true,
+          message: "Клиентский код не должен подключать базу данных: используйте API-маршрут",
+        },
+      ],
+    }],
+  },
+}, {
   ignores: [
     "node_modules/**",
     ".next/**",

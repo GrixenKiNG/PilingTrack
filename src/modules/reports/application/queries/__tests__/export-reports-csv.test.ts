@@ -55,6 +55,16 @@ it('X6: carries the stored ending readings into the PDF job payload', async () =
   expect((await loadSingleReportPdfContext('r1'))?.pdfData).toMatchObject({ endingEngineHours: 1234, endingFuelPercent: 0 });
 });
 
+it('F-R28-3: carries the already loaded revision into the PDF payload without another report query', async () => {
+  const { loadSingleReportPdfContext } = await import('@/lib/pdf-data');
+  findUniqueMock.mockClear();
+  findUniqueMock.mockResolvedValue({reportId: 'r2', date: '2026-10-09', tenantId: 't1', version: 2, crew: {assistants: [], equipment: null}, piles: [], drillings: [], downtimes: []});
+  getSettingsMock.mockResolvedValue({});
+  const context = await loadSingleReportPdfContext('r2');
+  expect(context?.pdfData).toMatchObject({version: 2});
+  expect(findUniqueMock).toHaveBeenCalledTimes(1);
+});
+
 describe('exportReportsCsv — tenant scoping', () => {
   beforeEach(() => {
     findManyMock.mockReset();

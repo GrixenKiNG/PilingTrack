@@ -5,7 +5,7 @@ import { buildAttentionItems, type AttentionInput } from '../dashboard-attention
 const NOW = new Date('2026-10-10T09:00:00.000Z');
 const PAST = '2026-10-09T09:00:00.000Z';
 const FUTURE = '2026-10-11T09:00:00.000Z';
-const permit = (state: WorkPermitDto['state'], validTo: string) => ({ id: `p-${state}-${validTo}`, state, validTo } as WorkPermitDto);
+const permit = (state: WorkPermitDto['state'], validTo: string, equipmentId = 'eq-1') => ({ id: `p-${state}-${validTo}-${equipmentId}`, state, validTo, equipmentId } as WorkPermitDto);
 const shift = (state: ReadinessShiftDto['state'], equipmentId = 'eq-1') => ({ id: `s-${equipmentId}`, state, equipmentId } as ReadinessShiftDto);
 const current = (equipmentId: string, inspectionCompleted: boolean) => ({ equipmentId, facts: { inspectionCompleted } } as unknown as CurrentReadinessDto);
 const defect = (status: DefectDto['status'], severity: DefectDto['severity'], equipmentId = 'eq-1') => ({ id: `d-${equipmentId}-${status}`, status, severity, equipmentId } as DefectDto);
@@ -22,10 +22,28 @@ describe('«Требует решения сейчас»', () => {
   });
 
   it('просроченные наряды: одна строка с числом, роль и действие, ссылка на фильтр просроченных', () => {
-    const items = buildAttentionItems({ ...base, permits: [permit('PENDING_APPROVAL', PAST), permit('EXPIRED', PAST), permit('APPROVED', FUTURE)] });
+    const items = buildAttentionItems({ ...base, permits: [permit('PENDING_APPROVAL', PAST), permit('APPROVED', PAST, 'eq-3'), permit('APPROVED', FUTURE, 'eq-2')] });
     expect(items).toHaveLength(1);
-    expect(items[0]).toMatchObject({ role: 'Инженер ОТ', action: 'Оформить новые', href: '/admin/safety?view=permits&filter=overdue' });
-    expect(items[0].problem).toContain('просрочено 2');
+    expect(items[0]).toMatchObject({ role: 'Инженер ОТ или механик', action: 'Закрыть / оформить новый', href: '/admin/safety?view=permits&filter=overdue' });
+    expect(items[0].problem).toContain('срок вышел, но не закрыты: 2');
+    expect(items[0].problem).toContain('закрыть: 1; оформить новый: 1');
+  });
+
+  it('согласованный нужно закрыть даже при наличии замены; ожидающий требует нового, закрытые не считаются', () => {
+    const approved = buildAttentionItems({...base, permits: [permit('APPROVED', PAST), permit('APPROVED', FUTURE), permit('CLOSED', PAST)]});
+    expect(approved[0]).toMatchObject({problem: 'Наряды-допуски: срок вышел, но не закрыты: 1', action: 'Закрыть'});
+    const pending = buildAttentionItems({...base, permits: [permit('PENDING_APPROVAL', PAST), permit('APPROVED', FUTURE)]});
+    expect(pending[0]).toMatchObject({action: 'Оформить новый'});
+    expect(pending[0].problem).toContain('ожидал согласования — оформить новый');
+    expect(buildAttentionItems({...base, permits: [permit('CLOSED', PAST)]})).toEqual([]);
+  });
+
+  it('наряды, уже переведённые в «истёк», — история: в «требует решения» не попадают', () => {
+    expect(buildAttentionItems({ ...base, permits: [permit('EXPIRED', PAST), permit('EXPIRED', PAST, 'eq-2')] })).toEqual([]);
+  });
+
+  it('просроченный наряд установки, у которой есть действующий новый, не в счёте', () => {
+    expect(buildAttentionItems({ ...base, permits: [permit('EXPIRED', PAST), permit('APPROVED', FUTURE)] })).toEqual([]);
   });
 
   it('смена ждёт допуска и осмотра нет — строка для диспетчера со ссылкой на смены этой установки', () => {

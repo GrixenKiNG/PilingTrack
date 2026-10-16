@@ -39,7 +39,7 @@ async function handleGet(request: NextRequest) {
       const common = parseReadinessReadFilters(params, timezone ?? undefined);
       const state = params.get('state') ?? common.status;
       const risk = params.get('risk') ?? common.risk;
-      if (state && !['DRAFT', 'PENDING_APPROVAL', 'APPROVED', 'EXPIRED', 'REVOKED'].includes(state)) {
+      if (state && !['DRAFT', 'PENDING_APPROVAL', 'APPROVED', 'EXPIRED', 'REVOKED', 'CLOSED'].includes(state)) {
         throw new ReadinessCommandError('VALIDATION_ERROR', 400, 'Неизвестное состояние наряда');
       }
       if (risk && !['NORMAL', 'ELEVATED'].includes(risk)) {

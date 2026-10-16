@@ -293,7 +293,7 @@ export async function acceptMaintenance(
     where: { id: recordId },
     // `status` нужен, чтобы приёмка уже закрытого наряда не завела второе
     // показание счётчика: сдвиг регламента идемпотентен, а запись в журнал нет.
-    select: { id: true, tenantId: true, acceptedById: true, completedAt: true, workDone: true, status: true },
+    select: { id: true, tenantId: true, acceptedById: true, closedById: true, completedAt: true, workDone: true, status: true },
   });
   if (!existing || existing.tenantId !== ctx.tenantId) {
     throw new ServiceError('Запись ТО не найдена', 404);
@@ -312,7 +312,7 @@ export async function acceptMaintenance(
         acceptedById: ctx.userId,
         acceptedAt: new Date(),
         status: 'DONE',
-        closedById: ctx.userId,
+        closedById: existing.closedById ?? ctx.userId,
         completedAt: existing.completedAt ?? new Date(),
       },
     }).catch(rethrowConcurrentChange);

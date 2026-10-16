@@ -3,7 +3,7 @@ import { createRoleAuditFixture } from './fixtures/role-audit.mjs';
 import {login} from './page-objects/login.page';
 
 // Real, isolated accounts. No actingAs, shared production users or external bots.
-const homes={ADMIN:'/admin',DISPATCHER:'/admin',OPERATOR:'/operator',ASSISTANT:'/assistant',MECHANIC:'/admin/to',FOREMAN:'/admin',SAFETY_ENGINEER:'/admin/to'};
+const homes={ADMIN:'/admin',DISPATCHER:'/admin',OPERATOR:'/operator',ASSISTANT:'/assistant',MECHANIC:'/admin/to',FOREMAN:'/admin',SAFETY_ENGINEER:'/admin/safety'};
 test.describe('seven real roles',()=>{
  test.describe.configure({mode:'default'});
  let fixture;
@@ -27,9 +27,10 @@ test.describe('seven real roles',()=>{
   await settled();
   await page.goto('/admin/users');
   if(role==='ADMIN'){await expect(page).toHaveURL(/\/admin\/users$/);await expect(page.getByText('QA OPERATOR',{exact:true}).first()).toBeVisible()}
-  else await expect(page).toHaveURL(new RegExp(home+'$'));
+  // С 07.10.2026 отказ в админке ведёт на «Нет доступа» (W17/W22), а не на домашнюю страницу роли.
+  else await expect(page).toHaveURL(/\/no-access$/);
   await settled();
-  if(role==='ADMIN')await page.goto(home);
+  await page.goto(home);
   if(role==='OPERATOR'||role==='ASSISTANT'){
    if(role==='OPERATOR'){
     await page.getByRole('button',{name:'Проверить средства защиты',exact:true}).click();
@@ -51,7 +52,9 @@ test.describe('seven real roles',()=>{
    const [saved]=await Promise.all([page.waitForResponse(r=>r.url().includes(role==='OPERATOR'?'/api/operator/mobile/command':'/api/assistant/command')),page.getByRole('button',{name:'Записать результат',exact:true}).click()]);
    expect(saved.ok()).toBe(true);expect((await saved.json()).data.correct).toBe(8);await settled();await page.reload();
    await expect(page.getByText(role==='OPERATOR'?'Приём установки':'Допуск в порядке',{exact:true})).toBeVisible();
-  }else if(role==='MECHANIC'||role==='SAFETY_ENGINEER')await expect(page.getByText('Чек-лист смены (5 шагов)',{exact:true})).toBeVisible();
+  }else if(role==='MECHANIC')await expect(page.getByText('Чек-лист смены (5 шагов)',{exact:true})).toBeVisible();
+  // Инженер ОТ входит в модуль «ТБ и допуски» (src/lib/routes.ts), а не в Техготовность.
+  else if(role==='SAFETY_ENGINEER')await expect(page.getByRole('tab',{name:'Наряд-допуски',exact:true})).toBeVisible();
   else await expect(page.getByRole('heading',{name:'Дашборд',exact:true})).toBeVisible();
   await page.screenshot({path:info.outputPath(role+'-desktop.png'),fullPage:true});
   await page.setViewportSize({width:390,height:844});

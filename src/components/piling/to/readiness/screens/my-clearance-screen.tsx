@@ -16,6 +16,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { Loader2 } from '@/components/piling/icons/unified-icons';
+import { toast } from 'sonner';
 import { authFetch } from '@/lib/api';
 import { formatRuDate } from '@/lib/format';
 import { Button } from '@/components/ui/button';
@@ -55,6 +56,11 @@ interface SelfView {
     documentVersion: string;
     result: string | null;
     validUntil: string | null;
+    instructorName: string | null;
+    instructorSignedAt: string | null;
+    employeeSignedAt: string | null;
+    /** Инструктор расписался, работник ещё нет — строке нужна кнопка. */
+    awaitingEmployeeSignature: boolean;
   }>;
 }
 
@@ -72,6 +78,7 @@ const isTrouble = (status: ClearanceDocument['status']) =>
 export function MyClearanceScreen() {
   const [data, setData] = useState<SelfView | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
+  const [signing, setSigning] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -89,6 +96,30 @@ export function MyClearanceScreen() {
 
   // eslint-disable-next-line react-hooks/set-state-in-effect -- loads data on mount; the async loader sets state
   useEffect(() => { void load(); }, [load]);
+
+  /**
+   * Подтвердить инструктаж, который провёл инструктор. Подписывается ровно та
+   * запись, под которой нажата кнопка; кто вправе её подписать, решает сервер по
+   * сессии. Ответ показываем всегда: молчаливая неудача выглядела бы как
+   * поставленная отметка.
+   */
+  const sign = async (recordId: string) => {
+    setSigning(recordId);
+    try {
+      const response = await authFetch(`/api/briefings/${recordId}/sign`, { method: 'POST' });
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        toast.error(body.error || `Сервер вернул ${response.status}`);
+        return;
+      }
+      toast.success('Отметка поставлена');
+      await load();
+    } catch {
+      toast.error('Нет связи с сервером. Отметка не поставлена, повторите.');
+    } finally {
+      setSigning(null);
+    }
+  };
 
   const clearance = data?.clearance;
 
@@ -234,13 +265,30 @@ export function MyClearanceScreen() {
                   <span className="min-w-0 flex-1">
                     <span className="font-medium">{record.documentTitle}</span>
                     <span className="ml-2 text-xs text-muted-foreground">
-                      {record.kind === 'KNOWLEDGE' ? 'проверка знаний' : 'ознакомление'}
+                      {record.kind === 'KNOWLEDGE' ? 'проверка знаний' : record.instructorName ? 'инструктаж' : 'ознакомление'}
                       {record.documentVersion ? ` · ред. ${record.documentVersion}` : ''}
+                      {record.instructorName ? ` · провёл ${record.instructorName}` : ''}
                     </span>
+                    {record.awaitingEmployeeSignature && (
+                      <span className="mt-0.5 block text-xs font-semibold text-warning-strong">
+                        ждёт вашей отметки
+                      </span>
+                    )}
                   </span>
-                  <span className="text-xs font-semibold">
-                    {record.result ?? '✓'}
-                  </span>
+                  {record.awaitingEmployeeSignature ? (
+                    <Button
+                      size="sm"
+                      disabled={signing === record.id}
+                      aria-label={`Подтвердить инструктаж «${record.documentTitle}»`}
+                      onClick={() => void sign(record.id)}
+                    >
+                      {signing === record.id ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Подтвердить'}
+                    </Button>
+                  ) : (
+                    <span className="text-xs font-semibold">
+                      {record.result ?? '✓'}
+                    </span>
+                  )}
                 </div>
               ))}
             </div>

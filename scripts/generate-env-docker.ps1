@@ -86,7 +86,6 @@ S3_FORCE_PATH_STYLE=true
 SENTRY_ORG=
 SENTRY_PROJECT=pilingtrack
 SENTRY_AUTH_TOKEN=
-OTEL_ENABLED=false
 
 # ============================================================
 # pgAdmin (only used with --profile dev)

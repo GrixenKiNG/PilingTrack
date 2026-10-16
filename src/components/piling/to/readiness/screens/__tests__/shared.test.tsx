@@ -88,6 +88,14 @@ describe('ReadinessFiltersBar: audit mode debounce and dropdown (R125 №6, №7
       expect.objectContaining({ status: 'STARTED' })
     );
   });
+
+  it('offers the closed permit state without removing legacy history states', () => {
+    render(<ReadinessFiltersBar filters={{}} onChange={mockOnChange} mode="permits" />);
+    expect(screen.getByRole('option', {name: 'Закрыт'})).toHaveValue('CLOSED');
+    expect(screen.getByRole('option', {name: 'Истёк'})).toHaveValue('EXPIRED');
+    fireEvent.change(screen.getByLabelText('Статус'), {target: {value: 'CLOSED'}});
+    expect(mockOnChange).toHaveBeenCalledWith(expect.objectContaining({status: 'CLOSED'}));
+  });
 });
 describe('commandFailure: причины отказа в допуске смены', () => {
   const failure = (status: number, body: unknown) =>

@@ -4,6 +4,7 @@ import {nextStep} from '../shift-next-step';
 import {NextStepTab} from '../step-bar';
 import {OperatorWorkOverview, type WorkAction} from '../operator-work-overview';
 import {useCallback, useEffect, useRef, useState} from 'react';
+import {useLocalFormDraft} from '../use-local-form-draft';
 import {
   DOWNTIME_QUICK_HOURS, downtimeHoursProblem, formatDowntimeHoursOnly, parseDowntimeHours,
 } from '@/lib/downtime-hours';
@@ -17,6 +18,7 @@ import {
   PPE_ITEMS, SAFETY_BRIEFING, TOPIC_LABELS,
 } from '@/modules/operator-mobile/contracts';
 import {ChecklistScreen} from '../screens/checklist-screen';
+import {ShiftThanks} from '../shift-thanks';
 import {knownAnswers} from '../safety/known-answers';
 import type {KnowledgeQuestion} from '@/modules/operator-mobile/contracts';
 import {admissionBlockers, admissionSteps} from '../safety/admission-steps';
@@ -27,6 +29,7 @@ import {OfflineQueueBanner} from '../offline-queue-banner';
 import {useOfflineQueue} from '../use-offline-queue';
 import type {ProductionEntryInput} from '../api';
 import {PilePassportForm} from '../screens/pile-passport-form';
+import {V10Entries, type CorrectionInput} from './v10-entries';
 import {formatNumber} from '@/lib/format';
 import {
   Badge, Banner, Card, Icon, Metric, Navbar, Nodata, Pair, Row, Tabbar,
@@ -276,7 +279,7 @@ function StepLadder({state, go}: {state: OperatorMobileState; go: Go}) {
         <button type="button" className="ov10-btn" onClick={() => go('step')}>
           Дальше: {next.title}
         </button>
-      ) : <Banner tone="info" title="Смена закрыта" />}
+      ) : <ShiftThanks operatorName={state.operator?.name} reportSent={Boolean(state.receipt?.submittedAt)} />}
       <Card title="Порядок смены">
         {STEPS.map((step, index) => {
           const done = index < current;
@@ -358,11 +361,24 @@ function ScreenAccept({state, busy, onAccept, go}: {
       </Card>
       {accepted
         ? <Banner tone="info" title="Установка уже принята" />
-        : (
-          <button type="button" className="ov10-btn" disabled={busy} onClick={onAccept}>
-            {busy ? 'Принимаем…' : 'Принять установку'}
-          </button>
-        )}
+        : !state.identity.ppe.confirmed
+          // Сервер не откроет смену без отметки о проверке СИЗ (решение владельца
+          // 14.10.2026): ведём на нужный шаг, а не на отказ.
+          ? (
+            <>
+              <Banner tone="warn" title="Сначала проверьте средства защиты">
+                Без этой отметки смену начать нельзя.
+              </Banner>
+              <button type="button" className="ov10-btn" onClick={() => go('ppe')}>
+                Проверить средства защиты
+              </button>
+            </>
+          )
+          : (
+            <button type="button" className="ov10-btn" disabled={busy} onClick={onAccept}>
+              {busy ? 'Принимаем…' : 'Принять установку'}
+            </button>
+          )}
       <button type="button" className="ov10-btn ghost" onClick={() => go('today')}>К порядку смены</button>
     </>
   );
@@ -386,11 +402,14 @@ function ProductionForm({state, busy, onLog, initialKind = 'PILES'}: {
   /** true — сервер принял запись (или она легла в очередь); только тогда форма очищается. */
   onLog: (entry: ProductionEntryInput) => Promise<boolean>;
 }) {
-  const [kind, setKind] = useState<WorkAction>(initialKind);
-  const [optionId, setOptionId] = useState('');
-  const [count, setCount] = useState('');
-  const [meters, setMeters] = useState('');
-  const [hoursText, setHoursText] = useState('');
+  const localDraft = useLocalFormDraft(state.operator?.id, state.shift?.id && `production:v10:${state.shift.id}`, {
+    kind: initialKind, optionId: '', count: '', meters: '', hoursText: '',
+  }, (value) => !value.optionId && !value.count && !value.meters && !value.hoursText);
+  const [kind, setKind] = localDraft.field('kind');
+  const [optionId, setOptionId] = localDraft.field('optionId');
+  const [count, setCount] = localDraft.field('count');
+  const [meters, setMeters] = localDraft.field('meters');
+  const [hoursText, setHoursText] = localDraft.field('hoursText');
 
   const options = kind === 'PILES' || kind === 'PASSPORT' ? state.dictionaries.pileGrades
     : kind === 'DRILLING' ? state.dictionaries.drillingTypes
@@ -437,6 +456,7 @@ function ProductionForm({state, busy, onLog, initialKind = 'PILES'}: {
     setCount('');
     setMeters('');
     setHoursText('');
+    localDraft.clear({...localDraft.value, optionId: '', count: '', meters: '', hoursText: ''});
   };
 
   return (
@@ -457,6 +477,8 @@ function ProductionForm({state, busy, onLog, initialKind = 'PILES'}: {
           ней нормативное, и расходиться ей нельзя. */}
       {kind === 'PASSPORT' ? (
         <PilePassportForm
+          draftUserId={state.operator?.id}
+          draftShiftId={state.shift?.id}
           grades={state.dictionaries.pileGrades}
           busy={busy}
           onSubmit={(pileGradeId, passport) => onLog({kind: 'PILE_PASSPORT', pileGradeId, passport})}
@@ -528,10 +550,11 @@ function ProductionForm({state, busy, onLog, initialKind = 'PILES'}: {
   );
 }
 
-function ScreenWork({state, busy, onLog, go}: {
+function ScreenWork({state, busy, onLog, onCorrect, go}: {
   state: OperatorMobileState;
   busy: boolean;
   onLog: (entry: ProductionEntryInput) => Promise<boolean>;
+  onCorrect: (input: CorrectionInput) => Promise<boolean>;
   go: Go;
 }) {
   const [entry, setEntry] = useState<WorkAction | null>(null);
@@ -543,13 +566,19 @@ function ScreenWork({state, busy, onLog, go}: {
     return (
       <>
         <ProductionForm state={state} busy={busy} onLog={onLog} />
+        <V10Entries entries={state.entries} busy={busy} onCorrect={onCorrect} />
         <button type="button" className="ov10-btn ghost" onClick={() => go(state.shift && state.shift.productionDate < state.productionDate ? 'closing' : 'step')}>{state.shift && state.shift.productionDate < state.productionDate ? 'К сдаче смены' : 'К ЕО после работы и закрытию'}</button>
       </>
     );
   }
   if (entry) return <><button type="button" className="oc-form-back" onClick={()=>setEntry(null)}>← К смене</button><ProductionForm key={entry} state={state} busy={busy} onLog={onLog} initialKind={entry} /></>;
-  return <OperatorWorkOverview state={state} variant="v10" busy={busy} onAction={setEntry}
-    onIncident={()=>go('incidents')} onFinish={()=>go('closing')} />;
+  return (
+    <>
+      <OperatorWorkOverview state={state} variant="v10" busy={busy} onAction={setEntry}
+        onIncident={()=>go('incidents')} onFinish={()=>go('closing')} />
+      <V10Entries entries={state.entries} busy={busy} onCorrect={onCorrect} />
+    </>
+  );
 }
 
 /**
@@ -646,7 +675,7 @@ function ScreenSafetyChecklists({state, busy, error, commandId, onSubmit, go}: {
   busy: boolean;
   error: string | null;
   commandId: string;
-  onSubmit: (stage: ChecklistStage, answers: ChecklistAnswer[]) => Promise<boolean>;
+  onSubmit: (stage: ChecklistStage, answers: ChecklistAnswer[], restoredCommandId?: string) => Promise<boolean>;
   go: Go;
 }) {
   const [open, setOpen] = useState<ChecklistStage | null>(null);
@@ -655,6 +684,8 @@ function ScreenSafetyChecklists({state, busy, error, commandId, onSubmit, go}: {
   if (opened) {
     return (
       <ChecklistScreen
+        draftUserId={state.operator?.id}
+        draftShiftId={state.shift?.id}
         key={`${state.shift?.id}:${state.assignment?.equipmentId}:${opened.stage}`}
         checklist={opened}
         warnings={state.warnings}
@@ -664,8 +695,10 @@ function ScreenSafetyChecklists({state, busy, error, commandId, onSubmit, go}: {
         lastMeter={state.assignment?.lastMeter ?? null}
         known={knownAnswers(opened.stage, state)}
         onBack={() => setOpen(null)}
-        onSubmit={(answers) => {
-          void onSubmit(opened.stage, answers).then((ok) => { if (ok) setOpen(null); });
+        onSubmit={async (answers, restoredCommandId) => {
+          const ok = await onSubmit(opened.stage, answers, restoredCommandId);
+          if (ok) setOpen(null);
+          return ok;
         }}
       />
     );
@@ -791,7 +824,7 @@ function ScreenClosing({state, busy, onFinish, onClose, go, unsent, onFlush}: {
           <Pair label="Отправлен" value={dateRu(state.receipt.submittedAt)} />
         </Card>
       ) : null}
-      {closed ? <Banner tone="info" title="Смена закрыта" /> : null}
+      {closed ? <ShiftThanks operatorName={state.operator?.name} reportSent={Boolean(state.receipt?.submittedAt)} /> : null}
       {!closed && !afterDone ? (
         <>
           <Banner tone="warn" title="Сначала ЕО после работы" />
@@ -915,9 +948,9 @@ function ScreenSafety({state, view, error, go}: {
       <>
       <Card>
         <Row icon="shield" tone={view.clearance.cleared ? 'ok' : 'bad'}
-          title={view.clearance.cleared ? 'Допуск в порядке' : 'Допуск не оформлен'}
+          title={view.clearance.cleared ? 'Допуск по документам' : 'Допуск не оформлен'}
           note={view.clearance.cleared
-            ? 'препятствий к работе нет'
+            ? state && left.length === 0 ? 'все шаги допуска пройдены' : 'по документам препятствий нет; завершите шаги допуска выше'
             : `препятствий: ${view.clearance.blockers.length}`} />
         <Row icon="inspect" tone={pending > 0 ? 'warn' : 'ok'} title="Инструктажи"
           note={pending > 0 ? `ожидают: ${pending}` : 'пройдены'} />
@@ -1513,7 +1546,7 @@ export function OperatorV10App() {
    * замеры), здесь только отправка. Успех возвращается, чтобы экран шага
    * вернул человека к порядку смены, а не оставлял на сданном списке.
    */
-  const submitChecklist = useCallback(async (stage: ChecklistStage, checklistAnswers: ChecklistAnswer[]): Promise<boolean> => {
+  const submitChecklist = useCallback(async (stage: ChecklistStage, checklistAnswers: ChecklistAnswer[], restoredCommandId?: string): Promise<boolean> => {
     const shiftId = state?.shift?.id;
     const equipmentId = state?.assignment?.equipmentId;
     const list = state?.checklists.find((item) => item.stage === stage);
@@ -1523,7 +1556,7 @@ export function OperatorV10App() {
     }
     return run(() => sendCommand({
       command: 'submit-checklist',
-      clientCommandId: commandId,
+      clientCommandId: restoredCommandId ?? commandId,
       shiftId,
       equipmentId,
       stage,
@@ -1540,6 +1573,18 @@ export function OperatorV10App() {
     return run(
       () => sendCommand({command: 'log-production', clientCommandId: commandId, shiftId, entry}),
       'Записано.',
+    );
+  }, [commandId, run, state]);
+
+  const correctProduction = useCallback(async (input: CorrectionInput): Promise<boolean> => {
+    const shiftId = state?.shift?.id;
+    if (!shiftId) {
+      setActionError('Смена не начата: поправлять нечего.');
+      return false;
+    }
+    return run(
+      () => sendCommand({command: 'correct-production', clientCommandId: commandId, shiftId, ...input}),
+      'Поправка записана.',
     );
   }, [commandId, run, state]);
 
@@ -1583,6 +1628,8 @@ export function OperatorV10App() {
       if (!list) return <Card><Nodata>Список «{stage}» не пришёл с сервера — обновите экран</Nodata></Card>;
       return (
         <ChecklistScreen
+          draftUserId={current.operator?.id}
+          draftShiftId={current.shift?.id}
           key={`${current.shift?.id}:${current.assignment?.equipmentId}:${list.stage}`}
           checklist={list}
           warnings={current.warnings}
@@ -1592,15 +1639,15 @@ export function OperatorV10App() {
           lastMeter={current.assignment?.lastMeter ?? null}
           known={knownAnswers(list.stage, current)}
           onBack={() => setActive('today')}
-          onSubmit={(checklistAnswers) => {
-            void submitChecklist(list.stage, checklistAnswers).then((ok) => {
-              if (ok) setActive(list.stage === 'EO_AFTER' ? 'closing' : 'today');
-            });
+          onSubmit={async (checklistAnswers, restoredCommandId) => {
+            const ok = await submitChecklist(list.stage, checklistAnswers, restoredCommandId);
+            if (ok) setActive(list.stage === 'EO_AFTER' ? 'closing' : 'today');
+            return ok;
           }}
         />
       );
     }
-    if (current.phase === 'WORK' && !oldShift) return <ScreenWork state={current} busy={busy} onLog={logProduction} go={setActive} />;
+    if (current.phase === 'WORK' && !oldShift) return <ScreenWork state={current} busy={busy} onLog={logProduction} onCorrect={correctProduction} go={setActive} />;
     return <ScreenClosing state={current} busy={busy} onFinish={finishWork} onClose={closeShift} go={goFromClosing}
       unsent={queued.length} onFlush={() => void flushQueued()} />;
   };
@@ -1640,7 +1687,7 @@ export function OperatorV10App() {
     if (!state) {
       return (
         <Card>
-          <Nodata>{loadError ?? 'Состояние смены недоступно'}</Nodata>
+          <Nodata>Состояние смены недоступно</Nodata>
         </Card>
       );
     }
@@ -1661,7 +1708,7 @@ export function OperatorV10App() {
         <ScreenClosing state={state} busy={busy} onFinish={finishWork} onClose={closeShift} go={goFromClosing}
           unsent={queued.length} onFlush={() => void flushQueued()} />
       ) : <>
-        <ScreenWork state={state} busy={busy} onLog={logProduction} go={goFromClosing} />
+        <ScreenWork state={state} busy={busy} onLog={logProduction} onCorrect={correctProduction} go={goFromClosing} />
         {oldShift && state.phase === 'WORK' ? <button type="button" className="ov10-btn ghost" onClick={() => goFromClosing('closing')}>К сдаче смены</button> : null}
       </>;
       case 'maint': return <ScreenMaint state={state} go={setActive} />;
@@ -1690,7 +1737,9 @@ export function OperatorV10App() {
       </div>
       <div className="ov10-content" ref={contentRef}>
         {oldShift && state?.shift ? <Banner tone="warn" title={`Не сдана смена за ${dateRu(state.shift.productionDate)}`}>Дописать можно только работу этой смены. Сегодняшняя работа — после открытия новой смены.</Banner> : null}
-        {loadError && state ? <Banner tone="warn" title={loadError} /> : null}
+        {loadError ? <Banner tone="warn" title={loadError}>
+          <button type="button" className="ov10-btn" onClick={() => void reload()}>Повторить</button>
+        </Banner> : null}
         {actionError ? <Banner tone="bad" title={`Не записано: ${actionError}`} /> : null}
         {notice ? <Banner tone="info" title={notice} /> : null}
         <OfflineQueueBanner items={queued} onRetry={retryQueued} onDiscard={discardQueued} className="space-y-1" />

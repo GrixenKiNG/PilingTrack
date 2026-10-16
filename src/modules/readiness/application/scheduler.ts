@@ -40,7 +40,9 @@ const SCHEDULER_ACTOR = {id: null, name: 'Планировщик техгото�
 
 export interface ReadinessSchedulerResult {
   permitsExpired: number;
+  permitsClosed: number;
   shiftsAutoClosed: number;
+  shiftsAutoCancelled: number;
   recalcRequested: number;
 }
 
@@ -121,28 +123,31 @@ export async function runReadinessScheduler(
   const runId = randomUUID();
 
   return withReadinessTenantTransaction(tenantId, async (tx) => {
-    // 1. Наряды с истёкшим сроком: согласованные и ожидающие согласования.
-    //    Наряд на согласовании с прошедшим окном согласовать нельзя (approve
-    //    отказывает), поэтому без перехода он висел бы в очереди вечно.
-    //    Черновик не трогаем — его можно перепланировать; отозванный уже
-    //    закрыт человеком.
-    //
-    // Сначала выбираем строки, потом обновляем по их идентификаторам: слепой
-    // `updateMany` не оставлял следа, кто и что поменял, а модуль стоит на
-    // доказательности. Внутри одной транзакции выбранный набор и есть
-    // обновлённый.
+    // 1. Согласованные наряды закрываем по сроку, не согласованные вовремя
+    // помечаем истёкшими. Уже закрытые и исторические EXPIRED не выбираем.
+    // CAS каждой строки не даёт ночному прогону перезаписать решение человека
+    // и записать ложный аудит, если после выборки наряд уже изменился.
     const expiring = await tx.workPermit.findMany({
       where: {tenantId, state: {in: ['APPROVED', 'PENDING_APPROVAL']}, validTo: {lte: now}},
       select: {id: true, version: true, state: true, validTo: true},
     });
-    const expired = expiring.length === 0 ? {count: 0} : await tx.workPermit.updateMany({
-      where: {tenantId, id: {in: expiring.map((permit) => permit.id)}, state: {in: ['APPROVED', 'PENDING_APPROVAL']}},
-      data: {state: 'EXPIRED', expiredAt: now, version: {increment: 1}},
-    });
+    let permitsExpired = 0;
+    let permitsClosed = 0;
     for (const permit of expiring) {
+      const closeByValidity = permit.state === 'APPROVED';
+      const state = closeByValidity ? 'CLOSED' : 'EXPIRED';
+      const updated = await tx.workPermit.updateMany({
+        where: {tenantId, id: permit.id, version: permit.version, state: permit.state, validTo: {lte: now}},
+        data: {state, version: {increment: 1}, ...(closeByValidity
+          ? {closedAt: now, closedById: null, closeReason: 'VALIDITY_ELAPSED' as const}
+          : {expiredAt: now})},
+      });
+      if (updated.count !== 1) continue;
+      if (closeByValidity) permitsClosed += 1;
+      else permitsExpired += 1;
       await recordChainedReadinessAudit(tx, {
         tenantId,
-        action: 'work-permit.expired',
+        action: closeByValidity ? 'work-permit.closed' : 'work-permit.expired',
         entityType: 'WorkPermit',
         entityId: permit.id,
         entityVersion: permit.version + 1,
@@ -152,9 +157,11 @@ export async function runReadinessScheduler(
         occurredAt: now,
         before: {state: permit.state, version: permit.version,
           validTo: permit.validTo ? permit.validTo.toISOString() : null},
-        after: {state: 'EXPIRED', version: permit.version + 1, expiredAt: now.toISOString()},
+        after: {state, version: permit.version + 1, ...(closeByValidity
+          ? {closedAt: now.toISOString(), closedById: null, closeReason: 'VALIDITY_ELAPSED'}
+          : {expiredAt: now.toISOString()})},
         metadata: {trigger: 'SCHEDULER',
-          reason: permit.state === 'PENDING_APPROVAL' ? 'UNAPPROVED_WINDOW_ELAPSED' : 'VALIDITY_ELAPSED'},
+          reason: closeByValidity ? 'VALIDITY_ELAPSED' : 'UNAPPROVED_WINDOW_ELAPSED'},
       });
     }
 
@@ -242,6 +249,38 @@ export async function runReadinessScheduler(
       });
     }
 
+    // 2б. Неначатые смены прошедших суток (PLANNED, PENDING_ACCEPTANCE) —
+    //     несостоявшийся план. Работа не шла, поэтому не «закрываем», а
+    //     отменяем с причиной: иначе смена вечно висела на дашборде как
+    //     «ждёт допуска», хотя допускать уже нечего — сутки кончились.
+    const unstarted = await tx.shift.findMany({
+      where: {tenantId, state: {in: ['PLANNED', 'PENDING_ACCEPTANCE']}},
+      select: {id: true, productionDate: true, timezone: true, version: true, state: true},
+    });
+    const lapsed = unstarted.filter((shift) => tenantProductionDate(now, shift.timezone).getTime() > shift.productionDate.getTime());
+    const lapsedIds = lapsed.map((shift) => shift.id);
+    const cancelled = lapsedIds.length === 0 ? {count: 0} : await tx.shift.updateMany({
+      where: {tenantId, id: {in: lapsedIds}, state: {in: ['PLANNED', 'PENDING_ACCEPTANCE']}},
+      data: {state: 'CANCELLED', cancelledAt: now, cancelReason: 'Смену не начали до конца производственных суток', version: {increment: 1}},
+    });
+    for (const shift of lapsed) {
+      await recordChainedReadinessAudit(tx, {
+        tenantId,
+        action: 'shift.auto-cancelled',
+        entityType: 'Shift',
+        entityId: shift.id,
+        entityVersion: shift.version + 1,
+        actor: SCHEDULER_ACTOR,
+        requestId: runId,
+        correlationId: runId,
+        occurredAt: now,
+        before: {state: shift.state, version: shift.version,
+          productionDate: shift.productionDate.toISOString().slice(0, 10)},
+        after: {state: 'CANCELLED', version: shift.version + 1, cancelledAt: now.toISOString()},
+        metadata: {trigger: 'SCHEDULER', reason: 'NOT_STARTED_PRODUCTION_DAY_ELAPSED', timezone: shift.timezone},
+      });
+    }
+
     // 3. Пересчёт готовности на новые сутки.
     //
     // Это лечит главную ложь экрана: `CurrentReadiness` пересчитывался ТОЛЬКО
@@ -276,8 +315,10 @@ export async function runReadinessScheduler(
     }
 
     return {
-      permitsExpired: expired.count,
+      permitsExpired,
+      permitsClosed,
       shiftsAutoClosed: closed.count,
+      shiftsAutoCancelled: cancelled.count,
       recalcRequested: fleet.length,
     };
   });

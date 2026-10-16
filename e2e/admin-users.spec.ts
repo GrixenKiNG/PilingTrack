@@ -14,12 +14,15 @@ test.describe('Пользователи — операционный модул�
     await expect(page.getByText('Бригада / установка')).toBeVisible();
     await expect(page.getByPlaceholder('ФИО, email или телефон')).toBeVisible();
 
+    // Панель сведений никого не подставляет сама (admin-users.tsx: activeId) —
+    // вкладки появляются после выбора человека в списке.
+    const firstRow = page.locator('section [role="button"]').first();
+    await expect(firstRow).toBeVisible();
+    await firstRow.click();
+
     for (const tab of ['Обзор', 'Закрепление', 'Активность', 'Доступ', 'История']) {
       await expect(page.getByRole('tab', { name: tab })).toBeVisible();
     }
-
-    const firstRow = page.locator('section [role="button"]').first();
-    await expect(firstRow).toBeVisible();
     const rowText = await firstRow.innerText();
     const email = rowText.match(/[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}/)?.[0];
     expect(email).toBeTruthy();

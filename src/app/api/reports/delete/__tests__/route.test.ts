@@ -32,7 +32,7 @@ const {
 
 vi.mock('@/lib/auth', () => ({ requireAuth: requireAuthMock }));
 vi.mock('@/lib/csrf-protection', () => ({ withCsrf: () => null }));
-vi.mock('@/lib/logger', () => ({ logger: { error: loggerErrorMock } }));
+vi.mock('@/lib/logger', () => ({ logger: { error: loggerErrorMock, warn: vi.fn(), info: vi.fn(), debug: vi.fn() } }));
 // Сброс кэша журнала отчётов (0eca0a0d) — отдельно проверен в cached-queries; здесь не нужен.
 vi.mock('@/lib/cached-queries', () => ({ invalidateReports: vi.fn() }));
 vi.mock('@/lib/db', () => {

@@ -163,19 +163,6 @@ export function ValueRow({ label, value, tone }: {
   );
 }
 
-/** Большой круг с галочкой — экраны пуска и закрытия смены. */
-export function BigCheck({ tone }: { tone: 'green' | 'purple' }) {
-  return (
-    <div className={cn('mx-auto flex h-24 w-24 items-center justify-center rounded-full',
-      tone === 'green' ? 'bg-success/12' : 'bg-success/12')}>
-      <div className={cn('flex h-16 w-16 items-center justify-center rounded-full border-[3px]',
-        tone === 'green' ? 'border-success text-success-strong' : 'border-success text-success-strong')}>
-        <Check className="h-9 w-9" />
-      </div>
-    </div>
-  );
-}
-
 export type V2Tab = 'shift' | 'safety' | 'equipment' | 'more';
 
 /**

@@ -37,6 +37,8 @@ const tx = {
   meterReading: {findFirst: vi.fn()},
   operatorShiftEvidence: {findFirst: vi.fn()},
   outboxEvent: {create: vi.fn()},
+  reportDowntime: {aggregate: vi.fn()},
+  user: {findFirst: vi.fn().mockResolvedValue({name: 'Иванов', role: 'OPERATOR'})},
 };
 
 beforeEach(() => {
@@ -66,6 +68,7 @@ beforeEach(() => {
     piles: [], drillings: [], downtimes: [],
   });
   tx.meterReading.findFirst.mockResolvedValue({engineHours: 1234});
+  tx.reportDowntime.aggregate.mockResolvedValue({_sum: {duration: null}});
   tx.operatorShiftEvidence.findFirst.mockResolvedValue({payload: {fuelPercent: 42}});
   withReadinessTenantTransaction.mockImplementation(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test: фиктивный клиент транзакции вместо Prisma
@@ -92,6 +95,7 @@ describe('closeShift — след сдачи в истории отчёта', ()
     expect(record).toEqual(expect.objectContaining({
       action: 'submitted',
       userId: input.operatorId,
+      userName: 'Иванов', userRole: 'OPERATOR',
     }));
     // Второй аргумент — клиент транзакции: след обязан быть атомарным со статусом.
     expect(client).toBe(tx);
@@ -196,6 +200,51 @@ describe('closeShift — правила закрытия', () => {
 
     await expect(closeShift(input)).rejects.toThrow('Смена уже закрыта');
     expect(tx.shift.update).not.toHaveBeenCalled();
+  });
+
+  // Смена в этих тестах — 12 часов (11:00 → 23:00 по Москве).
+  describe('простой не длиннее смены (то же правило, что у правки отчёта)', () => {
+    it('простой больше смены не даёт закрыть её и ничего не пишет', async () => {
+      tx.reportDowntime.aggregate.mockResolvedValue({_sum: {duration: 13}});
+
+      await expect(closeShift(input)).rejects.toMatchObject({
+        status: 409,
+        message: expect.stringContaining('больше самой смены'),
+      });
+      expect(tx.report.updateMany).not.toHaveBeenCalled();
+      expect(tx.shift.update).not.toHaveBeenCalled();
+      expect(writeReportAuditRow).not.toHaveBeenCalled();
+    });
+
+    it('считает простой этой смены в этой организации', async () => {
+      await closeShift(input);
+
+      expect(tx.reportDowntime.aggregate).toHaveBeenCalledWith({
+        _sum: {duration: true},
+        where: {tenantId: 'tenant-a', shiftId: input.shiftId},
+      });
+    });
+
+    it.each([[0], [3], [12]])('простой %s ч в смене на 12 ч проходит', async (hours) => {
+      tx.reportDowntime.aggregate.mockResolvedValue({_sum: {duration: hours}});
+
+      await expect(closeShift(input)).resolves.toMatchObject({ok: true});
+    });
+
+    it('смена сутки и более: часы и минуты её не различают — не судим', async () => {
+      tx.shift.findFirst.mockResolvedValue(shiftRow({startedAt: new Date('2026-09-25T07:00:00.000Z')}));
+      tx.reportDowntime.aggregate.mockResolvedValue({_sum: {duration: 10}});
+
+      await expect(closeShift(input)).resolves.toMatchObject({ok: true});
+      expect(tx.reportDowntime.aggregate).not.toHaveBeenCalled();
+    });
+
+    it('смена без времени начала проходит: сравнивать не с чем', async () => {
+      tx.shift.findFirst.mockResolvedValue(shiftRow({startedAt: null}));
+      tx.reportDowntime.aggregate.mockResolvedValue({_sum: {duration: 99}});
+
+      await expect(closeShift(input)).resolves.toMatchObject({ok: true});
+    });
   });
 
   it('успешное закрытие переводит смену в CLOSED', async () => {

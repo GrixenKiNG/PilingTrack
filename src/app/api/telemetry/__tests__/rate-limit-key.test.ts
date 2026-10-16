@@ -32,13 +32,14 @@ vi.mock('@/lib/csrf-protection', () => ({ withCsrf: () => null }));
 vi.mock('@/lib/auth', () => ({ requireAuth: vi.fn(async () => ({ user: null, error: null })) }));
 vi.mock('@/lib/tenant', () => ({ requireTenantId: () => 'tenant-a' }));
 vi.mock('@/services/auth/authorization-service', () => ({ assertCan: vi.fn() }));
-vi.mock('@/services/telemetry/telemetry-ingestion-service', () => ({
+vi.mock('@/modules/telemetry', () => ({
   ingestTelemetry: vi.fn(),
   ingestTelemetryBatch: vi.fn(),
   telemetryBuffer: { getStats: () => ({}), getDetailedStats: () => ({}) },
   getSamplingConfig: vi.fn(),
   getIngestStats: vi.fn(),
   findForeignEquipmentIds: vi.fn(async () => []),
+  authenticateDeviceByKey: vi.fn(async () => null),
 }));
 vi.mock('@/core/infrastructure/circuit-breakers', () => ({
   databaseCircuitBreaker: { getStats: () => ({ state: 'CLOSED' }) },
@@ -53,9 +54,6 @@ vi.mock('@/lib/request-context', () => ({
     Response.json(body as object, init),
 }));
 vi.mock('@/core/security/tenant-context', () => ({ setRequestTenantId: vi.fn() }));
-vi.mock('@/services/telemetry/device-key-service', () => ({
-  authenticateDeviceByKey: vi.fn(async () => null),
-}));
 vi.mock('@/lib/db', () => ({ db: {} }));
 
 import { POST as telemetryPost } from '../route';

@@ -20,7 +20,7 @@ import { db, DEFAULT_TX_OPTIONS } from '@/lib/db';
 import { ServiceError } from '@/lib/service-error';
 // eslint-disable-next-line no-restricted-imports -- legacy cross-layer import pending the parked services<->modules migration (CLAUDE.md); behavior-neutral
 import {
-  assertUserAssignedToSite,
+  assertReportOwnerOnSite,
   resolveAccessibleUserId,
   assertCanManageUserScope,
 } from '@/services/auth/resource-access-service';
@@ -87,7 +87,7 @@ export async function upsertReport(
 ): Promise<UpsertReportResult> {
   // Phase 1: Validation (fast, no DB)
   validateReportInput(input);
-  await assertUserAssignedToSite(input.userId, input.siteId);
+  await assertReportOwnerOnSite(input.userId, input.siteId, input.tenantId);
 
   // Site plans are checked inside the save transaction (see Phase 5).
 

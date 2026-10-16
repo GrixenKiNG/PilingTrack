@@ -55,6 +55,10 @@ export async function pileJournalTotals(
   const gte = bounds?.gte ?? null;
   const lt = bounds?.lt ?? null;
 
+  // ВНИМАНИЕ: ниже `ESCAPE '\\'` — именно два слеша в исходнике. В шаблонной строке
+  // JS одиночный `\'` превращается в `'`, и в базу уходил пустой `ESCAPE ''`:
+  // экранированный поиск (`QA\_AUDIT`) ничего не находил, итоги и титул XLSX
+  // показывали нули при непустых строках (аудит 16.10.2026, AU195-14).
   const [totals] = await db.$queryRaw<RawPileJournalTotals[]>`
     SELECT
       COALESCE(SUM(pw."count"), 0)::int AS "piles",
@@ -70,7 +74,7 @@ export async function pileJournalTotals(
     WHERE pw."tenantId" = ${input.tenantId}
       AND (${siteId}::text IS NULL OR r."siteId" = ${siteId}::text)
       AND (${acceptanceValue}::text IS NULL OR p."acceptance"::text = ${acceptanceValue}::text)
-      AND (${pileLike}::text IS NULL OR p."pileNumber" ILIKE ${pileLike}::text ESCAPE '\')
+      AND (${pileLike}::text IS NULL OR p."pileNumber" ILIKE ${pileLike}::text ESCAPE '\\')
       AND (
         (pw."occurredAt" IS NOT NULL
           AND (${gte}::timestamptz IS NULL OR pw."occurredAt" >= ${gte}::timestamptz)

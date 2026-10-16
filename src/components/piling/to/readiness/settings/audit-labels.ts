@@ -31,6 +31,7 @@ export const ACTION_LABEL: Record<string, string> = {
   // Планировщик техготовности (`runReadinessScheduler`) — код выдаёт только он,
   // в журнале показывался сырым.
   'shift.auto-closed': 'Смена закрыта автоматически',
+  'shift.auto-cancelled': 'Неначатая смена отменена автоматически',
   'handover.submitted': 'Смена передана диспетчеру',
   'handover.resubmitted': 'Передача сдана повторно',
   'handover.accepted': 'Передача принята',
@@ -47,6 +48,7 @@ export const ACTION_LABEL: Record<string, string> = {
   // Планировщик техготовности (`runReadinessScheduler`) — код выдаёт только он,
   // в журнале показывался сырым.
   'work-permit.expired': 'Наряд-допуск истёк',
+  'work-permit.closed': 'Наряд-допуск закрыт',
   'defect.reported': 'Зафиксировано замечание',
   'defect.triage': 'Замечание разобрано',
   'defect.resolve': 'Замечание закрыто',
@@ -120,6 +122,7 @@ const ACTION_MARK: Record<string, AuditActionMark> = {
   // кода не было — срабатывала запасная ветка и ночной инцидент рисовался
   // зелёной галочкой «успешно» (R125 №3).
   'shift.auto-closed': { icon: XCircle, tone: 'warning' },
+  'shift.auto-cancelled': { icon: XCircle, tone: 'warning' },
   'handover.submitted': { icon: Send, tone: 'info' },
   'handover.resubmitted': { icon: Send, tone: 'info' },
   'handover.accepted': { icon: Lock, tone: 'success' },
@@ -133,6 +136,7 @@ const ACTION_MARK: Record<string, AuditActionMark> = {
   // Планировщик помечает наряд истёкшим: допуск потерян. Значка не было, и
   // истечение рисовалось зелёной галочкой «успешно» (R125 №3).
   'work-permit.expired': { icon: AlertTriangle, tone: 'danger' },
+  'work-permit.closed': { icon: Lock, tone: 'neutral' },
   'defect.reported': { icon: AlertTriangle, tone: 'danger' },
   'defect.triage': { icon: Search, tone: 'info' },
   'defect.resolve': { icon: CheckCircle2, tone: 'success' },

@@ -301,6 +301,8 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const [bootstrapping, setBootstrapping] = useState(true);
+  const [sessionUnknown, setSessionUnknown] = useState(false);
+  const [sessionAttempt, setSessionAttempt] = useState(0);
 
   useEffect(() => {
     let active = true;
@@ -320,7 +322,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           } else {
             usePilingStore.getState().login(probe.user);
           }
-        } else if (probe.status === 'anonymous' && existingUser) {
+        } else if (probe.status === 'unknown') {
+          setSessionUnknown(true);
+        } else if (existingUser) {
           // Только явный ответ сервера «сессии нет» разлогинивает. При
           // 'unknown' (сеть/5xx) оставляем текущую сессию как есть — иначе
           // моргание БД выкидывало оператора на /login посреди работы.
@@ -328,6 +332,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           router.replace('/login');
           return;
         }
+      } catch {
+        if (active) setSessionUnknown(true);
       } finally {
         // Даже если проверка упала, снимаем «Проверка сессии...»: раньше
         // исключение здесь навсегда оставляло приложение на этом экране.
@@ -340,17 +346,17 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     return () => {
       active = false;
     };
-  }, [router]);
+  }, [router, sessionAttempt]);
 
   // Get current user for redirect check
   const currentUser = usePilingStore((s) => s.currentUser);
 
   // Redirect to login if session check finished but no user found
   useEffect(() => {
-    if (!bootstrapping && !currentUser) {
+    if (!bootstrapping && !sessionUnknown && !currentUser) {
       router.replace('/login');
     }
-  }, [bootstrapping, currentUser, router]);
+  }, [bootstrapping, sessionUnknown, currentUser, router]);
 
   if (bootstrapping) {
     return (
@@ -358,6 +364,22 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <div className="flex items-center gap-3 text-muted-foreground">
           <PilingIcon name="equipment-rig" size={38} tone="primary" decorative />
           <span className="text-sm font-medium">Проверка сессии...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (sessionUnknown) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-muted">
+        <div className="flex flex-col items-center gap-3 text-center px-4" role="alert">
+          <h1 className="text-lg font-medium">Нет связи</h1>
+          <p className="text-sm text-muted-foreground">Не удалось проверить сессию. Проверьте соединение и повторите.</p>
+          <Button onClick={() => {
+            setSessionUnknown(false);
+            setBootstrapping(true);
+            setSessionAttempt((attempt) => attempt + 1);
+          }}>Повторить</Button>
         </div>
       </div>
     );

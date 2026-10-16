@@ -1,5 +1,6 @@
 export type WorkPermitRisk = 'NORMAL' | 'ELEVATED';
-export type WorkPermitState = 'DRAFT' | 'PENDING_APPROVAL' | 'APPROVED' | 'EXPIRED' | 'REVOKED';
+export type WorkPermitState = 'DRAFT' | 'PENDING_APPROVAL' | 'APPROVED' | 'EXPIRED' | 'REVOKED' | 'CLOSED';
+export type WorkPermitCloseReason = 'WORK_DONE' | 'VALIDITY_ELAPSED';
 export type WorkPermitApprovalRole = 'DISPATCHER' | 'ADMIN';
 
 export interface WorkPermitApprovalRecord {

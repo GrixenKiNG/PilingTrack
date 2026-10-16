@@ -250,3 +250,11 @@ button.ov10-row{cursor:pointer}
 .ov10 input, .ov10 select { min-height: 44px; }
 
 .ov10-chips button { min-height: 44px; font-size: 15px; }
+
+/* Записанное за смену и поправка (v10-entries.tsx) */
+.ov10-entry{padding:calc(10px * var(--k)) 0;border-top:1px solid var(--line)}
+.ov10-entry:first-of-type{border-top:0;padding-top:0}
+.ov10-entry-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:calc(16px * var(--k))}
+.ov10-entry-head b{white-space:nowrap}
+.ov10-entry-note{margin:4px 0 0;font-size:calc(14px * var(--k));color:var(--muted)}
+.ov10-entry-fix{min-height:44px;padding:0;border:0;background:none;font:inherit;font-size:calc(15px * var(--k));font-weight:700;color:var(--orange);cursor:pointer;text-decoration:underline;text-underline-offset:3px}

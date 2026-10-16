@@ -283,12 +283,12 @@ export function PileJournal() {
           ))}
         </div>
 
-        <label className="text-2xs text-muted-foreground">
+        <label className="min-w-0 max-w-full text-2xs text-muted-foreground">
           Объект
           <select
             value={filters.siteId}
             onChange={(event) => patch({ siteId: event.target.value })}
-            className="mt-0.5 block min-h-11 rounded-md border bg-card px-2 text-xs sm:min-h-8 sm:h-8"
+            className="mt-0.5 block min-h-11 min-w-0 max-w-full rounded-md border bg-card px-2 text-xs sm:min-h-8 sm:h-8"
           >
             <option value="all">Все объекты</option>
             {sites.map((site) => (

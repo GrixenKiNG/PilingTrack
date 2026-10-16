@@ -15,7 +15,7 @@ import { withApi, withMutation, readJsonBody } from '@/core/api-wrapper';
 import {
   provisionDeviceKey,
   revokeDeviceKey,
-} from '@/services/telemetry/device-key-service';
+} from '@/modules/telemetry';
 
 export const runtime = 'nodejs';
 

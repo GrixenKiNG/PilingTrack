@@ -40,6 +40,7 @@ const CONFIRM_LEAVE = 'Закрыть без сохранения? Введён�
 
 interface CrewFormDialogProps {
   open: boolean;
+  returnFocusRef?: React.RefObject<HTMLButtonElement | null>;
   onClose: () => void;
   mode: 'create' | 'edit';
   editItem: CrewDTO | null;
@@ -110,6 +111,7 @@ function AssistantSelector({
 
 export function CrewFormDialog({
   open,
+  returnFocusRef,
   onClose,
   mode,
   editItem,
@@ -222,7 +224,9 @@ export function CrewFormDialog({
   return (
     <>
       <Dialog open={open} onOpenChange={(nextOpen) => { if (!nextOpen) handleClose(); }}>
-        <DialogContent aria-describedby={undefined} className="max-h-[90vh] overflow-y-auto">
+        <DialogContent aria-describedby={undefined} className="max-h-[90vh] overflow-y-auto" onCloseAutoFocus={(event) => {
+          if (returnFocusRef?.current) { event.preventDefault(); returnFocusRef.current.focus(); }
+        }}>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               {mode === 'edit'

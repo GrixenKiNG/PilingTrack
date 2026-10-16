@@ -1,10 +1,27 @@
-import {fireEvent, render, screen} from '@testing-library/react';
-import {describe, expect, it, vi} from 'vitest';
+import {fireEvent, render, screen, waitFor} from '@testing-library/react';
+import {beforeEach, describe, expect, it, vi} from 'vitest';
 import {PilePassportForm} from '../pile-passport-form';
 
 const grades = [{id: 'g1', name: 'С 100.30-8', lengthMm: 3000}];
+beforeEach(() => window.localStorage.clear());
 
 describe('форма паспорта сваи', () => {
+  it('после перезагрузки восстанавливает паспорт, после принятия стирает локальную копию', async () => {
+    const props = {grades, busy: false, draftUserId: 'operator', draftShiftId: 'shift', onSubmit: vi.fn().mockResolvedValue(true)};
+    const view = render(<PilePassportForm {...props} />);
+    fireEvent.change(screen.getByRole('combobox'), {target: {value: 'g1'}});
+    fireEvent.change(screen.getByPlaceholderText('С-130'), {target: {value: 'С-130'}});
+    view.unmount();
+    const restored = render(<PilePassportForm {...props} />);
+    expect(screen.getByPlaceholderText('С-130')).toHaveValue('С-130');
+    expect(screen.getByRole('combobox')).toHaveValue('g1');
+    fireEvent.click(screen.getByRole('button', {name: 'Записать сваю с паспортом'}));
+    await waitFor(() => expect(screen.getByPlaceholderText('С-130')).toHaveValue(''));
+    restored.unmount();
+    render(<PilePassportForm {...props} />);
+    expect(screen.getByPlaceholderText('С-130')).toHaveValue('');
+    expect(screen.getByRole('combobox')).toHaveValue('');
+  });
   it('без номера сваи называет недостающее под неактивной кнопкой', () => {
     render(<PilePassportForm grades={grades} busy={false} onSubmit={vi.fn()} />);
 

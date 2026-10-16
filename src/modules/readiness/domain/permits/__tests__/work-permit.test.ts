@@ -38,10 +38,24 @@ const permit = (overrides: Partial<WorkPermitRecord> = {}): WorkPermitRecord => 
 });
 
 describe('work permit state machine', () => {
+  it.each(['submit', 'approve', 'reject', 'edit', 'revoke', 'expire', 'close'])(
+    'закрытый наряд отклоняет команду %s с понятным состоянием', (command) => {
+      expect(() => transitionPermit('CLOSED', command)).toThrow(/^Наряд закрыт — действие/);
+    },
+  );
+
+  it('возвращает отказанный наряд на согласовании в черновик', () => {
+    expect(transitionPermit('PENDING_APPROVAL', 'reject')).toBe('DRAFT');
+  });
+
+  it.each(['DRAFT', 'APPROVED', 'REVOKED', 'EXPIRED'] as const)('не допускает отказ из %s', (state) => {
+    expect(() => transitionPermit(state, 'reject')).toThrow(/сейчас недоступно/);
+  });
   it.each([
     ['DRAFT', 'submit', 'PENDING_APPROVAL'],
     ['APPROVED', 'expire', 'EXPIRED'],
     ['APPROVED', 'revoke', 'REVOKED'],
+    ['APPROVED', 'close', 'CLOSED'],
   ] as const)('moves %s --%s--> %s', (from, command, expected) => {
     expect(transitionPermit(from, command)).toBe(expected);
   });
