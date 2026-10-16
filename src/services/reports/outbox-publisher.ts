@@ -19,6 +19,7 @@ import type { Prisma } from '@/generated/postgres-client/client';
 import { ReportDomainEvent } from '@/modules/reports/domain';
 import { logger } from '@/lib/logger';
 import { moveToDlq } from '@/core/outbox/dead-letter-queue';
+import { ALERT_DELIVERY_EVENT } from '@/core/notifications/durable-alert';
 import {
   runWithTenantContext,
   setRequestTenantId,
@@ -28,6 +29,14 @@ const MAX_RETRIES = 5;
 const RETRY_BASE_DELAY_MS = 1000; // 1s base
 const RETRY_MAX_DELAY_MS = 60000; // 60s cap
 const BATCH_SIZE = 100;
+
+/**
+ * События, чья единственная работа — отправка в Telegram. Идут отдельной
+ * полосой публикации (см. startOutboxWorker). Значение PDF-события совпадает с
+ * REPORT_PDF_DELIVERY_EVENT из services/reports/event-handlers.ts: сам модуль
+ * не импортируем, он тянет базу и Redis; совпадение закреплено тестом.
+ */
+export const TELEGRAM_LANE_EVENT_TYPES = [ALERT_DELIVERY_EVENT, 'ReportPdfDeliveryRequested'] as const;
 
 /**
  * Calculate exponential backoff delay with jitter.
@@ -88,6 +97,7 @@ export async function saveToOutbox(
 async function consumeOutboxEvents(
   consumerColumn: 'published' | 'projected',
   handler: (event: ReportDomainEvent) => Promise<void>,
+  typeFilter?: Prisma.OutboxEventWhereInput['type'],
 ): Promise<number> {
   const now = new Date();
 
@@ -95,6 +105,7 @@ async function consumeOutboxEvents(
   const events = await db.outboxEvent.findMany({
     where: {
       [consumerColumn]: false,
+      ...(typeFilter ? { type: typeFilter } : {}),
       OR: [
         { nextRetryAt: null },
         { nextRetryAt: { lte: now } },
@@ -239,8 +250,9 @@ async function consumeOutboxEvents(
  */
 export async function publishOutboxEvents(
   handler: (event: ReportDomainEvent) => Promise<void>,
+  typeFilter?: Prisma.OutboxEventWhereInput['type'],
 ): Promise<number> {
-  return consumeOutboxEvents('published', handler);
+  return consumeOutboxEvents('published', handler, typeFilter);
 }
 
 /**
@@ -270,23 +282,39 @@ export function startOutboxWorker(
   // start while the previous is mid-send: both findMany the same not-yet-claimed
   // row and both send the PDF → duplicate Telegram reports. Skipping a tick
   // while a pass is still running makes dispatch effectively single-flight.
-  let running = false;
-  const processOnce = async () => {
-    if (running) return;
-    running = true;
-    try {
-      const count = await publishOutboxEvents(handler);
-      if (count > 0) {
-        logger.info('Outbox worker processed events', { count });
+  //
+  // Проходов два — по одному на полосу, и в каждой полосе действует тот же
+  // запрет на наложение. Доставка в Telegram (до 30 с на документ) идёт в своей
+  // полосе: зависший Telegram держит только её, а события остальных отчётов
+  // публикуются в общей полосе без ожидания (F7 стенда 16.10). Типы полос не
+  // пересекаются, поэтому одно событие не может уйти в работу дважды, а порядок
+  // событий внутри каждой полосы прежний.
+  const lanes: Array<Prisma.OutboxEventWhereInput['type']> = [
+    { notIn: [...TELEGRAM_LANE_EVENT_TYPES] },
+    { in: [...TELEGRAM_LANE_EVENT_TYPES] },
+  ];
+  const processors = lanes.map((typeFilter) => {
+    let running = false;
+    return async () => {
+      if (running) return;
+      running = true;
+      try {
+        const count = await publishOutboxEvents(handler, typeFilter);
+        if (count > 0) {
+          logger.info('Outbox worker processed events', { count });
+        }
+      } catch (error) {
+        logger.error('Outbox worker error', error);
+      } finally {
+        running = false;
       }
-    } catch (error) {
-      logger.error('Outbox worker error', error);
-    } finally {
-      running = false;
-    }
+    };
+  });
+  const processOnce = () => {
+    for (const processLane of processors) void processLane();
   };
 
-  void processOnce();
+  processOnce();
   const interval = setInterval(processOnce, intervalMs);
 
   const stop = () => {
