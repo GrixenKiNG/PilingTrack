@@ -61,7 +61,6 @@
     "check:text-integrity": "node scripts/check-text-integrity.js",
     "test:load:smoke": "node scripts/quick-load-test.js",
     "test:load:stress": "node scripts/stress-test-100.js",
-    "db:indexes": "npx prisma db execute --file prisma/indexes.sql",
     "db:apply-ddl": "npx tsx scripts/apply-full-ddl.ts",
     "test:redis:stress": "node scripts/redis-stress-test.js",
     "test:redis:cache": "node scripts/test-redis-cache.js"
