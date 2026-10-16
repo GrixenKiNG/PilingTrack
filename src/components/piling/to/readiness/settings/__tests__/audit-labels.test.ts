@@ -38,6 +38,7 @@ const CONTOUR_ACTIONS = [
   'work-permit.approved-admin',
   'work-permit.revoke',
   'work-permit.expired',
+  'work-permit.closed',
   'defect.reported',
   'defect.triage',
   'defect.resolve',

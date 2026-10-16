@@ -24,8 +24,18 @@ describe('«Требует решения сейчас»', () => {
   it('просроченные наряды: одна строка с числом, роль и действие, ссылка на фильтр просроченных', () => {
     const items = buildAttentionItems({ ...base, permits: [permit('PENDING_APPROVAL', PAST), permit('APPROVED', PAST, 'eq-3'), permit('APPROVED', FUTURE, 'eq-2')] });
     expect(items).toHaveLength(1);
-    expect(items[0]).toMatchObject({ role: 'Инженер ОТ', action: 'Оформить новые', href: '/admin/safety?view=permits&filter=overdue' });
-    expect(items[0].problem).toContain('просрочено 2');
+    expect(items[0]).toMatchObject({ role: 'Инженер ОТ или механик', action: 'Закрыть / оформить новый', href: '/admin/safety?view=permits&filter=overdue' });
+    expect(items[0].problem).toContain('срок вышел, но не закрыты: 2');
+    expect(items[0].problem).toContain('закрыть: 1; оформить новый: 1');
+  });
+
+  it('согласованный нужно закрыть даже при наличии замены; ожидающий требует нового, закрытые не считаются', () => {
+    const approved = buildAttentionItems({...base, permits: [permit('APPROVED', PAST), permit('APPROVED', FUTURE), permit('CLOSED', PAST)]});
+    expect(approved[0]).toMatchObject({problem: 'Наряды-допуски: срок вышел, но не закрыты: 1', action: 'Закрыть'});
+    const pending = buildAttentionItems({...base, permits: [permit('PENDING_APPROVAL', PAST), permit('APPROVED', FUTURE)]});
+    expect(pending[0]).toMatchObject({action: 'Оформить новый'});
+    expect(pending[0].problem).toContain('ожидал согласования — оформить новый');
+    expect(buildAttentionItems({...base, permits: [permit('CLOSED', PAST)]})).toEqual([]);
   });
 
   it('наряды, уже переведённые в «истёк», — история: в «требует решения» не попадают', () => {

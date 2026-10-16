@@ -5,7 +5,7 @@ import {serializePermit} from './commands';
 
 export interface PermitListFilters {
   equipmentId?: string;
-  state?: 'DRAFT' | 'PENDING_APPROVAL' | 'APPROVED' | 'EXPIRED' | 'REVOKED';
+  state?: 'DRAFT' | 'PENDING_APPROVAL' | 'APPROVED' | 'EXPIRED' | 'REVOKED' | 'CLOSED';
   risk?: 'NORMAL' | 'ELEVATED';
   from?: Date;
   to?: Date;

@@ -1,10 +1,10 @@
 import {describe, expect, it} from 'vitest';
 import type {WorkPermitDto} from '../../api/contracts';
-import {buildPermitRoleSteps, isOverduePermit, permitSigningBlock} from '../permit-role-steps';
+import {actionableOverduePermits, buildPermitRoleSteps, isOverduePermit, permitSigningBlock} from '../permit-role-steps';
 
 const NOW = new Date('2026-10-10T09:00:00.000Z');
 const permit = (state: WorkPermitDto['state'], validTo: string, extra: Partial<WorkPermitDto> = {}) =>
-  ({id: `p-${state}-${validTo}`, equipmentId: 'eq-1', state, validTo, risk: 'NORMAL', scope: 'Монтаж', approvals: [], ...extra} as unknown as WorkPermitDto);
+  ({id: `p-${state}-${validTo}`, equipmentId: 'eq-1', state, validFrom: '2026-10-08T09:00:00.000Z', validTo, risk: 'NORMAL', scope: 'Монтаж', approvals: [], ...extra} as unknown as WorkPermitDto);
 const PAST = '2026-10-09T09:00:00.000Z';
 const FUTURE = '2026-10-11T09:00:00.000Z';
 const role = (label: string, permits: WorkPermitDto[]) => {
@@ -20,6 +20,7 @@ describe('просроченные наряды', () => {
     expect(isOverduePermit(permit('EXPIRED', PAST), NOW)).toBe(true);
     expect(isOverduePermit(permit('DRAFT', PAST), NOW)).toBe(false);
     expect(isOverduePermit(permit('REVOKED', PAST), NOW)).toBe(false);
+    expect(isOverduePermit(permit('CLOSED', PAST), NOW)).toBe(false);
     expect(isOverduePermit(permit('APPROVED', FUTURE), NOW)).toBe(false);
   });
 });
@@ -43,11 +44,20 @@ describe('шаги ролей на вкладке «Наряд-допуски»'
     expect(engineer.steps.find((step) => step.title === 'Отправить на согласование')?.done).toBe(false);
   });
 
-  it('инженер ОТ: согласованный наряд с прошедшим сроком требует нового наряда', () => {
+  it('инженер ОТ: согласованный наряд с прошедшим сроком нужно закрыть', () => {
     const engineer = role('Инженер ОТ или механик', [permit('APPROVED', PAST)]);
-    const step = engineer.steps.find((item) => item.title === 'Переоформить просроченные');
+    const step = engineer.steps.find((item) => item.title === 'Закрыть наряды завершённых работ');
     expect(step?.done).toBe(false);
-    expect(step?.hint).toContain('новый наряд');
+    expect(step?.hint).toContain('Закрыть наряд');
+    expect(engineer.steps.find((item) => item.title === 'Переоформить просроченные')?.done).toBe(true);
+  });
+
+  it('закрытый наряд — история; новый действующий не снимает задачу закрыть старый', () => {
+    const permits = [permit('APPROVED', PAST), permit('PENDING_APPROVAL', PAST), permit('APPROVED', FUTURE),
+      permit('CLOSED', PAST), permit('EXPIRED', PAST)];
+    expect(actionableOverduePermits(permits, NOW).map((item) => item.state)).toEqual(['APPROVED', 'PENDING_APPROVAL']);
+    const engineer = role('Инженер ОТ или механик', [permit('CLOSED', PAST)]);
+    expect(engineer.steps.find((item) => item.title === 'Закрыть наряды завершённых работ')?.done).toBe(true);
   });
 
   it('инженер ОТ: истёкший наряд — история, переоформлять нечего', () => {

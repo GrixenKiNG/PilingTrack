@@ -27,6 +27,7 @@ export const PERMIT_STATE_LABEL: Record<WorkPermitDto['state'], string> = {
   APPROVED: 'Согласован',
   EXPIRED: 'Истёк',
   REVOKED: 'Отозван',
+  CLOSED: 'Закрыт',
 };
 
 export const HANDOVER_STATE_LABEL: Record<ReadinessHandoverDto['state'], string> = {

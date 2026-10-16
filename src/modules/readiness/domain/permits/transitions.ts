@@ -7,6 +7,7 @@ const ALLOWED: Record<string, readonly WorkPermitState[]> = {
   reject: ['PENDING_APPROVAL'],
   edit: ['DRAFT', 'PENDING_APPROVAL', 'APPROVED'],
   revoke: ['APPROVED'],
+  close: ['APPROVED'],
   expire: ['APPROVED', 'PENDING_APPROVAL'],
 };
 
@@ -16,6 +17,7 @@ const PERMIT_STATE_TEXT: Record<WorkPermitState, string> = {
   APPROVED: 'согласован',
   EXPIRED: 'истёк',
   REVOKED: 'отозван',
+  CLOSED: 'закрыт',
 };
 
 const PERMIT_COMMAND_TEXT: Record<string, string> = {
@@ -24,6 +26,7 @@ const PERMIT_COMMAND_TEXT: Record<string, string> = {
   reject: 'отказать в согласовании',
   edit: 'изменить',
   revoke: 'отозвать',
+  close: 'закрыть',
   expire: 'пометить истёкшим',
 };
 
@@ -43,6 +46,7 @@ export function transitionPermit(state: WorkPermitState, command: string): WorkP
   if (command === 'reject') { assertPermitTransition(state, 'reject'); return 'DRAFT'; }
   if (command === 'edit') { assertPermitTransition(state, 'edit'); return 'DRAFT'; }
   if (command === 'revoke') { assertPermitTransition(state, 'revoke'); return 'REVOKED'; }
+  if (command === 'close') { assertPermitTransition(state, 'close'); return 'CLOSED'; }
   if (command === 'expire') { assertPermitTransition(state, 'expire'); return 'EXPIRED'; }
   throw new ReadinessCommandError('VALIDATION_ERROR', 422, `Неизвестная команда наряда: ${command}`);
 }

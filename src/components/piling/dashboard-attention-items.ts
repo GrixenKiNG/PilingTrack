@@ -40,11 +40,15 @@ export function buildAttentionItems(input: AttentionInput): AttentionItem[] {
   if (input.permits) {
     const overdue = actionableOverduePermits(input.permits, input.now);
     if (overdue.length > 0) {
+      const approved = overdue.filter((permit) => permit.state === 'APPROVED').length;
+      const pending = overdue.length - approved;
       items.push({
         id: 'permits-overdue',
-        problem: `Наряды-допуски: просрочено ${overdue.length}, согласовать нельзя`,
-        role: 'Инженер ОТ',
-        action: 'Оформить новые',
+        problem: `Наряды-допуски: срок вышел, но не закрыты: ${overdue.length}`
+          + (approved && pending ? ` (закрыть: ${approved}; оформить новый: ${pending})`
+            : pending ? ' (ожидал согласования — оформить новый)' : ''),
+        role: 'Инженер ОТ или механик',
+        action: approved && pending ? 'Закрыть / оформить новый' : approved ? 'Закрыть' : 'Оформить новый',
         href: '/admin/safety?view=permits&filter=overdue',
       });
     }

@@ -1,6 +1,6 @@
-import {beforeEach, describe, expect, it, vi} from 'vitest';
-import {rejectWorkPermitCommand, type PermitCommandContext} from './commands';
-import {rejectWorkPermitSchema} from './schemas';
+import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
+import {closeWorkPermitCommand, rejectWorkPermitCommand, type PermitCommandContext} from './commands';
+import {closeWorkPermitSchema, rejectWorkPermitSchema} from './schemas';
 import type {ReadinessTransaction} from '../../infrastructure/tenant-transaction';
 import {DEFAULT_ACCESS_MATRIX} from '../../domain/access-matrix';
 
@@ -111,6 +111,142 @@ describe('отказ в согласовании', () => {
     mocks.claim.mockResolvedValue(false);
     mocks.find.mockResolvedValue({status: 'completed', requestHash: hash, statusCode: first.status, result: first.body, responseHeaders: first.headers});
     expect(await run()).toMatchObject({body: first.body, replayed: true});
+    expect(tx.workPermit.updateMany).toHaveBeenCalledOnce();
+    expect(mocks.audit).toHaveBeenCalledOnce();
+  });
+});
+
+const CLOSE_NOW = new Date('2026-10-15T07:00:00.000Z');
+const closeContext: PermitCommandContext = {...context, actorId: 'mechanic', actorName: 'Механик', actorRole: 'MECHANIC'};
+
+function closeFixture(overrides: Record<string, unknown> = {}) {
+  const setup = fixture({state: 'APPROVED', validFrom: new Date('2026-10-15T06:00:00.000Z'),
+    closedAt: null, closedById: null, closeReason: null, ...overrides});
+  setup.tx.workPermit.findFirst.mockImplementation(async ({where}) =>
+    where.tenantId === setup.row.tenantId && where.id === setup.row.id ? setup.row : null);
+  const run = async (options: {context?: PermitCommandContext; reason?: string; expectedVersion?: number; key?: string | null} = {}) =>
+    closeWorkPermitCommand({tx: setup.tx as unknown as ReadinessTransaction,
+      context: closeContext, id: 'permit-1', key: 'close-key-1015-test', ifMatch: null, expectedVersion: 2, ...options});
+  return {...setup, run};
+}
+
+describe('закрытие согласованного наряда', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.claim.mockResolvedValue(true);
+    vi.useFakeTimers();
+    vi.setSystemTime(CLOSE_NOW);
+  });
+  afterEach(() => vi.useRealTimers());
+
+  it('закрывает начавшийся наряд, увеличивает версию и сохраняет доказательства и комментарий', async () => {
+    const {row, tx, run} = closeFixture({validFrom: CLOSE_NOW});
+    const result = await run({reason: '  Работы завершены  '});
+    expect(result).toMatchObject({status: 200, headers: {ETag: '"work-permit-permit-1-v3"'},
+      body: {data: {state: 'CLOSED', closedAt: CLOSE_NOW.toISOString(), closedById: 'mechanic', closeReason: 'WORK_DONE'}}});
+    expect(row).toMatchObject({state: 'CLOSED', version: 3, closedAt: CLOSE_NOW, closedById: 'mechanic', closeReason: 'WORK_DONE'});
+    expect(tx.workPermit.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({tenantId: 'tenant-1', id: 'permit-1', version: 2, state: 'APPROVED', validFrom: {lte: CLOSE_NOW}}),
+    }));
+    expect(mocks.audit).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      action: 'work-permit.closed', before: expect.objectContaining({state: 'APPROVED'}),
+      after: expect.objectContaining({state: 'CLOSED', closedById: 'mechanic', closeReason: 'WORK_DONE'}),
+      metadata: expect.objectContaining({comment: 'Работы завершены'}),
+    }));
+    expect(tx.outboxEvent.create).toHaveBeenCalledOnce();
+    expect(tx.workPermitApproval.updateMany).not.toHaveBeenCalled();
+  });
+
+  it.each(['MECHANIC', 'SAFETY_ENGINEER', 'ADMIN'])('право правки разрешает закрытие роли %s без комментария', async (actorRole) => {
+    const {run} = closeFixture({authorId: 'mechanic'});
+    await expect(run({context: {...closeContext, actorRole}})).resolves.toMatchObject({status: 200});
+  });
+
+  it.each(['DISPATCHER', 'OPERATOR', 'ASSISTANT', 'FOREMAN'])('отказывает роли %s без права правки', async (actorRole) => {
+    const {tx, run} = closeFixture();
+    await expect(run({context: {...closeContext, actorRole}})).rejects.toMatchObject({status: 403});
+    expect(tx.workPermit.updateMany).not.toHaveBeenCalled();
+    expect(mocks.audit).not.toHaveBeenCalled();
+  });
+
+  it('администратор действует с правами исполняемой роли', async () => {
+    const denied = closeFixture();
+    await expect(denied.run({context: {...closeContext, actorRole: 'ADMIN', actingAs: 'DISPATCHER'}}))
+      .rejects.toMatchObject({status: 403});
+    const allowed = closeFixture();
+    await expect(allowed.run({context: {...closeContext, actorRole: 'ADMIN', actingAs: 'MECHANIC'}}))
+      .resolves.toMatchObject({status: 200});
+    expect(mocks.audit).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      actor: expect.objectContaining({role: 'ADMIN', actingAs: 'MECHANIC'}),
+    }));
+  });
+
+  it('учитывает снятое право в опубликованной матрице', async () => {
+    const {tx, run} = closeFixture();
+    await expect(run({context: {...closeContext, accessMatrix: {...DEFAULT_ACCESS_MATRIX,
+      grants: {...DEFAULT_ACCESS_MATRIX.grants, MECHANIC: ['readiness.read']}}}})).rejects.toMatchObject({status: 403});
+    expect(tx.workPermit.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('будущий наряд предлагает отозвать', async () => {
+    const {tx, run} = closeFixture({validFrom: new Date(CLOSE_NOW.getTime() + 1)});
+    await expect(run()).rejects.toMatchObject({status: 422, message: expect.stringMatching(/отозв/i)});
+    expect(tx.workPermit.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('начавшийся согласованный наряд можно закрыть и после окончания срока', async () => {
+    const {run} = closeFixture({validTo: new Date(CLOSE_NOW.getTime() - 1)});
+    await expect(run()).resolves.toMatchObject({status: 200});
+  });
+
+  it.each(['DRAFT', 'PENDING_APPROVAL', 'REVOKED', 'EXPIRED', 'CLOSED'])('отклоняет состояние %s без мутации', async (state) => {
+    const {tx, run} = closeFixture({state});
+    await expect(run()).rejects.toMatchObject({status: 422, message: expect.stringMatching(/недоступно/)});
+    expect(tx.workPermit.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('старая версия и проигранный CAS возвращают 409 без аудита', async () => {
+    const stale = closeFixture();
+    await expect(stale.run({expectedVersion: 1})).rejects.toMatchObject({status: 409});
+    expect(stale.tx.workPermit.updateMany).not.toHaveBeenCalled();
+    const concurrent = closeFixture();
+    concurrent.tx.workPermit.updateMany.mockResolvedValue({count: 0});
+    await expect(concurrent.run()).rejects.toMatchObject({status: 409});
+    expect(mocks.audit).not.toHaveBeenCalled();
+  });
+
+  it.each([undefined, null, ''])('отсутствующая организация %s не доходит до записи/идемпотентности', async (tenantId) => {
+    const {tx, run} = closeFixture();
+    await expect(run({context: {...closeContext, tenantId} as PermitCommandContext})).rejects.toMatchObject({status: 403});
+    expect(mocks.claim).not.toHaveBeenCalled();
+    expect(tx.workPermit.findFirst).not.toHaveBeenCalled();
+    expect(tx.workPermit.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('чужой наряд не читается и не закрывается', async () => {
+    const {tx, run} = closeFixture();
+    await expect(run({context: {...closeContext, tenantId: 'other'}})).rejects.toMatchObject({status: 404});
+    expect(tx.workPermit.findFirst).toHaveBeenCalledWith(expect.objectContaining({where: {tenantId: 'other', id: 'permit-1'}}));
+    expect(tx.workPermit.updateMany).not.toHaveBeenCalled();
+    expect(mocks.audit).not.toHaveBeenCalled();
+  });
+
+  it('комментарий ограничен 500 символами и тело не принимает tenantId', async () => {
+    expect(closeWorkPermitSchema.safeParse({reason: 'я'.repeat(500)}).success).toBe(true);
+    expect(closeWorkPermitSchema.safeParse({tenantId: 'other'}).success).toBe(false);
+    const {tx, run} = closeFixture();
+    await expect(run({reason: 'я'.repeat(501)})).rejects.toMatchObject({status: 422});
+    expect(tx.workPermit.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('повтор ключа возвращает сохранённое закрытие без нового аудита', async () => {
+    const {tx, run} = closeFixture();
+    const first = await run();
+    const requestHash = mocks.claim.mock.calls[0][0].requestHash;
+    mocks.claim.mockResolvedValue(false);
+    mocks.find.mockResolvedValue({status: 'completed', requestHash, statusCode: first.status,
+      result: first.body, responseHeaders: first.headers});
+    await expect(run()).resolves.toMatchObject({body: first.body, replayed: true});
     expect(tx.workPermit.updateMany).toHaveBeenCalledOnce();
     expect(mocks.audit).toHaveBeenCalledOnce();
   });

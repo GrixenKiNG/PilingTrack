@@ -4,7 +4,7 @@
  * «Обслуживание (ТО)».
  */
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ReferenceUiProps } from '../types';
 
 import { PermitsScreen } from '../permits-screen';
@@ -154,9 +154,95 @@ it('открывает закрытые наряды из плитки со со
   const tile = screen.getByRole('button', {name: /Заблокированы/});
   expect(tile).toHaveTextContent('1');
   fireEvent.click(tile);
-  expect(screen.getByRole('button', {name: 'Закрытые (1)'})).toHaveAttribute('aria-pressed', 'true');
+  expect(screen.getByRole('button', {name: 'Заблокированные (1)'})).toHaveAttribute('aria-pressed', 'true');
   expect(screen.getAllByRole('button', {name: 'Открыть наряд НД-NEW12345'})).toHaveLength(2);
   expect(screen.getAllByText('Отозван')).toHaveLength(2);
+});
+
+describe('закрытие наряда', () => {
+  const approved: WorkPermitDto = {...pendingPermit, state: 'APPROVED', validFrom: '2020-01-01T00:00:00Z'};
+  beforeEach(() => vi.mocked(authFetch).mockReset().mockResolvedValue(new Response('{}', {status: 200})));
+
+  it('shows closed permits selected through the shared server status filter', () => {
+    render(<PermitsScreen {...makeProps({filters: {status: 'CLOSED'}, permits: [
+      {...approved, state: 'CLOSED', closedAt: '2026-10-15T08:00:00Z', closeReason: 'WORK_DONE'},
+    ]})} />);
+    expect(screen.getAllByText('Закрыт')).toHaveLength(2);
+  });
+
+  it.each([
+    ['MECHANIC', null, true], ['SAFETY_ENGINEER', null, true], ['ADMIN', null, true],
+    ['DISPATCHER', null, false], ['OPERATOR', null, false], ['ASSISTANT', null, false],
+    ['ADMIN', 'MECHANIC', true], ['ADMIN', 'DISPATCHER', false],
+  ] as const)('uses effective edit capability for %s acting as %s', (role, actingAs, edit) => {
+    const bootstrap = bootstrapEnvelope().data;
+    bootstrap.actor = {id: 'actor-1', role, actingAs};
+    bootstrap.capabilities.entities.permit.edit = edit;
+    render(<PermitsScreen {...makeProps({bootstrap, permits: [approved]})} />);
+    expect(screen.queryAllByRole('button', {name: 'Закрыть наряд'})).toHaveLength(edit ? 2 : 0);
+  });
+
+  it('does not offer closure before the window starts', () => {
+    const bootstrap = bootstrapEnvelope().data;
+    bootstrap.capabilities.entities.permit.edit = true;
+    render(<PermitsScreen {...makeProps({bootstrap, permits: [{...approved, validFrom: '2099-01-01T00:00:00Z'}]})} />);
+    expect(screen.queryByRole('button', {name: 'Закрыть наряд'})).not.toBeInTheDocument();
+  });
+
+  it('shows confirmation, sends the optional comment, refreshes, and preserves an inline server failure', async () => {
+    const bootstrap = bootstrapEnvelope().data;
+    bootstrap.actor.role = 'MECHANIC';
+    bootstrap.capabilities.entities.permit.edit = true;
+    const props = makeProps({bootstrap, permits: [approved]});
+    vi.mocked(authFetch).mockResolvedValueOnce(new Response(JSON.stringify({error: {message: 'Версия наряда изменилась'}}), {status: 409}));
+    render(<PermitsScreen {...props} />);
+    fireEvent.click(screen.getAllByRole('button', {name: 'Закрыть наряд'})[0]);
+    const dialog = within(await screen.findByRole('dialog'));
+    expect(dialog.getByText('Работы закончены? Наряд будет закрыт и перестанет давать допуск к работе')).toBeInTheDocument();
+    const comment = dialog.getByLabelText('Комментарий (необязательно)');
+    expect(comment).toHaveAttribute('maxLength', '500');
+    fireEvent.change(comment, {target: {value: 'Работы завершены'}});
+    fireEvent.click(dialog.getByRole('button', {name: 'Подтвердить действие'}));
+    expect(await dialog.findByRole('alert')).toHaveTextContent('Версия наряда изменилась');
+    expect(authFetch).toHaveBeenCalledWith(`/api/readiness/work-permits/${approved.id}/close`, expect.objectContaining({
+      method: 'POST', headers: expect.objectContaining({'if-match': `"work-permit-${approved.id}-v2"`, 'idempotency-key': expect.any(String)}),
+      body: JSON.stringify({expectedVersion: 2, reason: 'Работы завершены'}),
+    }));
+    expect(props.onRetry).toHaveBeenCalledTimes(1);
+    vi.mocked(authFetch).mockResolvedValueOnce(new Response(JSON.stringify({data: {state: 'CLOSED'}}), {status: 200}));
+    fireEvent.change(comment, {target: {value: ''}});
+    fireEvent.click(dialog.getByRole('button', {name: 'Подтвердить действие'}));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(props.onRetry).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps a network failure in the dialog and allows retry', async () => {
+    const bootstrap = bootstrapEnvelope().data;
+    bootstrap.actor.role = 'MECHANIC';
+    bootstrap.capabilities.entities.permit.edit = true;
+    vi.mocked(authFetch).mockRejectedValueOnce(new Error('network'));
+    render(<PermitsScreen {...makeProps({bootstrap, permits: [approved]})} />);
+    fireEvent.click(screen.getAllByRole('button', {name: 'Закрыть наряд'})[1]);
+    const dialog = within(await screen.findByRole('dialog'));
+    fireEvent.click(dialog.getByRole('button', {name: 'Подтвердить действие'}));
+    expect(await dialog.findByRole('alert')).toHaveTextContent('Не удалось выполнить действие. Повторите попытку.');
+    expect(dialog.getByRole('button', {name: 'Подтвердить действие'})).not.toBeDisabled();
+  });
+
+  it('separates closed history from blocked and uses neutral closure labels', () => {
+    render(<PermitsScreen {...makeProps({permits: [
+      {...approved, id: 'closed-manual', state: 'CLOSED', closeReason: 'WORK_DONE', closedAt: '2026-10-15T08:00:00Z'},
+      {...approved, id: 'closed-expiry', state: 'CLOSED', closeReason: 'VALIDITY_ELAPSED', closedAt: '2026-10-15T08:00:00Z'},
+      {...approved, id: 'old-expired', state: 'EXPIRED'},
+    ]})} />);
+    expect(screen.queryByText('Закрыт')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', {name: /Заблокированы/})).toHaveTextContent('1');
+    fireEvent.click(screen.getByRole('button', {name: 'Закрытые (2)'}));
+    expect(screen.getAllByText('Закрыт')).toHaveLength(2);
+    expect(screen.getAllByText('Закрыт по сроку')).toHaveLength(2);
+    expect(screen.queryByText('Истёк')).not.toBeInTheDocument();
+    expect(screen.getAllByText('Закрыт')[0]).toHaveClass('text-muted-foreground');
+  });
 });
 
 it.each(['network', '500'])('повторяет загрузку справочников после %s и обновляет их при новом открытии формы', async (failure) => {

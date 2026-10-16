@@ -82,7 +82,7 @@ describe('суточный сброс техготовности', () => {
     outboxCreate.mockResolvedValue({});
   });
 
-  it('истекают согласованные и ожидающие согласования наряды с прошедшим сроком; черновики не трогаем', async () => {
+  it('обрабатываются согласованные и ожидающие согласования наряды с прошедшим сроком; черновики не трогаем', async () => {
     await runReadinessScheduler('orion', NOW);
     // Отбор переехал в выборку: обновляем потом по идентификаторам, чтобы
     // знать, какие именно строки поменяли, и записать это в аудит.
@@ -92,7 +92,7 @@ describe('суточный сброс техготовности', () => {
 
   // Автопереход — единственное изменение состояния без человека. Без записи в
   // цепочку разбор «кто просрочил наряд» упирался в пустоту.
-  it('истёкший наряд оставляет событие в цепочке аудита', async () => {
+  it('согласованный наряд закрывается по сроку и оставляет событие в цепочке аудита', async () => {
     permitFindMany.mockResolvedValue([
       {id: 'permit-1', version: 3, state: 'APPROVED', validTo: new Date('2026-08-15T08:00:00.000Z')},
     ]);
@@ -100,18 +100,24 @@ describe('суточный сброс техготовности', () => {
 
     const result = await runReadinessScheduler('orion', NOW);
 
-    expect(permitUpdateMany.mock.calls[0][0].where.id).toEqual({in: ['permit-1']});
-    expect(permitUpdateMany.mock.calls[0][0].data.state).toBe('EXPIRED');
-    expect(result.permitsExpired).toBe(1);
+    expect(permitUpdateMany.mock.calls[0][0].where).toEqual({tenantId: 'orion', id: 'permit-1', version: 3,
+      state: 'APPROVED', validTo: {lte: NOW}});
+    expect(permitUpdateMany.mock.calls[0][0].data).toMatchObject({state: 'CLOSED', closedAt: NOW,
+      closedById: null, closeReason: 'VALIDITY_ELAPSED'});
+    expect(result.permitsClosed).toBe(1);
+    expect(result.permitsExpired).toBe(0);
 
     const event = auditCreate.mock.calls[0][0].data;
-    expect(event.action).toBe('work-permit.expired');
+    expect(event.action).toBe('work-permit.closed');
     expect(event.entityType).toBe('WorkPermit');
     expect(event.entityId).toBe('permit-1');
     // Автора-человека нет, но роль и исполнитель обязаны быть названы.
     expect(event.userRole).toBe('SYSTEM');
     expect(event.userId).toBeNull();
     expect(event.userName).toBe('Планировщик техготовности');
+    expect(event.after).toMatchObject({state: 'CLOSED', version: 4, closedAt: NOW.toISOString(),
+      closedById: null, closeReason: 'VALIDITY_ELAPSED'});
+    expect(event.metadata).toEqual({trigger: 'SCHEDULER', reason: 'VALIDITY_ELAPSED'});
   });
 
   // Наряд на согласовании с истёкшим окном согласовать нельзя (команда approve
@@ -123,12 +129,55 @@ describe('суточный сброс техготовности', () => {
     ]);
     permitUpdateMany.mockResolvedValue({count: 1});
 
-    await runReadinessScheduler('orion', NOW);
+    const result = await runReadinessScheduler('orion', NOW);
 
-    expect(permitUpdateMany.mock.calls[0][0].where.state).toEqual({in: ['APPROVED', 'PENDING_APPROVAL']});
+    expect(permitUpdateMany.mock.calls[0][0].where).toEqual({tenantId: 'orion', id: 'permit-2', version: 1,
+      state: 'PENDING_APPROVAL', validTo: {lte: NOW}});
+    expect(permitUpdateMany.mock.calls[0][0].data).toMatchObject({state: 'EXPIRED', expiredAt: NOW});
+    expect(permitUpdateMany.mock.calls[0][0].data).not.toHaveProperty('closedAt');
+    expect(result.permitsExpired).toBe(1);
+    expect(result.permitsClosed).toBe(0);
     const event = auditCreate.mock.calls[0][0].data;
     expect(event.before.state).toBe('PENDING_APPROVAL');
     expect(JSON.stringify(event.metadata)).toContain('UNAPPROVED_WINDOW_ELAPSED');
+  });
+
+  it.each(['APPROVED', 'PENDING_APPROVAL'])('проигранный CAS %s не оставляет ложный аудит', async (state) => {
+    permitFindMany.mockResolvedValue([{id: 'raced', version: 2, state, validTo: new Date('2026-08-14T08:00:00.000Z')}]);
+    const result = await runReadinessScheduler('orion', NOW);
+    expect(auditCreate).not.toHaveBeenCalled();
+    expect(result.permitsClosed).toBe(0);
+    expect(result.permitsExpired).toBe(0);
+  });
+
+  it('повтор не закрывает наряд заново, не переписывает EXPIRED и не трогает чужие/будущие строки', async () => {
+    const old = {id: 'legacy', tenantId: 'orion', version: 7, state: 'EXPIRED', validTo: new Date('2026-08-13T08:00:00.000Z')};
+    const oldSnapshot = {...old};
+    const approved = {id: 'approved', tenantId: 'orion', version: 3, state: 'APPROVED', validTo: new Date('2026-08-14T08:00:00.000Z')};
+    const rows = [old, approved,
+      {id: 'foreign', tenantId: 'other', version: 1, state: 'APPROVED', validTo: approved.validTo},
+      {id: 'future', tenantId: 'orion', version: 1, state: 'APPROVED', validTo: new Date('2026-08-16T08:00:00.000Z')},
+    ];
+    permitFindMany.mockImplementation(async ({where}) => rows.filter((row) => row.tenantId === where.tenantId
+      && where.state.in.includes(row.state) && row.validTo <= where.validTo.lte));
+    permitUpdateMany.mockImplementation(async ({where, data}) => {
+      const row = rows.find((item) => item.id === where.id && item.tenantId === where.tenantId
+        && item.state === where.state && item.version === where.version && item.validTo <= where.validTo.lte);
+      if (!row) return {count: 0};
+      Object.assign(row, data, {version: row.version + 1});
+      return {count: 1};
+    });
+
+    const first = await runReadinessScheduler('orion', NOW);
+    const second = await runReadinessScheduler('orion', NOW);
+    expect(first.permitsClosed).toBe(1);
+    expect(second.permitsClosed).toBe(0);
+    expect(approved).toMatchObject({state: 'CLOSED', version: 4, closedAt: NOW, closeReason: 'VALIDITY_ELAPSED'});
+    expect(old).toEqual(oldSnapshot);
+    expect(rows[2].state).toBe('APPROVED');
+    expect(rows[3].state).toBe('APPROVED');
+    expect(permitUpdateMany).toHaveBeenCalledOnce();
+    expect(auditCreate).toHaveBeenCalledOnce();
   });
 
   // Главная защита: закрыть смену текущих суток — значит оборвать работу,

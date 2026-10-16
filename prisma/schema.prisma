@@ -1050,6 +1050,12 @@ enum WorkPermitState {
   APPROVED
   EXPIRED
   REVOKED
+  CLOSED
+}
+
+enum WorkPermitCloseReason {
+  WORK_DONE
+  VALIDITY_ELAPSED
 }
 
 enum WorkPermitApprovalRole {
@@ -1495,6 +1501,9 @@ model WorkPermit {
   rejectedAt     DateTime?            @db.Timestamptz(3)
   rejectedById   String?
   rejectReason   String?
+  closedAt       DateTime?            @db.Timestamptz(3)
+  closedById     String?
+  closeReason    WorkPermitCloseReason?
   expiredAt      DateTime?            @db.Timestamptz(3)
   version        Int                  @default(1)
   createdAt      DateTime             @default(now()) @db.Timestamptz(3)

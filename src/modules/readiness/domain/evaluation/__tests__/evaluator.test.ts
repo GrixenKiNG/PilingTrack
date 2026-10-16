@@ -85,6 +85,19 @@ describe('authoritative readiness evaluator', () => {
     expect(result.warnings).toContainEqual(expect.objectContaining({code: 'WORK_PERMIT_MISSING_OPTIONAL'}));
   });
 
+  it('explains completed work without calling the closed permit missing or expired', () => {
+    const rules = publishedRules({...DEFAULT_READINESS_RULES,
+      criteria: DEFAULT_READINESS_RULES.criteria.map((item) => item.key === 'PERMIT'
+        ? {...item, weight: 25} : item)});
+    const result = evaluateReadiness({facts: {...facts, permitCloseReason: 'WORK_DONE'}, rules, evidence,
+      clock: capturedClock(new Date('2026-10-15T09:00:00.000Z'))});
+    expect(result.allowed).toBe(true);
+    expect(result.warnings).toContainEqual(expect.objectContaining({
+      message: 'Наряд-допуск закрыт после работ; новый допуск не оформлен (по правилам не обязателен)',
+    }));
+    expect(result.warnings.some((item) => item.code === 'PERMIT_EXPIRED')).toBe(false);
+  });
+
   // Просроченное ТО остаётся замечанием: оно не должно попасть в блокеры, иначе
   // интерфейс покажет предупреждение как критическое и остановит смену.
   it('reports overdue maintenance as a warning, never as a blocker', () => {

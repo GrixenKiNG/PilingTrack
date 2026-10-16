@@ -22,25 +22,16 @@ export function isOverduePermit(permit: Pick<WorkPermitDto, 'state' | 'validTo'>
 }
 
 /**
- * Просроченные наряды, по которым ещё нужно действие. Просроченный наряд
- * установки, у которой уже есть замена (черновик, наряд на согласовании или
- * действующий с неистёкшим сроком), решён: новый наряд его заменил. Иначе
- * истёкший наряд оставался в счётчике навсегда, и убрать его было нечем.
- *
- * Наряд, который планировщик уже перевёл в «истёк», — закрытая история, а не
- * задача: с ним ничего нельзя сделать, и вешать его на дашборд значит держать
- * вечную красную строку. Он остаётся в реестре. В счёт идут только наряды
- * «на согласовании» и «согласован» с прошедшим сроком: человек ещё может
- * оформить замену до ночного перевода в «истёк».
+ * Задачи до закрытия планировщиком: согласованный нужно закрыть, ожидающий
+ * согласования — переоформить. Наличие замены не закрывает старый наряд.
+ * EXPIRED и CLOSED — история; решение владельца cb8fc697 для EXPIRED сохранено.
  */
 export function actionableOverduePermits<T extends Pick<WorkPermitDto, 'state' | 'validTo' | 'equipmentId'>>(
   permits: readonly T[],
   now: Date,
 ): T[] {
-  const replaced = new Set(permits
-    .filter((permit) => ['DRAFT', 'PENDING_APPROVAL', 'APPROVED'].includes(permit.state) && !isOverduePermit(permit, now))
-    .map((permit) => permit.equipmentId));
-  return permits.filter((permit) => permit.state !== 'EXPIRED' && isOverduePermit(permit, now) && !replaced.has(permit.equipmentId));
+  return permits.filter((permit) => (permit.state === 'APPROVED' || permit.state === 'PENDING_APPROVAL')
+    && isOverduePermit(permit, now));
 }
 
 const SIGN_ROLE_LABEL = {DISPATCHER: 'Диспетчер', ADMIN: 'Администратор'} as const;
@@ -71,6 +62,8 @@ export function permitSigningBlock(
 
 export function buildPermitRoleSteps({permits, now}: {permits: readonly WorkPermitDto[]; now: Date}): PermitRoleSteps[] {
   const overdue = actionableOverduePermits(permits, now);
+  const overduePending = overdue.filter((permit) => permit.state === 'PENDING_APPROVAL');
+  const awaitingClosure = overdue.filter((permit) => permit.state === 'APPROVED' && new Date(permit.validFrom) <= now);
   const livePending = permits.filter((permit) => permit.state === 'PENDING_APPROVAL' && !isOverduePermit(permit, now));
   const drafts = permits.filter((permit) => permit.state === 'DRAFT');
   const elevatedPending = livePending.filter((permit) => permit.risk === 'ELEVATED');
@@ -91,8 +84,13 @@ export function buildPermitRoleSteps({permits, now}: {permits: readonly WorkPerm
         },
         {
           title: 'Переоформить просроченные',
-          done: overdue.length === 0,
+          done: overduePending.length === 0,
           hint: 'У просроченного наряда срок вышел, согласовать его нельзя. Создайте новый наряд-допуск на нужный срок.',
+        },
+        {
+          title: 'Закрыть наряды завершённых работ',
+          done: awaitingClosure.length === 0,
+          hint: 'У согласованного наряда с завершёнными работами нажмите «Закрыть наряд». Закрытый наряд больше не даёт допуска.',
         },
       ],
     },
@@ -106,8 +104,8 @@ export function buildPermitRoleSteps({permits, now}: {permits: readonly WorkPerm
         },
         {
           title: 'Решить по просроченным',
-          done: overdue.length === 0,
-          hint: 'Просроченный наряд не согласуется. Попросите инженера ОТ или механика оформить новый.',
+          done: overduePending.length === 0,
+          hint: 'Наряд с вышедшим окном согласования не согласуется. Попросите инженера ОТ или механика оформить новый.',
         },
       ],
     },
