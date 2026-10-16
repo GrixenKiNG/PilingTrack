@@ -119,6 +119,13 @@ export async function startPdf(): Promise<void> {
     await recordClusterHeartbeat('pdf');
 
     const heartbeatInterval = setInterval(() => {
+      // BullMQ сам переоткрывает соединение, но события «снова работает» не шлёт:
+      // из error статус выводит только завершённая задача, а при пустой очереди
+      // её нет. Соединение готово — значит, Redis вернулся.
+      if (state.status === 'error' && redisConnection.status === 'ready') {
+        logger.info('PDF worker recovered after Redis outage');
+        setRunning(state);
+      }
       if (state.status !== 'running') return;
 
       void recordClusterHeartbeat('pdf').catch((error) => {
