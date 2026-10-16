@@ -30,6 +30,10 @@ const migrationPaths = [
   // Без этой миграции в одноразовой базе нет таблицы осмотров, и решение о
   // пуске падает ещё до того, как дойдёт до проверяемого правила.
   resolve(process.cwd(), 'prisma/migrations/20260829170000_operator_v3_mobile_new_spec/migration.sql'),
+  // Расчёт готовности читает наряды-допуски и выбирает closeReason (закрытие
+  // нарядов, 15.10.2026). Без этой миграции запрос действующего наряда падает
+  // «column WorkPermit.closeReason does not exist» ещё до проверяемого правила.
+  resolve(process.cwd(), 'prisma/migrations/20261015090000_work_permit_close/migration.sql'),
 ];
 const code = (error: unknown) => (error as {code?: string; meta?: {code?: string}}).meta?.code
   ?? (error as {code?: string}).code;
