@@ -133,6 +133,15 @@ jobs:
             sleep 1
           done
           if ! curl -fsS http://127.0.0.1:3100/api/health >/dev/null; then cat stand-app.log; exit 1; fi
+      # Исполнитель очередей (PDF отчётов, outbox, проекции). Без него сценарий
+      # release-critical-path ждёт PDF и упирается в лимит запросов (первый запуск 16.10.2026).
+      - name: Start disposable workers
+        run: |
+          set -euo pipefail
+          set -a; . "$RUNNER_TEMP/s3.env"; set +a
+          NODE_ENV=production nohup node --import tsx src/workers/unified-worker.ts > stand-workers.log 2>&1 &
+          sleep 15
+          if ! pgrep -f unified-worker >/dev/null; then cat stand-workers.log; exit 1; fi
       - name: Create disposable E2E accounts
         shell: bash
         run: |
@@ -192,5 +201,6 @@ jobs:
             playwright-results.json
             test-results/
             stand-app.log
+            stand-workers.log
           if-no-files-found: warn
           retention-days: 14
