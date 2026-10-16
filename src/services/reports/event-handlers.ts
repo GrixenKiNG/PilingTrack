@@ -16,6 +16,7 @@ import { logger } from '@/lib/logger';
 import { formatCountMeters } from '@/lib/format';
 import { formatDowntimeHours } from '@/lib/downtime-hours';
 import { pileLengthMeters } from '@/lib/pile-length';
+import { transliterate } from '@/lib/transliterate';
 import { getRedisClient } from '@/lib/redis-cache';
 // Статически (в отличие от обработчиков ниже): динамический import этого
 // модуля не подменяется моком в юнит-тесте, и путь «тенант из отчёта» иначе
@@ -650,7 +651,7 @@ export async function deliverReportPdf(event: { id?: string; aggregateId: string
   const caption = lines.join('\n');
 
   const pdfBuffer = await generateSinglePdf(d);
-  const filename = `report-${d.date}-${d.user?.name || 'unknown'}.pdf`.replace(/[^A-Za-z0-9._-]/g, '_');
+  const filename = `report-${d.date}-${transliterate(d.user?.name || 'unknown')}.pdf`.replace(/[^A-Za-z0-9._-]/g, '_');
 
   // Строку события блокируем на время отправки: outbox-публикатор крутится и в
   // app, и в workers, а Telegram ключей идемпотентности не знает. Кто пришёл
