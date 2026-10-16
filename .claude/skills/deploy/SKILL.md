@@ -69,4 +69,4 @@ WORKER_GENERATION_EXTERNAL_STOPPED=1 bash scripts/replace-worker-generation.sh a
 
 Барьер сохраняет imageIDs/restart policies/число реплик, принимает app0/143, workers только0, проверяет OOM/drain/RUNNING. При отказе после STOP автоматически возвращает старое поколение (при удалённых IDs — прежние образы с текущим compose); exit остаётся1 и печатается RECOVERED. При невозможности возврата — OUTAGE: не запускать параллельных лидеров. Только после ручной проверки безопасен аварийный `cd /opt/pilingtrack && docker compose up -d app workers`.
 
-Автовозврат образов не откатывает миграции или env/volumes/topology. Проблема схемы требует отдельного решения владельца. Полная процедура и evidence — ранбуки008/016 и CODEX-REPORT-T6.md.
+Автовозврат образов не откатывает миграции или env/volumes/topology. Проблема схемы требует отдельного решения владельца. Полная процедура и evidence — ранбуки008/016 и docs/archive/codex-reports/CODEX-REPORT-T6.md.
