@@ -177,6 +177,23 @@ describe('LoginPage', () => {
     });
   });
 
+  it('отправляет то, что стоит в полях, даже если React не получил события ввода', async () => {
+    const { toast } = await import('sonner');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test: cast to a mock shape or to reach internals not in the public type
+    (global.fetch as any).mockResolvedValueOnce({ ok: false, status: 401, json: async () => ({ error: 'Неверный email или пароль' }) });
+    render(<LoginPage />);
+
+    // Как автозаполнение или ввод до «оживления» страницы: значение в поле есть, события change нет.
+    (screen.getByLabelText('Email') as HTMLInputElement).value = ' Test@Piling.ru ';
+    (screen.getByLabelText('Пароль') as HTMLInputElement).value = 'secret123';
+    fireEvent.click(screen.getByRole('button', { name: 'Войти' }));
+
+    await vi.waitFor(() => expect(global.fetch).toHaveBeenCalledWith('/api/auth/login', expect.objectContaining({
+      body: JSON.stringify({ email: 'test@piling.ru', password: 'secret123' }),
+    })));
+    expect(toast.error).not.toHaveBeenCalledWith('Заполните email и пароль');
+  });
+
   it('toggles password visibility', () => {
     render(<LoginPage />);
 

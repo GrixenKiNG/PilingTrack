@@ -494,6 +494,16 @@ describe('D-20260930-001: ЕО после работы и сдача для см
     expect(await screen.findByRole('button', {name: 'Принять установку'})).toBeInTheDocument();
     expect(screen.queryByText(/Сдача смены за 27\.09\.2026/)).not.toBeInTheDocument();
   });
+
+  it('у несданной смены прошлых суток счётчик «Время работы» не бежит', async () => {
+    current = {...current, checklists: current.checklists.map((list) => list.stage === 'EO_AFTER' ? {...list, done: true} : list)};
+    render(<OperatorShiftV2 />);
+    await closeButton();
+    // Первый тик счётчика приходит через setTimeout(0): ждём его, иначе проверка обгонит баг.
+    await new Promise((resolve) => setTimeout(resolve, 60));
+    const row = screen.getByText('Время работы').parentElement as HTMLElement;
+    expect(row).toHaveTextContent(/^Время работы—$/);
+  });
 });
 
 describe('закрытая смена v2: благодарность', () => {
@@ -517,5 +527,21 @@ describe('закрытая смена v2: благодарность', () => {
     expect(screen.getByText(/Алексей Геннадьевич, смена закрыта, отчёт ушёл диспетчеру. Хорошего отдыха./)).toBeInTheDocument();
     expect(screen.queryByText('Спасибо!')).not.toBeInTheDocument();
     expect(screen.getByRole('button', {name: 'На главную'})).toBeInTheDocument();
+  });
+});
+
+describe('закрытая смена v2: время работы', () => {
+  it('останавливается на отметке сдачи и не идёт дальше', async () => {
+    authFetch.mockResolvedValue({ok: true, json: async () => ({...facts,
+      shift: {id: 'shift-1', state: 'CLOSED', version: 3, type: 'DAY', productionDate: '2026-10-16', startedAt: '2026-10-16T04:00:00.000Z'},
+      clearance: {...facts.clearance, warnings: []},
+    })});
+    api.fetchState.mockResolvedValue(workStateFixture({
+      phase: 'CLOSED', productionDate: '2026-10-16',
+      shift: {id: 'shift-1', productionDate: '2026-10-16', startedAt: '2026-10-16T04:00:00.000Z', state: 'CLOSED'},
+      receipt: {reportId: 'RM-1', submittedAt: '2026-10-16T06:05:09.000Z', closedAt: '2026-10-16T06:05:09.000Z', timezone: 'Europe/Moscow'},
+    }));
+    render(<OperatorShiftV2 />);
+    expect(await screen.findByText('02:05:09')).toBeInTheDocument();
   });
 });

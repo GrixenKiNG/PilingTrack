@@ -231,18 +231,26 @@ function Blockers({ items }: { items: string[] }) {
   );
 }
 
-function useElapsed(startedAt: string | null): string | null {
+/*
+  Время работы. Пока смена идёт — бежит от пуска. Когда сервер записал сдачу
+  (`endedAt`), счёт останавливается на этой отметке: закрытая смена не должна
+  «работать» дальше, пока экран открыт.
+*/
+function useElapsed(startedAt: string | null, endedAt: string | null = null): string | null {
+  const fixedEnd = endedAt ? new Date(endedAt).getTime() : Number.NaN;
+  const frozen = !Number.isNaN(fixedEnd);
   const [now, setNow] = useState<number | null>(null);
   useEffect(() => {
-    if (!startedAt) return;
+    if (!startedAt || frozen) return;
     const first = setTimeout(() => setNow(Date.now()), 0);
     const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => { clearTimeout(first); clearInterval(timer); };
-  }, [startedAt]);
-  if (!startedAt || now === null) return null;
+  }, [startedAt, frozen]);
+  const reference = frozen ? fixedEnd : now;
+  if (!startedAt || reference === null) return null;
   const started = new Date(startedAt).getTime();
   if (Number.isNaN(started)) return null;
-  const seconds = Math.max(0, Math.floor((now - started) / 1000));
+  const seconds = Math.max(0, Math.floor((reference - started) / 1000));
   const pad = (value: number) => String(value).padStart(2, '0');
   return `${pad(Math.floor(seconds / 3600))}:${pad(Math.floor(seconds / 60) % 60)}:${pad(seconds % 60)}`;
 }
@@ -426,7 +434,12 @@ export function OperatorShiftV2() {
   const state = facts
     ? resolveV2State(facts, flowMobile?.phase ?? null, postDone, { accepted: accepted || Boolean(oldShift), finishing })
     : null;
-  const elapsed = useElapsed(facts?.shift?.startedAt ?? null);
+  // У несданной смены прошлых суток «время работы» растёт без предела и ничего не
+  // значит (72 часа и счёт идёт), поэтому для неё счётчик не показываем.
+  const elapsed = useElapsed(
+    oldShift ? null : facts?.shift?.startedAt ?? null,
+    mobile?.receipt?.closedAt ?? mobile?.receipt?.submittedAt ?? null,
+  );
 
   /**
    * Пока контур готовности держит машину — перечитываем факты.
