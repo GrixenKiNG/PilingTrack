@@ -1,5 +1,5 @@
-import {fireEvent, render, screen, waitFor} from '@testing-library/react';
-import {describe, expect, it, vi} from 'vitest';
+import {fireEvent, render, screen, waitFor, within} from '@testing-library/react';
+import {beforeEach, describe, expect, it, vi} from 'vitest';
 import type {OperatorMobileState} from '@/modules/operator-mobile/contracts';
 // Экран тянет рабочий обзор оператора, а тот — стили PostCSS; в тесте они не нужны.
 vi.mock('@/components/piling/operator-mobile/operator-concept.css', () => ({}));
@@ -30,6 +30,31 @@ vi.mock('@/components/piling/operator-mobile/api', () => ({
 import {ApiError, QueuedOffline} from '@/components/piling/operator-mobile/api';
 import {CloseScreen, OperatorV5App, WorkScreen} from '../operator-v5-app';
 import {workStateFixture} from '../../operator-mobile/__tests__/fixtures';
+
+beforeEach(() => window.localStorage.clear());
+
+describe('v5: поправка выработки', () => {
+  it('при 409 оставляет ввод и причину внутри формы, после успеха закрывает её', async () => {
+    api.fetchState.mockReset().mockResolvedValue(workStateFixture({operator: {id: 'operator', name: 'Машинист'}, options: [], entries: [{
+      id: 'entry-1', kind: 'DOWNTIME', label: 'Ожидание', value: 2, meters: null,
+      occurredAt: '2026-09-20T08:00:00.000Z', corrections: [],
+    }]}));
+    api.sendCommand.mockReset().mockRejectedValueOnce(new ApiError(409, 'Смена уже закрыта')).mockResolvedValue(undefined);
+    render(<OperatorV5App />);
+    fireEvent.click(await screen.findByRole('button', {name: 'Поправить'}));
+    const form = within(screen.getByRole('group', {name: 'Поправка записи'}));
+    fireEvent.change(form.getByLabelText('Сколько часов простоя было на самом деле'), {target: {value: '1,5'}});
+    fireEvent.change(form.getByLabelText('Что случилось'), {target: {value: 'Ошибка ввода'}});
+    fireEvent.click(form.getByRole('button', {name: 'Записать поправку'}));
+    await waitFor(() => expect(form.getByRole('alert')).toHaveTextContent('Смена уже закрыта'));
+    expect(form.getByLabelText('Сколько часов простоя было на самом деле')).toHaveValue('1,5');
+    expect(api.sendCommand).toHaveBeenLastCalledWith({command: 'correct-production', clientCommandId: 'cmd-1',
+      shiftId: 'shift-1', entryId: 'entry-1', kind: 'DOWNTIME', actual: 1.5, reason: 'Ошибка ввода'});
+    fireEvent.click(form.getByRole('button', {name: 'Записать поправку'}));
+    await waitFor(() => expect(screen.queryByRole('group', {name: 'Поправка записи'})).not.toBeInTheDocument());
+    expect(api.sendCommand).toHaveBeenCalledTimes(2);
+  });
+});
 
 describe('T12: следующий шаг v5 открывает действие и фокусирует его', () => {
   function open(value: Partial<OperatorMobileState>) {
@@ -197,6 +222,22 @@ describe('v5: вердикты осмотра и подтверждение за
 });
 
 describe('v5: явная замена счётчика моточасов', () => {
+  it('восстанавливает ответы, замер и замену счётчика после перезагрузки', async () => {
+    api.fetchState.mockReset().mockResolvedValue(workStateFixture({phase: 'CLOSING', operator: {id: 'draft-operator', name: 'Машинист'},
+      checklists: [{stage: 'EO_AFTER', title: 'ЕО после работы', purpose: '', version: '1', done: false, period: null,
+        sections: [{id: 'meter', title: 'Счётчик', items: [{id: 'hours', text: 'Снять показание', severity: 'NOTE', measure: {key: 'engineHours', label: 'Моточасы', unit: 'м/ч'}}]}]}],
+    }));
+    const view = render(<OperatorV5App />);
+    fireEvent.click(await screen.findByRole('button', {name: /^норма$/i}));
+    fireEvent.change(screen.getByRole('textbox'), {target: {value: '99'}});
+    fireEvent.click(screen.getByRole('checkbox', {name: 'Счётчик заменён'}));
+    view.unmount();
+    render(<OperatorV5App />);
+    await screen.findByRole('button', {name: /^норма$/i});
+    expect(screen.getByRole('textbox')).toHaveValue('99');
+    expect(screen.getByRole('checkbox', {name: 'Счётчик заменён'})).toBeChecked();
+    expect(screen.getByRole('button', {name: 'Завершить'})).toBeEnabled();
+  });
   it('посылает новое меньшее показание с пометкой, не отмечая неисправность', async () => {
     const assignment = working.assignment;
     if (!assignment) throw new Error('Для проверки нужна назначенная установка');
@@ -431,6 +472,18 @@ function fillPiles(container: HTMLElement) {
 }
 
 describe('запись выработки v5 и отказ сервера', () => {
+  it('восстанавливает открытую форму и количество после перезагрузки', () => {
+    const props = {state: {...working, operator: {id: 'operator', name: 'Машинист'}}, busy: false,
+      onLog: vi.fn().mockResolvedValue(false), onFinish: vi.fn(), onIncident: vi.fn(), onOpenSafety: vi.fn()};
+    const view = render(<WorkScreen {...props} />);
+    fireEvent.click(screen.getByRole('button', {name: 'Добавить сваю'}));
+    fireEvent.change(screen.getByRole('combobox'), {target: {value: 'grade-1'}});
+    fireEvent.change(screen.getByRole('textbox'), {target: {value: '12'}});
+    view.unmount();
+    render(<WorkScreen {...props} />);
+    expect(screen.getByRole('combobox')).toHaveValue('grade-1');
+    expect(screen.getByRole('textbox')).toHaveValue('12');
+  });
   it('оставляет введённое число, когда сервер отказал', async () => {
     const onLog = vi.fn().mockResolvedValue(false);
     const {container} = renderWork(onLog);
@@ -565,6 +618,17 @@ describe('запись ушла в офлайн-очередь', () => {
  * ничего. Показываем текст про роль сам по себе, как в v1/v10.
  */
 describe('отказ по роли при загрузке состояния', () => {
+  it('после 503 текстовый повтор открывает восстановленную смену', async () => {
+    api.fetchState.mockReset().mockRejectedValueOnce(new ApiError(503, 'Сервис временно недоступен'))
+      .mockResolvedValue(workStateFixture({operator: {id: 'operator', name: 'Машинист'}, options: []}));
+    render(<OperatorV5App />);
+    expect(await screen.findByText('Нет связи с сервером')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', {name: 'Повторить'}));
+    expect(await screen.findByRole('button', {name: 'Добавить сваю'})).toBeInTheDocument();
+    expect(screen.queryByText('Нет связи с сервером')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', {name: 'Повторить'})).not.toBeInTheDocument();
+    expect(api.fetchState).toHaveBeenCalledTimes(2);
+  });
   it('при 403 показывает текст про роль, без «Повторить» и без обещания отправки', async () => {
     vi.mocked(api.fetchState).mockRejectedValue(new ApiError(403, 'Экран доступен только машинисту'));
     render(<OperatorV5App />);

@@ -18,7 +18,7 @@ import {
   getSamplingConfig,
   getIngestStats,
   findForeignEquipmentIds,
-} from '@/services/telemetry/telemetry-ingestion-service';
+} from '@/modules/telemetry';
 import { databaseCircuitBreaker, CircuitOpenError } from '@/core/infrastructure/circuit-breakers';
 import { withApi, readJsonBody } from '@/core/api-wrapper';
 import { z } from 'zod';
@@ -328,7 +328,7 @@ export const GET = withApi(async (request: NextRequest) => {
         return NextResponse.json({ error: 'Для анализа укажите equipmentId' }, { status: 400 });
       }
       const { getTelemetryAnalysis } = await import(
-        '@/services/telemetry/telemetry-ingestion-service'
+        '@/modules/telemetry'
       );
       const analysis = await getTelemetryAnalysis({
         tenantId,
@@ -340,7 +340,7 @@ export const GET = withApi(async (request: NextRequest) => {
     }
 
     const { getTelemetryByRange } = await import(
-      '@/services/telemetry/telemetry-ingestion-service'
+      '@/modules/telemetry'
     );
     const records = await getTelemetryByRange({
       tenantId,

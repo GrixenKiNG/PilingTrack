@@ -4,6 +4,7 @@ import {nextStep} from '../shift-next-step';
 import {NextStepTab} from '../step-bar';
 import {OperatorWorkOverview, type WorkAction} from '../operator-work-overview';
 import {useCallback, useEffect, useRef, useState} from 'react';
+import {useLocalFormDraft} from '../use-local-form-draft';
 import {
   DOWNTIME_QUICK_HOURS, downtimeHoursProblem, formatDowntimeHoursOnly, parseDowntimeHours,
 } from '@/lib/downtime-hours';
@@ -401,11 +402,14 @@ function ProductionForm({state, busy, onLog, initialKind = 'PILES'}: {
   /** true — сервер принял запись (или она легла в очередь); только тогда форма очищается. */
   onLog: (entry: ProductionEntryInput) => Promise<boolean>;
 }) {
-  const [kind, setKind] = useState<WorkAction>(initialKind);
-  const [optionId, setOptionId] = useState('');
-  const [count, setCount] = useState('');
-  const [meters, setMeters] = useState('');
-  const [hoursText, setHoursText] = useState('');
+  const localDraft = useLocalFormDraft(state.operator?.id, state.shift?.id && `production:v10:${state.shift.id}`, {
+    kind: initialKind, optionId: '', count: '', meters: '', hoursText: '',
+  }, (value) => !value.optionId && !value.count && !value.meters && !value.hoursText);
+  const [kind, setKind] = localDraft.field('kind');
+  const [optionId, setOptionId] = localDraft.field('optionId');
+  const [count, setCount] = localDraft.field('count');
+  const [meters, setMeters] = localDraft.field('meters');
+  const [hoursText, setHoursText] = localDraft.field('hoursText');
 
   const options = kind === 'PILES' || kind === 'PASSPORT' ? state.dictionaries.pileGrades
     : kind === 'DRILLING' ? state.dictionaries.drillingTypes
@@ -452,6 +456,7 @@ function ProductionForm({state, busy, onLog, initialKind = 'PILES'}: {
     setCount('');
     setMeters('');
     setHoursText('');
+    localDraft.clear({...localDraft.value, optionId: '', count: '', meters: '', hoursText: ''});
   };
 
   return (
@@ -472,6 +477,8 @@ function ProductionForm({state, busy, onLog, initialKind = 'PILES'}: {
           ней нормативное, и расходиться ей нельзя. */}
       {kind === 'PASSPORT' ? (
         <PilePassportForm
+          draftUserId={state.operator?.id}
+          draftShiftId={state.shift?.id}
           grades={state.dictionaries.pileGrades}
           busy={busy}
           onSubmit={(pileGradeId, passport) => onLog({kind: 'PILE_PASSPORT', pileGradeId, passport})}
@@ -668,7 +675,7 @@ function ScreenSafetyChecklists({state, busy, error, commandId, onSubmit, go}: {
   busy: boolean;
   error: string | null;
   commandId: string;
-  onSubmit: (stage: ChecklistStage, answers: ChecklistAnswer[]) => Promise<boolean>;
+  onSubmit: (stage: ChecklistStage, answers: ChecklistAnswer[], restoredCommandId?: string) => Promise<boolean>;
   go: Go;
 }) {
   const [open, setOpen] = useState<ChecklistStage | null>(null);
@@ -677,6 +684,8 @@ function ScreenSafetyChecklists({state, busy, error, commandId, onSubmit, go}: {
   if (opened) {
     return (
       <ChecklistScreen
+        draftUserId={state.operator?.id}
+        draftShiftId={state.shift?.id}
         key={`${state.shift?.id}:${state.assignment?.equipmentId}:${opened.stage}`}
         checklist={opened}
         warnings={state.warnings}
@@ -686,8 +695,10 @@ function ScreenSafetyChecklists({state, busy, error, commandId, onSubmit, go}: {
         lastMeter={state.assignment?.lastMeter ?? null}
         known={knownAnswers(opened.stage, state)}
         onBack={() => setOpen(null)}
-        onSubmit={(answers) => {
-          void onSubmit(opened.stage, answers).then((ok) => { if (ok) setOpen(null); });
+        onSubmit={async (answers, restoredCommandId) => {
+          const ok = await onSubmit(opened.stage, answers, restoredCommandId);
+          if (ok) setOpen(null);
+          return ok;
         }}
       />
     );
@@ -1535,7 +1546,7 @@ export function OperatorV10App() {
    * замеры), здесь только отправка. Успех возвращается, чтобы экран шага
    * вернул человека к порядку смены, а не оставлял на сданном списке.
    */
-  const submitChecklist = useCallback(async (stage: ChecklistStage, checklistAnswers: ChecklistAnswer[]): Promise<boolean> => {
+  const submitChecklist = useCallback(async (stage: ChecklistStage, checklistAnswers: ChecklistAnswer[], restoredCommandId?: string): Promise<boolean> => {
     const shiftId = state?.shift?.id;
     const equipmentId = state?.assignment?.equipmentId;
     const list = state?.checklists.find((item) => item.stage === stage);
@@ -1545,7 +1556,7 @@ export function OperatorV10App() {
     }
     return run(() => sendCommand({
       command: 'submit-checklist',
-      clientCommandId: commandId,
+      clientCommandId: restoredCommandId ?? commandId,
       shiftId,
       equipmentId,
       stage,
@@ -1617,6 +1628,8 @@ export function OperatorV10App() {
       if (!list) return <Card><Nodata>Список «{stage}» не пришёл с сервера — обновите экран</Nodata></Card>;
       return (
         <ChecklistScreen
+          draftUserId={current.operator?.id}
+          draftShiftId={current.shift?.id}
           key={`${current.shift?.id}:${current.assignment?.equipmentId}:${list.stage}`}
           checklist={list}
           warnings={current.warnings}
@@ -1626,10 +1639,10 @@ export function OperatorV10App() {
           lastMeter={current.assignment?.lastMeter ?? null}
           known={knownAnswers(list.stage, current)}
           onBack={() => setActive('today')}
-          onSubmit={(checklistAnswers) => {
-            void submitChecklist(list.stage, checklistAnswers).then((ok) => {
-              if (ok) setActive(list.stage === 'EO_AFTER' ? 'closing' : 'today');
-            });
+          onSubmit={async (checklistAnswers, restoredCommandId) => {
+            const ok = await submitChecklist(list.stage, checklistAnswers, restoredCommandId);
+            if (ok) setActive(list.stage === 'EO_AFTER' ? 'closing' : 'today');
+            return ok;
           }}
         />
       );
@@ -1674,7 +1687,7 @@ export function OperatorV10App() {
     if (!state) {
       return (
         <Card>
-          <Nodata>{loadError ?? 'Состояние смены недоступно'}</Nodata>
+          <Nodata>Состояние смены недоступно</Nodata>
         </Card>
       );
     }
@@ -1724,7 +1737,9 @@ export function OperatorV10App() {
       </div>
       <div className="ov10-content" ref={contentRef}>
         {oldShift && state?.shift ? <Banner tone="warn" title={`Не сдана смена за ${dateRu(state.shift.productionDate)}`}>Дописать можно только работу этой смены. Сегодняшняя работа — после открытия новой смены.</Banner> : null}
-        {loadError && state ? <Banner tone="warn" title={loadError} /> : null}
+        {loadError ? <Banner tone="warn" title={loadError}>
+          <button type="button" className="ov10-btn" onClick={() => void reload()}>Повторить</button>
+        </Banner> : null}
         {actionError ? <Banner tone="bad" title={`Не записано: ${actionError}`} /> : null}
         {notice ? <Banner tone="info" title={notice} /> : null}
         <OfflineQueueBanner items={queued} onRetry={retryQueued} onDiscard={discardQueued} className="space-y-1" />

@@ -1,5 +1,5 @@
 import {fireEvent, render, screen, waitFor} from '@testing-library/react';
-import {describe, expect, it, vi} from 'vitest';
+import {beforeEach, describe, expect, it, vi} from 'vitest';
 import type {OperatorMobileState} from '@/modules/operator-mobile/contracts';
 
 // Экран тянет оформление обзора; в тестах подменяем CSS пустышкой — так же,
@@ -52,6 +52,34 @@ const baseProps = {
   errorDetails: [],
   onCorrect: vi.fn().mockResolvedValue(true),
 };
+
+beforeEach(() => window.localStorage.clear());
+
+describe('рабочий экран: незаписанный ввод после перезагрузки', () => {
+  const localState = {...state, operator: {id: 'draft-operator', name: 'Машинист'}};
+  it('восстанавливает марку и количество свай', () => {
+    const view = render(<WorkScreen {...baseProps} state={localState} />);
+    fireEvent.click(screen.getByRole('button', {name: 'Добавить сваю'}));
+    fireEvent.change(screen.getByLabelText('Марка сваи'), {target: {value: 'g1'}});
+    fireEvent.change(screen.getByLabelText('Свай, шт'), {target: {value: '12'}});
+    view.unmount();
+    render(<WorkScreen {...baseProps} state={localState} />);
+    expect(screen.getByLabelText('Марка сваи')).toHaveValue('g1');
+    expect(screen.getByLabelText('Свай, шт')).toHaveValue(12);
+  });
+  it('после принятия не восстанавливает отправленные числа', async () => {
+    const view = render(<WorkScreen {...baseProps} state={localState} />);
+    fireEvent.click(screen.getByRole('button', {name: 'Добавить сваю'}));
+    fireEvent.change(screen.getByLabelText('Марка сваи'), {target: {value: 'g1'}});
+    fireEvent.change(screen.getByLabelText('Свай, шт'), {target: {value: '12'}});
+    fireEvent.click(screen.getByRole('button', {name: 'Записать'}));
+    await waitFor(() => expect(screen.getByLabelText('Свай, шт')).toHaveValue(null));
+    view.unmount();
+    render(<WorkScreen {...baseProps} state={localState} />);
+    fireEvent.click(screen.getByRole('button', {name: 'Добавить сваю'}));
+    expect(screen.getByLabelText('Свай, шт')).toHaveValue(null);
+  });
+});
 
 /** Непустой список записей: с ним отказ обязан остаться у кнопки, а не под списком. */
 const stateWithEntries = {

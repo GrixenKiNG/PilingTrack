@@ -1,8 +1,10 @@
 'use client';
 
 import {useCallback, useEffect, useMemo, useRef, useState, type ReactNode} from 'react';
+import {useLocalFormDraft} from '../operator-mobile/use-local-form-draft';
 import {PilingIcon, type PilingIconName} from '@/components/piling/icons';
 import {OperatorWorkOverview} from '../operator-mobile/operator-work-overview';
+import type {CorrectionInput} from '../operator-mobile/screens/entries-list';
 import {
   DOWNTIME_QUICK_HOURS, downtimeHoursProblem, formatDowntimeHoursOnly, parseDowntimeHours,
 } from '@/lib/downtime-hours';
@@ -684,7 +686,7 @@ function IncidentScreen({state, busy, onReport}: {
 }
 
 /** F. Работа: плитки выработки и запись — экраны F1–F5 макета. */
-export function WorkScreen({state, busy, onLog, onFinish, onOpenSafety, onIncident, afterFinish = false}: {
+export function WorkScreen({state, busy, onLog, onFinish, onOpenSafety, onIncident, afterFinish = false, onCorrect, correctionError}: {
   state: OperatorMobileState;
   busy: boolean;
   /** Признак успеха: по нему форма решает, чистить ли поля. */
@@ -695,13 +697,18 @@ export function WorkScreen({state, busy, onLog, onFinish, onOpenSafety, onIncide
   onOpenSafety: (stage: ChecklistStage) => void;
   /** Работа завершена, смена ждёт сдачи: выработку и простой дописывают, «Завершить работу» нет. */
   afterFinish?: boolean;
+  onCorrect?: (input: CorrectionInput) => Promise<boolean>;
+  correctionError?: string | null;
 }) {
-  const [formOpen, setFormOpen] = useState(false);
-  const [kind, setKind] = useState<'PILES' | 'DRILLING' | 'DOWNTIME' | 'PASSPORT'>('PILES');
-  const [optionId, setOptionId] = useState('');
-  const [count, setCount] = useState('');
-  const [meters, setMeters] = useState('');
-  const [hoursText, setHoursText] = useState('');
+  const localDraft = useLocalFormDraft(state.operator?.id, state.shift?.id && `production:v5:${state.shift.id}`, {
+    kind: 'PILES' as 'PILES' | 'DRILLING' | 'DOWNTIME' | 'PASSPORT', optionId: '', count: '', meters: '', hoursText: '',
+  }, (value) => !value.optionId && !value.count && !value.meters && !value.hoursText);
+  const [formOpen, setFormOpen] = useState(localDraft.restored);
+  const [kind, setKind] = localDraft.field('kind');
+  const [optionId, setOptionId] = localDraft.field('optionId');
+  const [count, setCount] = localDraft.field('count');
+  const [meters, setMeters] = localDraft.field('meters');
+  const [hoursText, setHoursText] = localDraft.field('hoursText');
 
   const options = kind === 'PILES' || kind === 'PASSPORT' ? state.dictionaries.pileGrades
     : kind === 'DRILLING' ? state.dictionaries.drillingTypes
@@ -756,9 +763,11 @@ export function WorkScreen({state, busy, onLog, onFinish, onOpenSafety, onIncide
     setCount('');
     setMeters('');
     setHoursText('');
+    localDraft.clear({...localDraft.value, optionId: '', count: '', meters: '', hoursText: ''});
   };
 
   if (!formOpen) return <div className="scr"><OperatorWorkOverview state={state} variant="v5" busy={busy}
+    onCorrect={onCorrect} correctionError={correctionError}
     onAction={(next)=>{pick(next);setFormOpen(true);}} onFinish={onFinish} hideFinish={afterFinish} onIncident={onIncident}>
     {safety.filter(c=>c.period?.due||c.period?.warn).map(c=><button key={c.stage} type="button" className="oc-form-back" onClick={()=>onOpenSafety(c.stage)}>{c.title} · пройти проверку</button>)}
   </OperatorWorkOverview></div>;
@@ -820,6 +829,8 @@ export function WorkScreen({state, busy, onLog, onFinish, onOpenSafety, onIncide
           наше, а нормативное (СП 45.13330), и расходиться ей нельзя. */}
       {kind === 'PASSPORT' ? (
         <PilePassportForm
+          draftUserId={state.operator?.id}
+          draftShiftId={state.shift?.id}
           grades={state.dictionaries.pileGrades}
           busy={busy}
           onSubmit={(pileGradeId, passport) => onLog({kind: 'PILE_PASSPORT', pileGradeId, passport})}
@@ -997,6 +1008,7 @@ export function OperatorV5App() {
    */
   const [forbidden, setForbidden] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [tab, setTab] = useState<Tab>('SHIFT');
   const stepScreen = useRef<HTMLDivElement>(null);
@@ -1012,14 +1024,9 @@ export function OperatorV5App() {
     target?.scrollIntoView?.({block: 'center'});
   }, [focusRequest]);
   const [editingShiftId, setEditingShiftId] = useState<string | null>(null);
-  const [answers, setAnswers] = useState<Record<string, OperatorAnswer>>({});
-  const [notes, setNotes] = useState<Record<string, string>>({});
-  const [media, setMedia] = useState<Record<string, string[]>>({});
   const [uploading, setUploading] = useState<Record<string, boolean>>({});
   const [photoErrors, setPhotoErrors] = useState<Record<string, string>>({});
   /** Числовые замеры текущего списка: моточасы, остаток топлива, доливы. */
-  const [measures, setMeasures] = useState<Record<string, string>>({});
-  const [meterReplacement, setMeterReplacement] = useState<{shiftId: string; stage: ChecklistStage} | null>(null);
   const [commandId, setCommandId] = useState(newCommandId);
   const [online, setOnline] = useState(true);
 
@@ -1084,6 +1091,7 @@ export function OperatorV5App() {
   const run = useCallback(async (fn: () => Promise<unknown>, done: string): Promise<boolean> => {
     setBusy(true);
     setNotice(null);
+    setActionError(null);
     try {
       await fn();
       setCommandId(newCommandId());
@@ -1104,6 +1112,7 @@ export function OperatorV5App() {
         setBusy(false);
         return true;
       } else {
+        setActionError(cause instanceof Error ? cause.message : 'Действие не выполнено');
         setNotice(cause instanceof Error ? cause.message : 'Действие не выполнено');
         setBusy(false);
         return false;
@@ -1160,11 +1169,26 @@ export function OperatorV5App() {
     return list.done ? null : list;
   }, [stage, state, safetyStage]);
 
+  const checklistDraft = useLocalFormDraft(state?.operator?.id,
+    state?.shift?.id && checklist && `checklist:v5:${state.shift.id}:${checklist.stage}:${checklist.version}`, {
+      commandId: newCommandId(), answers: {} as Record<string, OperatorAnswer>, notes: {} as Record<string, string>,
+      media: {} as Record<string, string[]>, measures: {} as Record<string, string>,
+      meterReplacement: null as {shiftId: string; stage: ChecklistStage} | null,
+    }, (value) => !Object.keys(value.answers).length && !Object.values(value.notes).some((note) => note.trim())
+      && !Object.values(value.media).some((media) => media.length) && !Object.values(value.measures).some((measure) => measure.trim()) && !value.meterReplacement);
+  const [answers, setAnswers] = checklistDraft.field('answers');
+  const [notes, setNotes] = checklistDraft.field('notes');
+  const [media, setMedia] = checklistDraft.field('media');
+  const [measures, setMeasures] = checklistDraft.field('measures');
+  const [meterReplacement, setMeterReplacement] = checklistDraft.field('meterReplacement');
+  const checklistCommandId = checklistDraft.value.commandId;
+  const clearChecklistDraft = checklistDraft.clear;
+
   const attachChecklistPhoto = async (itemId: string, file: File) => {
     setUploading((current) => ({...current, [itemId]: true}));
     setPhotoErrors((current) => ({...current, [itemId]: ''}));
     try {
-      const mediaId = await uploadPhoto({file, clientCommandId: commandId, itemId});
+      const mediaId = await uploadPhoto({file, clientCommandId: checklistCommandId, itemId});
       setMedia((current) => ({...current, [itemId]: [...(current[itemId] ?? []), mediaId]}));
     } catch (cause) {
       setPhotoErrors((current) => ({...current, [itemId]: cause instanceof Error ? cause.message : 'Снимок не загружен'}));
@@ -1180,7 +1204,7 @@ export function OperatorV5App() {
     const items = checklist.sections.flatMap((section) => section.items);
     const accepted = await run(() => sendCommand({
       command: 'submit-checklist',
-      clientCommandId: commandId,
+      clientCommandId: checklistCommandId,
       shiftId,
       equipmentId,
       stage,
@@ -1206,15 +1230,11 @@ export function OperatorV5App() {
       }),
     }), `${checklist.title}: принято.`);
     if (!accepted) return;
-    setMeasures({});
-    setAnswers({});
-    setNotes({});
-    setMedia({});
+    clearChecklistDraft({commandId: newCommandId(), answers: {}, notes: {}, media: {}, measures: {}, meterReplacement: null});
     setPhotoErrors({});
-    setMeterReplacement(null);
     // Периодический список сдан — возвращаемся туда, откуда его открыли.
     setSafetyStage(null);
-  }, [answers, checklist, commandId, measures, media, meterReplacement, notes, run, stage, state]);
+  }, [answers, checklist, checklistCommandId, measures, media, meterReplacement, notes, run, stage, state, clearChecklistDraft]);
 
   const reportIncident = useCallback((input: {
     category: IncidentCategory; signs: IncidentSign[]; injured: boolean; description: string;
@@ -1233,6 +1253,13 @@ export function OperatorV5App() {
       () => sendCommand({command: 'log-production', clientCommandId: commandId, shiftId, entry}),
       'Записано.',
     );
+  }, [commandId, run, state]);
+
+  const correctProduction = useCallback(async (input: CorrectionInput): Promise<boolean> => {
+    const shiftId = state?.shift?.id;
+    if (!shiftId) return false;
+    return run(() => sendCommand({command: 'correct-production', clientCommandId: commandId, shiftId, ...input}),
+      'Поправка записана.');
   }, [commandId, run, state]);
 
   if (forbidden) {
@@ -1434,6 +1461,8 @@ export function OperatorV5App() {
           state={state}
           busy={busy}
           onLog={logProduction}
+          onCorrect={correctProduction}
+          correctionError={actionError}
           onOpenSafety={setSafetyStage}
           afterFinish={state.phase !== 'WORK' || Boolean(oldShift)}
           onIncident={()=>setTab('EVENTS')}

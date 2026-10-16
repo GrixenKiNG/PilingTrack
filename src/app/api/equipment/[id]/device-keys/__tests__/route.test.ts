@@ -25,7 +25,7 @@ vi.mock('@/lib/db', () => ({
     deviceKey: { findMany: findManyKeysMock, findUnique: findUniqueKeyMock },
   },
 }));
-vi.mock('@/services/telemetry/device-key-service', () => ({
+vi.mock('@/modules/telemetry', () => ({
   provisionDeviceKey: vi.fn(),
   revokeDeviceKey: revokeDeviceKeyMock,
 }));

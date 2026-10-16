@@ -1,7 +1,10 @@
-import {fireEvent, render, screen} from '@testing-library/react';
-import {describe, expect, it, vi} from 'vitest';
+import {fireEvent, render, screen, waitFor} from '@testing-library/react';
+import {beforeEach, describe, expect, it, vi} from 'vitest';
+vi.mock('../api', async (importOriginal) => ({...(await importOriginal<typeof import('../api')>()), uploadPhoto: vi.fn().mockResolvedValue('photo-1')}));
 import type {ChecklistView} from '@/modules/operator-mobile/contracts';
 import {ChecklistScreen} from './checklist-screen';
+import {uploadPhoto} from '../api';
+beforeEach(() => window.localStorage.clear());
 
 const checklist: ChecklistView = {
   stage: 'PRESHIFT_INSPECTION',
@@ -18,6 +21,41 @@ const checklist: ChecklistView = {
 };
 
 describe('чек-лист машиниста', () => {
+  it('не сохраняет пустой лист после снятия групповой отметки', () => {
+    render(<ChecklistScreen checklist={checklist} warnings={[]} busy={false} error={null} commandId="command"
+      draftUserId="operator" draftShiftId="shift" onSubmit={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', {expanded: false}));
+    const all = screen.getByRole('button', {name: 'Весь раздел «Кабина» в норме'});
+    fireEvent.click(all);
+    fireEvent.click(all);
+    expect(Object.keys(window.localStorage).filter((key) => key.startsWith('pilingtrack:form-draft:'))).toEqual([]);
+  });
+  it('восстанавливает ответ и фото с исходным ключом команды; принятый черновик удаляет', async () => {
+    const onSubmit = vi.fn().mockResolvedValue(true);
+    const props = {checklist: {...checklist, sections: [{id: 'cab', title: 'Кабина', items: [
+      {id: 'glass', text: 'Стёкла и зеркала', severity: 'ALERT' as const, photoOnIssue: true},
+    ]}]}, warnings: [], busy: false, error: null, draftUserId: 'operator', draftShiftId: 'shift', onSubmit};
+    const view = render(<ChecklistScreen {...props} commandId="original-command" />);
+    fireEvent.click(screen.getByRole('button', {expanded: false}));
+    fireEvent.click(screen.getByRole('button', {name: 'Замечание'}));
+    fireEvent.change(screen.getByRole('textbox'), {target: {value: 'Трещина стекла'}});
+    const photo = view.container.querySelector('input[type="file"]');
+    if (!photo) throw new Error('Нет поля фотографии');
+    fireEvent.change(photo, {target: {files: [new File(['qa'], 'qa.jpg', {type: 'image/jpeg'})]}});
+    await screen.findByRole('button', {name: 'Снимков: 1. Добавить ещё'});
+    expect(uploadPhoto).toHaveBeenCalledWith(expect.objectContaining({clientCommandId: 'original-command'}));
+    view.unmount();
+    const restored = render(<ChecklistScreen {...props} commandId="new-command" />);
+    expect(screen.getByText('Отмечено 1 из 1')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', {name: 'Завершить'}));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledWith([
+      expect.objectContaining({answer: 'REMARK', note: 'Трещина стекла', mediaIds: ['photo-1']}),
+    ], 'original-command'));
+    await waitFor(() => expect(screen.getByText('Отмечено 0 из 1')).toBeInTheDocument());
+    restored.unmount();
+    render(<ChecklistScreen {...props} commandId="third-command" />);
+    expect(screen.getByText('Отмечено 0 из 1')).toBeInTheDocument();
+  });
   it('объясняет, что снимок нужен при замечании или отказе, и принимает норму без снимка', () => {
     const onSubmit = vi.fn();
     render(<ChecklistScreen checklist={{...checklist, sections: [{

@@ -37,6 +37,7 @@
  */
 
 import {OperatorWorkOverview} from '../operator-mobile/operator-work-overview';
+import type {CorrectionInput} from '../operator-mobile/screens/entries-list';
 import { formatDowntimeHoursOnly } from '@/lib/downtime-hours';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
@@ -544,31 +545,44 @@ export function OperatorShiftV2() {
    * и откажет раньше, чем это сделает экран. Вторая копия правила здесь рано
    * или поздно разошлась бы с первой и начала разрешать запрещённое.
    */
-  const submitChecklist = useCallback(async (stage: ChecklistStage, answers: ChecklistAnswer[]) => {
+  const submitChecklist = useCallback(async (stage: ChecklistStage, answers: ChecklistAnswer[], restoredCommandId?: string) => {
     const shiftId = mobile?.shift?.id ?? facts?.shift?.id;
     const equipmentId = mobile?.assignment?.equipmentId ?? facts?.equipment?.id;
     if (!shiftId || !equipmentId) {
       setChecklistError('Смена не найдена — осмотр не к чему приложить');
-      return;
+      return false;
     }
     setBusy(true);
     setChecklistError(null);
     try {
       await sendCommand({
         command: 'submit-checklist',
-        clientCommandId: checklistCommandId,
+        clientCommandId: restoredCommandId ?? checklistCommandId,
         shiftId,
         equipmentId,
         stage,
         answers,
       });
       setChecklistCommandId(crypto.randomUUID());
-      await Promise.all([loadMobile(), load()]);
     } catch (cause) {
-      setChecklistError(cause instanceof Error ? cause.message : 'Осмотр не принят');
+      if (!(cause instanceof QueuedOffline)) {
+        setChecklistError(cause instanceof Error ? cause.message : 'Осмотр не принят');
+        setBusy(false);
+        return false;
+      }
+      setChecklistCommandId(crypto.randomUUID());
+      toast.success(cause.message);
+      setBusy(false);
+      return true;
+    }
+    try {
+      await Promise.all([loadMobile(), load()]);
+    } catch {
+      toast.info('Осмотр принят. Не удалось обновить экран — нажмите «Обновить».');
     } finally {
       setBusy(false);
     }
+    return true;
   }, [mobile?.shift?.id, mobile?.assignment?.equipmentId, facts?.shift?.id, facts?.equipment?.id,
     checklistCommandId, loadMobile, load]);
 
@@ -584,6 +598,31 @@ export function OperatorShiftV2() {
   const [productionCommandId, setProductionCommandId] = useState(() => crypto.randomUUID());
   // Причина отказа остаётся в открытой форме: всплывающее сообщение лежит под ней.
   const [productionError, setProductionError] = useState<string | null>(null);
+  const correctProduction = useCallback(async (input: CorrectionInput) => {
+    const shiftId = mobile?.shift?.id ?? facts?.shift?.id;
+    if (!shiftId) {
+      setProductionError('Смена не найдена — записать некуда');
+      return false;
+    }
+    setProductionError(null);
+    setBusy(true);
+    try {
+      await sendCommand({command: 'correct-production', clientCommandId: productionCommandId, shiftId, ...input});
+      setProductionCommandId(crypto.randomUUID());
+      await loadMobile();
+      return true;
+    } catch (cause) {
+      if (cause instanceof QueuedOffline) {
+        setProductionCommandId(crypto.randomUUID());
+        toast.info(cause.message);
+        return true;
+      }
+      setProductionError(cause instanceof Error ? cause.message : 'Поправка не прошла');
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  }, [mobile?.shift?.id, facts?.shift?.id, productionCommandId, loadMobile]);
   const logProduction = useCallback(async (entry: ProductionEntryInput) => {
     const shiftId = mobile?.shift?.id ?? facts?.shift?.id;
     if (!shiftId) {
@@ -1107,6 +1146,8 @@ export function OperatorShiftV2() {
       <StepShell bar={stepBar} screenRef={screenRef} title={V2_STEP_TITLE[step]} subtitle={stepLabel}>
         {oldShiftNotice}
         <ChecklistScreen
+          draftUserId={user?.id}
+          draftShiftId={mobile?.shift?.id ?? facts.shift?.id}
           key={`${mobile.shift?.id}:${mobile.assignment?.equipmentId}:${list.stage}`}
           checklist={list}
           warnings={mobile.warnings}
@@ -1115,7 +1156,7 @@ export function OperatorShiftV2() {
           commandId={checklistCommandId}
           lastMeter={mobile.assignment?.lastMeter ?? null}
           known={knownAnswers(catalogStage, mobile)}
-          onSubmit={(answers) => void submitChecklist(catalogStage, answers)}
+          onSubmit={(answers, restoredCommandId) => submitChecklist(catalogStage, answers, restoredCommandId)}
         />
       </StepShell>
     );
@@ -1139,6 +1180,7 @@ export function OperatorShiftV2() {
             </button>
           ) : null}
           {tab === 'shift' && mobile && <OperatorWorkOverview state={mobile} variant="v2" busy={busy}
+            onCorrect={correctProduction} correctionError={productionError}
             onAction={(kind)=>{if(kind==='PILES')setPileOpen(true);else if(kind==='PASSPORT')setPassportOpen(true);else if(kind==='DRILLING')setDrillingOpen(true);else setDowntimeOpen(true);}}
             hideFinish={editingProduction}
             onIncident={()=>setTab('safety')} onDefect={()=>setDefectOpen(true)} onFinish={()=>setFinishing(true)} />}
@@ -1227,32 +1269,40 @@ export function OperatorShiftV2() {
         </StepShell>
 
         <PileSheet
+          draftUserId={user?.id}
+          draftShiftId={mobile?.shift?.id ?? facts.shift?.id}
           open={pileOpen}
           grades={grades}
           busy={busy}
           error={productionError}
           onOpenSafety={openSafetyFromSheet}
           onClose={closeProductionSheets}
-          onAdd={(gradeId, count) => void (async () => {
-            if (await logProduction({ kind: 'PILES', pileGradeId: gradeId, count })) {
+          onAdd={async (gradeId, count) => {
+            const accepted = await logProduction({ kind: 'PILES', pileGradeId: gradeId, count });
+            if (accepted) {
               setPileOpen(false);
               toast.success(`Записано: ${count} шт`);
             }
-          })()}
+            return accepted;
+          }}
         />
         <DrillingSheet
+          draftUserId={user?.id}
+          draftShiftId={mobile?.shift?.id ?? facts.shift?.id}
           open={drillingOpen}
           types={drillingTypes}
           busy={busy}
           error={productionError}
           onOpenSafety={openSafetyFromSheet}
           onClose={closeProductionSheets}
-          onAdd={(typeId, count, metersPerUnit) => void (async () => {
-            if (await logProduction({ kind: 'DRILLING', typeId, count, metersPerUnit })) {
+          onAdd={async (typeId, count, metersPerUnit) => {
+            const accepted = await logProduction({ kind: 'DRILLING', typeId, count, metersPerUnit });
+            if (accepted) {
               setDrillingOpen(false);
               toast.success(`Записано: ${count} скв`);
             }
-          })()}
+            return accepted;
+          }}
         />
         {passportOpen && (
           <div className="fixed inset-0 z-50 flex flex-col bg-background">
@@ -1266,6 +1316,8 @@ export function OperatorShiftV2() {
             <div className="flex-1 space-y-3 overflow-y-auto p-4">
               <SheetError message={productionError} onOpenSafety={openSafetyFromSheet} />
               <PilePassportForm
+                draftUserId={user?.id}
+                draftShiftId={mobile?.shift?.id ?? facts.shift?.id}
                 grades={grades}
                 busy={busy}
                 onSubmit={async (pileGradeId, passport) => {
@@ -1281,19 +1333,23 @@ export function OperatorShiftV2() {
           </div>
         )}
         <DowntimeSheet
+          draftUserId={user?.id}
+          draftShiftId={mobile?.shift?.id ?? facts.shift?.id}
           open={downtimeOpen}
           reasons={reasons}
           busy={busy}
           error={productionError}
           onClose={closeProductionSheets}
-          onAdd={(reasonId, hours, comment) => void (async () => {
-            if (await logProduction({
+          onAdd={async (reasonId, hours, comment) => {
+            const accepted = await logProduction({
               kind: 'DOWNTIME', reasonId, hours, comment: comment || undefined,
-            })) {
+            });
+            if (accepted) {
               setDowntimeOpen(false);
               toast.success('Простой записан');
             }
-          })()}
+            return accepted;
+          }}
         />
         <DefectSheet
           open={defectOpen}

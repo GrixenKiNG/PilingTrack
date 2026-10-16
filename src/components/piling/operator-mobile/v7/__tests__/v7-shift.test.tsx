@@ -1,8 +1,9 @@
 import {fireEvent, render, screen, waitFor} from '@testing-library/react';
-import {describe, expect, it, vi} from 'vitest';
+import {beforeEach, describe, expect, it, vi} from 'vitest';
 import type {OperatorMobileState} from '@/modules/operator-mobile/contracts';
 import type {ProductionEntryInput} from '../../api';
 import {CloseFlow, ProductionFlow} from '../v7-shift';
+beforeEach(() => window.localStorage.clear());
 
 /**
  * F-R43-1: смену нельзя закрыть, пока на телефоне лежат неотправленные записи.
@@ -59,6 +60,15 @@ const dictionaries = {
 } as unknown as OperatorMobileState;
 
 describe('паспорт сваи v7 и отказ сервера', () => {
+  it('восстанавливает незаписанное количество после перезагрузки', () => {
+    const props = {state: {...dictionaries, operator: {id: 'operator', name: 'Машинист'}, shift: {id: 'shift'} } as OperatorMobileState,
+      busy: false, onSubmit: vi.fn().mockResolvedValue(false), onBack: vi.fn()};
+    const view = render(<ProductionFlow {...props} kind="PILES" />);
+    fireEvent.change(screen.getByRole('spinbutton'), {target: {value: '12'}});
+    view.unmount();
+    render(<ProductionFlow {...props} kind="PILES" />);
+    expect(screen.getByRole('spinbutton')).toHaveValue(12);
+  });
   const fill = async (onSubmit: (entry: ProductionEntryInput) => Promise<boolean>) => {
     render(
       <ProductionFlow state={dictionaries} busy={false} kind="PASSPORT"

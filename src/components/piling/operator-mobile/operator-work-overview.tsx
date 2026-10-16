@@ -6,6 +6,7 @@ import {PilingIcon, type PilingIconName} from '@/components/piling/icons';
 import type {OperatorMobileState} from '@/modules/operator-mobile/contracts';
 import {formatNumber} from '@/lib/format';
 import {formatDowntimeHoursOnly} from '@/lib/downtime-hours';
+import {EntryCorrectionForm, type CorrectionInput} from './screens/entries-list';
 import './operator-concept.css';
 
 export type WorkAction = 'PILES' | 'PASSPORT' | 'DRILLING' | 'DOWNTIME';
@@ -16,14 +17,19 @@ export function OperatorMachineHeader({state}: {state: OperatorMobileState}) {
 }
 
 /** One overview of server facts; actions delegate to each version's existing forms. */
-export function OperatorWorkOverview({state, variant, busy, onAction, onFinish, hideFinish, onIncident, onDefect, children}: {
+export function OperatorWorkOverview({state, variant, busy, onAction, onFinish, hideFinish, onIncident, onDefect, children, onCorrect, correctionError}: {
   state: OperatorMobileState; variant: Variant; busy?: boolean;
   onAction: (action: WorkAction) => void; onFinish: () => void;
   /** Работа уже завершена: кнопки «Завершить работу» нет (выработку дописывают до сдачи). */
   hideFinish?: boolean;
   onIncident?: () => void; onDefect?: () => void; children?: ReactNode;
+  onCorrect?: (input: CorrectionInput) => Promise<boolean>;
+  correctionError?: string | null;
 }) {
   const [allEntries, setAllEntries] = useState(false);
+  const [correctingId, setCorrectingId] = useState<string | null>(null);
+  const canCorrect = onCorrect && (variant === 'v2' || variant === 'v5' || variant === 'v7')
+    && (state.phase === 'WORK' || state.phase === 'CLOSING') && state.shift?.state !== 'CLOSED';
   const preparation = [
     {label: 'СИЗ и допуск', done: state.identity.ppe.confirmed && state.identity.ppe.missing.length === 0 && state.identity.briefing.ok && state.identity.knowledge.ok && state.identity.documents.every(d => !d.required || d.verdict === 'VALID' || d.verdict === 'EXPIRING')},
     ...(['PRESHIFT_INSPECTION', 'SITE_READY', 'EO_BEFORE'] as const).map((stage, i) => ({label: ['Осмотр машины', 'Площадка', 'Пуск'][i], done: state.checklists.some(c => c.stage === stage && c.done)})),
@@ -59,7 +65,14 @@ export function OperatorWorkOverview({state, variant, busy, onAction, onFinish, 
     </section>
     <section className="oc-card oc-preparation"><h2>Подготовка <small>{preparation.filter(s=>s.done).length} из 4</small></h2>{preparation.map(s=><div key={s.label}><PilingIcon name={s.done?'check':'inspection'} size={22} decorative /><span>{s.label}</span><small>{s.done?'Выполнено':'Ожидает'}</small></div>)}{finish}</section>
     <section className="oc-card oc-recent"><header><h2>Последние записи</h2>{entries.length>2&&<button type="button" onClick={()=>setAllEntries(!allEntries)}>{allEntries?'Свернуть':'Все записи'}<PilingIcon name="external" size={16} decorative /></button>}</header>
-      {entries.length===0?<p className="oc-caption">За смену пока ничего не записано.</p>:(allEntries?entries:entries.slice(0,2)).map(e=><div className="oc-entry" key={e.id}><time>{new Date(e.occurredAt).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'})}</time><PilingIcon name={e.kind==='PILES'?'pile-driving':e.kind==='DRILLING'?'drilling-auger':'downtime'} size={26} decorative /><div><strong>{e.label}</strong><span>{e.kind==='DOWNTIME'?formatDowntimeHoursOnly(e.value):`${formatNumber(e.value,0)} шт. · ${formatNumber(e.meters??0,1)} м`}</span>{e.corrections.length>0&&<small>Есть поправки: {e.corrections.length}</small>}</div><span className="oc-saved"><PilingIcon name="check" size={15} decorative /><span>Сохранено</span></span></div>)}
+      {entries.length===0?<p className="oc-caption">За смену пока ничего не записано.</p>:(allEntries?entries:entries.slice(0,2)).map(e=><div key={e.id}>
+        <div className="oc-entry"><time>{new Date(e.occurredAt).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'})}</time><PilingIcon name={e.kind==='PILES'?'pile-driving':e.kind==='DRILLING'?'drilling-auger':'downtime'} size={26} decorative /><div><strong>{e.label}</strong><span>{e.kind==='DOWNTIME'?formatDowntimeHoursOnly(e.value):`${formatNumber(e.value,0)} шт. · ${formatNumber(e.meters??0,1)} м`}</span>{e.corrections.length>0&&<small>Есть поправки: {e.corrections.length}</small>}</div><span className="oc-saved"><PilingIcon name="check" size={15} decorative /><span>Сохранено</span></span></div>
+        {canCorrect && (correctingId === e.id
+          ? <EntryCorrectionForm entry={e} busy={Boolean(busy)} onCorrect={onCorrect}
+              error={correctionError} onClose={() => setCorrectingId(null)} />
+          : <button type="button" disabled={busy} onClick={() => setCorrectingId(e.id)}
+              className="min-h-11 text-sm font-semibold text-signal">Поправить</button>)}
+      </div>)}
     </section>
     {finish ? <div className="oc-mobile-finish">{finish}</div> : null}
   </div>;

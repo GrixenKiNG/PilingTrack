@@ -118,6 +118,17 @@ describe('журнал забивки: цель нажатия на телефо
     expect(screen.getByPlaceholderText('С-130')).toHaveClass('min-h-11', 'text-xs', 'sm:min-h-8', 'sm:h-8');
   });
 
+  it('ограничивает ширину фильтра объекта с длинным названием границей секции', async () => {
+    const name = 'QA_AUDIT_1014 Объект с длинным названием для журнала забивки';
+    mocks.authFetch.mockImplementation(async (url: string) => url.startsWith('/api/sites/all')
+      ? json({sites: [{id: 'site-long', name}]}) : json({data: [pileRow()], header, truncated: false}));
+    render(<PileJournal />);
+    expect(await screen.findByRole('option', {name})).toBeInTheDocument();
+    const site = screen.getByRole('combobox');
+    expect(site).toHaveClass('min-w-0', 'max-w-full');
+    expect(site.closest('label')).toHaveClass('min-w-0', 'max-w-full');
+  });
+
   it('решение по свае («Принять сваю» / «На добивку») на телефоне — 44px', async () => {
     await renderJournal();
 

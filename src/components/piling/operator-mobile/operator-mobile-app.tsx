@@ -574,11 +574,11 @@ export function OperatorMobileApp() {
   const shift = state.shift;
   const assignment = state.assignment;
 
-  const submitChecklist = (stage: ChecklistStage) => (answers: ChecklistAnswer[]) => {
-    if (!shift || !assignment) return;
-    void run(() => sendCommand({
+  const submitChecklist = (stage: ChecklistStage) => (answers: ChecklistAnswer[], restoredCommandId?: string) => {
+    if (!shift || !assignment) return false;
+    return run(() => sendCommand({
       command: 'submit-checklist',
-      clientCommandId: checklistCommandId,
+      clientCommandId: restoredCommandId ?? checklistCommandId,
       shiftId: shift.id,
       equipmentId: assignment.equipmentId,
       stage,
@@ -890,6 +890,8 @@ export function OperatorMobileApp() {
     if (checklist) {
       return (
         <ChecklistScreen
+          draftUserId={state.operator?.id}
+          draftShiftId={state.shift?.id}
           key={`${state.shift?.id}:${state.assignment?.equipmentId}:${checklist.stage}`}
           checklist={checklist}
           warnings={state.warnings}

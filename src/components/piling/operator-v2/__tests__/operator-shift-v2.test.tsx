@@ -1,5 +1,7 @@
-import {fireEvent, render, screen, waitFor} from '@testing-library/react';
+import {fireEvent, render, screen, waitFor, within} from '@testing-library/react';
 import {beforeEach, describe, expect, it, vi} from 'vitest';
+
+beforeEach(() => window.localStorage.clear());
 import type {OperatorMobileState} from '@/modules/operator-mobile/contracts';
 
 // Экран тянет рабочий обзор оператора, а тот — стили PostCSS; в тесте они не нужны.
@@ -35,7 +37,9 @@ vi.mock('@/lib/api', async (importOriginal) => ({
 }));
 
 import {OperatorShiftV2} from '../operator-shift-v2';
+import {PileSheet, DrillingSheet, DowntimeSheet} from '../sheets';
 import {workStateFixture} from '@/components/piling/operator-mobile/__tests__/fixtures';
+import {ApiError} from '@/components/piling/operator-mobile/api';
 
 /**
  * D-20260927-005: у бригады нет сменщиков, и передача смены в v2 оставляла
@@ -71,6 +75,51 @@ const facts = {
 };
 
 const closeButton = () => screen.findByRole('button', {name: 'Закрыть смену и отправить отчёт'});
+
+describe('v2: поправка выработки', () => {
+  it('при 409 оставляет ввод и причину внутри формы, повторяет тот же ключ команды', async () => {
+    api.queued = [];
+    authFetch.mockReset().mockResolvedValue({ok: true, json: async () => ({...facts,
+      clearance: {...facts.clearance, warnings: []},
+    })});
+    api.fetchState.mockReset().mockResolvedValue(workStateFixture({operator: {id: 'operator', name: 'Машинист'}, entries: [{
+      id: 'entry-1', kind: 'DOWNTIME', label: 'Ожидание', value: 2, meters: null,
+      occurredAt: '2026-09-20T08:00:00.000Z', corrections: [],
+    }]}));
+    api.sendCommand.mockReset().mockRejectedValueOnce(new ApiError(409, 'Смена уже закрыта')).mockResolvedValue({ok: true});
+    render(<OperatorShiftV2 />);
+    fireEvent.click(await screen.findByRole('button', {name: 'Поправить'}));
+    const form = within(screen.getByRole('group', {name: 'Поправка записи'}));
+    fireEvent.change(form.getByLabelText('Сколько часов простоя было на самом деле'), {target: {value: '1,5'}});
+    fireEvent.change(form.getByLabelText('Что случилось'), {target: {value: 'Ошибка ввода'}});
+    fireEvent.click(form.getByRole('button', {name: 'Записать поправку'}));
+    await waitFor(() => expect(form.getByRole('alert')).toHaveTextContent('Смена уже закрыта'));
+    expect(form.getByLabelText('Сколько часов простоя было на самом деле')).toHaveValue('1,5');
+    expect(api.sendCommand).toHaveBeenLastCalledWith({command: 'correct-production', clientCommandId: expect.any(String),
+      shiftId: 'shift-1', entryId: 'entry-1', kind: 'DOWNTIME', actual: 1.5, reason: 'Ошибка ввода'});
+    const first = api.sendCommand.mock.calls[0][0];
+    fireEvent.click(form.getByRole('button', {name: 'Записать поправку'}));
+    await waitFor(() => expect(screen.queryByRole('group', {name: 'Поправка записи'})).not.toBeInTheDocument());
+    expect(api.sendCommand.mock.calls[1][0]).toEqual(first);
+  });
+});
+
+describe('V2: локальный ввод листов выработки', () => {
+  it.each(['PILES', 'DRILLING', 'DOWNTIME'] as const)('%s восстанавливает ввод после перезагрузки', (kind) => {
+    const props = {open: true, busy: false, onClose: vi.fn(), onAdd: vi.fn().mockResolvedValue(false), draftUserId: 'operator', draftShiftId: 'shift'};
+    const form = () => kind === 'PILES' ? <PileSheet {...props} grades={[{id: 'g', name: 'Марка', lengthMm: 3000}]} />
+      : kind === 'DRILLING' ? <DrillingSheet {...props} types={[{id: 'g', name: 'Тип'}]} />
+        : <DowntimeSheet {...props} reasons={[{id: 'g', name: 'Причина'}]} />;
+    const view = render(form());
+    fireEvent.change(screen.getByRole('combobox'), {target: {value: 'g'}});
+    const label = kind === 'PILES' ? 'Количество свай' : kind === 'DRILLING' ? 'Глубина одной скважины, м' : 'Простой, часов';
+    fireEvent.change(screen.getByLabelText(label), {target: {value: '12'}});
+    view.unmount();
+    render(form());
+    expect(screen.getByRole('combobox')).toHaveValue('g');
+    expect((screen.getByLabelText(label) as HTMLInputElement).value).toBe('12');
+  });
+});
 
 describe('T12: следующий шаг v2 выполняет общий переход', () => {
   beforeEach(() => {

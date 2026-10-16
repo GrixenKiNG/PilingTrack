@@ -1,6 +1,7 @@
 'use client';
 
 import {useMemo, useRef, useState} from 'react';
+import {useLocalFormDraft} from '../use-local-form-draft';
 import {
   measureRequired,
   ENGINE_HOURS_REPLACEMENT_NOTE,
@@ -70,11 +71,13 @@ function bulkItems(
  * Секции по узлам дают ориентир: течь была «где-то в гидравлике».
  */
 export function ChecklistScreen({
-  checklist, warnings, onSubmit, busy, error, errorDetails, commandId, onBack, lastMeter, known = {},
+  checklist, warnings, onSubmit, busy, error, errorDetails, commandId, onBack, lastMeter, known = {}, draftUserId, draftShiftId,
 }: {
   checklist: ChecklistView;
   warnings: WorkWarning[];
-  onSubmit: (answers: ChecklistAnswer[]) => void;
+  onSubmit: (answers: ChecklistAnswer[], restoredCommandId?: string) => void | boolean | Promise<boolean | void>;
+  draftUserId?: string;
+  draftShiftId?: string;
   busy: boolean;
   error: string | null;
   /** Подробности отказа: какие пункты не заполнены (аудит R76, находка 10). */
@@ -95,7 +98,20 @@ export function ChecklistScreen({
    */
   known?: Record<string, KnownAnswer>;
 }) {
-  const [drafts, setDrafts] = useState<Record<string, Draft>>({});
+  const localDraft = useLocalFormDraft(draftUserId, draftShiftId && `checklist:${draftShiftId}:${checklist.stage}:${checklist.version}`, {
+    commandId, drafts: {} as Record<string, Draft>,
+  }, (value) => Object.values(value.drafts).every((draft) => !draft.answer && !draft.note.trim()
+    && !Object.values(draft.measures).some((measure) => measure.trim()) && !draft.mediaIds.length && !draft.meterReplaced));
+  const storedDrafts = localDraft.value.drafts;
+  const [uploading, setUploading] = useState<Record<string, boolean>>({});
+  const drafts = useMemo(() => Object.fromEntries(Object.entries(storedDrafts).map(([itemId, draft]) => [
+    itemId, {...draft, uploading: uploading[itemId] ?? false},
+  ])), [storedDrafts, uploading]);
+  const draftCommandId = Object.keys(drafts).length ? localDraft.value.commandId : commandId;
+  const setDrafts = (next: React.SetStateAction<Record<string, Draft>>) => localDraft.update((current) => ({
+    commandId: Object.keys(current.drafts).length ? current.commandId : commandId,
+    drafts: typeof next === 'function' ? next(current.drafts) : next,
+  }));
   const [showGaps, setShowGaps] = useState(false);
   /**
    * Раскрыт ровно один раздел.
@@ -113,7 +129,11 @@ export function ChecklistScreen({
   );
 
   const update = (itemId: string, patch: Partial<Draft>) => {
-    setDrafts((current) => ({...current, [itemId]: {...(current[itemId] ?? emptyDraft()), ...patch}}));
+    const {uploading: pending, ...input} = patch;
+    if (pending !== undefined) setUploading((current) => ({...current, [itemId]: pending}));
+    if (Object.keys(input).length) {
+      setDrafts((current) => ({...current, [itemId]: {...(current[itemId] ?? emptyDraft()), ...input}}));
+    }
   };
 
   /** Обязательные пункты. «Долил за смену» необязателен и в счёт не идёт. */
@@ -142,7 +162,7 @@ export function ChecklistScreen({
       setShowGaps(true);
       return;
     }
-    onSubmit(items.flatMap((item): ChecklistAnswer[] => {
+    const answers = items.flatMap((item): ChecklistAnswer[] => {
       const draft = drafts[item.id] ?? emptyDraft();
       const measures = Object.fromEntries(
         Object.entries(draft.measures)
@@ -168,7 +188,9 @@ export function ChecklistScreen({
         measures: Object.keys(measures).length > 0 ? measures : undefined,
         mediaIds: draft.mediaIds.length > 0 ? draft.mediaIds : undefined,
       }];
-    }));
+    });
+    const accepted = draftUserId && draftShiftId ? onSubmit(answers, draftCommandId) : onSubmit(answers);
+    void Promise.resolve(accepted).then((ok) => { if (ok) localDraft.clear(); });
   };
 
   return (
@@ -311,7 +333,7 @@ export function ChecklistScreen({
                         item={item}
                         draft={drafts[item.id] ?? emptyDraft()}
                         known={known[item.id]}
-                        commandId={commandId}
+                        commandId={draftCommandId}
                         lastMeter={lastMeter}
                         onChange={(patch) => update(item.id, patch)}
                       />
