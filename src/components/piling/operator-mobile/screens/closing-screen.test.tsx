@@ -121,3 +121,25 @@ describe('закрытая смена оператора', () => {
       .toContain('Записи за эту смену сервер не принимает');
   });
 });
+
+describe('закрытая смена: благодарность', () => {
+  const closed = (receipt: Partial<NonNullable<OperatorMobileState['receipt']>> | null) => ({
+    operator: {id: 'op-1', name: 'Митрофанов Алексей Геннадьевич'},
+    assignment: {equipmentName: 'Liebherr LRH 100 №1'},
+    receipt: receipt && {reportId: 'RM-1', closedAt: '2026-10-16T15:00:00.000Z', timezone: 'Europe/Moscow', ...receipt},
+    production: {piles: {count: 3, meters: 36}, drilling: {count: 1, meters: 5}, downtimeHours: 0},
+  } as unknown as OperatorMobileState);
+
+  it('благодарит по имени и отчеству, когда сервер принял отчёт', () => {
+    render(<ClosedScreen state={closed({submittedAt: '2026-10-16T15:01:00.000Z'})} />);
+    expect(screen.getByRole('status')).toHaveTextContent('Спасибо за работу!');
+    expect(screen.getByRole('status')).toHaveTextContent('Алексей Геннадьевич, смена закрыта, отчёт ушёл диспетчеру. Хорошего отдыха.');
+    expect(screen.getByText('Принято сервером')).toBeInTheDocument();
+  });
+
+  it('не обещает отправку отчёта, пока сервер не подтвердил приём', () => {
+    render(<ClosedScreen state={closed({})} />);
+    expect(screen.getByRole('status')).toHaveTextContent('Спасибо за работу!');
+    expect(screen.getByRole('status')).not.toHaveTextContent('ушёл диспетчеру');
+  });
+});

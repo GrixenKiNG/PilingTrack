@@ -495,3 +495,27 @@ describe('D-20260930-001: ЕО после работы и сдача для см
     expect(screen.queryByText(/Сдача смены за 27\.09\.2026/)).not.toBeInTheDocument();
   });
 });
+
+describe('закрытая смена v2: благодарность', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    api.queued = [];
+    authFetch.mockResolvedValue({ok: true, json: async () => ({...facts, shift: null,
+      clearance: {...facts.clearance, warnings: []},
+    })});
+    api.fetchState.mockResolvedValue(workStateFixture({
+      phase: 'CLOSED', productionDate: '2026-10-16',
+      operator: {id: 'op-1', name: 'Митрофанов Алексей Геннадьевич'},
+      shift: {id: 'shift-1', productionDate: '2026-10-16', startedAt: '2026-10-16T04:00:00.000Z', state: 'CLOSED'},
+    }));
+  });
+
+  it('вместо мелкого «Спасибо!» показывает «Спасибо за работу!» с обращением по имени и отчеству', async () => {
+    render(<OperatorShiftV2 />);
+
+    expect(await screen.findByText('Спасибо за работу!')).toBeInTheDocument();
+    expect(screen.getByText(/Алексей Геннадьевич, смена закрыта, отчёт ушёл диспетчеру. Хорошего отдыха./)).toBeInTheDocument();
+    expect(screen.queryByText('Спасибо!')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', {name: 'На главную'})).toBeInTheDocument();
+  });
+});

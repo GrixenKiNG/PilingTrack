@@ -1,6 +1,21 @@
 import type {ChecklistDefinition, ChecklistStage} from './checklist-types';
 
 /**
+ * «Долил за смену» в ЕО после работы: id пункта, название, ключ замера. Порядок —
+ * порядок на экране. Предсменный осмотр свои доливы (масло, ОЖ, гидромасло — только
+ * при замечании) оставляет как есть: здесь они не дублируются.
+ */
+const TOP_UP_FLUIDS: ReadonlyArray<readonly [id: string, text: string, key: string]> = [
+  ['topup-coolant', 'Антифриз', 'coolantL'],
+  ['topup-hydraulic', 'Гидравлическое масло', 'hydraulicOilL'],
+  ['topup-engine-oil', 'Моторное масло', 'engineOilL'],
+  ['topup-diesel', 'Дизельное топливо', 'dieselL'],
+];
+
+/** Потолок значения долива, л: защита от опечатки, а не технический предел бака. */
+const TOP_UP_MAX_LITERS = 2000;
+
+/**
  * Чек-листы смены машиниста сваебойной установки.
  *
  * ПРАВИЛО СОСТАВА. В список попадает пункт, который отвечает «да» хотя бы на
@@ -451,7 +466,7 @@ export const OPERATOR_CHECKLISTS: ChecklistDefinition[] = [
   },
   {
     stage: 'EO_AFTER',
-    version: '3.1',
+    version: '3.2',
     title: 'ЕО после работы',
     purpose: 'Что сделать до ухода, чтобы завтра машина завелась и поехала.',
     sections: [
@@ -529,6 +544,16 @@ export const OPERATOR_CHECKLISTS: ChecklistDefinition[] = [
             severity: 'NOTE',
             measure: {key: 'fuelPercent', label: 'Остаток топлива', unit: '%', min: 0, max: 100},
           },
+          // «Долил за смену»: необязательные литры без вердикта. Ключи на `L` сервер
+          // сам записывает событием парка (`FLUID_READING`); дизельное топливо пока
+          // только записывается, в журнал топлива установки не передаётся.
+          ...TOP_UP_FLUIDS.map(([id, text, key]) => ({
+            id,
+            text,
+            severity: 'NOTE' as const,
+            topUp: true,
+            measure: {key, label: text, unit: 'л', min: 0, max: TOP_UP_MAX_LITERS},
+          })),
           {
             id: 'frost-fuel',
             text: 'Бак заправлен под пробку, конденсат слит',

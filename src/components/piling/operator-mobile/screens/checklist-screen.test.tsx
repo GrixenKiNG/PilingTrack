@@ -169,3 +169,81 @@ describe('чек-лист машиниста', () => {
     ]);
   });
 });
+
+/**
+ * «Долил за смену» (16.10.2026): четыре необязательных поля в литрах в разделе
+ * «Заправка и заглушение», без кнопок «норма / замечание / отказ».
+ */
+describe('чек-лист машиниста: блок «Долил за смену»', () => {
+  const topUp = (id: string, text: string, key: string) => ({
+    id, text, severity: 'NOTE' as const, topUp: true,
+    measure: {key, label: text, unit: 'л', min: 0, max: 2000},
+  });
+  const eoAfter: ChecklistView = {
+    ...checklist,
+    stage: 'EO_AFTER',
+    title: 'ЕО после работы',
+    sections: [{
+      id: 'closing',
+      title: 'Заправка и заглушение',
+      items: [
+        {id: 'shutdown-1', text: 'Двигатель заглушен', severity: 'ALERT'},
+        topUp('topup-coolant', 'Антифриз', 'coolantL'),
+        topUp('topup-hydraulic', 'Гидравлическое масло', 'hydraulicOilL'),
+        topUp('topup-engine-oil', 'Моторное масло', 'engineOilL'),
+        topUp('topup-diesel', 'Дизельное топливо', 'dieselL'),
+      ],
+    }],
+  };
+  const renderEo = (onSubmit = vi.fn()) => {
+    render(<ChecklistScreen checklist={eoAfter} warnings={[]} busy={false} error={null} commandId="topup-test" onSubmit={onSubmit} />);
+    fireEvent.click(screen.getByRole('button', {expanded: false}));
+    return onSubmit;
+  };
+
+  it('рисует один блок с четырьмя полями в литрах, а кнопки вердикта только у обычного пункта', () => {
+    renderEo();
+    expect(screen.getByText('Долил за смену')).toBeInTheDocument();
+    expect(screen.getByText('Если не доливали, оставьте пустым')).toBeInTheDocument();
+    for (const name of ['Антифриз', 'Гидравлическое масло', 'Моторное масло', 'Дизельное топливо']) {
+      expect(screen.getByRole('spinbutton', {name: `${name}, л`})).toHaveValue(null);
+    }
+    expect(screen.getAllByRole('button', {name: 'Норма'})).toHaveLength(1);
+  });
+
+  it('не считает доливы обязательными: счётчик и кнопка «Завершить» ждут только обычный пункт', () => {
+    renderEo();
+    expect(screen.getByText('Отмечено 0 из 1')).toBeInTheDocument();
+    expect(screen.getByRole('button', {name: 'Осталось заполнить: 1'})).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', {name: 'Норма'}));
+    expect(screen.getByText('Отмечено 1 из 1')).toBeInTheDocument();
+    expect(screen.getByRole('button', {name: 'Завершить'})).toBeInTheDocument();
+  });
+
+  it('без долива отправляет только обязательный ответ: пусто — не доливал', () => {
+    const onSubmit = renderEo();
+    fireEvent.click(screen.getByRole('button', {name: 'Норма'}));
+    fireEvent.click(screen.getByRole('button', {name: 'Завершить'}));
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+    expect(onSubmit.mock.calls[0]?.[0]).toEqual([expect.objectContaining({itemId: 'shutdown-1', answer: 'OK'})]);
+  });
+
+  it('отправляет заполненные литры ответом «OK» с замером, а пустые поля пропускает', () => {
+    const onSubmit = renderEo();
+    fireEvent.click(screen.getByRole('button', {name: 'Норма'}));
+    fireEvent.change(screen.getByRole('spinbutton', {name: 'Дизельное топливо, л'}), {target: {value: '120'}});
+    fireEvent.change(screen.getByRole('spinbutton', {name: 'Моторное масло, л'}), {target: {value: '2.5'}});
+    fireEvent.click(screen.getByRole('button', {name: 'Завершить'}));
+    const sent = onSubmit.mock.calls[0]?.[0] as Array<{itemId: string; answer: string; measures?: Record<string, number>}>;
+    expect(sent.map((answer) => answer.itemId).sort()).toEqual(['shutdown-1', 'topup-diesel', 'topup-engine-oil']);
+    expect(sent.find((answer) => answer.itemId === 'topup-diesel')).toMatchObject({answer: 'OK', measures: {dieselL: 120}});
+    expect(sent.find((answer) => answer.itemId === 'topup-engine-oil')?.measures).toEqual({engineOilL: 2.5});
+  });
+
+  it('раздел считается закрытым по обязательным пунктам, а прогресс раздела их же и показывает', () => {
+    renderEo();
+    expect(screen.getByText('0/1')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', {name: 'Норма'}));
+    expect(screen.getByText('1/1')).toBeInTheDocument();
+  });
+});

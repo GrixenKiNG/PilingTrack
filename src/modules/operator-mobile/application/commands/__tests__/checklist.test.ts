@@ -157,3 +157,44 @@ describe('submitChecklist — advisory-замки на ключи дефекто
     ]);
   });
 });
+
+describe('submitChecklist — «долил за смену» (ЕО после работы)', () => {
+  const topUpItems = [
+    {id: 'topup-coolant', text: 'Антифриз', topUp: true, measure: {key: 'coolantL', unit: 'л'}},
+    {id: 'topup-diesel', text: 'Дизельное топливо', topUp: true, measure: {key: 'dieselL', unit: 'л'}},
+  ];
+
+  beforeEach(() => {
+    getChecklist.mockReturnValue({stage: 'EO_AFTER', version: '3.2', title: 'ЕО после работы'});
+    selectChecklistItems.mockReturnValue(topUpItems);
+    collectDefectDrafts.mockReturnValue([]);
+  });
+
+  it('пишет литры событием парка вместе с ключом дизельного топлива и не заводит дефектов', async () => {
+    await submitChecklist({...input, stage: 'EO_AFTER', answers: [
+      {itemId: 'topup-coolant', answer: 'OK', measures: {coolantL: 2}},
+      {itemId: 'topup-diesel', answer: 'OK', measures: {dieselL: 120}},
+    ]});
+
+    const fluids = tx.operatorShiftEvidence.create.mock.calls
+      .map(([call]) => call.data)
+      .find((data: {clientCommandId: string}) => data.clientCommandId === 'cmd-1:fluids');
+    expect(fluids).toMatchObject({kind: 'FLUID_READING', shiftId: 'shift-1', equipmentId: 'eq-1'});
+    expect(fluids.payload).toEqual({
+      stage: 'EO_AFTER',
+      fluids: [
+        {itemId: 'topup-coolant', coolantL: 2},
+        {itemId: 'topup-diesel', dieselL: 120},
+      ],
+    });
+    expect(tx.equipmentDefect.create).not.toHaveBeenCalled();
+    expect(tx.operatorChecklistAnswerRecord.create).toHaveBeenCalledTimes(2);
+  });
+
+  it('без долива не пишет событие о жидкостях', async () => {
+    await submitChecklist({...input, stage: 'EO_AFTER', answers: []});
+
+    const kinds = tx.operatorShiftEvidence.create.mock.calls.map(([call]) => call.data.clientCommandId);
+    expect(kinds).not.toContain('cmd-1:fluids');
+  });
+});

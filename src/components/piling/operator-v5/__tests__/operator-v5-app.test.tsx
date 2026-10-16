@@ -219,6 +219,89 @@ describe('v5: явная замена счётчика моточасов', () =
   });
 });
 
+describe('v5: «Долил за смену» в ЕО после работы', () => {
+  const topUp = (id: string, text: string, key: string) => ({
+    id, text, severity: 'NOTE' as const, topUp: true, measure: {key, label: text, unit: 'л', min: 0, max: 2000},
+  });
+  const openEo = () => {
+    const assignment = working.assignment;
+    if (!assignment) throw new Error('Для проверки нужна назначенная установка');
+    api.fetchState.mockReset();
+    api.sendCommand.mockReset().mockResolvedValue(undefined);
+    api.fetchState.mockResolvedValue(workStateFixture({phase: 'CLOSING',
+      operator: {id: 'me', name: 'Машинист'}, assignment,
+      checklists: [{stage: 'EO_AFTER', title: 'ЕО после работы', purpose: '', version: '3.2', done: false, period: null,
+        sections: [{id: 'closing', title: 'Заправка и заглушение', items: [
+          {id: 'shutdown-1', text: 'Двигатель заглушен', severity: 'ALERT'},
+          topUp('topup-coolant', 'Антифриз', 'coolantL'),
+          topUp('topup-hydraulic', 'Гидравлическое масло', 'hydraulicOilL'),
+          topUp('topup-engine-oil', 'Моторное масло', 'engineOilL'),
+          topUp('topup-diesel', 'Дизельное топливо', 'dieselL'),
+        ]}]}],
+    }));
+    return render(<OperatorV5App />);
+  };
+
+  it('рисует блок с четырьмя полями в литрах, кнопки вердикта только у обычного пункта', async () => {
+    openEo();
+    expect(await screen.findByText('Долил за смену')).toBeInTheDocument();
+    expect(screen.getByText('Если не доливали, оставьте пустым')).toBeInTheDocument();
+    for (const name of ['Антифриз', 'Гидравлическое масло', 'Моторное масло', 'Дизельное топливо']) {
+      expect(screen.getByRole('textbox', {name: `${name}, л`})).toHaveValue('');
+    }
+    expect(screen.getAllByRole('button', {name: /^норма$/i})).toHaveLength(1);
+  });
+
+  it('не считает доливы обязательными: ждёт только обычный пункт', async () => {
+    openEo();
+    expect(await screen.findByRole('button', {name: 'Осталось отметить: 1'})).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', {name: /^норма$/i}));
+    expect(screen.getByRole('button', {name: 'Завершить'})).toBeEnabled();
+  });
+
+  it('без долива отправляет только обязательный ответ', async () => {
+    openEo();
+    fireEvent.click(await screen.findByRole('button', {name: /^норма$/i}));
+    fireEvent.click(screen.getByRole('button', {name: 'Завершить'}));
+    await waitFor(() => expect(api.sendCommand).toHaveBeenCalledWith(expect.objectContaining({
+      command: 'submit-checklist', answers: [expect.objectContaining({itemId: 'shutdown-1', answer: 'OK'})],
+    })));
+  });
+
+  it('отправляет заполненные литры ответом OK с замером, пустые поля пропускает', async () => {
+    openEo();
+    fireEvent.click(await screen.findByRole('button', {name: /^норма$/i}));
+    fireEvent.change(screen.getByRole('textbox', {name: 'Дизельное топливо, л'}), {target: {value: '120'}});
+    fireEvent.change(screen.getByRole('textbox', {name: 'Моторное масло, л'}), {target: {value: '2,5'}});
+    fireEvent.click(screen.getByRole('button', {name: 'Завершить'}));
+    await waitFor(() => expect(api.sendCommand).toHaveBeenCalledTimes(1));
+    const sent = (api.sendCommand.mock.calls[0] as unknown as [{answers: Array<{itemId: string; answer: string; measures?: Record<string, number>}>}])[0].answers;
+    expect(sent.map((answer) => answer.itemId).sort()).toEqual(['shutdown-1', 'topup-diesel', 'topup-engine-oil']);
+    expect(sent.find((answer) => answer.itemId === 'topup-diesel')).toMatchObject({answer: 'OK', measures: {dieselL: 120}});
+    expect(sent.find((answer) => answer.itemId === 'topup-engine-oil')?.measures).toEqual({engineOilL: 2.5});
+  });
+});
+
+describe('v5: закрытая смена — благодарность', () => {
+  it('под заголовком «Смена закрыта» благодарит по имени и отчеству', () => {
+    const state = workStateFixture({
+      phase: 'CLOSED',
+      operator: {id: 'op-1', name: 'Митрофанов Алексей Геннадьевич'},
+      receipt: {reportId: 'RM-1', submittedAt: '2026-10-16T15:01:00.000Z', closedAt: '2026-10-16T15:00:00.000Z', timezone: 'Europe/Moscow'},
+    });
+    render(<CloseScreen state={state} busy={false} onClose={vi.fn()} unsent={0} onFlush={vi.fn()} />);
+    expect(screen.getByText('Смена закрыта')).toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent('Спасибо за работу!');
+    expect(screen.getByRole('status')).toHaveTextContent('Алексей Геннадьевич, смена закрыта, отчёт ушёл диспетчеру. Хорошего отдыха.');
+  });
+
+  it('при сдаче смены (ещё не закрыта) благодарности нет', () => {
+    const state = workStateFixture({phase: 'CLOSING'});
+    render(<CloseScreen state={state} busy={false} onClose={vi.fn()} unsent={0} onFlush={vi.fn()} />);
+    expect(screen.queryByText('Спасибо за работу!')).not.toBeInTheDocument();
+  });
+});
+
 /** Обещание, которым тест сам решает, когда закончится перечитывание экрана. */
 function deferred<T>() {
   let resolve!: (value: T) => void;

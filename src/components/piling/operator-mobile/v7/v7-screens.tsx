@@ -15,6 +15,7 @@ import {
 import {formatNumber, formatRuDate} from '@/lib/format';
 import {formatDowntimeHoursOnly} from '@/lib/downtime-hours';
 import {Banner, Button, Card, CardBody, Chip, Empty, Metric, Pair, Row, type Tone} from './v7-ui';
+import {ShiftThanks} from '../shift-thanks';
 
 /**
  * Обзорные экраны v7: что показывает каждая вкладка нижнего меню.
@@ -257,8 +258,7 @@ function ClosedBlock({state}: {state: OperatorMobileState}) {
     <>
       <Card>
         <CardBody>
-          <div className="seal" aria-hidden="true">✓</div>
-          <div style={{textAlign: 'center', fontSize: 17, fontWeight: 800}}>Смена закрыта</div>
+          <ShiftThanks operatorName={state.operator?.name} reportSent={Boolean(receipt?.submittedAt)} />
         </CardBody>
         {receipt ? (
           <CardBody>

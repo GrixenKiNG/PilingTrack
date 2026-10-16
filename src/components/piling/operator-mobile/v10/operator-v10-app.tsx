@@ -17,6 +17,7 @@ import {
   PPE_ITEMS, SAFETY_BRIEFING, TOPIC_LABELS,
 } from '@/modules/operator-mobile/contracts';
 import {ChecklistScreen} from '../screens/checklist-screen';
+import {ShiftThanks} from '../shift-thanks';
 import {knownAnswers} from '../safety/known-answers';
 import type {KnowledgeQuestion} from '@/modules/operator-mobile/contracts';
 import {admissionBlockers, admissionSteps} from '../safety/admission-steps';
@@ -277,7 +278,7 @@ function StepLadder({state, go}: {state: OperatorMobileState; go: Go}) {
         <button type="button" className="ov10-btn" onClick={() => go('step')}>
           Дальше: {next.title}
         </button>
-      ) : <Banner tone="info" title="Смена закрыта" />}
+      ) : <ShiftThanks operatorName={state.operator?.name} reportSent={Boolean(state.receipt?.submittedAt)} />}
       <Card title="Порядок смены">
         {STEPS.map((step, index) => {
           const done = index < current;
@@ -812,7 +813,7 @@ function ScreenClosing({state, busy, onFinish, onClose, go, unsent, onFlush}: {
           <Pair label="Отправлен" value={dateRu(state.receipt.submittedAt)} />
         </Card>
       ) : null}
-      {closed ? <Banner tone="info" title="Смена закрыта" /> : null}
+      {closed ? <ShiftThanks operatorName={state.operator?.name} reportSent={Boolean(state.receipt?.submittedAt)} /> : null}
       {!closed && !afterDone ? (
         <>
           <Banner tone="warn" title="Сначала ЕО после работы" />

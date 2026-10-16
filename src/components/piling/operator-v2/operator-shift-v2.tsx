@@ -54,7 +54,7 @@ import { DowntimeSheet, DrillingSheet, PileSheet, SheetError } from './sheets';
 import { PilePassportForm } from '@/components/piling/operator-mobile/screens/pile-passport-form';
 import { IncidentsTab } from '@/components/piling/operator-mobile/screens/incidents-tab';
 import {
-  BigCheck, BottomTabs, CheckRow, RowList, StepButton, StepShell, ValueRow, type V2Tab,
+  BottomTabs, CheckRow, RowList, StepButton, StepShell, ValueRow, type V2Tab,
 } from './ui';
 import type {
   ChecklistAnswer, ChecklistStage, OperatorMobileState,
@@ -71,6 +71,7 @@ import { ChecklistScreen } from '@/components/piling/operator-mobile/screens/che
 import { knownAnswers } from '@/components/piling/operator-mobile/safety/known-answers';
 import { V2_STEP_STAGE, V2_STEP_TITLE, resolveV2State, stepCaption } from './shift-flow';
 import { NextStepDock, NextStepTab } from '../operator-mobile/step-bar';
+import { ShiftThanks } from '../operator-mobile/shift-thanks';
 import { nextStep } from '../operator-mobile/shift-next-step';
 
 /**
@@ -1402,13 +1403,8 @@ export function OperatorShiftV2() {
         />
       }
     >
-      <div className="pt-8 text-center">
-        <BigCheck tone="purple" />
-        <p className="mt-4 text-xl font-bold text-foreground">Спасибо!</p>
-        <p className="mt-1 text-base text-muted-foreground">Смена успешно завершена</p>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Смена закрыта, отчёт отправлен диспетчеру
-        </p>
+      <div className="pt-4">
+        <ShiftThanks operatorName={mobile?.operator?.name ?? user?.name} />
       </div>
       {/* Итог смены показываем здесь же: уводить за ним на чужой экран истории
           значит выкидывать человека из модуля на последнем шаге. */}

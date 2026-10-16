@@ -54,6 +54,29 @@ describe('AU164 — вывод разбора в v10', () => {
   });
 });
 
+describe('v10: закрытая смена — благодарность', () => {
+  const closedState = () => {
+    const state = makeState('CLOSED', [...STAGES]);
+    state.operator = {id: 'op', name: 'Митрофанов Алексей Геннадьевич'};
+    state.receipt = {reportId: 'RM-1', submittedAt: '2026-09-28T15:01:00.000Z', closedAt: '2026-09-28T15:00:00.000Z', timezone: 'Europe/Moscow'} as OperatorMobileState['receipt'];
+    return state;
+  };
+
+  it('на главном экране вместо «Смена закрыта» благодарит по имени и отчеству', async () => {
+    api.fetchState.mockResolvedValue(closedState());
+    render(<OperatorV10App />);
+    expect(await screen.findByText('Спасибо за работу!')).toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent('Алексей Геннадьевич, смена закрыта, отчёт ушёл диспетчеру. Хорошего отдыха.');
+  });
+
+  it('пока смена идёт, благодарности нет', async () => {
+    api.fetchState.mockResolvedValue(makeState('WORK', ['PRESHIFT_INSPECTION', 'SITE_READY', 'EO_BEFORE']));
+    render(<OperatorV10App />);
+    await screen.findByRole('button', {name: 'Дальше: Работа: сваи, бурение, простой'});
+    expect(screen.queryByText('Спасибо за работу!')).not.toBeInTheDocument();
+  });
+});
+
 function checklist(stage: string, done: boolean) {
   return {
     stage, title: {PRESHIFT_INSPECTION: 'Предсменный осмотр', SITE_READY: 'Готовность площадки',

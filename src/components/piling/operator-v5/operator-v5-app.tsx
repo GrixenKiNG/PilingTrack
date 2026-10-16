@@ -7,7 +7,7 @@ import {
   DOWNTIME_QUICK_HOURS, downtimeHoursProblem, formatDowntimeHoursOnly, parseDowntimeHours,
 } from '@/lib/downtime-hours';
 import type {
-  ChecklistStage, ChecklistView, IncidentCategory, IncidentSign,
+  ChecklistAnswer, ChecklistStage, ChecklistView, IncidentCategory, IncidentSign,
   OperatorAnswer, OperatorMobileState,
 } from '@/modules/operator-mobile/contracts';
 import {
@@ -21,6 +21,7 @@ import {PilePassportForm} from '../operator-mobile/screens/pile-passport-form';
 import {formatNumber} from '@/lib/format';
 import {nextStep} from '../operator-mobile/shift-next-step';
 import {NextStepTab} from '../operator-mobile/step-bar';
+import {ShiftThanks} from '../operator-mobile/shift-thanks';
 import {
   ApiError, QueuedOffline, currentPosition, fetchState, newCommandId, sendCommand, uploadPhoto,
   type ProductionEntryInput,
@@ -412,9 +413,10 @@ function ChecklistScreen({checklist, answers, measures, notes, media, uploading,
   onPhoto: (itemId: string, file: File) => Promise<void>;
   onSubmit: () => void;
 }) {
-  const items = checklist.sections.flatMap((section) => section.items);
+  // «Долил за смену» необязателен: в счёт «осталось отметить» и в полоску хода не идёт.
+  const items = checklist.sections.flatMap((section) => section.items).filter((item) => !item.topUp);
   // Замер обязателен при таком ответе — без него сервер список не примет.
-  const needsMeasure = (item: (typeof items)[number]) => Boolean(item.measure)
+  const needsMeasure = (item: (typeof items)[number]) => Boolean(item.measure) && !item.topUp
     && measureRequired(item, answers[item.id] ?? 'OK');
   const isIssue = (itemId: string) => answers[itemId] === 'REMARK' || answers[itemId] === 'FAULT';
   const left = items.filter(
@@ -435,7 +437,7 @@ function ChecklistScreen({checklist, answers, measures, notes, media, uploading,
         {checklist.sections.map((section) => (
           <div key={section.id}>
             <p className="kicker">{section.title}</p>
-            {section.items.map((item) => (
+            {section.items.filter((item) => !item.topUp).map((item) => (
               <div className="rowline" key={item.id}>
                 <span>
                   {item.severity === 'ALERT' ? <span className="crit">! </span> : null}
@@ -493,6 +495,24 @@ function ChecklistScreen({checklist, answers, measures, notes, media, uploading,
                 ) : null}
               </div>
             ))}
+            {section.items.some((item) => item.topUp) ? (
+              <div className="card">
+                <span className="lbl">Долил за смену</span>
+                <p className="m">Если не доливали, оставьте пустым</p>
+                {section.items.filter((item) => item.topUp).map((item) => (
+                  <label className="rowline" key={item.id}>
+                    <span>{item.text}</span>
+                    <input
+                      inputMode="decimal"
+                      aria-label={`${item.text}, ${item.measure?.unit ?? 'л'}`}
+                      placeholder="0"
+                      value={measures[item.measure?.key ?? ''] ?? ''}
+                      onChange={(event) => onMeasure(item.measure?.key ?? '', event.target.value)}
+                    />
+                  </label>
+                ))}
+              </div>
+            ) : null}
             {section.items.filter(needsMeasure).map((item) => (
               <div className="card" key={item.id + '-m'}>
                 <span className="lbl">
@@ -919,6 +939,7 @@ export function CloseScreen({state, busy, onClose, unsent, onFlush, onAddWork}: 
           <span className="s">Отчёт отправлен диспетчеру</span>
         </div>
         <div className="scr">
+          <ShiftThanks operatorName={state.operator?.name} />
           {receipt ? (
             <div className="card">
               <span className="lbl">Отчёт</span>
@@ -1163,7 +1184,15 @@ export function OperatorV5App() {
       shiftId,
       equipmentId,
       stage,
-      answers: items.map((item) => ({
+      answers: items.flatMap((item): ChecklistAnswer[] => {
+        // «Долил за смену»: пусто — не доливал, ответа нет; литры — «OK» с замером.
+        if (item.topUp) {
+          const litres = Number((measures[item.measure?.key ?? ''] ?? '').replace(',', '.'));
+          return (measures[item.measure?.key ?? ''] ?? '').trim() !== '' && Number.isFinite(litres) && item.measure
+            ? [{itemId: item.id, answer: 'OK', measures: {[item.measure.key]: litres}}]
+            : [];
+        }
+        return [{
         itemId: item.id,
         answer: answers[item.id],
         measures: item.measure && (measures[item.measure.key] ?? '').trim() !== ''
@@ -1173,7 +1202,8 @@ export function OperatorV5App() {
           answers[item.id] === 'REMARK' || answers[item.id] === 'FAULT' ? notes[item.id]?.trim() : ''].filter(Boolean).join('; ') || undefined,
         mediaIds: (answers[item.id] === 'REMARK' || answers[item.id] === 'FAULT') && media[item.id]?.length
           ? media[item.id] : undefined,
-      })),
+        }];
+      }),
     }), `${checklist.title}: принято.`);
     if (!accepted) return;
     setMeasures({});
