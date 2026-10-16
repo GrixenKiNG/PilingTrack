@@ -15,10 +15,12 @@ const {withReadinessTenantTransaction} = vi.hoisted(() => ({withReadinessTenantT
 vi.mock('@/modules/readiness/server', () => ({withReadinessTenantTransaction}));
 
 import {acknowledgeBriefing} from '../admission';
+import {SAFETY_BRIEFING} from '../../../domain/safety-briefing';
 
 /** Строка журнала инструктажей так, как её видит проверка повтора. */
 type HistoryRow = {
   kind: string; userId: string; documentCode: string; documentVersion: string; recordedAt: Date;
+  employeeSignedAt?: Date | null;
 };
 
 let history: HistoryRow[];
@@ -48,7 +50,7 @@ beforeEach(() => {
   // потом находит проверка, — сутки, вид записи и редакция инструкции.
   tx.briefingRecord.findFirst.mockImplementation(async (args: {where: {
     userId: string; kind: string; documentCode: string; documentVersion: string;
-    recordedAt: {gte: Date; lt: Date};
+    recordedAt: {gte: Date; lt: Date}; employeeSignedAt?: {not: null};
   }}) => {
     const {where} = args;
     return history.find((row) =>
@@ -57,7 +59,9 @@ beforeEach(() => {
       && row.documentCode === where.documentCode
       && row.documentVersion === where.documentVersion
       && row.recordedAt >= where.recordedAt.gte
-      && row.recordedAt < where.recordedAt.lt,
+      && row.recordedAt < where.recordedAt.lt
+      // Условие «отметка работника стоит» таблица понимает так же, как база.
+      && (!where.employeeSignedAt || (row.employeeSignedAt ?? null) !== null),
     ) ?? null;
   });
   withReadinessTenantTransaction.mockImplementation(
@@ -103,5 +107,37 @@ describe('acknowledgeBriefing — одна отметка в сутки на р�
 
     expect(tx.briefingRecord.create).toHaveBeenCalledTimes(2);
     expect(history).toHaveLength(2);
+  });
+});
+
+/*
+  ЗАПИСЬ ИНСТРУКТОРА БЕЗ ОТМЕТКИ РАБОТНИКА — НЕ ОЗНАКОМЛЕНИЕ.
+
+  Инструктор провёл инструктаж и поставил свою отметку, работник ещё нет
+  (аудит 16.10.2026, P1 R78-41). Прежняя проверка повтора видела в журнале
+  «запись за сегодня по этой редакции» и молча ничего не писала: человек нажал
+  «Ознакомлен», а его отметки не появилось нигде. Теперь повтором считается
+  только запись с отметкой работника.
+*/
+describe('acknowledgeBriefing — запись инструктора ждёт отметки работника', () => {
+  it('не принимает неподписанную запись инструктора за ознакомление и пишет отметку работника', async () => {
+    const now = new Date('2026-09-26T06:00:00.000Z');
+    history.push({
+      kind: 'INSTRUCTION', userId: 'operator-a', documentCode: SAFETY_BRIEFING.code, documentVersion: SAFETY_BRIEFING.version,
+      recordedAt: new Date('2026-09-26T04:00:00.000Z'), employeeSignedAt: null,
+    });
+    await call(now);
+
+    expect(tx.briefingRecord.create).toHaveBeenCalledTimes(1);
+    expect(tx.briefingRecord.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({userId: 'operator-a', employeeSignedAt: now}),
+    }));
+  });
+
+  it('запись с отметкой работника по-прежнему считается повтором', async () => {
+    await call(new Date('2026-09-26T06:00:00.000Z'));
+    const created = tx.briefingRecord.create.mock.calls.length;
+    await call(new Date('2026-09-26T07:00:00.000Z'));
+    expect(tx.briefingRecord.create).toHaveBeenCalledTimes(created);
   });
 });

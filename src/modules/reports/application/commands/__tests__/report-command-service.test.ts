@@ -18,6 +18,7 @@ import type { ReportRepository } from '../../../infrastructure';
 import { upsertReport, assertCanActForUser, resolveReportUserId } from '../report-command.service';
 import type { UpsertReportCommand } from '../upsert-report.command';
 import { ServiceError } from '@/lib/service-error';
+import { assertReportOwnerOnSite, assertUserAssignedToSite } from '@/services/auth/resource-access-service';
 
 // ============================================================
 // Mocks
@@ -26,6 +27,7 @@ import { ServiceError } from '@/lib/service-error';
 // Mock authorization
 vi.mock('@/services/auth/resource-access-service', () => ({
   assertUserAssignedToSite: vi.fn().mockResolvedValue(undefined),
+  assertReportOwnerOnSite: vi.fn().mockResolvedValue(undefined),
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test: cast to a mock shape or to reach internals not in the public type
   resolveAccessibleUserId: vi.fn((_session: any, requested: string | null | undefined) => requested || 'user-1'),
   assertCanManageUserScope: vi.fn(),
@@ -108,6 +110,32 @@ describe('Report Command Service', () => {
     vi.clearAllMocks();
     mockRepoFindById.mockResolvedValue(null);
     mockDb.report.findUnique.mockResolvedValue(mockReport);
+  });
+
+  /*
+    ВЛАДЕЛЕЦ ОТЧЁТА НА ОБЪЕКТЕ — ПО НАЗНАЧЕНИЮ ИЛИ ПО БРИГАДЕ (аудит 16.10.2026, P1 AU39-04).
+    Команда обязана спрашивать проверку, которая учитывает бригаду, и передавать ей
+    организацию: без неё администратор получал 403 на штатный мобильный отчёт.
+  */
+  describe('доступ владельца отчёта к объекту', () => {
+    const input: UpsertReportCommand = {
+      reportId: 'report-3', userId: 'user-1', siteId: 'site-1', date: '2026-04-05', shiftType: 'DAY',
+      tenantId: 'tenant-a', piles: [{ pileGradeId: 'grade-1', count: 1 }],
+    };
+
+    it('проверяет владельца по назначению или бригаде в своей организации', async () => {
+      await upsertReport({ ...input });
+
+      expect(assertReportOwnerOnSite).toHaveBeenCalledWith('user-1', 'site-1', 'tenant-a');
+      expect(assertUserAssignedToSite).not.toHaveBeenCalled();
+    });
+
+    it('отказ проверки останавливает команду до записи', async () => {
+      vi.mocked(assertReportOwnerOnSite).mockRejectedValueOnce(new ServiceError('Нет доступа к этому объекту', 403));
+
+      await expect(upsertReport({ ...input })).rejects.toMatchObject({ status: 403 });
+      expect(mockRepoSave).not.toHaveBeenCalled();
+    });
   });
 
   describe('create new report', () => {
