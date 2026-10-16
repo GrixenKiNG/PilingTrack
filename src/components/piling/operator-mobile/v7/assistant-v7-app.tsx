@@ -284,6 +284,12 @@ export function AssistantV7App() {
 
 /** Два шага помощника: прочитал инструкцию и подтвердил знания. */
 function SafetySteps({state, onStep}: {state: AssistantState; onStep: (detour: Detour) => void}) {
+  // Те же условия, что у базового экрана помощника (/assistant): обязательный документ
+  // не заведён или просрочен — допуск неполный. Раньше v7 смотрел только на инструктаж
+  // и знания и показывал «Допуск в порядке» при 11 отсутствующих документах.
+  const invalidDocuments = state.documents.filter(
+    (document) => document.required && (document.verdict === 'MISSING' || document.verdict === 'EXPIRED'),
+  ).length;
   return (
     <>
       <Card title="Перед работой">
@@ -306,8 +312,14 @@ function SafetySteps({state, onStep}: {state: AssistantState; onStep: (detour: D
           onClick={() => onStep('KNOWLEDGE')}
         />
       </Card>
-      {state.briefing.ok && state.knowledge.ok ? (
-        <Banner tone="ok" title="Допуск в порядке" note="Инструктаж пройден, знания подтверждены." />
+      {state.briefing.ok && state.knowledge.ok && invalidDocuments === 0 ? (
+        <Banner tone="ok" title="Допуск в порядке" note="Инструктаж пройден, знания подтверждены, обязательные документы на месте." />
+      ) : state.briefing.ok && state.knowledge.ok ? (
+        <Banner
+          tone="warn"
+          title="Допуск неполный"
+          note={`Не заведены или просрочены обязательные документы: ${invalidDocuments}. Список — во вкладке «Ещё».`}
+        />
       ) : (
         <Banner
           tone="info"

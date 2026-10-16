@@ -2,6 +2,7 @@ import {NextRequest, NextResponse} from 'next/server';
 import {z} from 'zod';
 import {withMutation} from '@/core/api-wrapper';
 import {requireAuth} from '@/lib/auth';
+import {authFailureResponse} from '@/lib/auth-failure';
 import {
   acceptEquipment, acknowledgeBriefing, closeShift, confirmPpe, finishWork, logProduction, submitReport,
   OperatorCommandError, correctProduction, reportIncident, submitChecklist, submitKnowledgeTest,
@@ -187,7 +188,7 @@ export const POST = withMutation(
   async (request: NextRequest) => {
     const {user, error} = await requireAuth(request);
     if (error || !user) {
-      return NextResponse.json({error: 'Войдите в систему'}, {status: 401});
+      return authFailureResponse(error);
     }
     if (user.role !== 'OPERATOR') {
       return NextResponse.json({error: 'Команды смены подаёт машинист'}, {status: 403});
