@@ -1,6 +1,7 @@
 import type {AuditJsonValue} from '../../domain/audit/types';
 import {commandInProgress, ReadinessCommandError} from './errors';
 import {hashesEqual, IDEMPOTENCY_TTL_MS} from './idempotency';
+import {postgresErrorCode} from './pg-error';
 
 export interface CommandHttpResult {
   status: number;
@@ -73,9 +74,12 @@ export async function executeIdempotentCommand(input: {
       expiresAt: new Date((input.now ?? new Date()).getTime() + IDEMPOTENCY_TTL_MS),
     });
   } catch (error) {
-    const code = (error as {code?: string; meta?: {code?: string}})?.meta?.code
-      ?? (error as {code?: string})?.code;
-    if (code === '55P03' || code === 'P2010') throw commandInProgress();
+    // «Такая же команда ещё выполняется» — только таймаут ожидания блокировки на
+    // ключе: другой запрос с тем же ключом держит его незакоммиченным. Остальное
+    // не маскируем: 40001 и 40P01 оболочка транзакции повторит целиком (на повторе
+    // ключ уже закоммичен, и придёт сохранённый ответ), настоящая SQL-ошибка должна
+    // быть видна, а не выглядеть как «команда выполняется».
+    if (postgresErrorCode(error) === '55P03') throw commandInProgress();
     throw error;
   }
 

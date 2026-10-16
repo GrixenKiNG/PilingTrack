@@ -1,6 +1,7 @@
 import type { Prisma } from '@/generated/postgres-client/client';
 import { db, DEFAULT_TX_OPTIONS } from '@/lib/db';
 import {ReadinessCommandError} from '../application/command-pipeline/errors';
+import {postgresErrorCode} from '../application/command-pipeline/pg-error';
 import { requireTenantId } from '@/lib/tenant-scope';
 
 export type ReadinessTransaction = Prisma.TransactionClient;
@@ -47,29 +48,18 @@ export const withReadinessWorkerTransaction = withReadinessTenantTransaction;
 
 const SERIALIZABLE_ATTEMPTS = 3;
 
-/** 40001 — сериализационный конфликт, 40P01 — взаимная блокировка. */
-const RETRYABLE_PG_CODES = new Set(['40001', '40P01']);
-
 /**
- * Код Postgres из ошибки Prisma, где бы он ни лежал.
+ * 40001 — сериализационный конфликт, 40P01 — взаимная блокировка, 55P03 — таймаут
+ * ожидания блокировки. Все три прерывают транзакцию целиком и проходят при
+ * повторе всей транзакции; после исчерпания попыток клиент получает устойчивый 409.
  *
- * Драйверный адаптер (PrismaPg) не поднимает код наверх: сериализационный сбой
- * приходит как P2010 «Raw query failed», а настоящий 40001 спрятан в
- * meta.driverAdapterError.cause.originalCode. Пока разбирали только code и
- * meta.code, такая ошибка не считалась конфликтом: транзакция не повторялась,
- * а наружу вместо 409 «Одновременное изменение» уходил сырой P2010. Ловилось
- * это как «плавающее» падение теста на 20 параллельных запусках.
+ * Код разбирает `postgresErrorCode`: адаптер PrismaPg прячет настоящий SQLSTATE под
+ * оболочкой P2010/P2039. Пока оболочку не разворачивали, такая ошибка не считалась
+ * конфликтом: транзакция не повторялась, а наружу вместо 409 «Одновременное
+ * изменение» уходил сырой P2010 (ловилось как «плавающее» падение теста на 20
+ * параллельных запусках).
  */
-function postgresErrorCode(error: unknown): string | null {
-  const candidate = error as {
-    code?: string;
-    meta?: {code?: string; driverAdapterError?: {cause?: {originalCode?: string}}};
-  };
-  return candidate.meta?.driverAdapterError?.cause?.originalCode
-    ?? candidate.meta?.code
-    ?? candidate.code
-    ?? null;
-}
+const RETRYABLE_PG_CODES = new Set(['40001', '40P01', '55P03']);
 
 function isSerializableConflict(error: unknown): boolean {
   if ((error as {code?: string}).code === 'P2034') return true;

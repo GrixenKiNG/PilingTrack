@@ -28,7 +28,16 @@ export class PrismaCommandIdempotencyRepository implements CommandIdempotencyRep
     expiresAt: Date;
   }): Promise<boolean> {
     const storageScope = tenantStorageScope(input.tenantId, input.scope);
-    await this.tx.$executeRaw`SET LOCAL lock_timeout = '1000ms'`;
+    // Секунда ожидания — только для самого claim: повтор той же команды не должен
+    // висеть на чужом незакоммиченном ключе. `SET LOCAL` живёт до конца транзакции,
+    // поэтому прежнее значение возвращается сразу после вставки: иначе любое ожидание
+    // блокировки в самой команде (очередь подписантов наряда FOR UPDATE, уникальность
+    // активной смены) обрывалось бы через секунду с 55P03. Не `0`: у вызывающего
+    // кода может стоять свой ненулевой предел.
+    const [{previous}] = await this.tx.$queryRaw<Array<{previous: string}>>`
+      SELECT current_setting('lock_timeout') AS previous
+    `;
+    await this.tx.$executeRaw`SELECT set_config('lock_timeout', '1000ms', true)`;
     const inserted = await this.tx.$queryRaw<Array<{id: string}>>(Prisma.sql`
       INSERT INTO "IdempotencyKey"
         ("id", "key", "scope", "status", "expiresAt", "createdAt", "tenantId", "actorId", "requestHash")
@@ -38,6 +47,8 @@ export class PrismaCommandIdempotencyRepository implements CommandIdempotencyRep
       ON CONFLICT ("tenantId", "scope", "key") DO NOTHING
       RETURNING "id"
     `);
+    // При ошибке вставки транзакция прервана и откатится вместе с настройкой.
+    await this.tx.$executeRaw`SELECT set_config('lock_timeout', ${previous}, true)`;
     return inserted.length === 1;
   }
 

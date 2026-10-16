@@ -226,7 +226,8 @@ jobs:
             tests/integration/tech-readiness-shifts.spec.ts \
             tests/integration/tech-readiness-work-permits.spec.ts \
             tests/integration/tenant-dictionary-migration.spec.ts \
-            tests/integration/tenant-transaction-pool.spec.ts > db-gated.log 2>&1; then
+            tests/integration/tenant-transaction-pool.spec.ts \
+            tests/integration/idempotency-lock-timeout.spec.ts > db-gated.log 2>&1; then
             EXIT=0
           else
             EXIT=$?
