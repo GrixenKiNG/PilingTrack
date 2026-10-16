@@ -1,7 +1,10 @@
 export const DB_SLOW_THRESHOLD_MS = 1000;
 export const REDIS_SLOW_THRESHOLD_MS = 500;
 export const OUTBOX_BACKLOG_THRESHOLD = 1000;
-export const OUTBOX_STALE_MS = 60 * 60 * 1000;
+// Обычно событие outbox публикуется за ~2 с. Порог в час (прежний) держал
+// /api/health/deep зелёным до 60 минут после остановки публикации (F2 стенда
+// 16.10.2026). 5 минут — это сотни обычных задержек, но остановку видно сразу.
+export const OUTBOX_STALE_MS = 5 * 60 * 1000;
 export const WORKER_STALE_MS = 90 * 1000;
 export const DB_CHECK_TIMEOUT_MS = 2000;
 export const REDIS_CHECK_TIMEOUT_MS = 1000;
