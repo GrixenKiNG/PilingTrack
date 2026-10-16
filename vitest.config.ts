@@ -69,10 +69,21 @@ export default defineConfig({
       // nothing. Bump these up whenever coverage grows — never down without a
       // deliberate reason. Run: `npm run test:coverage`.
       thresholds: {
-        lines: 65,
-        statements: 62,
-        functions: 56,
+        lines: 66,
+        statements: 63,
+        functions: 57,
         branches: 55,
+        // Критичные места держатся отдельной, более высокой планкой (16.10.2026,
+        // факт 90–100 %): авторизация, сессии, лимит входов и команды допусков —
+        // это то, что нельзя «потерять» среди общих процентов. Файлы, попавшие
+        // под эти правила, из общей планки исключаются.
+        'src/services/auth/**': { lines: 90, statements: 90, functions: 90, branches: 85 },
+        'src/core/security/**': { lines: 85, statements: 85, functions: 85, branches: 80 },
+        'src/lib/rate-limiter.ts': { lines: 90, statements: 90, functions: 90, branches: 85 },
+        'src/lib/csrf-protection.ts': { lines: 90, statements: 90, functions: 90, branches: 85 },
+        'src/modules/readiness/application/permits/**': { lines: 90, statements: 90, functions: 85, branches: 80 },
+        'src/modules/readiness/domain/permits/**': { lines: 80, statements: 80, functions: 80, branches: 75 },
+        'src/modules/readiness/application/shifts/**': { lines: 95, statements: 95, functions: 90, branches: 80 },
       },
     },
   },
