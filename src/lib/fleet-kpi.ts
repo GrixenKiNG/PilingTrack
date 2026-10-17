@@ -9,6 +9,8 @@
  *   still-running time of OPEN failures (startedAt ?? createdAt → now, clamped
  *   to the period). A rig sitting in an unclosed repair used to contribute
  *   zero downtime, so availability showed 100% during a live repair.
+ *   Failures started BEFORE the period (`opts.carriedOver`) add only their
+ *   in-period downtime: they are not counted as failures, repairs, cost or PM.
  * - Fleet hours = period length × equipment count (total machine-hours).
  * - Operating hours = fleet hours − downtime.
  * - MTBF = operating hours / failure count.
@@ -69,7 +71,14 @@ const toMs = (v: string | Date | null): number | null => {
 
 export function computeFleetKpi(
   records: KpiRecord[],
-  opts: { from: Date; to: Date; equipmentCount: number; now?: Date },
+  opts: {
+    from: Date;
+    to: Date;
+    equipmentCount: number;
+    now?: Date;
+    /** Failure WOs created before `from` that overlap the period — downtime only. */
+    carriedOver?: KpiRecord[];
+  },
 ): FleetKpi {
   const periodHours = Math.max(0, (opts.to.getTime() - opts.from.getTime()) / HOUR_MS);
   const fleetHours = periodHours * Math.max(0, opts.equipmentCount);
@@ -99,6 +108,25 @@ export function computeFleetKpi(
         if (end > start) downtimeHours += (end - start) / HOUR_MS;
       }
     }
+  }
+
+  for (const f of opts.carriedOver ?? []) {
+    const s = toMs(f.startedAt);
+    const c = toMs(f.completedAt);
+    const isOpen = c == null && f.status !== 'DONE' && f.status !== 'CANCELLED';
+    let rawStart: number | null = null;
+    let rawEnd: number | null = null;
+    if (c != null) {
+      rawStart = s; // closed: needs startedAt, like the in-period branch
+      rawEnd = c;
+    } else if (isOpen) {
+      rawStart = s ?? toMs(f.createdAt ?? null);
+      rawEnd = nowMs;
+    }
+    if (rawStart == null || rawEnd == null) continue;
+    const start = Math.max(rawStart, opts.from.getTime());
+    const end = Math.min(rawEnd, opts.to.getTime());
+    if (end > start) downtimeHours += (end - start) / HOUR_MS;
   }
 
   const mttrHours = repairDurations.length

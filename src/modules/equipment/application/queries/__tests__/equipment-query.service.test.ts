@@ -383,3 +383,50 @@ describe('equipment-query — tenant fail-closed guards (W52)', () => {
     }));
   });
 });
+
+describe('getFleetKpiData — переходящие ремонты', () => {
+  const from = new Date('2026-10-01T00:00:00Z');
+  const to = new Date('2026-10-11T00:00:00Z');
+  const row = (over: Record<string, unknown>) => ({
+    equipmentId: 'eq-1', type: 'REPAIR', status: 'IN_PROGRESS',
+    startedAt: null, completedAt: null, createdAt: new Date('2026-09-20T00:00:00Z'),
+    scheduledAt: null, cost: null, equipment: { name: 'Копёр-1' }, ...over,
+  });
+
+  beforeEach(() => {
+    findManyRecMock.mockReset().mockResolvedValue([]);
+    equipmentCountMock.mockReset().mockResolvedValue(1);
+  });
+
+  it('второй запрос берёт отказы организации, созданные до периода и пересекающиеся с ним', async () => {
+    await getFleetKpiData('orion', from, to);
+    expect(findManyRecMock).toHaveBeenCalledTimes(2);
+    const carriedWhere = findManyRecMock.mock.calls.map((c) => c[0].where)
+      .find((w) => w.createdAt?.lt?.getTime() === from.getTime());
+    expect(carriedWhere).toBeDefined();
+    expect(carriedWhere.tenantId).toBe('orion');
+    expect(carriedWhere.type).toEqual({ in: ['REPAIR', 'FAULT'] });
+    expect(carriedWhere.OR).toEqual([
+      // открытый: эффективное начало (startedAt ?? createdAt) <= to
+      { completedAt: null, OR: [{ startedAt: { lte: to } }, { startedAt: null }] },
+      // закрытый: закончен не раньше начала периода и начат не позже его конца
+      { completedAt: { gte: from }, startedAt: { lte: to } },
+    ]);
+  });
+
+  it('периодный запрос не изменился: наряды, созданные в периоде', async () => {
+    await getFleetKpiData('orion', from, to);
+    const periodWhere = findManyRecMock.mock.calls.map((c) => c[0].where)
+      .find((w) => w.createdAt?.gte);
+    expect(periodWhere).toEqual({ tenantId: 'orion', createdAt: { gte: from, lte: to } });
+  });
+
+  it('возвращает переходящие записи отдельно от записей периода', async () => {
+    findManyRecMock.mockImplementation(async ({ where }) =>
+      where.createdAt?.lt ? [row({ equipmentId: 'old' })] : [row({ equipmentId: 'new', createdAt: from })]);
+    const data = await getFleetKpiData('orion', from, to);
+    expect(data.records.map((r) => r.equipmentId)).toEqual(['new']);
+    expect(data.carriedOver.map((r) => r.equipmentId)).toEqual(['old']);
+    expect(data.equipmentCount).toBe(1);
+  });
+});

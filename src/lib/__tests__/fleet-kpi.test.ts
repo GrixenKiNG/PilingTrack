@@ -114,6 +114,77 @@ describe('computeFleetKpi', () => {
     expect(k.topProblemRigs[1]).toMatchObject({ equipmentId: 'b', failures: 1, cost: 999 });
   });
 
+  describe('переходящие ремонты (начаты до периода)', () => {
+    // Период 01.06–11.06 = 240 ч, одна установка.
+    const now = new Date('2026-06-20T00:00:00.000Z');
+
+    it('открытый ремонт, начатый до периода, держит установку в простое весь период: доступность 0', () => {
+      const k = computeFleetKpi([], {
+        from: FROM, to: TO, equipmentCount: 1, now,
+        carriedOver: [rec({ status: 'IN_PROGRESS', startedAt: '2026-05-20T00:00:00Z' })],
+      });
+      expect(k.downtimeHours).toBe(240);
+      expect(k.availability).toBe(0);
+    });
+
+    it('открытый ремонт без startedAt берёт createdAt как начало', () => {
+      const k = computeFleetKpi([], {
+        from: FROM, to: TO, equipmentCount: 1, now,
+        carriedOver: [rec({ status: 'PLANNED', createdAt: '2026-05-30T00:00:00Z' })],
+      });
+      expect(k.downtimeHours).toBe(240);
+    });
+
+    it('ремонт, закрытый внутри периода, считает простой только внутри периода', () => {
+      const k = computeFleetKpi([], {
+        from: FROM, to: TO, equipmentCount: 1, now,
+        carriedOver: [rec({ startedAt: '2026-05-30T00:00:00Z', completedAt: '2026-06-02T00:00:00Z' })],
+      });
+      expect(k.downtimeHours).toBe(24);
+    });
+
+    it('ремонт, закрытый до начала периода, не влияет', () => {
+      const k = computeFleetKpi([], {
+        from: FROM, to: TO, equipmentCount: 1, now,
+        carriedOver: [rec({ startedAt: '2026-05-20T00:00:00Z', completedAt: '2026-05-25T00:00:00Z' })],
+      });
+      expect(k.downtimeHours).toBe(0);
+      expect(k.availability).toBe(1);
+    });
+
+    it('отменённый ремонт без completedAt не создаёт простой', () => {
+      const k = computeFleetKpi([], {
+        from: FROM, to: TO, equipmentCount: 1, now,
+        carriedOver: [rec({ status: 'CANCELLED', startedAt: '2026-05-20T00:00:00Z' })],
+      });
+      expect(k.downtimeHours).toBe(0);
+    });
+
+    it('влияет только на простой: отказы, MTBF-счётчик, MTTR, ППР, стоимость и проблемные установки — как раньше', () => {
+      const periodOnly = [
+        rec({ startedAt: '2026-06-02T00:00:00Z', completedAt: '2026-06-02T04:00:00Z', cost: 10 }),
+        rec({ type: 'TO1', status: 'DONE', scheduledAt: '2026-06-03T00:00:00Z', cost: 5 }),
+      ];
+      const base = computeFleetKpi(periodOnly, { from: FROM, to: TO, equipmentCount: 2, now });
+      const k = computeFleetKpi(periodOnly, {
+        from: FROM, to: TO, equipmentCount: 2, now,
+        carriedOver: [rec({
+          equipmentId: 'eq2', equipmentName: 'Копёр-2', status: 'IN_PROGRESS',
+          startedAt: '2026-05-20T00:00:00Z', cost: 999,
+        })],
+      });
+      expect(k.failureCount).toBe(base.failureCount);
+      expect(k.mttrHours).toBe(base.mttrHours);
+      expect(k.pmPlanned).toBe(base.pmPlanned);
+      expect(k.pmClosed).toBe(base.pmClosed);
+      expect(k.pmCompliance).toBe(base.pmCompliance);
+      expect(k.totalCost).toBe(base.totalCost);
+      expect(k.topProblemRigs).toEqual(base.topProblemRigs);
+      // простой вырос ровно на 240 ч переходящего ремонта
+      expect(k.downtimeHours).toBe(base.downtimeHours + 240);
+    });
+  });
+
   it('ignores repairs missing a start/finish stamp for MTTR/downtime', () => {
     const k = computeFleetKpi(
       [rec({ startedAt: '2026-06-02T00:00:00Z', completedAt: null })],
