@@ -1,11 +1,11 @@
 /**
- * transliterate — ГОСТ 7.79 система Б для имени PDF в Telegram (F10 стенда 16.10).
+ * transliterate — читаемая латиница для имени PDF в Telegram (F10 стенда 16.10).
  * Кириллица не должна превращаться в «_»: имя файла остаётся читаемым.
  */
 import { describe, it, expect } from 'vitest';
 import { transliterate } from '../transliterate';
 
-describe('transliterate (ГОСТ 7.79, система Б)', () => {
+describe('transliterate', () => {
   it('переводит пример из стенда: «ЛОАД 1» → «LOAD 1»', () => {
     expect(transliterate('ЛОАД 1')).toBe('LOAD 1');
   });
@@ -14,13 +14,14 @@ describe('transliterate (ГОСТ 7.79, система Б)', () => {
     expect(transliterate('Иванов И.И.')).toBe('Ivanov I.I.');
   });
 
-  it('убирает диакритику: Щ → S, Ц → C, Ё → E', () => {
-    expect(transliterate('Щ')).toBe('S');
-    expect(transliterate('ц')).toBe('c');
-    expect(transliterate('Ё')).toBe('E');
+  it('шипящие и йотированные — буквенными сочетаниями, без склейки', () => {
+    expect(transliterate('Шишкин')).toBe('Shishkin');
+    expect(transliterate('Чижов')).toBe('Chizhov');
+    expect(transliterate('Щукин Цой Юрьев Яхин Хомяков')).toBe('Shchukin Tsoy Yurev Yakhin Khomyakov');
+    expect(transliterate('Ёлкин')).toBe('Elkin');
   });
 
-  it('опускает Ъ и Ь, которые ГОСТ передаёт знаками ʺ и ʹ', () => {
+  it('опускает Ъ и Ь', () => {
     expect(transliterate('Объём')).toBe('Obem');
   });
 
