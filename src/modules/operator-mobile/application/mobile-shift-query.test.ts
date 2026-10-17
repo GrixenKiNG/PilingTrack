@@ -107,6 +107,15 @@ describe('принадлежность смены до загрузки осмо
     expect((await read()).shift).toMatchObject({id: 'shift-old', productionDate: '2026-09-27'});
   });
 
+  it('простой смены отдаётся точной суммой, без округления до 0,1 ч; перерыв не считается', async () => {
+    database.shift.findFirst.mockResolvedValue({...shift, starter: {id: 'me', role: 'OPERATOR'}});
+    database.report.findFirst.mockImplementation(async ({select}) => select.userId
+      ? {userId: 'me'} : select.endingFuelPercent ? null
+        : {reportId: 'R-old', status: 'draft', submittedAt: null, piles: [], drillings: [],
+          downtimes: [{kind: 'DOWNTIME', duration: 0.05}, {kind: 'DOWNTIME', duration: 0.0333}, {kind: 'BREAK', duration: 1}]});
+    expect((await read()).production.downtimeHours).toBeCloseTo(0.0833, 6);
+  });
+
   it('незакрытая старая смена имеет приоритет перед сегодняшней закрытой', async () => {
     database.shift.findFirst.mockImplementation(async ({where}) => where.state?.in
       ? shift : {...shift, state: 'CLOSED', productionDate: new Date('2026-10-07'), starter: {id: 'me', role: 'OPERATOR'}});
