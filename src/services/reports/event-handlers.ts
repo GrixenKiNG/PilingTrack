@@ -16,7 +16,8 @@ import { logger } from '@/lib/logger';
 import { formatCountMeters } from '@/lib/format';
 import { formatDowntimeHours } from '@/lib/downtime-hours';
 import { pileLengthMeters } from '@/lib/pile-length';
-import { getRedisClient } from '@/lib/redis-cache';
+import { transliterate } from '@/lib/transliterate';
+import { enqueueAlert } from '@/core/notifications/durable-alert';
 // Статически (в отличие от обработчиков ниже): динамический import этого
 // модуля не подменяется моком в юнит-тесте, и путь «тенант из отчёта» иначе
 // уходил бы в живую базу из теста. Прод-поведение то же — db это ленивый прокси.
@@ -288,11 +289,9 @@ export function registerAlertEventHandler() {
   on(REPORT_DOMAIN_EVENT_TYPES.DOWNTIME_ADDED, handleDowntimeAlert);
 }
 
-/** Окно дедупликации алерта о простое: правки отчёта идут в 24-часовом окне. */
-const DOWNTIME_ALERT_TTL_SECONDS = 48 * 60 * 60;
-
 /**
- * Ключ дедупликации алерта о простое (F-R33-2).
+ * Ключ дедупликации алерта о простое (F-R33-2); сам дедуп делает доставка
+ * очереди (durable-alert-delivery).
  *
  * `DOWNTIME_ADDED` несёт только `reasonId`/`duration`/`comment` — id самой
  * строки простоя в `event.data` нет, а времени начала/окончания форма не
@@ -319,6 +318,13 @@ async function handleDowntimeAlert(event: ReportDomainEvent) {
 
   if (duration <= 2) return;
 
+  // Организация обязательна: очередь доставки без неё не работает, а алерт без
+  // организации ушёл бы мимо её настроек (fail closed).
+  if (!event.tenantId) {
+    logger.warn('Downtime alert skipped: event has no tenantId', { reportId: event.aggregateId });
+    return;
+  }
+
   // Признак из настроек организации. До этого переключатель «Простой…» на
   // экране настроек сохранялся, но отправку не спрашивали, и выключенное
   // правило всё равно слало алерт.
@@ -328,36 +334,6 @@ async function handleDowntimeAlert(event: ReportDomainEvent) {
       reportId: event.aggregateId, duration,
     });
     return;
-  }
-
-  // Дедупликация (F-R33-2): upsertReport пересобирает агрегат со ВСЕМИ
-  // строками и `addDowntime` заново эмитит `DowntimeAdded` на каждую, поэтому
-  // любое сохранение отчёта в окне правки слало диспетчеру повторный алерт о
-  // том же простое — как будто простой новый.
-  const alertKey = downtimeAlertKey(event);
-  let redis: Awaited<ReturnType<typeof getRedisClient>> = null;
-  if (alertKey) {
-    try {
-      redis = await getRedisClient();
-      if (!redis) {
-        // Нет Redis — шлём без дедупа: дубль лучше, чем молчание.
-        logger.warn('Downtime alert: Redis unavailable, sending without dedupe', {
-          reportId: event.aggregateId,
-        });
-      } else if (await redis.get(alertKey)) {
-        logger.info('Downtime alert already sent for this downtime, skipping', {
-          reportId: event.aggregateId, duration,
-        });
-        return;
-      }
-    } catch (err) {
-      // Сбой Redis — тоже не повод молчать.
-      logger.warn('Downtime alert: dedupe check failed, sending anyway', {
-        reportId: event.aggregateId,
-        error: err instanceof Error ? err.message : String(err),
-      });
-      redis = null;
-    }
   }
 
   logger.warn('High downtime detected', {
@@ -373,73 +349,50 @@ async function handleDowntimeAlert(event: ReportDomainEvent) {
   // строки с id — фолбэк в telegram.ts.
   let siteName: string | undefined;
   let reportNumber: string | undefined;
-  if (event.tenantId) {
-    try {
-      const report = await db.report.findFirst({
-        where: { reportId: event.aggregateId, tenantId: event.tenantId },
-        select: { reportId: true, site: { select: { name: true } } },
-      });
-      siteName = report?.site?.name || undefined;
-      reportNumber = report?.reportId || undefined;
-    } catch (err) {
-      logger.warn('Downtime alert: cannot resolve site name/report number', {
-        reportId: event.aggregateId,
-        error: err instanceof Error ? err.message : String(err),
-      });
-    }
+  try {
+    const report = await db.report.findFirst({
+      where: { reportId: event.aggregateId, tenantId: event.tenantId },
+      select: { reportId: true, site: { select: { name: true } } },
+    });
+    siteName = report?.site?.name || undefined;
+    reportNumber = report?.reportId || undefined;
+  } catch (err) {
+    logger.warn('Downtime alert: cannot resolve site name/report number', {
+      reportId: event.aggregateId,
+      error: err instanceof Error ? err.message : String(err),
+    });
   }
 
   // Часовой пояс организации для строки времени: серверное время в алерте
   // отставало от московского на 3 часа (F-R33-1). Незнание зоны — не повод
   // молчать, поэтому при ошибке оставляем "Europe/Moscow".
   let timeZone = 'Europe/Moscow';
-  if (event.tenantId) {
-    try {
-      const { getSettings } = await import('@/modules/settings');
-      timeZone = (await getSettings(event.tenantId)).timezone || 'Europe/Moscow';
-    } catch {
-      // Настройки не прочитались — шлём в зоне по умолчанию.
-    }
+  try {
+    const { getSettings } = await import('@/modules/settings');
+    timeZone = (await getSettings(event.tenantId)).timezone || 'Europe/Moscow';
+  } catch {
+    // Настройки не прочитались — шлём в зоне по умолчанию.
   }
 
-  try {
-    const { telegramNotifier } = await import('@/core/notifications/telegram');
-    const sent = await telegramNotifier.sendAlert({
+  // В очередь, а не в Telegram: отправка (до 5 с) идёт в полосе Telegram
+  // публикатора outbox и не держит остальные события. Дедуп по Redis, признак
+  // «Простой» и повтор/DLQ — там же. Сбой записи не глотаем: outbox повторит
+  // событие, иначе алерт потерялся бы.
+  await enqueueAlert(db, {
+    tenantId: event.tenantId,
+    aggregateId: event.aggregateId,
+    alert: {
       severity: duration > 4 ? 'high' : 'medium',
       message: `Простой ${formatDowntimeHours(duration)} зафиксирован в отчёте`,
       siteId: event.siteId,
-      siteName,
       reportId: event.aggregateId,
+      siteName,
       reportNumber,
       timeZone,
-    });
-    // Ключ ставим только ПОСЛЕ успешной отправки: неудачная попытка должна
-    // остаться возможной к повтору, а не глушиться собственным дедупом.
-    if (redis && alertKey) {
-      if (sent) {
-        try {
-          await redis.set(alertKey, '1', 'EX', DOWNTIME_ALERT_TTL_SECONDS);
-        } catch (err) {
-          logger.warn('Downtime alert: failed to set dedupe key', {
-            reportId: event.aggregateId,
-            error: err instanceof Error ? err.message : String(err),
-          });
-        }
-      } else {
-        logger.warn('Downtime alert not marked as sent: Telegram rejected it', {
-          reportId: event.aggregateId, duration,
-        });
-      }
-    }
-  } catch (err) {
-    // Notification must never fail the event — log and continue.
-    // The audit/projection paths re-throw on failure (see emitDomainEvent
-    // contract); alerts are best-effort.
-    logger.error('Telegram downtime alert failed', err, {
-      reportId: event.aggregateId,
-      duration,
-    });
-  }
+      notificationKey: 'downtime30',
+      dedupeKey: downtimeAlertKey(event) ?? undefined,
+    },
+  });
 }
 
 // ============================================================
@@ -650,7 +603,7 @@ export async function deliverReportPdf(event: { id?: string; aggregateId: string
   const caption = lines.join('\n');
 
   const pdfBuffer = await generateSinglePdf(d);
-  const filename = `report-${d.date}-${d.user?.name || 'unknown'}.pdf`.replace(/[^A-Za-z0-9._-]/g, '_');
+  const filename = `report-${d.date}-${transliterate(d.user?.name || 'unknown')}.pdf`.replace(/[^A-Za-z0-9._-]/g, '_');
 
   // Строку события блокируем на время отправки: outbox-публикатор крутится и в
   // app, и в workers, а Telegram ключей идемпотентности не знает. Кто пришёл

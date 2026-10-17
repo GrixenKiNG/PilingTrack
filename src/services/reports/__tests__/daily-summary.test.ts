@@ -16,7 +16,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const {
   findManyMock, upsertMock, deleteManyMock, findUniqueMock, analyticsUpsertMock, invalidateAnalyticsMock,
   outboxFindUnique, outboxUpdate, sendDocument, findFirstMock, isNotifMock, getSettingsMock, sendAlertMock,
-  redisGetClientMock, redisGetMock, redisSetMock, userFindFirst, recordAuditEventMock, dbClient,
+  outboxCreate, userFindFirst, recordAuditEventMock, dbClient,
 } = vi.hoisted(() => {
   const findManyMock = vi.fn();
   const upsertMock = vi.fn();
@@ -31,9 +31,7 @@ const {
   const isNotifMock = vi.fn();
   const getSettingsMock = vi.fn();
   const sendAlertMock = vi.fn();
-  const redisGetClientMock = vi.fn();
-  const redisGetMock = vi.fn();
-  const redisSetMock = vi.fn();
+  const outboxCreate = vi.fn();
   const userFindFirst = vi.fn();
   const recordAuditEventMock = vi.fn();
 
@@ -42,7 +40,7 @@ const {
     user: { findFirst: userFindFirst },
     siteDailySummary: { upsert: upsertMock, deleteMany: deleteManyMock },
     reportAnalytics: { upsert: analyticsUpsertMock },
-    outboxEvent: { findUnique: outboxFindUnique, update: outboxUpdate },
+    outboxEvent: { findUnique: outboxFindUnique, update: outboxUpdate, create: outboxCreate },
     $queryRaw: vi.fn(),
     $transaction: (fn: (tx: unknown) => unknown) => fn(client),
   };
@@ -50,7 +48,7 @@ const {
   return {
     findManyMock, upsertMock, deleteManyMock, findUniqueMock, analyticsUpsertMock, invalidateAnalyticsMock,
     outboxFindUnique, outboxUpdate, sendDocument, findFirstMock, isNotifMock, getSettingsMock, sendAlertMock,
-    redisGetClientMock, redisGetMock, redisSetMock, userFindFirst, recordAuditEventMock, dbClient: client,
+    outboxCreate, userFindFirst, recordAuditEventMock, dbClient: client,
   };
 });
 
@@ -99,12 +97,6 @@ vi.mock('@/lib/cached-queries', () => ({
   invalidateSiteAnalytics: invalidateAnalyticsMock,
 }));
 
-// Дедуп алертов о простое (F-R33-2) ходит в Redis: без мока тест либо тянул бы
-// живую базу разработчика, либо ждал таймаут подключения.
-vi.mock('@/lib/redis-cache', () => ({
-  getRedisClient: redisGetClientMock,
-}));
-
 vi.mock('@/lib/logger', () => ({
   logger: { warn: vi.fn(), error: vi.fn(), info: vi.fn() },
 }));
@@ -132,6 +124,16 @@ describe('deliverReportPdf', () => {
 
     await expect(deliverReportPdf({ id: 'ev-1', aggregateId: 'r-1' })).rejects.toThrow();
     expect(outboxUpdate).not.toHaveBeenCalled();
+  });
+
+  // F10: кириллица в имени файла транслитерируется, а не превращается в «_».
+  it('имя PDF в Telegram — латиница, ФИО транслитерировано (F10)', async () => {
+    outboxFindUnique.mockResolvedValue({ published: false });
+    sendDocument.mockResolvedValue(true);
+
+    await deliverReportPdf({ id: 'ev-name', aggregateId: 'r-name' });
+
+    expect(sendDocument.mock.calls[0][0]).toMatch(/^report-[\d-]+-Ivanov\.pdf$/);
   });
 
   it('уже доставленное событие повторно не отправляется', async () => {
@@ -484,23 +486,26 @@ describe('сброс кэша сводки по объектам (F-R35-2)', () 
   («Простой 2.3333333333333335 ч») и внутренними id вместо названия объекта и
   номера отчёта. Обработчик обязан подтянуть их одним тенантным запросом
   (строгое равенство по организации события) и передать зону из настроек.
+
+  F7-хвост: сам Telegram-вызов (до 5 с на отправку) не должен идти в общей
+  полосе публикатора outbox. Обработчик только ставит алерт в очередь
+  NotificationDeliveryRequested (её разбирает полоса Telegram); отправку и
+  дедуп по Redis делает durable-alert-delivery (см. его тесты).
 */
-describe('алерт о простое (F-R33-1)', () => {
+describe('алерт о простое: постановка в очередь (F-R33-1, F7)', () => {
   beforeEach(() => {
     findFirstMock.mockReset();
     sendAlertMock.mockReset();
     isNotifMock.mockReset();
     getSettingsMock.mockReset();
-    redisGetClientMock.mockReset();
+    outboxCreate.mockReset();
     findFirstMock.mockResolvedValue(null);
     isNotifMock.mockResolvedValue(true);
     getSettingsMock.mockResolvedValue({ timezone: 'Asia/Krasnoyarsk' });
-    // Redis недоступен → путь «шлём без дедупа»; сами алерты ниже про текст.
-    redisGetClientMock.mockResolvedValue(null);
     registerAlertEventHandler();
   });
 
-  function downtimeEvent() {
+  function downtimeEvent(overrides: { data?: Record<string, unknown>; tenantId?: string | null } = {}) {
     return {
       id: 'evt-dt-1',
       type: REPORT_DOMAIN_EVENT_TYPES.DOWNTIME_ADDED,
@@ -509,12 +514,12 @@ describe('алерт о простое (F-R33-1)', () => {
       occurredAt: new Date().toISOString(),
       siteId: 'clx-site-cuid',
       userId: 'user-1',
-      tenantId: 'tenant-a',
-      data: { duration: 2.3333333333333335 },
+      tenantId: overrides.tenantId === null ? undefined : (overrides.tenantId ?? 'tenant-a'),
+      data: { reasonId: 'reason-1', duration: 2.3333333333333335, ...overrides.data },
     };
   }
 
-  it('передаёт название объекта, номер отчёта и зону тенанта', async () => {
+  it('кладёт в очередь название объекта, номер отчёта, зону тенанта и ключ дедупа', async () => {
     findFirstMock.mockResolvedValue({
       reportId: 'RM-abcd1234-2026-09-26',
       site: { name: 'Северный' },
@@ -525,12 +530,30 @@ describe('алерт о простое (F-R33-1)', () => {
     expect(findFirstMock).toHaveBeenCalledWith(expect.objectContaining({
       where: { reportId: 'RM-abcd1234-2026-09-26', tenantId: 'tenant-a' },
     }));
-    expect(sendAlertMock).toHaveBeenCalledWith(expect.objectContaining({
-      message: 'Простой 2 ч 20 мин зафиксирован в отчёте',
-      siteName: 'Северный',
-      reportNumber: 'RM-abcd1234-2026-09-26',
-      timeZone: 'Asia/Krasnoyarsk',
-    }));
+    expect(outboxCreate).toHaveBeenCalledTimes(1);
+    expect(outboxCreate).toHaveBeenCalledWith({ data: expect.objectContaining({
+      type: 'NotificationDeliveryRequested',
+      tenantId: 'tenant-a',
+      aggregateId: 'RM-abcd1234-2026-09-26',
+      payload: expect.objectContaining({
+        severity: 'medium',
+        message: 'Простой 2 ч 20 мин зафиксирован в отчёте',
+        siteId: 'clx-site-cuid',
+        reportId: 'RM-abcd1234-2026-09-26',
+        siteName: 'Северный',
+        reportNumber: 'RM-abcd1234-2026-09-26',
+        timeZone: 'Asia/Krasnoyarsk',
+        notificationKey: 'downtime30',
+        dedupeKey: 'alert:downtime:tenant-a:RM-abcd1234-2026-09-26:reason-1:2.3333333333333335',
+      }),
+    }) });
+  });
+
+  it('не зовёт Telegram из общей полосы: отправка уходит только в очередь', async () => {
+    await emitDomainEvent(downtimeEvent());
+
+    expect(sendAlertMock).not.toHaveBeenCalled();
+    expect(outboxCreate).toHaveBeenCalledTimes(1);
   });
 
   it('падает обратно на строки с id, если отчёт не нашёлся', async () => {
@@ -538,105 +561,52 @@ describe('алерт о простое (F-R33-1)', () => {
 
     await emitDomainEvent(downtimeEvent());
 
-    expect(sendAlertMock).toHaveBeenCalledWith(expect.objectContaining({
-      siteName: undefined,
-      reportNumber: undefined,
-    }));
-  });
-});
-
-/*
-  F-R33-2: upsertReport пересобирает агрегат со всеми строками и `addDowntime`
-  заново эмитит DowntimeAdded на каждую, поэтому каждое сохранение отчёта в
-  окне правки слало диспетчеру новый алерт про тот же простой — как будто
-  простой новый. Дедуп по (tenantId, reportId, reasonId, duration) в Redis на
-  48 ч: ключ ставится только после успешной отправки, при недоступном Redis
-  шлём как раньше (дубль лучше молчания).
-*/
-describe('дедупликация алерта о простое (F-R33-2)', () => {
-  const sentKeys = new Map<string, string>();
-
-  beforeEach(() => {
-    sentKeys.clear();
-    findFirstMock.mockReset();
-    sendAlertMock.mockReset();
-    isNotifMock.mockReset();
-    getSettingsMock.mockReset();
-    redisGetClientMock.mockReset();
-    redisGetMock.mockReset();
-    redisSetMock.mockReset();
-
-    redisGetMock.mockImplementation(async (key: string) => sentKeys.get(key) ?? null);
-    redisSetMock.mockImplementation(async (key: string, value: string) => {
-      sentKeys.set(key, value);
-      return 'OK';
-    });
-    redisGetClientMock.mockResolvedValue({ get: redisGetMock, set: redisSetMock });
-
-    findFirstMock.mockResolvedValue(null);
-    isNotifMock.mockResolvedValue(true);
-    getSettingsMock.mockResolvedValue({ timezone: 'Europe/Moscow' });
-    sendAlertMock.mockResolvedValue(true);
-    registerAlertEventHandler();
+    const payload = outboxCreate.mock.calls[0][0].data.payload;
+    expect(payload.siteName).toBeUndefined();
+    expect(payload.reportNumber).toBeUndefined();
+    expect(payload.reportId).toBe('RM-abcd1234-2026-09-26');
   });
 
-  function downtimeEvent(id: string, overrides: { data?: Record<string, unknown>; tenantId?: string } = {}) {
-    return {
-      id,
-      type: REPORT_DOMAIN_EVENT_TYPES.DOWNTIME_ADDED,
-      aggregateId: 'RM-1234-2026-09-26',
-      aggregateType: 'Report' as const,
-      occurredAt: new Date().toISOString(),
-      siteId: 'site-1',
-      userId: 'user-1',
-      tenantId: overrides.tenantId ?? 'tenant-a',
-      data: { reasonId: 'reason-1', duration: 3, ...overrides.data },
-    };
-  }
+  it('больше 4 ч — severity high', async () => {
+    await emitDomainEvent(downtimeEvent({ data: { duration: 5 } }));
 
-  it('тот же простой из нового события — одна отправка', async () => {
-    await emitDomainEvent(downtimeEvent('evt-dt-1'));
-    await emitDomainEvent(downtimeEvent('evt-dt-2'));
-
-    expect(sendAlertMock).toHaveBeenCalledTimes(1);
+    expect(outboxCreate.mock.calls[0][0].data.payload.severity).toBe('high');
   });
 
-  it('разный простой (другая причина или длительность) — две отправки', async () => {
-    await emitDomainEvent(downtimeEvent('evt-dt-1'));
-    await emitDomainEvent(downtimeEvent('evt-dt-2', { data: { reasonId: 'reason-2' } }));
-    await emitDomainEvent(downtimeEvent('evt-dt-3', { data: { duration: 5 } }));
+  it('до 2 ч включительно алерта нет', async () => {
+    await emitDomainEvent(downtimeEvent({ data: { duration: 2 } }));
 
-    expect(sendAlertMock).toHaveBeenCalledTimes(3);
+    expect(outboxCreate).not.toHaveBeenCalled();
   });
 
-  it('у той же строки, но другой организации — своя отправка', async () => {
-    await emitDomainEvent(downtimeEvent('evt-dt-1'));
-    await emitDomainEvent(downtimeEvent('evt-dt-2', { tenantId: 'tenant-b' }));
+  it('выключенный в настройках признак «Простой» — в очередь не ставит', async () => {
+    isNotifMock.mockResolvedValue(false);
 
-    expect(sendAlertMock).toHaveBeenCalledTimes(2);
+    await emitDomainEvent(downtimeEvent());
+
+    expect(isNotifMock).toHaveBeenCalledWith('tenant-a', 'downtime30');
+    expect(outboxCreate).not.toHaveBeenCalled();
   });
 
-  it('неудачная отправка не закрывает повтор: ключ ставится только после успеха', async () => {
-    sendAlertMock.mockResolvedValue(false);
-    await emitDomainEvent(downtimeEvent('evt-dt-1'));
-    expect(redisSetMock).not.toHaveBeenCalled();
+  it('без организации в событии очередь не трогает (fail closed)', async () => {
+    await emitDomainEvent(downtimeEvent({ tenantId: null }));
 
-    sendAlertMock.mockResolvedValue(true);
-    await emitDomainEvent(downtimeEvent('evt-dt-2'));
-
-    expect(sendAlertMock).toHaveBeenCalledTimes(2);
-    expect(redisSetMock).toHaveBeenCalledWith(
-      'alert:downtime:tenant-a:RM-1234-2026-09-26:reason-1:3', '1', 'EX', 48 * 60 * 60,
-    );
+    expect(outboxCreate).not.toHaveBeenCalled();
   });
 
-  it('при недоступном Redis шлём без дедупа', async () => {
-    redisGetClientMock.mockResolvedValue(null);
+  it('другая организация или другая длительность — свой ключ дедупа', async () => {
+    await emitDomainEvent(downtimeEvent());
+    await emitDomainEvent(downtimeEvent({ tenantId: 'tenant-b' }));
+    await emitDomainEvent(downtimeEvent({ data: { duration: 5 } }));
 
-    await emitDomainEvent(downtimeEvent('evt-dt-1'));
-    await emitDomainEvent(downtimeEvent('evt-dt-2'));
+    const keys = outboxCreate.mock.calls.map(c => c[0].data.payload.dedupeKey);
+    expect(new Set(keys).size).toBe(3);
+  });
 
-    expect(sendAlertMock).toHaveBeenCalledTimes(2);
+  it('сбой постановки в очередь уходит на повтор outbox, а не глотается: алерт не теряется', async () => {
+    outboxCreate.mockRejectedValueOnce(new Error('db down'));
+
+    await expect(emitDomainEvent(downtimeEvent())).rejects.toThrow('db down');
   });
 });
 

@@ -1,7 +1,9 @@
 import {beforeEach,describe,expect,it,vi} from 'vitest';
-const m=vi.hoisted(()=>({send:vi.fn(),enabled:vi.fn(),find:vi.fn(),update:vi.fn(),lock:vi.fn(),create:vi.fn(),inTx:false,enabledInsideTx:false}));
+const m=vi.hoisted(()=>({send:vi.fn(),enabled:vi.fn(),find:vi.fn(),update:vi.fn(),lock:vi.fn(),create:vi.fn(),inTx:false,enabledInsideTx:false,redisClient:vi.fn(),redisGet:vi.fn(),redisSet:vi.fn()}));
 vi.mock('@/lib/db',()=>({db:{$transaction:async(fn:(tx:unknown)=>Promise<void>)=>{m.inTx=true;try{return await fn({$queryRaw:m.lock,outboxEvent:{findFirst:m.find,update:m.update}})}finally{m.inTx=false}}}}));
 vi.mock('@/core/notifications/telegram',()=>({telegramNotifier:{sendAlert:m.send}}));
+vi.mock('@/lib/redis-cache',()=>({getRedisClient:m.redisClient}));
+vi.mock('@/lib/logger',()=>({logger:{warn:vi.fn(),error:vi.fn(),info:vi.fn()}}));
 vi.mock('@/modules/settings',()=>({isNotificationEnabled:m.enabled}));
 import {deliverQueuedAlert} from '../durable-alert-delivery';
 import {enqueueCriticalDefects} from '@/core/notifications/durable-alert';
@@ -72,4 +74,91 @@ it('I08: queued Alertmanager notifications use systemAlerts, not a matching doma
   const queued = { ...event, data: { ...event.data, notificationKey: 'systemAlerts' } };
   await deliverQueuedAlert(queued);
   expect(m.enabled).toHaveBeenCalledWith(event.tenantId, 'systemAlerts');
+});
+
+/*
+  F-R33-2 + F7: дедуп алерта о простое переехал сюда вместе с отправкой.
+  Ключ Redis читается до отправки, ставится только после успешной отправки,
+  при недоступном Redis шлём без дедупа (дубль лучше молчания).
+*/
+describe('durable alert: дедуп по ключу Redis', () => {
+  const key = 'alert:downtime:tenant-a:RM-1:reason-1:3';
+  const downtime = {
+    id: 'event-6', tenantId: 'tenant-a',
+    data: {
+      severity: 'medium', message: 'Простой 3 ч зафиксирован в отчёте', reportId: 'RM-1', siteId: 'site-1',
+      siteName: 'Северный', reportNumber: 'RM-1', timeZone: 'Asia/Krasnoyarsk',
+      notificationKey: 'downtime30', dedupeKey: key,
+    },
+  };
+  const sent = new Map<string, string>();
+
+  beforeEach(() => {
+    sent.clear();
+    m.redisGet.mockImplementation(async (k: string) => sent.get(k) ?? null);
+    m.redisSet.mockImplementation(async (k: string, v: string) => { sent.set(k, v); return 'OK'; });
+    m.redisClient.mockResolvedValue({ get: m.redisGet, set: m.redisSet });
+    m.find.mockResolvedValue({ id: 'event-6', published: false });
+  });
+
+  it('передаёт в Telegram название объекта, номер отчёта и часовой пояс', async () => {
+    await deliverQueuedAlert(downtime);
+    expect(m.send).toHaveBeenCalledWith(expect.objectContaining({
+      siteName: 'Северный', reportNumber: 'RM-1', timeZone: 'Asia/Krasnoyarsk',
+    }), expect.anything());
+  });
+
+  it('проверяет признак «Простой» по ключу downtime30', async () => {
+    await deliverQueuedAlert(downtime);
+    expect(m.enabled).toHaveBeenCalledWith('tenant-a', 'downtime30');
+  });
+
+  it('выключенный признак: не шлёт, ключ не ставит, строку закрывает', async () => {
+    m.enabled.mockResolvedValue(false);
+    await deliverQueuedAlert(downtime);
+    expect(m.send).not.toHaveBeenCalled();
+    expect(m.redisSet).not.toHaveBeenCalled();
+    expect(m.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ published: true }) }));
+  });
+
+  it('ставит ключ на 48 ч только после успешной отправки', async () => {
+    m.send.mockResolvedValue(false);
+    await expect(deliverQueuedAlert(downtime)).rejects.toThrow('retained');
+    expect(m.redisSet).not.toHaveBeenCalled();
+
+    m.send.mockResolvedValue(true);
+    await deliverQueuedAlert(downtime);
+    expect(m.redisSet).toHaveBeenCalledWith(key, '1', 'EX', 48 * 60 * 60);
+  });
+
+  it('тот же простой уже отправлен: повторно не шлёт, строку закрывает', async () => {
+    sent.set(key, '1');
+    await deliverQueuedAlert(downtime);
+    expect(m.send).not.toHaveBeenCalled();
+    expect(m.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ published: true }) }));
+  });
+
+  it('при недоступном Redis шлёт без дедупа', async () => {
+    m.redisClient.mockResolvedValue(null);
+    await deliverQueuedAlert(downtime);
+    expect(m.send).toHaveBeenCalledTimes(1);
+  });
+
+  it('сбой чтения ключа не глушит алерт', async () => {
+    m.redisGet.mockRejectedValue(new Error('redis down'));
+    await deliverQueuedAlert(downtime);
+    expect(m.send).toHaveBeenCalledTimes(1);
+  });
+
+  it('алерт без ключа дедупа Redis не трогает', async () => {
+    await deliverQueuedAlert(event);
+    expect(m.redisClient).not.toHaveBeenCalled();
+  });
+
+  it('повтор уже опубликованной строки не шлёт и ключ не ставит', async () => {
+    m.find.mockResolvedValue({ id: 'event-6', published: true });
+    await deliverQueuedAlert(downtime);
+    expect(m.send).not.toHaveBeenCalled();
+    expect(m.redisSet).not.toHaveBeenCalled();
+  });
 });

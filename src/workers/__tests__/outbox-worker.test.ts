@@ -302,20 +302,118 @@ describe('Outbox Publisher', () => {
       const handler = vi.fn().mockResolvedValue(undefined);
       const worker = startOutboxWorker(handler, 1000);
 
-      // Immediate processOnce() has entered and is awaiting the hanging findMany.
+      // Immediate processOnce() has entered: по одному проходу на полосу
+      // (общая и Telegram); первый findMany общей полосы висит.
       await Promise.resolve();
-      expect(mocks.mockFindMany).toHaveBeenCalledTimes(1);
+      expect(mocks.mockFindMany).toHaveBeenCalledTimes(2);
 
-      // A tick fires while the first pass is still in flight — must be skipped.
+      // A tick fires while the first pass is still in flight — общая полоса
+      // пропускает его, Telegram-полоса (проход уже завершён) идёт дальше.
       await vi.advanceTimersByTimeAsync(1000);
-      expect(mocks.mockFindMany).toHaveBeenCalledTimes(1);
+      const generalCalls = () => mocks.mockFindMany.mock.calls.filter(([args]) => args.where.type?.notIn);
+      expect(generalCalls()).toHaveLength(1);
 
       // Once the first pass finishes, later ticks run normally again.
       releaseFirstPass();
       await vi.advanceTimersByTimeAsync(1000);
-      expect(mocks.mockFindMany.mock.calls.length).toBeGreaterThan(1);
+      expect(generalCalls().length).toBeGreaterThan(1);
 
       worker.stop();
+    });
+
+    describe('полосы публикации: зависший Telegram не держит остальные события (F7)', () => {
+      const PDF = 'ReportPdfDeliveryRequested';
+      const ALERT = 'NotificationDeliveryRequested';
+
+      /** Мини-outbox в памяти: findMany понимает фильтр type {in|notIn}, updateMany — claim. */
+      function fakeOutbox(events: Array<ReturnType<typeof createOutboxEvent>>) {
+        const rows = new Map(events.map((e) => [e.id, { ...e }]));
+        mocks.mockFindMany.mockImplementation(async (args: { where: { type?: { in?: string[]; notIn?: string[] } } }) => {
+          const t = args.where.type;
+          return [...rows.values()].filter((r) => {
+            if (r.published) return false;
+            if (t?.in) return t.in.includes(r.type);
+            if (t?.notIn) return !t.notIn.includes(r.type);
+            return true;
+          });
+        });
+        mocks.mockUpdateMany.mockImplementation(async (args: { where: { id: string } }) => {
+          const row = rows.get(args.where.id);
+          if (!row || row.published) return { count: 0 };
+          row.published = true;
+          return { count: 1 };
+        });
+        return rows;
+      }
+
+      it('событие, не связанное с Telegram, публикуется, пока доставка PDF висит', async () => {
+        const rows = fakeOutbox([
+          createOutboxEvent({ id: 'pdf-A', type: PDF, aggregateId: 'rep-A', createdAt: new Date(1) }),
+          createOutboxEvent({ id: 'sub-B', type: 'ReportSubmitted', aggregateId: 'rep-B', createdAt: new Date(2) }),
+        ]);
+        let releasePdf!: () => void;
+        const handler = vi.fn((event: { type: string }) =>
+          event.type === PDF ? new Promise<void>((resolve) => { releasePdf = resolve; }) : Promise.resolve(),
+        );
+
+        const worker = startOutboxWorker(handler as never, 1000);
+        await vi.advanceTimersByTimeAsync(1);
+
+        // PDF «зависло» в Telegram, а ReportSubmitted чужого отчёта уже опубликован.
+        expect(rows.get('sub-B')?.published).toBe(true);
+        expect(rows.get('pdf-A')?.published).toBe(false);
+
+        // Повторные тики не запускают зависшую доставку второй раз (ровно один раз).
+        await vi.advanceTimersByTimeAsync(5000);
+        expect(handler.mock.calls.filter(([e]) => e.type === PDF)).toHaveLength(1);
+
+        releasePdf();
+        await vi.advanceTimersByTimeAsync(1);
+        expect(rows.get('pdf-A')?.published).toBe(true);
+        worker.stop();
+      });
+
+      it('доставка уведомлений тоже идёт в своей полосе, общая полоса не ждёт её', async () => {
+        const rows = fakeOutbox([
+          createOutboxEvent({ id: 'alert-1', type: ALERT, aggregateId: 'x', createdAt: new Date(1) }),
+          createOutboxEvent({ id: 'upd-1', type: 'ReportUpdated', aggregateId: 'rep-C', createdAt: new Date(2) }),
+        ]);
+        const handler = vi.fn((event: { type: string }) =>
+          event.type === ALERT ? new Promise<void>(() => {}) : Promise.resolve(),
+        );
+
+        const worker = startOutboxWorker(handler as never, 1000);
+        await vi.advanceTimersByTimeAsync(1);
+
+        expect(rows.get('upd-1')?.published).toBe(true);
+        worker.stop();
+      });
+
+      it('тип PDF-доставки в полосе совпадает с типом, который ставит обработчик отчёта', async () => {
+        const { REPORT_PDF_DELIVERY_EVENT } = await import('@/services/reports/event-handlers');
+        const { TELEGRAM_LANE_EVENT_TYPES } = await import('@/services/reports/outbox-publisher');
+        expect(TELEGRAM_LANE_EVENT_TYPES).toContain(REPORT_PDF_DELIVERY_EVENT);
+        expect(TELEGRAM_LANE_EVENT_TYPES).toContain(ALERT);
+      });
+
+      it('события одной полосы по-прежнему идут по одному и по порядку', async () => {
+        const order: string[] = [];
+        fakeOutbox([
+          createOutboxEvent({ id: 'a', type: 'ReportCreated', aggregateId: 'r', createdAt: new Date(1) }),
+          createOutboxEvent({ id: 'b', type: 'ReportSubmitted', aggregateId: 'r', createdAt: new Date(2) }),
+        ]);
+        const handler = vi.fn(async (event: { id: string }) => {
+          order.push(`start:${event.id}`);
+          await Promise.resolve();
+          order.push(`end:${event.id}`);
+        });
+
+        const worker = startOutboxWorker(handler as never, 1000);
+        await vi.advanceTimersByTimeAsync(1);
+
+        expect(order).toEqual(['start:a', 'end:a', 'start:b', 'end:b']);
+        worker.stop();
+      });
     });
 
     it('stops polling after worker.stop()', async () => {

@@ -28,6 +28,17 @@ function defaultNodeId(): string {
 const RENEW_LEASE = "if redis.call('GET', KEYS[1]) == ARGV[1] then return redis.call('PEXPIRE', KEYS[1], ARGV[2]) end return 0";
 const RELEASE_LEASE = "if redis.call('GET', KEYS[1]) == ARGV[1] then return redis.call('DEL', KEYS[1]) end return 0";
 
+const TIMED_OUT = Symbol('timed out');
+
+/** Stops waiting after `ms`; the request itself is not cancelled, its result is just ignored. */
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | typeof TIMED_OUT> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<typeof TIMED_OUT>((resolve) => {
+    timer = setTimeout(resolve, ms, TIMED_OUT);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
 export class LeaderElection {
   private readonly resource: string;
   private readonly config: LeaderElectionConfig;
@@ -38,6 +49,7 @@ export class LeaderElection {
   private running = false;
   private generation = 0;
   private ownershipVersion = 0;
+  private attempt = 0;
   private acquisition: Promise<void> | null = null;
   private stopping: Promise<void> | null = null;
 
@@ -92,10 +104,16 @@ export class LeaderElection {
     this.loseLeadership('stopped', false);
 
     // Wait for the old request before release; a restart must not race with
-    // cleanup of the same nodeId's lease.
+    // cleanup of the same nodeId's lease. A hung Redis request must not hang
+    // shutdown, so each wait is bounded; TTL cleanup remains the fallback.
     const stopping = (async () => {
-      if (this.acquisition) await this.acquisition;
-      await this.release();
+      if (this.acquisition) {
+        await withTimeout(this.acquisition, this.config.renewInterval);
+        // The old attempt is stale (generation changed); a restart must not
+        // reuse it while it still hangs.
+        this.acquisition = null;
+      }
+      await withTimeout(this.release(), this.config.renewInterval);
       if (shouldLogLeaderElectionLifecycle()) {
         logger.info('Leader election stopped', {
           resource: this.resource,
@@ -146,7 +164,15 @@ export class LeaderElection {
   private async tryAcquire(generation: number): Promise<void> {
     if (!this.running || this.generation !== generation) return;
     if (this.acquisition) return this.acquisition;
-    const acquisition = this.acquire(generation);
+    const attempt = ++this.attempt;
+    // A reply after ttl can never confirm the lease (see the deadline in
+    // acquire), so waiting longer is useless; without this bound one hung
+    // request blocked every later attempt forever. The abandoned attempt is
+    // invalidated so its late reply cannot change leadership.
+    const acquisition = withTimeout(this.acquire(generation, attempt), this.config.ttl)
+      .then((result) => {
+        if (result === TIMED_OUT && this.attempt === attempt) ++this.attempt;
+      });
     this.acquisition = acquisition;
     try {
       await acquisition;
@@ -155,15 +181,16 @@ export class LeaderElection {
     }
   }
 
-  private async acquire(generation: number): Promise<void> {
+  private async acquire(generation: number, attempt: number): Promise<void> {
     // The server may apply the command before its reply arrives. Starting the
     // local deadline before any await never grants more time than Redis's TTL.
     // Monotonic time prevents wall-clock corrections extending the lease.
     const deadline = performance.now() + this.config.ttl;
     const ownershipVersion = this.ownershipVersion;
+    const stale = () => !this.running || this.generation !== generation || this.attempt !== attempt;
     try {
       const client = await getStateRedisClient();
-      if (!this.running || this.generation !== generation) return;
+      if (stale()) return;
       if (!client) {
         this.loseLeadership('Redis unavailable');
         return;
@@ -172,7 +199,7 @@ export class LeaderElection {
       const renewed = await client.eval(
         RENEW_LEASE, 1, this.resource, this.config.nodeId, this.config.ttl,
       );
-      if (!this.running || this.generation !== generation) return;
+      if (stale()) return;
 
       if (this.ownershipVersion !== ownershipVersion) return;
       let ownsLease = renewed === 1;
@@ -184,7 +211,7 @@ export class LeaderElection {
         ) === 'OK';
       }
 
-      if (!this.running || this.generation !== generation) return;
+      if (stale()) return;
       if (this.ownershipVersion !== ownershipVersion) return;
       if (!ownsLease || performance.now() >= deadline) {
         this.loseLeadership('lease not confirmed before deadline');
@@ -208,7 +235,7 @@ export class LeaderElection {
         this.onBecomeLeader?.();
       }
     } catch (err) {
-      if (this.generation !== generation) return;
+      if (this.generation !== generation || this.attempt !== attempt) return;
       this.loseLeadership('Redis request failed');
       logger.error('Leader election: acquire failed', {
         resource: this.resource,

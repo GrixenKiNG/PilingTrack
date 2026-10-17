@@ -126,9 +126,16 @@ export async function moveToDlq(
   }
 }
 
-export async function retryDlqEntry(id: string): Promise<boolean> {
+/**
+ * `already_retried` — запись уже переотправлена (повторный клик): событие не
+ * ставим второй раз, это не ошибка. `not_retriable` — записи нет, её отбросили
+ * или сбой базы.
+ */
+export type DlqRetryResult = 'retried' | 'already_retried' | 'not_retriable';
+
+export async function retryDlqEntry(id: string): Promise<DlqRetryResult> {
   try {
-    return await db.$transaction(async (tx) => {
+    return await db.$transaction(async (tx): Promise<DlqRetryResult> => {
       // Захват записи и постановка события — одна транзакция. Раньше было две
       // отдельные записи: двойной клик или сбой между ними ставил событие
       // в очередь дважды. Кто не захватил строку (count 0) — ничего не делает.
@@ -136,10 +143,13 @@ export async function retryDlqEntry(id: string): Promise<boolean> {
         where: { id, status: 'pending' },
         data: { status: 'resolved' },
       });
-      if (claim.count === 0) return false;
+      if (claim.count === 0) {
+        const current = await tx.deadLetterQueue.findUnique({ where: { id }, select: { status: true } });
+        return current?.status === 'resolved' ? 'already_retried' : 'not_retriable';
+      }
 
       const entry = await tx.deadLetterQueue.findUnique({ where: { id } });
-      if (!entry) return false;
+      if (!entry) return 'not_retriable';
 
       // Новый id (Prisma сгенерирует): entry.id — это id записи DLQ, а не события.
       // dedupeKey не переносим: исходное событие с ним ещё лежит в outbox.
@@ -158,11 +168,11 @@ export async function retryDlqEntry(id: string): Promise<boolean> {
           projected: entry.consumer === 'published',
         },
       });
-      return true;
+      return 'retried';
     });
   } catch (err) {
     logger.error('DLQ retry failed', { id, error: err });
-    return false;
+    return 'not_retriable';
   }
 }
 

@@ -600,7 +600,7 @@ export function BriefingsScreen(props: ReferenceUiProps) {
 
       <BriefingConductDialog
         open={conducting}
-        employees={employees}
+        employees={employees.filter((employee) => employee.id !== props.bootstrap?.actor.id)}
         onClose={() => setConducting(false)}
         onDone={() => { setRows(null); void load(); }}
       />

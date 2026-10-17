@@ -33,6 +33,7 @@ import {
 import type { DefectDto } from '../api/contracts';
 import { card } from '../settings/shared-ui';
 import { CommandDialog } from '../shared/command-dialog';
+import { closeAfterMaintenancePrefill, linkableOrders, linkedOrderOf } from './defect-maintenance-link';
 import { commandFailure } from './shared';
 import type { ReferenceUiProps } from './types';
 
@@ -53,6 +54,15 @@ const ACTION_TITLE = {
   reject: 'Отклонить замечание',
 } as const;
 
+const MAINTENANCE_STATUS_LABEL: Record<string, string> = {
+  PLANNED: 'запланирован',
+  ASSIGNED: 'назначен',
+  IN_PROGRESS: 'в работе',
+  ON_HOLD: 'приостановлен',
+  DONE: 'выполнен',
+  CANCELLED: 'отменён',
+};
+
 /** Текст поля свободного ввода: у каждого действия он значит своё. */
 const ACTION_FIELD = {
   triage: { label: 'Комментарий разбора', required: false, hint: 'Необязательно: что решили и кому передали.' },
@@ -66,6 +76,7 @@ export function DefectsPanel(props: ReferenceUiProps) {
   const [node, setNode] = useState('');
   const [severity, setSeverity] = useState<DefectSeverity>('NORMAL');
   const [text, setText] = useState('');
+  const [orderId, setOrderId] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [showClosed, setShowClosed] = useState(false);
@@ -83,7 +94,7 @@ export function DefectsPanel(props: ReferenceUiProps) {
   const open = forSelected.filter((defect) => defect.status === 'OPEN' || defect.status === 'IN_WORK');
   const shown = showClosed ? forSelected : open;
 
-  const reset = () => { setTitle(''); setNode(''); setSeverity('NORMAL'); setText(''); setError(null); };
+  const reset = () => { setTitle(''); setNode(''); setSeverity('NORMAL'); setText(''); setOrderId(''); setError(null); };
 
   const headers = (extra: Record<string, string> = {}) => ({
     'content-type': 'application/json',
@@ -120,6 +131,7 @@ export function DefectsPanel(props: ReferenceUiProps) {
     setPending(true);
     const body: Record<string, unknown> = { expectedVersion: defect.version };
     if (action === 'triage' && text.trim()) body.comment = text.trim();
+    if (action === 'triage' && orderId) body.maintenanceRecordId = orderId;
     if (action === 'resolve') body.resolution = text.trim();
     if (action === 'reject') body.reason = text.trim();
     const response = await authFetch(`/api/readiness/defects/${defect.id}/${action}`, {
@@ -135,8 +147,9 @@ export function DefectsPanel(props: ReferenceUiProps) {
     props.onRetry();
   };
 
-  const startAction = (defect: DefectDto, action: 'triage' | 'resolve' | 'reject') => {
+  const startAction = (defect: DefectDto, action: 'triage' | 'resolve' | 'reject', prefill = '') => {
     reset();
+    setText(prefill);
     setCommand({ kind: 'action', defect, action });
   };
 
@@ -183,6 +196,8 @@ export function DefectsPanel(props: ReferenceUiProps) {
           </p>
         ) : shown.map((defect) => {
           const blocking = defect.severity === 'CRITICAL' && (defect.status === 'OPEN' || defect.status === 'IN_WORK');
+          const linked = linkedOrderOf(defect, props.maintenance);
+          const closingOrder = linked?.readyToClose ? linked.order : null;
           return (
             <article
               key={defect.id}
@@ -206,6 +221,15 @@ export function DefectsPanel(props: ReferenceUiProps) {
                     {formatDateTimeInTimezone(defect.reportedAt, timezone)}
                   </p>
                   {defect.description ? <p className="mt-1 text-2xs leading-relaxed text-muted-foreground">{defect.description}</p> : null}
+                  {linked ? (
+                    <p className="mt-1 text-2xs leading-relaxed text-muted-foreground">
+                      <b>Наряд ТО:</b>{' '}
+                      <a className="underline" href={`/admin/maintenance/${defect.maintenanceRecordId}`}>
+                        {linked.order ? linked.order.title : 'открыть запись'}
+                      </a>
+                      {linked.order ? ` · ${MAINTENANCE_STATUS_LABEL[linked.order.status] ?? linked.order.status}${linked.order.acceptedAt ? ', принят' : ''}` : ''}
+                    </p>
+                  ) : null}
                   {defect.resolution ? (
                     <p className="mt-1 text-2xs leading-relaxed text-muted-foreground">
                       <b>{defect.status === 'REJECTED' ? 'Причина отклонения' : 'Устранено'}:</b> {defect.resolution}
@@ -240,11 +264,25 @@ export function DefectsPanel(props: ReferenceUiProps) {
                   </Button>
                 </div>
               ) : null}
+              {/*
+                Приёмка наряда ТО дефект сама не закрывает: ремонт завершён ≠
+                препятствие снято (спецификация готовности 2.0, §26). Когда связанный
+                наряд принят, кнопка подсказывает, что пора проверить и закрыть.
+              */}
               {canManage && defect.status === 'IN_WORK' ? (
-                <div className="mt-2 flex flex-wrap gap-2">
-                  <Button type="button" className="h-9 bg-success-strong text-2xs hover:bg-success-strong" onClick={() => startAction(defect, 'resolve')}>
-                    Устранён
-                  </Button>
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  {closingOrder ? (
+                    <>
+                      <Button type="button" className="h-9 bg-success-strong text-2xs hover:bg-success-strong" onClick={() => startAction(defect, 'resolve', closeAfterMaintenancePrefill(closingOrder))}>
+                        Закрыть после ТО
+                      </Button>
+                      <span className="text-3xs text-muted-foreground">Наряд принят — проверьте устранение и закройте дефект.</span>
+                    </>
+                  ) : (
+                    <Button type="button" className="h-9 bg-success-strong text-2xs hover:bg-success-strong" onClick={() => startAction(defect, 'resolve')}>
+                      Устранён
+                    </Button>
+                  )}
                 </div>
               ) : null}
             </article>
@@ -304,6 +342,26 @@ export function DefectsPanel(props: ReferenceUiProps) {
                 </div>
               </fieldset>
             </>
+          ) : null}
+          {command?.kind === 'action' && command.action === 'triage' ? (
+            <label className="grid gap-1 font-medium">
+              Наряд ТО <span className="font-normal text-muted-foreground">(необязательно)</span>
+              <select
+                value={orderId}
+                onChange={(event) => setOrderId(event.target.value)}
+                className="min-h-10 rounded-md border border-input bg-background px-3 font-normal"
+              >
+                <option value="">Без наряда</option>
+                {linkableOrders(props.maintenance, command.defect.equipmentId).map((order) => (
+                  <option key={order.id} value={order.id}>
+                    {order.title} · {MAINTENANCE_STATUS_LABEL[order.status] ?? order.status}
+                  </option>
+                ))}
+              </select>
+              <span className="text-3xs font-normal text-muted-foreground">
+                Связь нужна, чтобы по принятому наряду закрыть дефект одной кнопкой. Позже привязать наряд нельзя.
+              </span>
+            </label>
           ) : null}
           {command ? (
             <label className="grid gap-1 font-medium">

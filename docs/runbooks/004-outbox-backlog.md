@@ -59,8 +59,12 @@ attempts >= 5 → переезд в DeadLetterQueue, флаг текущего c
 
 ## Симптомы
 
-- `/api/health/deep` → `200`, но в `/api/system/status` (админский)
-  `metrics.outboxPending` большой и растёт
+- `/api/health/deep` → `503` (`status: "unhealthy"`), если самое старое
+  необработанное событие старше 5 минут (порог `OUTBOX_STALE_MS`,
+  `src/core/observability/health-tracker/thresholds.ts`); при очереди больше
+  1000 событий, но без застрявших, — `200` (`degraded`). В
+  `/api/system/status` (админский) `metrics.outboxPending` большой и растёт
+  (публичный deep поле outbox не показывает — смотреть общий `status` и код)
 - Проекции (OperatorPerformance, аналитика) не обновляются
 - Realtime-уведомления не приходят
 - В Grafana — рост `outbox_lag_seconds` или `projection_lag_seconds`

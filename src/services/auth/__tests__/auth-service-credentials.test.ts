@@ -14,14 +14,15 @@ import { describe, it, expect, vi, beforeEach, beforeAll } from 'vitest';
 import { hash as bcryptHash } from 'bcryptjs';
 import { createHash } from 'node:crypto';
 
-const { checkMock, resetMock } = vi.hoisted(() => ({
+const { checkMock, resetMock, refundMock } = vi.hoisted(() => ({
   checkMock: vi.fn(),
   resetMock: vi.fn().mockResolvedValue(undefined),
+  refundMock: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock('@/lib/rate-limiter', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/rate-limiter')>();
-  return { ...actual, rateLimiter: { check: checkMock, reset: resetMock } };
+  return { ...actual, rateLimiter: { check: checkMock, reset: resetMock, refund: refundMock } };
 });
 
 const { findUniqueMock, findManyMock, updateMock } = vi.hoisted(() => ({
@@ -65,6 +66,7 @@ beforeEach(() => {
   checkMock.mockReset();
   checkMock.mockResolvedValue(ALLOWED);
   resetMock.mockClear();
+  refundMock.mockClear();
   findUniqueMock.mockReset();
   findManyMock.mockReset();
   findManyMock.mockResolvedValue([]);
@@ -119,6 +121,20 @@ describe('authenticateUserByEmailPassword — кого пускать', () => {
     expect(resetMock).toHaveBeenCalledWith('login:operator@piling.ru:10.0.0.1');
     expect(resetMock).toHaveBeenCalledWith('login-acct:operator@piling.ru');
     expect(resetMock).not.toHaveBeenCalledWith('login-ip:10.0.0.1');
+  });
+
+  it('успешный вход возвращает свою попытку в счётчик по адресу, неудачный — нет (F3 стенда 16.10)', async () => {
+    // Счётчик по адресу считал и успешные входы: на участке с общим Wi-Fi
+    // 22-й машинист получал блок на 30 минут. Возврат ровно одной попытки, а
+    // не сброс: иначе своя учётка обнуляла бы счётчик для перебора чужих.
+    findUniqueMock.mockResolvedValue(userRow());
+
+    await authenticateUserByEmailPassword('operator@piling.ru', 'wrong', '10.0.0.1');
+    expect(refundMock).not.toHaveBeenCalled();
+
+    await authenticateUserByEmailPassword('operator@piling.ru', PASSWORD, '10.0.0.1');
+    expect(refundMock).toHaveBeenCalledOnce();
+    expect(refundMock).toHaveBeenCalledWith('login-ip:10.0.0.1');
   });
 
   it('на неизвестном адресе тратит время на bcrypt, как на известном', async () => {
