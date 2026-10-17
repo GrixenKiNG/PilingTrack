@@ -44,6 +44,15 @@ describe('подпись под записью журнала', () => {
     expect(mocks.update).not.toHaveBeenCalled();
   });
 
+  // Запись «сам себе» (если такая легла до запрета на проведение себе): первой
+  // срабатывает отметка инструктора, она уже стоит, поэтому отметка работника
+  // этим человеком не ставится и запись остаётся неподтверждённой.
+  it('под записью «сам себе» вторая отметка не появляется', async () => {
+    mocks.find.mockResolvedValue(record({userId: 'safety-1', instructorId: 'safety-1'}));
+    expect(await sign('safety-1')).toEqual({alreadySigned: true});
+    expect(mocks.update).not.toHaveBeenCalled();
+  });
+
   it('повторное нажатие время первой отметки не переписывает', async () => {
     mocks.find.mockResolvedValue(record({employeeSignedAt: new Date('2026-10-16T06:00:00Z')}));
     expect(await sign('worker-1')).toEqual({alreadySigned: true});
