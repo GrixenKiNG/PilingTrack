@@ -17,6 +17,7 @@ import {
 import type { CrewSummary, MaintenanceSummary } from './readiness-design-views';
 import type { ActingRole } from '@/lib/types';
 import { TechReadinessModule } from './readiness/tech-readiness-module';
+import { InspectionLayer } from './inspection-layer';
 import { MODULE_TABS, SAFETY_TABS, type ModuleTab } from './readiness/module-tab-list';
 import type { QueryState } from './readiness/boundaries/query-state';
 import {
@@ -898,6 +899,7 @@ export function ToModule({ surface = 'readiness' }: { surface?: ModuleSurface } 
         : { status: 'ready' };
 
   return (
+    <InspectionLayer>
     <TechReadinessModule
       activeView={view}
       onViewChange={changeView}
@@ -916,5 +918,6 @@ export function ToModule({ surface = 'readiness' }: { surface?: ModuleSurface } 
     >
       {referenceUi}
     </TechReadinessModule>
+    </InspectionLayer>
   );
 }
