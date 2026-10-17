@@ -102,12 +102,24 @@ export async function moveToDlq(
         return;
       }
       const { telegramNotifier } = await import('@/core/notifications/telegram');
-      await telegramNotifier.sendMessage(
+      const delivered = await telegramNotifier.sendMessage(
         `⚠️ <b>Dead Letter Queue</b>\n\nСобытие <code>${escapeHtml(eventType)}</code> исчерпало ${attempts} попыток.\n` +
         (aggregateId ? `aggregateId: <code>${escapeHtml(aggregateId)}</code>\n` : '') +
         `Ошибка: <code>${escapeHtml(errorMessage.substring(0, 200))}</code>`
       );
-    })().catch(() => {/* ignore */});
+      // false — канал выключен, не настроен или Telegram недоступен: независимого
+      // канала тревоги нет, так что след остаётся только в логе.
+      if (!delivered) {
+        logger.warn('DLQ alert was not delivered to Telegram', { eventType, outboxId });
+      }
+    })().catch((alertError) => {
+      // Токена в тексте ошибки нет: sendMessage не пробрасывает URL запроса.
+      logger.warn('DLQ alert failed', {
+        eventType,
+        outboxId,
+        error: alertError instanceof Error ? alertError.message : String(alertError),
+      });
+    });
   } catch (dlqError) {
     // Last resort — log to console
     logger.error('DLQ: failed to move event to DLQ', dlqError);

@@ -18,6 +18,11 @@ const mocks = vi.hoisted(() => ({
   mockOutboxCreate: vi.fn().mockResolvedValue({ id: 'outbox-1' }),
   mockUpdateMany: vi.fn().mockResolvedValue({ count: 1 }),
   mockSendMessage: vi.fn().mockResolvedValue(true),
+  mockWarn: vi.fn(),
+}));
+
+vi.mock('@/lib/logger', () => ({
+  logger: { error: vi.fn(), warn: mocks.mockWarn, info: vi.fn(), debug: vi.fn() },
 }));
 
 vi.mock('@/core/notifications/telegram', () => ({
@@ -117,6 +122,36 @@ describe('Dead Letter Queue', () => {
 
     await vi.waitFor(() => expect(mocks.mockSendMessage).toHaveBeenCalled());
     expect(mocks.mockCreate).toHaveBeenCalledWith({ data: expect.objectContaining({ sourceOutboxId: 'outbox-offline' }) });
+  });
+
+  it('пишет предупреждение в лог, когда тревога о DLQ не ушла (Telegram бросил ошибку)', async () => {
+    mocks.mockSendMessage.mockRejectedValueOnce(new Error('Telegram unavailable'));
+    await moveToDlq('outbox-warn-1', 'ReportCreated', 'report-1', {}, new Error('failure'), 5, ORIGIN);
+
+    await vi.waitFor(() => expect(mocks.mockWarn).toHaveBeenCalled());
+    expect(mocks.mockWarn).toHaveBeenCalledWith(
+      expect.stringContaining('DLQ alert'),
+      expect.objectContaining({ eventType: 'ReportCreated', outboxId: 'outbox-warn-1', error: 'Telegram unavailable' }),
+    );
+  });
+
+  it('пишет предупреждение в лог, когда Telegram вернул false (канал выключен или не настроен)', async () => {
+    mocks.mockSendMessage.mockResolvedValueOnce(false);
+    await moveToDlq('outbox-warn-2', 'ReportCreated', null, {}, new Error('failure'), 5, ORIGIN);
+
+    await vi.waitFor(() => expect(mocks.mockWarn).toHaveBeenCalled());
+    expect(mocks.mockWarn).toHaveBeenCalledWith(
+      expect.stringContaining('DLQ alert'),
+      expect.objectContaining({ eventType: 'ReportCreated', outboxId: 'outbox-warn-2' }),
+    );
+  });
+
+  it('не пишет предупреждение, когда тревога о DLQ доставлена', async () => {
+    await moveToDlq('outbox-ok', 'ReportCreated', null, {}, new Error('failure'), 5, ORIGIN);
+
+    await vi.waitFor(() => expect(mocks.mockSendMessage).toHaveBeenCalled());
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(mocks.mockWarn).not.toHaveBeenCalled();
   });
 
   it('повтор сохраняет организацию и будит только упавшего потребителя', async () => {
