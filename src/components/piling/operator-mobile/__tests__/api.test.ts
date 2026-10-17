@@ -249,6 +249,8 @@ describe('sendCommand и отказ по существу', () => {
         setItem: (key: string, value: string) => { store.set(key, value); },
         removeItem: (key: string) => { store.delete(key); },
         clear: () => { store.clear(); },
+        get length() { return store.size; },
+        key: (index: number) => [...store.keys()][index] ?? null,
       },
     });
   });
@@ -311,6 +313,8 @@ describe('sendCommand и CSRF-отказ', () => {
         setItem: (key: string, value: string) => { store.set(key, value); },
         removeItem: (key: string) => { store.delete(key); },
         clear: () => { store.clear(); },
+        get length() { return store.size; },
+        key: (index: number) => [...store.keys()][index] ?? null,
       },
     });
   });
@@ -388,6 +392,8 @@ describe('sendCommand: повод отложения в очереди', () => {
         setItem: (key: string, value: string) => { store.set(key, value); },
         removeItem: (key: string) => { store.delete(key); },
         clear: () => { store.clear(); },
+        get length() { return store.size; },
+        key: (index: number) => [...store.keys()][index] ?? null,
       },
     });
   });
@@ -457,6 +463,8 @@ describe('таймаут запроса', () => {
         setItem: (key: string, value: string) => { store.set(key, value); },
         removeItem: (key: string) => { store.delete(key); },
         clear: () => { store.clear(); },
+        get length() { return store.size; },
+        key: (index: number) => [...store.keys()][index] ?? null,
       },
     });
     timeouts = [];
@@ -789,6 +797,8 @@ describe('ответ 200 без поля data — не успех', () => {
         setItem: (key: string, value: string) => { store.set(key, value); },
         removeItem: (key: string) => { store.delete(key); },
         clear: () => { store.clear(); },
+        get length() { return store.size; },
+        key: (index: number) => [...store.keys()][index] ?? null,
       },
     });
   });
@@ -909,6 +919,8 @@ describe('ошибочный статус без разобранного тел
         setItem: (key: string, value: string) => { store.set(key, value); },
         removeItem: (key: string) => { store.delete(key); },
         clear: () => { store.clear(); },
+        get length() { return store.size; },
+        key: (index: number) => [...store.keys()][index] ?? null,
       },
     });
     vi.stubGlobal('fetch', vi.fn(async () => new Response('<html>502 Bad Gateway</html>', {status: 502})));

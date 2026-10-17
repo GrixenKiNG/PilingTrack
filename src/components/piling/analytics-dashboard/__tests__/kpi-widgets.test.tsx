@@ -126,7 +126,18 @@ describe('buildAnalyticsKpiWidgets: период против «на сегод�
     // R139 №19: значение — только активные установки; №14: объекты включают закрытые.
     expect(screen.getByText('активных в парке на сегодня')).toBeInTheDocument();
     expect(screen.getByText('всего на сегодня, включая закрытые')).toBeInTheDocument();
-    expect(screen.getAllByText('на смене сегодня, включая несданные смены')).toHaveLength(2);
+    // Источник (getFleetSnapshot) берёт только сданные отчёты — тест I05 в
+    // fleet-monitoring.service.test.ts. Подпись не вправе обещать черновики.
+    expect(screen.getAllByText('сдали отчёт сегодня')).toHaveLength(2);
+  });
+
+  it('ни одна дневная плитка не обещает несданные смены: снимок парка считает только сданные', () => {
+    const w = buildAnalyticsKpiWidgets({ ...PERIOD_DATA, period: undefined });
+    for (const id of ['kpi-piles', 'kpi-drilling', 'kpi-downtime', 'kpi-crews', 'kpi-operators']) {
+      render(<>{w[id].render({})}</>);
+    }
+    expect(screen.queryByText(/несданн/)).not.toBeInTheDocument();
+    expect(screen.getAllByText('за сегодня, по сданным отчётам')).toHaveLength(3);
   });
 
   // R139 №21: deltaPct = null (нет прошлого периода с базой) — процент исчезал, и на

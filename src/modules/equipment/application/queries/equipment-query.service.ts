@@ -326,41 +326,60 @@ export async function getFuelSummary(
 
 /**
  * Maintenance records + fleet size for fleet KPI (MTBF/MTTR/availability) over a
- * period. Records are scoped by tenant; the period filters on createdAt so it
- * captures every work order opened in the window. Pure aggregation is in
+ * period. Records are scoped by tenant; `records` are the work orders created in
+ * the window. `carriedOver` are failure orders (REPAIR/FAULT) created BEFORE the
+ * window that still overlap it (open, or closed inside/after its start) — the
+ * calculator uses them for downtime/availability only. Pure aggregation is in
  * lib/fleet-kpi.ts.
  */
 export async function getFleetKpiData(tenantId: string, from: Date, to: Date) {
   if (!tenantId) throw new ServiceError('Не определена организация пользователя', 400); // fail-closed (IDOR guard)
-  const [records, equipmentCount] = await Promise.all([
+  const select = {
+    equipmentId: true,
+    type: true,
+    status: true,
+    startedAt: true,
+    completedAt: true,
+    createdAt: true,
+    scheduledAt: true,
+    cost: true,
+    equipment: { select: { name: true } },
+  } as const;
+  const [records, carriedOver, equipmentCount] = await Promise.all([
     db.maintenanceRecord.findMany({
       where: { tenantId, createdAt: { gte: from, lte: to } },
-      select: {
-        equipmentId: true,
-        type: true,
-        status: true,
-        startedAt: true,
-        completedAt: true,
-        createdAt: true,
-        scheduledAt: true,
-        cost: true,
-        equipment: { select: { name: true } },
+      select,
+    }),
+    db.maintenanceRecord.findMany({
+      where: {
+        tenantId,
+        createdAt: { lt: from },
+        type: { in: ['REPAIR', 'FAULT'] },
+        OR: [
+          // открытый: эффективное начало (startedAt ?? createdAt) не позже конца периода
+          { completedAt: null, OR: [{ startedAt: { lte: to } }, { startedAt: null }] },
+          // закрытый: закончен не раньше начала периода и начат не позже его конца
+          { completedAt: { gte: from }, startedAt: { lte: to } },
+        ],
       },
+      select,
     }),
     db.equipment.count({ where: { tenantId, isActive: true } }),
   ]);
+  const toKpiRecord = (r: (typeof records)[number]) => ({
+    equipmentId: r.equipmentId,
+    equipmentName: r.equipment?.name ?? '—',
+    type: r.type as string,
+    status: r.status as string,
+    startedAt: r.startedAt,
+    completedAt: r.completedAt,
+    createdAt: r.createdAt,
+    scheduledAt: r.scheduledAt,
+    cost: r.cost != null ? Number(r.cost) : null,
+  });
   return {
-    records: records.map((r) => ({
-      equipmentId: r.equipmentId,
-      equipmentName: r.equipment?.name ?? '—',
-      type: r.type as string,
-      status: r.status as string,
-      startedAt: r.startedAt,
-      completedAt: r.completedAt,
-      createdAt: r.createdAt,
-      scheduledAt: r.scheduledAt,
-      cost: r.cost != null ? Number(r.cost) : null,
-    })),
+    records: records.map(toKpiRecord),
+    carriedOver: carriedOver.map(toKpiRecord),
     equipmentCount,
   };
 }

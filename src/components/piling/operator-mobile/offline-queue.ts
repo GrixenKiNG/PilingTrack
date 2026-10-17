@@ -22,11 +22,26 @@
  * маленьких JSON-команд (снимки в неё не попадают), и синхронный доступ без
  * схемы и миграций проще и надёжнее. Любой доступ обёрнут: в приватном режиме
  * хранилище бросает, и падать из-за этого нельзя.
+ *
+ * КАЖДАЯ КОМАНДА — ПОД СВОИМ КЛЮЧОМ. Раньше весь список лежал одним значением, и
+ * любая операция читала его целиком, меняла и писала обратно. Две вкладки (два
+ * процесса браузера) перемежались: A читает, B читает и пишет, A пишет старый
+ * список со своей записью — запись B пропадала (аудит 17.10.2026). Теперь
+ * `enqueue` пишет только свой ключ, а `resolve`/`retry`/`discard`/`markAttempt`
+ * меняют только ключ своей команды; список собирается перечислением ключей.
+ * Оставшийся риск уже другого рода: две вкладки правят ОДНУ и ту же команду
+ * одновременно — худший исход там повторная отправка, а её сервер гасит по
+ * `clientCommandId`.
  */
 
 import {usePilingStore} from '@/lib/store';
 
-const STORAGE_KEY = 'pilingtrack.operator.queue.v1';
+/** Прежний общий ключ (весь список одним значением): читается только для переноса. */
+const LEGACY_KEY = 'pilingtrack.operator.queue.v1';
+/** Приставка ключа отдельной команды: `<приставка><clientCommandId>`. */
+const COMMAND_PREFIX = `${LEGACY_KEY}:cmd:`;
+/** Куда уходят элементы старого списка, которые не похожи на команду (их нельзя ни разложить, ни стереть). */
+const UNMIGRATED_PREFIX = `${LEGACY_KEY}:unmigrated:`;
 
 /** `FAILED` — сервер отказал по существу: нужно решение человека, не повтор. */
 export type QueuedCommandState = 'PENDING' | 'FAILED';
@@ -207,18 +222,128 @@ export class QueueOwnershipError extends Error {
   }
 }
 
-function read(strict = false): QueuedCommand[] {
+function getStorage(): Storage | undefined {
   try {
-    const raw = globalThis.localStorage?.getItem(STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw) as unknown;
-    if (!Array.isArray(parsed)) throw new QueueStorageError();
-    return parsed as QueuedCommand[];
+    return globalThis.localStorage ?? undefined;
   } catch {
-    if (strict) throw new QueueStorageError();
-    // Reading the badge must not crash the screen; enqueue uses strict reads.
+    return undefined;
+  }
+}
+
+function commandKey(clientCommandId: string): string {
+  return `${COMMAND_PREFIX}${clientCommandId}`;
+}
+
+function isStoredCommand(value: unknown): value is QueuedCommand {
+  return typeof value === 'object' && value !== null
+    && typeof (value as QueuedCommand).clientCommandId === 'string'
+    && typeof (value as QueuedCommand).queuedAt === 'string';
+}
+
+/**
+ * Прочитать одну команду строго: `null` — записи нет, `QueueStorageError` —
+ * значение есть, но не читается.
+ *
+ * Нестрогое чтение превращает испорченное значение в «записи нет», и запись
+ * поверх него стирала бы неотправленные сваи. Если прочитать нельзя — ничего
+ * не пишем: лучше оставить как есть, чем затереть. Строгость теперь у каждого
+ * ключа своя: одна испорченная запись не трогает остальные.
+ */
+function readCommand(storage: Storage, clientCommandId: string): QueuedCommand | null {
+  try {
+    const raw = storage.getItem(commandKey(clientCommandId));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as unknown;
+    if (!isStoredCommand(parsed) || parsed.clientCommandId !== clientCommandId) throw new QueueStorageError();
+    return parsed;
+  } catch {
+    throw new QueueStorageError();
+  }
+}
+
+/** Положить элемент старого списка под свой ключ; `false` — не удалось убедиться, что он на месте. */
+function copyLegacyItem(storage: Storage, item: QueuedCommand): boolean {
+  const key = commandKey(item.clientCommandId);
+  const existing = storage.getItem(key);
+  if (existing) {
+    // Запись под своим ключом новее старого списка (его мог оставить старый
+    // код): её не трогаем, лишь убеждаемся, что она читается.
+    try {
+      return isStoredCommand(JSON.parse(existing));
+    } catch {
+      return false;
+    }
+  }
+  const value = JSON.stringify(item);
+  storage.setItem(key, value);
+  return storage.getItem(key) === value;
+}
+
+/**
+ * Разложить старый общий список по ключам команд.
+ *
+ * Зовётся при каждом обращении: старый ключ нужен, пока он есть, а если его
+ * после переноса снова положит открытая вкладка со старым кодом, он будет
+ * разобран при следующем чтении (записи под своим ключом при этом не
+ * перезаписываются). Старый ключ удаляется только после того, как каждая
+ * команда прочитана обратно с нового места; при любой ошибке он остаётся как
+ * есть и перенос повторится — ничего не стирается. Испорченный старый список
+ * не трогаем вовсе.
+ */
+function migrateLegacy(storage: Storage): void {
+  try {
+    const raw = storage.getItem(LEGACY_KEY);
+    if (!raw) return;
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return;
+    const unrecognized: unknown[] = [];
+    for (const item of parsed) {
+      if (!isStoredCommand(item)) {
+        unrecognized.push(item);
+      } else if (!copyLegacyItem(storage, item)) {
+        return;
+      }
+    }
+    if (unrecognized.length > 0) {
+      const value = JSON.stringify(unrecognized);
+      const key = `${UNMIGRATED_PREFIX}${Date.now()}:${Math.random().toString(36).slice(2)}`;
+      storage.setItem(key, value);
+      if (storage.getItem(key) !== value) return;
+    }
+    storage.removeItem(LEGACY_KEY);
+  } catch {
+    // Старый список остался на месте целым; перенос повторится при следующем обращении.
+  }
+}
+
+/** Все читаемые команды по порядку постановки; испорченные записи пропускаются, а не стираются. */
+function readAll(): QueuedCommand[] {
+  const storage = getStorage();
+  if (!storage) return [];
+  migrateLegacy(storage);
+  const keys: string[] = [];
+  try {
+    for (let index = 0; index < storage.length; index += 1) {
+      const key = storage.key(index);
+      if (key?.startsWith(COMMAND_PREFIX)) keys.push(key);
+    }
+  } catch {
+    // Reading the badge must not crash the screen; enqueue does not depend on it.
     return [];
   }
+  const items: QueuedCommand[] = [];
+  for (const key of keys) {
+    try {
+      const parsed = JSON.parse(storage.getItem(key) as string) as unknown;
+      if (isStoredCommand(parsed) && key === commandKey(parsed.clientCommandId)) items.push(parsed);
+    } catch {
+      // Испорченную запись не показываем и не трогаем.
+    }
+  }
+  return items.sort((a, b) => {
+    if (a.queuedAt !== b.queuedAt) return a.queuedAt < b.queuedAt ? -1 : 1;
+    return a.clientCommandId < b.clientCommandId ? -1 : 1;
+  });
 }
 
 function currentOwnerId(): string | null {
@@ -229,18 +354,25 @@ function isMine(item: QueuedCommand): boolean {
   return !item.ownerId || item.ownerId === currentOwnerId();
 }
 
-function write(queue: QueuedCommand[]): void {
-  let storage: Storage | undefined;
-  try {
-    storage = globalThis.localStorage;
-  } catch {
-    storage = undefined;
-  }
+/** Записать команду под её ключом и прочитать обратно: молча проглоченную запись считаем ошибкой. */
+function writeCommand(storage: Storage | undefined, item: QueuedCommand): void {
   if (!storage) throw new QueueStorageError('unavailable');
+  const key = commandKey(item.clientCommandId);
   try {
-    const value = JSON.stringify(queue);
-    storage.setItem(STORAGE_KEY, value);
-    if (storage.getItem(STORAGE_KEY) !== value) throw new QueueStorageError();
+    const value = JSON.stringify(item);
+    storage.setItem(key, value);
+    if (storage.getItem(key) !== value) throw new QueueStorageError();
+  } catch {
+    throw new QueueStorageError();
+  }
+  notify();
+}
+
+function removeCommand(storage: Storage, clientCommandId: string): void {
+  const key = commandKey(clientCommandId);
+  try {
+    storage.removeItem(key);
+    if (storage.getItem(key)) throw new QueueStorageError();
   } catch {
     throw new QueueStorageError();
   }
@@ -248,20 +380,26 @@ function write(queue: QueuedCommand[]): void {
 }
 
 /**
- * Изменить очередь, прочитав её строго.
- *
- * Нестрогое чтение превращает испорченное значение в пустой список, и запись
- * этого списка стирала бы все неотправленные сваи разом. Если прочитать
- * нельзя — ничего не пишем: лучше оставить как есть, чем затереть.
+ * Изменить одну команду, прочитав её строго. `change` возвращает новую запись,
+ * `null` — убрать, `undefined` — оставить как есть. Других команд не касаемся.
  */
-function mutate(change: (queue: QueuedCommand[]) => QueuedCommand[]): void {
-  let queue: QueuedCommand[];
+function mutate(
+  clientCommandId: string,
+  change: (item: QueuedCommand) => QueuedCommand | null | undefined,
+): void {
+  const storage = getStorage();
+  if (!storage) return;
+  migrateLegacy(storage);
+  let item: QueuedCommand | null;
   try {
-    queue = read(true);
+    item = readCommand(storage, clientCommandId);
   } catch {
     return;
   }
-  write(change(queue));
+  if (!item) return;
+  const next = change(item);
+  if (next === null) removeCommand(storage, clientCommandId);
+  else if (next) writeCommand(storage, next);
 }
 
 // --- Подписка для интерфейса ---
@@ -275,7 +413,7 @@ function notify(): void {
 // Вторая вкладка того же браузера пишет в то же хранилище: без этого экран
 // первой показывал бы очередь, которой уже нет.
 function onStorage(event: StorageEvent): void {
-  if (event.key === null || event.key === STORAGE_KEY) notify();
+  if (event.key === null || event.key.startsWith(LEGACY_KEY)) notify();
 }
 
 export function subscribeQueue(listener: () => void): () => void {
@@ -288,7 +426,7 @@ export function subscribeQueue(listener: () => void): () => void {
 }
 
 export function readQueue(): QueuedCommand[] {
-  return read().filter(isMine);
+  return readAll().filter(isMine);
 }
 
 export function pendingCount(): number {
@@ -304,7 +442,7 @@ export function pendingCount(): number {
  * Сменщику показываем, что они лежат, чтобы он сообщил хозяину или мастеру.
  */
 export function foreignQueueSummary(): {count: number; owners: string[]} {
-  const foreign = read().filter((item) => !isMine(item));
+  const foreign = readAll().filter((item) => !isMine(item));
   const owners = [...new Set(foreign.map((item) => item.ownerName).filter((name): name is string => !!name))];
   return {count: foreign.length, owners};
 }
@@ -330,20 +468,23 @@ export function foreignQueueSummary(): {count: number; owners: string[]} {
  * поздний ответ на старую отправку узнаёт, что запись уже другая.
  */
 export function enqueue(command: {clientCommandId: string}): void {
-  const queue = read(true);
-  const existing = queue.find((item) => item.clientCommandId === command.clientCommandId);
+  const storage = getStorage();
+  if (storage) migrateLegacy(storage);
+  const existing = storage ? readCommand(storage, command.clientCommandId) : null;
   if (existing) {
     if (existing.state !== 'FAILED') return;
     if (!isMine(existing)) throw new QueueOwnershipError();
-    existing.command = command;
-    existing.label = commandLabel(command);
-    existing.state = 'PENDING';
-    existing.lastError = null;
-    existing.queuedAt = new Date().toISOString();
-    write(queue);
+    writeCommand(storage, {
+      ...existing,
+      command,
+      label: commandLabel(command),
+      state: 'PENDING',
+      lastError: null,
+      queuedAt: new Date().toISOString(),
+    });
     return;
   }
-  queue.push({
+  writeCommand(storage, {
     ownerId: currentOwnerId(),
     ownerName: usePilingStore.getState().currentUser?.name ?? null,
     clientCommandId: command.clientCommandId,
@@ -354,7 +495,6 @@ export function enqueue(command: {clientCommandId: string}): void {
     state: 'PENDING',
     lastError: null,
   });
-  write(queue);
 }
 
 /**
@@ -367,9 +507,8 @@ export function enqueue(command: {clientCommandId: string}): void {
  * Не передан — поведение прежнее.
  */
 export function resolve(clientCommandId: string, expectedQueuedAt?: string): void {
-  mutate((queue) => queue.filter((item) =>
-    item.clientCommandId !== clientCommandId
-    || (expectedQueuedAt !== undefined && item.queuedAt !== expectedQueuedAt)));
+  mutate(clientCommandId, (item) =>
+    expectedQueuedAt !== undefined && item.queuedAt !== expectedQueuedAt ? undefined : null);
 }
 
 /**
@@ -381,9 +520,7 @@ export function resolve(clientCommandId: string, expectedQueuedAt?: string): voi
  * вызывающий (`useOfflineQueue`).
  */
 export function retry(clientCommandId: string): void {
-  mutate((queue) => queue.map((item) => item.clientCommandId === clientCommandId
-    ? {...item, state: 'PENDING' as const, lastError: null}
-    : item));
+  mutate(clientCommandId, (item) => ({...item, state: 'PENDING' as const, lastError: null}));
 }
 
 /**
@@ -396,8 +533,7 @@ export function retry(clientCommandId: string): void {
  * Ждущие отправки записи так не убрать — они ещё могут уйти.
  */
 export function discard(clientCommandId: string): void {
-  mutate((queue) => queue.filter((item) =>
-    item.clientCommandId !== clientCommandId || item.state !== 'FAILED'));
+  mutate(clientCommandId, (item) => (item.state === 'FAILED' ? null : undefined));
 }
 
 /**
@@ -411,12 +547,11 @@ export function discard(clientCommandId: string): void {
 export function markAttempt(
   clientCommandId: string, error: string | null, permanent: boolean, expectedQueuedAt?: string,
 ): void {
-  mutate((queue) => queue.map((item) => {
-    if (item.clientCommandId !== clientCommandId) return item;
-    if (expectedQueuedAt !== undefined && item.queuedAt !== expectedQueuedAt) return item;
+  mutate(clientCommandId, (item) => {
+    if (expectedQueuedAt !== undefined && item.queuedAt !== expectedQueuedAt) return undefined;
     return {...item, attempts: item.attempts + 1, lastError: error,
       state: permanent ? 'FAILED' as const : 'PENDING' as const};
-  }));
+  });
 }
 
 let inFlight: Promise<{sent: number; left: number}> | null = null;
