@@ -27,6 +27,8 @@ const mocks = vi.hoisted(() => ({
 
   // PDF
   mockRedisOptions: vi.fn(),
+  // Созданные соединения: тест рабочего восстановления PDF переключает status.
+  redisInstances: [] as Array<{ status: string }>,
   mockBullMQWorker: vi.fn(),
   // Один и тот же объект воркера на все тесты: фабрика vi.mock('bullmq')
   // выполняется заново после каждого resetModules и перезаписала бы
@@ -149,7 +151,11 @@ vi.mock('bullmq', () => ({
 
 vi.mock('ioredis', () => ({
   default: class MockRedis {
-    constructor(url: string, options: unknown) { mocks.mockRedisOptions(url, options); }
+    status = 'ready';
+    constructor(url: string, options: unknown) {
+      mocks.mockRedisOptions(url, options);
+      mocks.redisInstances.push(this);
+    }
     async quit() {}
   },
 }));
@@ -411,6 +417,45 @@ describe('Unified Worker Service', { timeout: 30_000 }, () => {
       } finally {
         vi.useRealTimers();
         delete process.env.IDEMPOTENCY_CLEANUP_ENABLED;
+      }
+    });
+  });
+
+  describe('PDF-воркер после недоступности Redis (F6 стенда 16.10)', () => {
+    /*
+      BullMQ шлёт 'error' на каждую ошибку соединения (getaddrinfo ENOTFOUND redis),
+      а сам соединение ioredis переоткрывает. Событие «снова работает» у воркера
+      нет, а из error в running вело только 'completed' — при пустой очереди
+      статус не снимался никогда, /health отвечал 503, контейнер оставался unhealthy.
+    */
+    it('возвращает статус running, когда соединение снова готово, без новых задач', async () => {
+      vi.useFakeTimers();
+      try {
+        const { startPdf } = await import('@/workers/unified-worker/pdf');
+        const { workerStates } = await import('@/workers/unified-worker/state');
+        await startPdf();
+
+        const redis = mocks.redisInstances.at(-1);
+        const errorHandler = mocks.mockPdfWorker.on.mock.calls.find(([event]) => event === 'error')?.[1];
+        if (!redis || typeof errorHandler !== 'function') throw new Error('PDF-воркер не подписан на error');
+        expect(workerStates.pdf.status).toBe('running');
+
+        // Redis остановлен: соединение переподключается, воркер сообщает об ошибке.
+        redis.status = 'reconnecting';
+        errorHandler(new Error('getaddrinfo ENOTFOUND redis'));
+        expect(workerStates.pdf.status).toBe('error');
+
+        // Пока Redis недоступен, статус не снимаем.
+        await vi.advanceTimersByTimeAsync(60_000);
+        expect(workerStates.pdf.status).toBe('error');
+
+        // Redis вернулся, задач нет: ближайший тик пульса обязан снять ошибку.
+        redis.status = 'ready';
+        await vi.advanceTimersByTimeAsync(30_000);
+        expect(workerStates.pdf.status).toBe('running');
+        expect(workerStates.pdf.error).toBeNull();
+      } finally {
+        vi.useRealTimers();
       }
     });
   });
