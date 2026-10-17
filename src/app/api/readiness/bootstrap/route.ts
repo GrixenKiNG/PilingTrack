@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { ServiceError } from '@/lib/service-error';
 import { attachRequestIdHeader, getRequestId } from '@/lib/request-context';
-import { canActAs, isActingRole } from '@/lib/types';
+import { isActingRole } from '@/lib/types';
 import { can } from '@/services/auth/authorization-service';
 import { queryReadinessBootstrap } from '@/modules/readiness/application/bootstrap-query';
 import { withReadinessRequestTransaction } from '@/modules/readiness/infrastructure/tenant-transaction';
@@ -26,17 +26,14 @@ async function handleGet(request: NextRequest) {
   // Проверка выше сужает тип, но сужение свойства не переживает вход в
   // замыкание ниже — там стояло `user.tenantId!`. Константа сужается честно.
   const tenantId = user.tenantId;
-  const searchParams = new URL(request.url).searchParams;
-  const actingAs = searchParams.get('actingAs');
-  if (
-    searchParams.size > (actingAs === null ? 0 : 1)
-    || (actingAs !== null && !isActingRole(actingAs))
-  ) {
+  // Контекст из строки запроса не принимается вовсе. Исполняемая роль — только
+  // из сессии: `requireAuth` уже сверил заголовок `x-acting-as` (замещать может
+  // лишь администратор и лишь известной ролью) — как в остальных маршрутах
+  // контура, см. `_shared/request-context.ts`.
+  if (new URL(request.url).searchParams.size > 0) {
     return response({ error: 'Контекст, заданный клиентом, не принимается' }, 400, requestId);
   }
-  if (!canActAs(user.role, actingAs)) {
-    return response({ error: 'Нет доступа к контуру технической готовности' }, 403, requestId);
-  }
+  const actingAs = isActingRole(user.actingAs) ? user.actingAs : null;
 
   try {
     const data = await withReadinessRequestTransaction(tenantId, (tx) =>

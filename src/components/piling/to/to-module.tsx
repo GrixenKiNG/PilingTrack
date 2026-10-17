@@ -408,10 +408,9 @@ export function ToModule({ surface = 'readiness' }: { surface?: ModuleSurface } 
     setDefectsError(null);
     setRulesAvailable(false);
     try {
-      let readinessBootstrap = await fetchReadinessBootstrap({ signal: controller.signal });
-      if (actingAs && readinessBootstrap.actor.role === 'ADMIN') {
-        readinessBootstrap = await fetchReadinessBootstrap({ signal: controller.signal, actingAs });
-      }
+      // Роль замещения уходит заголовком `x-acting-as` из `authFetch`, сервер
+      // берёт её из сессии — повторный запрос с ролью не нужен.
+      const readinessBootstrap = await fetchReadinessBootstrap({ signal: controller.signal });
       if (controller.signal.aborted) return;
       setBootstrap(readinessBootstrap);
       // Спрашиваем только то, что роли положено. Раньше здесь стоял один
@@ -606,6 +605,7 @@ export function ToModule({ surface = 'readiness' }: { surface?: ModuleSurface } 
         setLoading(false);
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- actingAs: смена режима «Действую как» должна пересоздать загрузчик и перезагрузить раздел (заголовок читается из хранилища при запросе)
   }, [readinessFilters, actingAs]);
 
   const loadMorePermits = useCallback(async () => {
