@@ -107,12 +107,26 @@ async function connectClient(slot: ClientSlot): Promise<Redis | null> {
     if (slot.client === client) slot.client = null;
   });
 
+  let timer: ReturnType<typeof setTimeout> | undefined;
   try {
-    await client.connect();
+    // connectTimeout ioredis ограничивает только TCP-фазу. Сервер, который принял
+    // сокет и молчит на handshake, держал бы общий промис вечно — вместе со
+    // всеми, кто его ждёт (кэш, пульс, лидер outbox; рецензия N17-22).
+    await Promise.race([
+      client.connect(),
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(
+          () => reject(new Error('Redis handshake timed out')),
+          CACHE_CONNECT_TIMEOUT * 2,
+        );
+      }),
+    ]);
   } catch (err) {
     logger.error('Redis: initial connect failed', err instanceof Error ? err : new Error(String(err)));
     client.disconnect();
     return null;
+  } finally {
+    clearTimeout(timer);
   }
 
   slot.client = client;

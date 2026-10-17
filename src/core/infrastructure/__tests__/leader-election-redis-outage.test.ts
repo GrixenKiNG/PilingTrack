@@ -157,6 +157,25 @@ describe('LeaderElection: недоступность Redis (F1)', () => {
     await closeRedisConnection().catch(() => undefined);
   });
 
+  it('подключение к Redis, который принял сокет, но молчит, не виснет вечно', async () => {
+    // Рецензия N17-22: connect() без ответа на handshake не завершается ни
+    // успехом, ни ошибкой, и все потребители слота (кэш, пульс, лидер) ждали бы
+    // один и тот же промис до перезапуска.
+    await fake.stop();
+    const silent = net.createServer((socket) => { socket.on('error', () => undefined); });
+    await new Promise<void>((resolve) => silent.listen(Number(new URL(process.env.REDIS_URL!).port), '127.0.0.1', resolve));
+    try {
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+      const { getStateRedisClient } = await import('@/lib/redis-cache');
+      const pending = getStateRedisClient();
+      await vi.advanceTimersByTimeAsync(30_000);
+      expect(await pending).toBeNull();
+    } finally {
+      vi.useRealTimers();
+      await new Promise<void>((resolve) => silent.close(() => resolve()));
+    }
+  }, 30_000);
+
   it('возвращает лидерство после того, как Redis был выключен и снова включён', async () => {
     const { LeaderElection } = await import('../leader-election');
     // Параллельный потребитель клиента (лимитер, пульс) — как в app и workers.
