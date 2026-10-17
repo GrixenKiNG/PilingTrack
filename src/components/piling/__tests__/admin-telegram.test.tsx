@@ -76,6 +76,17 @@ describe('AdminTelegram: «Тест» проверяет свой канал (R1
     expect(JSON.parse(String(init.body))).toEqual({ configId: 'cfg-old' });
   });
 
+  it('«Тест» доступен у выключенного канала — можно проверить, что причина устранена', async () => {
+    const buttons = await renderWithChannels([config({ id: 'cfg-off', enabled: false })]);
+
+    expect(buttons[0]).toBeEnabled();
+    fireEvent.click(buttons[0]);
+
+    await waitFor(() => expect(posts()).toHaveLength(1));
+    const [, init] = posts()[0] as [string, RequestInit];
+    expect(JSON.parse(String(init.body))).toEqual({ configId: 'cfg-off' });
+  });
+
   it('спиннер крутится только на нажатой карточке', async () => {
     const buttons = await renderWithChannels([
       config({ id: 'cfg-new', label: 'Ночной чат' }),
