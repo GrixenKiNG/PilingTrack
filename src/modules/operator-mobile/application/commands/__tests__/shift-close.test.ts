@@ -202,48 +202,26 @@ describe('closeShift — правила закрытия', () => {
     expect(tx.shift.update).not.toHaveBeenCalled();
   });
 
+  // Решение владельца 17.10.2026: простой не мешает закрыть смену, как бы он ни
+  // сравнивался с её длиной. Машинист мог ошибиться в единицах (минуты вместо часов);
+  // такая смена закрывается, а простой правят в записях смены и в отчёте.
   // Смена в этих тестах — 12 часов (11:00 → 23:00 по Москве).
-  describe('простой не длиннее смены (то же правило, что у правки отчёта)', () => {
-    it('простой больше смены не даёт закрыть её и ничего не пишет', async () => {
-      tx.reportDowntime.aggregate.mockResolvedValue({_sum: {duration: 13}});
-
-      await expect(closeShift(input)).rejects.toMatchObject({
-        status: 409,
-        message: expect.stringContaining('больше самой смены'),
-      });
-      expect(tx.report.updateMany).not.toHaveBeenCalled();
-      expect(tx.shift.update).not.toHaveBeenCalled();
-      expect(writeReportAuditRow).not.toHaveBeenCalled();
-    });
-
-    it('считает простой этой смены в этой организации', async () => {
-      await closeShift(input);
-
-      expect(tx.reportDowntime.aggregate).toHaveBeenCalledWith({
-        _sum: {duration: true},
-        where: {tenantId: 'tenant-a', shiftId: input.shiftId},
-      });
-    });
-
-    it.each([[0], [3], [12]])('простой %s ч в смене на 12 ч проходит', async (hours) => {
+  describe('простой не мешает закрыть смену', () => {
+    it.each([[0], [3], [12], [13], [99]])('простой %s ч в смене на 12 ч — смена закрывается', async (hours) => {
       tx.reportDowntime.aggregate.mockResolvedValue({_sum: {duration: hours}});
 
       await expect(closeShift(input)).resolves.toMatchObject({ok: true});
+      expect(tx.shift.update).toHaveBeenCalledWith(expect.objectContaining({
+        data: expect.objectContaining({state: 'CLOSED'}),
+      }));
     });
 
-    it('смена сутки и более: часы и минуты её не различают — не судим', async () => {
-      tx.shift.findFirst.mockResolvedValue(shiftRow({startedAt: new Date('2026-09-25T07:00:00.000Z')}));
-      tx.reportDowntime.aggregate.mockResolvedValue({_sum: {duration: 10}});
+    it('закрытие не сравнивает простой с длиной смены', async () => {
+      tx.reportDowntime.aggregate.mockResolvedValue({_sum: {duration: 2}});
+      tx.shift.findFirst.mockResolvedValue(shiftRow({startedAt: new Date('2026-09-26T19:56:00.000Z')}));
 
       await expect(closeShift(input)).resolves.toMatchObject({ok: true});
       expect(tx.reportDowntime.aggregate).not.toHaveBeenCalled();
-    });
-
-    it('смена без времени начала проходит: сравнивать не с чем', async () => {
-      tx.shift.findFirst.mockResolvedValue(shiftRow({startedAt: null}));
-      tx.reportDowntime.aggregate.mockResolvedValue({_sum: {duration: 99}});
-
-      await expect(closeShift(input)).resolves.toMatchObject({ok: true});
     });
   });
 
