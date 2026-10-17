@@ -333,3 +333,60 @@ describe('Наряд с двумя обязательными подписями
     expect(screen.queryByText(/Вы уже подписали/)).toBeNull();
   });
 });
+
+describe('неполный список нарядов', () => {
+  const overdue: WorkPermitDto = {...pendingPermit, id: 'permit-over111', validFrom: '2020-01-01T00:00:00Z', validTo: '2020-01-02T00:00:00Z'};
+
+  it('полный список не показывает ни подписи «показано N из M», ни кнопки', () => {
+    render(<PermitsScreen {...makeProps({permits: [pendingPermit], permitsPage: {total: 1, hasMore: false}, onLoadMorePermits: vi.fn()})} />);
+    expect(screen.queryByText(/Показано/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', {name: 'Показать ещё'})).not.toBeInTheDocument();
+  });
+
+  it('показывает «показано N из M», помечает счётчик просроченных как неполный и подгружает ещё', async () => {
+    const onLoadMorePermits = vi.fn().mockResolvedValue(undefined);
+    render(<PermitsScreen {...makeProps({permits: [overdue], permitsPage: {total: 450, hasMore: true}, onLoadMorePermits})} />);
+    expect(screen.getByRole('status')).toHaveTextContent('Показано 1 из 450 нарядов');
+    expect(screen.getByRole('button', {name: 'Просроченные (1+)'})).toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent('Просрочено нарядов-допусков: не менее 1');
+    fireEvent.click(screen.getByRole('button', {name: 'Показать ещё'}));
+    await waitFor(() => expect(onLoadMorePermits).toHaveBeenCalledOnce());
+  });
+
+  it('блокирует повторное нажатие, пока страница грузится, и показывает отказ загрузки', async () => {
+    let reject: (error: Error) => void = () => undefined;
+    const onLoadMorePermits = vi.fn(() => new Promise<void>((_, fail) => { reject = fail; }));
+    render(<PermitsScreen {...makeProps({permits: [overdue], permitsPage: {total: 450, hasMore: true}, onLoadMorePermits})} />);
+    fireEvent.click(screen.getByRole('button', {name: 'Показать ещё'}));
+    expect(await screen.findByRole('button', {name: 'Загружаем…'})).toBeDisabled();
+    reject(new Error('сеть'));
+    expect(await screen.findByText('Не удалось загрузить следующие наряды. Повторите попытку.')).toBeInTheDocument();
+    expect(screen.getByRole('button', {name: 'Показать ещё'})).not.toBeDisabled();
+    expect(onLoadMorePermits).toHaveBeenCalledOnce();
+  });
+});
+
+describe('закрытие просроченного наряда', () => {
+  const bootstrap = () => {
+    const data = bootstrapEnvelope().data;
+    data.capabilities.entities.permit.edit = true;
+    return data;
+  };
+  const started: WorkPermitDto = {...pendingPermit, state: 'APPROVED', validFrom: '2020-01-01T00:00:00Z'};
+
+  it('в диалоге называет закрытие по сроку, а не «работы закончены»', async () => {
+    render(<PermitsScreen {...makeProps({bootstrap: bootstrap(), permits: [{...started, validTo: '2020-01-02T00:00:00Z'}]})} />);
+    fireEvent.click(screen.getByRole('button', {name: 'Просроченные (1)'}));
+    fireEvent.click(screen.getAllByRole('button', {name: 'Закрыть наряд'})[0]);
+    const dialog = within(await screen.findByRole('dialog'));
+    expect(dialog.getByText(/Срок наряда вышел/)).toBeInTheDocument();
+    expect(dialog.queryByText(/Работы закончены/)).not.toBeInTheDocument();
+  });
+
+  it('у действующего наряда спрашивает про завершение работ', async () => {
+    render(<PermitsScreen {...makeProps({bootstrap: bootstrap(), permits: [started]})} />);
+    fireEvent.click(screen.getAllByRole('button', {name: 'Закрыть наряд'})[0]);
+    const dialog = within(await screen.findByRole('dialog'));
+    expect(dialog.getByText(/Работы закончены/)).toBeInTheDocument();
+  });
+});

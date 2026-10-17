@@ -99,6 +99,14 @@ export interface ReferenceUiProps {
   bootstrap: ReadinessBootstrap | null;
   shifts: ReadinessShiftDto[];
   permits: WorkPermitDto[];
+  /**
+   * Сколько нарядов всего под серверными фильтрами и есть ли ещё страницы. Сервер
+   * отдаёт наряды страницами по 200: без этого экран выдавал бы первые 200 за
+   * весь список, а счётчики — за итоги.
+   */
+  permitsPage?: { total: number; hasMore: boolean };
+  /** Подгружает следующую страницу нарядов; при сбое бросает ошибку. */
+  onLoadMorePermits?: () => Promise<void>;
   defects: DefectDto[];
   /**
    * Отказ чтения журнала дефектов — отдельный источник (F-N1005-DEFECTS-UNKNOWN).
