@@ -22,14 +22,18 @@ export function OperatorChecklistHistory({ equipmentId, onlyEo = false, title }:
 }) {
   const [rows, setRows] = useState<EquipmentChecklistRow[] | null>(null);
   const [failed, setFailed] = useState(false);
+  // 403: у текущей роли нет права читать осмотры установки — это не сбой загрузки.
+  const [forbidden, setForbidden] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     // eslint-disable-next-line react-hooks/set-state-in-effect -- resets the list when the equipment changes before the new one loads
     setRows(null);
     setFailed(false);
+    setForbidden(false);
     authFetch(`/api/equipment/${encodeURIComponent(equipmentId)}/operator-checklists`)
       .then(async (response) => {
+        if (response.status === 403) { if (!cancelled) setForbidden(true); return; }
         if (!response.ok) throw new Error(String(response.status));
         const body = await response.json() as { records?: EquipmentChecklistRow[] };
         if (!cancelled) setRows(body.records ?? []);
@@ -44,7 +48,9 @@ export function OperatorChecklistHistory({ equipmentId, onlyEo = false, title }:
     <section aria-label={title} className="mt-4">
       <h3 className="text-sm font-semibold text-foreground">{title}</h3>
       <p className="mb-2 text-xs text-muted-foreground">Проходит машинист на своём экране перед сменой и после неё.</p>
-      {failed ? (
+      {forbidden ? (
+        <p className="rounded-lg bg-muted px-3 py-2 text-sm text-muted-foreground">Осмотры машиниста недоступны текущей роли.</p>
+      ) : failed ? (
         <p role="alert" className="rounded-lg bg-warning/10 px-3 py-2 text-sm text-warning-strong">Не удалось загрузить осмотры машиниста.</p>
       ) : rows === null ? (
         <p className="rounded-lg bg-muted px-3 py-2 text-sm text-muted-foreground">Загрузка…</p>

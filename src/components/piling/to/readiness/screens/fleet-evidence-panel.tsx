@@ -6,6 +6,7 @@ import { PilingIcon, type PilingIconName } from '@/components/piling/icons';
 import { Button } from '@/components/ui/button';
 import { formatDateTimeInTimezone } from '@/lib/timezone';
 import { cn } from '@/lib/utils';
+import { OperatorChecklistHistory } from '@/components/piling/admin-equipment/detail/operator-checklist-history';
 import { fetchReadinessDefects } from '../api/client';
 import type { DefectDto } from '../api/contracts';
 import { EquipmentPhoto, blockerTone, BLOCKER_TONE_CLASS } from './shared';
@@ -183,7 +184,7 @@ export function FleetEvidencePanel({ item, props }: { item: FleetItem; props: Re
         </div>
       </>}
       {section === 'inspection' && <div className="mt-3 space-y-3 text-sm">
-        <p className="text-muted-foreground">Последний осмотр в карточке установки. Он может отличаться от источника сохранённой оценки.</p>
+        <p className="text-muted-foreground">Последний осмотр механика (журнал осмотров). Он может отличаться от источника сохранённой оценки.</p>
         {!detail ? missingDetail : inspection ? <>
           <div className="rounded-lg border border-border p-3">
             <p className="font-semibold">{RECORD_STATUS[inspection.status] ?? inspection.status}</p>
@@ -193,7 +194,10 @@ export function FleetEvidencePanel({ item, props }: { item: FleetItem; props: Re
             {inspectionEvidence && inspectionEvidence.reference !== inspection.id && <p className="mt-2 rounded bg-signal/10 p-2">Это другая запись, не источник выбранной оценки.</p>}
             <FleetSourceLink href={`/inspections/${inspection.id}`}>Открыть этот осмотр</FleetSourceLink>
           </div>
-        </> : <p className="rounded-lg bg-muted p-3">В карточке установки нет осмотров.</p>}
+        </> : <p className="rounded-lg bg-muted p-3">В журнале осмотров механика нет осмотров этой установки.</p>}
+        {/* ЕО и предсменный осмотр машиниста лежат в чек-листах смены, а не в журнале осмотров механика: без этого списка здесь стояла бы дата последнего осмотра механика, а не сегодняшний осмотр машиниста. */}
+        {/* Тот же доступ, что у карточки установки (equipment.read): при роли без него маршрут отвечает 403. */}
+        {!cardUnavailable && <OperatorChecklistHistory equipmentId={equipment.id} title="Осмотры машиниста" />}
       </div>}
       {section === 'maintenance' && <div className="mt-3 space-y-3 text-sm">
         {!detail ? missingDetail : <div className="rounded-lg bg-muted p-3">

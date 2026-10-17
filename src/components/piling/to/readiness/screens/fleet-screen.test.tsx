@@ -5,12 +5,15 @@ import type { EquipmentOption } from '../../to-module-bits';
 import type { ReferenceUiProps } from './types';
 import { bootstrapEnvelope } from '../api/__tests__/fixtures';
 import { formatDateTimeInTimezone } from '@/lib/timezone';
+import { formatRuDate } from '@/lib/format';
 import { FleetScreen } from './fleet-screen';
 import { ReportsScreen } from './reports-screen';
 import { buildFleetItems, countFleetGroups, DEFAULT_FLEET_VIEW, filterFleetItems, readFleetViewState, writeFleetViewState } from './fleet-workspace-model';
 import type { MaintenanceSummary } from '../../readiness-design-views';
 
 const fetchDefects = vi.hoisted(() => vi.fn());
+const authFetchMock = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/api', async (original) => ({ ...await original<typeof import('@/lib/api')>(), authFetch: authFetchMock }));
 vi.mock('../api/client', async (original) => ({ ...await original<typeof import('../api/client')>(), fetchReadinessDefects: fetchDefects }));
 // Подменяем только фото (next/image + защищённый URL) и выгрузку; KPI-плитки
 // остаются настоящими, иначе тест не увидит счётчики парка.
@@ -60,6 +63,9 @@ beforeEach(() => {
   window.history.replaceState({}, '', '/admin/to?view=fleet');
   window.matchMedia = vi.fn().mockReturnValue({ matches: false });
   fetchDefects.mockReset();
+  // Список осмотров машиниста в разделе «Осмотры»; по умолчанию — пустой.
+  authFetchMock.mockReset();
+  authFetchMock.mockResolvedValue({ ok: true, json: async () => ({ records: [] }) });
 });
 afterEach(cleanup);
 
@@ -130,6 +136,37 @@ describe('Fleet evidence interactions', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Осмотры' }));
     expect(screen.getByText('Это другая запись, не источник выбранной оценки.')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Открыть этот осмотр/ })).toHaveAttribute('href', '/inspections/different-inspection');
+  });
+  it('показывает осмотры машиниста рядом с журналом осмотров механика', async () => {
+    authFetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({ records: [{
+        id: 'execution-1', shiftId: 'shift-1', templateKey: 'EO_BEFORE', label: 'ЕО до смены',
+        completedAt: '2026-10-17T12:18:29.218Z', performerName: 'Герасимов Сергей', counts: { ok: 30, remark: 0, fault: 0, na: 1 },
+      }] }),
+    });
+    render(<FleetScreen {...propsFor()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Осмотры' }));
+
+    expect(await screen.findByText('ЕО до смены')).toBeInTheDocument();
+    expect(authFetchMock).toHaveBeenCalledWith('/api/equipment/rig-1/operator-checklists');
+    expect(screen.getByText(formatRuDate('2026-10-17T12:18:29.218Z'))).toBeInTheDocument();
+    expect(screen.getByText('Герасимов Сергей')).toBeInTheDocument();
+  });
+  it('роль без права на осмотры машиниста (403) видит спокойную подсказку, а не ошибку загрузки', async () => {
+    authFetchMock.mockResolvedValue({ ok: false, status: 403, json: async () => ({}) });
+    render(<FleetScreen {...propsFor()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Осмотры' }));
+
+    expect(await screen.findByText('Осмотры машиниста недоступны текущей роли.')).toBeInTheDocument();
+    expect(screen.queryByText('Не удалось загрузить осмотры машиниста.')).not.toBeInTheDocument();
+  });
+  it('роли без доступа к карточке установки список осмотров машиниста не запрашивается', () => {
+    render(<FleetScreen {...propsFor({ outOfRoleSources: ['Карточка установки'] })} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Осмотры' }));
+
+    expect(screen.queryByText('Осмотры машиниста')).not.toBeInTheDocument();
+    expect(authFetchMock).not.toHaveBeenCalled();
   });
   it('filters by the KPI tile and shows which slice is selected', () => {
     render(<FleetScreen {...propsFor()} />);
