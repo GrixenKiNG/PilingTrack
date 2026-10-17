@@ -101,7 +101,7 @@ describe('журнал инструктажей: подсчёт сегодняш
       { ...journalRow, id: 'tomorrow', recordedAt: '2026-10-03T07:00:00.000Z' },
     ];
     mocks.authFetch.mockResolvedValue({ ok: true, json: async () => ({ rows, truncated: false }) });
-    render(<BriefingsScreen {...({ bootstrap: { tenant: { timezone: 'America/Los_Angeles' } } } as unknown as ReferenceUiProps)} />);
+    render(<BriefingsScreen {...({ bootstrap: { actor: { id: 'me' }, tenant: { timezone: 'America/Los_Angeles' } } } as unknown as ReferenceUiProps)} />);
     await act(async () => {
       await Promise.resolve();
       await Promise.resolve();
@@ -157,11 +157,31 @@ describe('журнал инструктажей: время строк по по
         truncated: false,
       }),
     });
-    render(<BriefingsScreen {...({ bootstrap: { tenant: { timezone: 'Asia/Vladivostok' } } } as unknown as ReferenceUiProps)} />);
+    render(<BriefingsScreen {...({ bootstrap: { actor: { id: 'me' }, tenant: { timezone: 'Asia/Vladivostok' } } } as unknown as ReferenceUiProps)} />);
 
     // 20:00 UTC 01.09 — это 06:00 02.09 во Владивостоке; по московскому времени
     // было бы «01.09.2026, 23:00», то есть другой день.
     expect((await screen.findAllByText('02.09.2026, 06:00')).length).toBeGreaterThan(0);
     expect(screen.queryByText('01.09.2026, 23:00')).toBeNull();
+  });
+});
+
+describe('«Провести инструктаж»: себя в списке работников нет (аудит N17-14 #1)', () => {
+  it('предлагает других людей, но не самого инструктора', async () => {
+    mocks.authFetch.mockImplementation(async (url: string) => ({
+      ok: true,
+      json: async () => (url === '/api/safety/clearance'
+        ? { rows: [
+          { userId: 'me', name: 'Сам Инженер', role: 'SAFETY_ENGINEER' },
+          { userId: 'u1', name: 'Иван Машинист', role: 'OPERATOR' },
+        ] }
+        : { rows: [], truncated: false }),
+    }));
+    render(<BriefingsScreen {...({ bootstrap: { actor: { id: 'me' }, tenant: { timezone: 'UTC' } } } as unknown as ReferenceUiProps)} />);
+    await waitFor(() => expect(mocks.authFetch).toHaveBeenCalledWith('/api/safety/clearance'));
+    fireEvent.click((await screen.findAllByRole('button', { name: 'Провести инструктаж' }))[0]);
+    const select = await screen.findByRole('option', { name: 'Иван Машинист' });
+    expect(select).toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: 'Сам Инженер' })).not.toBeInTheDocument();
   });
 });
