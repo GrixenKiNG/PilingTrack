@@ -243,8 +243,11 @@ async function versionedAction(input: {
         if (beforeRow.validFrom > closedAt) {
           throw new ReadinessCommandError('VALIDATION_ERROR', 422, 'Срок наряда ещё не начался. Для отмены нужно отозвать наряд');
         }
+        // Та же граница, что у планировщика (`validTo <= now`): наряд, срок которого
+        // уже вышел, закрывается по сроку, а не «после работ».
+        const closeReason = beforeRow.validTo <= closedAt ? 'VALIDITY_ELAPSED' : 'WORK_DONE';
         row = await repository.close({tenantId: input.context.tenantId, id: input.id,
-          version: expected, actorId: input.context.actorId, closedAt});
+          version: expected, actorId: input.context.actorId, closedAt, closeReason});
         eventAction = 'closed';
       } else if (input.action === 'revoke') {
         assertPermitTransition(beforeRow.state, 'revoke');

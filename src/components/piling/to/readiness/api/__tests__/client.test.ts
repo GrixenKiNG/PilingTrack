@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { authFetch } from '@/lib/api';
-import { fetchCurrentReadiness, fetchReadinessBootstrap, readinessFilterQuery } from '../client';
+import { fetchCurrentReadiness, fetchReadinessBootstrap, fetchWorkPermits, fetchWorkPermitsPage, readinessFilterQuery } from '../client';
 import { isReadinessRequestCancelled, ReadinessRequestCancelledError } from '../errors';
 import { READINESS_REQUEST_ID_HEADER } from '../idempotency';
 import { readinessQueryKeys } from '../query-keys';
@@ -141,5 +141,33 @@ describe('fetchCurrentReadiness', () => {
       triggerType: null, ruleSetVersion: null, facts: {inspectionCompleted: true},
     }]}));
     await expect(fetchCurrentReadiness()).rejects.toMatchObject({code: 'INVALID_RESPONSE'});
+  });
+});
+
+describe('fetchWorkPermitsPage', () => {
+  beforeEach(() => mockedAuthFetch.mockReset());
+
+  it('возвращает страницу с итогом, признаком продолжения и курсором', async () => {
+    mockedAuthFetch.mockResolvedValue(jsonResponse({data: [{id: 'p1'}], page: {limit: 200, hasMore: true, total: 450, nextCursor: 'cur-1'}}));
+    await expect(fetchWorkPermitsPage()).resolves.toEqual({
+      items: [{id: 'p1'}], total: 450, hasMore: true, nextCursor: 'cur-1',
+    });
+    expect(mockedAuthFetch).toHaveBeenCalledWith('/api/readiness/work-permits?limit=200', {signal: undefined});
+  });
+
+  it('передаёт курсор и фильтры следующей страницы', async () => {
+    mockedAuthFetch.mockResolvedValue(jsonResponse({data: [], page: {limit: 200, hasMore: false, total: 3, nextCursor: null}}));
+    await fetchWorkPermitsPage(undefined, {status: 'APPROVED'}, 'cur 1');
+    expect(mockedAuthFetch).toHaveBeenCalledWith('/api/readiness/work-permits?limit=200&status=APPROVED&cursor=cur+1', {signal: undefined});
+  });
+
+  it('без блока page считает список полным по числу строк', async () => {
+    mockedAuthFetch.mockResolvedValue(jsonResponse({data: [{id: 'p1'}, {id: 'p2'}]}));
+    await expect(fetchWorkPermitsPage()).resolves.toEqual({items: [{id: 'p1'}, {id: 'p2'}], total: 2, hasMore: false, nextCursor: null});
+  });
+
+  it('fetchWorkPermits по-прежнему отдаёт только строки', async () => {
+    mockedAuthFetch.mockResolvedValue(jsonResponse({data: [{id: 'p1'}], page: {limit: 200, hasMore: true, total: 450, nextCursor: 'cur-1'}}));
+    await expect(fetchWorkPermits()).resolves.toEqual([{id: 'p1'}]);
   });
 });

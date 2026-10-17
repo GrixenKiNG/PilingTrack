@@ -171,10 +171,42 @@ export async function fetchReadinessShifts(signal?: AbortSignal, filters: Readin
   return Array.isArray(body.data) ? body.data : [];
 }
 
+export interface WorkPermitsPage {
+  items: WorkPermitDto[];
+  /** Всего нарядов под теми же серверными фильтрами — не только на этой странице. */
+  total: number;
+  hasMore: boolean;
+  nextCursor: string | null;
+}
+
+/**
+ * Страница нарядов. Сервер режет список на 200 строк и отдаёт курсор следующей;
+ * без `total`/`nextCursor` экран молча показывал бы только первые 200.
+ */
+export async function fetchWorkPermitsPage(
+  signal?: AbortSignal,
+  filters: ReadinessUrlFilters = {},
+  cursor?: string,
+): Promise<WorkPermitsPage> {
+  const params = new URLSearchParams(readinessFilterQuery(filters));
+  if (cursor) params.set('cursor', cursor);
+  const query = params.toString();
+  const body = await fetchReadinessJson<{
+    data?: WorkPermitDto[];
+    page?: { hasMore?: boolean; total?: number; nextCursor?: string | null };
+  }>(`/api/readiness/work-permits?limit=200${query ? `&${query}` : ''}`, signal);
+  const items = Array.isArray(body.data) ? body.data : [];
+  const nextCursor = typeof body.page?.nextCursor === 'string' ? body.page.nextCursor : null;
+  return {
+    items,
+    total: typeof body.page?.total === 'number' ? body.page.total : items.length,
+    hasMore: body.page?.hasMore === true && nextCursor !== null,
+    nextCursor,
+  };
+}
+
 export async function fetchWorkPermits(signal?: AbortSignal, filters: ReadinessUrlFilters = {}): Promise<WorkPermitDto[]> {
-  const query = readinessFilterQuery(filters);
-  const body = await fetchReadinessJson<{ data?: WorkPermitDto[] }>(`/api/readiness/work-permits?limit=200${query ? `&${query}` : ''}`, signal);
-  return Array.isArray(body.data) ? body.data : [];
+  return (await fetchWorkPermitsPage(signal, filters)).items;
 }
 
 /**

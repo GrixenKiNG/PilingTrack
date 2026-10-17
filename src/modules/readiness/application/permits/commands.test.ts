@@ -199,6 +199,26 @@ describe('закрытие согласованного наряда', () => {
     await expect(run()).resolves.toMatchObject({status: 200});
   });
 
+  // Планировщик закрывает по `validTo <= now` с причиной VALIDITY_ELAPSED. Ручное
+  // закрытие просроченного, но ещё не сметённого наряда обязано писать то же —
+  // иначе экран и снимок готовности назовут просрочку «закрыт после работ».
+  it.each([
+    ['срок вышел раньше', new Date(CLOSE_NOW.getTime() - 1), 'VALIDITY_ELAPSED'],
+    ['срок вышел ровно сейчас', CLOSE_NOW, 'VALIDITY_ELAPSED'],
+    ['срок ещё действует', new Date(CLOSE_NOW.getTime() + 1), 'WORK_DONE'],
+  ])('причина закрытия: %s — %s', async (_name, validTo, closeReason) => {
+    const {row, tx, run} = closeFixture({validTo});
+    const result = await run();
+    expect(result.body).toMatchObject({data: {state: 'CLOSED', closeReason}});
+    expect(row).toMatchObject({closeReason});
+    expect(tx.workPermit.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({closeReason}),
+    }));
+    expect(mocks.audit).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      action: 'work-permit.closed', after: expect.objectContaining({closeReason}),
+    }));
+  });
+
   it.each(['DRAFT', 'PENDING_APPROVAL', 'REVOKED', 'EXPIRED', 'CLOSED'])('отклоняет состояние %s без мутации', async (state) => {
     const {tx, run} = closeFixture({state});
     await expect(run()).rejects.toMatchObject({status: 422, message: expect.stringMatching(/недоступно/)});

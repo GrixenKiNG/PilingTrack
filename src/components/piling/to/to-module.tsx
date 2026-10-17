@@ -25,8 +25,9 @@ import {
   fetchReadinessBootstrap,
   fetchReadinessHistory,
   fetchReadinessShifts,
-  fetchWorkPermits,
+  fetchWorkPermitsPage,
   fetchReadinessDefects,
+  type WorkPermitsPage,
   type ReadinessUrlFilters,
 } from './readiness/api/client';
 import type {
@@ -257,6 +258,8 @@ async function readAuthoritativeCollection<T>(
  * работать с частичными данными, но не выдаёт «всё чисто» за отсутствие данных.
  * Отменённый запрос пере-бросает: им занимается внешний обработчик загрузки.
  */
+const EMPTY_PERMITS_PAGE: WorkPermitsPage = { items: [], total: 0, hasMore: false, nextCursor: null };
+
 async function readReadinessPartial<T>(
   request: Promise<T>,
   fallback: T,
@@ -315,6 +318,11 @@ export function ToModule({ surface = 'readiness' }: { surface?: ModuleSurface } 
   const [rulesAvailable, setRulesAvailable] = useState(false);
   const [shifts, setShifts] = useState<ReadinessShiftDto[]>([]);
   const [permits, setPermits] = useState<WorkPermitDto[]>([]);
+  // Сервер отдаёт наряды страницами по 200: итог и курсор нужны экрану, чтобы
+  // не выдавать первую страницу за весь список.
+  const [permitsPage, setPermitsPage] = useState<Pick<WorkPermitsPage, 'total' | 'hasMore' | 'nextCursor'>>(
+    { total: 0, hasMore: false, nextCursor: null },
+  );
   const [defects, setDefects] = useState<DefectDto[]>([]);
   // Отказ чтения дефектов — отдельный источник (F-N1005-DEFECTS-UNKNOWN).
   // Пустой `defects` при этом значит «не прочитано», а не «замечаний нет»:
@@ -460,7 +468,7 @@ export function ToModule({ surface = 'readiness' }: { surface?: ModuleSurface } 
           'Правила готовности',
         ),
         readReadinessPartial(fetchReadinessShifts(controller.signal, readinessFilters), []),
-        readReadinessPartial(fetchWorkPermits(controller.signal, readinessFilters), []),
+        readReadinessPartial(fetchWorkPermitsPage(controller.signal, readinessFilters), EMPTY_PERMITS_PAGE),
         readReadinessPartial(fetchReadinessDefects(controller.signal, readinessFilters), []),
         readAuthoritativeCollection(fetchCurrentReadiness(controller.signal, readinessFilters)),
         readAuthoritativeCollection(fetchReadinessHistory(controller.signal, readinessFilters)),
@@ -504,7 +512,8 @@ export function ToModule({ surface = 'readiness' }: { surface?: ModuleSurface } 
       const readinessRules = readinessRulesResult.data;
       setRulesAvailable(readinessRules !== null);
       setShifts(shiftsResult.data);
-      setPermits(permitsResult.data);
+      setPermits(permitsResult.data.items);
+      setPermitsPage({ total: permitsResult.data.total, hasMore: permitsResult.data.hasMore, nextCursor: permitsResult.data.nextCursor });
       setDefects(defectsResult.data);
       setDefectsError(defectsResult.failed ? DEFECTS_UNAVAILABLE_MESSAGE : null);
       setCurrentReadiness(currentResult.data);
@@ -598,6 +607,21 @@ export function ToModule({ surface = 'readiness' }: { surface?: ModuleSurface } 
       }
     }
   }, [readinessFilters, actingAs]);
+
+  const loadMorePermits = useCallback(async () => {
+    if (!permitsPage.nextCursor) return;
+    const request = workspaceRequest.current;
+    const page = await fetchWorkPermitsPage(undefined, readinessFilters, permitsPage.nextCursor);
+    // Рабочее место успели перезагрузить: страница относится к прежнему списку.
+    if (workspaceRequest.current !== request) return;
+    // Курсор идёт по updatedAt: наряд, изменённый между запросами, мог попасть
+    // на обе страницы — второй экземпляр отбрасываем.
+    setPermits((current) => {
+      const known = new Set(current.map((permit) => permit.id));
+      return [...current, ...page.items.filter((permit) => !known.has(permit.id))];
+    });
+    setPermitsPage({ total: page.total, hasMore: page.hasMore, nextCursor: page.nextCursor });
+  }, [permitsPage.nextCursor, readinessFilters]);
 
   useEffect(() => {
     /*
@@ -838,6 +862,8 @@ export function ToModule({ surface = 'readiness' }: { surface?: ModuleSurface } 
       bootstrap={bootstrap}
       shifts={shifts}
       permits={permits}
+      permitsPage={permitsPage}
+      onLoadMorePermits={loadMorePermits}
       defects={defects}
       defectsError={defectsError}
       currentReadiness={currentReadiness}
