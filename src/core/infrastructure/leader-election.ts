@@ -30,7 +30,7 @@ const RELEASE_LEASE = "if redis.call('GET', KEYS[1]) == ARGV[1] then return redi
 
 const TIMED_OUT = Symbol('timed out');
 
-/** Не ждать дольше `ms`; сам запрос не отменяется, его итог просто не нужен. */
+/** Stops waiting after `ms`; the request itself is not cancelled, its result is just ignored. */
 function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | typeof TIMED_OUT> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   const timeout = new Promise<typeof TIMED_OUT>((resolve) => {
