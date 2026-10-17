@@ -214,9 +214,30 @@ function escapeHtml(text: string): string {
 // Telegram Bot API Client
 // ============================================================
 
+/**
+ * Отказ «навсегда» (401, 403, чат не найден) отключает канал только третьим
+ * подряд (решение владельца 17.10.2026, F8 стенда 16.10): один случайный 403
+ * выключал канал для всех, и отчёты копились в DLQ до ручного включения. До
+ * третьего отказа это обычный сбой — outbox повторит. Счёт в памяти процесса,
+ * по каналу; успешная отправка и само отключение его обнуляют.
+ */
+const PERMANENT_FAILURES_TO_DISABLE = 3;
+const permanentFailures = new Map<string, number>();
+
+function recordTelegramSuccess(config: TelegramBotConfig): true {
+  permanentFailures.delete(config.id);
+  return true;
+}
+
 async function recordTelegramFailure(config: TelegramBotConfig, status: number, raw: string): Promise<DeliveryResult> {
   const permanent = status === 401 || status === 403 || (status === 400 && /chat not found|bot was blocked|user is deactivated|not a member|chat_write_forbidden/i.test(raw));
   if (!permanent) return false;
+  const failures = (permanentFailures.get(config.id) ?? 0) + 1;
+  if (failures < PERMANENT_FAILURES_TO_DISABLE) {
+    permanentFailures.set(config.id, failures);
+    return false;
+  }
+  permanentFailures.delete(config.id);
   const reason = describeTelegramError(raw);
   const db = await getDbClient();
   const marked = await runWithTenantContext(() => runOutsideGucScope(async () => {
@@ -257,7 +278,7 @@ async function sendTelegramMessage(
     }
 
     const result = await response.json();
-    return result.ok === true ? true : await recordTelegramFailure(config, result.error_code ?? 0, JSON.stringify(result));
+    return result.ok === true ? recordTelegramSuccess(config) : await recordTelegramFailure(config, result.error_code ?? 0, JSON.stringify(result));
   } catch (error) {
     logger.error('Failed to send Telegram message', error);
     return false;
@@ -291,7 +312,7 @@ async function sendTelegramDocument(
       return await recordTelegramFailure(config, response.status, err);
     }
     const result = await response.json();
-    return result.ok === true ? true : await recordTelegramFailure(config, result.error_code ?? 0, JSON.stringify(result));
+    return result.ok === true ? recordTelegramSuccess(config) : await recordTelegramFailure(config, result.error_code ?? 0, JSON.stringify(result));
   } catch (error) {
     logger.error('Failed to send Telegram document', error);
     return false;

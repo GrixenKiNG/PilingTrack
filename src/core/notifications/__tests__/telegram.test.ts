@@ -214,13 +214,19 @@ describe('telegramNotifier — доставка во все конфигурац
       { id: 'config-b', label: 'Сломанный', tenantId: 'test-tenant', botToken: 'test-b', chatId: 'B', enabled: true },
     ]);
     isEncryptedMock.mockReturnValue(false);
-    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({ ok: true }) })
-      .mockResolvedValueOnce({ ok: false, status: 400, text: async () => '{"ok":false,"description":"Bad Request: chat not found"}' });
+    fetchMock.mockImplementation(async (url: string) => url.includes('/bottest-b/')
+      ? { ok: false, status: 400, text: async () => '{"ok":false,"description":"Bad Request: chat not found"}' }
+      : { ok: true, json: async () => ({ ok: true }) });
     let payload: Prisma.JsonValue = { message: 'batch' };
     const progress = createTelegramDeliveryProgress(payload, async next => { payload = JSON.parse(JSON.stringify(next)); });
-    const result = kind === 'alert'
-      ? await telegramNotifier.sendAlert({ severity: 'high', message: 'batch' }, progress)
-      : await telegramNotifier.sendDocument('test.pdf', Buffer.from('%PDF'), undefined, progress);
+    const send = () => kind === 'alert'
+      ? telegramNotifier.sendAlert({ severity: 'high', message: 'batch' }, progress)
+      : telegramNotifier.sendDocument('test.pdf', Buffer.from('%PDF'), undefined, progress);
+    // Канал отключается только третьим отказом подряд (F8); до того — повтор.
+    expect(await send()).toBe(false);
+    expect(await send()).toBe(false);
+    expect(updateManyMock).not.toHaveBeenCalled();
+    const result = await send();
     expect(result).toBe(true);
     expect(updateManyMock).toHaveBeenCalledWith(expect.objectContaining({
       where: expect.objectContaining({ id: 'config-b', tenantId: 'test-tenant', enabled: true }),
@@ -233,10 +239,33 @@ describe('telegramNotifier — доставка во все конфигурац
       { id: 'a', label: 'A', botToken: 'test-a', chatId: 'A', enabled: true },
       { id: 'b', label: 'B', botToken: 'test-b', chatId: 'B', enabled: true },
     ]);
-    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({ ok: true }) })
-      .mockResolvedValueOnce({ ok: false, status, text: async () => description });
+    fetchMock.mockImplementation(async (url: string) => url.includes('/bottest-b/')
+      ? { ok: false, status, text: async () => description }
+      : { ok: true, json: async () => ({ ok: true }) });
+    // Третий подряд отказ «навсегда» отключает канал (F8), временный — никогда.
+    await telegramNotifier.sendMessage('batch');
+    await telegramNotifier.sendMessage('batch');
     expect(await telegramNotifier.sendMessage('batch')).toBe(permanent);
     expect(updateManyMock).toHaveBeenCalledTimes(permanent ? 1 : 0);
+  });
+  it('F8 стенда 16.10: один 403 не отключает канал, успешная отправка обнуляет счёт', async () => {
+    // Один ответ 403 выключал канал для всех, и отчёты копились в DLQ до
+    // ручного включения. Решение владельца 17.10: отключать после 3 подряд.
+    findManyMock.mockResolvedValue([{ id: 'f8-only', label: 'Канал', botToken: 'test-f8', chatId: 'F8', enabled: true }]);
+    const blocked = { ok: false, status: 403, text: async () => 'Forbidden: bot was blocked by the user' };
+    const ok = { ok: true, json: async () => ({ ok: true }) };
+    fetchMock.mockResolvedValueOnce(blocked).mockResolvedValueOnce(blocked)
+      .mockResolvedValueOnce(ok)
+      .mockResolvedValueOnce(blocked).mockResolvedValueOnce(blocked);
+    expect(await telegramNotifier.sendMessage('1')).toBe(false);
+    expect(await telegramNotifier.sendMessage('2')).toBe(false);
+    expect(await telegramNotifier.sendMessage('3')).toBe(true);
+    expect(await telegramNotifier.sendMessage('4')).toBe(false);
+    expect(await telegramNotifier.sendMessage('5')).toBe(false);
+    expect(updateManyMock).not.toHaveBeenCalled();
+    fetchMock.mockResolvedValueOnce(blocked);
+    await telegramNotifier.sendMessage('6');
+    expect(updateManyMock).toHaveBeenCalledOnce();
   });
   it('I08: persists a partial batch and retries only unconfirmed chats after restart', async () => {
     findManyMock.mockResolvedValue([{ botToken: 'test-a', chatId: 'A', enabled: true }, { botToken: 'test-b', chatId: 'B', enabled: true }]);
