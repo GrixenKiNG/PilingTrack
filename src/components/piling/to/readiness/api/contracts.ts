@@ -325,6 +325,8 @@ export interface ReadinessAuditEventDto {
   correlationId: string;
   hash: string;
   prevHash: string | null;
+  /** Дополнение записи (например, пометка о закрытии без проверки другим лицом). Приходит из цепочки аудита как есть. */
+  metadata?: unknown;
 }
 
 export interface ReadinessAuditEnvelope {

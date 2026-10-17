@@ -50,7 +50,7 @@ export function AuditSettings({ audit, auditFailed, bootstrap, canExport, active
 
   const normalized = normalizeSearch(query);
   const visible = events.filter((event) => !normalized || normalizeSearch([
-    auditActionLabel(event.action),
+    auditActionLabel(event.action, event.metadata),
     auditEntityLabel(event.entity.type),
     event.actor.name ?? '',
     event.action,
@@ -128,7 +128,7 @@ export function AuditSettings({ audit, auditFailed, bootstrap, canExport, active
                     </span>
                     <span className="flex min-w-0 items-center gap-2">
                       <ActionIcon className={cn('h-3.5 w-3.5 shrink-0', AUDIT_TONE[mark.tone])} />
-                      <span className="min-w-0 leading-snug">{auditActionLabel(event.action)}</span>
+                      <span className="min-w-0 leading-snug">{auditActionLabel(event.action, event.metadata)}</span>
                     </span>
                     <span className="min-w-0">
                       <span className="block truncate">{auditEntityLabel(event.entity.type)}</span>
@@ -148,7 +148,7 @@ export function AuditSettings({ audit, auditFailed, bootstrap, canExport, active
               return (
               <article key={event.id} className="rounded-lg border border-border p-3 text-xs">
                 <div className="flex items-start justify-between gap-2">
-                  <b className="flex min-w-0 items-center gap-2"><ActionIcon className={cn('h-4 w-4 shrink-0', AUDIT_TONE[mark.tone])} />{auditActionLabel(event.action)}</b>
+                  <b className="flex min-w-0 items-center gap-2"><ActionIcon className={cn('h-4 w-4 shrink-0', AUDIT_TONE[mark.tone])} />{auditActionLabel(event.action, event.metadata)}</b>
                   {isCriticalAuditAction(event.action) ? <StatusPill tone="danger">Критично</StatusPill> : <StatusPill tone="neutral">Обычное</StatusPill>}
                 </div>
                 <div className="mt-2 text-muted-foreground">{event.actor.name || 'Система'} · {handoverRoleLabel(event.actor.actingAs || event.actor.role) ?? 'PilingTrack'}</div>
@@ -173,7 +173,7 @@ export function AuditSettings({ audit, auditFailed, bootstrap, canExport, active
               <InfoRow label="Автор" value={selected?.actor.name || 'Система'} />
               <InfoRow label="Роль" value={handoverRoleLabel(selected?.actor.actingAs || selected?.actor.role || null) ?? '—'} />
               <InfoRow label="Дата и время" value={selected ? formatDateTimeInTimezone(selected.occurredAt, bootstrap?.tenant.timezone) : '—'} />
-              <InfoRow label="Действие" value={selected ? auditActionLabel(selected.action) : '—'} />
+              <InfoRow label="Действие" value={selected ? auditActionLabel(selected.action, selected.metadata) : '—'} />
               <InfoRow label="Объект" value={selected ? `${auditEntityLabel(selected.entity.type)} · ${selected.entity.id.slice(0, 12)}` : '—'} />
             </div>
             <div className="mt-4 overflow-x-auto rounded-lg bg-primary p-3 font-mono text-3xs leading-relaxed">

@@ -152,7 +152,7 @@ async function versionedAction(input: {
   ifMatch: string | null; expectedVersion?: number;
   action: 'triage' | 'resolve' | 'reject'; body: unknown;
   /** Дополнение к записи аудита: то, что в таблице дефекта негде хранить. */
-  auditMetadata?: unknown;
+  auditMetadata?: (before: DefectRow) => unknown;
   apply: (args: {repository: DefectRepository; expected: number; before: DefectRow}) => Promise<DefectRow>;
 }): Promise<CommandHttpResult> {
   assertCanManage(input.context);
@@ -170,7 +170,7 @@ async function versionedAction(input: {
       }
       const row = await input.apply({repository, expected, before});
       await emitEffects({tx: input.tx, context: input.context, action: input.action,
-        before: serializeDefect(before), row, key, metadata: input.auditMetadata});
+        before: serializeDefect(before), row, key, metadata: input.auditMetadata?.(before)});
       return {status: 200, body: {data: serializeDefect(row)},
         headers: {ETag: formatStrongEtag('defect', row.id, row.version)}};
     }});
@@ -184,7 +184,7 @@ export async function triageDefectCommand(input: {
     expectedVersion: input.payload.expectedVersion,
     // У дефекта нет поля под комментарий разбора (миграции не добавляем), поэтому
     // он живёт в неизменяемом журнале аудита: «кому передали, чего ждём».
-    auditMetadata: input.payload.comment ? {comment: input.payload.comment} : undefined,
+    auditMetadata: () => (input.payload.comment ? {comment: input.payload.comment} : undefined),
     apply: async ({repository, expected, before}) => {
       const status = transitionDefect(before.status, 'TRIAGE');
       if (!status) {
@@ -207,6 +207,12 @@ export async function resolveDefectCommand(input: {
 }): Promise<CommandHttpResult> {
   return versionedAction({...input, action: 'resolve', body: input.payload,
     expectedVersion: input.payload.expectedVersion,
+    // Решение владельца 17.10.2026: второй проверяющий для критического дефекта
+    // не вводится, закрытие не блокируется. Если закрывает тот же человек, что
+    // взял дефект в работу, это остаётся в аудите. Сравниваются настоящие id
+    // пользователей: режим «Действую как» другого человека не создаёт.
+    auditMetadata: (before) => (before.severity === 'CRITICAL' && before.triagedById === input.context.actorId
+      ? {withoutSecondPersonCheck: true} : undefined),
     apply: async ({repository, expected, before}) => {
       const status = transitionDefect(before.status, 'RESOLVE');
       if (!status) {

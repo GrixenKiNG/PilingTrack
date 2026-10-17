@@ -101,3 +101,45 @@ describe('resolveDefectCommand', () => {
     expect(mocks.defect.close).not.toHaveBeenCalled();
   });
 });
+
+describe('resolveDefectCommand: проверка вторым лицом', () => {
+  const mechanic: DefectCommandContext = {...dispatcher, actorId: 'mechanic-1', actorName: 'Механик', actorRole: 'MECHANIC'};
+  const inWork = (over: Record<string, unknown> = {}) =>
+    defectRow({status: 'IN_WORK', severity: 'CRITICAL', triagedById: 'dispatcher-1', ...over});
+
+  const resolveAs = async (context: DefectCommandContext, row: ReturnType<typeof defectRow>) => {
+    mocks.defect.get.mockResolvedValue(row);
+    mocks.defect.close.mockResolvedValue({...row, status: 'CLOSED', version: row.version + 1});
+    await resolveDefectCommand({
+      tx: asTx(), context, id: 'defect-1', key: KEY, ifMatch: null,
+      payload: {expectedVersion: row.version, resolution: 'Заменили уплотнение'},
+    });
+    return mocks.audit.mock.calls[0][1];
+  };
+
+  it('критический дефект закрыл тот, кто взял его в работу: пометка в аудите', async () => {
+    const entry = await resolveAs(dispatcher, inWork());
+    expect(entry).toMatchObject({action: 'defect.resolve', metadata: {withoutSecondPersonCheck: true}});
+  });
+
+  it('«Действую как» не делает человека другим лицом: сравниваются настоящие id', async () => {
+    const entry = await resolveAs({...dispatcher, actingAs: 'MECHANIC'}, inWork());
+    expect(entry.metadata).toEqual({withoutSecondPersonCheck: true});
+  });
+
+  it('критический дефект закрыл другой человек: пометки нет', async () => {
+    const entry = await resolveAs(mechanic, inWork());
+    expect(entry.metadata).toBeUndefined();
+    expect(mocks.defect.close).toHaveBeenCalledTimes(1);
+  });
+
+  it('не критический дефект закрыл тот же человек: пометки нет', async () => {
+    const entry = await resolveAs(dispatcher, inWork({severity: 'HIGH'}));
+    expect(entry.metadata).toBeUndefined();
+  });
+
+  it('пометка ничего не блокирует: дефект закрывается', async () => {
+    await resolveAs(dispatcher, inWork());
+    expect(mocks.defect.close).toHaveBeenCalledWith(expect.objectContaining({status: 'CLOSED'}));
+  });
+});
