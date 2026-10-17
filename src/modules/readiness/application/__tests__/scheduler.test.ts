@@ -302,7 +302,8 @@ describe('суточный сброс техготовности', () => {
     });
     const update = reportUpdateMany.mock.calls[0][0];
     expect(update.where).toMatchObject({id: {in: ['r-internal']}, status: 'draft'});
-    expect(update.data).toMatchObject({status: 'submitted', submittedAt: NOW});
+    // Сдача двигает version: устаревшая форма админа получит 409 (К2, N17-11).
+    expect(update.data).toMatchObject({status: 'submitted', submittedAt: NOW, version: {increment: 1}});
 
     const event = outboxCreate.mock.calls[0][0].data;
     expect(event.type).toBe('ReportSubmitted');

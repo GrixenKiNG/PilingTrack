@@ -287,6 +287,16 @@ describe('submitReport — след сдачи в истории отчёта', 
     expect(client).toBe(tx);
   });
 
+  // Сдача обязана двигать `Report.version`: иначе форма, открытая до сдачи,
+  // проходит оптимистическую проверку и затирает сданный отчёт (К2, N17-11).
+  it('повышает version отчёта при сдаче', async () => {
+    await submitReport(submitInput);
+
+    expect(tx.report.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({version: {increment: 1}}),
+    }));
+  });
+
   function storedReport(status = 'draft') {
     const stored = {status, submittedAt: new Date('2026-09-26T19:00:00Z'), closingComment: 'Первоначальный комментарий', endingEngineHours: 1200, endingFuelPercent: 30};
     tx.report.update.mockImplementation(async ({data}) => {
