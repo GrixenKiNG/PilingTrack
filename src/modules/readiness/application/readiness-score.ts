@@ -7,6 +7,7 @@ import {evaluateReadiness} from '../domain/evaluation/evaluator';
 import {buildEvidence} from '../domain/evaluation/evidence';
 import {immutablePublishedRules} from '../domain/evaluation/rules';
 import {usesWorkPermits} from '../domain/readiness-rules';
+import {isPermitInForce} from '../domain/permits/in-force';
 
 /**
  * Статусы наряда ТО, которые авторитетный расчёт считает «работа не закрыта».
@@ -191,7 +192,7 @@ export async function evaluateAuthoritativeReadiness(input: {
     healthScore,
     meterKnown: equipment.engineHoursTotal != null,
     permitValid: permitsInUse
-      ? Boolean(permit && permit.state === 'APPROVED' && permit.validFrom <= now && permit.validTo > now)
+      ? Boolean(permit && isPermitInForce(permit, now))
       : null,
     permitExpired: permitsInUse
       && Boolean(permit && (permit.state === 'EXPIRED'

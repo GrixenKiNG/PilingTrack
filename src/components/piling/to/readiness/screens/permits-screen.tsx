@@ -12,7 +12,7 @@ import { can } from '@/services/auth/authorization-service';
 import { authFetch } from '@/lib/api';
 import { formatDateInTimezone, formatDateTimeInTimezone } from '@/lib/timezone';
 import { cn } from '@/lib/utils';
-import { READINESS_READY_THRESHOLD } from '@/modules/readiness';
+import { READINESS_READY_THRESHOLD, isPermitInForce } from '@/modules/readiness';
 import { PERMIT_STATE_LABEL } from '../readiness-labels';
 import { handoverRoleLabel } from '../handover-journal';
 import type { WorkPermitDto } from '../api/contracts';
@@ -99,7 +99,12 @@ export function PermitsScreen(props: ReferenceUiProps) {
     return () => { cancelled = true; };
   }, [canReadDocuments, documentActorKey]);
 
-  const active = props.permits.filter((item) => item.state === 'APPROVED').length;
+  // «Действуют» — по тому же правилу, что и расчёт готовности: просроченный или ещё
+  // не начавшийся согласованный наряд допуска не даёт.
+  const nowForActive = new Date();
+  const active = props.permits.filter((item) => isPermitInForce(item, nowForActive)).length;
+  const notStarted = props.permits.filter((item) => item.state === 'APPROVED' && new Date(item.validFrom) > nowForActive).length;
+  const drafts = props.permits.filter((item) => item.state === 'DRAFT').length;
   const blocked = props.permits.filter((item) => ['EXPIRED', 'REVOKED'].includes(item.state)).length;
   const closed = props.permits.filter((item) => item.state === 'CLOSED').length;
   const crewByEquipment = new Map(props.crews.flatMap((crew) => crew.isActive && crew.equipment ? [[crew.equipment.id, crew] as const] : []));
@@ -114,13 +119,15 @@ export function PermitsScreen(props: ReferenceUiProps) {
   // Список неполон, пока сервер говорит «есть ещё»: счётчики ниже считаются по
   // загруженным строкам, поэтому такие числа — «не менее», а не итог.
   const incomplete = props.permitsPage?.hasMore === true;
+  // Пустой список при отказе чтения — «не загрузились», а не «нарядов нет».
+  const permitsLoadFailed = Boolean(props.permitsError) && props.permits.length === 0;
   const overduePermits = actionableOverduePermits(props.permits, new Date(nowMs));
   const awaitingApproval = props.permits.filter((item) => item.state === 'PENDING_APPROVAL' && !isOverduePermit(item, new Date(nowMs)));
   const pending = awaitingApproval.length;
   const signingBlock = (permit: WorkPermitDto) => (props.bootstrap ? permitSigningBlock(permit, props.bootstrap.actor) : null);
   const roleSteps = buildPermitRoleSteps({permits: props.permits, now: new Date(nowMs)});
   const equipmentWithApprovedPermit = new Set(
-    props.permits.flatMap((item) => item.state === 'APPROVED' ? [item.equipmentId] : []),
+    props.permits.flatMap((item) => isPermitInForce(item, nowForActive) ? [item.equipmentId] : []),
   ).size;
   /*
     Счётчики плиток — по авторитетным снимкам, а не по производной модели.
@@ -234,7 +241,7 @@ export function PermitsScreen(props: ReferenceUiProps) {
             <p className="mt-0.5 text-xs text-foreground">Плитки, полоса и счётчик «Просроченные» считаются только по загруженным нарядам — это минимум, а не итог.</p>
             {loadMoreFailed && <p className="mt-1 text-xs text-destructive-strong">Не удалось загрузить следующие наряды. Повторите попытку.</p>}
           </div>
-          <Button type="button" variant="outline" className="min-h-11" disabled={loadingMore} onClick={() => void loadMorePermits()}>{loadingMore ? 'Загружаем…' : 'Показать ещё'}</Button>
+          <Button type="button" variant="outline" className="min-h-11" disabled={loadingMore} onClick={() => void loadMorePermits()}>{loadingMore ? 'Загружаем…' : loadMoreFailed ? 'Повторить' : 'Показать ещё'}</Button>
         </section>
       )}
       <section className={COMPACT_KPI_GRID} style={kpiGridStyle(4)}>
@@ -262,7 +269,7 @@ export function PermitsScreen(props: ReferenceUiProps) {
             <div key={index} className={cls} style={{ width: `${props.permits.length ? count / props.permits.length * 100 : 0}%` }} />
           ))}
         </div>
-        <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-2xs text-muted-foreground"><span>● <b>{active}</b> допущено</span><span className="text-signal-strong">● <b>{pending}</b> ожидают подтверждения</span><span className="text-destructive-strong">● <b>{blocked}</b> заблокировано</span>{props.permits.length - active - pending - blocked - closed > 0 && <span>● <b>{props.permits.length - active - pending - blocked - closed}</b> черновиков</span>}{closed > 0 && <span>● <b>{closed}</b> закрыто</span>}<span className="xl:ml-auto text-muted-foreground">Фактическая проверка условий готовности</span></div>
+        <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-2xs text-muted-foreground"><span>● <b>{active}</b> допущено</span><span className="text-signal-strong">● <b>{pending}</b> ожидают подтверждения</span><span className="text-destructive-strong">● <b>{blocked}</b> заблокировано</span>{overduePermits.length > 0 && <span className="text-destructive-strong">● <b>{overduePermits.length}</b> просрочено</span>}{notStarted > 0 && <span>● <b>{notStarted}</b> ещё не начались</span>}{drafts > 0 && <span>● <b>{drafts}</b> черновиков</span>}{closed > 0 && <span>● <b>{closed}</b> закрыто</span>}<span className="xl:ml-auto text-muted-foreground">Фактическая проверка условий готовности</span></div>
       </section>
       {overduePermits.length > 0 && (
         <section role="alert" className="mt-2 flex flex-wrap items-center gap-3 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm">
@@ -270,7 +277,7 @@ export function PermitsScreen(props: ReferenceUiProps) {
             <b className="text-destructive-strong">Просрочено нарядов-допусков: {incomplete ? 'не менее ' : ''}{overduePermits.length}</b>
             <p className="mt-0.5 text-xs text-foreground">Согласованные наряды завершённых работ закрывает инженер ОТ или механик. Если срок согласования пропущен, нужно оформить новый наряд и согласовать его.</p>
           </div>
-          <Button type="button" variant="outline" className="min-h-11" onClick={() => setPermitFilter('OVERDUE')}>Показать просроченные</Button>
+          <Button type="button" variant="outline" className="min-h-11" onClick={() => { setPermitQuery(''); setPermitFilter('OVERDUE'); }}>Показать просроченные</Button>
         </section>
       )}
       <section className={cn(card, 'mt-2 p-3')}>
@@ -315,6 +322,12 @@ export function PermitsScreen(props: ReferenceUiProps) {
       </section>
       <div className="mt-2 grid grid-cols-1 gap-2 xl:grid-cols-[minmax(0,1fr)_300px]">
         <section className={cn(card, 'overflow-x-auto')}>
+          {permitsLoadFailed && (
+            <div role="alert" className="m-3 flex flex-wrap items-center gap-3 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm">
+              <div className="min-w-0 flex-1"><b className="text-destructive-strong">Наряды не загрузились</b><p className="mt-0.5 text-xs text-foreground">{props.permitsError}</p></div>
+              <Button type="button" variant="outline" className="min-h-11" disabled={props.loading} onClick={props.onRetry}>Повторить</Button>
+            </div>
+          )}
           <div className="p-3"><h2 className="font-bold">Реестр нарядов-допусков</h2><div className="mt-2 flex flex-wrap gap-2"><div className="relative min-w-[220px] flex-1"><Search className="absolute left-3 top-3.5 h-4 w-4 text-muted-foreground" /><Input aria-label="Поиск нарядов" value={permitQuery} onChange={(event) => setPermitQuery(event.target.value)} placeholder="Номер, установка, объект" className="min-h-11 bg-muted pl-9 text-xs" /></div>{([['ALL', 'Все'], ['APPROVED', 'Действующие'], ['PENDING_APPROVAL', 'На согласовании'], ['OVERDUE', `Просроченные (${overduePermits.length}${incomplete ? '+' : ''})`], ['BLOCKED', `Заблокированные (${blocked})`], ['CLOSED', `Закрытые (${closed})`]] as const).map(([value, label]) => <button key={value} type="button" aria-pressed={permitFilter === value} onClick={() => setPermitFilter(value)} className={cn('min-h-11 rounded border px-3 text-2xs', permitFilter === value ? 'border-info bg-info/10 text-info-strong' : 'border-border text-muted-foreground')}>{label}</button>)}</div></div>
           <div className="hidden min-w-[880px] grid-cols-[125px_minmax(120px,1.2fr)_minmax(110px,1fr)_70px_100px_80px_110px_120px] border-y border-border bg-muted px-3 py-2 text-3xs uppercase tracking-wide text-muted-foreground md:grid"><span>№ наряда</span><span>Установка</span><span>Объект</span><span>Смена</span><span>Действует до</span><span>Готовность</span><span>Статус</span><span>Действие</span></div>
           <div className="hidden max-h-[230px] min-w-[760px] divide-y divide-border overflow-y-auto md:block">
@@ -329,7 +342,7 @@ export function PermitsScreen(props: ReferenceUiProps) {
                 </div>
               );
             })}
-            {filteredPermits.length === 0 && <div className="py-12 text-center text-sm text-muted-foreground">По выбранным условиям наряды не найдены.</div>}
+            {filteredPermits.length === 0 && !permitsLoadFailed && <div className="py-12 text-center text-sm text-muted-foreground">По выбранным условиям наряды не найдены.</div>}
           </div>
           <div className="space-y-2 p-3 md:hidden">
             {filteredPermits.map((permit) => {
@@ -350,7 +363,7 @@ export function PermitsScreen(props: ReferenceUiProps) {
                 {action && canAct && !(action === 'approve' && signingBlock(permit)) && <Button type="button" variant="outline" className="mt-3 min-h-11 w-full text-xs" onClick={() => void runPermitAction(permit, action)}>{action === 'submit' ? 'Отправить' : action === 'approve' ? 'Согласовать' : 'Отозвать'}</Button>}
               </article>;
             })}
-            {filteredPermits.length === 0 && <div className="py-8 text-center text-sm text-muted-foreground">По выбранным условиям наряды не найдены.</div>}
+            {filteredPermits.length === 0 && !permitsLoadFailed && <div className="py-8 text-center text-sm text-muted-foreground">По выбранным условиям наряды не найдены.</div>}
           </div>
         </section>
         <aside className={cn(card, 'p-3')}>

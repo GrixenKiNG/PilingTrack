@@ -107,6 +107,8 @@ export interface ReferenceUiProps {
   permitsPage?: { total: number; hasMore: boolean };
   /** Подгружает следующую страницу нарядов; при сбое бросает ошибку. */
   onLoadMorePermits?: () => Promise<void>;
+  /** Отказ чтения нарядов: пустой `permits` при нём значит «не загрузились», а не «нарядов нет». */
+  permitsError?: string | null;
   defects: DefectDto[];
   /**
    * Отказ чтения журнала дефектов — отдельный источник (F-N1005-DEFECTS-UNKNOWN).
