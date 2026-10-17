@@ -163,7 +163,7 @@ describe('LeaderElection: недоступность Redis (F1)', () => {
     // один и тот же промис до перезапуска.
     await fake.stop();
     const silent = net.createServer((socket) => { socket.on('error', () => undefined); });
-    await new Promise<void>((resolve) => silent.listen(Number(new URL(process.env.REDIS_URL!).port), '127.0.0.1', resolve));
+    await new Promise<void>((resolve) => silent.listen(Number(new URL(String(process.env.REDIS_URL)).port), '127.0.0.1', resolve));
     try {
       vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
       const { getStateRedisClient } = await import('@/lib/redis-cache');
