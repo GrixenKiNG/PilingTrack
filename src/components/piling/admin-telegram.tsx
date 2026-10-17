@@ -365,7 +365,7 @@ export function AdminTelegram() {
                   <div className="flex items-center justify-end gap-2 mt-3">
                     <button
                       onClick={() => handleTest(config)}
-                      disabled={testingId !== null || !config.enabled}
+                      disabled={testingId !== null}
                       className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-info-strong transition-colors px-2 py-1.5 rounded-lg hover:bg-info/10 disabled:opacity-50"
                     >
                       {testingId === config.id ? (
