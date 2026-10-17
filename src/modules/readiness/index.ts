@@ -1,5 +1,6 @@
 export * from './domain/readiness-rules';
 export * from './domain/readiness-score';
+export { isPermitInForce } from './domain/permits/in-force';
 export {
   buildReadinessFacts,
   type ReadinessFactsInput,

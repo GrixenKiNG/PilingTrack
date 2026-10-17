@@ -361,7 +361,7 @@ describe('неполный список нарядов', () => {
     expect(await screen.findByRole('button', {name: 'Загружаем…'})).toBeDisabled();
     reject(new Error('сеть'));
     expect(await screen.findByText('Не удалось загрузить следующие наряды. Повторите попытку.')).toBeInTheDocument();
-    expect(screen.getByRole('button', {name: 'Показать ещё'})).not.toBeDisabled();
+    expect(screen.getByRole('button', {name: 'Повторить'})).not.toBeDisabled();
     expect(onLoadMorePermits).toHaveBeenCalledOnce();
   });
 });
@@ -388,5 +388,74 @@ describe('закрытие просроченного наряда', () => {
     fireEvent.click(screen.getAllByRole('button', {name: 'Закрыть наряд'})[0]);
     const dialog = within(await screen.findByRole('dialog'));
     expect(dialog.getByText(/Работы закончены/)).toBeInTheDocument();
+  });
+});
+
+describe('плитка «Действуют» считает по правилу готовности', () => {
+  const inForce: WorkPermitDto = {...pendingPermit, id: 'permit-live111', state: 'APPROVED',
+    validFrom: '2020-01-01T00:00:00Z', validTo: '2099-01-02T00:00:00Z'};
+  const tile = () => screen.getByText('Действуют').closest('button, div') as HTMLElement;
+
+  it('просроченный и ещё не начавшийся согласованные наряды не действуют', () => {
+    render(<PermitsScreen {...makeProps({permits: [
+      inForce,
+      {...inForce, id: 'permit-over111', validTo: '2020-01-02T00:00:00Z'},
+      {...inForce, id: 'permit-next111', validFrom: '2098-01-01T00:00:00Z'},
+    ]})} />);
+    expect(screen.getByText('Условия допуска подтверждены для 1 из 3 нарядов')).toBeInTheDocument();
+    expect(tile()).toHaveTextContent('1');
+    expect(screen.getByText(/допущено/).closest('span')).toHaveTextContent('1 допущено');
+    // Остаток полосы подписан по составу, а не «черновиками».
+    expect(screen.getByText(/просрочено$/).closest('span')).toHaveTextContent('1 просрочено');
+    expect(screen.getByText(/ещё не начались/).closest('span')).toHaveTextContent('1 ещё не начались');
+    expect(screen.queryByText(/черновиков/)).not.toBeInTheDocument();
+  });
+
+  it('установка с одним лишь просроченным нарядом не считается «с действующим нарядом»', () => {
+    render(<PermitsScreen {...makeProps({equipment: [{id: 'equipment-1', name: 'Копёр 1'}] as ReferenceUiProps['equipment'],
+      permits: [{...inForce, validTo: '2020-01-02T00:00:00Z'}]})} />);
+    expect(screen.getByText('0 из 1 установок с действующим нарядом')).toBeInTheDocument();
+  });
+});
+
+describe('красный алерт «Просрочено»', () => {
+  it('«Показать просроченные» сбрасывает поиск, иначе список пуст при счётчике больше нуля', () => {
+    const overdue: WorkPermitDto = {...pendingPermit, id: 'permit-over111', validFrom: '2020-01-01T00:00:00Z', validTo: '2020-01-02T00:00:00Z'};
+    render(<PermitsScreen {...makeProps({permits: [overdue]})} />);
+    const search = screen.getByRole('textbox', {name: 'Поиск нарядов'});
+    fireEvent.change(search, {target: {value: 'нет такого'}});
+    fireEvent.click(screen.getByRole('button', {name: 'Показать просроченные'}));
+    expect(search).toHaveValue('');
+    expect(screen.getByRole('button', {name: 'Просроченные (1)'})).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getAllByRole('button', {name: /Открыть наряд НД-.OVER111/}).length).toBeGreaterThan(0);
+  });
+});
+
+describe('отказ загрузки нарядов', () => {
+  it('пишет «не загрузились» с кнопкой «Повторить», а не «наряды не найдены»', () => {
+    const onRetry = vi.fn();
+    render(<PermitsScreen {...makeProps({permits: [], permitsError: 'Не удалось загрузить наряды.', onRetry})} />);
+    expect(screen.getByRole('alert')).toHaveTextContent('Наряды не загрузились');
+    expect(screen.queryByText(/наряды не найдены/)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', {name: 'Повторить'}));
+    expect(onRetry).toHaveBeenCalledOnce();
+  });
+
+  it('при пустом списке без ошибки по-прежнему «не найдены»', () => {
+    render(<PermitsScreen {...makeProps({permits: []})} />);
+    expect(screen.getAllByText('По выбранным условиям наряды не найдены.').length).toBeGreaterThan(0);
+    expect(screen.queryByText('Наряды не загрузились')).not.toBeInTheDocument();
+  });
+
+  it('сбой подгрузки «Показать ещё» оставляет загруженный список и предлагает «Повторить»', async () => {
+    const overdue: WorkPermitDto = {...pendingPermit, id: 'permit-over111', validFrom: '2020-01-01T00:00:00Z', validTo: '2020-01-02T00:00:00Z'};
+    const onLoadMorePermits = vi.fn().mockRejectedValueOnce(new Error('сеть')).mockResolvedValue(undefined);
+    render(<PermitsScreen {...makeProps({permits: [pendingPermit, overdue], permitsPage: {total: 450, hasMore: true}, onLoadMorePermits})} />);
+    fireEvent.click(screen.getByRole('button', {name: 'Показать ещё'}));
+    expect(await screen.findByText('Не удалось загрузить следующие наряды. Повторите попытку.')).toBeInTheDocument();
+    expect(screen.queryByText('Наряды не загрузились')).not.toBeInTheDocument();
+    expect(screen.getAllByRole('button', {name: 'Открыть наряд НД-NEW12345'}).length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole('button', {name: 'Повторить'}));
+    await waitFor(() => expect(onLoadMorePermits).toHaveBeenCalledTimes(2));
   });
 });

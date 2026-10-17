@@ -59,6 +59,7 @@ vi.mock('@/components/piling/to/readiness-reference-ui', () => ({
     authoritativeReadinessError: string | null;
     readinessHistoryError: string | null;
     defectsError: string | null;
+    permitsError?: string | null;
     workspaceIssues: Array<{ source: string; message: string }>;
     journals: Record<string, unknown>;
     details: Record<string, unknown>;
@@ -72,6 +73,7 @@ vi.mock('@/components/piling/to/readiness-reference-ui', () => ({
       data-authoritative-error={props.authoritativeReadinessError ?? ''}
       data-history-error={props.readinessHistoryError ?? ''}
       data-defects-error={props.defectsError ?? ''}
+      data-permits-error={props.permitsError ?? ''}
       data-issues={props.workspaceIssues.map((issue) => issue.source).join('|')}
       data-journals={Object.keys(props.journals).join(',')}
       data-details={Object.keys(props.details).join(',')}
@@ -589,6 +591,34 @@ describe('ToModule production shell integration', () => {
       expect(screen.getByTestId('reference-ui')).toHaveAttribute('data-defects-error', '');
     });
     expect(screen.getByTestId('reference-ui').getAttribute('data-issues') ?? '').not.toContain('Дефекты');
+  }, 30_000);
+
+  it('отказ чтения нарядов — своё состояние, а повтор его снимает', async () => {
+    let permitsFail = true;
+    mocks.authFetch.mockImplementation(async (url: string, options?: RequestInit) => {
+      if (url.startsWith('/api/readiness/work-permits')) {
+        return permitsFail ? jsonResponse({ error: 'Наряды недоступны' }, 503) : jsonResponse({ data: [] });
+      }
+      if (url.startsWith('/api/readiness/defects')) return jsonResponse({ data: [] });
+      if (url.startsWith('/api/readiness/shifts')) return jsonResponse({ data: [] });
+      if (url.startsWith('/api/readiness/current')) return jsonResponse({ data: [] });
+      if (url.startsWith('/api/readiness/history')) {
+        return jsonResponse({ data: [], page: { limit: 500, total: 0 }, filters: {} });
+      }
+      if (url.startsWith('/api/readiness/audit')) {
+        return jsonResponse({ data: [], page: { limit: 500, total: 0 }, filters: {} });
+      }
+      return responseFor(url, options);
+    });
+
+    await renderToModule('/admin/to');
+    expect(screen.getByTestId('reference-ui').getAttribute('data-permits-error')).toBeTruthy();
+
+    permitsFail = false;
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    await waitFor(() => {
+      expect(screen.getByTestId('reference-ui')).toHaveAttribute('data-permits-error', '');
+    });
   }, 30_000);
 });
 

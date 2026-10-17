@@ -135,6 +135,7 @@ export const TECH_READINESS_PRODUCTION_SHELL_ENABLED =
  * нём при отказе читался бы как «замечаний нет» (F-N1005-DEFECTS-UNKNOWN).
  */
 const DEFECTS_UNAVAILABLE_MESSAGE = 'Не удалось загрузить журнал дефектов.';
+const PERMITS_UNAVAILABLE_MESSAGE = 'Сервер не отдал список нарядов. Повторите загрузку.';
 
 /**
  * Какой модуль показывает оболочка. Данные и экраны у них общие, разные —
@@ -328,6 +329,8 @@ export function ToModule({ surface = 'readiness' }: { surface?: ModuleSurface } 
   // Пустой `defects` при этом значит «не прочитано», а не «замечаний нет»:
   // счётчик критических дефектов влияет на допуск установки.
   const [defectsError, setDefectsError] = useState<string | null>(null);
+  // То же для нарядов: пустой список при отказе — «не загрузились», не «не найдены».
+  const [permitsError, setPermitsError] = useState<string | null>(null);
   const [currentReadiness, setCurrentReadiness] = useState<CurrentReadinessDto[]>([]);
   const [readinessHistory, setReadinessHistory] = useState<ReadinessSnapshotDto[]>([]);
   const [authoritativeReadinessError, setAuthoritativeReadinessError] = useState<string | null>(null);
@@ -406,6 +409,7 @@ export function ToModule({ surface = 'readiness' }: { surface?: ModuleSurface } 
     setAuthoritativeReadinessError(null);
     setReadinessHistoryError(null);
     setDefectsError(null);
+    setPermitsError(null);
     setRulesAvailable(false);
     try {
       // Роль замещения уходит заголовком `x-acting-as` из `authFetch`, сервер
@@ -512,6 +516,7 @@ export function ToModule({ surface = 'readiness' }: { surface?: ModuleSurface } 
       setRulesAvailable(readinessRules !== null);
       setShifts(shiftsResult.data);
       setPermits(permitsResult.data.items);
+      setPermitsError(permitsResult.failed ? PERMITS_UNAVAILABLE_MESSAGE : null);
       setPermitsPage({ total: permitsResult.data.total, hasMore: permitsResult.data.hasMore, nextCursor: permitsResult.data.nextCursor });
       setDefects(defectsResult.data);
       setDefectsError(defectsResult.failed ? DEFECTS_UNAVAILABLE_MESSAGE : null);
@@ -863,6 +868,7 @@ export function ToModule({ surface = 'readiness' }: { surface?: ModuleSurface } 
       shifts={shifts}
       permits={permits}
       permitsPage={permitsPage}
+      permitsError={permitsError}
       onLoadMorePermits={loadMorePermits}
       defects={defects}
       defectsError={defectsError}
