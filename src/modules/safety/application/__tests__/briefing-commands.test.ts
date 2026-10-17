@@ -94,6 +94,16 @@ describe('проведение инструктажа', () => {
     expect(mocks.create).not.toHaveBeenCalled();
   });
 
+  // Аудит N17-14 #1: инструктаж — встреча двоих. Администратор в режиме
+  // «Действую как инженер ОТ» остаётся собой (actor.id — его учётка), поэтому
+  // запрет не мешает ему проводить инструктаж другим людям.
+  it('инструктор не может провести инструктаж самому себе', async () => {
+    await expect(conduct({payload: {...payload, userId: 'safety-1'}}))
+      .rejects.toMatchObject({status: 403, message: expect.stringContaining('самому себе')});
+    expect(mocks.userFind).not.toHaveBeenCalled();
+    expect(mocks.create).not.toHaveBeenCalled();
+  });
+
   it('работник из другой организации или отключённый не принимается', async () => {
     mocks.userFind.mockResolvedValueOnce(null);
     await expect(conduct()).rejects.toMatchObject({status: 404});

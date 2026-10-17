@@ -184,6 +184,49 @@ describe('readiness bootstrap query', () => {
     expect(tx.auditLog.create).not.toHaveBeenCalled();
   });
 
+  // Аудит N17-33 #2: права внутри bootstrap держались только кодом, тестом
+  // закреплены не были. Помощник по умолчанию без `readiness.read`: отказ
+  // приходит ДО выборок, и в ответ не попадает ни одной строки организации.
+  it('отказывает роли без readiness.read до любых выборок', async () => {
+    const tx = transaction();
+    await expect(queryReadinessBootstrap(
+      tx as never,
+      { id: 'assistant-1', name: 'Помощник', role: 'ASSISTANT', tenantId: TECH_READINESS_USERS.admin.tenantId },
+      readReadinessFeatureFlags(TECH_READINESS_FLAGS),
+    )).rejects.toMatchObject({ status: 403 });
+    expect(tx.equipment.findMany).not.toHaveBeenCalled();
+    expect(tx.user.findMany).not.toHaveBeenCalled();
+    expect(tx.readinessRuleSet.count).not.toHaveBeenCalled();
+  });
+
+  // Состав «что роли открыто» — по матрице по умолчанию. Если кто-то расширит
+  // права роли случайно, ответ перестанет совпадать с этой таблицей.
+  it.each([
+    ['OPERATOR', false, { settings: false, reports: false, safety: false, briefings: false, shifts: true }, { ruleManage: false, auditRead: false, shiftManage: true }],
+    ['FOREMAN', false, { settings: true, reports: true, safety: false, briefings: false, shifts: true }, { ruleManage: false, auditRead: true, shiftManage: false }],
+    ['SAFETY_ENGINEER', false, { settings: true, reports: true, safety: false, briefings: false, shifts: true }, { ruleManage: false, auditRead: true, shiftManage: false }],
+    ['SAFETY_ENGINEER', true, { settings: true, reports: true, safety: true, briefings: true, shifts: true }, { ruleManage: false, auditRead: true, shiftManage: false }],
+  ])('состав ответа для %s (контроль документов: %s)', async (role, documentsControl, screens, entities) => {
+    const tx = transaction();
+    const result = await queryReadinessBootstrap(
+      tx as never,
+      { id: `${role}-1`, name: role, role, tenantId: TECH_READINESS_USERS.admin.tenantId },
+      readReadinessFeatureFlags(TECH_READINESS_FLAGS),
+      null,
+      null,
+      { documentsControl, incidentsRead: false },
+    );
+    expect(result.actor).toEqual({ id: `${role}-1`, role, actingAs: null });
+    expect(result.capabilities.screens).toMatchObject({ ...screens, 'my-clearance': true });
+    expect(result.capabilities.entities.rules.manage).toBe(entities.ruleManage);
+    expect(result.capabilities.entities.audit.read).toBe(entities.auditRead);
+    expect(result.capabilities.entities.shift.manage).toBe(entities.shiftManage);
+    // Контактные данные и ключи не пересылаются: в списке людей только id, имя, роль.
+    expect(tx.user.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      select: { id: true, name: true, role: true },
+    }));
+  });
+
   it('scopes every selector/count query to the session tenant and leaks no foreign identifier', async () => {
     const tx = transaction();
     const result = await queryReadinessBootstrap(

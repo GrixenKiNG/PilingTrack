@@ -15,6 +15,7 @@ vi.mock('@/modules/readiness/application/bootstrap-query', () => ({
   queryReadinessBootstrap: mocks.queryBootstrap,
 }));
 
+import { ServiceError } from '@/lib/service-error';
 import { GET } from '../route';
 
 function request(query = '') {
@@ -52,12 +53,15 @@ describe('GET /api/readiness/bootstrap', () => {
     expect(mocks.withTransaction).not.toHaveBeenCalled();
   });
 
-  it('allows only authenticated ADMIN to request the audited mechanic execution context', async () => {
+  // Аудит N17-33 #1: исполняемая роль берётся из сессии (`user.actingAs`,
+  // заголовок `x-acting-as` проверяет requireAuth), как во всех маршрутах
+  // контура. Строка запроса второго источника не создаёт.
+  it('takes the audited execution role from the session, not from the query string', async () => {
     mocks.requireAuth.mockResolvedValue({
-      user: { id: 'admin-1', name: 'Admin', role: 'ADMIN', tenantId: 'tenant-a' },
+      user: { id: 'admin-1', name: 'Admin', role: 'ADMIN', tenantId: 'tenant-a', actingAs: 'MECHANIC' },
       error: null,
     });
-    const result = await GET(request('?actingAs=MECHANIC'));
+    const result = await GET(request());
     expect(result.status).toBe(200);
     expect(mocks.queryBootstrap).toHaveBeenCalledWith({}, {
       id: 'admin-1',
@@ -67,12 +71,21 @@ describe('GET /api/readiness/bootstrap', () => {
     }, undefined, 'MECHANIC', expect.any(String), { documentsControl: expect.any(Boolean), incidentsRead: expect.any(Boolean) });
   });
 
-  // DISPATCHER и OPERATOR стали исполняемыми ролями 2026-08-10, поэтому
-  // «неизвестной» ролью для этой проверки взят несуществующий код.
-  it('rejects actingAs for non-admin and rejects unknown acting roles', async () => {
-    expect((await GET(request('?actingAs=MECHANIC'))).status).toBe(403);
+  it('does not accept the execution role from the query string at all', async () => {
+    mocks.requireAuth.mockResolvedValue({
+      user: { id: 'admin-1', name: 'Admin', role: 'ADMIN', tenantId: 'tenant-a', actingAs: null },
+      error: null,
+    });
+    expect((await GET(request('?actingAs=MECHANIC'))).status).toBe(400);
     expect((await GET(request('?actingAs=WELDER'))).status).toBe(400);
     expect(mocks.withTransaction).not.toHaveBeenCalled();
+  });
+
+  it('maps a readiness.read denial from the bootstrap query to 403 without data', async () => {
+    mocks.queryBootstrap.mockRejectedValue(new ServiceError('Readiness access denied', 403));
+    const result = await GET(request());
+    expect(result.status).toBe(403);
+    expect(await result.json()).toEqual({ error: 'Readiness access denied' });
   });
 
   it('fails closed when the authenticated session has no tenant', async () => {
