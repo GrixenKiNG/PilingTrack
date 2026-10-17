@@ -4,7 +4,11 @@ import {z} from 'zod';
 export const ALERT_DELIVERY_EVENT = 'NotificationDeliveryRequested';
 export const alertSchema = z.object({severity: z.enum(['low', 'medium', 'high', 'critical']), message: z.string().min(1),
   siteId: z.string().optional(), reportId: z.string().optional(), ruleId: z.string().optional(),
-  notificationKey: z.literal('systemAlerts').optional()});
+  // Человекочитаемые подстановки и зона для текста Telegram (как у AlertPayload).
+  siteName: z.string().optional(), reportNumber: z.string().optional(), timeZone: z.string().optional(),
+  // Ключ Redis: пока он стоит, повторный алерт о том же событии не уходит.
+  dedupeKey: z.string().optional(),
+  notificationKey: z.enum(['systemAlerts', 'downtime30']).optional()});
 
 /** Enqueue inside the transaction which records the incident or defect. */
 export async function enqueueAlert(tx: Pick<Prisma.TransactionClient, 'outboxEvent'>, input: {
