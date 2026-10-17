@@ -12,6 +12,7 @@ import { requireAuth } from '@/lib/auth';
 import { withApi, withMutation } from '@/core/api-wrapper';
 import { getTemplate, saveTemplate } from '@/modules/monitoring';
 import { resolveEffectiveRole } from '@/lib/types';
+import { logger } from '@/lib/logger';
 
 export const runtime = 'nodejs';
 
@@ -40,7 +41,14 @@ export const PUT = withMutation(async (request: NextRequest) => {
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     const saved = await saveTemplate(tenantId, body, user!.id);
     return NextResponse.json(saved);
-  } catch {
-    return NextResponse.json({ error: 'Некорректные данные' }, { status: 400 });
+  } catch (err) {
+    // `TypeError` — шаблон не прошёл проверку. Всё остальное — сбой базы или
+    // кэша: админу не нужно «править верные данные», нужно повторить позже.
+    if (err instanceof TypeError) return NextResponse.json({ error: 'Некорректные данные' }, { status: 400 });
+    logger.error('Monitoring template save failed', err, { domain: 'monitoring' });
+    return NextResponse.json(
+      { error: 'Сервис временно недоступен. Повторите через минуту.' },
+      { status: 503, headers: { 'Retry-After': '15' } },
+    );
   }
 }, { domain: 'monitoring' });

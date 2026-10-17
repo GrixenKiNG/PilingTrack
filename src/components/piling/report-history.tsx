@@ -17,7 +17,8 @@ import {
 import { toast } from 'sonner';
 import { usePilingStore } from '@/lib/store';
 import { authFetch } from '@/lib/api';
-import { formatFixed, formatNumber } from '@/lib/format';
+import { formatFixed } from '@/lib/format';
+import { formatDowntimeHours } from '@/lib/downtime-hours';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -339,9 +340,8 @@ export function ReportHistory() {
                       <div className="flex items-center gap-1.5">
                         <Clock className="w-3.5 h-3.5 text-warning-strong" />
                         <span className="text-sm font-mono font-semibold text-warning-strong">
-                          {formatNumber(report.totalDowntime)}
+                          {formatDowntimeHours(report.totalDowntime)}
                         </span>
-                        <span className="text-xs text-muted-foreground">ч</span>
                       </div>
                     )}
                   </div>

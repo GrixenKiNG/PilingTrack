@@ -9,7 +9,8 @@ import { Clock, Drill, Eye, HardHat, Loader2 } from '@/components/piling/icons/u
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Separator } from '@/components/ui/separator';
-import { formatFixed, formatNumber } from '@/lib/format';
+import { formatFixed } from '@/lib/format';
+import { formatDowntimeHours } from '@/lib/downtime-hours';
 import type { ReportDTO } from '@/lib/types';
 
 export function ReportHistoryDetailDialog({
@@ -165,7 +166,7 @@ export function ReportHistoryDetailDialog({
                             )}
                           </div>
                           <span className="font-mono font-semibold text-warning-strong">
-                            {formatNumber(downtime.duration)} ч
+                            {formatDowntimeHours(downtime.duration)}
                           </span>
                         </div>
                       ))}

@@ -698,9 +698,11 @@ export async function queryOperatorMobileState(input: {
         count: report?.drillings.reduce((sum, drill) => sum + drill.count, 0) ?? 0,
         meters: round1(report?.drillings.reduce((sum, drill) => sum + drill.meters, 0) ?? 0),
       },
-      downtimeHours: round1(report?.downtimes
+      // Точная сумма: округлять до 0,1 ч нельзя — 3 минуты стали бы «0,1 ч».
+      // Показ округляет сам (`formatDowntimeHoursOnly`).
+      downtimeHours: report?.downtimes
         .filter((downtime) => downtime.kind !== 'BREAK')
-        .reduce((sum, downtime) => sum + downtime.duration, 0) ?? 0),
+        .reduce((sum, downtime) => sum + downtime.duration, 0) ?? 0,
     },
     dictionaries: {...dictionaries, pileGrades: offeredGrades},
   };

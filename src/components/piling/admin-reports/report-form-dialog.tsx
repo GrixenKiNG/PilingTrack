@@ -26,7 +26,7 @@ import {
 } from '@/components/ui/select';
 import type { ReportDTO, SiteFlatDTO, PileGradeDTO, DrillingTypeDTO, DowntimeReasonDTO } from '@/lib/types';
 import { pileLengthMeters } from '@/lib/pile-length';
-import { DOWNTIME_MAX_HOURS } from '@/lib/downtime-hours';
+import { DOWNTIME_MAX_HOURS, formatDowntimeHours } from '@/lib/downtime-hours';
 import { formatFixed, formatNumber } from '@/lib/format';
 import { getTodayInTimezone } from '@/lib/timezone';
 
@@ -419,7 +419,7 @@ export function ReportFormDialog({
                           {dt.comment && <p className="text-3xs text-muted-foreground truncate">{dt.comment}</p>}
                         </div>
                         <div className="flex items-center gap-2">
-                          <span className="font-mono font-semibold text-warning-strong">{formatNumber(dt.duration)} ч</span>
+                          <span className="font-mono font-semibold text-warning-strong">{formatDowntimeHours(dt.duration)}</span>
                           <button onClick={() => setFormDowntimes((prev) => prev.filter((d) => d.id !== dt.id))}
                             aria-label={`Удалить простой ${getDtReasonName(dt.reasonId)}`}
                             title="Удалить простой"
@@ -442,7 +442,7 @@ export function ReportFormDialog({
               <div className="flex items-center gap-4 text-sm">
                 <span className="font-mono font-bold">{formTotalPiles} шт. / {formatFixed(formTotalPileMeters, 1)} м.п. сваи</span>
                 <span className="font-mono font-bold">{formTotalDrillingCount} шт. / {formatFixed(formTotalMeters, 1)} м.п. бурение</span>
-                {formDowntimes.length > 0 && <span className="font-mono font-bold text-warning-strong">{formatNumber(formTotalDowntime)} ч</span>}
+                {formDowntimes.length > 0 && <span className="font-mono font-bold text-warning-strong">{formatDowntimeHours(formTotalDowntime)}</span>}
               </div>
             </div>
           )}
