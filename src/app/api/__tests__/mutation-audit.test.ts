@@ -80,7 +80,7 @@ const cases: Array<{ label: string; handler: unknown; mock: typeof m.audit; meth
     body: { id: 'incident-1', note: 'Проведён разбор обстоятельств' }, result: { count: 1 },
     action: 'incident.reviewed', targetId: 'incident-1' },
   { label: 'повтор события очереди', handler: dlq, mock: m.retry, method: 'POST',
-    body: { id: 'queue-1', action: 'retry' }, result: true, action: 'dlq.retried', targetId: 'queue-1' },
+    body: { id: 'queue-1', action: 'retry' }, result: 'retried', action: 'dlq.retried', targetId: 'queue-1' },
   { label: 'отказ от события очереди', handler: dlq, mock: m.discard, method: 'POST',
     body: { id: 'queue-1', action: 'discard' }, result: undefined, action: 'dlq.discarded', targetId: 'queue-1' },
   { label: 'удаление вложения', handler: deleteMedia, mock: m.deleteMedia, method: 'DELETE',
@@ -147,7 +147,7 @@ it('повторный разбор происшествия не создаёт
   expect(m.audit).not.toHaveBeenCalled();
 });
 it('неудачный retry не создаёт события', async () => {
-  m.retry.mockResolvedValue(false);
+  m.retry.mockResolvedValue('not_retriable');
   expect((await dlq(request('POST', { id: 'queue-1', action: 'retry' }))).status).toBe(400);
   expect(m.audit).not.toHaveBeenCalled();
 });
