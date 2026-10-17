@@ -134,6 +134,16 @@ describe('deliverReportPdf', () => {
     expect(outboxUpdate).not.toHaveBeenCalled();
   });
 
+  // F10: кириллица в имени файла транслитерируется, а не превращается в «_».
+  it('имя PDF в Telegram — латиница, ФИО транслитерировано (F10)', async () => {
+    outboxFindUnique.mockResolvedValue({ published: false });
+    sendDocument.mockResolvedValue(true);
+
+    await deliverReportPdf({ id: 'ev-name', aggregateId: 'r-name' });
+
+    expect(sendDocument.mock.calls[0][0]).toMatch(/^report-[\d-]+-Ivanov\.pdf$/);
+  });
+
   it('уже доставленное событие повторно не отправляется', async () => {
     outboxFindUnique.mockResolvedValue({ published: true });
 

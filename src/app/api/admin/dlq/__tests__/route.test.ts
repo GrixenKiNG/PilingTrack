@@ -15,6 +15,8 @@ const {
   dlqFindManyMock,
   getPendingDlqEntriesMock,
   getDlqStatsMock,
+  retryDlqEntryMock,
+  recordAuditEventMock,
 } = vi.hoisted(() => ({
   requireAuthMock: vi.fn(),
   assertCanMock: vi.fn(),
@@ -22,14 +24,18 @@ const {
   dlqFindManyMock: vi.fn(),
   getPendingDlqEntriesMock: vi.fn(),
   getDlqStatsMock: vi.fn(),
+  retryDlqEntryMock: vi.fn(),
+  recordAuditEventMock: vi.fn(),
 }));
 
 vi.mock('@/lib/auth', () => ({ requireAuth: requireAuthMock }));
+vi.mock('@/lib/csrf-protection', () => ({ withCsrf: () => null }));
 vi.mock('@/services/auth/authorization-service', () => ({ assertCan: assertCanMock }));
+vi.mock('@/services/audit/audit-service', () => ({ recordAuditEvent: recordAuditEventMock }));
 vi.mock('@/core/outbox/dead-letter-queue', () => ({
   getPendingDlqEntries: getPendingDlqEntriesMock,
   getDlqStats: getDlqStatsMock,
-  retryDlqEntry: vi.fn(),
+  retryDlqEntry: retryDlqEntryMock,
   discardDlqEntry: vi.fn(),
 }));
 vi.mock('@/lib/db', () => ({
@@ -39,7 +45,7 @@ vi.mock('@/lib/db', () => ({
   },
 }));
 
-import { GET } from '../route';
+import { GET, POST } from '../route';
 
 const ADMIN = { id: 'admin-1', name: 'Админ А.', role: 'ADMIN', tenantId: 'tenant-a' };
 
@@ -102,5 +108,40 @@ describe('GET /api/admin/dlq — отчёт к записям очереди (W5
     expect(res.status).toBe(200);
     expect(reportFindManyMock).not.toHaveBeenCalled();
     expect((await res.json()).entries[0].report).toBeNull();
+  });
+});
+
+describe('POST /api/admin/dlq — повтор уже переотправленной записи', () => {
+  function postRetry(id: string): NextRequest {
+    return new NextRequest('http://localhost/api/admin/dlq', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ id, action: 'retry' }),
+    });
+  }
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+    requireAuthMock.mockResolvedValue({ user: ADMIN, error: null });
+    recordAuditEventMock.mockResolvedValue(undefined);
+  });
+
+  it('второй клик отвечает 409 «Уже переотправлено» и не пишет аудит повторно', async () => {
+    retryDlqEntryMock.mockResolvedValue('already_retried');
+
+    const res = await POST(postRetry('dlq-1'));
+
+    expect(res.status).toBe(409);
+    expect((await res.json()).error).toBe('Уже переотправлено');
+    expect(recordAuditEventMock).not.toHaveBeenCalled();
+  });
+
+  it('первый клик ставит повтор и пишет аудит', async () => {
+    retryDlqEntryMock.mockResolvedValue('retried');
+
+    const res = await POST(postRetry('dlq-1'));
+
+    expect(res.status).toBe(200);
+    expect(recordAuditEventMock).toHaveBeenCalledWith(expect.objectContaining({ action: 'dlq.retried', targetId: 'dlq-1' }));
   });
 });

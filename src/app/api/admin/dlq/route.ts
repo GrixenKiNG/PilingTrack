@@ -122,8 +122,11 @@ export const POST = withMutation(
     const { id, action } = validation.data;
 
     if (action === 'retry') {
-      const ok = await retryDlqEntry(id);
-      if (!ok) {
+      const result = await retryDlqEntry(id);
+      if (result === 'already_retried') {
+        return NextResponse.json({ error: 'Уже переотправлено' }, { status: 409 });
+      }
+      if (result !== 'retried') {
         return NextResponse.json({ error: 'Не удалось переотправить' }, { status: 400 });
       }
       await recordAuditEvent({
