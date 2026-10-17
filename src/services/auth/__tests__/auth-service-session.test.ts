@@ -14,7 +14,7 @@ vi.mock('bcryptjs', () => ({
 }));
 vi.mock('@/lib/rate-limiter', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/rate-limiter')>();
-  return {...actual, rateLimiter: {check: mocks.check, reset: mocks.reset}};
+  return {...actual, rateLimiter: {check: mocks.check, reset: mocks.reset, refund: vi.fn().mockResolvedValue(undefined)}};
 });
 vi.mock('@/lib/db', () => ({db: {user: {findUnique: mocks.findUnique}}}));
 vi.mock('@/lib/logger', () => ({logger: {info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn()}}));

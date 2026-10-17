@@ -92,6 +92,16 @@ if remaining < 0 then remaining = 0 end
 return {0, remaining, 0}  -- allowed
 `;
 
+// Возврат одной попытки (успешный вход). DECR сохраняет срок окна; ниже нуля
+// не опускаем, блокировку не трогаем.
+const REFUND_LUA = `
+local count = tonumber(redis.call('GET', KEYS[1]))
+if count and count > 0 then
+  redis.call('DECR', KEYS[1])
+end
+return 0
+`;
+
 // In-memory fallback entry
 interface RateLimitEntry {
   count: number;
@@ -160,7 +170,10 @@ class RateLimiter {
    * Check if Redis is available.
    */
   isRedisAvailable(): boolean {
-    return this.redisReady && this.redis !== null;
+    // Пока клиент не 'ready', команда встаёт в его очередь и ждёт, пока ioredis
+    // не исчерпает переподключения: первый вход после падения Redis ждал ~15 с
+    // (F6 стенда 16.10). Такой же порог у отзыва сессий (session-service).
+    return this.redisReady && this.redis !== null && this.redis.status === 'ready';
   }
 
   /**
@@ -224,8 +237,10 @@ class RateLimiter {
         String(config.blockDurationMs),
         String(now),
       ) as unknown[];
-    } catch {
-      // Script not cached — use EVAL
+    } catch (err) {
+      // Only a missing cached script is retried with EVAL; a connection error
+      // would just wait in the queue a second time before the fallback.
+      if (!(err instanceof Error) || !err.message.includes('NOSCRIPT')) throw err;
       result = await this.redis.eval(
         RATE_LIMIT_LUA,
         2,
@@ -332,6 +347,24 @@ class RateLimiter {
     // Fallback to in-memory
     this.store.delete(identifier);
     this.blocked.delete(identifier);
+  }
+
+  /**
+   * Вернуть одну попытку: успешный вход не должен тратить лимит по адресу
+   * (F3 стенда 16.10). Не сброс — иначе своя учётка обнуляла бы счётчик для
+   * перебора чужих; неудачи копятся как раньше.
+   */
+  async refund(identifier: string): Promise<void> {
+    if (this.isRedisAvailable()) {
+      try {
+        await this.redis?.eval(REFUND_LUA, 1, `rl:${identifier}`);
+        return;
+      } catch {
+        this.redisReady = false;
+      }
+    }
+    const entry = this.store.get(identifier);
+    if (entry && entry.count > 0) entry.count--;
   }
 
   /**
