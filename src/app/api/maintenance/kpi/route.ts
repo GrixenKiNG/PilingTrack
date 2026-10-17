@@ -57,8 +57,8 @@ export const GET = withApi(
       return NextResponse.json({ error: 'Некорректный диапазон дат' }, { status: 400 });
     }
 
-    const { records, equipmentCount } = await getFleetKpiData(tenantId, from, to);
-    const kpi = computeFleetKpi(records, { from, to, equipmentCount });
+    const { records, carriedOver, equipmentCount } = await getFleetKpiData(tenantId, from, to);
+    const kpi = computeFleetKpi(records, { from, to, equipmentCount, carriedOver });
     return NextResponse.json({
       kpi,
       period: { from: from.toISOString(), to: to.toISOString() },
