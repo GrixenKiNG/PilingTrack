@@ -93,7 +93,7 @@ describe('Dead Letter Queue', () => {
 
     const result = await retryDlqEntry('dlq-1');
 
-    expect(result).toBe(true);
+    expect(result).toBe('retried');
     expect(mocks.mockUpdateMany).toHaveBeenCalledWith({
       where: { id: 'dlq-1', status: 'pending' },
       data: { status: 'resolved' },
@@ -172,10 +172,19 @@ describe('Dead Letter Queue', () => {
     });
   });
 
-  it('повтор уже взятой записи ничего не ставит в очередь', async () => {
+  it('повтор уже переотправленной записи не ставит событие второй раз', async () => {
     mocks.mockUpdateMany.mockResolvedValueOnce({ count: 0 });
+    mocks.mockFindUnique.mockResolvedValueOnce({ id: 'dlq-1', status: 'resolved' });
 
-    expect(await retryDlqEntry('dlq-1')).toBe(false);
+    expect(await retryDlqEntry('dlq-1')).toBe('already_retried');
+    expect(mocks.mockOutboxCreate).not.toHaveBeenCalled();
+  });
+
+  it('повтор отброшенной или несуществующей записи не ставит событие', async () => {
+    mocks.mockUpdateMany.mockResolvedValueOnce({ count: 0 });
+    mocks.mockFindUnique.mockResolvedValueOnce({ id: 'dlq-1', status: 'discarded' });
+
+    expect(await retryDlqEntry('dlq-1')).toBe('not_retriable');
     expect(mocks.mockOutboxCreate).not.toHaveBeenCalled();
   });
 

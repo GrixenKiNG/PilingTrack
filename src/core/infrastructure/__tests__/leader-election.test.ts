@@ -237,12 +237,64 @@ describe('LeaderElection', () => {
     await election.stop();
   });
 
+  it('starts a new attempt after a hung renewal times out and ignores its late reply', async () => {
+    const election = await createElection();
+    await election.start();
+    const pending = deferred<0 | 1>();
+    mocks.evalMock.mockClear().mockReturnValueOnce(pending.promise);
+    await vi.advanceTimersByTimeAsync(100);
+    // Last confirmed renewal was at t=0: leadership ends at t=ttl, not later.
+    await vi.advanceTimersByTimeAsync(900);
+    expect(election.isLeader()).toBe(false);
+    mocks.store.set('leader:outbox-worker', 'node-b');
+    await vi.advanceTimersByTimeAsync(200);
+    expect(mocks.evalMock.mock.calls.length).toBeGreaterThan(1);
+    pending.resolve(1);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(election.isLeader()).toBe(false);
+    expect(election.onBecomeLeader).toHaveBeenCalledTimes(1);
+    await election.stop();
+    expect(mocks.store.get('leader:outbox-worker')).toBe('node-b');
+  });
+
+  it('a late reply of an abandoned follower attempt does not drop newer leadership', async () => {
+    mocks.store.set('leader:outbox-worker', 'node-b');
+    const election = await createElection();
+    await election.start();
+    expect(election.isLeader()).toBe(false);
+    const pending = deferred<'OK' | null>();
+    mocks.set.mockReturnValueOnce(pending.promise);
+    await vi.advanceTimersByTimeAsync(100);
+    mocks.store.delete('leader:outbox-worker');
+    await vi.advanceTimersByTimeAsync(1100);
+    expect(election.isLeader()).toBe(true);
+    pending.resolve(null);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(election.isLeader()).toBe(true);
+    expect(election.onLoseLeadership).not.toHaveBeenCalled();
+    await election.stop();
+  });
+
+  it('stop does not hang on a hung renewal and a hung release', async () => {
+    const election = await createElection();
+    await election.start();
+    mocks.evalMock.mockReturnValue(new Promise<never>(() => undefined));
+    await vi.advanceTimersByTimeAsync(100);
+    let stopped = false;
+    void election.stop().then(() => { stopped = true; });
+    await vi.advanceTimersByTimeAsync(200);
+    expect(stopped).toBe(true);
+    expect(election.isLeader()).toBe(false);
+  });
+
   it('rejects an initial acknowledgement received after its conservative lease deadline', async () => {
     const pending = deferred<typeof mocks.client | null>();
     mocks.state.mockReturnValueOnce(pending.promise);
     const election = await createElection();
     const started = election.start();
-    await vi.advanceTimersByTimeAsync(1100);
+    // Past the deadline (and the attempt timeout), before the first renewal
+    // tick at 1100 could legitimately acquire with a fresh attempt.
+    await vi.advanceTimersByTimeAsync(1050);
     pending.resolve(mocks.client);
     await started;
     expect(election.isLeader()).toBe(false);

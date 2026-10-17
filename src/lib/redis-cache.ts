@@ -59,52 +59,78 @@ function getRedisOptions(): RedisOptions {
 
 interface ClientSlot {
   client: Redis | null;
+  /** Идущее подключение: все параллельные вызовы ждут его, а не берут клиента до `connect()`. */
+  connecting: Promise<Redis | null> | null;
   readonly url: string;
 }
 
-const cacheSlot: ClientSlot = { client: null, url: REDIS_URL };
-const stateSlot: ClientSlot = { client: null, url: STATE_REDIS_URL };
+const cacheSlot: ClientSlot = { client: null, connecting: null, url: REDIS_URL };
+const stateSlot: ClientSlot = { client: null, connecting: null, url: STATE_REDIS_URL };
 
-async function getClient(slot: ClientSlot): Promise<Redis | null> {
-  if (!slot.client) {
-    const client = new Redis(slot.url, getRedisOptions());
-    slot.client = client;
+function getClient(slot: ClientSlot): Promise<Redis | null> {
+  if (slot.client) return Promise.resolve(slot.client);
+  // Клиент в слот попадает только после успешного connect(). Раньше его клали
+  // сразу, и параллельный вызов (лимитер, пульс, лидер outbox) ставил команду в
+  // очередь клиента, который тут же отбрасывался по ошибке подключения:
+  // disconnect() очередь не очищает, команда не завершалась никогда, а выбор
+  // лидера при висящей попытке новых не начинает (F1 стенда 16.10.2026).
+  slot.connecting ??= connectClient(slot).finally(() => {
+    slot.connecting = null;
+  });
+  return slot.connecting;
+}
 
-    client.on('error', (err) => {
-      logger.error('Redis: connection error', err);
-    });
+async function connectClient(slot: ClientSlot): Promise<Redis | null> {
+  const client = new Redis(slot.url, getRedisOptions());
 
-    client.on('connect', () => {
-      if (process.env.LOG_REDIS_LIFECYCLE === 'true') {
-        logger.info('Redis: connected');
-      }
-    });
+  client.on('error', (err) => {
+    logger.error('Redis: connection error', err);
+  });
 
-    client.on('ready', () => {
-      if (process.env.LOG_REDIS_LIFECYCLE === 'true') {
-        logger.info('Redis: ready');
-      }
-    });
-
-    client.on('end', () => {
-      // Terminal close: retryStrategy gave up (returned null). Without this
-      // reset the dead client stayed the singleton forever — a brief startup
-      // race became permanent degradation until a container restart
-      // (audit M1: ~5760 heartbeat/metrics errors per day at green health).
-      if (slot.client === client) slot.client = null;
-    });
-
-    try {
-      await client.connect();
-    } catch (err) {
-      logger.error('Redis: initial connect failed', err instanceof Error ? err : new Error(String(err)));
-      client.disconnect();
-      if (slot.client === client) slot.client = null;
-      return null;
+  client.on('connect', () => {
+    if (process.env.LOG_REDIS_LIFECYCLE === 'true') {
+      logger.info('Redis: connected');
     }
+  });
+
+  client.on('ready', () => {
+    if (process.env.LOG_REDIS_LIFECYCLE === 'true') {
+      logger.info('Redis: ready');
+    }
+  });
+
+  client.on('end', () => {
+    // Terminal close: retryStrategy gave up (returned null). Without this
+    // reset the dead client stayed the singleton forever — a brief startup
+    // race became permanent degradation until a container restart
+    // (audit M1: ~5760 heartbeat/metrics errors per day at green health).
+    if (slot.client === client) slot.client = null;
+  });
+
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    // connectTimeout ioredis ограничивает только TCP-фазу. Сервер, который принял
+    // сокет и молчит на handshake, держал бы общий промис вечно — вместе со
+    // всеми, кто его ждёт (кэш, пульс, лидер outbox; рецензия N17-22).
+    await Promise.race([
+      client.connect(),
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(
+          () => reject(new Error('Redis handshake timed out')),
+          CACHE_CONNECT_TIMEOUT * 2,
+        );
+      }),
+    ]);
+  } catch (err) {
+    logger.error('Redis: initial connect failed', err instanceof Error ? err : new Error(String(err)));
+    client.disconnect();
+    return null;
+  } finally {
+    clearTimeout(timer);
   }
 
-  return slot.client;
+  slot.client = client;
+  return client;
 }
 
 export async function getRedisClient(): Promise<Redis | null> {

@@ -135,6 +135,9 @@ export async function authenticateUserByEmailPassword(
 
     await rateLimiter.reset(accountKey);
     await rateLimiter.reset(lockoutKey);
+    // Счётчик по адресу считает только неудачи: успешный вход возвращает свою
+    // попытку (F3 стенда 16.10 — общий Wi-Fi участка упирался в лимит).
+    await rateLimiter.refund(`login-ip:${clientIdentifier}`);
     return { user: toSessionUser(user), rateLimited: false };
   } catch (err) {
     logger.error('authenticateUserByEmailPassword failed', err);

@@ -22,6 +22,28 @@ describe('rate-limiter', () => {
     rateLimiter.clearAll();
   });
 
+  describe('refund', () => {
+    const config = { maxAttempts: 2, windowMs: 60_000, blockDurationMs: 60_000 };
+
+    it('возвращает одну попытку: успешные входы не копятся в счётчике', async () => {
+      await rateLimiter.check('ip-1', config);
+      await rateLimiter.check('ip-1', config);
+      await rateLimiter.refund('ip-1');
+      expect((await rateLimiter.check('ip-1', config)).allowed).toBe(true);
+      expect((await rateLimiter.check('ip-1', config)).allowed).toBe(false);
+    });
+
+    it('не опускает счётчик ниже нуля и не снимает блокировку', async () => {
+      await rateLimiter.refund('ip-2');
+      await rateLimiter.refund('ip-2');
+      await rateLimiter.check('ip-2', config);
+      await rateLimiter.check('ip-2', config);
+      expect((await rateLimiter.check('ip-2', config)).allowed).toBe(false);
+      await rateLimiter.refund('ip-2');
+      expect((await rateLimiter.check('ip-2', config)).allowed).toBe(false);
+    });
+  });
+
   describe('check', () => {
     it('allows first request', async () => {
       const result = await rateLimiter.check('user-1', AUTH_RATE_LIMIT);

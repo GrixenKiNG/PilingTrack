@@ -9,6 +9,7 @@ import {AUTH_RATE_LIMIT, rateLimiter} from '../rate-limiter';
  */
 function fakeRedis() {
   return {
+    status: 'ready',
     evalsha: vi.fn(),
     eval: vi.fn(),
     del: vi.fn().mockResolvedValue(2),
@@ -82,6 +83,30 @@ describe('rate-limiter через Redis', () => {
     expect((await rateLimiter.check('login:c', config)).allowed).toBe(false);
   });
 
+  it('пока Redis переподключается, не ждёт его и сразу считает в памяти (F6 стенда 16.10)', async () => {
+    // Команда к переподключающемуся клиенту стояла в его очереди, пока ioredis
+    // не исчерпает попытки: первый вход после падения Redis ждал ~15 с.
+    redis.status = 'reconnecting';
+    const config = {maxAttempts: 1, windowMs: 60_000, blockDurationMs: 60_000};
+    expect((await rateLimiter.check('login:r', config)).allowed).toBe(true);
+    expect((await rateLimiter.check('login:r', config)).allowed).toBe(false);
+    expect(redis.evalsha).not.toHaveBeenCalled();
+  });
+
+  it('EVALSHA упал не из-за NOSCRIPT — EVAL не повторяет, а сразу считает в памяти', async () => {
+    redis.evalsha.mockRejectedValue(new Error('Connection is closed.'));
+    expect((await rateLimiter.check('login:n', AUTH_RATE_LIMIT)).allowed).toBe(true);
+    expect(redis.eval).not.toHaveBeenCalled();
+    expect(rateLimiter.isRedisAvailable()).toBe(false);
+  });
+
+  it('refund возвращает одну попытку сценарием в Redis и не трогает блокировку', async () => {
+    redis.eval.mockResolvedValue(1);
+    await rateLimiter.refund('login-ip:1.2.3.4');
+    expect(redis.eval).toHaveBeenCalledWith(expect.stringContaining('DECR'), 1, 'rl:login-ip:1.2.3.4');
+    expect(redis.del).not.toHaveBeenCalled();
+  });
+
   it('reset снимает оба ключа в Redis', async () => {
     await rateLimiter.reset('login:a');
     expect(redis.del).toHaveBeenCalledWith('rl:login:a', 'rl:blocked:login:a');
@@ -144,6 +169,7 @@ describe('rate-limiter: запуск и уборка', () => {
       handlers: Record<string, (arg?: unknown) => void> = {};
       constructor() { created.push(this); }
       on(event: string, handler: (arg?: unknown) => void) { this.handlers[event] = handler; return this; }
+      status = 'ready';
       connect = connect;
       script = script;
     }}));
