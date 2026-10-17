@@ -124,7 +124,7 @@ export function SettingsWorkspace(props: ReferenceUiProps) {
             canExport={Boolean(props.bootstrap?.capabilities.entities.audit.export)}
             activeFilterCount={AUDIT_FILTER_KEYS.filter((key) => Boolean(props.filters[key])).length}
             filtersBar={<ReadinessFiltersBar filters={props.filters} onChange={props.onFiltersChange} mode="audit" />}
-            onExport={(events) => downloadCsv('readiness-audit.csv', [['Последовательность', 'Дата', 'Автор', 'Действие', 'Объект', 'Hash'], ...events.map((event) => [event.sequence, event.occurredAt, event.actor.name, auditActionLabel(event.action), `${auditEntityLabel(event.entity.type)}:${event.entity.id}`, event.hash])])}
+            onExport={(events) => downloadCsv('readiness-audit.csv', [['Последовательность', 'Дата', 'Автор', 'Действие', 'Объект', 'Hash'], ...events.map((event) => [event.sequence, event.occurredAt, event.actor.name, auditActionLabel(event.action, event.metadata), `${auditEntityLabel(event.entity.type)}:${event.entity.id}`, event.hash])])}
           />
         )}
       </div>

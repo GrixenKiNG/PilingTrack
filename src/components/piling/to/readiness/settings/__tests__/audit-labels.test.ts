@@ -166,3 +166,21 @@ describe('auditChainReasonLabel', () => {
     expect(auditChainReasonLabel('SOMETHING_NEW')).toBe('SOMETHING_NEW');
   });
 });
+
+describe('подпись закрытия дефекта без проверки другим лицом', () => {
+  it('показывает пометку из metadata записи аудита', () => {
+    expect(auditActionLabel('defect.resolve', {withoutSecondPersonCheck: true}))
+      .toBe('Замечание закрыто без проверки другим лицом');
+  });
+
+  it.each([null, undefined, {}, {withoutSecondPersonCheck: false}, {comment: 'x'}])(
+    'без пометки подпись обычная (%j)',
+    (metadata) => {
+      expect(auditActionLabel('defect.resolve', metadata)).toBe('Замечание закрыто');
+    },
+  );
+
+  it('пометка не меняет подписи других действий', () => {
+    expect(auditActionLabel('defect.triage', {withoutSecondPersonCheck: true})).toBe('Замечание разобрано');
+  });
+});

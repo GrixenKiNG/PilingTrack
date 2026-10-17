@@ -158,8 +158,21 @@ export function auditActionMark(action: string): AuditActionMark {
       : { icon: CheckCircle2, tone: 'success' });
 }
 
-export function auditActionLabel(action: string): string {
+/**
+ * `metadata` — дополнение записи аудита. Пока оно меняет подпись в одном месте:
+ * критический дефект, закрытый тем же человеком, что взял его в работу
+ * (`withoutSecondPersonCheck`), — второй проверяющий не требуется, но в ленте
+ * это должно быть видно.
+ */
+export function auditActionLabel(action: string, metadata?: unknown): string {
+  if (action === 'defect.resolve' && hasFlag(metadata, 'withoutSecondPersonCheck')) {
+    return 'Замечание закрыто без проверки другим лицом';
+  }
   return ACTION_LABEL[action] ?? action;
+}
+
+function hasFlag(metadata: unknown, key: string): boolean {
+  return typeof metadata === 'object' && metadata !== null && (metadata as Record<string, unknown>)[key] === true;
 }
 
 export function auditEntityLabel(type: string): string {
