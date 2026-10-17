@@ -45,6 +45,14 @@ function getRedisOptions(): RedisOptions {
     protocol: 2,
     maxRetriesPerRequest: CACHE_MAX_RETRIES,
     connectTimeout: CACHE_CONNECT_TIMEOUT,
+    // Соединение, умершее молча после подключения (NAT сбросил состояние,
+    // завис прокси), держало все команды в очереди клиента, пока TCP не оборвёт
+    // его — минуты. Таймер включается, только пока команда ждёт ответа, и по
+    // истечении рвёт сокет: клиент переподключается, команды получают ответ или
+    // ошибку. 10 с — вдвое больше connectTimeout и втрое меньше аренды лидера
+    // (30 с); команды здесь короткие (GET/SET/EVAL/SCAN), блокирующих нет.
+    // TCP keep-alive у ioredis уже включён (30 с по умолчанию) — не трогаем.
+    socketTimeout: 10_000,
     retryStrategy: (times: number) => {
       if (times > CACHE_MAX_RETRIES) {
         return null; // Stop retrying — circuit breaker handles the rest

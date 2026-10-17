@@ -82,6 +82,7 @@ function reply(args: string[]): string {
 class FakeRedis {
   private server: net.Server | null = null;
   private sockets = new Set<net.Socket>();
+  private muted = new WeakSet<net.Socket>();
 
   constructor(readonly port: number) {}
 
@@ -91,6 +92,7 @@ class FakeRedis {
         this.sockets.add(socket);
         let pending: Buffer = Buffer.alloc(0);
         socket.on('data', (chunk) => {
+          if (this.muted.has(socket)) return;
           pending = Buffer.concat([pending, Buffer.from(chunk)]);
           const { commands, rest } = parseCommands(pending);
           pending = rest;
@@ -105,6 +107,11 @@ class FakeRedis {
         resolve();
       });
     });
+  }
+
+  /** Уже открытые соединения молча перестают отвечать и не закрываются; новые работают. */
+  muteExistingConnections(): void {
+    for (const socket of this.sockets) this.muted.add(socket);
   }
 
   async stop(): Promise<void> {
@@ -157,21 +164,51 @@ describe('LeaderElection: недоступность Redis (F1)', () => {
     await closeRedisConnection().catch(() => undefined);
   });
 
+  it('соединение, умершее молча уже после подключения, не держит команды и выбор лидера', async () => {
+    // Сокет жив, ответов нет (NAT сбросил состояние, зависший прокси): без
+    // socketTimeout команды стоят в очереди клиента, пока TCP не оборвёт его.
+    const { LeaderElection } = await import('../leader-election');
+    const { getStateRedisClient } = await import('@/lib/redis-cache');
+
+    const election = new LeaderElection('outbox-worker', {
+      nodeId: 'node-a', ttl: 1500, renewInterval: 300,
+    });
+    await election.start();
+    expect(election.isLeader()).toBe(true);
+    const client = await getStateRedisClient();
+
+    fake.muteExistingConnections();
+    const startedAt = Date.now();
+    const command = client?.get('probe').then(() => 'answered', (err: Error) => err.message) ?? Promise.resolve('no client');
+    await sleep(2000);
+    expect(election.isLeader()).toBe(false);
+
+    const settled = await Promise.race([command, sleep(15_000).then(() => 'hung')]);
+    expect(settled).not.toBe('hung');
+    expect(Date.now() - startedAt).toBeLessThan(15_000);
+
+    const recovered = await waitFor(() => election.isLeader(), 8000);
+    await election.stop();
+    expect(recovered).toBe(true);
+  }, 40_000);
+
   it('подключение к Redis, который принял сокет, но молчит, не виснет вечно', async () => {
     // Рецензия N17-22: connect() без ответа на handshake не завершается ни
     // успехом, ни ошибкой, и все потребители слота (кэш, пульс, лидер) ждали бы
     // один и тот же промис до перезапуска.
     await fake.stop();
-    const silent = net.createServer((socket) => { socket.on('error', () => undefined); });
+    const silentSockets = new Set<net.Socket>();
+    const silent = net.createServer((socket) => {
+      silentSockets.add(socket);
+      socket.on('error', () => undefined);
+    });
     await new Promise<void>((resolve) => silent.listen(Number(new URL(String(process.env.REDIS_URL)).port), '127.0.0.1', resolve));
     try {
-      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
       const { getStateRedisClient } = await import('@/lib/redis-cache');
-      const pending = getStateRedisClient();
-      await vi.advanceTimersByTimeAsync(30_000);
-      expect(await pending).toBeNull();
+      // Предел — 2 × connectTimeout (10 с); тест идёт в реальном времени.
+      expect(await getStateRedisClient()).toBeNull();
     } finally {
-      vi.useRealTimers();
+      for (const socket of silentSockets) socket.destroy();
       await new Promise<void>((resolve) => silent.close(() => resolve()));
     }
   }, 30_000);
