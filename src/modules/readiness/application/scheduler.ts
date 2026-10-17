@@ -224,7 +224,7 @@ export async function runReadinessScheduler(
     if (drafts.length > 0) {
       await tx.report.updateMany({
         where: {tenantId, id: {in: drafts.map((report) => report.id)}, status: 'draft'},
-        data: {status: 'submitted', submittedAt: now},
+        data: {status: 'submitted', submittedAt: now, version: {increment: 1}},
       });
     }
     for (const report of drafts) {

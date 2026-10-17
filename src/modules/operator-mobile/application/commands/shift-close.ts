@@ -222,6 +222,9 @@ export async function submitShiftReport(tx: Tx, input: {
       endingEngineHours: lastMeter?.engineHours ?? null,
       endingFuelPercent: fuelPercent,
       lastEditedById: input.operatorId,
+      // Как у веб-сохранения (report.repository.ts): иначе форма, открытая до
+      // сдачи, пройдёт проверку версии и затрёт сданный отчёт.
+      version: {increment: 1},
     },
   });
   if (submitted.count === 0) return {reportId};
