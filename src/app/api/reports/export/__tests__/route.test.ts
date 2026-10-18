@@ -51,6 +51,13 @@ describe('GET /api/reports/export', () => {
     expect(exportReportsCsvMock).not.toHaveBeenCalled();
   });
 
+  it.each(['drafts', 'submitted'])('принимает статусный фильтр %s и передаёт его в выгрузку', async (filter) => {
+    requireAuthMock.mockResolvedValue({user: {id: 'admin', role: 'ADMIN', tenantId: 'orion'}, error: null});
+    const res = await GET(req(`dateFrom=2026-10-01&dateTo=2026-10-18&filter=${filter}`));
+    expect(res.status).toBe(200);
+    expect(exportReportsCsvMock).toHaveBeenCalledWith(expect.objectContaining({filter}));
+  });
+
   it('refuses when no tenantId can be resolved (fail closed)', async () => {
     const prevDefault = process.env.DEFAULT_TENANT_ID;
     delete process.env.DEFAULT_TENANT_ID;

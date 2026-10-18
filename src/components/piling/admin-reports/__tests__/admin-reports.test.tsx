@@ -194,6 +194,21 @@ describe('AdminReports — пометка формата выгрузки (F-R11
     reportsState.current = baseState();
   });
 
+  it.each([['Черновики', 'drafts'], ['Сданные', 'submitted']])('передаёт фильтр «%s» в CSV и Excel', async (label, filter) => {
+    reportsState.current = baseState({periodActive: true, periodFrom: '2026-10-01', periodTo: '2026-10-18'});
+    authFetchMock.mockResolvedValue({ok: false, status: 500, json: async () => ({})});
+    render(<AdminReports />);
+    fireEvent.click(screen.getByRole('button', {name: label}));
+    for (const format of ['CSV', 'Excel']) {
+      fireEvent.click(screen.getByRole('button', {name: format}));
+      await waitFor(() => expect(screen.getByTestId('export-state')).toHaveTextContent('idle'));
+    }
+    expect(authFetchMock).toHaveBeenCalledTimes(2);
+    for (const [url] of authFetchMock.mock.calls) {
+      expect(new URL(url, 'http://localhost').searchParams.get('filter')).toBe(filter);
+    }
+  });
+
   it('во время выгрузки помечен только нажатый формат, после ответа — снова пусто', async () => {
     let resolveFetch: (value: unknown) => void = () => {};
     authFetchMock.mockImplementation(() => new Promise((resolve) => { resolveFetch = resolve; }));

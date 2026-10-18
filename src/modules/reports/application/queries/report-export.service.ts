@@ -107,7 +107,7 @@ export interface ReportExportFilters {
   tenantId: string;
   userId?: string | null;
   equipmentId?: string | null;
-  filter?: 'downtime' | 'withPhotos' | 'edited' | null;
+  filter?: 'drafts' | 'submitted' | 'downtime' | 'withPhotos' | 'edited' | null;
   siteId?: string | null;
   dateFrom?: string | null;
   dateTo?: string | null;
@@ -123,6 +123,8 @@ async function fetchReportsForExport(filters: ReportExportFilters) {
   }
 
   const where: Record<string, unknown> = { tenantId: filters.tenantId };
+  if (filters.filter === 'drafts') where.status = 'draft';
+  if (filters.filter === 'submitted') where.status = 'submitted';
   if (filters.siteId) where.siteId = filters.siteId;
   if (filters.userId) where.userId = filters.userId;
   if (filters.equipmentId) where.equipmentId = filters.equipmentId;
