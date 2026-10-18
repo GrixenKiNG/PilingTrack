@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { ReportSentScreen } from '../report-sent-screen';
+import { SubmitBar } from '../submit-bar';
 
 const baseProps = {
   siteName: 'Ленина 12',
@@ -46,5 +47,21 @@ describe('ReportSentScreen', () => {
     render(<ReportSentScreen {...baseProps} onDone={onDone} />);
     fireEvent.click(screen.getByText('Готово'));
     expect(onDone).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('SubmitBar', () => {
+  it('shows a short downtime in minutes, not as "0 ч"', () => {
+    // N17-06: 2 минуты (0,033 ч) через formatNumber печатались как «0 ч»,
+    // хотя строка простоя в отчёте есть, а блок «Простой» выше пишет «2 мин».
+    render(
+      <SubmitBar
+        totalPiles={1} totalPileMeters={12} totalDrillingCount={0} totalMeters={0}
+        totalDowntime={2 / 60} hasDowntime selectedSiteId="site-1" hasEntries
+        submitting={false} onSubmit={vi.fn()}
+      />,
+    );
+    expect(screen.getByText('2 мин')).toBeTruthy();
+    expect(screen.queryByText('0 ч')).toBeNull();
   });
 });

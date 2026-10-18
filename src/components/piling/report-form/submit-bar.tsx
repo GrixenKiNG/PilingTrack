@@ -3,6 +3,7 @@
 import { Send, AlertTriangle, Loader2 } from '@/components/piling/icons/unified-icons';
 import { cn } from '@/lib/utils';
 import { formatNumber } from '@/lib/format';
+import { formatDowntimeHours } from '@/lib/downtime-hours';
 import { Card, CardContent } from '@/components/ui/card';
 
 interface SubmitBarProps {
@@ -41,7 +42,7 @@ export function SubmitBar({
               </div>
               {hasDowntime && (
                 <div>
-                  <p className="text-lg font-bold font-mono tabular-nums text-warning-strong">{formatNumber(totalDowntime)} ч</p>
+                  <p className="text-lg font-bold font-mono tabular-nums text-warning-strong">{formatDowntimeHours(totalDowntime)}</p>
                   <p className="text-xs font-medium text-muted-foreground">Простой</p>
                 </div>
               )}
