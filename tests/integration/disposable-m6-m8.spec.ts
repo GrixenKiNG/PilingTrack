@@ -121,7 +121,12 @@ describe.skipIf(!enabled)('M6–M8 on disposable migrated Postgres', () => {
         : { ok: true, json: async () => ({ ok: true }) };
     }));
     const { deliverQueuedAlert } = await import('@/services/notifications/durable-alert-delivery');
-    await inContext(() => deliverQueuedAlert({ id: eventId, tenantId: tenant, data: alert }));
+    const deliver = () => inContext(() => deliverQueuedAlert({ id: eventId, tenantId: tenant, data: alert }));
+    // Решение владельца 17.10.2026: канал отключается после трёх отказов «навсегда» подряд.
+    // Первые два — обычный сбой: доставка в A уже сохранена, outbox повторит попытку.
+    await expect(deliver()).rejects.toThrow('retained for retry');
+    await expect(deliver()).rejects.toThrow('retained for retry');
+    await deliver();
     expect((await fixture.owner.query('SELECT payload,published FROM "OutboxEvent" WHERE id=$1', [eventId])).rows[0])
       .toMatchObject({ published: true, payload: { telegramDeliveredChatIds: ['A'] } });
     expect((await fixture.owner.query('SELECT enabled,label FROM "TelegramConfig" WHERE id=$1 AND "tenantId"=$2', [tenant + '-chat-B', tenant])).rows[0])
