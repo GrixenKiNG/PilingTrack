@@ -438,6 +438,10 @@ export class MediaService {
 
   /**
    * Run retention policy — hard delete soft-deleted files older than retention period.
+   *
+   * Только брошенные загрузки (`pending`, `failed`): файла-доказательства у них
+   * нет. Готовое фото (`completed`) не стирается никогда, даже скрытое кнопкой
+   * «удалить»: по решению владельца 02.10.2026 фото хранятся навсегда.
    */
   async runRetention(retentionDays: number = 90): Promise<number> {
     const cutoff = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000);
@@ -447,6 +451,7 @@ export class MediaService {
       where: {
         isDeleted: true,
         deletedAt: { lt: cutoff },
+        uploadStatus: { not: 'completed' },
       },
       select: { id: true },
       take: 100, // Batch delete
