@@ -362,7 +362,7 @@ export function AdminTelegram() {
                       </Badge>
                     </div>
                   </div>
-                  <div className="flex items-center justify-end gap-2 mt-3">
+                  <div className="flex flex-wrap items-center justify-end gap-2 mt-3">
                     <button
                       onClick={() => handleTest(config)}
                       disabled={testingId !== null}

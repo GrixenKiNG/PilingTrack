@@ -34,7 +34,7 @@ export default defineConfig({
     },
     {
       name: 'Mobile Chrome',
-      use: { ...devices['Galaxy S20'] },
+      use: { ...devices['Galaxy S24'] },
     },
     {
       name: 'unauthenticated',
