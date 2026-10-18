@@ -3,6 +3,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { NextRequest } from 'next/server';
 
 const { getRedisClientMock, redisPingMock } = vi.hoisted(() => ({
   getRedisClientMock: vi.fn(),
@@ -23,6 +24,7 @@ vi.mock('@/lib/redis-cache', () => ({
 
 import { getHealth, getReadiness, getLiveness, diskHealthFromStats } from '../health-checks';
 import { db } from '@/lib/db';
+import { GET as getLivenessRoute } from '@/app/api/liveness/route';
 
 // 100 blocks × 4 KiB; bavail = 100 - usedPercent → an exact used% for assertions.
 const diskStats = (usedPercent: number) => ({ blocks: 100, bsize: 4096, bavail: 100 - usedPercent });
@@ -47,6 +49,21 @@ describe('Health Checks', () => {
       expect(result.memory.rssMB).toBeGreaterThan(0);
       expect(result.nodeVersion).toBe(process.version);
       expect(result.platform).toBe(process.platform);
+    });
+  });
+
+  describe('GET /api/liveness', () => {
+    it('exposes only { status: "alive" } publicly — no internal process details', async () => {
+      const res = await getLivenessRoute(new NextRequest('http://localhost/api/liveness'));
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body).toEqual({ status: 'alive' });
+      expect(body).not.toHaveProperty('pid');
+      expect(body).not.toHaveProperty('memory');
+      expect(body).not.toHaveProperty('nodeVersion');
+      expect(body).not.toHaveProperty('platform');
+      expect(body).not.toHaveProperty('uptime');
     });
   });
 
