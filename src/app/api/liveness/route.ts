@@ -6,11 +6,11 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getLiveness } from '@/core/observability/health-checks';
 
 export const runtime = 'nodejs';
 
 export async function GET(_request: NextRequest) {
-  const liveness = getLiveness();
-  return NextResponse.json(liveness, { status: 200 });
+  // Публичная проба: отдаём только признак живости процесса.
+  // Детали процесса (pid, память, версия, платформа) — материал для фингерпринтинга.
+  return NextResponse.json({ status: 'alive' }, { status: 200 });
 }
