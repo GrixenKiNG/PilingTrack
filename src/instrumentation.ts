@@ -4,6 +4,7 @@
 
 import * as Sentry from '@sentry/nextjs';
 import { logger } from '@/lib/logger';
+import { reportMissingDefaultTenant } from '@/lib/startup-checks';
 
 export const onRequestError = Sentry.captureRequestError;
 
@@ -58,6 +59,7 @@ export async function register() {
   }
 
   logEffectiveRuntimeFlags();
+  reportMissingDefaultTenant();
 
   try {
     const { startEmbeddedWorkers } = await import('@/workers/embedded-workers');
