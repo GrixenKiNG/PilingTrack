@@ -186,6 +186,11 @@ export const PILE_JOURNAL_EXPORT_LIMIT = 20000;
 
 /** Итоги периода — по всему периоду, а не по показанной странице. */
 export interface PileJournalTotals {
+  /** Описательные поля по всей выборке, независимо от лимита страницы. */
+  scope?: Pick<PileJournalHeader, 'siteNames' | 'equipmentNames' | 'hammerTypes' | 'hammerEnergyKj' | 'designRefusalMm'> & {
+    drivenFrom: string | null;
+    drivenTo: string | null;
+  };
   /** «Свай (всего)»: Σ count по всем строкам периода. */
   piles: number;
   /** «из них в черновиках»: Σ count строк отчётов-черновиков. */
@@ -209,6 +214,7 @@ export interface PileJournalPage {
 }
 
 export interface RawPileJournalTotals {
+  scope?: PileJournalTotals['scope'];
   piles: number;
   draftPiles: number;
   withoutPassportPiles: number;

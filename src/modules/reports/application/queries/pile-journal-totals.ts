@@ -67,10 +67,23 @@ export async function pileJournalTotals(
       COUNT(*) FILTER (WHERE p."acceptance" = 'ACCEPTED')::int AS "accepted",
       COUNT(*) FILTER (WHERE p."acceptance" = 'NEEDS_REDRIVE')::int AS "needsRedrive",
       COUNT(*) FILTER (WHERE p."acceptance" = 'PENDING')::int AS "pending",
-      COUNT(*)::int AS "rows"
+      COUNT(*)::int AS "rows",
+      jsonb_build_object(
+        'siteNames', COALESCE(array_agg(DISTINCT COALESCE(s.name, '—')) FILTER (WHERE pw.id IS NOT NULL), ARRAY[]::text[]),
+        'equipmentNames', COALESCE(array_agg(DISTINCT COALESCE(e.name, ce.name)) FILTER (WHERE COALESCE(e.name, ce.name) IS NOT NULL), ARRAY[]::text[]),
+        'hammerTypes', COALESCE(array_agg(DISTINCT p."hammerType") FILTER (WHERE p."hammerType" IS NOT NULL), ARRAY[]::text[]),
+        'hammerEnergyKj', COALESCE(array_agg(DISTINCT p."hammerEnergyKj" ORDER BY p."hammerEnergyKj") FILTER (WHERE p."hammerEnergyKj" IS NOT NULL), ARRAY[]::double precision[]),
+        'designRefusalMm', COALESCE(array_agg(DISTINCT p."designRefusalMm" ORDER BY p."designRefusalMm") FILTER (WHERE p."designRefusalMm" IS NOT NULL), ARRAY[]::double precision[]),
+        'drivenFrom', MIN(COALESCE(pw."occurredAt", pw."receivedAt")),
+        'drivenTo', MAX(COALESCE(pw."occurredAt", pw."receivedAt"))
+      ) AS scope
     FROM "PileWork" pw
     LEFT JOIN "Report" r ON r.id = pw."reportId"
     LEFT JOIN "PilePassport" p ON p."pileWorkId" = pw.id
+    LEFT JOIN "Site" s ON s.id = r."siteId"
+    LEFT JOIN "Equipment" e ON e.id = r."equipmentId"
+    LEFT JOIN "Crew" c ON c.id = r."crewId"
+    LEFT JOIN "Equipment" ce ON ce.id = c."equipmentId"
     WHERE pw."tenantId" = ${input.tenantId}
       AND (${siteId}::text IS NULL OR r."siteId" = ${siteId}::text)
       AND (${acceptanceValue}::text IS NULL OR p."acceptance"::text = ${acceptanceValue}::text)
@@ -105,8 +118,8 @@ function printYmd(ymd: string): string {
 }
 
 /**
- * Титул журнала: описательные величины — из показанных строк, итоги — из
- * агрегата периода (`totals`).
+ * Титул журнала: описательные величины и итоги — из агрегата всей выборки.
+ * Строки остаются fallback для ранее загруженных данных без scope.
  *
  * ПОЧЕМУ ОПИСАТЕЛЬНЫЕ ИЗ СТРОК, А НЕ ИЗ ОТДЕЛЬНЫХ ПОЛЕЙ ОБЪЕКТА. Копёр, молот,
  * энергия удара и проектный отказ записаны в каждом паспорте на момент забивки.
@@ -129,8 +142,9 @@ export function pileJournalHeader(
   const uniq = <T,>(values: (T | null | undefined)[]): T[] =>
     [...new Set(values.filter((value): value is T => value !== null && value !== undefined))];
 
-  const dates = rows
-    .map((row) => (timezone ? dayInTimezone(row.drivenAt, timezone) : row.drivenAt.slice(0, 10)))
+  const scope = totals.scope;
+  const dates = (scope ? [scope.drivenFrom, scope.drivenTo].filter((value): value is string => value !== null) : rows.map((row) => row.drivenAt))
+    .map((iso) => (timezone ? dayInTimezone(iso, timezone) : iso.slice(0, 10)))
     .sort();
   const periodEdge = (day: string | undefined): string | null => {
     if (day === undefined) return null;
@@ -138,11 +152,11 @@ export function pileJournalHeader(
   };
 
   return {
-    siteNames: uniq(rows.map((row) => row.siteName)),
-    equipmentNames: uniq(rows.map((row) => row.equipmentName)),
-    hammerTypes: uniq(rows.map((row) => row.hammerType)),
-    hammerEnergyKj: uniq(rows.map((row) => row.hammerEnergyKj)).sort((a, b) => a - b),
-    designRefusalMm: uniq(rows.map((row) => row.designRefusalMm)).sort((a, b) => a - b),
+    siteNames: scope?.siteNames ?? uniq(rows.map((row) => row.siteName)),
+    equipmentNames: scope?.equipmentNames ?? uniq(rows.map((row) => row.equipmentName)),
+    hammerTypes: scope?.hammerTypes ?? uniq(rows.map((row) => row.hammerType)),
+    hammerEnergyKj: scope?.hammerEnergyKj ?? uniq(rows.map((row) => row.hammerEnergyKj)).sort((a, b) => a - b),
+    designRefusalMm: scope?.designRefusalMm ?? uniq(rows.map((row) => row.designRefusalMm)).sort((a, b) => a - b),
     dateFrom: periodEdge(dates[0]),
     dateTo: periodEdge(dates[dates.length - 1]),
     // Единицы не смешиваем: «Свай (всего)» — сваи (Σ count, пачка приносит

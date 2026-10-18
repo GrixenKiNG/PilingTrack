@@ -214,6 +214,28 @@ describe('listPilePassports — строки из выработки (W14)', () 
 describe('listPilePassports — итоги по всему периоду (W21)', () => {
   beforeEach(defaultMocks);
 
+  it('титул экрана и XLSX описывает всю выборку, включая строки за пределом страницы', async () => {
+    pileWorkFindMany.mockResolvedValue(Array.from({length: PILE_JOURNAL_LIMIT + 1}, (_, i) => work({id: `w${i}`})));
+    pileTotalsQuery.mockResolvedValue([totals({rows: 900, scope: {
+      siteNames: ['Объект', 'Другой объект'], equipmentNames: ['СО-1', 'СО-2'],
+      hammerTypes: ['Молот-2'], hammerEnergyKj: [80], designRefusalMm: [2],
+      drivenFrom: '2026-09-01T21:30:00.000Z', drivenTo: '2026-09-30T21:30:00.000Z',
+    }})]);
+    const page = await listPilePassports({tenantId: 'orion'});
+    const header = pileJournalHeader(page.rows, page.totals, 'Europe/Moscow');
+    expect(page.truncated).toBe(true);
+    expect(header).toMatchObject({
+      siteNames: ['Объект', 'Другой объект'], equipmentNames: ['СО-1', 'СО-2'],
+      hammerTypes: ['Молот-2'], hammerEnergyKj: [80], designRefusalMm: [2],
+      dateFrom: '02.09.2026', dateTo: '01.10.2026', rowsTotal: 900,
+    });
+    await exportPileJournalXlsx({tenantId: 'orion'});
+    const title = sheet('Титул').rows;
+    expect(title.flat()).toContain('Объект, Другой объект');
+    expect(title.flat()).toContain('СО-1, СО-2');
+    expect(title.flat()).toContain('02.09.2026 — 01.10.2026');
+  });
+
   it('при усечении итоги считаются по всему периоду, а не по показанным строкам', async () => {
     // 501 строка → срез: титул обязан описать весь период, а не первые 500.
     pileWorkFindMany.mockResolvedValue(
