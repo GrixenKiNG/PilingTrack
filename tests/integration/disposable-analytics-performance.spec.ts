@@ -131,7 +131,13 @@ describe.skipIf(!process.env.INTEGRATION_DATABASE_URL_OWNER)('J8 pile journal pe
         expect(page.rows).toHaveLength(expected);
         expect(page.truncated).toBe(false);
         expect(page.rows.map(row => row.pileWorkId).sort()).toEqual(listed.rows.map(row => row.id).sort());
-        expect(page.totals).toEqual(totals.rows[0]);
+        const {scope, ...numericTotals} = page.totals;
+        expect(numericTotals).toEqual(totals.rows[0]);
+        if (!scope?.drivenFrom || !scope.drivenTo) throw new Error('Journal period scope missing');
+        expect(scope.siteNames.sort()).toEqual([...new Set(page.rows.map(row => row.siteName))].sort());
+        const moments = page.rows.map(row => row.drivenAt).sort();
+        expect(new Date(scope.drivenFrom).toISOString()).toBe(moments[0]);
+        expect(new Date(scope.drivenTo).toISOString()).toBe(moments[moments.length - 1]);
         expect(page.totals).toMatchObject({ piles: expected, rows: expected, draftPiles: 0, withoutPassportPiles: expected, accepted: 0, needsRedrive: 0, pending: 0 });
         const branches = await owner.query<{ fallback: number; occurred: number }>(`
           SELECT COUNT(*) FILTER (WHERE pw."occurredAt" IS NULL)::int AS fallback,
