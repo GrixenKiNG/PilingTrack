@@ -1,20 +1,32 @@
 import { describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 
-const { getReadinessMock } = vi.hoisted(() => ({
+const { getReadinessMock, getLivenessMock } = vi.hoisted(() => ({
   getReadinessMock: vi.fn(),
+  getLivenessMock: vi.fn(),
 }));
 
 vi.mock('@/core/observability/health-checks', () => ({
   getReadiness: getReadinessMock,
+  getLiveness: getLivenessMock,
 }));
 
 import { GET as readyGET } from '../route';
 import { GET as readinessGET } from '../../readiness/route';
+import { GET as livenessGET } from '../../liveness/route';
 
 const request = () => new NextRequest('http://localhost/api/ready');
 
 describe('public readiness probes must not leak internal details', () => {
+  it('returns only status and uptime from the public liveness probe', async () => {
+    getLivenessMock.mockReturnValue({
+      status: 'alive', uptime: 12, pid: 123,
+      memory: { heapUsedMB: 50, rssMB: 100 }, nodeVersion: 'v22.0.0', platform: 'linux',
+    });
+    const response = await livenessGET(request());
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ status: 'alive', uptime: 12 });
+  });
   it('strips details from /api/ready checks while keeping ready/status/latencyMs', async () => {
     getReadinessMock.mockResolvedValue({
       status: 'not_ready',

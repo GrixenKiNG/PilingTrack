@@ -11,5 +11,5 @@ registerAllEventHandlers();
 registerReadinessProjectionHandler();
 
 export const GET = withApi(async () => {
-  return NextResponse.json({ status: "ok", version: "1.0.0", timestamp: new Date().toISOString() });
+  return NextResponse.json({ status: "ok", version: process.env.APP_VERSION || process.env.npm_package_version || 'unknown', timestamp: new Date().toISOString() });
 }, { domain: 'health' });

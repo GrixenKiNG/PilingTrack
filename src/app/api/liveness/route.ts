@@ -12,5 +12,5 @@ export const runtime = 'nodejs';
 
 export async function GET(_request: NextRequest) {
   const liveness = getLiveness();
-  return NextResponse.json(liveness, { status: 200 });
+  return NextResponse.json({ status: liveness.status, uptime: liveness.uptime }, { status: 200 });
 }

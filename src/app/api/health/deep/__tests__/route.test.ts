@@ -76,7 +76,7 @@ describe('GET /api/health/deep', () => {
       schedulers: 'ok',
       storage: 'ok',
     });
-    expect(body.staleSchedulers).toEqual([]);
+    expect(body).not.toHaveProperty('staleSchedulers');
   });
 
   it('returns 200 when overall status is degraded (still serving)', async () => {
@@ -189,7 +189,7 @@ describe('GET /api/health/deep', () => {
     expect(JSON.stringify(body)).not.toMatch(/error/i);
   });
 
-  it('отдаёт schedulers «stale» с именем вставшего планировщика, оставаясь 200', async () => {
+  it('отдаёт schedulers «stale» без имени вставшего планировщика, оставаясь 200', async () => {
     getFreshStatusMock.mockResolvedValue(
       makeStatus({
         status: 'degraded',
@@ -213,7 +213,8 @@ describe('GET /api/health/deep', () => {
     const body = await res.json();
     expect(body.status).toBe('degraded');
     expect(body.components.schedulers).toBe('stale');
-    expect(body.staleSchedulers).toEqual(['projection-rebuild']);
+    expect(body).not.toHaveProperty('staleSchedulers');
+    expect(JSON.stringify(body)).not.toContain('projection-rebuild');
   });
 
   it('sets Cache-Control: no-store so monitors always see fresh status', async () => {

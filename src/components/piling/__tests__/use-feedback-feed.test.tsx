@@ -29,8 +29,8 @@ function liveIntervals(): number {
   return setIntervalSpy.mock.calls.length - clearIntervalSpy.mock.calls.length;
 }
 
-function Probe({ open = false }: { open?: boolean }) {
-  useFeedbackFeedRef.current?.({ enabled: true, isPrivileged: false, open });
+function Probe({ open = false, isPrivileged = false }: { open?: boolean; isPrivileged?: boolean }) {
+  useFeedbackFeedRef.current?.({ enabled: true, isPrivileged, open });
   return null;
 }
 
@@ -63,6 +63,7 @@ describe('useFeedbackFeed', () => {
   afterEach(() => {
     setIntervalSpy.mockRestore();
     clearIntervalSpy.mockRestore();
+    vi.unstubAllGlobals();
   });
 
   it('два экземпляра дают один запрос и один живой таймер, а не два', async () => {
@@ -104,5 +105,21 @@ describe('useFeedbackFeed', () => {
 
     expect(mocks.authFetch).not.toHaveBeenCalled();
     expect(liveIntervals()).toBe(0);
+  });
+
+  it('ограничивает запрос ready общим таймаутом и продолжает читать события после его отказа', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({ ready: true }) }));
+    mocks.authFetch.mockImplementation(async (url: string) => {
+      if (url === '/api/ready') throw new Error('Нет связи');
+      return { ok: true, json: async () => ({ events: [], summary: null }) };
+    });
+    const view = render(<Probe isPrivileged />);
+    await act(async () => {});
+
+    expect(mocks.authFetch).toHaveBeenCalledWith('/api/ready');
+    const { loadFeedbackFeed } = await import('../use-feedback-feed');
+    await expect(loadFeedbackFeed({ includeHealth: true })).resolves.toBeUndefined();
+    expect(mocks.authFetch.mock.calls.filter(([url]) => url.includes('/api/feedback/events'))).toHaveLength(2);
+    view.unmount();
   });
 });

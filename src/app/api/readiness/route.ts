@@ -8,20 +8,9 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getReadiness } from '@/core/observability/health-checks';
+import { sanitizeChecks } from '@/core/observability/public-health';
 
 export const runtime = 'nodejs';
-
-/**
- * Public probe — never expose internal `details` (DB error message, missing
- * env var names). The authenticated system status keeps the full diagnostics.
- */
-function sanitizeChecks(checks: Record<string, { name: string; status: string; latencyMs?: number }>) {
-  return Object.fromEntries(
-    Object.values(checks).map(({ name, status, latencyMs }) =>
-      latencyMs === undefined ? [name, { name, status }] : [name, { name, status, latencyMs }]
-    )
-  );
-}
 
 export async function GET(_request: NextRequest) {
   const readiness = await getReadiness();

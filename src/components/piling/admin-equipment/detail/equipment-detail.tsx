@@ -127,6 +127,7 @@ export function EquipmentDetail({ equipmentId, embedded = false, onSaved }: Prop
       // Второй проход: разделы выше якоря (мониторинг, ТО, осмотры) грузят
       // свои данные сами и подрастают уже после первого скролла, утаскивая
       // раздел вниз. Один повтор возвращает его на место.
+      if (settle !== undefined) window.clearTimeout(settle);
       settle = window.setTimeout(
         () => document.getElementById(key)?.scrollIntoView({ block: 'start' }),
         700,

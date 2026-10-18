@@ -106,12 +106,13 @@ export const POST = withMutation(async (request: NextRequest) => {
 
     // Fallback to sync if Redis unavailable
     if (!jobId) {
+      let timer: ReturnType<typeof setTimeout> | undefined;
       const pdfBuffer = await Promise.race([
         generateSinglePdf(context.pdfData),
-        new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new ServiceError('Превышено время подготовки PDF (30 с)', 504)), 30_000),
-        ),
-      ]);
+        new Promise<never>((_, reject) => {
+          timer = setTimeout(() => reject(new ServiceError('Превышено время подготовки PDF (30 с)', 504)), 30_000);
+        }),
+      ]).finally(() => clearTimeout(timer));
       return new NextResponse(new Uint8Array(pdfBuffer), {
         status: 200,
         headers: {

@@ -54,6 +54,14 @@ describe('ReadinessFiltersBar: audit mode debounce and dropdown (R125 №6, №7
     );
   });
 
+  it('does not change the URL filters after unmount', () => {
+    const view = render(<ReadinessFiltersBar filters={{}} onChange={mockOnChange} mode="audit" />);
+    fireEvent.change(screen.getByLabelText('Кто изменил'), { target: { value: 'test-actor' } });
+    view.unmount();
+    vi.advanceTimersByTime(300);
+    expect(mockOnChange).not.toHaveBeenCalled();
+  });
+
   it('renders eventType as a Select component with options', () => {
     render(
       <ReadinessFiltersBar
