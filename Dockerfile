@@ -60,6 +60,8 @@ ENV DATABASE_PROVIDER=postgres
 ENV DATABASE_URL_POSTGRES=postgresql://build:build@localhost:5432/build
 COPY --from=deps /app/node_modules ./node_modules
 COPY prisma ./prisma
+# Файлы сидов с демо-учётками и фиксированными паролями в образ не попадают.
+RUN rm -f ./prisma/seed.ts ./prisma/seed-test-data.ts
 # prisma.config.ts holds the datasource.url (env-based) + seed command — Prisma 7
 # requires it for `migrate deploy`/`status`; the schema has no inline url.
 COPY package.json tsconfig.json prisma.config.ts ./
@@ -96,6 +98,8 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
+# Сиды с демо-учётками и фиксированными паролями в боевый образ не попадают.
+RUN rm -f ./prisma/seed.ts ./prisma/seed-test-data.ts
 
 # Next.js standalone не трассирует кастомный Prisma client из src/generated/postgres-client.
 # Явно копируем @prisma и .prisma — иначе runtime падает с

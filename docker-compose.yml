@@ -46,7 +46,7 @@ services:
       - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@postgres:5432/${POSTGRES_DB:-pilingtrack_test}?schema=public
       - DATABASE_URL_POSTGRES=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@postgres:5432/${POSTGRES_DB:-pilingtrack_test}?schema=public
       - DATABASE_PROVIDER=postgres
-      - SKIP_SEED=${SKIP_SEED:-0}
+      - SKIP_SEED=${SKIP_SEED:-1}
     depends_on:
       postgres:
         condition: service_healthy
