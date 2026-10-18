@@ -173,6 +173,32 @@ describe('POST /api/reports/single-pdf — body validation', () => {
     requireAuthMock.mockResolvedValue({ user: OPERATOR, error: null });
   });
 
+  it('clears the sync fallback deadline when PDF generation completes or fails', async () => {
+    vi.mocked(loadSingleReportPdfContext).mockResolvedValue({
+      report: { date: '2026-10-18', siteId: 'site-1', tenantId: 'tenant-a', userId: OPERATOR.id },
+      pdfData: {},
+    } as never);
+    vi.mocked(enqueuePdfGeneration).mockResolvedValue(null);
+    const timeoutSpy = vi.spyOn(globalThis, 'setTimeout');
+    const clearSpy = vi.spyOn(globalThis, 'clearTimeout');
+    try {
+      for (const fails of [false, true]) {
+        timeoutSpy.mockClear();
+        clearSpy.mockClear();
+        if (fails) vi.mocked(generateSinglePdf).mockRejectedValueOnce(new Error('render failed'));
+        else vi.mocked(generateSinglePdf).mockResolvedValueOnce(Buffer.from('%PDF-1.4'));
+        const response = await POST(postReq({ reportId: 'report-1' }));
+        expect(response.status).toBe(fails ? 500 : 200);
+        const index = timeoutSpy.mock.calls.findIndex(([, delay]) => delay === 30_000);
+        expect(index).toBeGreaterThanOrEqual(0);
+        expect(clearSpy).toHaveBeenCalledWith(timeoutSpy.mock.results[index].value);
+      }
+    } finally {
+      timeoutSpy.mockRestore();
+      clearSpy.mockRestore();
+    }
+  });
+
   it('rejects a non-string reportId with 400 and details', async () => {
     const res = await POST(postReq({ reportId: { evil: true } }));
 

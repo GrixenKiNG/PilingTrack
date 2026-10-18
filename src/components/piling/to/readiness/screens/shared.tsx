@@ -140,6 +140,11 @@ export function ReadinessFiltersBar({filters, onChange, mode}: {
   const activeCount = keys.filter((key) => Boolean(filters[key])).length;
   const debounceRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
+  useEffect(() => {
+    const timers = debounceRef.current;
+    return () => Object.values(timers).forEach(clearTimeout);
+  }, []);
+
   const update = (key: keyof ReadinessUrlFilters, value: string, debounceMs = 0) => {
     if (debounceMs > 0) {
       const existing = debounceRef.current[key];

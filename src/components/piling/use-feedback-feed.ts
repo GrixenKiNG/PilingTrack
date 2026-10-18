@@ -82,12 +82,14 @@ export async function loadFeedbackFeed(options?: {
   try {
     const requests: Promise<Response>[] = [authFetch('/api/feedback/events?limit=25')];
     if (shouldLoadHealth) {
-      requests.push(fetch('/api/ready', { credentials: 'same-origin' }));
+      requests.push(authFetch('/api/ready'));
     }
 
-    const [eventsRes, readyRes] = await Promise.all(requests);
+    const [eventsResult, readyResult] = await Promise.allSettled(requests);
+    const eventsRes = eventsResult.status === 'fulfilled' ? eventsResult.value : undefined;
+    const readyRes = readyResult?.status === 'fulfilled' ? readyResult.value : undefined;
 
-    if (eventsRes.ok) {
+    if (eventsRes?.ok) {
       const eventsData = await eventsRes.json();
       useFeedbackFeedStore.setState({
         events: eventsData.events || [],
