@@ -106,13 +106,24 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: true, forwarded: 0 });
   }
 
-  // Выключатель «Сбои сервера (мониторинг)». У вебхука нет сессии: тенант —
-  // только тенант развёртывания, тот же, в чьи чаты уходит отправка
-  // (core/notifications/telegram.ts:getConfigs).
-  const notifyEnabled = await isNotificationEnabled(
-    process.env.DEFAULT_TENANT_ID ?? null,
-    'systemAlerts',
-  );
+  // У вебхука нет сессии: тенант — только тенант развёртывания, тот же, в чьи
+  // чаты уходит отправка (core/notifications/telegram.ts:getConfigs).
+  // Без него доставлять некуда, а выключатель «Сбои сервера» прочитать не из
+  // чего (isNotificationEnabled без тенанта отвечает «включено»). Раньше это
+  // кончалось тем же 503, но без причины в журнале; закрытые алерты отказа
+  // не требуют, их по-прежнему принимаем.
+  const tenantId = process.env.DEFAULT_TENANT_ID?.trim();
+  if (!tenantId && alerts.some((alert) => alert.status === 'firing')) {
+    logger.error('Alertmanager webhook: DEFAULT_TENANT_ID не задана, организация для доставки неизвестна', {
+      total: alerts.length,
+    });
+    return NextResponse.json(
+      { ok: false, forwarded: 0, error: 'Организация по умолчанию не настроена' },
+      { status: 503 },
+    );
+  }
+  // Выключатель «Сбои сервера (мониторинг)».
+  const notifyEnabled = await isNotificationEnabled(tenantId ?? null, 'systemAlerts');
   if (!notifyEnabled) {
     logger.info('Alertmanager webhook suppressed by notification settings', { total: alerts.length });
     return NextResponse.json({ ok: true, forwarded: 0, reason: 'disabled' });
@@ -121,7 +132,6 @@ export async function POST(request: NextRequest) {
   let forwarded = 0;
   let firing = 0;
   let attempted = 0;
-  const tenantId = process.env.DEFAULT_TENANT_ID;
   for (const alert of alerts) {
     if (alert.status !== 'firing') continue;
     firing++;

@@ -28,6 +28,7 @@ vi.mock('@/modules/settings', () => ({ isNotificationEnabled: mocks.enabled }));
 vi.mock('@/lib/logger', () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }));
 
 import { POST } from '../route';
+import { logger } from '@/lib/logger';
 
 const TOKEN = 'super-secret-webhook-token';
 
@@ -288,5 +289,27 @@ describe('POST /api/alerts/webhook — delivery failure', () => {
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ ok: true, forwarded: 0 });
     expect(mocks.sendAlert).not.toHaveBeenCalled();
+  });
+});
+
+describe('POST /api/alerts/webhook — организация по умолчанию не задана', () => {
+  const firing = { status: 'firing', labels: { severity: 'critical', alertname: 'rule-1' }, annotations: { summary: 'Сбой' } };
+  beforeEach(() => { vi.stubEnv('ALERTMANAGER_WEBHOOK_TOKEN', TOKEN); });
+
+  it('отвечает понятным 503 и не трогает ни выключатель, ни очередь', async () => {
+    vi.stubEnv('DEFAULT_TENANT_ID', '');
+    const res = await POST(reqWithBody({ alerts: [firing] }));
+    expect(res.status).toBe(503);
+    expect(await res.json()).toMatchObject({ ok: false, forwarded: 0, error: 'Организация по умолчанию не настроена' });
+    expect(mocks.enabled).not.toHaveBeenCalled();
+    expect(mocks.upsert).not.toHaveBeenCalled();
+    expect(logger.error).toHaveBeenCalledWith(expect.stringContaining('DEFAULT_TENANT_ID'), expect.anything());
+  });
+
+  it('пакет только из закрытых алертов по-прежнему отвечает 200', async () => {
+    vi.stubEnv('DEFAULT_TENANT_ID', '');
+    const res = await POST(reqWithBody({ alerts: [{ ...firing, status: 'resolved' }] }));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true, forwarded: 0 });
   });
 });
