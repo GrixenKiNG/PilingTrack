@@ -1,38 +1,12 @@
 # Публичная часть — только сайт компании /orion.
 # Остальное закрыто входом: индексировать страницы, которые отвечают
 # переадресацией на логин, бессмысленно, а перечислять их в выдаче — значит
-# раскрывать структуру системы. Правила перечислены для каждого агента
-# отдельно: Disallow из блока «*» не применяется к агенту, у которого есть
-# собственный блок, — иначе Googlebot и Bingbot ходили бы куда угодно.
+# раскрывать структуру системы. Все агенты используют один набор правил.
 
 User-agent: Googlebot
-Allow: /orion
-Disallow: /admin
-Disallow: /operator
-Disallow: /report
-Disallow: /monitoring
-Disallow: /history
-Disallow: /inspections
-Disallow: /login
-Disallow: /api/
-
 User-agent: Bingbot
-Allow: /orion
-Disallow: /admin
-Disallow: /operator
-Disallow: /report
-Disallow: /monitoring
-Disallow: /history
-Disallow: /inspections
-Disallow: /login
-Disallow: /api/
-
 User-agent: Twitterbot
-Allow: /
-
 User-agent: facebookexternalhit
-Allow: /
-
 User-agent: *
 Allow: /orion
 Disallow: /admin
@@ -42,6 +16,8 @@ Disallow: /monitoring
 Disallow: /history
 Disallow: /inspections
 Disallow: /login
-Disallow: /api/
+Disallow: /api
+Disallow: /assistant
+Disallow: /print
 
 Sitemap: https://orionpiling.ru/sitemap.xml
