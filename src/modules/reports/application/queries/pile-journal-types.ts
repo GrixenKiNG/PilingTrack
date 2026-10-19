@@ -186,6 +186,9 @@ export const PILE_JOURNAL_EXPORT_LIMIT = 20000;
 
 /** Итоги периода — по всему периоду, а не по показанной странице. */
 export interface PileJournalTotals {
+  /** Фактические границы работ всей выборки, ISO UTC; null — работ нет. */
+  drivenFrom: string | null;
+  drivenTo: string | null;
   /** «Свай (всего)»: Σ count по всем строкам периода. */
   piles: number;
   /** «из них в черновиках»: Σ count строк отчётов-черновиков. */
@@ -209,6 +212,8 @@ export interface PileJournalPage {
 }
 
 export interface RawPileJournalTotals {
+  drivenFrom: Date | null;
+  drivenTo: Date | null;
   piles: number;
   draftPiles: number;
   withoutPassportPiles: number;

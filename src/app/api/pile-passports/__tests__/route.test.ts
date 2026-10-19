@@ -53,6 +53,8 @@ const row = (drivenAt: string) => ({
 
 /** Итоги периода — титул берёт счётчики отсюда, не из показанных строк (W21). */
 const totals = {
+  drivenFrom: '2026-09-25T21:30:00.000Z',
+  drivenTo: '2026-09-25T21:30:00.000Z',
   piles: 1,
   draftPiles: 0,
   withoutPassportPiles: 1,
@@ -91,7 +93,7 @@ describe('GET /api/pile-passports — период в поясе тенанта'
     listPilePassportsMock.mockResolvedValue({
       rows: [row('2026-09-25T14:30:00.000Z')],
       truncated: false,
-      totals,
+      totals: { ...totals, drivenFrom: '2026-09-25T14:30:00.000Z', drivenTo: '2026-09-25T14:30:00.000Z' },
     });
 
     const response = await GET(req());

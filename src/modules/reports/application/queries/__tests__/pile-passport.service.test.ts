@@ -125,6 +125,8 @@ function totals(overrides: Record<string, unknown> = {}) {
     needsRedrive: 0,
     pending: 0,
     rows: 1,
+    drivenFrom: new Date('2026-09-25T21:30:00.000Z'),
+    drivenTo: new Date('2026-09-25T21:30:00.000Z'),
     ...overrides,
   };
 }
@@ -226,6 +228,8 @@ describe('listPilePassports — итоги по всему периоду (W21)'
       needsRedrive: 2,
       pending: 3,
       rows: 900,
+      drivenFrom: new Date('2026-09-01T21:30:00.000Z'),
+      drivenTo: new Date('2026-09-30T21:30:00.000Z'),
     })]);
 
     const { rows, truncated, totals: sum } = await listPilePassports({ tenantId: 'orion' });
@@ -239,6 +243,8 @@ describe('listPilePassports — итоги по всему периоду (W21)'
     expect(header.needsRedrive).toBe(2);
     expect(header.pending).toBe(3);
     expect(header.rowsTotal).toBe(900);
+    expect(header.dateFrom).toBe('2026-09-01');
+    expect(header.dateTo).toBe('2026-09-30');
   });
 
   it('«Свай без паспорта» — отдельная сумма, не смешана с плитками паспортов', async () => {
@@ -302,7 +308,11 @@ describe('exportPileJournalXlsx — полная выгрузка (W21)', () => 
     pileWorkFindMany.mockResolvedValue(
       Array.from({ length: 600 }, (_, i) => work({ id: `w${i}` })),
     );
-    pileTotalsQuery.mockResolvedValue([totals({ piles: 600, withoutPassportPiles: 600, rows: 600 })]);
+    pileTotalsQuery.mockResolvedValue([totals({
+      piles: 600, withoutPassportPiles: 600, rows: 600,
+      drivenFrom: new Date('2026-08-31T21:30:00.000Z'),
+      drivenTo: new Date('2026-09-30T21:30:00.000Z'),
+    })]);
 
     await exportPileJournalXlsx({ tenantId: 'orion' });
 
@@ -310,6 +320,7 @@ describe('exportPileJournalXlsx — полная выгрузка (W21)', () => 
     expect(sheet('Журнал забивки').rows.length).toBeGreaterThan(600);
     // Выборка идёт до предела выгрузки, а не до 500.
     expect(pileWorkFindMany.mock.calls[0][0].take).toBe(PILE_JOURNAL_EXPORT_LIMIT + 1);
+    expect(sheet('Титул').rows).toContainEqual(['Период забивки', '01.09.2026 — 01.10.2026']);
   });
 });
 

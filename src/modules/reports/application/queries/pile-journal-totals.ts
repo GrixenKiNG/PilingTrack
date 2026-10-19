@@ -61,6 +61,8 @@ export async function pileJournalTotals(
   // показывали нули при непустых строках (аудит 16.10.2026, AU195-14).
   const [totals] = await db.$queryRaw<RawPileJournalTotals[]>`
     SELECT
+      MIN(COALESCE(pw."occurredAt", pw."receivedAt")) AS "drivenFrom",
+      MAX(COALESCE(pw."occurredAt", pw."receivedAt")) AS "drivenTo",
       COALESCE(SUM(pw."count"), 0)::int AS "piles",
       COALESCE(SUM(pw."count") FILTER (WHERE r."status" IS DISTINCT FROM ${SUBMITTED_REPORT_STATUS}), 0)::int AS "draftPiles",
       COALESCE(SUM(pw."count") FILTER (WHERE p.id IS NULL), 0)::int AS "withoutPassportPiles",
@@ -84,7 +86,11 @@ export async function pileJournalTotals(
           AND (${lt}::timestamptz IS NULL OR pw."receivedAt" < ${lt}::timestamptz))
       )
   `;
-  return totals;
+  return {
+    ...totals,
+    drivenFrom: totals.drivenFrom?.toISOString() ?? null,
+    drivenTo: totals.drivenTo?.toISOString() ?? null,
+  };
 }
 
 /**
@@ -105,8 +111,8 @@ function printYmd(ymd: string): string {
 }
 
 /**
- * Титул журнала: описательные величины — из показанных строк, итоги — из
- * агрегата периода (`totals`).
+ * Титул журнала: оборудование и проектные величины — из показанных строк,
+ * фактический период работ и итоги — из агрегата всей выборки (`totals`).
  *
  * ПОЧЕМУ ОПИСАТЕЛЬНЫЕ ИЗ СТРОК, А НЕ ИЗ ОТДЕЛЬНЫХ ПОЛЕЙ ОБЪЕКТА. Копёр, молот,
  * энергия удара и проектный отказ записаны в каждом паспорте на момент забивки.
@@ -129,11 +135,9 @@ export function pileJournalHeader(
   const uniq = <T,>(values: (T | null | undefined)[]): T[] =>
     [...new Set(values.filter((value): value is T => value !== null && value !== undefined))];
 
-  const dates = rows
-    .map((row) => (timezone ? dayInTimezone(row.drivenAt, timezone) : row.drivenAt.slice(0, 10)))
-    .sort();
-  const periodEdge = (day: string | undefined): string | null => {
-    if (day === undefined) return null;
+  const periodEdge = (iso: string | null): string | null => {
+    if (iso === null) return null;
+    const day = timezone ? dayInTimezone(iso, timezone) : iso.slice(0, 10);
     return timezone ? printYmd(day) : day;
   };
 
@@ -143,8 +147,8 @@ export function pileJournalHeader(
     hammerTypes: uniq(rows.map((row) => row.hammerType)),
     hammerEnergyKj: uniq(rows.map((row) => row.hammerEnergyKj)).sort((a, b) => a - b),
     designRefusalMm: uniq(rows.map((row) => row.designRefusalMm)).sort((a, b) => a - b),
-    dateFrom: periodEdge(dates[0]),
-    dateTo: periodEdge(dates[dates.length - 1]),
+    dateFrom: periodEdge(totals.drivenFrom),
+    dateTo: periodEdge(totals.drivenTo),
     // Единицы не смешиваем: «Свай (всего)» — сваи (Σ count, пачка приносит
     // несколько, поправка с отрицательным счётом вычитается), а «Паспортов …» —
     // число строк с паспортом. Оба числа — по всему периоду, не по странице.
