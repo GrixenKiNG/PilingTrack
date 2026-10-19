@@ -30,6 +30,30 @@ vi.mock('@/lib/xlsx-writer', () => ({
 
 import { exportReportsCsv, exportReportsXlsx } from '../report-query.service';
 
+it.each([-4, 0])('сохраняет числовой метраж поправки %i при известной длине', async (count) => {
+  findManyMock.mockResolvedValue([{
+    reportId: 'R-correction', date: '2026-10-18', shiftType: 'DAY', status: 'draft',
+    site: { name: 'Объект' }, user: { name: 'Иванов' }, crew: null, equipment: null,
+    piles: [10, count].map((value) => ({ count: value, pileGrade: { name: 'С120', lengthMm: 12000 } })),
+    drillings: [], downtimes: [],
+  }]);
+  getSettingsMock.mockResolvedValue({ timezone: 'Europe/Moscow', companyName: '', inn: '' });
+  const csv = await exportReportsCsv({ tenantId: 'tenant-a' });
+  expect(csv).toContain(`"${count}";"${(count * 12).toFixed(1).replace('.', ',')}"`);
+  expect(csv).not.toContain('длина марки не задана');
+
+  await exportReportsXlsx({ tenantId: 'tenant-a' });
+  const detail = sheets.current.find((sheet) => sheet.name === 'Детализация');
+  const drafts = sheets.current.find((sheet) => sheet.name === 'Черновики');
+  if (!detail || !drafts) throw new Error('нет листов детализации и черновиков');
+  const rows = detail.rows.filter((row) => row[0] === 'R-correction');
+  expect(rows[1][10]).toBe(count * 12);
+  expect(rows[1][16]).toBe('');
+  const total = drafts.rows.find((row) => row[0] === 'R-correction');
+  expect(total?.[7]).toBe(rows.reduce((sum, row) => sum + Number(row[10]), 0));
+  expect(total?.[12]).toBe('');
+});
+
 it('X6: exports ending engine hours and fuel as numbers, preserving zero and unknown', async () => {
   getSettingsMock.mockResolvedValue({ timezone: 'Europe/Moscow' });
   const report = { reportId: 'readings', date: '2026-10-09', shiftType: 'DAY', status: 'submitted', site: { name: 'S' }, user: { name: 'U' }, piles: [], drillings: [], downtimes: [], endingEngineHours: 1234, endingFuelPercent: 0 };

@@ -189,7 +189,8 @@ export async function exportReportsCsv(filters: ReportExportFilters) {
         pileCount: String(pile.count),
         // Без длины марки метраж не считается: печатаем пояснение, а не «0.0» —
         // иначе пустая длина выглядит как реальный ноль погонных метров.
-        pileMeters: meters > 0 ? csvMeters(meters) : PILE_LENGTH_UNKNOWN_LABEL,
+        pileMeters: pileLengthMeters({ gradeLengthMm: pile.pileGrade?.lengthMm }) > 0
+          ? csvMeters(meters) : PILE_LENGTH_UNKNOWN_LABEL,
         drillType: '',
         drillMeters: '',
         dtReason: '',
@@ -325,10 +326,11 @@ export async function exportReportsXlsx(filters: ReportExportFilters): Promise<B
     // весь экспорт падает из-за одной такой строки.
     for (const p of r.piles) {
       const meters = pileRowMeters(p);
+      const hasLength = pileLengthMeters({ gradeLengthMm: p.pileGrade?.lengthMm }) > 0;
       // Колонка «Свай, м.п.» — числовая: без длины марки её оставляем пустой,
       // а пояснение печатаем в «Примечании» (находка 14) — иначе текст в
       // числовой колонке делает её текстовой и лист не суммируется.
-      detail.push([...base, p.pileGrade?.name ?? '', p.count, meters > 0 ? meters : null, '', null, '', null, '', meters > 0 ? '' : PILE_LENGTH_UNKNOWN_LABEL]);
+      detail.push([...base, p.pileGrade?.name ?? '', p.count, hasLength ? meters : null, '', null, '', null, '', hasLength ? '' : PILE_LENGTH_UNKNOWN_LABEL]);
     }
     for (const d of r.drillings) detail.push([...base, '', null, '', d.type?.name ?? '', d.meters, '', null, '', '']);
     for (const d of r.downtimes) detail.push([...base, '', null, '', '', null, d.reason?.name ?? '', d.duration, d.comment || '', '']);
@@ -347,7 +349,7 @@ export async function exportReportsXlsx(filters: ReportExportFilters): Promise<B
     const piles = r.piles.reduce((s, p) => s + p.count, 0);
     const pileMeters = r.piles.reduce((s, p) => s + pileRowMeters(p), 0);
     // Марка без длины: м.п. неполные, и по файлу это должно быть видно.
-    const pilesWithoutLength = r.piles.some((p) => pileRowMeters(p) === 0);
+    const pilesWithoutLength = r.piles.some((p) => pileLengthMeters({ gradeLengthMm: p.pileGrade?.lengthMm }) === 0);
     const wells = r.drillings.reduce((s, d) => s + d.count, 0);
     const meters = r.drillings.reduce((s, d) => s + d.meters, 0);
     const downtime = r.downtimes.reduce((s, d) => s + d.duration, 0);
