@@ -97,6 +97,12 @@ export async function createMaintenance(
         cancelReason: input.cancelReason?.trim() || null,
       },
     });
+    if (status === 'DONE') {
+      await advanceMaintenanceRegulation(tx as typeof db, {
+        tenantId: ctx.tenantId, equipmentId: record.equipmentId, record,
+      });
+      await recordServiceHours(tx as typeof db, record, ctx.tenantId, ctx.createdById);
+    }
     await requestMaintenanceSnapshot(tx as typeof db, record, ctx.tenantId, 'created');
     return record;
   });
