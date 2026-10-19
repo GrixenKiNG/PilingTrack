@@ -42,7 +42,7 @@ export interface PlannedDefect {
  * не считается, до завершения осмотра его всё равно не пропустит проверка
  * заполненности.
  */
-const NEGATIVE_RESULTS = new Set(['NO', 'FAIL', 'BAD', 'NOT_OK']);
+const NEGATIVE_RESULTS = new Set(['NO', 'FAIL', 'BAD', 'NOT_OK', 'NOT_DONE']);
 
 const SEVERITIES = new Set<DefectSeverity>(['LOW', 'NORMAL', 'HIGH', 'CRITICAL']);
 
