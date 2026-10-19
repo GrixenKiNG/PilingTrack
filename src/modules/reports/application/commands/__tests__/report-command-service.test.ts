@@ -202,6 +202,39 @@ describe('Report Command Service', () => {
     });
   });
 
+  describe('установка отчёта фиксируется при создании', () => {
+    // Отчёт без установки выпадал из выборки по установке (фильтр экспорта,
+    // парк), хотя экспорт подписывал строку установкой бригады. Установку
+    // фиксируем при создании той же бригадой, что и crewId: задним числом по
+    // нынешней бригаде её не вывести — бригады переходят между машинами.
+    const base: UpsertReportCommand = {
+      reportId: 'report-eq', userId: 'user-1', siteId: 'site-1', date: '2026-04-05',
+      tenantId: 'orion', piles: [{ pileGradeId: 'grade-1', count: 2 }],
+    };
+    const saved = () => (mockRepoSave.mock.calls[0][0] as ReportAggregate).getState();
+
+    it('без установки в запросе берёт установку бригады оператора', async () => {
+      mockTx.crew.findMany.mockResolvedValueOnce([{ id: 'crew-1', equipmentId: 'eq-1' }]);
+      await upsertReport(base);
+      expect(saved()).toMatchObject({ crewId: 'crew-1', equipmentId: 'eq-1' });
+    });
+
+    it('установку из запроса не заменяет', async () => {
+      mockTx.crew.findMany.mockResolvedValueOnce([{ id: 'crew-1', equipmentId: 'eq-1' }]);
+      await upsertReport({ ...base, equipmentId: 'eq-2' });
+      expect(saved().equipmentId).toBe('eq-2');
+    });
+
+    it('несколько бригад и нет идущей смены — установку не угадывает', async () => {
+      mockTx.crew.findMany.mockResolvedValueOnce([
+        { id: 'crew-1', equipmentId: 'eq-1' }, { id: 'crew-2', equipmentId: 'eq-2' },
+      ]);
+      await upsertReport(base);
+      expect(saved().crewId ?? null).toBeNull();
+      expect(saved().equipmentId ?? null).toBeNull();
+    });
+  });
+
   describe('update existing report', () => {
     it('X5: requires the version the client actually edited', async () => {
       mockRepoFindById.mockResolvedValue(ReportAggregate.create({ reportId: 'report-1', userId: 'user-1', siteId: 'site-1', date: '2026-04-05' }));

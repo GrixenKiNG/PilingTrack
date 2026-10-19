@@ -273,7 +273,9 @@ export async function upsertReport(
         shiftType: input.shiftType,
         shiftStart: input.shiftStart,
         shiftEnd: input.shiftEnd,
-        equipmentId: input.equipmentId,
+        // Установка — оттуда же, откуда бригада: точка во времени, а не вывод по
+        // нынешней бригаде. Явное значение из запроса важнее; бригады нет — null.
+        equipmentId: input.equipmentId === undefined ? operatorCrew?.equipmentId : input.equipmentId,
       });
     }
 
