@@ -2,6 +2,39 @@ import { describe, expect, it } from 'vitest';
 import { describeStateChanges, diffInspectionStates } from '../state-diff';
 
 describe('diffInspectionStates', () => {
+  it('не придумывает ухудшение у неизменившихся пунктов с одинаковым текстом', () => {
+    const answers = [{ text: 'Течи', result: 'FAIL' }, { text: 'Течи', result: 'NORMAL' }];
+    expect(diffInspectionStates(answers, answers)).toEqual([]);
+  });
+
+  it('не считает перестановку одинаковых ответов изменением состояния', () => {
+    expect(diffInspectionStates(
+      [{ text: 'Течи', result: 'NORMAL' }, { text: 'Течи', result: 'FAIL' }],
+      [{ text: 'Течи', result: 'FAIL' }, { text: 'Течи', result: 'NORMAL' }],
+    )).toEqual([]);
+  });
+
+  it('оставляет точные совпадения для всех пунктов перед сравнением изменившихся', () => {
+    expect(diffInspectionStates(
+      [{ text: 'Течи', result: 'FAIL' }, { text: 'Течи', result: 'NORMAL' }],
+      [{ text: 'Течи', result: 'WARNING' }, { text: 'Течи', result: 'FAIL' }],
+    )).toEqual([{ text: 'Течи', from: 'NORMAL', to: 'WARNING', worsened: true }]);
+  });
+
+  it('сравнивает каждое повторение формулировки с соответствующим повторением', () => {
+    expect(diffInspectionStates(
+      [{ text: 'Течи', result: 'FAIL' }, { text: 'Течи', result: 'NORMAL' }],
+      [{ text: 'течи', result: 'FAIL' }, { text: ' ТЕЧИ ', result: 'FAIL' }],
+    )).toEqual([{ text: ' ТЕЧИ ', from: 'NORMAL', to: 'FAIL', worsened: true }]);
+  });
+
+  it('не использует один предсменный ответ повторно для лишнего послесменного пункта', () => {
+    expect(diffInspectionStates(
+      [{ text: 'Течи', result: 'NORMAL' }],
+      [{ text: 'Течи', result: 'NORMAL' }, { text: 'Течи', result: 'FAIL' }],
+    )).toEqual([]);
+  });
+
   it('молчит, когда состояние не изменилось', () => {
     const answers = [{ text: 'Течи гидравлического масла', result: 'NORMAL' }];
     expect(diffInspectionStates(answers, answers)).toEqual([]);
