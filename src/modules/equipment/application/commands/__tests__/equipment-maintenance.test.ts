@@ -139,6 +139,43 @@ describe('createMaintenance — work order fields', () => {
     await createMaintenance('eq_1', { type: 'REPAIR', title: 'x', status: 'IN_PROGRESS' }, { tenantId: 'orion' });
     const data = createRecMock.mock.calls[0][0].data;
     expect(data.startedAt).toBeInstanceOf(Date);
+    expect(findManyPlanMock).not.toHaveBeenCalled();
+    expect(createReadingMock).not.toHaveBeenCalled();
+  });
+
+  it('creating DONE records service hours and advances the matching maintenance plan', async () => {
+    const completedAt = new Date('2026-10-19T06:00:00Z');
+    createRecMock.mockResolvedValue({ id: 'rec_1', equipmentId: 'eq_1', type: 'TO1',
+      engineHoursAtService: 200, completedAt, updatedAt: completedAt });
+    findFirstEquipmentMock.mockResolvedValue({ id: 'eq_1', engineHoursTotal: 100 });
+    findManyPlanMock.mockResolvedValue([{ id: 'plan_1', type: 'TO1', triggerType: 'HOURS',
+      intervalHours: 100, intervalDays: null, leadTimeDays: 7, lastDoneHours: 50, lastDoneAt: null }]);
+
+    await createMaintenance('eq_1', { type: 'TO1', title: 'ТО-1', status: 'DONE',
+      engineHoursAtService: 200, completedAt, workDone: 'Заменены фильтры' },
+    { tenantId: 'orion', createdById: 'mechanic_1' });
+
+    expect(updatePlanMock).toHaveBeenCalledWith({ where: { id: 'plan_1' },
+      data: { lastDoneHours: 200, lastDoneAt: completedAt } });
+    expect(updateEquipmentMock).toHaveBeenCalledWith({ where: { id: 'eq_1' },
+      data: { nextMaintenanceAtHours: 300 } });
+    expect(createReadingMock).toHaveBeenCalledTimes(1);
+    expect(createReadingMock.mock.calls[0][0].data).toMatchObject({
+      equipmentId: 'eq_1', engineHours: 200, recordedAt: completedAt,
+      recordedById: 'mechanic_1', tenantId: 'orion',
+    });
+  });
+
+  it('creating DONE propagates a failed meter write before requesting a snapshot', async () => {
+    const completedAt = new Date('2026-10-19T06:00:00Z');
+    createRecMock.mockResolvedValue({ id: 'rec_1', equipmentId: 'eq_1', type: 'TO1',
+      engineHoursAtService: 200, completedAt, updatedAt: completedAt });
+    createReadingMock.mockRejectedValue(new Error('meter write failed'));
+
+    await expect(createMaintenance('eq_1', { type: 'TO1', title: 'ТО-1', status: 'DONE',
+      engineHoursAtService: 200, workDone: 'Заменены фильтры' }, { tenantId: 'orion' }))
+      .rejects.toThrow('meter write failed');
+    expect(outboxCreateManyMock).not.toHaveBeenCalled();
   });
 });
 
