@@ -14,9 +14,9 @@ import {beforeEach, describe, expect, it, vi} from 'vitest';
 const mocks = vi.hoisted(() => ({queryRaw: vi.fn()}));
 vi.mock('@/lib/db', () => ({db: {$queryRaw: mocks.queryRaw}}));
 
-import {escapeLikePattern, pileJournalTotals} from '../pile-journal-totals';
+import {escapeLikePattern, pileJournalHeader, pileJournalTotals} from '../pile-journal-totals';
 
-const emptyTotals = {piles: 0, draftPiles: 0, withoutPassportPiles: 0, accepted: 0, needsRedrive: 0, pending: 0, rows: 0};
+const emptyTotals = {piles: 0, draftPiles: 0, withoutPassportPiles: 0, accepted: 0, needsRedrive: 0, pending: 0, rows: 0, drivenFrom: null, drivenTo: null};
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -26,6 +26,32 @@ beforeEach(() => {
 /** Текст запроса так, как его соберёт драйвер: части шаблона, `?` вместо параметров. */
 const sentSql = () => (mocks.queryRaw.mock.calls[0][0] as TemplateStringsArray).join('?');
 const sentParams = () => mocks.queryRaw.mock.calls[0].slice(1);
+
+it('период берёт из всех работ, включая receivedAt, и печатает по поясу организации', async () => {
+  mocks.queryRaw.mockResolvedValue([{
+    ...emptyTotals, piles: 501, rows: 501,
+    drivenFrom: new Date('2026-08-31T21:30:00.000Z'),
+    drivenTo: new Date('2026-09-30T21:30:00.000Z'),
+  }]);
+  const totals = await pileJournalTotals({tenantId: 'tenant-a'}, undefined, null);
+  const header = pileJournalHeader([], totals, 'Europe/Moscow');
+  expect(header.dateFrom).toBe('01.09.2026');
+  expect(header.dateTo).toBe('01.10.2026');
+  expect(header.pilesTotal).toBe(501);
+  expect(sentSql()).toContain('MIN(COALESCE(pw."occurredAt", pw."receivedAt"))');
+  expect(sentSql()).toContain('MAX(COALESCE(pw."occurredAt", pw."receivedAt"))');
+});
+
+it('пустая выборка не получает период из запрошенных границ', async () => {
+  const totals = await pileJournalTotals(
+    {tenantId: 'tenant-a', dateFrom: '2026-09-01', dateTo: '2026-09-30'}, undefined,
+    {gte: new Date('2026-08-31T21:00:00Z'), lt: new Date('2026-09-30T21:00:00Z')},
+  );
+  const header = pileJournalHeader([], totals, 'Europe/Moscow');
+  expect(header.dateFrom).toBeNull();
+  expect(header.dateTo).toBeNull();
+  expect(header.pilesTotal).toBe(0);
+});
 
 describe('итоги журнала свай: поиск по номеру', () => {
   it('в базу уходит ESCAPE с настоящим обратным слешем, а не пустой строкой', async () => {
