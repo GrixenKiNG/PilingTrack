@@ -131,7 +131,10 @@ describe.skipIf(!process.env.INTEGRATION_DATABASE_URL_OWNER)('J8 pile journal pe
         expect(page.rows).toHaveLength(expected);
         expect(page.truncated).toBe(false);
         expect(page.rows.map(row => row.pileWorkId).sort()).toEqual(listed.rows.map(row => row.id).sort());
-        expect(page.totals).toEqual(totals.rows[0]);
+        // Сырой SQL считает только счётчики; период забивки (drivenFrom/drivenTo) страница добавляет сверху.
+        expect(page.totals).toMatchObject(totals.rows[0]);
+        expect(page.totals.drivenFrom).toEqual(expect.any(String));
+        expect(page.totals.drivenTo).toEqual(expect.any(String));
         expect(page.totals).toMatchObject({ piles: expected, rows: expected, draftPiles: 0, withoutPassportPiles: expected, accepted: 0, needsRedrive: 0, pending: 0 });
         const branches = await owner.query<{ fallback: number; occurred: number }>(`
           SELECT COUNT(*) FILTER (WHERE pw."occurredAt" IS NULL)::int AS fallback,
