@@ -61,6 +61,15 @@ describe('фото на ежесменном осмотре', () => {
     required: true, photoRequired: true,
   };
 
+  it('требует фото невыполненного действия, если оно отмечено обязательным', () => {
+    const action = { ...item, answerType: 'DONE' as const };
+    const missing = findMissing([action], [{itemId: 'i1', result: 'NOT_DONE', photoCount: 0}]);
+    expect(missing.missingAnswers).toEqual([]);
+    expect(missing.missingPhotosOnFault).toEqual(['i1']);
+    expect(findMissing([action], [{itemId: 'i1', result: 'NOT_DONE', photoCount: 1}])
+      .missingPhotosOnFault).toEqual([]);
+  });
+
   it('исправный узел без снимка не считается неисправностью без фото', () => {
     // Норма — снимать нечего. Именно это позволяло смене закрываться в поле.
     const missing = findMissing([item], [{itemId: 'i1', result: 'YES', photoCount: 0}]);

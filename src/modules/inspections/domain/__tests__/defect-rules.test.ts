@@ -7,6 +7,15 @@ const item = (over: Partial<Parameters<typeof planDefectsFromInspection>[0]['ite
 });
 
 describe('дефекты из чек-листа осмотра', () => {
+  it('заводит критичный дефект на невыполненное действие помеченного пункта', () => {
+    const planned = planDefectsFromInspection({
+      items: [item()], answers: [{ itemId: 'i1', result: 'NOT_DONE' }],
+    });
+    expect(isNegativeAnswer('NOT_DONE')).toBe(true);
+    expect(planned).toHaveLength(1);
+    expect(planned[0]).toMatchObject({ itemId: 'i1', severity: 'CRITICAL' });
+  });
+
   it('заводит дефект на отрицательный ответ помеченного пункта', () => {
     const planned = planDefectsFromInspection({
       items: [item()],
