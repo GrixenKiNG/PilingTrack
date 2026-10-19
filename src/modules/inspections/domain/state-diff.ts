@@ -13,6 +13,9 @@
  *
  * Сравниваются только пункты, встречающиеся в обоих осмотрах. Пункт, которого
  * в послесменном нет, — не «стало лучше», а «не проверяли».
+ * У повторяющихся формулировок сначала исключаются совпавшие ответы, чтобы
+ * перестановка пунктов не стала ухудшением. Остатки сравниваются по порядку,
+ * каждый предсменный ответ участвует в сравнении только один раз.
  */
 export interface StateAnswer {
   /** Формулировка пункта из снимка шаблона. */
@@ -49,13 +52,28 @@ export function diffInspectionStates(
   before: readonly StateAnswer[],
   after: readonly StateAnswer[],
 ): StateChange[] {
-  const beforeByText = new Map(before.map((answer) => [normalize(answer.text), answer]));
+  const beforeByText = new Map<string, StateAnswer[]>();
+  for (const answer of before) {
+    const text = normalize(answer.text);
+    const matches = beforeByText.get(text) ?? [];
+    matches.push(answer);
+    beforeByText.set(text, matches);
+  }
   const changes: StateChange[] = [];
 
-  for (const post of after) {
-    const pre = beforeByText.get(normalize(post.text));
+  const unmatched = after.filter((post) => {
+    const matches = beforeByText.get(normalize(post.text));
+    if (!matches) return true;
+    const same = matches.findIndex((pre) =>
+      pre.result.trim().toUpperCase() === post.result.trim().toUpperCase());
+    if (same < 0) return true;
+    matches.splice(same, 1);
+    return false;
+  });
+
+  for (const post of unmatched) {
+    const pre = beforeByText.get(normalize(post.text))?.shift();
     if (!pre) continue;
-    if (pre.result.trim().toUpperCase() === post.result.trim().toUpperCase()) continue;
 
     const preLevel = severity(pre.result);
     const postLevel = severity(post.result);
