@@ -7,10 +7,10 @@ import {
   assertNotSelfAction,
   isPrivilegedRole,
   resolveUserScope,
-} from '../authorization-service';
-import { ServiceError } from '@/services/service-error';
+} from '../authorization';
+import { ServiceError } from '@/lib/service-error';
 
-describe('authorization-service', () => {
+describe('authorization (core/security)', () => {
   describe('isPrivilegedRole', () => {
     it('returns true for ADMIN', () => {
       expect(isPrivilegedRole('ADMIN')).toBe(true);

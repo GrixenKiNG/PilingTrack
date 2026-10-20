@@ -1,4 +1,4 @@
-import { hash as bcryptHash, compare as bcryptCompare } from 'bcryptjs';
+import { compare as bcryptCompare } from 'bcryptjs';
 import { NextResponse } from 'next/server';
 import { attachRequestIdHeader } from '@/lib/request-context';
 import {
@@ -10,22 +10,17 @@ import {
 import { rateLimiter, AUTH_RATE_LIMIT, LOGIN_IP_RATE_LIMIT, ACCOUNT_LOCKOUT_RATE_LIMIT } from '@/lib/rate-limiter';
 import { logger } from '@/lib/logger';
 import { withIdentityRole } from '@/core/security/identity-role';
+import { hashPassword, verifyPassword } from '@/core/security/password';
 
-const BCRYPT_ROUNDS = 12;
+// Обёртки bcrypt живут в core/security/password.ts (их берёт и modules/users); путь сохранён.
+export { hashPassword, verifyPassword };
+
 /**
  * bcrypt-хеш случайной строки, которой никто не знает. Сверка с ним занимает
  * столько же, сколько сверка с настоящим паролем: без неё ответ «нет такого
  * адреса» приходил мгновенно, и по секундомеру перебирались все e-mail.
  */
 const TIMING_EQUALIZER_HASH = '$2b$12$NgCt4i.5lgeRdr5zSX6/aOm6xxgGEOFfKmpvQy9k9QU3fEiPFiKE2';
-
-export async function hashPassword(value: string): Promise<string> {
-  return bcryptHash(value, BCRYPT_ROUNDS);
-}
-
-export async function verifyPassword(value: string, hash: string): Promise<boolean> {
-  return bcryptCompare(value, hash);
-}
 
 function isBcryptHash(hash: string) {
   return hash.startsWith('$2');

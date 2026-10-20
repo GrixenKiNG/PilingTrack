@@ -1,6 +1,6 @@
 import { db } from '@/lib/db';
 import { requireTenantId } from '@/lib/tenant-scope';
-import { ensureTenantAccess } from '@/services/auth/resource-access-service';
+import { ensureTenantAccess } from '@/core/security/resource-access';
 import {
   actionLabel, humanizeDiff,
   type NameLookups, type ReportHistory, type ReportHistoryEvent, type ReportHistoryVersion,

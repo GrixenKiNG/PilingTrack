@@ -18,14 +18,14 @@ import type { ReportRepository } from '../../../infrastructure';
 import { upsertReport, assertCanActForUser, resolveReportUserId } from '../report-command.service';
 import type { UpsertReportCommand } from '../upsert-report.command';
 import { ServiceError } from '@/lib/service-error';
-import { assertReportOwnerOnSite, assertUserAssignedToSite } from '@/services/auth/resource-access-service';
+import { assertReportOwnerOnSite, assertUserAssignedToSite } from '@/core/security/resource-access';
 
 // ============================================================
 // Mocks
 // ============================================================
 
 // Mock authorization
-vi.mock('@/services/auth/resource-access-service', () => ({
+vi.mock('@/core/security/resource-access', () => ({
   assertUserAssignedToSite: vi.fn().mockResolvedValue(undefined),
   assertReportOwnerOnSite: vi.fn().mockResolvedValue(undefined),
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test: cast to a mock shape or to reach internals not in the public type

@@ -10,7 +10,7 @@ import {
   assertReportOwnerOnSite,
   assertUserAssignedToSite,
   resolveAccessibleUserId,
-} from '../resource-access-service';
+} from '../resource-access';
 
 const operator = {id: 'op-1', role: 'OPERATOR'};
 const dispatcher = {id: 'disp-1', role: 'DISPATCHER'};

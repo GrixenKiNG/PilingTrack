@@ -18,7 +18,7 @@
 ## Безопасность
 - Особо осторожно (сначала тест, потом правка): `src/services/auth/`, `src/core/security/`, `src/lib/rate-limiter.ts`, `src/lib/csrf-protection.ts`.
 - Сравнение секретов — `crypto.timingSafeEqual`; без `as any` в auth.
-- Организация: нет `tenantId` → отказ (fail closed), строгое равенство; никогда `IS NULL OR tenantId` (IDOR 31.05). Политика — `resource-access-service.ts`.
+- Организация: нет `tenantId` → отказ (fail closed), строгое равенство; никогда `IS NULL OR tenantId` (IDOR 31.05). Политика — `core/security/resource-access.ts` и `core/security/authorization.ts` (пути `services/auth/*-service.ts` — реэкспорты).
 
 ## Ловушки
 - Файлы > 500 строк — делить по ответственности. `console.log` в сервисах — нет, `logger` из `@/lib/logger`.

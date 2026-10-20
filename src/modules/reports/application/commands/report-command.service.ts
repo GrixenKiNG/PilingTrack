@@ -23,7 +23,7 @@ import {
   assertReportOwnerOnSite,
   resolveAccessibleUserId,
   assertCanManageUserScope,
-} from '@/services/auth/resource-access-service';
+} from '@/core/security/resource-access';
 import { ReportAggregate } from '../../domain';
 import { getReportRepository } from '../../infrastructure';
 import { UpsertReportCommand, UpsertReportResult } from './upsert-report.command';

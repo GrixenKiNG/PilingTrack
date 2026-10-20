@@ -1,5 +1,5 @@
 // eslint-disable-next-line no-restricted-imports -- legacy cross-layer import pending the parked services<->modules migration (CLAUDE.md); behavior-neutral
-import { can, isPrivilegedRole } from '@/services/auth/authorization-service';
+import { can, isPrivilegedRole } from '@/core/security/authorization';
 import { resolveEffectiveRole } from '@/lib/types';
 import { ServiceError } from '@/lib/service-error';
 

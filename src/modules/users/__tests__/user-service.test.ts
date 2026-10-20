@@ -49,10 +49,10 @@ vi.mock('@/lib/db', () => {
   };
   return { db: client };
 });
-vi.mock('@/services/auth/auth-service', () => ({
+vi.mock('@/core/security/password', () => ({
   hashPassword: vi.fn(async () => 'password-hash'),
 }));
-vi.mock('@/services/auth/authorization-service', () => ({
+vi.mock('@/core/security/authorization', () => ({
   assertNotSelfAction: vi.fn(),
 }));
 vi.mock('@/modules/audit', () => ({ recordAuditEvent: vi.fn(async () => undefined) }));

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ensureTenantAccess } from '@/services/auth/resource-access-service';
+import { ensureTenantAccess } from '@/core/security/resource-access';
 
 describe('ensureTenantAccess', () => {
   it('fails closed when the authenticated session has no tenant', async () => {

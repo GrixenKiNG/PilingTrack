@@ -1,9 +1,9 @@
 import { db } from '@/lib/db';
 import { ServiceError } from '@/lib/service-error';
 // eslint-disable-next-line no-restricted-imports -- auth/audit остаются в services/ до их переноса (CLAUDE.md); поведение не меняется
-import { assertNotSelfAction } from '@/services/auth/authorization-service';
+import { assertNotSelfAction } from '@/core/security/authorization';
 // eslint-disable-next-line no-restricted-imports -- auth/audit остаются в services/ до их переноса (CLAUDE.md); поведение не меняется
-import { hashPassword } from '@/services/auth/auth-service';
+import { hashPassword } from '@/core/security/password';
 import { recordAuditEvent } from '@/modules/audit';
 import { type CursorPaginationResult } from '@/lib/pagination-cursor';
 import type { OperationalUserDTO, UserRole } from '@/lib/types';

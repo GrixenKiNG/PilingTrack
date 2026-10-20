@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { findMany, findFirst } = vi.hoisted(() => ({ findMany: vi.fn(), findFirst: vi.fn() }));
 vi.mock('@/lib/db', () => ({ db: { site: { findMany, findFirst } } }));
-vi.mock('@/services/auth/resource-access-service', () => ({
+vi.mock('@/core/security/resource-access', () => ({
   resolveAccessibleUserId: vi.fn((user: { id: string }) => user.id),
   assertCanAccessSite: vi.fn(),
 }));

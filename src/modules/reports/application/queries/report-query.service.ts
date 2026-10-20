@@ -10,9 +10,9 @@ import { db } from '@/lib/db';
 import { ServiceError } from '@/lib/service-error';
 import { pileLengthMeters } from '@/lib/pile-length';
 // eslint-disable-next-line no-restricted-imports -- legacy cross-layer import pending the parked services<->modules migration (CLAUDE.md); behavior-neutral
-import { resolveUserScope } from '@/services/auth/authorization-service';
+import { resolveUserScope } from '@/core/security/authorization';
 // eslint-disable-next-line no-restricted-imports -- legacy cross-layer import pending the parked services<->modules migration (CLAUDE.md); behavior-neutral
-import { resolveAccessibleUserId } from '@/services/auth/resource-access-service';
+import { resolveAccessibleUserId } from '@/core/security/resource-access';
 import type { CursorPaginationResult } from '@/lib/pagination-cursor';
 
 export const reportDetailInclude = {
