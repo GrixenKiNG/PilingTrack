@@ -1,4 +1,3 @@
-src/app/api/operator/mobile/command/route.ts|@/modules/operator-mobile/contracts|app/ may not import module internals (use @/modules/<x>)
 src/core/event-bus/index.ts|@/services/reports/domain-events|core/ may not import from services/
 src/core/media/media-auth.ts|@/services/auth/authorization-service|core/ may not import from services/
 src/modules/crews/application/queries/crew-query.service.ts|@/services/auth/authorization-service|modules/ may not import from services/ (migration frozen)

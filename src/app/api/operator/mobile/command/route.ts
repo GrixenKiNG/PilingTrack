@@ -9,7 +9,7 @@ import {
   acceptEquipment, acknowledgeBriefing, closeShift, confirmPpe, finishWork, logProduction, submitReport,
   OperatorCommandError, correctProduction, reportIncident, submitChecklist, submitKnowledgeTest,
 } from '@/modules/operator-mobile';
-import {INCIDENT_CATEGORIES, INCIDENT_SIGNS} from '@/modules/operator-mobile/contracts';
+import {INCIDENT_CATEGORIES, INCIDENT_SIGNS} from '@/modules/operator-mobile/client';
 // Напрямую из `application`, а не через `@/modules/readiness`: тот барьер
 // импортируют клиентские компоненты, и серверный модуль в нём тянет `lib/db`
 // в браузерный бандл.
