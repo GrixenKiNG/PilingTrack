@@ -135,3 +135,48 @@ describe('принадлежность смены до загрузки осмо
     expectNoContents();
   });
 });
+
+describe('замещение администратором: бригады и выбор установки', () => {
+  const equipment = (id: string) => ({
+    id, name: `Установка ${id}`, model: 'Модель', isActive: true, hammerKind: 'DIESEL',
+    isCombined: false, engineHoursTotal: 100, nextMaintenanceDate: null, nextMaintenanceAtHours: null,
+  });
+  const crewOf = (id: string, operatorId: string, equipmentId: string) => ({
+    id, operatorId, site: {id: 'site', name: 'Объект', latitude: null, longitude: null},
+    equipment: equipment(equipmentId), assistants: [],
+  });
+  const acting = (equipmentId?: string) => queryOperatorMobileState({
+    tenantId: 't', operatorId: 'adm', operatorName: 'Админ', actingAs: 'OPERATOR', now,
+    ...(equipmentId ? {equipmentId} : {}),
+  });
+
+  it('без своей бригады и без выбора установки назначения нет, а список — все бригады организации', async () => {
+    database.crew.findMany.mockResolvedValue([crewOf('c-other', 'other', 'eq-other')]);
+
+    const state = await acting();
+
+    expect(state.assignment).toBeNull();
+    expect(state.options).toEqual([expect.objectContaining({crewId: 'c-other', equipmentId: 'eq-other'})]);
+    expect(database.crew.findMany.mock.calls[0][0].where).not.toHaveProperty('operatorId');
+  });
+
+  it('явно выбранная установка назначается, даже закреплённая за другим машинистом', async () => {
+    database.crew.findMany.mockResolvedValue([crewOf('c-adm', 'adm', 'eq-adm'), crewOf('c-other', 'other', 'eq-other')]);
+
+    expect((await acting('eq-other')).assignment).toMatchObject({crewId: 'c-other', equipmentId: 'eq-other'});
+  });
+
+  it('без выбора назначается собственная бригада администратора', async () => {
+    database.crew.findMany.mockResolvedValue([crewOf('c-other', 'other', 'eq-other'), crewOf('c-adm', 'adm', 'eq-adm')]);
+
+    expect((await acting()).assignment).toMatchObject({crewId: 'c-adm', equipmentId: 'eq-adm'});
+  });
+
+  it('обычный машинист видит только закреплённые за ним бригады', async () => {
+    database.crew.findMany.mockResolvedValue([crewOf('c-me', 'me', 'eq')]);
+
+    await read();
+
+    expect(database.crew.findMany.mock.calls[0][0].where).toMatchObject({operatorId: 'me'});
+  });
+});

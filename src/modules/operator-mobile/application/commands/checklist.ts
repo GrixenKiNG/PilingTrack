@@ -69,6 +69,7 @@ async function shiftConditions(tx: Tx, tenantId: string, shiftId: string): Promi
 export async function submitChecklist(input: {
   tenantId: string;
   operatorId: string;
+  actingAs?: string | null;
   shiftId: string;
   equipmentId: string;
   stage: ChecklistStage;
@@ -87,7 +88,7 @@ export async function submitChecklist(input: {
     if (shift.equipmentId !== input.equipmentId) {
       throw new OperatorCommandError(403, 'Осмотр относится к другой установке');
     }
-    const crew = await requireCrew(tx, input.tenantId, input.operatorId, shift.equipmentId);
+    const crew = await requireCrew(tx, input.tenantId, input.operatorId, shift.equipmentId, input.actingAs);
 
     // Порядок этапов проверяет сервер, а не только экран.
     const completed = await tx.operatorChecklistExecution.findMany({

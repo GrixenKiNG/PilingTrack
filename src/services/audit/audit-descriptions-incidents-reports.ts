@@ -2,6 +2,13 @@ import { str, num, subject, withSubject, pileAcceptanceLabel, autoSubmitted, typ
 
 /** Тексты ленты: происшествия, осмотры, ТО, вход, отчёты, паспорта свай. */
 export const INCIDENT_REPORT_DESCRIPTIONS: Record<string, AuditDescription> = {
+  // Команда смены, которую исполнил администратор в роли оператора. Реальный
+  // администратор — актор записи, роль — в metadata.
+  'operator.acting-command': {
+    level: 'audit',
+    title: 'Действие администратора от имени оператора',
+    message: 'Команда смены выполнена администратором в режиме «Действую как → Оператор».',
+  },
   'incident.reported': {
     level: (m) => m.stopRequired === true ? 'warn' : 'audit',
     title: 'Происшествие заявлено', message: 'Сообщение о происшествии сохранено.',

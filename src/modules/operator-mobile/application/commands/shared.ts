@@ -35,9 +35,14 @@ export async function reportAuditActor(tx: Tx, tenantId: string, userId: string)
 
 export const DAY_MS = 86_400_000;
 
-export async function requireCrew(tx: Tx, tenantId: string, operatorId: string, equipmentId: string) {
+/**
+ * `actingAs` — администратор работает в роли оператора. Установку он выбрал сам,
+ * поэтому бригада ищется по установке во всей организации, а не по закреплённому
+ * машинисту. Смену и отчёт при этом проверяет `requireOpenShift` как обычно.
+ */
+export async function requireCrew(tx: Tx, tenantId: string, operatorId: string, equipmentId: string, actingAs?: string | null) {
   const crew = await tx.crew.findFirst({
-    where: {operatorId, equipmentId, isActive: true, equipment: {tenantId}},
+    where: {...(actingAs ? {} : {operatorId}), equipmentId, isActive: true, equipment: {tenantId}},
     select: {
       id: true, siteId: true,
       equipment: {select: {isActive: true, hammerKind: true, isCombined: true}},

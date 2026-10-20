@@ -52,6 +52,7 @@ async function writeCorrectionAudit(
 export async function correctProduction(input: {
   tenantId: string;
   operatorId: string;
+  actingAs?: string | null;
   shiftId: string;
   kind: 'PILES' | 'DRILLING' | 'DOWNTIME';
   entryId: string;
@@ -72,7 +73,7 @@ export async function correctProduction(input: {
 
   return withReadinessTenantTransaction(input.tenantId, async (tx) => {
     const shift = await requireOpenShift(tx, input.tenantId, input.shiftId, input.operatorId);
-    await requireCrew(tx, input.tenantId, input.operatorId, shift.equipmentId);
+    await requireCrew(tx, input.tenantId, input.operatorId, shift.equipmentId, input.actingAs);
 
     const duplicate = await findByCommand(tx, input.tenantId, input.kind, input.clientCommandId);
     if (duplicate) return {correctionId: duplicate};

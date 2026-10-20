@@ -20,13 +20,13 @@ function clockIn(timezone: string, at: Date | null | undefined) {
 }
 
 /** Оператор объявил, что работа закончена: дальше только ЕО после работы. */
-export async function finishWork(input: {tenantId: string; operatorId: string; shiftId: string}) {
+export async function finishWork(input: {tenantId: string; operatorId: string; shiftId: string; actingAs?: string | null}) {
   return withReadinessTenantTransaction(input.tenantId, async (tx) => {
     const shift = await requireOpenShift(tx, input.tenantId, input.shiftId, input.operatorId);
     // Единственная команда, где проверки закрепления не было: чужую смену
     // можно было перевести в «сдаётся» одним идентификатором. Остальные
     // команды спрашивали бригаду, эта — нет.
-    await requireCrew(tx, input.tenantId, input.operatorId, shift.equipmentId);
+    await requireCrew(tx, input.tenantId, input.operatorId, shift.equipmentId, input.actingAs);
     await tx.shift.update({
       where: {tenantId_id: {tenantId: input.tenantId, id: input.shiftId}},
       data: {state: 'HANDOVER_PENDING', lastEditedById: input.operatorId},
@@ -48,6 +48,7 @@ export async function finishWork(input: {tenantId: string; operatorId: string; s
 export async function closeShift(input: {
   tenantId: string;
   operatorId: string;
+  actingAs?: string | null;
   shiftId: string;
   comment: string;
   now?: Date;
@@ -56,7 +57,7 @@ export async function closeShift(input: {
 
   return withReadinessTenantTransaction(input.tenantId, async (tx) => {
     const shift = await requireOpenShift(tx, input.tenantId, input.shiftId, input.operatorId);
-    const crew = await requireCrew(tx, input.tenantId, input.operatorId, shift.equipmentId);
+    const crew = await requireCrew(tx, input.tenantId, input.operatorId, shift.equipmentId, input.actingAs);
     const started = await tx.shift.findFirst({
       where: {tenantId: input.tenantId, id: input.shiftId},
       select: {startedAt: true, timezone: true},
@@ -235,6 +236,7 @@ export async function submitShiftReport(tx: Tx, input: {
 export async function submitReport(input: {
   tenantId: string;
   operatorId: string;
+  actingAs?: string | null;
   shiftId: string;
   comment: string;
   now?: Date;
@@ -243,7 +245,7 @@ export async function submitReport(input: {
 
   return withReadinessTenantTransaction(input.tenantId, async (tx) => {
     const shift = await requireOpenShift(tx, input.tenantId, input.shiftId, input.operatorId);
-    const crew = await requireCrew(tx, input.tenantId, input.operatorId, shift.equipmentId);
+    const crew = await requireCrew(tx, input.tenantId, input.operatorId, shift.equipmentId, input.actingAs);
     const started = await tx.shift.findFirst({
       where: {tenantId: input.tenantId, id: input.shiftId},
       select: {startedAt: true, timezone: true},

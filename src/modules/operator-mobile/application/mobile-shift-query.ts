@@ -144,6 +144,11 @@ export async function queryOperatorMobileState(input: {
   longitude?: number;
   /** Выбранная установка, если за оператором закреплено несколько. */
   equipmentId?: string;
+  /**
+   * Администратор работает в роли оператора. Бригады — все активные в организации,
+   * а не закреплённые за ним; без выбранной установки назначается только его собственная.
+   */
+  actingAs?: string | null;
   /** Порт погоды. Не передан — экран работает без неё. */
   readWeather?: ReadWeather;
   now?: Date;
@@ -164,9 +169,9 @@ export async function queryOperatorMobileState(input: {
       orderBy: {createdAt: 'desc'},
     }),
     db.crew.findMany({
-      where: {operatorId, isActive: true, equipment: {tenantId}},
+      where: {...(input.actingAs ? {} : {operatorId}), isActive: true, equipment: {tenantId}},
       select: {
-        id: true,
+        id: true, operatorId: true,
         site: {select: {id: true, name: true, latitude: true, longitude: true}},
         equipment: {
           select: {
@@ -239,9 +244,14 @@ export async function queryOperatorMobileState(input: {
     siteName: crew.site.name,
   }));
 
+  // Замещение без выбранной установки: назначаем только собственную бригаду
+  // администратора. Чужую он должен выбрать сам — иначе экран подставил бы ему
+  // машину, которую он не выбирал.
   const crew = input.equipmentId
     ? crews.find((candidate) => candidate.equipment.id === input.equipmentId)
-    : crews[0];
+    : input.actingAs
+      ? crews.find((candidate) => candidate.operatorId === operatorId)
+      : crews[0];
 
   const buildProgress = (current: OperatorPhase) => {
     const done = completedPhases(current);
