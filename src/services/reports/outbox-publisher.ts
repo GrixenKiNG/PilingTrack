@@ -19,13 +19,17 @@ import type { Prisma } from '@/generated/postgres-client/client';
 import { ReportDomainEvent } from '@/modules/reports/domain';
 import { logger } from '@/lib/logger';
 import { moveToDlq } from '@/core/outbox/dead-letter-queue';
+import { MAX_OUTBOX_RETRIES } from '@/core/outbox/outbox-stats';
+
+// Статистика живёт в core (её читает health-tracker); реэкспорт — для воркеров.
+export { getOutboxStats } from '@/core/outbox/outbox-stats';
 import { ALERT_DELIVERY_EVENT } from '@/core/notifications/durable-alert';
 import {
   runWithTenantContext,
   setRequestTenantId,
 } from '@/core/security/tenant-context';
 
-const MAX_RETRIES = 5;
+const MAX_RETRIES = MAX_OUTBOX_RETRIES;
 const RETRY_BASE_DELAY_MS = 1000; // 1s base
 const RETRY_MAX_DELAY_MS = 60000; // 60s cap
 const BATCH_SIZE = 100;
@@ -332,26 +336,4 @@ export function startOutboxWorker(
   }
 
   return { stop };
-}
-
-/**
- * Get outbox stats (for diagnostics).
- */
-export async function getOutboxStats(): Promise<{
-  unpublished: number;
-  failed: number;
-  total: number;
-}> {
-  const [unpublished, failed, total] = await Promise.all([
-    db.outboxEvent.count({ where: { published: false } }),
-    db.outboxEvent.count({
-      where: {
-        published: false,
-        attempts: { gte: MAX_RETRIES },
-      },
-    }),
-    db.outboxEvent.count(),
-  ]);
-
-  return { unpublished, failed, total };
 }

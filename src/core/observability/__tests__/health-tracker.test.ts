@@ -48,7 +48,7 @@ vi.mock('@/lib/redis-cache', () => ({
       : null),
 }));
 
-vi.mock('@/services/reports/outbox-publisher', () => ({
+vi.mock('@/core/outbox/outbox-stats', () => ({
   getOutboxStats: mocks.outboxStats,
 }));
 

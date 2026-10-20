@@ -10,7 +10,7 @@ vi.mock('@/lib/db', () => ({
   db: { outboxEvent: { findFirst: mocks.findFirst } },
 }));
 
-vi.mock('@/services/reports/outbox-publisher', () => ({
+vi.mock('@/core/outbox/outbox-stats', () => ({
   getOutboxStats: mocks.outboxStats,
 }));
 

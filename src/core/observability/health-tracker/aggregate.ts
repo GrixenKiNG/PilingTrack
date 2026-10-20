@@ -1,6 +1,5 @@
 import { getDlqStats } from '@/core/outbox/dead-letter-queue';
-// eslint-disable-next-line no-restricted-imports -- legacy cross-layer import pending the parked services<->modules migration (CLAUDE.md); behavior-neutral
-import { getOutboxStats } from '@/services/reports/outbox-publisher';
+import { getOutboxStats } from '@/core/outbox/outbox-stats';
 import { getLagMetrics } from '../lag-monitor';
 import { checkBackupStatus } from './checkers/backup';
 import { checkDatabase } from './checkers/database';
