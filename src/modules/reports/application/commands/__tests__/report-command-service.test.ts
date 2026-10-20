@@ -29,7 +29,7 @@ vi.mock('@/core/security/resource-access', () => ({
   assertUserAssignedToSite: vi.fn().mockResolvedValue(undefined),
   assertReportOwnerOnSite: vi.fn().mockResolvedValue(undefined),
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test: cast to a mock shape or to reach internals not in the public type
-  resolveAccessibleUserId: vi.fn((_session: any, requested: string | null | undefined) => requested || 'user-1'),
+  resolveAccessibleUserId: vi.fn((_session: unknown, requested: string | null | undefined) => requested || 'user-1'),
   assertCanManageUserScope: vi.fn(),
 }));
 
@@ -312,7 +312,7 @@ describe('Report Command Service', () => {
         date: '2026-04-03',
       });
       // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test: cast to a mock shape or to reach internals not in the public type
-      (existingAggregate as any).state.updatedAt = oldDate.toISOString();
+      (existingAggregate as unknown as { state: { updatedAt: string } }).state.updatedAt = oldDate.toISOString();
 
       mockRepoFindById.mockResolvedValue(existingAggregate);
 
