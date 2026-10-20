@@ -8,8 +8,7 @@ import { rateLimiter, getRateLimitIdentifier } from '@/lib/rate-limiter';
 import { logger } from '@/lib/logger';
 import { getResponseCache } from '@/core/cache';
 import { recordHttpRequest } from '@/core/observability/http-metrics';
-// eslint-disable-next-line no-restricted-imports -- legacy cross-layer import pending the parked services<->modules migration (CLAUDE.md); behavior-neutral
-import { readSessionToken } from '@/services/auth/session-service';
+import { readSessionToken } from '@/core/security/session-token';
  
 import { requireAuth } from '@/lib/auth';
 import { runWithTenantContext } from '@/core/security/tenant-context';

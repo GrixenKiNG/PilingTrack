@@ -154,6 +154,21 @@ async function main() {
   const current = new Set(violations.map(fingerprint));
 
   if (process.argv.includes('--update')) {
+    // Ratchet: the snapshot may only shrink. Grandfathering a new violation
+    // needs an explicit --allow-new, so a routine refresh cannot hide one.
+    let previous = new Set<string>();
+    try {
+      previous = new Set((await fs.readFile(baselinePath, 'utf8')).split(/\r?\n/).filter(Boolean));
+    } catch {
+      // No baseline yet — nothing to compare against.
+    }
+    const added = Array.from(current).filter((line) => !previous.has(line));
+    if (added.length > 0 && previous.size > 0 && !process.argv.includes('--allow-new')) {
+      console.error(`✗ --update refused: ${added.length} violation(s) are not in the baseline (it may only shrink):`);
+      for (const line of added) console.error(`  ${line}`);
+      console.error('Fix them, or pass --allow-new to grandfather them on purpose.');
+      process.exit(1);
+    }
     const sorted = Array.from(current).sort();
     await fs.writeFile(baselinePath, sorted.join('\n') + '\n', 'utf8');
     console.log(`Baseline updated: ${sorted.length} entries written to`);

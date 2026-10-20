@@ -53,7 +53,7 @@ const mockRequireAuth = vi.fn<(request: NextRequest) => Promise<FakeAuth>>(
   async () => ({ user: { id: 'u1' }, error: null }),
 );
 
-vi.mock('@/services/auth/session-service', () => ({
+vi.mock('@/core/security/session-token', () => ({
   readSessionToken: (request: NextRequest) => mockReadSessionToken(request),
 }));
 

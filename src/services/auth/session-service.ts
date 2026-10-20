@@ -1,10 +1,12 @@
 import { SignJWT, jwtVerify, type JWTPayload } from 'jose';
 import { randomBytes } from 'node:crypto';
 import { Redis } from 'ioredis';
-import type { NextRequest, NextResponse } from 'next/server';
+import type { NextResponse } from 'next/server';
 import { logger } from '@/lib/logger';
 
-export const SESSION_COOKIE_NAME = 'pt-session';
+import { SESSION_COOKIE_NAME } from '@/core/security/session-token';
+
+export { SESSION_COOKIE_NAME, readSessionToken } from '@/core/security/session-token';
 const SESSION_TTL_SECONDS = 60 * 60 * 12;
 
 export interface SessionUser {
@@ -261,20 +263,6 @@ export async function revokeSessionToken(token: string): Promise<boolean> {
   if (ttl <= 0) return false;
 
   return revocationStore.revoke(payload.jti, ttl);
-}
-
-export function readSessionToken(request: NextRequest) {
-  const cookieToken = request.cookies.get(SESSION_COOKIE_NAME)?.value;
-  if (cookieToken) {
-    return cookieToken;
-  }
-
-  const authHeader = request.headers.get('authorization');
-  if (authHeader?.startsWith('Bearer ')) {
-    return authHeader.slice(7);
-  }
-
-  return null;
 }
 
 export function attachSessionCookie(response: NextResponse, token: string) {

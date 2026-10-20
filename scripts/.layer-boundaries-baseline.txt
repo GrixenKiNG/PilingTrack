@@ -225,7 +225,6 @@ src/components/piling/to/readiness/settings/roles-section.tsx|@/modules/readines
 src/components/piling/to/readiness/settings/roles-section.tsx|@/modules/readiness/application/capabilities|components/ may not import module internals (use @/modules/<x>)
 src/components/piling/to/readiness/shift-create-form.tsx|@/modules/reports/domain/shift-types|components/ may not import module internals (use @/modules/<x>)
 src/components/piling/workspace-settings.tsx|@/modules/settings/domain/settings|components/ may not import module internals (use @/modules/<x>)
-src/core/api-wrapper.ts|@/services/auth/session-service|core/ may not import from services/
 src/core/event-bus/index.ts|@/services/reports/domain-events|core/ may not import from services/
 src/core/media/media-auth.ts|@/services/auth/authorization-service|core/ may not import from services/
 src/modules/crews/application/commands/crew-command.service.ts|@/services/audit/audit-service|modules/ may not import from services/ (migration frozen)
