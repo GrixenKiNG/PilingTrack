@@ -17,8 +17,8 @@ const { tx, transactionMock } = vi.hoisted(() => {
     crew: { upsert: vi.fn().mockResolvedValue({}) },
     outboxEvent: { createMany: vi.fn().mockResolvedValue({}) },
   };
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test transaction shim
-  return { tx, transactionMock: vi.fn((cb: any) => cb(tx)) };
+  type Tx = typeof tx;
+  return { tx, transactionMock: vi.fn((cb: (tx: Tx) => Promise<unknown>) => cb(tx)) };
 });
 
 vi.mock('@/lib/db', () => ({
