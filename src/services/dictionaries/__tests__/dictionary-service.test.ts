@@ -14,7 +14,7 @@ const { dbMock, auditMock } = vi.hoisted(() => ({
   auditMock: vi.fn(),
 }));
 vi.mock('@/lib/db', () => ({ db: dbMock }));
-vi.mock('@/services/audit/audit-service', () => ({ recordAuditEvent: auditMock }));
+vi.mock('@/modules/audit', () => ({ recordAuditEvent: auditMock }));
 
 import {
   deleteDictionaryItem,

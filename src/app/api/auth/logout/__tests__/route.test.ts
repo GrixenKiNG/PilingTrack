@@ -19,7 +19,7 @@ const { requireAuthMock, createLogoutMock, auditMock, tenantMock, requestIdMock,
 vi.mock('@/lib/auth', () => ({ requireAuth: requireAuthMock, clearAuthUserCacheEntry: clearMock }));
 vi.mock('@/lib/request-context', () => ({ getRequestId: requestIdMock }));
 vi.mock('@/services/auth/auth-service', () => ({ createLogoutResponse: createLogoutMock }));
-vi.mock('@/services/audit/audit-service', () => ({ recordAuditEvent: auditMock }));
+vi.mock('@/modules/audit', () => ({ recordAuditEvent: auditMock }));
 vi.mock('@/services/tenancy/tenant-context-service', () => ({ resolveTenantContext: tenantMock }));
 vi.mock('@/lib/csrf-protection', () => ({ withCsrf: () => null }));
 

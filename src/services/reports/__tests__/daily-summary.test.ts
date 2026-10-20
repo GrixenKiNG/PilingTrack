@@ -66,7 +66,7 @@ beforeEach(() => {
 
 // След в ленте пишет audit-service; здесь проверяется контракт обработчика —
 // каким актором и с каким именем оператора событие уезжает в запись.
-vi.mock('@/services/audit/audit-service', () => ({
+vi.mock('@/modules/audit', () => ({
   recordAuditEvent: recordAuditEventMock,
 }));
 

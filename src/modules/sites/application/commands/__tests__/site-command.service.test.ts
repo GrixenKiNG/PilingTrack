@@ -10,7 +10,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { SiteAggregate, type SiteInfo } from '../../../domain';
 
 const recordAuditEvent = vi.fn();
-vi.mock('@/services/audit/audit-service', () => ({
+vi.mock('@/modules/audit', () => ({
   recordAuditEvent: (...args: unknown[]) => recordAuditEvent(...args),
 }));
 

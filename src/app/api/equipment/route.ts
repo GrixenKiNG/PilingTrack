@@ -6,7 +6,7 @@ import { canDecreaseMeter, createEquipment, getEquipmentByIdOrThrow, listAllEqui
 import { createEquipmentSchema } from '@/lib/validation-schemas';
 import { withApi, withMutation, readJsonBody } from '@/core/api-wrapper';
 import { parseCursorPagination } from '@/lib/pagination-cursor';
-import { recordAuditEvent } from '@/services/audit/audit-service';
+import { recordAuditEvent } from '@/modules/audit';
 
 export const runtime = 'nodejs';
 

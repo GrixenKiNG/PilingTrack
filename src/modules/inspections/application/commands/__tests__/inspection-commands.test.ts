@@ -16,7 +16,7 @@ const m = vi.hoisted(() => ({
   transaction: vi.fn(),
   audit: vi.fn(),
 }));
-vi.mock('@/services/audit/audit-service', () => ({ recordAuditEvent: m.audit }));
+vi.mock('@/modules/audit', () => ({ recordAuditEvent: m.audit }));
 vi.mock('@/lib/db', () => {
   const client = {
     checklistTemplate: { findUnique: m.tplFindUnique, findMany: m.tplFindMany },

@@ -13,7 +13,7 @@ import { telegramConfigSchema } from '@/lib/validation-schemas';
 import { withApi, withMutation, readJsonBody } from '@/core/api-wrapper';
 import { getResponseCache } from '@/core/cache';
 import { db } from '@/lib/db';
-import { recordAuditEvent } from '@/services/audit/audit-service';
+import { recordAuditEvent } from '@/modules/audit';
 
 const telegramConfigIdSchema = telegramConfigSchema.partial().extend({ id: z.string().min(1) });
 const deleteIdSchema = z.object({ id: z.string().min(1, 'Invalid ID') });

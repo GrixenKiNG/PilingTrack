@@ -9,7 +9,7 @@ import { requireAuth } from '@/lib/auth';
 import { resolveEffectiveRole } from '@/lib/types';
 import { withApi, withMutation } from '@/core/api-wrapper';
 import { getSettings, saveSettings, type WorkspaceSettings } from '@/modules/settings';
-import { recordAuditEvent } from '@/services/audit/audit-service';
+import { recordAuditEvent } from '@/modules/audit';
 
 export const runtime = 'nodejs';
 

@@ -14,7 +14,7 @@ const { findFirstUserMock, findFirstTypeMock, findManyTypeMock, findManyDocMock,
 }));
 
 // След пишется в audit-service; подменяем его, чтобы поймать metadata события.
-vi.mock('@/services/audit/audit-service', () => ({
+vi.mock('@/modules/audit', () => ({
   recordAuditEvent: recordAuditMock,
 }));
 

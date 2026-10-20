@@ -19,7 +19,7 @@ vi.mock('@/lib/db', () => ({ db: {
   site: { findFirst: m.siteFindFirst },
   pileGrade: { count: m.gradeCount },
 } }));
-vi.mock('@/services/audit/audit-service', () => ({ recordAuditEvent: vi.fn() }));
+vi.mock('@/modules/audit', () => ({ recordAuditEvent: vi.fn() }));
 
 import { createSiteWithPlans, updateSiteWithPlans } from '../site-admin-command.service';
 

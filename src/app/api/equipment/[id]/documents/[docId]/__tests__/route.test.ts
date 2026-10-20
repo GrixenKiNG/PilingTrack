@@ -28,7 +28,7 @@ vi.mock('@/lib/auth', () => ({ requireAuth: requireAuthMock }));
 vi.mock('@/lib/csrf-protection', () => ({ withCsrf: () => null }));
 vi.mock('@/lib/db', () => ({ db: { equipmentDocument: { findFirst: findFirstDocMock } } }));
 vi.mock('@/modules/equipment', () => ({ deleteEquipmentDocument: deleteEquipmentDocumentMock }));
-vi.mock('@/services/audit/audit-service', () => ({ recordAuditEvent: recordAuditEventMock }));
+vi.mock('@/modules/audit', () => ({ recordAuditEvent: recordAuditEventMock }));
 vi.mock('@/lib/logger', () => ({
   logger: { error: loggerErrorMock, warn: vi.fn(), info: vi.fn(), debug: vi.fn() },
 }));

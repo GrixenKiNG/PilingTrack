@@ -4,7 +4,7 @@ import { requireAuth } from '@/lib/auth';
 import { signBriefingRecord } from '@/modules/safety';
 import { withMutation } from '@/core/api-wrapper';
 import { ServiceError } from '@/lib/service-error';
-import { recordAuditEvent } from '@/services/audit/audit-service';
+import { recordAuditEvent } from '@/modules/audit';
 
 export const runtime = 'nodejs';
 

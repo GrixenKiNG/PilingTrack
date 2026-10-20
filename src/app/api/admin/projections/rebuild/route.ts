@@ -20,7 +20,7 @@ import { requireAuth } from '@/lib/auth';
 import { assertCan } from '@/services/auth/authorization-service';
 import { withMutation } from '@/core/api-wrapper';
 import { logger } from '@/lib/logger';
-import { recordAuditEvent } from '@/services/audit/audit-service';
+import { recordAuditEvent } from '@/modules/audit';
 import {
   rebuildReportAnalytics,
   rebuildSiteDailySummary,

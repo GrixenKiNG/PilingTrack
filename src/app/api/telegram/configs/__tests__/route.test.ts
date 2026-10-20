@@ -23,7 +23,7 @@ const { requireAuthMock, recordAuditEventMock, svc, findFirstMock } = vi.hoisted
 
 vi.mock('@/lib/auth', () => ({ requireAuth: requireAuthMock }));
 vi.mock('@/lib/csrf-protection', () => ({ withCsrf: () => null }));
-vi.mock('@/services/audit/audit-service', () => ({ recordAuditEvent: recordAuditEventMock }));
+vi.mock('@/modules/audit', () => ({ recordAuditEvent: recordAuditEventMock }));
 vi.mock('@/services/telegram/telegram-config-service', () => svc);
 vi.mock('@/lib/db', () => ({ db: { telegramConfig: { findFirst: findFirstMock } } }));
 

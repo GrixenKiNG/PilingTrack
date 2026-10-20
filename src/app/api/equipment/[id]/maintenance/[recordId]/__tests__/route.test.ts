@@ -42,7 +42,7 @@ vi.mock('@/modules/equipment', () => ({
   updateMaintenance: updateMaintenanceMock,
   deleteMaintenance: deleteMaintenanceMock,
 }));
-vi.mock('@/services/audit/audit-service', () => ({ recordAuditEvent: recordAuditEventMock }));
+vi.mock('@/modules/audit', () => ({ recordAuditEvent: recordAuditEventMock }));
 vi.mock('@/lib/logger', () => ({
   logger: { error: loggerErrorMock, warn: loggerWarnMock, info: vi.fn(), debug: vi.fn() },
 }));

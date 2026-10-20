@@ -37,7 +37,7 @@ vi.mock('@/lib/db', () => ({ db: { equipment: { findFirst: findFirstEquipmentMoc
 vi.mock('@/lib/logger', () => ({
   logger: { error: loggerErrorMock, warn: vi.fn(), info: vi.fn(), debug: vi.fn() },
 }));
-vi.mock('@/services/audit/audit-service', () => ({ recordAuditEvent: recordAuditEventMock }));
+vi.mock('@/modules/audit', () => ({ recordAuditEvent: recordAuditEventMock }));
 vi.mock('@/modules/equipment', () => ({
   updateEquipment: updateEquipmentMock,
   updateEquipmentMetadata: vi.fn().mockResolvedValue(true),

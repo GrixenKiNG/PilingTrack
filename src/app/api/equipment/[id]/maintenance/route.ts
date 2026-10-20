@@ -7,7 +7,7 @@ import { createMaintenance, listMaintenance } from '@/modules/equipment';
 import { withApi, withMutation, readJsonBody } from '@/core/api-wrapper';
 import { ServiceError } from '@/services/service-error';
 import { logger } from '@/lib/logger';
-import { recordAuditEvent } from '@/services/audit/audit-service';
+import { recordAuditEvent } from '@/modules/audit';
 
 export const runtime = 'nodejs';
 

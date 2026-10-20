@@ -5,7 +5,7 @@ import { requireAuth } from '@/lib/auth';
 import { assertCan } from '@/services/auth/authorization-service';
 import { createEquipmentDocument } from '@/modules/equipment';
 import { withMutation, readJsonBody } from '@/core/api-wrapper';
-import { recordAuditEvent } from '@/services/audit/audit-service';
+import { recordAuditEvent } from '@/modules/audit';
 
 export const runtime = 'nodejs';
 

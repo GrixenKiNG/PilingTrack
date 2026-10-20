@@ -18,7 +18,7 @@ import {requireAuth} from '@/lib/auth';
 import {authFailureResponse} from '@/lib/auth-failure';
 import {assertCan} from '@/services/auth/authorization-service';
 import {db} from '@/lib/db';
-import {recordAuditEvent} from '@/services/audit/audit-service';
+import {recordAuditEvent} from '@/modules/audit';
 
 export const runtime = 'nodejs';
 

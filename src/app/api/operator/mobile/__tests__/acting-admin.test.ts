@@ -17,7 +17,7 @@ const {requireAuthMock, queryMock, auditMock, acknowledgeMock} = vi.hoisted(() =
 vi.mock('@/core/api-wrapper', () => ({withApi: (handler: unknown) => handler, withMutation: (handler: unknown) => handler}));
 vi.mock('@/lib/auth', () => ({requireAuth: requireAuthMock}));
 vi.mock('@/services/weather/weather-client', () => ({getWeatherAt: vi.fn()}));
-vi.mock('@/services/audit/audit-service', () => ({recordAuditEvent: auditMock}));
+vi.mock('@/modules/audit', () => ({recordAuditEvent: auditMock}));
 vi.mock('@/modules/operator-mobile', () => {
   class OperatorCommandError extends Error {
     constructor(public status: number, message: string, public details?: unknown) { super(message); }

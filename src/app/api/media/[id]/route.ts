@@ -4,7 +4,7 @@ import { getMediaService } from '@/core/media/media-service';
 import { assertCanAccessMedia } from '@/core/media/media-auth';
 import { withMutation } from '@/core/api-wrapper';
 import { ServiceError } from '@/services/service-error';
-import { recordAuditEvent } from '@/services/audit/audit-service';
+import { recordAuditEvent } from '@/modules/audit';
 
 export const DELETE = withMutation(
   async (request: NextRequest, ctx: { params: Promise<{ id: string }> }) => {

@@ -31,7 +31,7 @@ const {
 vi.mock('@/lib/auth', () => ({ requireAuth: requireAuthMock }));
 vi.mock('@/lib/csrf-protection', () => ({ withCsrf: () => null }));
 vi.mock('@/services/auth/authorization-service', () => ({ assertCan: assertCanMock }));
-vi.mock('@/services/audit/audit-service', () => ({ recordAuditEvent: recordAuditEventMock }));
+vi.mock('@/modules/audit', () => ({ recordAuditEvent: recordAuditEventMock }));
 vi.mock('@/core/outbox/dead-letter-queue', () => ({
   getPendingDlqEntries: getPendingDlqEntriesMock,
   getDlqStats: getDlqStatsMock,

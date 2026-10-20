@@ -60,7 +60,7 @@ vi.mock('@/lib/db', () => ({
   DEFAULT_TX_OPTIONS: { timeout: 10000, maxWait: 5000 },
 }));
 
-vi.mock('@/services/audit/audit-service', () => ({
+vi.mock('@/modules/audit', () => ({
   recordAuditEvent: vi.fn().mockResolvedValue(undefined),
 }));
 

@@ -5,7 +5,7 @@ import {
 } from '@/services/auth/auth-service';
 import { createJsonResponse, getRequestId } from '@/lib/request-context';
 import { loginSchema } from '@/lib/validation-schemas';
-import { recordAuditEvent } from '@/services/audit/audit-service';
+import { recordAuditEvent } from '@/modules/audit';
 import { resolveTenantContext } from '@/services/tenancy/tenant-context-service';
 import { withApi, readJsonBody } from '@/core/api-wrapper';
 import { getRateLimitIdentifier } from '@/lib/rate-limiter';

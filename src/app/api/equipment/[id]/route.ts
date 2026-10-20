@@ -7,7 +7,7 @@ import { equipmentUpdateSchema } from '@/lib/validation-schemas';
 import { withApi, withMutation, readJsonBody } from '@/core/api-wrapper';
 import { db } from '@/lib/db';
 import { logger } from '@/lib/logger';
-import { recordAuditEvent } from '@/services/audit/audit-service';
+import { recordAuditEvent } from '@/modules/audit';
 
 export const runtime = 'nodejs';
 

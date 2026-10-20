@@ -6,7 +6,7 @@ import { deleteMeterReading } from '@/modules/equipment';
 import { withMutation } from '@/core/api-wrapper';
 import { ServiceError } from '@/services/service-error';
 import { db } from '@/lib/db';
-import { recordAuditEvent } from '@/services/audit/audit-service';
+import { recordAuditEvent } from '@/modules/audit';
 
 export const runtime = 'nodejs';
 

@@ -26,7 +26,7 @@ const {
 vi.mock('@/lib/auth', () => ({ requireAuth: requireAuthMock }));
 vi.mock('@/lib/csrf-protection', () => ({ withCsrf: () => null }));
 vi.mock('@/services/auth/authorization-service', () => ({ assertCan: vi.fn() }));
-vi.mock('@/services/audit/audit-service', () => ({ recordAuditEvent: recordAuditEventMock }));
+vi.mock('@/modules/audit', () => ({ recordAuditEvent: recordAuditEventMock }));
 vi.mock('@/modules/equipment', () => ({
   createEquipment: createEquipmentMock,
   getEquipmentByIdOrThrow: getEquipmentByIdOrThrowMock,

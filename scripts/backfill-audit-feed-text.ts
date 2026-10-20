@@ -19,7 +19,7 @@
  */
 
 import { readFileSync, writeFileSync } from 'node:fs';
-import { describeAuditEvent } from '../src/services/audit/audit-service';
+import { describeAuditEvent } from '../src/modules/audit';
 
 interface Row {
   id: string;

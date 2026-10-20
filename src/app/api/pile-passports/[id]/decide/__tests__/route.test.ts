@@ -24,7 +24,7 @@ const { requireAuthMock, assertCanMock, decideMock, findFirstMock, recordAuditEv
 vi.mock('@/lib/auth', () => ({ requireAuth: requireAuthMock }));
 vi.mock('@/lib/csrf-protection', () => ({ withCsrf: () => null }));
 vi.mock('@/services/auth/authorization-service', () => ({ assertCan: assertCanMock }));
-vi.mock('@/services/audit/audit-service', () => ({ recordAuditEvent: recordAuditEventMock }));
+vi.mock('@/modules/audit', () => ({ recordAuditEvent: recordAuditEventMock }));
 vi.mock('@/modules/reports/application/queries/pile-passport.service', () => ({
   decidePilePassport: decideMock,
 }));

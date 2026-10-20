@@ -6,8 +6,7 @@
 import type { Prisma } from '@/generated/postgres-client/client';
 import { db } from '@/lib/db';
 import { ServiceError } from '@/lib/service-error';
-// eslint-disable-next-line no-restricted-imports -- legacy cross-layer import pending the parked services<->modules migration (CLAUDE.md); behavior-neutral
-import { recordAuditEvent } from '@/services/audit/audit-service';
+import { recordAuditEvent } from '@/modules/audit';
 
 // ────────────────────────────────────────────
 // Plan normalization

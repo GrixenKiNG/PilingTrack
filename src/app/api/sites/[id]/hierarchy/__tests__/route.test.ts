@@ -17,7 +17,7 @@ vi.mock('@/lib/auth', () => ({ requireAuth: mocks.auth }));
 vi.mock('@/lib/csrf-protection', () => ({ withCsrf: () => null }));
 vi.mock('@/modules/sites', () => ({ createSiteHierarchyItem: mocks.create, deleteSiteHierarchyItem: mocks.remove }));
 vi.mock('@/lib/cached-queries', () => ({ invalidateSites: mocks.invalidate }));
-vi.mock('@/services/audit/audit-service', () => ({ recordAuditEvent: mocks.audit }));
+vi.mock('@/modules/audit', () => ({ recordAuditEvent: mocks.audit }));
 vi.mock('@/lib/db', () => ({
   db: {
     pileField: { findFirst: mocks.pileFieldFindFirst },

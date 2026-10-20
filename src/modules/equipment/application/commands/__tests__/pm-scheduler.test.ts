@@ -17,7 +17,7 @@ const {
   transactionMock: vi.fn(),
   auditMock: vi.fn(),
 }));
-vi.mock('@/services/audit/audit-service', () => ({ recordAuditEvent: auditMock }));
+vi.mock('@/modules/audit', () => ({ recordAuditEvent: auditMock }));
 
 vi.mock('@/lib/db', () => {
   const tx = {

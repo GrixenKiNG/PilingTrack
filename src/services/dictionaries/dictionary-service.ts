@@ -1,5 +1,6 @@
 import { db } from '@/lib/db';
-import { recordAuditEvent } from '@/services/audit/audit-service';
+// eslint-disable-next-line no-restricted-imports -- legacy cross-layer import pending the parked services<->modules migration (CLAUDE.md); behavior-neutral
+import { recordAuditEvent } from '@/modules/audit';
 import { ServiceError } from '@/services/service-error';
 import { normalizeDictionaryName } from './system-templates';
 

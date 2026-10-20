@@ -34,7 +34,7 @@ vi.mock('@/modules/equipment', () => ({
   listMeterReadings: vi.fn(),
 }));
 vi.mock('@/modules/crews', () => ({ getCrewForOperator: vi.fn() }));
-vi.mock('@/services/audit/audit-service', () => ({ recordAuditEvent: recordAuditEventMock }));
+vi.mock('@/modules/audit', () => ({ recordAuditEvent: recordAuditEventMock }));
 
 import { POST } from '../route';
 

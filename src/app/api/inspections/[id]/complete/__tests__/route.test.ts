@@ -41,7 +41,7 @@ vi.mock('@/lib/db', () => ({
   },
 }));
 vi.mock('@/modules/inspections', () => ({ completeInspectionWithOutcome: completeInspectionMock }));
-vi.mock('@/services/audit/audit-service', () => ({ recordAuditEvent: recordAuditEventMock }));
+vi.mock('@/modules/audit', () => ({ recordAuditEvent: recordAuditEventMock }));
 
 import { POST } from '../route';
 

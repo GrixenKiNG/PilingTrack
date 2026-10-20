@@ -1,6 +1,7 @@
 import { db } from '@/lib/db';
 import { logger } from '@/lib/logger';
 import { type FeedbackEventLevel } from '@/lib/types';
+// eslint-disable-next-line no-restricted-imports -- feedback остаётся в services/ до своего переноса (CLAUDE.md); поведение не меняется
 import { recordFeedbackEvent } from '@/services/feedback/feedback-event-service';
 import { recordAuditFeedbackFailure } from '@/core/observability/audit-feedback-metrics';
 import { AUDIT_DESCRIPTIONS } from './audit-descriptions';

@@ -55,7 +55,7 @@ vi.mock('@/services/auth/auth-service', () => ({
 vi.mock('@/services/auth/authorization-service', () => ({
   assertNotSelfAction: vi.fn(),
 }));
-vi.mock('@/services/audit/audit-service', () => ({ recordAuditEvent: vi.fn(async () => undefined) }));
+vi.mock('@/modules/audit', () => ({ recordAuditEvent: vi.fn(async () => undefined) }));
 
 import {
   createUser,

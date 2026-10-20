@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { assertCan } from '@/services/auth/authorization-service';
-import { getEntityHistory } from '@/services/audit/audit-history-service';
+import { getEntityHistory } from '@/modules/audit';
 import { withApi } from '@/core/api-wrapper';
 
 export const runtime = 'nodejs';

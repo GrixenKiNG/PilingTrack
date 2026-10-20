@@ -9,8 +9,7 @@
  */
 
 import { db } from '@/lib/db';
-// eslint-disable-next-line no-restricted-imports -- W117: shared best-effort audit after the committed mutation; no audit module facade exists
-import { recordAuditEvent } from '@/services/audit/audit-service';
+import { recordAuditEvent } from '@/modules/audit';
 import { ServiceError } from '@/lib/service-error';
 import { evaluatePlanDue } from '@/lib/pm-due';
 import { requestReadinessSnapshot } from '@/modules/readiness/server';

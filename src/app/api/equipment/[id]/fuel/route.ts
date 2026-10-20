@@ -7,7 +7,7 @@ import { addFuelEntry, listFuelLog, getFuelSummary } from '@/modules/equipment';
 import { getCrewForOperator } from '@/modules/crews';
 import { withApi, withMutation, readJsonBody } from '@/core/api-wrapper';
 import { ServiceError } from '@/services/service-error';
-import { recordAuditEvent } from '@/services/audit/audit-service';
+import { recordAuditEvent } from '@/modules/audit';
 
 export const runtime = 'nodejs';
 

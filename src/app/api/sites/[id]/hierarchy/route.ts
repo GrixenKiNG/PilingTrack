@@ -8,7 +8,7 @@ import { invalidateSites } from '@/lib/cached-queries';
 import { withMutation, readJsonBody } from '@/core/api-wrapper';
 import { db } from '@/lib/db';
 import { logger } from '@/lib/logger';
-import { recordAuditEvent } from '@/services/audit/audit-service';
+import { recordAuditEvent } from '@/modules/audit';
 
 
 export const runtime = 'nodejs';

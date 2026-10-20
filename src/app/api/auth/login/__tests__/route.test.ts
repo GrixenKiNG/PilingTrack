@@ -22,7 +22,7 @@ vi.mock('@/services/auth/auth-service', () => ({
   createAuthenticatedResponse: createResponseMock,
 }));
 
-vi.mock('@/services/audit/audit-service', () => ({
+vi.mock('@/modules/audit', () => ({
   recordAuditEvent: auditMock,
 }));
 

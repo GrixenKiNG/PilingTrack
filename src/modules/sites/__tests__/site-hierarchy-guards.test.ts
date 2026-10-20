@@ -54,7 +54,7 @@ vi.mock('@/lib/db', () => ({
     report: { count: m.reportCount },
   },
 }));
-vi.mock('@/services/audit/audit-service', () => ({ recordAuditEvent: vi.fn() }));
+vi.mock('@/modules/audit', () => ({ recordAuditEvent: vi.fn() }));
 
 import {
   createSiteHierarchyItem,

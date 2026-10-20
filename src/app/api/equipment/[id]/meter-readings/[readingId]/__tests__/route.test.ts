@@ -29,7 +29,7 @@ vi.mock('@/lib/db', () => ({
   db: { meterReading: { findFirst: findFirstReadingMock } },
 }));
 vi.mock('@/modules/equipment', () => ({ deleteMeterReading: deleteMeterReadingMock }));
-vi.mock('@/services/audit/audit-service', () => ({ recordAuditEvent: recordAuditEventMock }));
+vi.mock('@/modules/audit', () => ({ recordAuditEvent: recordAuditEventMock }));
 
 import { DELETE } from '../route';
 

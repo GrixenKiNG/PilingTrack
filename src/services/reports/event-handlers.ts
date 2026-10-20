@@ -408,7 +408,7 @@ export function registerAuditEventHandler() {
 
 async function handleAuditEvent(event: ReportDomainEvent) {
   try {
-    const { recordAuditEvent } = await import('@/services/audit/audit-service');
+    const { recordAuditEvent } = await import('@/modules/audit');
 
     // Автосдача черновика: смену закрыл планировщик по истечении
     // производственных суток, оператор отчёт не сдавал, и запись от его имени —

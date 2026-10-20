@@ -23,8 +23,7 @@ import { ServiceError } from '@/lib/service-error';
 // eslint-disable-next-line no-restricted-imports -- auth/audit остаются в services/ до их переноса (CLAUDE.md); поведение не меняется
 import { can } from '@/services/auth/authorization-service';
 import { documentExpiry } from '@/lib/document-expiry';
-// eslint-disable-next-line no-restricted-imports -- auth/audit остаются в services/ до их переноса (CLAUDE.md); поведение не меняется
-import { recordAuditEvent } from '@/services/audit/audit-service';
+import { recordAuditEvent } from '@/modules/audit';
 import { evaluateOperatorClearance, type OperatorClearance } from './operator-clearance';
 import {
   assertCanRead,

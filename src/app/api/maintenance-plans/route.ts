@@ -7,7 +7,7 @@ import { createMaintenancePlan, listMaintenancePlans } from '@/modules/equipment
 import { evaluatePlanDue } from '@/lib/pm-due';
 import { withApi, withMutation, readJsonBody } from '@/core/api-wrapper';
 import { ServiceError } from '@/services/service-error';
-import { recordAuditEvent } from '@/services/audit/audit-service';
+import { recordAuditEvent } from '@/modules/audit';
 
 export const runtime = 'nodejs';
 

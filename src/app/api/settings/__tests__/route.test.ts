@@ -22,7 +22,7 @@ vi.mock('@/modules/settings', () => ({
   getSettings: getSettingsMock,
   saveSettings: saveSettingsMock,
 }));
-vi.mock('@/services/audit/audit-service', () => ({ recordAuditEvent: recordAuditEventMock }));
+vi.mock('@/modules/audit', () => ({ recordAuditEvent: recordAuditEventMock }));
 
 import { PUT } from '../route';
 

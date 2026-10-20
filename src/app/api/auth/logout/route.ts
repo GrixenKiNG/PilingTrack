@@ -3,7 +3,7 @@ import { clearAuthUserCacheEntry, requireAuth } from '@/lib/auth';
 import { getRequestId } from '@/lib/request-context';
 import { createLogoutResponse } from '@/services/auth/auth-service';
 import { readSessionToken, revokeSessionToken } from '@/services/auth/session-service';
-import { recordAuditEvent } from '@/services/audit/audit-service';
+import { recordAuditEvent } from '@/modules/audit';
 import { resolveTenantContext } from '@/services/tenancy/tenant-context-service';
 import { withMutation } from '@/core/api-wrapper';
 

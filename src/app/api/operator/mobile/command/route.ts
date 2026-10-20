@@ -4,7 +4,7 @@ import {withMutation} from '@/core/api-wrapper';
 import {getRequestId} from '@/lib/request-context';
 import {requireAuth} from '@/lib/auth';
 import {authFailureResponse} from '@/lib/auth-failure';
-import {recordAuditEvent} from '@/services/audit/audit-service';
+import {recordAuditEvent} from '@/modules/audit';
 import {
   acceptEquipment, acknowledgeBriefing, closeShift, confirmPpe, finishWork, logProduction, submitReport,
   OperatorCommandError, correctProduction, reportIncident, submitChecklist, submitKnowledgeTest,
