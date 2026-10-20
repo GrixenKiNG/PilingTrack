@@ -3,3 +3,4 @@ export {requestReadinessSnapshot, type ReadinessSnapshotRequest} from './applica
 export {consumeReadinessProjectionEvent} from './application/projection/consumer';
 export {withReadinessTenantTransaction} from './infrastructure/tenant-transaction';
 export {OPEN_MAINTENANCE} from './application/readiness-score';
+export {createRepairOrderForDefect} from './infrastructure/defects/repair-order';

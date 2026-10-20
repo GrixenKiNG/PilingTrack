@@ -271,8 +271,18 @@ describe('completeInspection', () => {
     });
     m.insFindUniqueOrThrow.mockResolvedValue({ id: 'ins1', status: 'COMPLETED' });
     m.defectCreate.mockResolvedValue({ id: 'd1' });
+    m.recCreate.mockResolvedValue({ id: 'rec-repair' });
     await completeInspectionWithOutcome('ins1', { tenantId: 'orion', signedByName: 'Иванов' });
     expect(m.transaction).toHaveBeenCalledTimes(1);
+    // Дефект высокого и критического уровня сам заводит заявку ТО, обычный — нет (решение 18.10.2026).
+    if (severity === 'NORMAL') {
+      expect(m.recCreate).not.toHaveBeenCalled();
+      expect(m.defectCreate).toHaveBeenCalledWith({ data: expect.objectContaining({ maintenanceRecordId: null }), select: { id: true } });
+    } else {
+      expect(m.recCreate).toHaveBeenCalledWith({ data: expect.objectContaining({ type: 'REPAIR', status: 'PLANNED', priority: 'HIGH', createdById: 'u1' }), select: { id: true } });
+      expect(m.defectCreate).toHaveBeenCalledWith({ data: expect.objectContaining({ maintenanceRecordId: 'rec-repair' }), select: { id: true } });
+    }
+    m.recCreate.mockClear();
     if (severity === 'NORMAL') {
       expect(m.outboxAlertCreate).not.toHaveBeenCalled();
     } else {

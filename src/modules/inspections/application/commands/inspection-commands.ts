@@ -5,7 +5,7 @@ import { recordAuditEvent } from '@/services/audit/audit-service';
 import type { Prisma } from '@/generated/postgres-client/client';
 import { ServiceError } from '@/lib/service-error';
 import { recordMeterReadingInTx } from '@/modules/equipment';
-import { OPEN_MAINTENANCE, requestReadinessSnapshot } from '@/modules/readiness/server';
+import { createRepairOrderForDefect, OPEN_MAINTENANCE, requestReadinessSnapshot } from '@/modules/readiness/server';
 import { computeHealthScore, findMissing, type SnapItem, type AnswerLike } from '../../domain/inspection-logic';
 import { inspectionDefectKey, planDefectsFromInspection, type DefectRuleItem } from '../../domain/defect-rules';
 import {
@@ -470,6 +470,11 @@ export async function completeInspectionWithOutcome(
       const toCreate = plannedDefects.filter((item) =>
         !alreadyOpen.has(inspectionDefectKey(ins.equipmentId, item.itemId)));
       for (const planned of toCreate) {
+        // Дефект высокого и критического уровня сам заводит заявку ТО (решение 18.10.2026).
+        const repairOrderId = await createRepairOrderForDefect(tx, {
+          tenantId: ctx.tenantId, equipmentId: ins.equipmentId, defectTitle: planned.title,
+          severity: planned.severity, actorId: ins.performedById,
+        });
         const defect = await tx.equipmentDefect.create({
           data: {
             tenantId: ctx.tenantId,
@@ -481,6 +486,7 @@ export async function completeInspectionWithOutcome(
             inspectionId: id,
             reportedById: ins.performedById,
             sourceKey: inspectionDefectKey(ins.equipmentId, planned.itemId),
+            maintenanceRecordId: repairOrderId,
           },
           select: { id: true },
         });

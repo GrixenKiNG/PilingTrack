@@ -15,11 +15,14 @@ import {beforeEach, describe, expect, it, vi} from 'vitest';
   команде. `collectDefectDrafts` возвращает заведомо неотсортированный набор с
   повтором, `selectChecklistItems`/`validateChecklistRun` — тривиальные.
 */
-const {withReadinessTenantTransaction, requestReadinessSnapshot} = vi.hoisted(() => ({
+const {withReadinessTenantTransaction, requestReadinessSnapshot, createRepairOrderForDefect} = vi.hoisted(() => ({
   withReadinessTenantTransaction: vi.fn(),
   requestReadinessSnapshot: vi.fn(),
+  createRepairOrderForDefect: vi.fn(),
 }));
-vi.mock('@/modules/readiness/server', () => ({withReadinessTenantTransaction, requestReadinessSnapshot}));
+vi.mock('@/modules/readiness/server', () => ({
+  withReadinessTenantTransaction, requestReadinessSnapshot, createRepairOrderForDefect,
+}));
 
 const {enqueueCriticalDefects} = vi.hoisted(() => ({enqueueCriticalDefects: vi.fn()}));
 vi.mock('@/core/notifications/durable-alert', () => ({enqueueCriticalDefects}));
@@ -133,6 +136,21 @@ describe('submitChecklist — пометка замены счётчика', () 
       {itemId: 'glass', answer: 'OK', note: 'Счётчик заменён'},
     ]})).rejects.toMatchObject({status: 400});
     expect(tx.meterReading.create).not.toHaveBeenCalled();
+  });
+});
+
+describe('submitChecklist — заявка ТО по дефекту', () => {
+  it('дефект высокого уровня получает заявку ТО и привязку, обычный — нет (решение 18.10.2026)', async () => {
+    createRepairOrderForDefect.mockResolvedValue('rec-repair');
+
+    await submitChecklist(input);
+
+    expect(createRepairOrderForDefect).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      severity: 'HIGH', defectTitle: 'Течь', actorId: input.operatorId,
+    }));
+    expect(tx.equipmentDefect.create).toHaveBeenCalledWith({data: expect.objectContaining({
+      severity: 'HIGH', maintenanceRecordId: 'rec-repair',
+    })});
   });
 });
 
