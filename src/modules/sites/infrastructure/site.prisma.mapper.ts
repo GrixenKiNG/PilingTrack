@@ -20,7 +20,7 @@ export function toPrismaData(aggregate: SiteAggregate) {
   };
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Prisma row shape boundary in a mapper
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Prisma row shape boundary in a mapper; точный тип: Prisma.SiteGetPayload<{}> (требует импорт Prisma и знания схемы)
 export function fromPrismaToState(prismaSite: any): SiteInfo {
   return {
     id: prismaSite.id,
@@ -44,7 +44,7 @@ export function fromPrismaToState(prismaSite: any): SiteInfo {
 // тенанта не несут, поэтому берём его из состояния агрегата, а не из события
 // (см. вызов в site.repository.ts). `undefined` — у объекта нет организации,
 // колонка OutboxEvent.tenantId nullable.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Prisma JSON column / event payload is an arbitrary serializable shape
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Prisma JSON column / event payload is an arbitrary serializable shape; точный тип события зависит от доменных событий (SiteActivated/SiteDeactivated)
 export function toOutboxData(event: any, tenantId?: string) {
   return {
     type: event.type,
