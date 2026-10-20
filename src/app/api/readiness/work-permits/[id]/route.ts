@@ -1,8 +1,8 @@
 import type {NextRequest} from 'next/server';
 import {ReadinessCommandError} from '@/modules/readiness/server';
-import {updateWorkPermitCommand} from '@/modules/readiness/application/permits/commands';
-import {queryWorkPermit} from '@/modules/readiness/application/permits/queries';
-import {updateWorkPermitSchema} from '@/modules/readiness/application/permits/schemas';
+import {updateWorkPermitCommand} from '@/modules/readiness/server';
+import {queryWorkPermit} from '@/modules/readiness/server';
+import {updateWorkPermitSchema} from '@/modules/readiness/server';
 import {withReadinessRequestTransaction, withReadinessSerializableTransaction} from '@/modules/readiness/server';
 import {resolveReadinessRequestContext} from '../../_shared/request-context';
 import {readinessErrorResponse, readinessResponse} from '../../_shared/response';

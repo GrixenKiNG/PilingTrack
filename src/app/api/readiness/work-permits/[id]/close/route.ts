@@ -1,7 +1,7 @@
 import type {NextRequest} from 'next/server';
 import {ReadinessCommandError} from '@/modules/readiness/server';
-import {closeWorkPermitCommand} from '@/modules/readiness/application/permits/commands';
-import {closeWorkPermitSchema} from '@/modules/readiness/application/permits/schemas';
+import {closeWorkPermitCommand} from '@/modules/readiness/server';
+import {closeWorkPermitSchema} from '@/modules/readiness/server';
 import {withReadinessSerializableTransaction} from '@/modules/readiness/server';
 import {withReadinessCommand} from '../../../_shared/route-adapter';
 import {readinessResponse} from '../../../_shared/response';

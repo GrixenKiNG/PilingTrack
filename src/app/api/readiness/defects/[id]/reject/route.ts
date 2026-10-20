@@ -1,7 +1,7 @@
 import type {NextRequest} from 'next/server';
 import {ReadinessCommandError} from '@/modules/readiness/server';
-import {rejectDefectCommand} from '@/modules/readiness/application/defects/commands';
-import {rejectDefectSchema} from '@/modules/readiness/application/defects/schemas';
+import {rejectDefectCommand} from '@/modules/readiness/server';
+import {rejectDefectSchema} from '@/modules/readiness/server';
 import {withReadinessSerializableTransaction} from '@/modules/readiness/server';
 import {withReadinessCommand} from '../../../_shared/route-adapter';
 import {readinessResponse} from '../../../_shared/response';

@@ -1,8 +1,8 @@
 import type {NextRequest} from 'next/server';
 import {ReadinessCommandError} from '@/modules/readiness/server';
-import {createDefectCommand} from '@/modules/readiness/application/defects/commands';
-import {queryDefects} from '@/modules/readiness/application/defects/queries';
-import {createDefectSchema, listDefectsQuerySchema} from '@/modules/readiness/application/defects/schemas';
+import {createDefectCommand} from '@/modules/readiness/server';
+import {queryDefects} from '@/modules/readiness/server';
+import {createDefectSchema, listDefectsQuerySchema} from '@/modules/readiness/server';
 import {
   withReadinessRequestTransaction,
   withReadinessSerializableTransaction,

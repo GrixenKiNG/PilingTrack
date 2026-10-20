@@ -1,7 +1,7 @@
 import {ReadinessCommandError} from '@/modules/readiness/server';
 import type {NextRequest} from 'next/server';
-import {requestShiftAcceptanceCommand} from '@/modules/readiness/application/shifts/commands';
-import {versionedShiftSchema} from '@/modules/readiness/application/shifts/schemas';
+import {requestShiftAcceptanceCommand} from '@/modules/readiness/server';
+import {versionedShiftSchema} from '@/modules/readiness/server';
 import {withReadinessSerializableTransaction} from '@/modules/readiness/server';
 import {readinessResponse} from '../../../_shared/response';
 import {withReadinessCommand} from '../../../_shared/route-adapter';

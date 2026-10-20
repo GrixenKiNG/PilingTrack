@@ -1,8 +1,8 @@
 import type {NextRequest} from 'next/server';
 import {ReadinessCommandError} from '@/modules/readiness/server';
-import {createShiftCommand} from '@/modules/readiness/application/shifts/commands';
-import {queryShifts} from '@/modules/readiness/application/shifts/queries';
-import {createShiftSchema} from '@/modules/readiness/application/shifts/schemas';
+import {createShiftCommand} from '@/modules/readiness/server';
+import {queryShifts} from '@/modules/readiness/server';
+import {createShiftSchema} from '@/modules/readiness/server';
 import {parseReadinessReadFilters} from '@/modules/readiness/application/read-filters';
 import {SHIFT_STATES} from '@/modules/readiness/domain/shifts/types';
 import {withReadinessRequestTransaction, withReadinessSerializableTransaction} from '@/modules/readiness/server';

@@ -1,6 +1,6 @@
 import {ReadinessCommandError} from '@/modules/readiness/server';
 import type {NextRequest} from 'next/server';
-import {acceptHandoverCommand} from '@/modules/readiness/application/shifts/commands'; import {acceptHandoverSchema} from '@/modules/readiness/application/shifts/schemas';
+import {acceptHandoverCommand} from '@/modules/readiness/server'; import {acceptHandoverSchema} from '@/modules/readiness/server';
 import {HandoverRepository} from '@/modules/readiness/infrastructure/shifts/handover-repository';
 import {withReadinessSerializableTransaction, withReadinessTenantTransaction} from '@/modules/readiness/server'; import {readinessResponse} from '../../../_shared/response'; import {withReadinessCommand} from '../../../_shared/route-adapter';
 import { readJsonBody } from '@/core/api-wrapper';
