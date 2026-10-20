@@ -7,7 +7,7 @@
 - Задачу превращай в проверяемую цель (тест воспроизводит → правка → тест зелёный) и проверяй до «готово».
 
 ## Архитектура (PilingTrack)
-- `src/modules/` — доменная логика (DDD/CQRS); `src/services/` — старые общие сервисы (auth, audit, notifications); `src/core/` — только настоящая инфраструктура; `src/app/api/` — маршруты.
+- `src/modules/` — доменная логика (DDD/CQRS); `src/services/` — старые общие сервисы (auth, notifications; `audit` перенесён в `modules/audit` 20.10.2026); `src/core/` — только настоящая инфраструктура; `src/app/api/` — маршруты.
 - Миграция `services/ → modules/` остановлена на полпути: не доделывать отдельным рефакторингом. `reports/` — эталон полного переноса. Для `telemetry` `modules/telemetry/index.ts` — только фасад, код живёт в `services/telemetry/`. `analytics` и `system` перенесены целиком в `modules/` по решению владельца 16.10.2026, `users` — 20.10.2026 (правило «не доделывать» отменено только для них; `system` по-прежнему берёт `resolveTenantContext` из `services/tenancy`). Импортировать всегда из `@/modules/<x>`.
 - Модуль или справочник: таблица `{id, name, isActive}` только под FK `onDelete: Restrict` → справочник (вкладка `admin-dictionaries`); есть состояние/жизненный цикл/история/дочерние строки → операционный модуль; `enum` в коде остаётся в коде (подробно — навык `module-vs-dictionary`).
 
