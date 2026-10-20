@@ -6,7 +6,7 @@ import { withApi } from '@/core/api-wrapper';
 export const runtime = 'nodejs';
 
 async function getReportQueryService() {
-  return import('@/modules/reports/application/queries/report-query.service');
+  return import('@/modules/reports');
 }
 
 export const GET = withApi(

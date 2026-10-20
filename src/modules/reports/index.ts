@@ -58,3 +58,32 @@ export { startProjectionWorker } from './application/projections/projection-work
 // Infrastructure
 export { getReportRepository, PrismaReportRepository } from './infrastructure';
 export type { ReportRepository } from './infrastructure';
+
+// Public exports for routes and screens (previously deep imports).
+export {
+  rebuildAll,
+  rebuildReportAnalytics,
+  rebuildSiteDailySummary,
+  rebuildSiteWeeklyTrend,
+} from './application/projections/rebuild';
+export type {
+  ProjectionName,
+  RebuildResult,
+} from './application/projections/rebuild';
+export {
+  decidePilePassport,
+  exportPileJournalXlsx,
+  listPilePassports,
+  pileJournalHeader,
+} from './application/queries/pile-passport.service';
+export type {
+  PileJournalHeader,
+  PilePassportRow,
+} from './application/queries/pile-passport.service';
+export {
+  computePeriodSummary,
+} from './domain/period-summary';
+export type {
+  PeriodReportInput,
+} from './domain/period-summary';
+export { saveReportEndingEngineHours } from './infrastructure/report.repository';

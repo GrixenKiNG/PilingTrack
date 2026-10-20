@@ -11,7 +11,7 @@ import { invalidateReports } from '@/lib/cached-queries';
 export const runtime = 'nodejs';
 
 async function getReportCommandService() {
-  return import('@/modules/reports/application/commands/report-command.service');
+  return import('@/modules/reports');
 }
 
 export const POST = withMutation(

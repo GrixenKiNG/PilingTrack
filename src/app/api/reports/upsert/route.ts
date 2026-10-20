@@ -11,7 +11,7 @@ import { invalidateReports } from '@/lib/cached-queries';
 export const runtime = 'nodejs';
 
 async function getReportCommandService() {
-  return import('@/modules/reports/application/commands/report-command.service');
+  return import('@/modules/reports');
 }
 
 export const POST = withMutation(
@@ -112,7 +112,7 @@ export const POST = withMutation(
           { tenantId, recordedById: user!.id, allowDecrease: false, dedupeByNote: true },
         );
         meterWarning = meterResult.warning;
-        const {saveReportEndingEngineHours} = await import('@/modules/reports/infrastructure/report.repository');
+        const {saveReportEndingEngineHours} = await import('@/modules/reports');
         if (await saveReportEndingEngineHours({
           reportId: result.report.reportId, version: result.report.version,
           equipmentId: validatedDto.equipmentId, tenantId,

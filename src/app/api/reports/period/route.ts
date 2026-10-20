@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { assertCan } from '@/services/auth/authorization-service';
 import { withApi } from '@/core/api-wrapper';
-import { computePeriodSummary, type PeriodReportInput } from '@/modules/reports/domain/period-summary';
+import { computePeriodSummary, type PeriodReportInput } from '@/modules/reports';
 
 
 export const runtime = 'nodejs';
@@ -24,7 +24,7 @@ function isDateOnly(value: string): boolean {
 }
 
 async function getReportQueryService() {
-  return import('@/modules/reports/application/queries/report-query.service');
+  return import('@/modules/reports');
 }
 
 export const GET = withApi(
