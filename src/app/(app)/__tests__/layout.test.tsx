@@ -41,12 +41,9 @@ vi.mock('@/components/piling/feedback-center', () => ({ FeedbackCenter: () => nu
 vi.mock('@/components/piling/acting-as-banner', () => ({ ActingAsBanner: () => null }));
 
 vi.mock('framer-motion', () => ({
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test: cast to a mock shape or to reach internals not in the public type
-  motion: { div: ({ children, ...props }: any) => <div {...props}>{children}</div> },
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test: cast to a mock shape or to reach internals not in the public type
-  AnimatePresence: ({ children }: any) => <>{children}</>,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test: cast to a mock shape or to reach internals not in the public type
-  MotionConfig: ({ children }: any) => <>{children}</>,
+  motion: { div: ({ children, ...props }: React.ComponentPropsWithoutRef<'div'>) => <div {...props}>{children}</div> },
+  AnimatePresence: ({ children }: React.PropsWithChildren<Record<string, unknown>>) => <>{children}</>,
+  MotionConfig: ({ children }: React.PropsWithChildren<Record<string, unknown>>) => <>{children}</>,
 }));
 
 import AppLayout from '../layout';
