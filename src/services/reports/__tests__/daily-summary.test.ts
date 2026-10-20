@@ -709,3 +709,27 @@ it('I08: partial PDF batch retains per-chat receipts before a retry', async () =
   expect(row.published).toBe(true);
   expect(row.payload).toMatchObject({ telegramDeliveredChatIds: ['A', 'B'] });
 });
+
+describe('PDF автозакрытой смены: ссылка на журнал забивки', () => {
+  async function captionOf(data?: Record<string, unknown>) {
+    outboxFindUnique.mockReset().mockResolvedValue({ published: false, payload: {} });
+    outboxUpdate.mockReset().mockResolvedValue(undefined);
+    sendDocument.mockReset().mockResolvedValue(true);
+    await deliverReportPdf({ id: 'evt-caption', aggregateId: 'r1', data });
+    return sendDocument.mock.calls[0][2] as string;
+  }
+
+  it('подпись автозакрытия ведёт в журнал забивки', async () => {
+    const caption = await captionOf({ autoClosed: true });
+
+    expect(caption).toContain('Смена закрыта автоматически');
+    expect(caption).toContain('href="https://orionpiling.ru/admin/reports?view=piles"');
+    expect(caption).toContain('журнал забивки');
+  });
+
+  it('обычная сдача ссылки не получает', async () => {
+    const caption = await captionOf();
+
+    expect(caption).not.toContain('view=piles');
+  });
+});

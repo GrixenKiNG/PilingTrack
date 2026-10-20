@@ -455,6 +455,14 @@ export function PileJournal() {
                             без паспорта
                           </span>
                         ) : null}
+                        {row.shiftAutoClosed ? (
+                          <span
+                            title="Смену закрыл планировщик, а не оператор. Если запись пропущена, её вносит мастер в журнале забивки."
+                            className="rounded bg-warning/15 px-1.5 py-0.5 text-3xs font-semibold text-warning-strong"
+                          >
+                            автозакрытие
+                          </span>
+                        ) : null}
                         {row.isDraft ? (
                           <span className="rounded bg-warning/15 px-1.5 py-0.5 text-3xs font-semibold text-warning-strong">
                             черновик

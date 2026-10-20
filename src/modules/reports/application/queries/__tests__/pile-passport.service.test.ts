@@ -10,8 +10,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 type Sheet = { name: string; rows: (string | number | null)[][] };
 
-const { pileWorkFindMany, pileTotalsQuery, pileUpdateMany, userFindMany, getSettings, sheets } = vi.hoisted(() => ({
+const { pileWorkFindMany, shiftFindMany, pileTotalsQuery, pileUpdateMany, userFindMany, getSettings, sheets } = vi.hoisted(() => ({
   pileWorkFindMany: vi.fn(),
+  shiftFindMany: vi.fn(),
   pileTotalsQuery: vi.fn(),
   pileUpdateMany: vi.fn(),
   userFindMany: vi.fn(),
@@ -22,6 +23,7 @@ const { pileWorkFindMany, pileTotalsQuery, pileUpdateMany, userFindMany, getSett
 vi.mock('@/lib/db', () => ({
   db: {
     pileWork: { findMany: pileWorkFindMany },
+    shift: { findMany: shiftFindMany },
     pilePassport: { updateMany: pileUpdateMany },
     user: { findMany: userFindMany },
     $queryRaw: pileTotalsQuery,
@@ -103,6 +105,8 @@ function defaultMocks() {
   sheets.current = [];
   pileWorkFindMany.mockReset();
   pileWorkFindMany.mockResolvedValue([work()]);
+  shiftFindMany.mockReset();
+  shiftFindMany.mockResolvedValue([]);
   pileTotalsQuery.mockReset();
   pileTotalsQuery.mockResolvedValue([totals()]);
   userFindMany.mockReset();
@@ -194,6 +198,29 @@ describe('listPilePassports — строки из выработки (W14)', () 
     const { rows } = await listPilePassports({ tenantId: 'orion' });
 
     expect(rows[0].isDraft).toBe(true);
+  });
+
+  it('строка автозакрытой смены помечена, остальные нет; смены ищутся по своему тенанту', async () => {
+    pileWorkFindMany.mockResolvedValue([
+      work({ id: 'w1', report: { ...work().report, shiftId: 'sh-auto' } }),
+      work({ id: 'w2', report: { ...work().report, shiftId: 'sh-manual' } }),
+      work({ id: 'w3' }),
+    ]);
+    shiftFindMany.mockResolvedValue([{ id: 'sh-auto' }]);
+
+    const { rows } = await listPilePassports({ tenantId: 'tenant-a' });
+
+    expect(rows.map((row) => row.shiftAutoClosed)).toEqual([true, false, false]);
+    expect(shiftFindMany).toHaveBeenCalledTimes(1);
+    const where = shiftFindMany.mock.calls[0][0].where as Record<string, unknown>;
+    expect(where.tenantId).toBe('tenant-a');
+    expect(where.autoClosedAt).toEqual({ not: null });
+  });
+
+  it('без смен в отчётах запрос к сменам не идёт', async () => {
+    await listPilePassports({ tenantId: 'orion' });
+
+    expect(shiftFindMany).not.toHaveBeenCalled();
   });
 
   it('организация — строгим равенством: выборка только по своему тенанту', async () => {

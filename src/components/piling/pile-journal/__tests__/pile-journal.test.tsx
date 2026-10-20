@@ -27,6 +27,7 @@ function pileRow(over: Partial<PilePassportRow> = {}): PilePassportRow {
     passportId: 'pile-1',
     hasPassport: true,
     isDraft: false,
+    shiftAutoClosed: false,
     count: 1,
     pileNumber: 'С-130',
     drivenAt: '2026-09-28T09:00:00.000Z',
@@ -496,5 +497,25 @@ describe('журнал забивки: закрепление левых кол�
 
     const detail = table.querySelector(`td[colspan="${JOURNAL_COLUMNS}"]`);
     expect(detail).not.toBeNull();
+  });
+});
+
+describe('журнал забивки: смена закрыта автоматически', () => {
+  beforeEach(() => {
+    mocks.authFetch.mockReset();
+  });
+
+  it('строка автозакрытой смены несёт пометку, обычная — нет', async () => {
+    mocks.authFetch.mockImplementation(async (url: string) => {
+      if (url.startsWith('/api/sites/all')) return json({ sites: [] });
+      return json({
+        data: [pileRow({ id: 'a', pileNumber: 'С-1', shiftAutoClosed: true }), pileRow({ id: 'b', pileNumber: 'С-2' })],
+        header, truncated: false,
+      });
+    });
+    render(<PileJournal />);
+
+    expect(await screen.findByText('С-1')).toBeInTheDocument();
+    expect(screen.getAllByText('автозакрытие')).toHaveLength(1);
   });
 });

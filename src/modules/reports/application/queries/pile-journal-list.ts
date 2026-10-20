@@ -81,6 +81,7 @@ export async function listPilePassports(input: PileJournalFilters): Promise<Pile
           equipment: { select: { name: true } },
           crew: { select: { equipment: { select: { name: true } } } },
           shiftType: true,
+          shiftId: true,
           status: true,
         },
       },
@@ -106,6 +107,19 @@ export async function listPilePassports(input: PileJournalFilters): Promise<Pile
     })
     : [];
   const deciderById = new Map(deciders.map((user) => [user.id, user.name]));
+
+  // Смены, которые закрыл планировщик, — одним запросом на всю страницу. У отчёта
+  // нет связи со сменой в схеме, поэтому ищем по shiftId, строго по организации.
+  const shiftIds = [...new Set(
+    page.map((work) => work.report?.shiftId).filter((id): id is string => !!id),
+  )];
+  const autoClosed = shiftIds.length > 0
+    ? await db.shift.findMany({
+      where: { tenantId: input.tenantId, id: { in: shiftIds }, autoClosedAt: { not: null } },
+      select: { id: true },
+    })
+    : [];
+  const autoClosedIds = new Set(autoClosed.map((shift) => shift.id));
 
   const items = page.map((work) => {
     const passport = work.passport;
@@ -138,6 +152,7 @@ export async function listPilePassports(input: PileJournalFilters): Promise<Pile
       passportId: passport?.id ?? null,
       hasPassport: passport !== null,
       isDraft: !isSubmittedReport(report),
+      shiftAutoClosed: !!report?.shiftId && autoClosedIds.has(report.shiftId),
       count: work.count,
       pileNumber: passport?.pileNumber ?? null,
       drivenAt: (work.occurredAt ?? work.receivedAt).toISOString(),

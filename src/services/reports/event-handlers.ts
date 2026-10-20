@@ -548,6 +548,8 @@ async function handleReportSubmittedTelegram(event: ReportDomainEvent) {
   }
 }
 
+const PILE_JOURNAL_URL = `${process.env.NEXT_PUBLIC_SITE_URL ?? 'https://orionpiling.ru'}/admin/reports?view=piles`;
+
 /** Доставка PDF отчёта в Telegram. Бросает при сбое — outbox повторит. */
 export async function deliverReportPdf(event: { id?: string; aggregateId: string; data?: unknown }) {
   if (!event.id) throw new Error('Report PDF delivery requires the outbox event id');
@@ -599,6 +601,9 @@ export async function deliverReportPdf(event: { id?: string; aggregateId: string
     `🔩 Свай забито: <b>${formatCountMeters(totalPiles, totalPileMeters)}</b>`,
     `🌀 Бурение: <b>${formatCountMeters(totalDrillingCount, totalDrilling)}</b>`,
     `⏸ Простои: <b>${formatDowntimeHours(totalDowntime)}</b>`,
+    ...(autoClosed
+      ? ['', `Если запись пропущена, её вносит мастер: <a href="${PILE_JOURNAL_URL}">журнал забивки</a>`]
+      : []),
   ];
   const caption = lines.join('\n');
 
