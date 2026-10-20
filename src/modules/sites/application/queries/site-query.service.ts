@@ -4,9 +4,7 @@
 
 import { db } from '@/lib/db';
 import { ServiceError } from '@/lib/service-error';
-// eslint-disable-next-line no-restricted-imports -- legacy cross-layer import pending the parked services<->modules migration (CLAUDE.md); behavior-neutral
 import { resolveAccessibleUserId } from '@/core/security/resource-access';
-// eslint-disable-next-line no-restricted-imports -- legacy cross-layer import pending the parked services<->modules migration (CLAUDE.md); behavior-neutral
 import { assertCanAccessSite } from '@/core/security/resource-access';
 import type { CursorPaginationResult } from '@/lib/pagination-cursor';
 import { resolveEquipmentOperationalStates } from '@/modules/equipment';

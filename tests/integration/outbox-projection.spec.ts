@@ -2,7 +2,7 @@
  * Integration tests for the outbox → domain-event-bus → handlers flow.
  *
  * These tests do not boot Postgres or BullMQ — they exercise the in-process
- * event bus that connects services/reports/domain-events to the registered
+ * event bus that connects modules/reports/application/domain-events to the registered
  * handlers (analytics, alerts, audit). The contract under test is:
  *
  *   emitDomainEvent(event) → awaits every handler subscribed to event.type
@@ -17,7 +17,7 @@ import {
   emitDomainEvent,
   getHandlerCount,
   getRegisteredEventTypes,
-} from '@/services/reports/domain-events';
+} from '@/modules/reports/server';
 import type { ReportDomainEvent } from '@/modules/reports/domain';
 
 function makeEvent(type: ReportDomainEvent['type']): ReportDomainEvent {

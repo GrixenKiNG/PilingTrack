@@ -7,7 +7,6 @@
  */
 import type {Prisma} from '@/generated/postgres-client/client';
 import {withReadinessTenantTransaction} from '@/modules/readiness/server';
-// eslint-disable-next-line no-restricted-imports -- legacy cross-layer import pending the parked services<->modules migration (CLAUDE.md); behavior-neutral
 import {writeReportAuditRow} from '@/modules/reports/server';
 import {OperatorCommandError, requireCrew, requireOpenShift, ensureReport, businessReportId, reportAuditActor} from './shared';
 import type {Tx} from './shared';

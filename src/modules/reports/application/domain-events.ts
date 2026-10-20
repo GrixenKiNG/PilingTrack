@@ -6,11 +6,9 @@
  * the request, then persisted to outbox for reliable async processing.
  */
 
-// eslint-disable-next-line no-restricted-imports -- legacy cross-layer import pending the parked services<->modules migration (CLAUDE.md); behavior-neutral
 import type {
   ReportDomainEvent as DomainEvent,
 } from '../domain';
-// eslint-disable-next-line no-restricted-imports -- legacy cross-layer import pending the parked services<->modules migration (CLAUDE.md); behavior-neutral
 import { REPORT_DOMAIN_EVENT_TYPES, normalizeReportDomainEventType } from '../domain';
 import { logger } from '@/lib/logger';
 
@@ -21,7 +19,6 @@ function shouldLogHandlerRegistration(): boolean {
 // Re-export for convenience — aliased from the report domain types so
 // existing call sites that import `DomainEvent` from this module keep
 // working unchanged.
-// eslint-disable-next-line no-restricted-imports -- legacy cross-layer import pending the parked services<->modules migration (CLAUDE.md); behavior-neutral
 export type {
   ReportDomainEvent as DomainEvent,
   ReportDomainEventType as DomainEventType,

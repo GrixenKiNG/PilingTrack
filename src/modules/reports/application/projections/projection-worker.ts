@@ -13,7 +13,6 @@ import {
   REPORT_DOMAIN_EVENT_TYPES,
   normalizeReportDomainEventType,
 } from '@/modules/reports/domain';
-// eslint-disable-next-line no-restricted-imports -- legacy cross-layer import pending the parked services<->modules migration (CLAUDE.md); behavior-neutral
 import { projectOutboxEvents } from '../outbox-publisher';
 import { projectWeeklyTrend } from './projection-handlers';
 import {consumeReadinessProjectionEvent} from '@/modules/readiness/server';

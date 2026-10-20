@@ -20,7 +20,6 @@
 
 import { db } from '@/lib/db';
 import { ServiceError } from '@/lib/service-error';
-// eslint-disable-next-line no-restricted-imports -- auth/audit остаются в services/ до их переноса (CLAUDE.md); поведение не меняется
 import { can } from '@/core/security/authorization';
 import { documentExpiry } from '@/lib/document-expiry';
 import { recordAuditEvent } from '@/modules/audit';

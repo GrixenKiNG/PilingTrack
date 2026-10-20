@@ -53,7 +53,7 @@ describe.skipIf(!enabled)('M6–M8 on disposable migrated Postgres', () => {
   });
 
   it('M6: draft excluded from KPI/live projection/rebuild; submission and rebuild agree', async () => {
-    const { recomputeSiteDailySummary } = await import('@/services/reports/event-handlers');
+    const { recomputeSiteDailySummary } = await import('@/modules/reports/server');
     const { rebuildSiteDailySummary } = await import('@/modules/reports/application/projections/rebuild');
     const { getFleetSnapshot } = await import('@/modules/monitoring/application/queries/fleet-monitoring.service');
     const today = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Moscow' }).format(new Date());
@@ -119,14 +119,14 @@ describe.skipIf(!enabled)('M6–M8 on disposable migrated Postgres', () => {
       if (chat === 'B' && !failed) { failed = true; throw new Error('simulated network timeout'); }
       return { ok: true, json: async () => ({ ok: true }) };
     }));
-    const { deliverQueuedAlert } = await import('@/services/notifications/durable-alert-delivery');
+    const { deliverQueuedAlert } = await import('@/modules/notifications');
     await expect(inContext(() => deliverQueuedAlert({ id: eventId, tenantId: tenant, data: alert }))).rejects.toThrow('retained for retry');
     const persisted = await fixture.owner.query('SELECT payload,published FROM "OutboxEvent" WHERE id=$1', [eventId]);
     expect(persisted.rows[0]).toMatchObject({ payload: { telegramDeliveredChatIds: ['A'] }, published: false });
     expect(sent).toEqual(['A', 'B']); sent.length = 0;
     await db.$disconnect(); delete (globalThis as { prisma?: unknown }).prisma; vi.resetModules();
     db = (await import('@/lib/db')).db;
-    const restarted = await import('@/services/notifications/durable-alert-delivery');
+    const restarted = await import('@/modules/notifications');
     await inContext(() => restarted.deliverQueuedAlert({ id: eventId, tenantId: tenant, data: persisted.rows[0].payload }));
     expect(sent).toEqual(['B']);
     const complete = await fixture.owner.query('SELECT payload,published FROM "OutboxEvent" WHERE id=$1', [eventId]);
@@ -148,7 +148,7 @@ describe.skipIf(!enabled)('M6–M8 on disposable migrated Postgres', () => {
         ? { ok: false, status: 400, text: async () => '{"description":"Bad Request: chat not found"}' }
         : { ok: true, json: async () => ({ ok: true }) };
     }));
-    const { deliverQueuedAlert } = await import('@/services/notifications/durable-alert-delivery');
+    const { deliverQueuedAlert } = await import('@/modules/notifications');
     const deliver = () => inContext(() => deliverQueuedAlert({ id: eventId, tenantId: tenant, data: alert }));
     // Решение владельца 17.10.2026: канал отключается после трёх отказов «навсегда» подряд.
     // Первые два — обычный сбой: доставка в A уже сохранена, outbox повторит попытку.

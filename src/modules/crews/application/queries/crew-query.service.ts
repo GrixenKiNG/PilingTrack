@@ -5,7 +5,6 @@
 import { db } from '@/lib/db';
 import { ServiceError } from '@/lib/service-error';
 import { resolveEffectiveRole } from '@/lib/types';
-// eslint-disable-next-line no-restricted-imports -- legacy cross-layer import pending the parked services<->modules migration (CLAUDE.md); behavior-neutral
 import { isPrivilegedRole } from '@/core/security/authorization';
 import type { CursorPaginationResult } from '@/lib/pagination-cursor';
 

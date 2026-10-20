@@ -6,7 +6,6 @@
  * и свой путь повтора команды при обрыве сети.
  */
 import {withReadinessTenantTransaction} from '@/modules/readiness/server';
-// eslint-disable-next-line no-restricted-imports -- legacy cross-layer import pending the parked services<->modules migration (CLAUDE.md); behavior-neutral
 import {writeReportAuditRow} from '@/modules/reports/server';
 import {OperatorCommandError, requireCrew, requireOpenShift, businessReportId, reportAuditActor} from './shared';
 import type {Tx} from './shared';

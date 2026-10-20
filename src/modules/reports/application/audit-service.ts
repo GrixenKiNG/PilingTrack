@@ -4,7 +4,6 @@
  */
 
 import { db } from '@/lib/db';
-// eslint-disable-next-line no-restricted-imports -- legacy cross-layer import pending the parked services<->modules migration (CLAUDE.md); behavior-neutral
 import { recordAuditEvent } from '@/modules/audit';
 
 export interface AuditRecord {

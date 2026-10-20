@@ -34,8 +34,7 @@ function violations(entry: string): string[] {
   const seen = new Set<string>();
   const found: string[] = [];
   const stack = [entry];
-  while (stack.length) {
-    const file = stack.pop()!;
+  for (let file = stack.pop(); file; file = stack.pop()) {
     if (seen.has(file)) continue;
     seen.add(file);
     const text = fs.readFileSync(file, 'utf8');

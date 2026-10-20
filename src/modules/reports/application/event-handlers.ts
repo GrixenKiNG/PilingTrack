@@ -9,7 +9,6 @@ import { SUBMITTED_REPORT_STATUS } from '@/lib/report-status';
  * These are registered once on server startup.
  */
 
-// eslint-disable-next-line no-restricted-imports -- legacy cross-layer import pending the parked services<->modules migration (CLAUDE.md); behavior-neutral
 import { ReportDomainEvent, REPORT_DOMAIN_EVENT_TYPES } from '../domain';
 import { on } from './domain-events';
 import { logger } from '@/lib/logger';
