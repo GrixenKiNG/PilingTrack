@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { formatNumber } from '@/lib/format';
 import { PILE_ACCEPTANCE_LABELS } from '@/modules/operator-mobile/domain/pile-passport';
-import type { PilePassportRow } from '@/modules/reports/application/queries/pile-passport.service';
+import type { PilePassportRow } from '@/modules/reports';
 import { DrivingSets } from './driving-sets';
 
 /**

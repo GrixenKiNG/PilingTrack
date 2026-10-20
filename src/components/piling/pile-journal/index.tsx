@@ -9,7 +9,7 @@ import { PILE_ACCEPTANCE_LABELS, type PileAcceptanceValue } from '@/modules/oper
 import type {
   PileJournalHeader,
   PilePassportRow,
-} from '@/modules/reports/application/queries/pile-passport.service';
+} from '@/modules/reports';
 import type { SiteFlatDTO } from '@/lib/types';
 import { getTodayInTimezone } from '@/lib/timezone';
 import { JournalTitleBlock } from './journal-title-block';

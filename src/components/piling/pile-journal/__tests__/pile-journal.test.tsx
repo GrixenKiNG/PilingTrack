@@ -8,7 +8,7 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { toast } from 'sonner';
-import type { PilePassportRow } from '@/modules/reports/application/queries/pile-passport.service';
+import type { PilePassportRow } from '@/modules/reports';
 
 const mocks = vi.hoisted(() => ({ authFetch: vi.fn() }));
 

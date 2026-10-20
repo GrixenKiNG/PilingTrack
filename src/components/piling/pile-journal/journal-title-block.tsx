@@ -1,7 +1,7 @@
 'use client';
 
 import { cn } from '@/lib/utils';
-import type { PileJournalHeader } from '@/modules/reports/application/queries/pile-passport.service';
+import type { PileJournalHeader } from '@/modules/reports';
 
 /**
  * Титул журнала забивки.

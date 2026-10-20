@@ -6,7 +6,7 @@ import { requireTenantId } from '@/lib/tenant';
 import { db } from '@/lib/db';
 import { assertCan } from '@/services/auth/authorization-service';
 import { recordAuditEvent } from '@/modules/audit';
-import { decidePilePassport } from '@/modules/reports/application/queries/pile-passport.service';
+import { decidePilePassport } from '@/modules/reports';
 
 export const runtime = 'nodejs';
 

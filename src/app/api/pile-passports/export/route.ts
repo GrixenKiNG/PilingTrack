@@ -4,7 +4,7 @@ import { requireAuth } from '@/lib/auth';
 import { requireTenantId } from '@/lib/tenant';
 import { assertCan } from '@/services/auth/authorization-service';
 import { rateLimiter, type RateLimitConfig } from '@/lib/rate-limiter';
-import { exportPileJournalXlsx } from '@/modules/reports/application/queries/pile-passport.service';
+import { exportPileJournalXlsx } from '@/modules/reports';
 import type { PileAcceptanceValue } from '@/modules/operator-mobile/domain/pile-passport';
 import { getSettings } from '@/modules/settings';
 import { getTodayInTimezone } from '@/lib/timezone';

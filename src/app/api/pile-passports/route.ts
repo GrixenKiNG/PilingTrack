@@ -6,7 +6,7 @@ import { assertCan } from '@/services/auth/authorization-service';
 import {
   listPilePassports,
   pileJournalHeader,
-} from '@/modules/reports/application/queries/pile-passport.service';
+} from '@/modules/reports';
 import { getSettings } from '@/modules/settings';
 import type { PileAcceptanceValue } from '@/modules/operator-mobile/domain/pile-passport';
 

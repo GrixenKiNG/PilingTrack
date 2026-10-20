@@ -2,7 +2,7 @@
 
 import { cn } from '@/lib/utils';
 import { REFUSAL_SET_WINDOW } from '@/modules/operator-mobile/domain/pile-passport';
-import type { PilePassportRow } from '@/modules/reports/application/queries/pile-passport.service';
+import type { PilePassportRow } from '@/modules/reports';
 
 /**
  * Ход забивки по залогам — главная графа нормативного журнала.

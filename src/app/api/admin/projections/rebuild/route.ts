@@ -28,7 +28,7 @@ import {
   rebuildAll,
   type ProjectionName,
   type RebuildResult,
-} from '@/modules/reports/application/projections/rebuild';
+} from '@/modules/reports';
 
 export const runtime = 'nodejs';
 
