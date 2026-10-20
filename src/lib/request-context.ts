@@ -139,8 +139,13 @@ export function createSpan(operationName: string): {
       return parentContext;
     },
     _childContext: childContext,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
-  } as any;
+  } as {
+    spanId: string;
+    operationName: string;
+    startTime: number;
+    end: () => TraceContext | undefined;
+    _childContext: TraceContext;
+  };
 }
 
 // ============================================================
