@@ -22,6 +22,7 @@ import {OperatorCommandError, requireCrew, requireOpenShift, productionDateOf, r
 export async function acceptEquipment(input: {
   tenantId: string;
   operatorId: string;
+  actingAs?: string | null;
   equipmentId: string;
   shiftType: 'DAY' | 'NIGHT';
   clientCommandId: string;
@@ -31,7 +32,7 @@ export async function acceptEquipment(input: {
   const now = input.now ?? new Date();
 
   return withReadinessTenantTransaction(input.tenantId, async (tx) => {
-    const crew = await requireCrew(tx, input.tenantId, input.operatorId, input.equipmentId);
+    const crew = await requireCrew(tx, input.tenantId, input.operatorId, input.equipmentId, input.actingAs);
     const profile = await tx.user.findFirst({
       where: {tenantId: input.tenantId, id: input.operatorId}, select: {timezone: true},
     });

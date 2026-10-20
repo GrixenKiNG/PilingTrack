@@ -98,6 +98,7 @@ export type ProductionEntry =
 export async function logProduction(input: {
   tenantId: string;
   operatorId: string;
+  actingAs?: string | null;
   shiftId: string;
   entry: ProductionEntry;
   clientCommandId: string;
@@ -123,7 +124,7 @@ export async function logProduction(input: {
     if (duplicate) return {reportId: ''};
 
     const shift = await requireOpenShift(tx, input.tenantId, input.shiftId, input.operatorId);
-    const crew = await requireCrew(tx, input.tenantId, input.operatorId, shift.equipmentId);
+    const crew = await requireCrew(tx, input.tenantId, input.operatorId, shift.equipmentId, input.actingAs);
 
     // ВЫРАБОТКУ МОЖНО ВНЕСТИ И ПОСЛЕ «ЗАВЕРШИТЬ РАБОТУ» — ДО СДАЧИ СМЕНЫ
     // (решение владельца 07.10.2026: «оператор может после работы занести

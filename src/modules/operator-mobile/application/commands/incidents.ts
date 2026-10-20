@@ -32,6 +32,7 @@ import type {Tx} from './shared';
 export async function reportIncident(input: {
   tenantId: string;
   operatorId: string;
+  actingAs?: string | null;
   shiftId: string;
   category: IncidentCategory;
   signs: IncidentSign[];
@@ -58,7 +59,7 @@ export async function reportIncident(input: {
 
   const outcome = await withReadinessTenantTransaction(input.tenantId, async (tx) => {
     const shift = await requireOpenShift(tx, input.tenantId, input.shiftId, input.operatorId);
-    const crew = await requireCrew(tx, input.tenantId, input.operatorId, shift.equipmentId);
+    const crew = await requireCrew(tx, input.tenantId, input.operatorId, shift.equipmentId, input.actingAs);
 
     const duplicate = await tx.safetyIncident.findUnique({
       where: {tenantId_clientCommandId: {

@@ -1,8 +1,10 @@
 import {NextRequest, NextResponse} from 'next/server';
 import {z} from 'zod';
 import {withMutation} from '@/core/api-wrapper';
+import {getRequestId} from '@/lib/request-context';
 import {requireAuth} from '@/lib/auth';
 import {authFailureResponse} from '@/lib/auth-failure';
+import {recordAuditEvent} from '@/services/audit/audit-service';
 import {
   acceptEquipment, acknowledgeBriefing, closeShift, confirmPpe, finishWork, logProduction, submitReport,
   OperatorCommandError, correctProduction, reportIncident, submitChecklist, submitKnowledgeTest,
@@ -13,6 +15,7 @@ import {INCIDENT_CATEGORIES, INCIDENT_SIGNS} from '@/modules/operator-mobile/con
 // в браузерный бандл.
 
 import {getWeatherAt} from '@/services/weather/weather-client';
+import {resolveOperatorAccess} from '../_shared/operator-access';
 
 export const runtime = 'nodejs';
 
@@ -177,12 +180,60 @@ const commandSchema = z.discriminatedUnion('command', [
   }),
 ]);
 
+type Command = z.infer<typeof commandSchema>;
+type Actor = {tenantId: string; operatorId: string; actingAs: 'OPERATOR' | null};
+
+/**
+ * Исполнение одной команды. Возвращает то, что уйдёт в `data`, — ответ и след
+ * пишет вызывающий, чтобы след ставился только после успешной записи.
+ */
+function runCommand(body: Command, actor: Actor): Promise<unknown> {
+  switch (body.command) {
+    case 'acknowledge-briefing':
+      return acknowledgeBriefing(actor);
+    case 'confirm-ppe':
+      return confirmPpe({...actor, ...body});
+    case 'submit-knowledge':
+      return submitKnowledgeTest({...actor, ...body});
+    case 'accept-equipment':
+      return acceptEquipment({...actor, ...body, readWeather: getWeatherAt});
+    case 'submit-checklist':
+      return submitChecklist({...actor, ...body});
+    case 'log-production':
+      return logProduction({...actor, ...body, readWeather: getWeatherAt});
+    case 'correct-production':
+      return correctProduction({...actor, ...body});
+    case 'report-incident':
+      return reportIncident({
+        ...actor,
+        shiftId: body.shiftId,
+        category: body.category as Parameters<typeof reportIncident>[0]['category'],
+        signs: body.signs as Parameters<typeof reportIncident>[0]['signs'],
+        injured: body.injured,
+        description: body.description,
+        mediaIds: body.mediaIds,
+        clientCommandId: body.clientCommandId,
+      });
+    case 'finish-work':
+      return finishWork({...actor, ...body});
+    case 'submit-report':
+      return submitReport({...actor, ...body});
+    case 'close-shift':
+      return closeShift({...actor, ...body});
+  }
+}
+
 /**
  * Единственная точка записи для мобильного места.
  *
  * ПОЧЕМУ ОДИН МАРШРУТ НА ВСЕ КОМАНДЫ. Команд немного, и у всех одна и та же
  * обвязка: кто ты, твоя ли смена, не повтор ли это. Восемь маршрутов означали
  * бы восемь мест, где эту обвязку можно забыть.
+ *
+ * ПОМЕТКА ЗАМЕЩЕНИЯ. Когда команду исполняет администратор в роли оператора,
+ * в журнал пишется реальный администратор и исполняемая роль. Запись идёт
+ * после успешной команды: отказ команды следа не оставляет, потому что ничего
+ * не изменилось.
  */
 export const POST = withMutation(
   async (request: NextRequest) => {
@@ -190,7 +241,8 @@ export const POST = withMutation(
     if (error || !user) {
       return authFailureResponse(error);
     }
-    if (user.role !== 'OPERATOR') {
+    const access = resolveOperatorAccess(user);
+    if (!access) {
       return NextResponse.json({error: 'Команды смены подаёт машинист'}, {status: 403});
     }
     if (!user.tenantId) {
@@ -206,50 +258,22 @@ export const POST = withMutation(
     }
 
     const body = parsed.data;
-    const actor = {tenantId: user.tenantId, operatorId: user.id};
+    const actor: Actor = {tenantId: user.tenantId, operatorId: access.operatorId, actingAs: access.actingAs};
 
     try {
-      switch (body.command) {
-        case 'acknowledge-briefing':
-          return NextResponse.json({data: await acknowledgeBriefing(actor)});
-        case 'confirm-ppe':
-          return NextResponse.json({data: await confirmPpe({...actor, ...body})});
-        case 'submit-knowledge':
-          return NextResponse.json({data: await submitKnowledgeTest({...actor, ...body})});
-        case 'accept-equipment':
-          return NextResponse.json({
-            data: await acceptEquipment({...actor, ...body, readWeather: getWeatherAt}),
-          });
-        case 'submit-checklist': {
-          const result = await submitChecklist({...actor, ...body});
-          return NextResponse.json({data: result});
-        }
-        case 'log-production':
-          return NextResponse.json({
-            data: await logProduction({...actor, ...body, readWeather: getWeatherAt}),
-          });
-        case 'correct-production':
-          return NextResponse.json({data: await correctProduction({...actor, ...body})});
-        case 'report-incident': {
-          const result = await reportIncident({
-            ...actor,
-            shiftId: body.shiftId,
-            category: body.category as Parameters<typeof reportIncident>[0]['category'],
-            signs: body.signs as Parameters<typeof reportIncident>[0]['signs'],
-            injured: body.injured,
-            description: body.description,
-            mediaIds: body.mediaIds,
-            clientCommandId: body.clientCommandId,
-          });
-          return NextResponse.json({data: result});
-        }
-        case 'finish-work':
-          return NextResponse.json({data: await finishWork({...actor, ...body})});
-        case 'submit-report':
-          return NextResponse.json({data: await submitReport({...actor, ...body})});
-        case 'close-shift':
-          return NextResponse.json({data: await closeShift({...actor, ...body})});
+      const data = await runCommand(body, actor);
+      if (actor.actingAs) {
+        await recordAuditEvent({
+          action: 'operator.acting-command',
+          scope: 'operator',
+          actorId: user.id,
+          targetId: 'shiftId' in body ? body.shiftId : 'equipmentId' in body ? body.equipmentId : null,
+          tenantId: user.tenantId,
+          requestId: getRequestId(request),
+          metadata: {actingAs: actor.actingAs, realRole: user.role, command: body.command},
+        });
       }
+      return NextResponse.json({data});
     } catch (commandError) {
       if (commandError instanceof OperatorCommandError) {
         return NextResponse.json(

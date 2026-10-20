@@ -4,6 +4,7 @@ import {requireAuth} from '@/lib/auth';
 import {authFailureResponse} from '@/lib/auth-failure';
 import {queryOperatorMobileState} from '@/modules/operator-mobile';
 import {getWeatherAt} from '@/services/weather/weather-client';
+import {resolveOperatorAccess} from '../_shared/operator-access';
 
 export const runtime = 'nodejs';
 
@@ -20,7 +21,8 @@ export const GET = withApi(
     if (error || !user) {
       return authFailureResponse(error);
     }
-    if (user.role !== 'OPERATOR') {
+    const access = resolveOperatorAccess(user);
+    if (!access) {
       return NextResponse.json({error: 'Экран доступен только машинисту'}, {status: 403});
     }
     if (!user.tenantId) {
@@ -54,8 +56,9 @@ export const GET = withApi(
 
     const state = await queryOperatorMobileState({
       tenantId: user.tenantId,
-      operatorId: user.id,
+      operatorId: access.operatorId,
       operatorName: user.name,
+      actingAs: access.actingAs,
       equipmentId: parameters.get('equipmentId') ?? undefined,
       // Реализация порта погоды подставляется здесь: маршруту разрешено знать
       // о `services/`, модулю правил смены — нет.
