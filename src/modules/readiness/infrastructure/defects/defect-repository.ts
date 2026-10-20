@@ -52,7 +52,7 @@ export class DefectRepository {
   async create(input: {
     tenantId: string; equipmentId: string; severity: DefectSeverity; title: string;
     description: string; node: string | null; inspectionId: string | null;
-    shiftId: string | null; actorId: string;
+    shiftId: string | null; actorId: string; maintenanceRecordId: string | null;
   }) {
     return this.tx.equipmentDefect.create({
       data: {
@@ -66,6 +66,7 @@ export class DefectRepository {
         inspectionId: input.inspectionId,
         shiftId: input.shiftId,
         reportedById: input.actorId,
+        maintenanceRecordId: input.maintenanceRecordId,
       },
     });
   }

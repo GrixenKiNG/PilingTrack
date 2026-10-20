@@ -10,6 +10,7 @@ import {ReadinessCommandError} from '../command-pipeline/errors';
 import {transitionDefect} from '../../domain/defects/defect';
 import {PrismaCommandIdempotencyRepository} from '../../infrastructure/command-pipeline/idempotency-repository';
 import {DefectRepository, toDefectRecord, type DefectRow} from '../../infrastructure/defects/defect-repository';
+import {createRepairOrderForDefect} from '../../infrastructure/defects/repair-order';
 import type {ReadinessTransaction} from '../../infrastructure/tenant-transaction';
 import type {
   CreateDefectPayload, RejectDefectPayload, ResolveDefectPayload, TriageDefectPayload,
@@ -125,6 +126,12 @@ export async function createDefectCommand(input: {
       const repository = new DefectRepository(input.tx);
       await repository.requireActor(input.context.tenantId, input.context.actorId);
       await repository.requireEquipment(input.context.tenantId, input.payload.equipmentId);
+      // Заявка ТО создаётся до дефекта: дефект рождается уже с привязкой (решение 18.10.2026).
+      const repairOrderId = await createRepairOrderForDefect(input.tx, {
+        tenantId: input.context.tenantId, equipmentId: input.payload.equipmentId,
+        defectTitle: input.payload.title, severity: input.payload.severity,
+        actorId: input.context.actorId,
+      });
       const row = await repository.create({
         tenantId: input.context.tenantId,
         equipmentId: input.payload.equipmentId,
@@ -135,8 +142,10 @@ export async function createDefectCommand(input: {
         inspectionId: input.payload.inspectionId ?? null,
         shiftId: input.payload.shiftId ?? null,
         actorId: input.context.actorId,
+        maintenanceRecordId: repairOrderId,
       });
-      await emitEffects({tx: input.tx, context: input.context, action: 'reported', row, key});
+      await emitEffects({tx: input.tx, context: input.context, action: 'reported', row, key,
+        metadata: repairOrderId ? {repairOrderId} : undefined});
       await enqueueCriticalDefects(input.tx, {tenantId: input.context.tenantId, aggregateId: row.id,
         equipmentId: row.equipmentId, reportedBy: input.context.actorName,
         defects: [{severity: row.severity, title: row.title}]});
