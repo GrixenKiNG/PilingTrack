@@ -14,7 +14,7 @@ const { requireAuthMock, getEditableMock } = vi.hoisted(() => ({
 }));
 
 vi.mock('@/lib/auth', () => ({ requireAuth: requireAuthMock }));
-vi.mock('@/modules/reports/application/queries/report-query.service', () => ({
+vi.mock('@/modules/reports', () => ({
   getEditableReport: getEditableMock,
 }));
 

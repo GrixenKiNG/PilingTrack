@@ -15,7 +15,9 @@ const { requireAuthMock, getByPeriodMock } = vi.hoisted(() => ({
 }));
 
 vi.mock('@/lib/auth', () => ({ requireAuth: requireAuthMock }));
-vi.mock('@/modules/reports/application/queries/report-query.service', () => ({
+vi.mock('@/modules/reports', async () => ({
+  // computePeriodSummary — чистая функция: берём настоящую, остальной фасад (база) подменяем.
+  ...(await vi.importActual<typeof import('@/modules/reports/domain/period-summary')>('@/modules/reports/domain/period-summary')),
   getReportsByPeriod: getByPeriodMock,
 }));
 

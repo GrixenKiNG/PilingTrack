@@ -33,3 +33,8 @@ export {
 // Infrastructure
 export { getSiteRepository } from './infrastructure';
 export type { SiteRepository } from './infrastructure';
+
+// Public exports for routes and screens (previously deep imports).
+export {
+  updateSiteWithPlans,
+} from './application/commands';

@@ -21,3 +21,11 @@ export type {
 } from './application/briefing-journal-query';
 export {listEquipmentChecklistHistory} from './application/equipment-checklist-history';
 export type {EquipmentChecklistRow} from './application/equipment-checklist-history';
+
+// Public exports for routes and screens (previously deep imports).
+export {
+  createKnowledgeAttempt,
+} from './application/knowledge-attempt';
+export type {
+  PileAcceptanceValue,
+} from './domain/pile-passport';
