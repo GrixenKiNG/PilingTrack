@@ -7,4 +7,4 @@
  * зависеть от components/ (проверка границ слоёв), а обратное направление —
  * норма.
  */
-export * from '@/modules/layout/domain/layout-template';
+export * from '@/modules/layout/client';

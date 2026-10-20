@@ -1,7 +1,7 @@
 'use client';
 
 import {useState} from 'react';
-import {PPE_ITEMS} from '@/modules/operator-mobile/contracts';
+import {PPE_ITEMS} from '@/modules/operator-mobile/client';
 import {BigButton, ErrorNote, Panel, PanelTitle, Screen} from '../ui';
 
 /**

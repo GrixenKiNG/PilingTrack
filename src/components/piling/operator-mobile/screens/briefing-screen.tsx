@@ -1,6 +1,6 @@
 'use client';
 
-import {SAFETY_BRIEFING} from '@/modules/operator-mobile/contracts';
+import {SAFETY_BRIEFING} from '@/modules/operator-mobile/client';
 import {BigButton, ErrorNote, Panel, Screen} from '../ui';
 
 /**

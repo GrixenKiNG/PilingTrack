@@ -11,7 +11,7 @@
  * Файл НЕ тестовый: ни `describe`, ни `it`, имя не `*.test.*` — поэтому vitest
  * его не собирает (`vitest.config.ts`, ключ `include`).
  */
-import type {OperatorMobileState} from '@/modules/operator-mobile/contracts';
+import type {OperatorMobileState} from '@/modules/operator-mobile/client';
 
 /**
  * Состояние смены в фазе работы (как его видит открытый рабочий экран).

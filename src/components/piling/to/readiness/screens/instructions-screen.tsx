@@ -19,7 +19,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Loader2 } from '@/components/piling/icons/unified-icons';
 import { authFetch } from '@/lib/api';
 import { formatRuDate } from '@/lib/format';
-import { SAFETY_INSTRUCTIONS } from '@/modules/safety/instructions';
+import { SAFETY_INSTRUCTIONS } from '@/modules/safety/client';
 import type { BriefingJournalEntry } from '@/modules/operator-mobile';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';

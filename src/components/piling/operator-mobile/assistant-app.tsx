@@ -3,14 +3,14 @@
 import {useCallback, useEffect, useState} from 'react';
 import {
   SLINGER_BRIEFING, type AssistantState,
-} from '@/modules/operator-mobile/contracts';
+} from '@/modules/operator-mobile/client';
 import {ApiError} from './api';
 import {AssistantDefectForm} from './screens/assistant-defect-form';
 import {BriefingScreen} from './screens/briefing-screen';
 import {KnowledgeScreen} from './screens/knowledge-screen';
 import {
   DEFECT_SEVERITY_FIELD_LABELS, DEFECT_STATUS_FIELD_LABELS, isAlarmingSeverity,
-} from '@/modules/operator-mobile/domain/defect-labels';
+} from '@/modules/operator-mobile/client';
 import {BigButton, ErrorNote, Fact, Panel, PanelTitle, Screen, Sign} from './ui';
 import './operator-type.css';
 

@@ -4,9 +4,9 @@ import type {ReactNode} from 'react';
 import {formatDowntimeHoursOnly} from '@/lib/downtime-hours';
 
 import {useState} from 'react';
-import {CONDITION_LABELS, type OperatorMobileState} from '@/modules/operator-mobile/contracts';
+import {CONDITION_LABELS, type OperatorMobileState} from '@/modules/operator-mobile/client';
 import {cn} from '@/lib/utils';
-import {SELECTABLE_SHIFT_TYPES} from '@/modules/reports/domain/shift-types';
+import {SELECTABLE_SHIFT_TYPES} from '@/modules/reports/client';
 import {BigButton, ErrorNote, Fact, Panel, PanelTitle, Screen, VolumeFact} from '../ui';
 import {WarningsPanel} from '../warnings-panel';
 

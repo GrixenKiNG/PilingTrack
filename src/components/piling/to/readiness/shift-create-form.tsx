@@ -30,7 +30,7 @@ import {
   CreationForm, FormSection, FormLabel, TilePicker, type TileOption,
 } from '@/components/piling/forms/creation-form';
 import { getTodayInTimezone } from '@/lib/timezone';
-import { isShiftTypeSelectable } from '@/modules/reports/domain/shift-types';
+import { isShiftTypeSelectable } from '@/modules/reports/client';
 import { loadFailureMessage } from './screens/shared';
 
 type ShiftType = 'DAY' | 'NIGHT';

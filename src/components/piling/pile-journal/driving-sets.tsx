@@ -1,7 +1,7 @@
 'use client';
 
 import { cn } from '@/lib/utils';
-import { REFUSAL_SET_WINDOW } from '@/modules/operator-mobile/domain/pile-passport';
+import { REFUSAL_SET_WINDOW } from '@/modules/operator-mobile/client';
 import type { PilePassportRow } from '@/modules/reports';
 
 /**

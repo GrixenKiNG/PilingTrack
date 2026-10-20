@@ -21,7 +21,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import { usePilingStore } from '@/lib/store';
-import { computeHealthScore } from '@/modules/inspections/domain/inspection-logic';
+import { computeHealthScore } from '@/modules/inspections/client';
 import { healthScoreColor, LEVEL_LABEL, STATUS_LABEL, STATUS_STYLE, type InspectionLevel, type InspectionStatus } from './inspection-labels';
 import { InspectionItemPhotos } from './inspection-item-photos';
 import { YesNoControl, Status4Control, DoneControl, MeasureControl } from './inspection-controls';

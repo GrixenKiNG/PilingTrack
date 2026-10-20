@@ -10,7 +10,7 @@
  */
 import {act, fireEvent, render, screen, within} from '@testing-library/react';
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
-import type {OperatorMobileState} from '@/modules/operator-mobile/contracts';
+import type {OperatorMobileState} from '@/modules/operator-mobile/client';
 
 // Стили не участвуют в поведении, а PostCSS-настройка проекта в vitest не грузится
 // (так же поступают соседние тесты этой папки).

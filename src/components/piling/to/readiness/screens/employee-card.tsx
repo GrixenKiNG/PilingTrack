@@ -23,7 +23,7 @@ import { ROLE_LABELS, type UserRole } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { PilingIcon, type PilingIconName } from '@/components/piling/icons';
 import { card, ScreenTitle, StatusPill } from '../settings/shared-ui';
-import { SAFETY_INSTRUCTIONS } from '@/modules/safety/instructions';
+import { SAFETY_INSTRUCTIONS } from '@/modules/safety/client';
 import { EquipmentPermitMatrix } from './equipment-permit-matrix';
 
 /**

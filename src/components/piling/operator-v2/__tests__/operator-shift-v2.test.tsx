@@ -2,7 +2,7 @@ import {fireEvent, render, screen, waitFor, within} from '@testing-library/react
 import {beforeEach, describe, expect, it, vi} from 'vitest';
 
 beforeEach(() => window.localStorage.clear());
-import type {OperatorMobileState} from '@/modules/operator-mobile/contracts';
+import type {OperatorMobileState} from '@/modules/operator-mobile/client';
 
 // Экран тянет рабочий обзор оператора, а тот — стили PostCSS; в тесте они не нужны.
 vi.mock('@/components/piling/operator-mobile/operator-concept.css', () => ({}));

@@ -30,8 +30,8 @@ import { ROLE_LABELS, type UserRole } from '@/lib/types';
 import {
   BRIEFING_KIND_LABELS, BRIEFING_TYPE_LABELS, BRIEFING_TYPE_ORDER,
   formatJournalMoment, type BriefingJournalEntry, type BriefingType,
-} from '@/modules/operator-mobile/contracts';
-import { SAFETY_INSTRUCTIONS } from '@/modules/safety/instructions';
+} from '@/modules/operator-mobile/client';
+import { SAFETY_INSTRUCTIONS } from '@/modules/safety/client';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { COMPACT_KPI_GRID, ScreenTitle, card } from '../settings/shared-ui';

@@ -1,4 +1,4 @@
-import {WIND_STOP_MS, type ChecklistStage, type OperatorMobileState} from '@/modules/operator-mobile/contracts';
+import {WIND_STOP_MS, type ChecklistStage, type OperatorMobileState} from '@/modules/operator-mobile/client';
 
 /**
  * Пункты, ответ на которые система знает лучше человека.

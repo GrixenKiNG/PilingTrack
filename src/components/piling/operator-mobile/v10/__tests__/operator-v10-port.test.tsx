@@ -9,8 +9,8 @@
  */
 import {fireEvent, render, screen, waitFor} from '@testing-library/react';
 import {beforeEach, describe, expect, it, vi} from 'vitest';
-import type {OperatorMobileState} from '@/modules/operator-mobile/contracts';
-import {PPE_ITEMS} from '@/modules/operator-mobile/contracts';
+import type {OperatorMobileState} from '@/modules/operator-mobile/client';
+import {PPE_ITEMS} from '@/modules/operator-mobile/client';
 
 const api = vi.hoisted(() => ({
   fetchState: vi.fn(),

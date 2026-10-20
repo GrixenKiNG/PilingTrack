@@ -15,8 +15,8 @@
 
 import { useState } from 'react';
 import { authFetch } from '@/lib/api';
-import { BRIEFING_TYPE_LABELS, BRIEFING_TYPE_ORDER, type BriefingType } from '@/modules/operator-mobile/contracts';
-import { SAFETY_INSTRUCTIONS } from '@/modules/safety/instructions';
+import { BRIEFING_TYPE_LABELS, BRIEFING_TYPE_ORDER, type BriefingType } from '@/modules/operator-mobile/client';
+import { SAFETY_INSTRUCTIONS } from '@/modules/safety/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {

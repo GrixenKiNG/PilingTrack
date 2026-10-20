@@ -1,6 +1,6 @@
 import {fireEvent, render, screen, waitFor} from '@testing-library/react';
 import {afterEach, describe, expect, it, vi} from 'vitest';
-import type {KnowledgeQuestion} from '@/modules/operator-mobile/contracts';
+import type {KnowledgeQuestion} from '@/modules/operator-mobile/client';
 import {KnowledgeScreen, isKnowledgeAttemptExpired} from '../knowledge-screen';
 
 /** Тот же текст, что отдаёт сервер на просроченный токен попытки (admission.ts:314). */

@@ -7,7 +7,7 @@ import {
   ENGINE_HOURS_REPLACEMENT_NOTE,
   type ChecklistAnswer, type ChecklistItem, type ChecklistSection, type ChecklistView,
   type OperatorAnswer, type WorkWarning,
-} from '@/modules/operator-mobile/contracts';
+} from '@/modules/operator-mobile/client';
 import {cn} from '@/lib/utils';
 import {operatorErrorText, uploadPhoto} from '../api';
 import {BigButton, ErrorNote, Panel, PanelTitle, Screen} from '../ui';

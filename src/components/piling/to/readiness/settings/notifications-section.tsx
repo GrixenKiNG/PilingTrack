@@ -11,7 +11,7 @@ import {
   DEFAULT_WORKSPACE_SETTINGS,
   NOTIFICATION_KEYS,
   type WorkspaceSettings,
-} from '@/modules/settings/domain/settings';
+} from '@/modules/settings/client';
 import { ScreenTitle, SettingsKpis, StatusPill, Toggle, card } from './shared-ui';
 
 /**

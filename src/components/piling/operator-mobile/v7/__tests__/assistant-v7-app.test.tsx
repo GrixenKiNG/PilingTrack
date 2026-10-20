@@ -1,6 +1,6 @@
 import {render, screen} from '@testing-library/react';
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
-import type {AssistantState} from '@/modules/operator-mobile/contracts';
+import type {AssistantState} from '@/modules/operator-mobile/client';
 
 vi.mock('../../operator-concept.css', () => ({}));
 vi.mock('next/navigation', () => ({useRouter: () => ({push: vi.fn()})}));

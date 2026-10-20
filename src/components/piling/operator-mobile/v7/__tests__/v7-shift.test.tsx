@@ -1,6 +1,6 @@
 import {fireEvent, render, screen, waitFor} from '@testing-library/react';
 import {beforeEach, describe, expect, it, vi} from 'vitest';
-import type {OperatorMobileState} from '@/modules/operator-mobile/contracts';
+import type {OperatorMobileState} from '@/modules/operator-mobile/client';
 import type {ProductionEntryInput} from '../../api';
 import {CloseFlow, ProductionFlow} from '../v7-shift';
 beforeEach(() => window.localStorage.clear());

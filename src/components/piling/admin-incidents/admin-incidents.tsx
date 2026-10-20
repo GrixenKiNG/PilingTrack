@@ -4,7 +4,7 @@ import {useCallback, useEffect, useState} from 'react';
 import {
   INCIDENT_CATEGORY_LABELS, INCIDENT_SEVERITY_LABELS, INCIDENT_SIGN_LABELS,
   type IncidentCategory, type IncidentSeverity, type IncidentSign,
-} from '@/modules/operator-mobile/contracts';
+} from '@/modules/operator-mobile/client';
 import {authFetch} from '@/lib/api';
 import {cn} from '@/lib/utils';
 import {usePilingStore} from '@/lib/store';

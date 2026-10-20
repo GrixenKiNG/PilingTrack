@@ -1,7 +1,7 @@
 'use client';
 
 import {useEffect, useState} from 'react';
-import {TOPIC_LABELS, type KnowledgeQuestion} from '@/modules/operator-mobile/contracts';
+import {TOPIC_LABELS, type KnowledgeQuestion} from '@/modules/operator-mobile/client';
 import {cn} from '@/lib/utils';
 import {ApiError, fetchKnowledgeAttempt, operatorErrorText} from '../api';
 import {BigButton, ErrorNote, Panel, PanelTitle, Screen} from '../ui';

@@ -16,7 +16,7 @@ import {
   INCIDENT_CATEGORIES, INCIDENT_CATEGORY_LABELS, INCIDENT_DESCRIPTION_MIN,
   INCIDENT_SIGN_LABELS, INCIDENT_SIGNS,
   PPE_ITEMS, SAFETY_BRIEFING, TOPIC_LABELS,
-} from '@/modules/operator-mobile/contracts';
+} from '@/modules/operator-mobile/client';
 import {ChecklistScreen} from '../screens/checklist-screen';
 import {ShiftThanks} from '../shift-thanks';
 import {knownAnswers} from '../safety/known-answers';

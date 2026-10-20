@@ -24,7 +24,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   BRIEFING_KIND_LABELS, formatJournalDay, formatJournalMoment,
   type BriefingJournalEntry, type BriefingKind,
-} from '@/modules/operator-mobile/contracts';
+} from '@/modules/operator-mobile/client';
 import { formatRuDate } from '@/lib/format';
 import { formatDateInTimezone } from '@/lib/timezone';
 import { ROLE_LABELS, type UserRole } from '@/lib/types';

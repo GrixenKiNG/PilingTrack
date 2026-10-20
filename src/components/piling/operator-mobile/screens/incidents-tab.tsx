@@ -6,7 +6,7 @@ import {
   INCIDENT_DESCRIPTION_MIN, INCIDENT_SEVERITY_LABELS, INCIDENT_SIGN_LABELS, INCIDENT_SIGNS,
   isIncidentOpen,
   type IncidentCategory, type IncidentSign, type OperatorMobileState,
-} from '@/modules/operator-mobile/contracts';
+} from '@/modules/operator-mobile/client';
 import {cn} from '@/lib/utils';
 import {operatorErrorText, uploadPhoto} from '../api';
 import {BigButton, ErrorNote, Panel, PanelTitle, Sign} from '../ui';

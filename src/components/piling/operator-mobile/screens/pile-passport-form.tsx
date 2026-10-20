@@ -4,7 +4,7 @@ import {useLocalFormDraft} from '../use-local-form-draft';
 import {
   DEFAULT_SET_BLOWS, journalRefusalMm, REFUSAL_SET_WINDOW, refusalExceedsDesign,
   setRefusalMm, validatePassport,
-} from '@/modules/operator-mobile/domain/pile-passport';
+} from '@/modules/operator-mobile/client';
 import type {PilePassportInput} from '../api';
 import {BigButton, ErrorNote, Panel, PanelTitle} from '../ui';
 

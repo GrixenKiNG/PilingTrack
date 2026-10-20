@@ -1,5 +1,5 @@
 import {describe, expect, it} from 'vitest';
-import type {OperatorMobileState} from '@/modules/operator-mobile/contracts';
+import type {OperatorMobileState} from '@/modules/operator-mobile/client';
 import {nextStep, TOTAL_STEPS} from '../shift-next-step';
 
 type Phase = OperatorMobileState['phase'];

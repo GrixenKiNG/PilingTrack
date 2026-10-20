@@ -1,6 +1,6 @@
 import {render, screen} from '@testing-library/react';
 import {describe, expect, it} from 'vitest';
-import type {WorkWarning} from '@/modules/operator-mobile/contracts';
+import type {WorkWarning} from '@/modules/operator-mobile/client';
 import {Screen} from '../ui';
 import {WarningsPanel} from '../warnings-panel';
 

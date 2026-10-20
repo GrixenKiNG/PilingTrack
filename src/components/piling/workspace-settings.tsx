@@ -13,7 +13,7 @@ import {
   DEFAULT_WORKSPACE_SETTINGS,
   NOTIFICATION_KEYS,
   type WorkspaceSettings as WorkspaceSettingsData,
-} from '@/modules/settings/domain/settings';
+} from '@/modules/settings/client';
 import { COMMON_TIMEZONES } from '@/lib/timezone';
 import { AnalyticsDashboardLayoutEditor } from '@/components/piling/analytics-dashboard/kpi-widgets';
 import { MainDashboardLayoutEditor } from '@/components/piling/main-dashboard/dashboard-layout';

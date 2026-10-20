@@ -2,7 +2,7 @@
 
 import type {OperatorMobileState, OperatorPhase} from '@/modules/operator-mobile';
 import {formatDowntimeHoursOnly} from '@/lib/downtime-hours';
-import {PHASE_CHECKLIST, PHASE_LABELS} from '@/modules/operator-mobile/domain/shift-phases';
+import {PHASE_CHECKLIST, PHASE_LABELS} from '@/modules/operator-mobile/client';
 import {formatRuDate} from '@/lib/format';
 import {BigButton, Fact, Panel, PanelTitle, Screen, VolumeFact} from '../ui';
 

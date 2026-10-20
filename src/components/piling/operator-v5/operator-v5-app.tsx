@@ -17,7 +17,7 @@ import {
   INCIDENT_SIGN_LABELS, INCIDENT_SIGNS, PHASE_LABELS, PPE_ITEMS, SAFETY_BRIEFING,
   measureRequired,
   ENGINE_HOURS_REPLACEMENT_NOTE,
-} from '@/modules/operator-mobile/contracts';
+} from '@/modules/operator-mobile/client';
 import {KnowledgeScreen} from '../operator-mobile/screens/knowledge-screen';
 import {PilePassportForm} from '../operator-mobile/screens/pile-passport-form';
 import {formatNumber} from '@/lib/format';

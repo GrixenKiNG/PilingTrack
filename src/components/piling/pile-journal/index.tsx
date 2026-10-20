@@ -5,7 +5,7 @@ import { toast } from 'sonner';
 import { authFetch } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { PILE_ACCEPTANCE_LABELS, type PileAcceptanceValue } from '@/modules/operator-mobile/domain/pile-passport';
+import { PILE_ACCEPTANCE_LABELS, type PileAcceptanceValue } from '@/modules/operator-mobile/client';
 import type {
   PileJournalHeader,
   PilePassportRow,

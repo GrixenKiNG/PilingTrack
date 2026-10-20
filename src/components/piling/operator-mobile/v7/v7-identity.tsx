@@ -2,7 +2,7 @@
 
 import {useEffect, useState} from 'react';
 import type {KnowledgeQuestion} from '@/modules/operator-mobile';
-import {PPE_ITEMS, SAFETY_BRIEFING, TOPIC_LABELS} from '@/modules/operator-mobile/contracts';
+import {PPE_ITEMS, SAFETY_BRIEFING, TOPIC_LABELS} from '@/modules/operator-mobile/client';
 
 /**
  * Текст инструктажа: у машиниста свой, у помощника свой (стропальные работы).

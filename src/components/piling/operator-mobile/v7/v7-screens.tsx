@@ -8,11 +8,11 @@ import type {
 } from '@/modules/operator-mobile';
 import {
   CONDITION_LABELS, INCIDENT_CATEGORY_LABELS, PHASE_LABELS,
-} from '@/modules/operator-mobile/contracts';
-import {PHASE_CHECKLIST} from '@/modules/operator-mobile/domain/shift-phases';
+} from '@/modules/operator-mobile/client';
+import {PHASE_CHECKLIST} from '@/modules/operator-mobile/client';
 import {
   DEFECT_SEVERITY_FIELD_LABELS, DEFECT_STATUS_FIELD_LABELS, isAlarmingSeverity,
-} from '@/modules/operator-mobile/domain/defect-labels';
+} from '@/modules/operator-mobile/client';
 import {formatNumber, formatRuDate} from '@/lib/format';
 import {formatDowntimeHoursOnly} from '@/lib/downtime-hours';
 import {Banner, Button, Card, CardBody, Chip, Empty, Metric, Pair, Row, type Tone} from './v7-ui';

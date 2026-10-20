@@ -5,7 +5,7 @@ import {useCallback, useEffect, useRef, useState} from 'react';
 import type {
   ChecklistAnswer, ChecklistStage, OperatorMobileState, OperatorPhase,
 } from '@/modules/operator-mobile';
-import {PHASE_LABELS, PHASE_ORDER} from '@/modules/operator-mobile/contracts';
+import {PHASE_LABELS, PHASE_ORDER} from '@/modules/operator-mobile/client';
 import {
   ApiError, currentPosition, fetchState, newCommandId, QueuedOffline, sendCommand,
   type ProductionEntryInput,

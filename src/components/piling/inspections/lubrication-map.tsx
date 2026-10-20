@@ -11,7 +11,7 @@
 
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
-import { getLubeMap, type LubePoint } from '@/modules/inspections/domain/lubrication-maps';
+import { getLubeMap, type LubePoint } from '@/modules/inspections/client';
 import { PilingIcon } from '@/components/piling/icons';
 
 /** Силуэт гусеничной сваебойной установки (viewBox 0 0 200 240). */

@@ -6,11 +6,11 @@ import {useLocalFormDraft} from '../use-local-form-draft';
 import type {
   ChecklistAnswer, ChecklistStage, ChecklistView, IncidentSign, OperatorMobileState,
 } from '@/modules/operator-mobile';
-import {PHASE_CHECKLIST} from '@/modules/operator-mobile/domain/shift-phases';
+import {PHASE_CHECKLIST} from '@/modules/operator-mobile/client';
 import {
   INCIDENT_CATEGORIES, INCIDENT_CATEGORY_HINTS, INCIDENT_CATEGORY_LABELS,
   INCIDENT_DESCRIPTION_MIN, INCIDENT_SIGN_LABELS, INCIDENT_SIGNS,
-} from '@/modules/operator-mobile/contracts';
+} from '@/modules/operator-mobile/client';
 import {PilePassportForm} from '../screens/pile-passport-form';
 import type {ProductionEntryInput} from '../api';
 import {

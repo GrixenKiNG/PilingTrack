@@ -24,7 +24,7 @@ import {
 } from '@/components/ui/select';
 import { LEVEL_LABEL, type InspectionLevel } from './inspection-labels';
 import { catchText } from './inspection-api-error';
-import { getConsumables } from '@/modules/inspections/domain/consumables';
+import { getConsumables } from '@/modules/inspections/client';
 import { LubricationMap } from './lubrication-map';
 import { getTodayInTimezone } from '@/lib/timezone';
 

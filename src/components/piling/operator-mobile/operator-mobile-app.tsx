@@ -23,7 +23,7 @@ import {PpeScreen} from './screens/ppe-screen';
 import {AdmissionScreen} from './screens/admission-screen';
 import {ChecklistScreen} from './screens/checklist-screen';
 import {WorkScreen} from './screens/work-screen';
-import {isIncidentOpen} from '@/modules/operator-mobile/contracts';
+import {isIncidentOpen} from '@/modules/operator-mobile/client';
 import {ClosedScreen, ClosingScreen} from './screens/closing-screen';
 import {ReviewScreen} from './screens/review-screen';
 import {EquipmentTab} from './screens/equipment-tab';

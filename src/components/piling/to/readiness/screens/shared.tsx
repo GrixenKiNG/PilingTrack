@@ -12,7 +12,7 @@ import { authFetch } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { READINESS_READY_THRESHOLD } from '@/modules/readiness';
-import { SELECTABLE_SHIFT_TYPES } from '@/modules/reports/domain/shift-types';
+import { SELECTABLE_SHIFT_TYPES } from '@/modules/reports/client';
 import { SHIFT_TYPE_LABEL } from '../readiness-labels';
 import type { FleetCard } from '@/components/piling/admin-equipment/fleet-types';
 import { readinessFilterQuery, type ReadinessUrlFilters } from '../api/client';

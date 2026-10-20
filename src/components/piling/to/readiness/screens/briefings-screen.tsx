@@ -21,7 +21,7 @@ import {
   currentMonthRange, dayRangeToInstants, formatJournalDay,
   formatJournalMoment, type BriefingJournalEntry, type BriefingKind,
   type BriefingJournalStatus, type BriefingType,
-} from '@/modules/operator-mobile/contracts';
+} from '@/modules/operator-mobile/client';
 import { BriefingConductDialog } from './briefing-conduct-dialog';
 import { authFetch } from '@/lib/api';
 import { formatDateInTimezone } from '@/lib/timezone';

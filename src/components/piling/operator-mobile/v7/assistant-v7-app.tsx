@@ -3,10 +3,10 @@
 import {useCallback, useEffect, useState} from 'react';
 import {useRouter} from 'next/navigation';
 import type {AssistantState, DocumentVerdict} from '@/modules/operator-mobile';
-import {SLINGER_BRIEFING} from '@/modules/operator-mobile/contracts';
+import {SLINGER_BRIEFING} from '@/modules/operator-mobile/client';
 import {
   DEFECT_SEVERITY_FIELD_LABELS, DEFECT_STATUS_FIELD_LABELS, isAlarmingSeverity,
-} from '@/modules/operator-mobile/domain/defect-labels';
+} from '@/modules/operator-mobile/client';
 import {formatRuDate} from '@/lib/format';
 import {
   Banner, Button, Card, CardBody, Chip, Dock, Empty, Pair, PhoneShell, Row, Title,
