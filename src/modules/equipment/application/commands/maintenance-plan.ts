@@ -58,7 +58,7 @@ export async function createMaintenancePlan(input: MaintenancePlanInput, ctx: { 
       tenantId: ctx.tenantId,
       equipmentId: input.equipmentId,
       title: input.title.trim(),
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- MaintenanceType enum cast at the command boundary
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- MaintenanceType enum из Prisma схемы недоступен в этом модуле без импорта generated типов
       type: (input.type as any) ?? 'TO1',
       triggerType: input.triggerType,
       intervalHours: input.triggerType === 'HOURS' ? input.intervalHours ?? null : null,
