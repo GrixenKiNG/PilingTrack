@@ -302,7 +302,11 @@ export async function updateUserDocument(
     data.mediaId = mediaId;
   }
 
-  if (input.expiresAt !== undefined && data.expiresAt == null) {
+  // Срок может остаться пустым и при смене одного лишь вида (NIGHT-DOC-001):
+  // проверяем итоговую пару «вид + срок», а не только присланную дату.
+  const resultingExpiresAt =
+    input.expiresAt !== undefined ? (data.expiresAt as Date | null) : existing.expiresAt;
+  if ((input.expiresAt !== undefined || input.typeId !== undefined) && resultingExpiresAt == null) {
     const typeId = (data.typeId as string | undefined) ?? existing.typeId;
     const type = await requireTenantDocumentType(typeId, ctx.tenantId);
     if (type.requiresExpiry) {

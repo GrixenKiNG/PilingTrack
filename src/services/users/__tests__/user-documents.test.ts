@@ -304,4 +304,36 @@ describe('след правки документа — прежний срок (
     expect(event.action).toBe('user.document.created');
     expect(event.metadata.before).toBeUndefined();
   });
+
+  // NIGHT-DOC-001: смена вида на «со сроком» не должна оставлять срок пустым.
+  it('смена вида на обязательный срок при пустом сроке — 400', async () => {
+    findFirstDocMock.mockResolvedValue({
+      id: 'doc_1',
+      typeId: 'type_perpetual',
+      issuedAt: null,
+      expiresAt: null,
+      mediaId: null,
+    });
+    findFirstTypeMock.mockResolvedValue({ id: 'type_1', requiresExpiry: true, name: 'Удостоверение' });
+    updateDocMock.mockClear();
+
+    await expect(
+      updateUserDocument('usr_other', 'doc_1', { typeId: 'type_1' }, ctx(ADMIN)),
+    ).rejects.toThrow(/нужно указать срок действия/);
+    expect(updateDocMock).not.toHaveBeenCalled();
+  });
+
+  it('смена вида вместе со сроком проходит', async () => {
+    findFirstDocMock.mockResolvedValue({
+      id: 'doc_1',
+      typeId: 'type_perpetual',
+      issuedAt: null,
+      expiresAt: null,
+      mediaId: null,
+    });
+    updateDocMock.mockClear();
+
+    await updateUserDocument('usr_other', 'doc_1', { typeId: 'type_1', expiresAt: '2027-01-01' }, ctx(ADMIN));
+    expect(updateDocMock).toHaveBeenCalledTimes(1);
+  });
 });
