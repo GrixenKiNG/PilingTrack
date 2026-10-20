@@ -7,7 +7,7 @@
  */
 import {withReadinessTenantTransaction} from '@/modules/readiness/server';
 import {writeReportAuditRow} from '@/modules/reports/server';
-import {OperatorCommandError, requireCrew, requireOpenShift, businessReportId, reportAuditActor} from './shared';
+import {OperatorCommandError, requireCrew, requireOpenShift, bumpReportVersion, businessReportId, reportAuditActor} from './shared';
 import type {Tx} from './shared';
 import {findByCommand} from './production';
 
@@ -24,6 +24,7 @@ import {findByCommand} from './production';
 async function writeCorrectionAudit(
   tx: Tx, tenantId: string, actorId: string, reportPk: string, before: string, after: string,
 ) {
+  await bumpReportVersion(tx, reportPk);
   await writeReportAuditRow({
     reportId: await businessReportId(tx, reportPk),
     action: 'updated',

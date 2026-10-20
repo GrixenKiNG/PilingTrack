@@ -35,7 +35,7 @@ const tx = {
   $executeRaw: vi.fn(),
   shift: {findFirst: vi.fn()},
   crew: {findFirst: vi.fn()},
-  report: {findFirst: vi.fn(), findUniqueOrThrow: vi.fn()},
+  report: {findFirst: vi.fn(), findUniqueOrThrow: vi.fn(), update: vi.fn()},
   pileWork: {findUnique: vi.fn(), findFirst: vi.fn(), aggregate: vi.fn(), create: vi.fn()},
   reportAudit: {create: vi.fn()},
   user: {findFirst: vi.fn().mockResolvedValue({name: 'Иванов', role: 'OPERATOR'})},
@@ -94,10 +94,19 @@ describe('correctProduction — след поправки в истории от
     expect(data.diff).toEqual({'Выработка': {old: 'было 13', new: 'стало 8'}});
   });
 
-  it('повтор уже принятой поправки след не пишет', async () => {
+  it('повышает Report.version: встречная строка не должна пропасть при веб-сохранении старой формы', async () => {
+    await correctProduction(input);
+
+    expect(tx.report.update).toHaveBeenCalledWith({
+      where: {id: 'report-pk-1'}, data: {version: {increment: 1}},
+    });
+  });
+
+  it('повтор уже принятой поправки след не пишет и версию не двигает', async () => {
     tx.pileWork.findUnique.mockResolvedValue({id: 'pw-existing'});
 
     await expect(correctProduction(input)).resolves.toEqual({correctionId: 'pw-existing'});
     expect(tx.reportAudit.create).not.toHaveBeenCalled();
+    expect(tx.report.update).not.toHaveBeenCalled();
   });
 });

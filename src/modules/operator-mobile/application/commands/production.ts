@@ -18,7 +18,7 @@ import {SHIFT_WINDOW} from '../../domain/shift-window';
 import {validateDowntimeWithinShift} from '@/modules/reports';
 import type {ReadWeather} from '../../domain/view-contracts';
 import {
-  OperatorCommandError, requireCrew, requireOpenShift, ensureReport, businessReportId, reportAuditActor,
+  OperatorCommandError, requireCrew, requireOpenShift, ensureReport, bumpReportVersion, businessReportId, reportAuditActor,
   requireDowntimeReason, requireDrillingType, requirePileGrade, requireProductionPermit,
 } from './shared';
 import type {Tx} from './shared';
@@ -562,6 +562,7 @@ export async function logProduction(input: {
       ищет строки по нему (`report-history-service.ts`). Повтор уже принятой
       команды отсекается выше по `clientCommandId` и сюда не доходит.
     */
+    await bumpReportVersion(tx, reportId);
     await writeReportAuditRow({
       reportId: await businessReportId(tx, reportId),
       action: 'updated',

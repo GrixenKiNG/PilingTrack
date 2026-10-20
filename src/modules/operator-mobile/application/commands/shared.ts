@@ -434,6 +434,17 @@ export async function ensureReport(tx: Tx, input: {
 }
 
 /**
+ * Повышает `Report.version` при записи мобильной выработки в отчёт.
+ *
+ * Веб-сохранение сверяет только версию (report.repository.ts) и удаляет строки,
+ * которых нет в присланной форме. Запись с телефона версию не двигала, поэтому
+ * форма, открытая до неё, проходила проверку и стирала новую строку без 409.
+ */
+export async function bumpReportVersion(tx: Tx, reportPk: string): Promise<void> {
+  await tx.report.update({where: {id: reportPk}, data: {version: {increment: 1}}});
+}
+
+/**
  * Деловой номер отчёта (`RM-…`) по первичному ключу.
  *
  * ЗАЧЕМ ОТДЕЛЬНОЕ ЧТЕНИЕ. `ensureReport` возвращает первичный ключ `report.id`,

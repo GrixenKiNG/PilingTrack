@@ -147,7 +147,7 @@ describe('logProduction — след записи выработки в исто
   const auditTx = {
     $executeRaw: vi.fn(),
     shift: {findFirst: vi.fn()},
-    report: {findFirst: vi.fn(), upsert: vi.fn(), findUnique: vi.fn(), findUniqueOrThrow: vi.fn()},
+    report: {findFirst: vi.fn(), upsert: vi.fn(), findUnique: vi.fn(), findUniqueOrThrow: vi.fn(), update: vi.fn()},
     crew: {findFirst: vi.fn()},
     operatorChecklistExecution: {findFirst: vi.fn()},
     userDocumentType: {findMany: vi.fn()},
@@ -219,11 +219,20 @@ describe('logProduction — след записи выработки в исто
     }));
   });
 
-  it('повтор уже принятой команды след не пишет', async () => {
+  it('повышает Report.version: веб-форма, открытая до записи, получит 409, а не сотрёт строку', async () => {
+    await logProduction(pilesInput);
+
+    expect(auditTx.report.update).toHaveBeenCalledWith({
+      where: {id: 'report-pk-1'}, data: {version: {increment: 1}},
+    });
+  });
+
+  it('повтор уже принятой команды след не пишет и версию не двигает', async () => {
     auditTx.pileWork.findUnique.mockResolvedValue({id: 'pw-existing'});
 
     await expect(logProduction(pilesInput)).resolves.toEqual({reportId: ''});
     expect(auditTx.reportAudit.create).not.toHaveBeenCalled();
+    expect(auditTx.report.update).not.toHaveBeenCalled();
   });
 });
 
@@ -242,7 +251,7 @@ describe('logProduction — после завершения работы выр�
   const finishTx = {
     $executeRaw: vi.fn(),
     shift: {findFirst: vi.fn()},
-    report: {findFirst: vi.fn(), upsert: vi.fn(), findUnique: vi.fn(), findUniqueOrThrow: vi.fn()},
+    report: {findFirst: vi.fn(), upsert: vi.fn(), findUnique: vi.fn(), findUniqueOrThrow: vi.fn(), update: vi.fn()},
     crew: {findFirst: vi.fn()},
     pileWork: {findUnique: vi.fn(), create: vi.fn()},
     leaderDrilling: {findUnique: vi.fn(), create: vi.fn()},
