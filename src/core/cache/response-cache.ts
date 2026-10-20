@@ -198,7 +198,7 @@ export class ResponseCache {
 
     this.cache.set(cacheKey, {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
-      value: cloneResponse(value) as any,
+      value: cloneResponse(value) as NextResponse<T>,
       createdAt: Date.now(),
       lastAccessedAt: Date.now(),
       hitCount: 0,
