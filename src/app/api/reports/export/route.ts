@@ -31,10 +31,10 @@ export const GET = withApi(
     const userId = request.nextUrl.searchParams.get('userId');
     const equipmentId = request.nextUrl.searchParams.get('equipmentId');
     const filterParam = request.nextUrl.searchParams.get('filter');
-    if (filterParam && !['downtime', 'withPhotos', 'edited'].includes(filterParam)) {
+    if (filterParam && !['drafts', 'submitted', 'downtime', 'withPhotos', 'edited'].includes(filterParam)) {
       return NextResponse.json({ error: 'Неизвестный фильтр выгрузки' }, { status: 400 });
     }
-    const filter = filterParam as 'downtime' | 'withPhotos' | 'edited' | null;
+    const filter = filterParam as 'drafts' | 'submitted' | 'downtime' | 'withPhotos' | 'edited' | null;
 
     if (!dateFrom || !dateTo) {
       return NextResponse.json(

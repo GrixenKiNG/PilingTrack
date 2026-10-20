@@ -31,6 +31,6 @@ export default defineConfig({
   },
   projects: [
     { name: 'desktop', use: { ...devices['Desktop Chrome'] }, testIgnore: /operator-/ },
-    { name: 'phone', use: { ...devices['Galaxy S20'] }, testMatch: /operator-/ },
+    { name: 'phone', use: { ...devices['Galaxy S24'] }, testMatch: /operator-/ },
   ],
 });

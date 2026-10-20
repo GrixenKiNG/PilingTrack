@@ -76,6 +76,34 @@ describe.skipIf(!enabled)('M6–M8 on disposable migrated Postgres', () => {
     expect((await inContext(() => getFleetSnapshot({ tenantId: tenant }))).totals).toEqual(kpi.totals);
   });
 
+  it('journal header covers all 501 rows and export status filters reach PostgreSQL', async () => {
+    const {listPilePassports, pileJournalHeader} = await import('@/modules/reports/application/queries/pile-passport.service');
+    const {exportReportsCsv} = await import('@/modules/reports/application/queries/report-export.service');
+    const extraReport = tenant + '-scope-report';
+    const extraSite = tenant + '-scope-site';
+    try {
+      await fixture.owner.query('INSERT INTO "Site" (id,"tenantId",name,"updatedAt") VALUES ($1,$2,$3,now())', [extraSite, tenant, 'Other scope site']);
+      await fixture.owner.query('INSERT INTO "Report" (id,"tenantId","reportId","userId","siteId",date,status,"updatedAt") VALUES ($1,$2,$1,$3,$4,$5,$6,now())', [extraReport, tenant, fixture.id(tenant, 'User'), extraSite, '2026-09-02', 'draft']);
+      await fixture.owner.query('INSERT INTO "PileWork" (id,"tenantId","reportId","pileGradeId",count,"occurredAt") SELECT $1 || n,$2,CASE WHEN n=501 THEN $3 ELSE $4 END,$5,1,CASE WHEN n=501 THEN $6::timestamptz ELSE $7::timestamptz END FROM generate_series(1,501) n', [tenant + '-scope-', tenant, extraReport, report, grade, '2026-09-01T21:30:00Z', '2026-09-29T21:30:00Z']);
+      const page = await inContext(() => listPilePassports({tenantId: tenant, dateFrom: '2026-09-01', dateTo: '2026-09-30', timezone: 'Europe/Moscow'}));
+      expect(page.rows).toHaveLength(500);
+      expect(page.truncated).toBe(true);
+      const header = pileJournalHeader(page.rows, page.totals, 'Europe/Moscow');
+      expect(header.siteNames.sort()).toEqual(['Disposable site', 'Other scope site']);
+      expect(header).toMatchObject({dateFrom: '02.09.2026', dateTo: '30.09.2026', rowsTotal: 501, pilesTotal: 501});
+      const submitted = await inContext(() => exportReportsCsv({tenantId: tenant, filter: 'submitted'}));
+      const drafts = await inContext(() => exportReportsCsv({tenantId: tenant, filter: 'drafts'}));
+      expect(submitted).toContain(report);
+      expect(submitted).not.toContain(extraReport);
+      expect(drafts).toContain(extraReport);
+      expect(drafts).not.toContain(`"${report}"`);
+    } finally {
+      await fixture.owner.query('DELETE FROM "PileWork" WHERE "tenantId"=$1 AND id LIKE $2', [tenant, tenant + '-scope-%']);
+      await fixture.owner.query('DELETE FROM "Report" WHERE id=$1', [extraReport]);
+      await fixture.owner.query('DELETE FROM "Site" WHERE id=$1', [extraSite]);
+    }
+  });
+
   it('M7: partial receipts survive a disconnected client/module restart; retry sends only B', async () => {
     const eventId = tenant + '-delivery';
     const alert = { severity: 'high', message: 'Disposable Telegram proof' };

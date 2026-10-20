@@ -107,6 +107,16 @@ describe('exportReportsCsv — tenant scoping', () => {
       expect.objectContaining({ where: expect.objectContaining({ tenantId: 'tenant-a' }) })
     );
   });
+
+  it.each([['drafts', 'draft'], ['submitted', 'submitted']] as const)('CSV и Excel ограничивают выборку статусом %s', async (filter, status) => {
+    getSettingsMock.mockResolvedValue({timezone: 'Europe/Moscow'});
+    await exportReportsCsv({tenantId: 'tenant-a', filter});
+    await exportReportsXlsx({tenantId: 'tenant-a', filter});
+    expect(findManyMock).toHaveBeenCalledTimes(2);
+    for (const [query] of findManyMock.mock.calls) {
+      expect(query.where).toMatchObject({tenantId: 'tenant-a', status});
+    }
+  });
 });
 
 /**

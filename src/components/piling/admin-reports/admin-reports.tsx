@@ -144,7 +144,7 @@ export function AdminReports() {
       if (filterSiteId !== 'all') params.set('siteId', filterSiteId);
       if (filterUserId !== 'all') params.set('userId', filterUserId);
       if (filterEquipmentId !== 'all') params.set('equipmentId', filterEquipmentId);
-      if (['downtime', 'withPhotos', 'edited'].includes(quickFilter)) params.set('filter', quickFilter);
+      if (['drafts', 'submitted', 'downtime', 'withPhotos', 'edited'].includes(quickFilter)) params.set('filter', quickFilter);
       if (format === 'xlsx') params.set('format', 'xlsx');
 
       const response = await authFetch(`/api/reports/export?${params.toString()}`);
