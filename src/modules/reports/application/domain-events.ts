@@ -96,7 +96,7 @@ export function on(eventType: string, handler: EventHandler) {
  */
 export async function emitDomainEvent(event: DomainEvent | (Omit<DomainEvent, 'type'> & {type: 'NotificationDeliveryRequested' | 'ReportPdfDeliveryRequested'})): Promise<void> {
   if (event.type === 'NotificationDeliveryRequested') {
-    const {deliverQueuedAlert} = await import('@/services/notifications/durable-alert-delivery');
+    const {deliverQueuedAlert} = await import('@/modules/notifications');
     await deliverQueuedAlert(event);
     return;
   }

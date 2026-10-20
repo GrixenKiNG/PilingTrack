@@ -12,7 +12,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { timingSafeEqual, createHash, randomUUID } from 'node:crypto';
 import { ALERT_DELIVERY_EVENT } from '@/core/notifications/durable-alert';
-import { deliverQueuedAlert } from '@/services/notifications/durable-alert-delivery';
+import { deliverQueuedAlert } from '@/modules/notifications';
 import { db } from '@/lib/db';
 import { runWithTenantContext, setRequestTenantId } from '@/core/security/tenant-context';
 import { isNotificationEnabled } from '@/modules/settings';

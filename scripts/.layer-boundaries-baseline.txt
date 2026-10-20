@@ -1,4 +1,3 @@
-src/modules/reports/application/domain-events.ts|@/services/notifications/durable-alert-delivery|modules/ may not import from services/ (migration frozen)
 src/modules/system/application/queries/system-service.ts|@/services/tenancy/tenant-context-service|modules/ may not import from services/ (migration frozen)
 src/modules/telemetry/index.ts|@/services/telemetry/device-key-service|modules/ may not import from services/ (migration frozen)
 src/modules/telemetry/index.ts|@/services/telemetry/telemetry-ingestion-service|modules/ may not import from services/ (migration frozen)

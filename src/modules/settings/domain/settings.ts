@@ -35,7 +35,7 @@ export interface WorkspaceSettings {
  *
  * - `downtime30`, `newReports` — `modules/reports/application/event-handlers.ts`
  * - `maintenanceOverdue` — `workers/unified-worker/pm-scheduler.ts`
- * - `criticalDefect`, `incidents` — `services/notifications/durable-alert-delivery.ts`
+ * - `criticalDefect`, `incidents` — `modules/notifications/application/durable-alert-delivery.ts`
  * - `systemAlerts` — `app/api/alerts/webhook/route.ts` (тревоги Alertmanager)
  * - `deliveryFailures` — `core/outbox/dead-letter-queue.ts`
  *
