@@ -4,7 +4,7 @@ import { ServiceError } from '@/lib/service-error';
 import { attachRequestIdHeader, getRequestId } from '@/lib/request-context';
 import { isActingRole } from '@/lib/types';
 import { can } from '@/services/auth/authorization-service';
-import { queryReadinessBootstrap } from '@/modules/readiness/application/bootstrap-query';
+import { queryReadinessBootstrap } from '@/modules/readiness/server';
 import { withReadinessRequestTransaction } from '@/modules/readiness/server';
 import {withApi} from '@/core/api-wrapper';
 

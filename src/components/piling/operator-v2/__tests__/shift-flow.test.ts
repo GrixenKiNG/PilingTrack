@@ -1,5 +1,5 @@
 import {describe, expect, it} from 'vitest';
-import type {OperatorShiftFacts} from '@/modules/readiness/application/operator-shift-query';
+import type {OperatorShiftFacts} from '@/modules/readiness';
 import {resolveV2State, type V2Session} from '../shift-flow';
 
 /**

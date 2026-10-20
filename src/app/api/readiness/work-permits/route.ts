@@ -3,7 +3,7 @@ import {ReadinessCommandError} from '@/modules/readiness/server';
 import {createWorkPermitCommand} from '@/modules/readiness/server';
 import {queryWorkPermits, type PermitListFilters} from '@/modules/readiness/server';
 import {createWorkPermitSchema} from '@/modules/readiness/server';
-import {parseReadinessReadFilters} from '@/modules/readiness/application/read-filters';
+import {parseReadinessReadFilters} from '@/modules/readiness/server';
 import {withReadinessRequestTransaction, withReadinessSerializableTransaction} from '@/modules/readiness/server';
 import {resolveReadinessRequestContext} from '../_shared/request-context';
 import {readinessErrorResponse, readinessResponse} from '../_shared/response';

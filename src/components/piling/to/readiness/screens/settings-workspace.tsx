@@ -17,7 +17,7 @@ import { resolveEffectiveRole } from '@/lib/types';
 import { formatDateTimeInTimezone } from '@/lib/timezone';
 import { cn } from '@/lib/utils';
 import { BLOCKER_ACTIONS, BLOCKER_ACTION_LABELS, BLOCKER_LABELS, CRITERION_LABELS, SYSTEM_SAFETY_BLOCKERS, computeReadinessScore, describeRuleSetChanges, normalizeWeights, type BlockerAction, type ReadinessCriterionKey, type ReadinessRuleSet, type ReadinessRulesState } from '@/modules/readiness';
-import { resolveReadinessCapabilities, type ReadinessAbility, type ReadinessRole } from '@/modules/readiness/application/capabilities';
+import { resolveReadinessCapabilities, type ReadinessAbility, type ReadinessRole } from '@/modules/readiness';
 import { type ReadinessUrlFilters } from '../api/client';
 import { authoritativeFactsForEquipment, buildAuthoritativeReadinessPresentation } from '../authoritative-presentation';
 import { EquipmentPhoto, ReadinessFiltersBar, ReadinessRing, downloadReadinessExport } from './shared';

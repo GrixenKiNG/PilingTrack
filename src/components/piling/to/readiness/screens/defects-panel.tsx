@@ -29,7 +29,7 @@ import {
   DEFECT_SEVERITY_LABELS,
   DEFECT_STATUS_LABELS,
   type DefectSeverity,
-} from '@/modules/readiness/domain/defects/types';
+} from '@/modules/readiness';
 import type { DefectDto } from '../api/contracts';
 import { card } from '../settings/shared-ui';
 import { CommandDialog } from '../shared/command-dialog';

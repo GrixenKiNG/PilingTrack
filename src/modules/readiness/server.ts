@@ -74,3 +74,42 @@ export {
   updateShiftSchema,
   versionedShiftSchema,
 } from './application/shifts/schemas';
+export {
+  getAccessMatrix,
+  getPublishedAccessMatrix,
+  publishAccessMatrix,
+  saveAccessMatrixDraft,
+} from './application/access-matrix-service';
+export {
+  queryReadinessBootstrap,
+} from './application/bootstrap-query';
+export {
+  resolveCorrelationId,
+} from './application/command-pipeline/correlation';
+export {
+  buildReadinessCsv,
+} from './application/csv-export';
+export {
+  parseReadinessReadFilters,
+  serializeReadinessFilters,
+} from './application/read-filters';
+export {
+  getReadinessRules,
+  publishReadinessRules,
+  saveReadinessDraft,
+} from './application/readiness-rules-service';
+export {
+  PrismaAuditRepository,
+} from './infrastructure/audit/audit-repository';
+export {
+  recordChainedReadinessAudit,
+} from './infrastructure/audit/record-audit';
+export {
+  verifyAuditEvents,
+} from './infrastructure/audit/verify-chain';
+export {
+  HandoverRepository,
+} from './infrastructure/shifts/handover-repository';
+export {
+  getOperatorShiftFacts,
+} from './application/operator-shift-query';

@@ -7,7 +7,7 @@ import {
   parseCurrentReadinessResponse,
   parseReadinessHistoryResponse,
 } from '../contracts';
-import { READINESS_ABILITIES as SERVER_ABILITIES } from '@/modules/readiness/application/capabilities';
+import { READINESS_ABILITIES as SERVER_ABILITIES } from '@/modules/readiness';
 import { bootstrapEnvelope } from './fixtures';
 
 const historyMocks = vi.hoisted(() => ({

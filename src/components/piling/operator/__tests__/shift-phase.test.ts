@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { OperatorShiftFacts } from '@/modules/readiness/application/operator-shift-query';
+import type { OperatorShiftFacts } from '@/modules/readiness';
 import { resolveShiftPhase } from '../shift-phase';
 
 const facts = (patch: Partial<OperatorShiftFacts> = {}): OperatorShiftFacts => ({

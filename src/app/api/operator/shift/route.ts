@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireTenantId } from '@/lib/tenant';
 import { requireAuth } from '@/lib/auth';
 import { withApi } from '@/core/api-wrapper';
-import { getOperatorShiftFacts } from '@/modules/readiness/application/operator-shift-query';
+import { getOperatorShiftFacts } from '@/modules/readiness/server';
 
 export const runtime = 'nodejs';
 

@@ -1,10 +1,10 @@
 import type {NextRequest, NextResponse} from 'next/server';
 import {requireAuth} from '@/lib/auth';
 import {getRequestId} from '@/lib/request-context';
-import {resolveCorrelationId} from '@/modules/readiness/application/command-pipeline/correlation';
-import {getPublishedAccessMatrix} from '@/modules/readiness/application/access-matrix-service';
-import {effectiveReadinessCapabilities, type ReadinessAbility} from '@/modules/readiness/application/capabilities';
-import type {ReadinessAccessMatrix} from '@/modules/readiness/domain/access-matrix';
+import {resolveCorrelationId} from '@/modules/readiness/server';
+import {getPublishedAccessMatrix} from '@/modules/readiness/server';
+import {effectiveReadinessCapabilities, type ReadinessAbility} from '@/modules/readiness';
+import type {ReadinessAccessMatrix} from '@/modules/readiness';
 
 export interface ReadinessRequestContext {
   tenantId: string;

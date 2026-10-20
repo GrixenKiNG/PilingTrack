@@ -4,7 +4,7 @@ import {
   getAccessMatrix,
   publishAccessMatrix,
   saveAccessMatrixDraft,
-} from '@/modules/readiness/application/access-matrix-service';
+} from '@/modules/readiness/server';
 import {resolveReadinessRequestContext} from '../_shared/request-context';
 import {withReadinessCommand} from '../_shared/route-adapter';
 import {withApi} from '@/core/api-wrapper';

@@ -5,7 +5,7 @@ import { requireAuth } from '@/lib/auth';
 import {
   getReadinessRules,
   saveReadinessDraft,
-} from '@/modules/readiness/application/readiness-rules-service';
+} from '@/modules/readiness/server';
 import { assertRole } from '@/services/auth/authorization-service';
 
 export const runtime = 'nodejs';

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireTenantId } from '@/lib/tenant';
 import { withMutation } from '@/core/api-wrapper';
 import { requireAuth } from '@/lib/auth';
-import { publishReadinessRules } from '@/modules/readiness/application/readiness-rules-service';
+import { publishReadinessRules } from '@/modules/readiness/server';
 import { assertRole } from '@/services/auth/authorization-service';
 
 export const runtime = 'nodejs';

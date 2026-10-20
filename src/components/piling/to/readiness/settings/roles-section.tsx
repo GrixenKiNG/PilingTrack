@@ -15,8 +15,8 @@ import {
   type ReadinessAbility,
   type ReadinessRole,
   resolveReadinessCapabilities,
-} from '@/modules/readiness/application/capabilities';
-import type { AccessMatrixState } from '@/modules/readiness/application/access-matrix-service';
+} from '@/modules/readiness';
+import type { AccessMatrixState } from '@/modules/readiness';
 import type { ReadinessBootstrap } from '../api/contracts';
 import { handoverRoleLabel } from '../handover-journal';
 import { ScreenTitle, SettingsKpis, StatusPill, card } from './shared-ui';

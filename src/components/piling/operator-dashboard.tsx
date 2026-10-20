@@ -17,7 +17,7 @@ import { OperatorDocumentReminder } from '@/components/piling/operator-document-
 import { ShiftPhaseStrip, ShiftStepCard } from '@/components/piling/operator/shift-step-card';
 import { resolveShiftPhase } from '@/components/piling/operator/shift-phase';
 import { ShiftTaskScreen, type ShiftTask } from '@/components/piling/operator/shift-task-screen';
-import type { OperatorShiftFacts } from '@/modules/readiness/application/operator-shift-query';
+import type { OperatorShiftFacts } from '@/modules/readiness';
 import type { SiteFlatDTO, ReportListItemDTO } from '@/lib/types';
 
 /**

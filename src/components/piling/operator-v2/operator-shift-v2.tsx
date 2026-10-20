@@ -47,7 +47,7 @@ import { authFetch } from '@/lib/api';
 import { getEquipmentPhoto } from '@/components/piling/admin-equipment/equipment-photo';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatNumber } from '@/lib/format';
-import type { OperatorShiftFacts } from '@/modules/readiness/application/operator-shift-query';
+import type { OperatorShiftFacts } from '@/modules/readiness';
 import type { ClearanceDocument } from '@/modules/users';
 import { WeatherCard } from './weather-card';
 import { DefectSheet } from './defect-sheet';

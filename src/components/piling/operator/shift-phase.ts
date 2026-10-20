@@ -1,4 +1,4 @@
-import type { OperatorShiftFacts } from '@/modules/readiness/application/operator-shift-query';
+import type { OperatorShiftFacts } from '@/modules/readiness';
 
 /**
  * Какой шаг смены оператор проходит прямо сейчас.

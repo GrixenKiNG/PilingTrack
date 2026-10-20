@@ -40,7 +40,7 @@ import type {ChecklistStage, OperatorPhase} from '@/modules/operator-mobile/cont
  * помечены на экране.
  */
 
-import type { OperatorShiftFacts } from '@/modules/readiness/application/operator-shift-query';
+import type { OperatorShiftFacts } from '@/modules/readiness';
 
 export const V2_STEPS = [
   'acceptance',
