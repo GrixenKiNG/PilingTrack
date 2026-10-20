@@ -48,7 +48,7 @@ vi.mock('@/lib/logger', () => ({
 }));
 
 // Import after mocks
-import { publishOutboxEvents, startOutboxWorker, getOutboxStats } from '@/services/reports/outbox-publisher';
+import { publishOutboxEvents, startOutboxWorker, getOutboxStats } from '@/modules/reports/server';
 import * as dlqModule from '@/core/outbox/dead-letter-queue';
 
 // ============================================================
@@ -390,8 +390,8 @@ describe('Outbox Publisher', () => {
       });
 
       it('тип PDF-доставки в полосе совпадает с типом, который ставит обработчик отчёта', async () => {
-        const { REPORT_PDF_DELIVERY_EVENT } = await import('@/services/reports/event-handlers');
-        const { TELEGRAM_LANE_EVENT_TYPES } = await import('@/services/reports/outbox-publisher');
+        const { REPORT_PDF_DELIVERY_EVENT } = await import('@/modules/reports/server');
+        const { TELEGRAM_LANE_EVENT_TYPES } = await import('@/modules/reports/server');
         expect(TELEGRAM_LANE_EVENT_TYPES).toContain(REPORT_PDF_DELIVERY_EVENT);
         expect(TELEGRAM_LANE_EVENT_TYPES).toContain(ALERT);
       });
@@ -452,7 +452,7 @@ describe('Outbox Publisher', () => {
   describe('saveToOutbox', () => {
     it('saves events to outbox within transaction', async () => {
       // Dynamic import to avoid early mock issues
-      const { saveToOutbox } = await import('@/services/reports/outbox-publisher');
+      const { saveToOutbox } = await import('@/modules/reports/server');
 
       const mockTx = {
         outboxEvent: { create: vi.fn().mockResolvedValue({ id: 'outbox-1' }) },
@@ -470,7 +470,7 @@ describe('Outbox Publisher', () => {
     });
 
     it('does nothing for empty event array', async () => {
-      const { saveToOutbox } = await import('@/services/reports/outbox-publisher');
+      const { saveToOutbox } = await import('@/modules/reports/server');
 
       const mockTx = {
         outboxEvent: { create: vi.fn() },

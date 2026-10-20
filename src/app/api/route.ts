@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { registerAllEventHandlers } from "@/services/reports/event-handlers";
+import { registerAllEventHandlers } from "@/modules/reports/server";
 import { registerReadinessProjectionHandler } from "@/workers/register-readiness-projection";
 import { withApi } from "@/core/api-wrapper";
 

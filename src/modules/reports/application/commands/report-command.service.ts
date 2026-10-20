@@ -34,7 +34,7 @@ import {
   recordPostCommitAuditEvent,
   computeDiff,
   type AuditRecord,
-} from '@/services/reports/audit-service';
+} from '../audit-service';
 
 const EDIT_WINDOW_HOURS = 24;
 

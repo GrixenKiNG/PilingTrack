@@ -88,14 +88,14 @@ mocks.mockProjectionElection.start.mockImplementation(async () => {
   mocks.mockProjectionElection.onBecomeLeader?.();
 });
 
-vi.mock('@/services/reports/outbox-publisher', () => ({
+vi.mock('@/modules/reports/application/outbox-publisher', () => ({
   startOutboxWorker: mocks.mockStartOutboxWorker.mockReturnValue({
     stop: vi.fn(),
   }),
   getOutboxStats: mocks.mockGetOutboxStats,
 }));
 
-vi.mock('@/services/reports/domain-events', () => ({
+vi.mock('@/modules/reports/application/domain-events', () => ({
   emitDomainEvent: mocks.mockEmitDomainEvent,
 }));
 
@@ -109,7 +109,7 @@ vi.mock('@/modules/reports/application/projections/projection-worker', () => ({
   }),
 }));
 
-vi.mock('@/services/reports/event-handlers', () => ({
+vi.mock('@/modules/reports/application/event-handlers', () => ({
   registerAllEventHandlers: vi.fn(),
 }));
 

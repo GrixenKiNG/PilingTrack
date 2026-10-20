@@ -33,7 +33,7 @@ export interface WorkspaceSettings {
  * раньше, но его никто не читал, и включённое правило вело себя ровно как
  * выключенное; сейчас каждый отправитель спрашивает его перед отправкой:
  *
- * - `downtime30`, `newReports` — `services/reports/event-handlers.ts`
+ * - `downtime30`, `newReports` — `modules/reports/application/event-handlers.ts`
  * - `maintenanceOverdue` — `workers/unified-worker/pm-scheduler.ts`
  * - `criticalDefect`, `incidents` — `services/notifications/durable-alert-delivery.ts`
  * - `systemAlerts` — `app/api/alerts/webhook/route.ts` (тревоги Alertmanager)

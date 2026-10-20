@@ -8,7 +8,7 @@
 import type {Prisma} from '@/generated/postgres-client/client';
 import {withReadinessTenantTransaction} from '@/modules/readiness/server';
 // eslint-disable-next-line no-restricted-imports -- legacy cross-layer import pending the parked services<->modules migration (CLAUDE.md); behavior-neutral
-import {writeReportAuditRow} from '@/services/reports/audit-service';
+import {writeReportAuditRow} from '@/modules/reports/server';
 import {
   DOWNTIME_MAX_HOURS, DOWNTIME_STEP_HOURS, downtimeHoursBetween, isWholeDowntimeStep,
 } from '@/lib/downtime-hours';

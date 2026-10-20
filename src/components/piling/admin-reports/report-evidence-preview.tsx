@@ -28,7 +28,7 @@ import { cn } from '@/lib/utils';
 import { formatNumber, formatHours, formatRuDate } from '@/lib/format';
 import type { ReportDTO } from '@/lib/types';
 import { getReportTotals, shiftDurationHours } from './report-totals';
-import { statusLabel, type ReportHistory } from '@/services/reports/report-history';
+import { statusLabel, type ReportHistory } from '@/modules/reports/client';
 import {
   formatIsoDateTime,
   formatPercentValue,

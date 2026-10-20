@@ -171,7 +171,7 @@ async function rebuildSiteWeeklyTrendForTenant(tenantId: string): Promise<number
 /**
  * Rebuild ReportAnalytics — per-report read model used by the operator's
  * report history and the admin period filter. Mirrors the upsert logic in
- * services/reports/event-handlers.ts:handleReportForAnalytics so the same
+ * modules/reports/application/event-handlers.ts:handleReportForAnalytics so the same
  * source of truth (Report row + child sums) is written.
  */
 export async function rebuildReportAnalytics(): Promise<RebuildResult> {
@@ -202,7 +202,7 @@ async function rebuildReportAnalyticsForTenant(tenantId: string): Promise<number
     const totalDrilling = r.drillings.reduce((s, d) => s + (d.meters || 0), 0);
     const totalDowntime = r.downtimes.reduce((s, d) => s + (d.duration || 0), 0);
     // ReportAnalytics.reportId stores Report.reportId (uuid), NOT Report.id
-    // (cuid). The realtime handler (services/reports/event-handlers.ts
+    // (cuid). The realtime handler (modules/reports/application/event-handlers.ts
     // handleReportForAnalytics) writes the uuid — see commits 3b07426 /
     // 7f1f0e6. This rebuilder used to write the cuid, which created
     // unreachable rows alongside the real ones (every monitoring query

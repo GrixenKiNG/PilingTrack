@@ -6,8 +6,8 @@
  * separate worker service is not deployed.
  */
 
-import { emitDomainEvent } from '@/services/reports/domain-events';
-import { registerAllEventHandlers } from '@/services/reports/event-handlers';
+import { emitDomainEvent } from '@/modules/reports/server';
+import { registerAllEventHandlers } from '@/modules/reports/server';
 import { registerReadinessProjectionHandler } from '@/workers/register-readiness-projection';
 import { registerAllEventSchemas } from '@/core/event-bus/schema-registry';
 import {
@@ -109,7 +109,7 @@ function registerShutdownHook() {
 }
 
 async function startEmbeddedOutboxWorker(): Promise<EmbeddedWorkerHandle> {
-  const { getOutboxStats, startOutboxWorker } = await import('@/services/reports/outbox-publisher');
+  const { getOutboxStats, startOutboxWorker } = await import('@/modules/reports/server');
 
   try {
     registerAllEventSchemas();

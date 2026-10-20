@@ -14,7 +14,7 @@ import {
   normalizeReportDomainEventType,
 } from '@/modules/reports/domain';
 // eslint-disable-next-line no-restricted-imports -- legacy cross-layer import pending the parked services<->modules migration (CLAUDE.md); behavior-neutral
-import { projectOutboxEvents } from '@/services/reports/outbox-publisher';
+import { projectOutboxEvents } from '../outbox-publisher';
 import { projectWeeklyTrend } from './projection-handlers';
 import {consumeReadinessProjectionEvent} from '@/modules/readiness/server';
 import { forEachTenant } from '@/lib/tenant-iteration';
@@ -67,7 +67,7 @@ function normalizeProjectionEvent(event: unknown): ReportDomainEvent | null {
  * не писали ничего — а событие всё равно помечалось projected=true, так что и
  * ретрая не было: ReportStats, OperatorPerformance, DowntimeSummary и
  * SiteWeeklyTrend наполнялись только ручным rebuild'ом. Тот же дефект уже
- * чинили в handleReportForDailySummary (services/reports/event-handlers.ts) —
+ * чинили в handleReportForDailySummary (modules/reports/application/event-handlers.ts) —
  * здесь его пропустили.
  *
  * `aggregateId` — это Report.reportId (бизнес-ключ), а не первичный `id`.

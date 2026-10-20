@@ -105,7 +105,7 @@ import {
   recomputeSiteDailySummary, deliverReportPdf, registerAnalyticsEventHandler, registerAlertEventHandler,
   registerAuditEventHandler,
 } from '../event-handlers';
-import { emitDomainEvent } from '@/services/reports/domain-events';
+import { emitDomainEvent } from '../domain-events';
 import { REPORT_DOMAIN_EVENT_TYPES } from '@/modules/reports/domain';
 import { logger } from '@/lib/logger';
 

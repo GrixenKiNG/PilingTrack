@@ -16,7 +16,7 @@
  * не могут (CLAUDE.md §1). Соединять их — работа композиционного слоя.
  */
 
-import { on } from '@/services/reports/domain-events';
+import { on } from '@/modules/reports/server';
 import { consumeReadinessProjectionEvent } from '@/modules/readiness/application/projection/consumer';
 
 let registered = false;

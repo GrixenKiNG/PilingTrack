@@ -3,7 +3,7 @@
  */
 
 import { startProjectionWorker } from '@/modules/reports/application/projections/projection-worker';
-import { registerAllEventHandlers } from '@/services/reports/event-handlers';
+import { registerAllEventHandlers } from '@/modules/reports/server';
 import { logger } from '@/lib/logger';
 import { recordWorkerHeartbeat } from '@/core/observability/health-tracker';
 import { getProjectionLeaderElection } from '@/core/infrastructure/leader-election';

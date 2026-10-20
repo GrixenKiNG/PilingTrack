@@ -9,9 +9,9 @@
 // eslint-disable-next-line no-restricted-imports -- legacy cross-layer import pending the parked services<->modules migration (CLAUDE.md); behavior-neutral
 import type {
   ReportDomainEvent as DomainEvent,
-} from '@/modules/reports/domain';
+} from '../domain';
 // eslint-disable-next-line no-restricted-imports -- legacy cross-layer import pending the parked services<->modules migration (CLAUDE.md); behavior-neutral
-import { REPORT_DOMAIN_EVENT_TYPES, normalizeReportDomainEventType } from '@/modules/reports/domain';
+import { REPORT_DOMAIN_EVENT_TYPES, normalizeReportDomainEventType } from '../domain';
 import { logger } from '@/lib/logger';
 
 function shouldLogHandlerRegistration(): boolean {
@@ -25,7 +25,7 @@ function shouldLogHandlerRegistration(): boolean {
 export type {
   ReportDomainEvent as DomainEvent,
   ReportDomainEventType as DomainEventType,
-} from '@/modules/reports/domain';
+} from '../domain';
 
 // ============================================================
 // Event Handlers Registry
@@ -101,7 +101,7 @@ export async function emitDomainEvent(event: DomainEvent | (Omit<DomainEvent, 't
     return;
   }
   if (event.type === 'ReportPdfDeliveryRequested') {
-    const {deliverReportPdf} = await import('@/services/reports/event-handlers');
+    const {deliverReportPdf} = await import('./event-handlers');
     await deliverReportPdf(event);
     return;
   }
@@ -187,7 +187,7 @@ export function getHandlerCount(eventType: string): number {
   return handlers.get(eventType)?.size || 0;
 }
 
-// Handler registration moved to @/services/reports/event-handlers.
+// Handler registration moved to @/modules/reports/application/event-handlers.
 // Import registerAllEventHandlers directly from there to register
 // synchronously at startup (avoids the fire-and-forget race that
 // caused N-4: events firing before lazy import().then() resolved).

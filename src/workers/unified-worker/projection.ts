@@ -1,6 +1,6 @@
 import { getProjectionLeaderElection } from '@/core/infrastructure/leader-election';
 import { startProjectionWorker } from '@/modules/reports/application/projections/projection-worker';
-import { registerAllEventHandlers } from '@/services/reports/event-handlers';
+import { registerAllEventHandlers } from '@/modules/reports/server';
 import { logger } from '@/lib/logger';
 import { PROJECTION_INTERVAL } from './config';
 import { recordLeaderHeartbeat, setRunning, workerStates } from './state';

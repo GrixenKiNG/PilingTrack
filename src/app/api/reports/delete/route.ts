@@ -9,7 +9,7 @@ import { db, DEFAULT_TX_OPTIONS } from '@/lib/db';
 import { pileLengthMeters } from '@/lib/pile-length';
 import { formatRuDate } from '@/lib/format';
 import { createReportEvent } from '@/modules/reports';
-import { saveToOutbox } from '@/services/reports/outbox-publisher';
+import { saveToOutbox } from '@/modules/reports/server';
 import { recordFeedbackEvent } from '@/services/feedback/feedback-event-service';
 
 export const runtime = 'nodejs';
@@ -161,7 +161,7 @@ export const DELETE = withMutation(
     // backstop — a recompute failure must not turn a successful delete into
     // a 500.
     try {
-      const { recomputeSiteDailySummary } = await import('@/services/reports/event-handlers');
+      const { recomputeSiteDailySummary } = await import('@/modules/reports/server');
       await db.reportAnalytics.deleteMany({ where: { reportId: parsed.data.reportId } });
       await recomputeSiteDailySummary(deleted.siteId, deleted.date);
     } catch (err) {

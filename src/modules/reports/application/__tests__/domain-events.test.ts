@@ -11,7 +11,7 @@
  * Целевое поведение: пустой реестр — ошибка, пробрасываемая наружу. Тест красный
  * до правки Codex (см. комментарий с it.fails).
  *
- * ВАЖНО: не импортировать `@/services/reports/event-handlers` — иначе реестр
+ * ВАЖНО: не импортировать `@/modules/reports/application/event-handlers` — иначе реестр
  * заполнится и тест перестанет проверять «нет подписчиков».
  */
 import { describe, it, expect, vi } from 'vitest';

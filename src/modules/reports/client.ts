@@ -6,3 +6,9 @@ export {
   isShiftTypeSelectable,
   SELECTABLE_SHIFT_TYPES,
 } from './domain/shift-types';
+export {
+  statusLabel,
+} from './application/report-history';
+export type {
+  ReportHistory,
+} from './application/report-history';

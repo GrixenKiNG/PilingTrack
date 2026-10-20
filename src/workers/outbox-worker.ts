@@ -2,8 +2,8 @@
  * Outbox Worker - reliable event publishing entrypoint.
  */
 
-import { startOutboxWorker, getOutboxStats } from '@/services/reports/outbox-publisher';
-import { emitDomainEvent } from '@/services/reports/domain-events';
+import { startOutboxWorker, getOutboxStats } from '@/modules/reports/server';
+import { emitDomainEvent } from '@/modules/reports/server';
 import { logger } from '@/lib/logger';
 import { recordWorkerHeartbeat } from '@/core/observability/health-tracker';
 import { registerAllEventSchemas } from '@/core/event-bus/schema-registry';

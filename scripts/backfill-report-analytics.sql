@@ -1,7 +1,7 @@
 -- Backfill missing ReportAnalytics rows.
 --
 -- ReportAnalytics is built in real time by handleReportForAnalytics in
--- services/reports/event-handlers.ts. If that handler ever doesn't run
+-- modules/reports/application/event-handlers.ts. If that handler ever doesn't run
 -- (registration race on cold start, DB outage, deploy bug), the rows
 -- are missing and the monitoring dashboard shows empty data for those
 -- reports.
@@ -19,7 +19,7 @@
 -- Use ":days" parameter to control the window (default 7 if not set).
 --
 -- See:
---   src/services/reports/event-handlers.ts:handleReportForAnalytics
+--   src/modules/reports/application/event-handlers.ts:handleReportForAnalytics
 --     — the realtime path. Mirror this logic if you change shape.
 --   src/modules/reports/application/projections/rebuild.ts
 --     — the canonical Prisma-based rebuilder. Use this script ONLY for

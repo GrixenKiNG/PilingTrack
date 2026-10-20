@@ -1,10 +1,10 @@
 import { getOutboxLeaderElection } from '@/core/infrastructure/leader-election';
 import { logger } from '@/lib/logger';
-import { emitDomainEvent } from '@/services/reports/domain-events';
+import { emitDomainEvent } from '@/modules/reports/server';
 import { registerAllEventSchemas } from '@/core/event-bus/schema-registry';
-import { registerAllEventHandlers } from '@/services/reports/event-handlers';
+import { registerAllEventHandlers } from '@/modules/reports/server';
 import { registerReadinessProjectionHandler } from '@/workers/register-readiness-projection';
-import { getOutboxStats, startOutboxWorker } from '@/services/reports/outbox-publisher';
+import { getOutboxStats, startOutboxWorker } from '@/modules/reports/server';
 import { OUTBOX_INTERVAL } from './config';
 import { recordLeaderHeartbeat, setRunning, workerStates } from './state';
 

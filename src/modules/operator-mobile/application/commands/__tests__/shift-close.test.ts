@@ -14,7 +14,7 @@ const {withReadinessTenantTransaction} = vi.hoisted(() => ({withReadinessTenantT
 vi.mock('@/modules/readiness/server', () => ({withReadinessTenantTransaction}));
 
 const {writeReportAuditRow} = vi.hoisted(() => ({writeReportAuditRow: vi.fn()}));
-vi.mock('@/services/reports/audit-service', () => ({writeReportAuditRow}));
+vi.mock('@/modules/reports/application/audit-service', () => ({writeReportAuditRow}));
 
 import {closeShift, finishWork, submitReport} from '../shift-close';
 

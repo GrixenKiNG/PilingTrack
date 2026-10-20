@@ -24,7 +24,6 @@ src/core/ @pilingtrack/core-team
 # Reports Module (DDD Bounded Context)
 # ============================================================
 src/modules/reports/ @pilingtrack/reports-team
-src/services/reports/ @pilingtrack/reports-team
 
 # ============================================================
 # Sync Engine (Offline-First)

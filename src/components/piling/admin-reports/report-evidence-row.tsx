@@ -29,7 +29,7 @@ import { formatCountMeters, formatNumber } from '@/lib/format';
 import type { ReportDTO } from '@/lib/types';
 import { getReportTotals, type JournalSums, type ReportTotals } from './report-totals';
 import { ReportThumbnail } from './report-thumbnail';
-import { statusLabel } from '@/services/reports/report-history';
+import { statusLabel } from '@/modules/reports/client';
 import { shortDate, shiftLabel } from './report-list-format';
 import { formatDowntimeHours } from '@/lib/downtime-hours';
 

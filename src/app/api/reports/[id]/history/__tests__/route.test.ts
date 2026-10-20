@@ -6,7 +6,7 @@ const { requireAuthMock, getHistoryMock } = vi.hoisted(() => ({
   getHistoryMock: vi.fn(),
 }));
 vi.mock('@/lib/auth', () => ({ requireAuth: requireAuthMock }));
-vi.mock('@/services/reports/report-history-service', () => ({ getReportHistory: getHistoryMock }));
+vi.mock('@/modules/reports/application/report-history-service', () => ({ getReportHistory: getHistoryMock }));
 
 import { GET } from '../route';
 

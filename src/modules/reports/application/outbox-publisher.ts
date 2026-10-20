@@ -16,7 +16,7 @@
 import { db } from '@/lib/db';
 import type { Prisma } from '@/generated/postgres-client/client';
 // eslint-disable-next-line no-restricted-imports -- legacy cross-layer import pending the parked services<->modules migration (CLAUDE.md); behavior-neutral
-import { ReportDomainEvent } from '@/modules/reports/domain';
+import { ReportDomainEvent } from '../domain';
 import { logger } from '@/lib/logger';
 import { moveToDlq } from '@/core/outbox/dead-letter-queue';
 import { MAX_OUTBOX_RETRIES } from '@/core/outbox/outbox-stats';
@@ -37,7 +37,7 @@ const BATCH_SIZE = 100;
 /**
  * События, чья единственная работа — отправка в Telegram. Идут отдельной
  * полосой публикации (см. startOutboxWorker). Значение PDF-события совпадает с
- * REPORT_PDF_DELIVERY_EVENT из services/reports/event-handlers.ts: сам модуль
+ * REPORT_PDF_DELIVERY_EVENT из modules/reports/application/event-handlers.ts: сам модуль
  * не импортируем, он тянет базу и Redis; совпадение закреплено тестом.
  */
 export const TELEGRAM_LANE_EVENT_TYPES = [ALERT_DELIVERY_EVENT, 'ReportPdfDeliveryRequested'] as const;

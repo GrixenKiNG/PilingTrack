@@ -10,8 +10,8 @@ import { SUBMITTED_REPORT_STATUS } from '@/lib/report-status';
  */
 
 // eslint-disable-next-line no-restricted-imports -- legacy cross-layer import pending the parked services<->modules migration (CLAUDE.md); behavior-neutral
-import { ReportDomainEvent, REPORT_DOMAIN_EVENT_TYPES } from '@/modules/reports/domain';
-import { on } from '@/services/reports/domain-events';
+import { ReportDomainEvent, REPORT_DOMAIN_EVENT_TYPES } from '../domain';
+import { on } from './domain-events';
 import { logger } from '@/lib/logger';
 import { formatCountMeters } from '@/lib/format';
 import { formatDowntimeHours } from '@/lib/downtime-hours';
