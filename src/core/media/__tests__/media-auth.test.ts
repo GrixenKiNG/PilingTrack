@@ -1,5 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
+/** Локальный тип актора для тестов — заменяет `any` без изменения поведения. */
+type TestActor = {
+  id: string;
+  role: 'ADMIN' | 'DISPATCHER' | 'OPERATOR' | 'MECHANIC' | 'SAFETY_ENGINEER';
+  tenantId: string | null | undefined;
+  actingAs?: string;
+};
+
 // assertCanAccessMediaEntity уходит в базу за владельцем отчёта и осмотра
 // (динамическим import), поэтому мок нужен и здесь.
 const { reportFindFirstMock, inspectionFindUniqueMock, userDocumentFindFirstMock, maintenanceFindUniqueMock } = vi.hoisted(() => ({
@@ -21,51 +29,42 @@ import { assertCanAccessMedia, assertCanAccessMediaEntity, ownsUserDocumentMedia
 
 describe('assertCanAccessMediaEntity — equipment', () => {
   it('allows ADMIN to manage equipment media and rejects DISPATCHER', async () => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test actor stub
-    await expect(assertCanAccessMediaEntity({ id: 'u', role: 'ADMIN' } as any, 'equipment', 'eq1')).resolves.toBeUndefined();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test actor stub
-    await expect(assertCanAccessMediaEntity({ id: 'u', role: 'DISPATCHER' } as any, 'equipment', 'eq1')).rejects.toThrow();
+    await expect(assertCanAccessMediaEntity({ id: 'u', role: 'ADMIN', tenantId: 'orion' } as TestActor, 'equipment', 'eq1')).resolves.toBeUndefined();
+    await expect(assertCanAccessMediaEntity({ id: 'u', role: 'DISPATCHER', tenantId: 'orion' } as TestActor, 'equipment', 'eq1')).rejects.toThrow();
   });
 
   it('rejects OPERATOR for equipment media', async () => {
     await expect(
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test actor stub
-      assertCanAccessMediaEntity({ id: 'u', role: 'OPERATOR' } as any, 'equipment', 'eq1'),
+      assertCanAccessMediaEntity({ id: 'u', role: 'OPERATOR', tenantId: 'orion' } as TestActor, 'equipment', 'eq1'),
     ).rejects.toThrow();
   });
 });
 
 describe('assertCanAccessMedia — equipment photos (existing records)', () => {
   const equipmentMedia = { userId: 'admin-1', entityType: 'equipment', entityId: 'eq1', tenantId: 'orion' };
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test actor stub
-  const operator = { id: 'op-1', role: 'OPERATOR', tenantId: 'orion' } as any;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test actor stub
-  const admin = { id: 'admin-1', role: 'ADMIN', tenantId: 'orion' } as any;
+  const operator = { id: 'op-1', role: 'OPERATOR', tenantId: 'orion' } as TestActor;
+  const admin = { id: 'admin-1', role: 'ADMIN', tenantId: 'orion' } as TestActor;
 
   it('allows any same-tenant user to READ an equipment photo (fleet dashboard is for all roles)', () => {
     expect(() => assertCanAccessMedia(operator, equipmentMedia, 'read')).not.toThrow();
   });
 
   it('rejects cross-tenant and missing-tenant reads of equipment photos (fail closed)', () => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test actor stub
-    expect(() => assertCanAccessMedia({ id: 'x', role: 'OPERATOR', tenantId: 'other' } as any, equipmentMedia, 'read')).toThrow();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test actor stub
-    expect(() => assertCanAccessMedia({ id: 'x', role: 'OPERATOR' } as any, equipmentMedia, 'read')).toThrow();
+    expect(() => assertCanAccessMedia({ id: 'x', role: 'OPERATOR', tenantId: 'other' } as TestActor, equipmentMedia, 'read')).toThrow();
+    expect(() => assertCanAccessMedia({ id: 'x', role: 'OPERATOR', tenantId: undefined } as TestActor, equipmentMedia, 'read')).toThrow();
     expect(() => assertCanAccessMedia(operator, { ...equipmentMedia, tenantId: null }, 'read')).toThrow();
   });
 
   it('only ADMIN may mutate (confirm/delete) an equipment photo — DISPATCHER and OPERATOR rejected', () => {
     expect(() => assertCanAccessMedia(admin, equipmentMedia)).not.toThrow();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test actor stub
-    expect(() => assertCanAccessMedia({ id: 'd', role: 'DISPATCHER', tenantId: 'orion' } as any, equipmentMedia)).toThrow();
+    expect(() => assertCanAccessMedia({ id: 'd', role: 'DISPATCHER', tenantId: 'orion' } as TestActor, equipmentMedia)).toThrow();
     expect(() => assertCanAccessMedia(operator, equipmentMedia)).toThrow();
   });
 
   it('keeps legacy behavior for non-equipment media: owner or privileged role', () => {
     const reportMedia = { userId: 'op-1', entityType: 'report', entityId: 'r1', tenantId: 'orion' };
     expect(() => assertCanAccessMedia(operator, reportMedia)).not.toThrow();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test actor stub
-    expect(() => assertCanAccessMedia({ id: 'other-op', role: 'OPERATOR', tenantId: 'orion' } as any, reportMedia)).toThrow();
+    expect(() => assertCanAccessMedia({ id: 'other-op', role: 'OPERATOR', tenantId: 'orion' } as TestActor, reportMedia)).toThrow();
   });
 });
 
@@ -76,10 +75,8 @@ describe('assertCanAccessMedia — equipment photos (existing records)', () => {
  * на 50%. Ошибка здесь означает чужие фото в чужом отчёте.
  */
 describe('assertCanAccessMediaEntity — отчёты и осмотры', () => {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- заглушка актора
-  const operator = { id: 'op-1', role: 'OPERATOR', tenantId: 'orion' } as any;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- заглушка актора
-  const dispatcher = { id: 'd-1', role: 'DISPATCHER', tenantId: 'orion' } as any;
+  const operator = { id: 'op-1', role: 'OPERATOR', tenantId: 'orion' } as TestActor;
+  const dispatcher = { id: 'd-1', role: 'DISPATCHER', tenantId: 'orion' } as TestActor;
 
   beforeEach(() => {
     reportFindFirstMock.mockReset();
@@ -159,8 +156,7 @@ describe('ownsUserDocumentMedia — свой документ работника
 
   it('признаёт файл своим, когда документ принадлежит работнику', async () => {
     userDocumentFindFirstMock.mockResolvedValue({ id: 'doc-1' });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test actor stub
-    await expect(ownsUserDocumentMedia({ id: 'u1', role: 'OPERATOR', tenantId: 'orion' } as any, 'm1')).resolves.toBe(true);
+    await expect(ownsUserDocumentMedia({ id: 'u1', role: 'OPERATOR', tenantId: 'orion' } as TestActor, 'm1')).resolves.toBe(true);
     expect(userDocumentFindFirstMock).toHaveBeenCalledWith(
       expect.objectContaining({ where: { mediaId: 'm1', userId: 'u1', tenantId: 'orion' } }),
     );
@@ -168,56 +164,54 @@ describe('ownsUserDocumentMedia — свой документ работника
 
   it('не признаёт чужой документ', async () => {
     userDocumentFindFirstMock.mockResolvedValue(null);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test actor stub
-    await expect(ownsUserDocumentMedia({ id: 'u1', role: 'OPERATOR', tenantId: 'orion' } as any, 'm1')).resolves.toBe(false);
+    await expect(ownsUserDocumentMedia({ id: 'u1', role: 'OPERATOR', tenantId: 'orion' } as TestActor, 'm1')).resolves.toBe(false);
   });
 
   // Организация без значения доступа не даёт и в базу не ходит: правило
   // проекта — закрываться, а не подбирать строки без владельца.
   it('закрывается, когда у работника нет организации', async () => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test actor stub
-    await expect(ownsUserDocumentMedia({ id: 'u1', role: 'OPERATOR', tenantId: null } as any, 'm1')).resolves.toBe(false);
+    await expect(ownsUserDocumentMedia({ id: 'u1', role: 'OPERATOR', tenantId: null } as TestActor, 'm1')).resolves.toBe(false);
     expect(userDocumentFindFirstMock).not.toHaveBeenCalled();
   });
 });
 
 describe('inspection evidence read access', () => {
   it.each(['MECHANIC', 'SAFETY_ENGINEER'])('lets %s read but not mutate another inspector evidence', async (role) => {
-    const actor = { id: 'reviewer', role, tenantId: 'orion' };
+    const actor = { id: 'reviewer', role, tenantId: 'orion' } as TestActor;
     const media = { userId: 'inspector', entityType: 'inspection', entityId: 'inspection__item', tenantId: 'orion' };
     inspectionFindUniqueMock.mockResolvedValue({ performedById: 'inspector', tenantId: 'orion' });
     await expect(assertCanAccessMediaEntity(actor, 'inspection', media.entityId, 'read')).resolves.toBeUndefined();
     expect(() => assertCanAccessMedia(actor, media, 'read')).not.toThrow();
     await expect(assertCanAccessMediaEntity(actor, 'inspection', media.entityId)).rejects.toMatchObject({ status: 403 });
     expect(() => assertCanAccessMedia(actor, media)).toThrow();
-    expect(() => assertCanAccessMedia({ ...actor, tenantId: 'other' }, media, 'read')).toThrow();
-    await expect(assertCanAccessMediaEntity({ ...actor, tenantId: 'other' }, 'inspection', media.entityId, 'read')).rejects.toMatchObject({ status: 403 });
-    expect(() => assertCanAccessMedia({ ...actor, tenantId: undefined }, media, 'read')).toThrow();
+    expect(() => assertCanAccessMedia({ ...actor, tenantId: 'other' } as TestActor, media, 'read')).toThrow();
+    await expect(assertCanAccessMediaEntity({ ...actor, tenantId: 'other' } as TestActor, 'inspection', media.entityId, 'read')).rejects.toMatchObject({ status: 403 });
+    expect(() => assertCanAccessMedia({ ...actor, tenantId: undefined } as TestActor, media, 'read')).toThrow();
   });
 });
 
 
 describe('maintenance evidence access', () => {
   it.each(['read', 'mutate'] as const)('does not let ownership bypass tenant and mechanic permission for maintenance %s', (action) => {
-    const actor = {id: 'mechanic', role: 'MECHANIC', tenantId: 'orion'};
+    const actor = {id: 'mechanic', role: 'MECHANIC', tenantId: 'orion'} as TestActor;
     const media = {userId: actor.id, entityType: 'maintenance', entityId: 'record-1__work', tenantId: 'orion'};
-    expect(() => assertCanAccessMedia({...actor, role: 'OPERATOR'}, media, action)).toThrow();
-    expect(() => assertCanAccessMedia({...actor, tenantId: 'other'}, media, action)).toThrow();
-    expect(() => assertCanAccessMedia({...actor, tenantId: undefined}, media, action)).toThrow();
+    expect(() => assertCanAccessMedia({...actor, role: 'OPERATOR'} as TestActor, media, action)).toThrow();
+    expect(() => assertCanAccessMedia({...actor, tenantId: 'other'} as TestActor, media, action)).toThrow();
+    expect(() => assertCanAccessMedia({...actor, tenantId: undefined} as TestActor, media, action)).toThrow();
     expect(() => assertCanAccessMedia(actor, media, action)).not.toThrow();
   });
   it.each(['read', 'mutate'] as const)('allows completed-work photos for the mechanic: %s', async (action) => {
-    const actor = { id: 'mechanic', role: 'MECHANIC', tenantId: 'orion' };
+    const actor = { id: 'mechanic', role: 'MECHANIC', tenantId: 'orion' } as TestActor;
     maintenanceFindUniqueMock.mockImplementation(async ({ where }: { where: { id: string } }) =>
       where.id === 'record-1' ? { tenantId: 'orion' } : null);
     await expect(assertCanAccessMediaEntity(actor, 'maintenance', 'record-1__work', action)).resolves.toBeUndefined();
     for (const denied of [{ ...actor, tenantId: 'other' }, { ...actor, role: 'OPERATOR' }]) {
-      await expect(assertCanAccessMediaEntity(denied, 'maintenance', 'record-1__work', action)).rejects.toMatchObject({ status: 403 });
+      await expect(assertCanAccessMediaEntity(denied as TestActor, 'maintenance', 'record-1__work', action)).rejects.toMatchObject({ status: 403 });
     }
   });
 
   it.each(['record-1__unknown', 'record-1__work__extra', '__work'])('rejects unknown maintenance blocks throughout the media lifecycle: %s', async (entityId) => {
-    const actor = { id: 'mechanic', role: 'MECHANIC', tenantId: 'orion' };
+    const actor = { id: 'mechanic', role: 'MECHANIC', tenantId: 'orion' } as TestActor;
     maintenanceFindUniqueMock.mockResolvedValue({ tenantId: 'orion' });
     for (const action of ['read', 'mutate'] as const) {
       await expect(assertCanAccessMediaEntity(actor, 'maintenance', entityId, action)).rejects.toMatchObject({ status: 403 });
@@ -226,7 +220,7 @@ describe('maintenance evidence access', () => {
   });
 
   it.each(['MECHANIC', 'SAFETY_ENGINEER'])('lets %s read and attach same-tenant maintenance evidence', async (role) => {
-    const actor = { id: 'reviewer', role, tenantId: 'orion' };
+    const actor = { id: 'reviewer', role, tenantId: 'orion' } as TestActor;
     const media = { userId: 'other-uploader', entityType: 'maintenance', entityId: 'record-1', tenantId: 'orion' };
     maintenanceFindUniqueMock.mockResolvedValue({ tenantId: 'orion' });
     await expect(assertCanAccessMediaEntity(actor, 'maintenance', media.entityId, 'read')).resolves.toBeUndefined();
@@ -235,15 +229,15 @@ describe('maintenance evidence access', () => {
     expect(() => assertCanAccessMedia(actor, { ...media, userId: actor.id }, 'mutate')).not.toThrow();
     expect(() => assertCanAccessMedia(actor, media, 'mutate')).toThrow();
     for (const tenantId of ['other', undefined]) {
-      await expect(assertCanAccessMediaEntity({ ...actor, tenantId }, 'maintenance', media.entityId, 'read')).rejects.toMatchObject({ status: 403 });
-      expect(() => assertCanAccessMedia({ ...actor, tenantId }, media, 'read')).toThrow();
+      await expect(assertCanAccessMediaEntity({ ...actor, tenantId } as TestActor, 'maintenance', media.entityId, 'read')).rejects.toMatchObject({ status: 403 });
+      expect(() => assertCanAccessMedia({ ...actor, tenantId } as TestActor, media, 'read')).toThrow();
     }
     maintenanceFindUniqueMock.mockResolvedValue(null);
     await expect(assertCanAccessMediaEntity(actor, 'maintenance', media.entityId, 'read')).rejects.toMatchObject({ status: 403 });
   });
 
   it('does not retain administrator evidence privileges while acting as an operator', async () => {
-    const actor = { id: 'admin', role: 'ADMIN', actingAs: 'OPERATOR', tenantId: 'orion' };
+    const actor = { id: 'admin', role: 'ADMIN', actingAs: 'OPERATOR', tenantId: 'orion' } as TestActor;
     maintenanceFindUniqueMock.mockResolvedValue({ tenantId: 'orion' });
     await expect(assertCanAccessMediaEntity(actor, 'maintenance', 'record-1', 'read')).rejects.toMatchObject({ status: 403 });
     expect(() => assertCanAccessMedia(actor, { userId: 'other', entityType: 'maintenance', entityId: 'record-1', tenantId: 'orion' }, 'read')).toThrow();
