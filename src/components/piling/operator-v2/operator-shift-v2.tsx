@@ -59,7 +59,7 @@ import {
 } from './ui';
 import type {
   ChecklistAnswer, ChecklistStage, OperatorMobileState,
-} from '@/modules/operator-mobile/contracts';
+} from '@/modules/operator-mobile';
 import {
   fetchState, QueuedOffline, sendCommand, type ProductionEntryInput,
 } from '@/components/piling/operator-mobile/api';

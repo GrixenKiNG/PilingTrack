@@ -5,7 +5,7 @@ import {OperatorWorkOverview} from '../operator-work-overview';
 import {EntriesList, type CorrectionInput} from '../screens/entries-list';
 import type {
   ChecklistStage, DefectView, DocumentVerdict, IncidentView, OperatorMobileState, ProductionPermit, WorkWarning,
-} from '@/modules/operator-mobile/contracts';
+} from '@/modules/operator-mobile';
 import {
   CONDITION_LABELS, INCIDENT_CATEGORY_LABELS, PHASE_LABELS,
 } from '@/modules/operator-mobile/contracts';

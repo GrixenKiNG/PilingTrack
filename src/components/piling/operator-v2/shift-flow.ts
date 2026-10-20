@@ -1,4 +1,4 @@
-import type {ChecklistStage, OperatorPhase} from '@/modules/operator-mobile/contracts';
+import type {ChecklistStage, OperatorPhase} from '@/modules/operator-mobile';
 /**
  * Порядок экранов смены в модуле-кандидате (v2).
  *

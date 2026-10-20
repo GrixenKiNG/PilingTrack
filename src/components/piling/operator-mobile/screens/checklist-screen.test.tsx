@@ -1,7 +1,7 @@
 import {fireEvent, render, screen, waitFor} from '@testing-library/react';
 import {beforeEach, describe, expect, it, vi} from 'vitest';
 vi.mock('../api', async (importOriginal) => ({...(await importOriginal<typeof import('../api')>()), uploadPhoto: vi.fn().mockResolvedValue('photo-1')}));
-import type {ChecklistView} from '@/modules/operator-mobile/contracts';
+import type {ChecklistView} from '@/modules/operator-mobile';
 import {ChecklistScreen} from './checklist-screen';
 import {uploadPhoto} from '../api';
 beforeEach(() => window.localStorage.clear());

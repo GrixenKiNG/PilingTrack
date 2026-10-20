@@ -3,7 +3,7 @@
 import {useState, type ReactNode} from 'react';
 import {Clock, Flag, TriangleAlert} from 'lucide-react';
 import {PilingIcon, type PilingIconName} from '@/components/piling/icons';
-import type {OperatorMobileState} from '@/modules/operator-mobile/contracts';
+import type {OperatorMobileState} from '@/modules/operator-mobile';
 import {formatNumber} from '@/lib/format';
 import {formatDowntimeHoursOnly} from '@/lib/downtime-hours';
 import {EntryCorrectionForm, type CorrectionInput} from './screens/entries-list';

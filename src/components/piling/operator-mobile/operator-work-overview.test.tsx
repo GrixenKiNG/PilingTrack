@@ -1,6 +1,6 @@
 import {fireEvent, render, screen, waitFor, within} from '@testing-library/react';
 import {describe, expect, it, vi} from 'vitest';
-import type {OperatorMobileState} from '@/modules/operator-mobile/contracts';
+import type {OperatorMobileState} from '@/modules/operator-mobile';
 vi.mock('./operator-concept.css', () => ({}));
 import {OperatorWorkOverview} from './operator-work-overview';
 

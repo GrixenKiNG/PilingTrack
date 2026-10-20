@@ -8,7 +8,7 @@ import {
   pileJournalHeader,
 } from '@/modules/reports';
 import { getSettings } from '@/modules/settings';
-import type { PileAcceptanceValue } from '@/modules/operator-mobile/domain/pile-passport';
+import type { PileAcceptanceValue } from '@/modules/operator-mobile';
 
 export const runtime = 'nodejs';
 

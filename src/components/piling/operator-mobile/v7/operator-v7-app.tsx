@@ -4,7 +4,7 @@ import {PilingIcon} from '@/components/piling/icons';
 import {useCallback, useEffect, useRef, useState} from 'react';
 import type {
   ChecklistAnswer, ChecklistStage, OperatorMobileState, OperatorPhase,
-} from '@/modules/operator-mobile/contracts';
+} from '@/modules/operator-mobile';
 import {PHASE_LABELS, PHASE_ORDER} from '@/modules/operator-mobile/contracts';
 import {
   ApiError, currentPosition, fetchState, newCommandId, QueuedOffline, sendCommand,

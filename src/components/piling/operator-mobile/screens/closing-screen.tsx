@@ -3,7 +3,7 @@
 import {useState, type ReactNode} from 'react';
 import {formatDowntimeHoursOnly} from '@/lib/downtime-hours';
 import {pluralizeRu} from '@/lib/format';
-import type {OperatorMobileState} from '@/modules/operator-mobile/contracts';
+import type {OperatorMobileState} from '@/modules/operator-mobile';
 import {formatDateTimeInTimezone} from '@/lib/timezone';
 import {BigButton, ErrorNote, Fact, Panel, PanelTitle, Screen, VolumeFact} from '../ui';
 import {WarningsPanel} from '../warnings-panel';

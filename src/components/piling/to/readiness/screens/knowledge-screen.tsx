@@ -18,7 +18,7 @@ import { Loader2, Search } from '@/components/piling/icons/unified-icons';
 import { authFetch } from '@/lib/api';
 import { formatRuDate } from '@/lib/format';
 import { ROLE_LABELS, type UserRole } from '@/lib/types';
-import type { BriefingJournalEntry } from '@/modules/operator-mobile/contracts';
+import type { BriefingJournalEntry } from '@/modules/operator-mobile';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';

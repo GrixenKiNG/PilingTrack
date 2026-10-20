@@ -11,7 +11,7 @@ import {
 import type {
   ChecklistAnswer, ChecklistStage, ChecklistView, IncidentCategory, IncidentSign,
   OperatorAnswer, OperatorMobileState,
-} from '@/modules/operator-mobile/contracts';
+} from '@/modules/operator-mobile';
 import {
   INCIDENT_CATEGORIES, INCIDENT_CATEGORY_LABELS, INCIDENT_DESCRIPTION_MIN,
   INCIDENT_SIGN_LABELS, INCIDENT_SIGNS, PHASE_LABELS, PPE_ITEMS, SAFETY_BRIEFING,

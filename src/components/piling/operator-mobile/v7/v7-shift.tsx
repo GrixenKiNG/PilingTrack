@@ -5,7 +5,7 @@ import {useState} from 'react';
 import {useLocalFormDraft} from '../use-local-form-draft';
 import type {
   ChecklistAnswer, ChecklistStage, ChecklistView, IncidentSign, OperatorMobileState,
-} from '@/modules/operator-mobile/contracts';
+} from '@/modules/operator-mobile';
 import {PHASE_CHECKLIST} from '@/modules/operator-mobile/domain/shift-phases';
 import {
   INCIDENT_CATEGORIES, INCIDENT_CATEGORY_HINTS, INCIDENT_CATEGORY_LABELS,

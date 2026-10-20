@@ -2,7 +2,7 @@
 
 import {useCallback, useEffect, useState} from 'react';
 import {useRouter} from 'next/navigation';
-import type {AssistantState, DocumentVerdict} from '@/modules/operator-mobile/contracts';
+import type {AssistantState, DocumentVerdict} from '@/modules/operator-mobile';
 import {SLINGER_BRIEFING} from '@/modules/operator-mobile/contracts';
 import {
   DEFECT_SEVERITY_FIELD_LABELS, DEFECT_STATUS_FIELD_LABELS, isAlarmingSeverity,

@@ -1,7 +1,7 @@
 'use client';
 
 import {useState} from 'react';
-import type {ProductionEntryView} from '@/modules/operator-mobile/contracts';
+import type {ProductionEntryView} from '@/modules/operator-mobile';
 import {formatDowntimeHoursOnly} from '@/lib/downtime-hours';
 import {Card} from './v10-ui';
 

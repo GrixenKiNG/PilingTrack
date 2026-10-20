@@ -4,7 +4,7 @@ import { requireAuth } from '@/lib/auth';
 import { ServiceError } from '@/services/service-error';
 import { assertCan } from '@/services/auth/authorization-service';
 import { getSiteWithHierarchy, updateSite, activateSite, deactivateSite, hardDeleteSite } from '@/modules/sites';
-import { updateSiteWithPlans, setSiteCompleted } from '@/modules/sites/application/commands';
+import { updateSiteWithPlans, setSiteCompleted } from '@/modules/sites';
 import { updateSiteSchema } from '@/lib/validation-schemas';
 import { invalidateSites } from '@/lib/cached-queries';
 import { withApi, withMutation, readJsonBody } from '@/core/api-wrapper';

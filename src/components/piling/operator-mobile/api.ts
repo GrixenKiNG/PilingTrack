@@ -2,7 +2,7 @@
 
 import type {
   ChecklistAnswer, ChecklistStage, KnowledgeQuestion, OperatorMobileState,
-} from '@/modules/operator-mobile/contracts';
+} from '@/modules/operator-mobile';
 import {
   AUTH_WAIT_MESSAGE, classifyFailure, commandLabel, CSRF_REJECT_MESSAGE,
   CSRF_REJECT_NOT_QUEUED_MESSAGE, enqueue, isCsrfFailure, isQueueable, markAttempt,

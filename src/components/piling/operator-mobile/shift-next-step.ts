@@ -1,4 +1,4 @@
-import type {ChecklistStage, OperatorMobileState} from '@/modules/operator-mobile/contracts';
+import type {ChecklistStage, OperatorMobileState} from '@/modules/operator-mobile';
 import {admissionSteps} from './safety/admission-steps';
 
 /**

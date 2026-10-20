@@ -1,4 +1,4 @@
-import type {DocumentCheck, DocumentVerdict} from '@/modules/operator-mobile/contracts';
+import type {DocumentCheck, DocumentVerdict} from '@/modules/operator-mobile';
 
 /**
  * Сводка по документам работника — то, что видно, пока список свёрнут.

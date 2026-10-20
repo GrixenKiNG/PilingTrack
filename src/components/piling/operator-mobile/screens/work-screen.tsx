@@ -2,7 +2,7 @@
 
 import {OperatorWorkOverview} from '../operator-work-overview';
 import {useState, type ReactNode} from 'react';
-import type {OperatorMobileState} from '@/modules/operator-mobile/contracts';
+import type {OperatorMobileState} from '@/modules/operator-mobile';
 import {cn} from '@/lib/utils';
 import type {ProductionEntryInput} from '../api';
 import {

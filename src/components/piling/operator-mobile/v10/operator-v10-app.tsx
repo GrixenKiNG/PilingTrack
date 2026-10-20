@@ -11,7 +11,7 @@ import {
 import type {
   ChecklistAnswer, ChecklistStage, DocumentVerdict, IncidentCategory, IncidentSign,
   OperatorMobileState,
-} from '@/modules/operator-mobile/contracts';
+} from '@/modules/operator-mobile';
 import {
   INCIDENT_CATEGORIES, INCIDENT_CATEGORY_LABELS, INCIDENT_DESCRIPTION_MIN,
   INCIDENT_SIGN_LABELS, INCIDENT_SIGNS,
@@ -20,10 +20,10 @@ import {
 import {ChecklistScreen} from '../screens/checklist-screen';
 import {ShiftThanks} from '../shift-thanks';
 import {knownAnswers} from '../safety/known-answers';
-import type {KnowledgeQuestion} from '@/modules/operator-mobile/contracts';
+import type {KnowledgeQuestion} from '@/modules/operator-mobile';
 import {admissionBlockers, admissionSteps} from '../safety/admission-steps';
 import {documentsSummary} from '../safety/documents-summary';
-import type {SelfSafetyView} from '@/modules/safety/application/self-clearance-query';
+import type {SelfSafetyView} from '@/modules/safety';
 import {ApiError, QueuedOffline, currentPosition, fetchState, newCommandId, sendCommand} from '../api';
 import {OfflineQueueBanner} from '../offline-queue-banner';
 import {useOfflineQueue} from '../use-offline-queue';

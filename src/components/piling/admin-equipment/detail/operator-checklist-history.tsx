@@ -12,7 +12,7 @@ import { useEffect, useState } from 'react';
 import { authFetch } from '@/lib/api';
 import { formatRuDate } from '@/lib/format';
 import { cn } from '@/lib/utils';
-import type { EquipmentChecklistRow } from '@/modules/operator-mobile/contracts';
+import type { EquipmentChecklistRow } from '@/modules/operator-mobile';
 
 export function OperatorChecklistHistory({ equipmentId, onlyEo = false, title }: {
   equipmentId: string;

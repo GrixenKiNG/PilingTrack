@@ -5,7 +5,7 @@ import {Ellipsis, HardHat, ShieldCheck, Wrench} from 'lucide-react';
 import {logoutClient} from '@/lib/api';
 import type {
   ChecklistAnswer, ChecklistStage, OperatorMobileState, OperatorPhase,
-} from '@/modules/operator-mobile/contracts';
+} from '@/modules/operator-mobile';
 import {
   ApiError, currentPosition, fetchState, newCommandId, operatorErrorDetails, operatorErrorText, QueuedOffline,
   sendCommand, type ProductionEntryInput,

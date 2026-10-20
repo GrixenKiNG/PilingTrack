@@ -1,4 +1,4 @@
-import type {OperatorMobileState} from '@/modules/operator-mobile/contracts';
+import type {OperatorMobileState} from '@/modules/operator-mobile';
 
 /**
  * Шаги допуска к смене — один список на все модули оператора.

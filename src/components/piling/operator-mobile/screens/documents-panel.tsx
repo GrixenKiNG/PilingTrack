@@ -2,7 +2,7 @@
 
 import {useState} from 'react';
 import {ChevronDown, ChevronRight} from 'lucide-react';
-import type {DocumentCheck} from '@/modules/operator-mobile/contracts';
+import type {DocumentCheck} from '@/modules/operator-mobile';
 import {documentsSummary} from '../safety/documents-summary';
 import {Panel, PanelTitle, Sign} from '../ui';
 

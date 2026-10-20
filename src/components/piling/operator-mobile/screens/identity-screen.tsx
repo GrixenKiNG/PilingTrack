@@ -2,7 +2,7 @@
 
 import type {ReactNode} from 'react';
 import {missingPpeLabels} from '@/modules/operator-mobile/contracts';
-import type {IdentityView, WorkWarning} from '@/modules/operator-mobile/contracts';
+import type {IdentityView, WorkWarning} from '@/modules/operator-mobile';
 import {BigButton, Panel, PanelTitle, Screen, Sign} from '../ui';
 import {WarningsPanel} from '../warnings-panel';
 import {DocumentsPanel} from './documents-panel';

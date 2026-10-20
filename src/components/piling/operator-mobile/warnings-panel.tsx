@@ -2,7 +2,7 @@
 
 import {useState} from 'react';
 import {ChevronDown, ChevronRight} from 'lucide-react';
-import type {ProductionPermit, WorkWarning} from '@/modules/operator-mobile/contracts';
+import type {ProductionPermit, WorkWarning} from '@/modules/operator-mobile';
 import {Panel, PanelTitle, Sign} from './ui';
 
 const TONE = {

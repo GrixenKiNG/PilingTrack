@@ -1,6 +1,6 @@
 'use client';
 
-import type {OperatorMobileState} from '@/modules/operator-mobile/contracts';
+import type {OperatorMobileState} from '@/modules/operator-mobile';
 import {Fact, Panel, PanelTitle} from '../ui';
 
 /**

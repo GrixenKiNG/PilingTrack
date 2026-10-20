@@ -20,7 +20,7 @@ import { Loader2 } from '@/components/piling/icons/unified-icons';
 import { authFetch } from '@/lib/api';
 import { formatRuDate } from '@/lib/format';
 import { SAFETY_INSTRUCTIONS } from '@/modules/safety/instructions';
-import type { BriefingJournalEntry } from '@/modules/operator-mobile/contracts';
+import type { BriefingJournalEntry } from '@/modules/operator-mobile';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { COMPACT_KPI_GRID, ScreenTitle, card } from '../settings/shared-ui';

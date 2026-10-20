@@ -2,7 +2,7 @@
 
 import {useCallback, useEffect, useState} from 'react';
 import {useRouter} from 'next/navigation';
-import type {SelfSafetyView} from '@/modules/safety/application/self-clearance-query';
+import type {SelfSafetyView} from '@/modules/safety';
 import {DOCUMENT_EXPIRY_LABELS, type DocumentExpiryStatus} from '@/lib/document-expiry';
 import {formatRuDate} from '@/lib/format';
 import {

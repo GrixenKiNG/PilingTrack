@@ -1,7 +1,7 @@
 'use client';
 
 import {ChevronRight} from 'lucide-react';
-import type {OperatorMobileState} from '@/modules/operator-mobile/contracts';
+import type {OperatorMobileState} from '@/modules/operator-mobile';
 import {admissionBlockers, admissionSteps} from '../safety/admission-steps';
 import {Panel, PanelTitle, Sign} from '../ui';
 

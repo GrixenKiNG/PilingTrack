@@ -1,7 +1,7 @@
 'use client';
 
 import {useState} from 'react';
-import type {AssistantState} from '@/modules/operator-mobile/contracts';
+import type {AssistantState} from '@/modules/operator-mobile';
 import {authFetch} from '@/lib/api';
 import {cn} from '@/lib/utils';
 import {BigButton, Panel, PanelTitle} from '../ui';

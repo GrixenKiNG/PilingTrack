@@ -1,7 +1,7 @@
 import {NextRequest, NextResponse} from 'next/server';
 import {withApi} from '@/core/api-wrapper';
 import {requireAuth} from '@/lib/auth';
-import {createKnowledgeAttempt} from '@/modules/operator-mobile/application/knowledge-attempt';
+import {createKnowledgeAttempt} from '@/modules/operator-mobile';
 export const runtime = 'nodejs';
 export const GET = withApi(async (request: NextRequest) => {
   const {user, error} = await requireAuth(request);
