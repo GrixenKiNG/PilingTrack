@@ -64,8 +64,8 @@ const mockDb = {
   report: {
     deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
   },
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test: cast to a mock shape or to reach internals not in the public type
-  $transaction: vi.fn(async (fn: (tx: any) => Promise<any>) => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test: tx client is the mock db (unknown с сужением в теле)
+  $transaction: vi.fn(async (fn: (tx: unknown) => Promise<unknown>) => {
     return fn(mockDb);
   }),
   outboxEvent: {
@@ -83,8 +83,8 @@ vi.mock('@/lib/db', () => ({
 // mockDb as the tx client) so assistant persistence inside the hook is exercised.
 const mockRepoSave = vi.fn(async (
   _aggregate: unknown,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test: tx client is the mock db
-  hooks?: { onBeforeCommit?: (tx: any) => Promise<void> },
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test: tx client is the mock db (unknown с сужением в теле)
+  hooks?: { onBeforeCommit?: (tx: unknown) => Promise<void> },
 ) => {
   if (hooks?.onBeforeCommit) await hooks.onBeforeCommit(mockDb);
 });
