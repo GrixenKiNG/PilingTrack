@@ -29,6 +29,22 @@ import {
   type AnswerType, type BlockType, type HammerKind, type SectionDraft,
 } from './template-editor-parts';
 
+// Тип ответа API для секций шаблона (unknown с сужением, Prisma-типы недоступны на клиенте)
+type TemplateSectionResponse = {
+  title: string;
+  items: Array<{
+    text: string;
+    answerType: AnswerType;
+    unit: string;
+    norm: string;
+    provenance: string;
+    photoRequired: boolean;
+    required: boolean;
+    createsDefect: boolean;
+    defectSeverity: 'LOW' | 'NORMAL' | 'HIGH' | 'CRITICAL';
+  }>;
+};
+
 // ─── Main component ───────────────────────────────────────────────────────────
 
 /**
@@ -99,12 +115,10 @@ export function TemplateEditor({ templateId }: TemplateEditorProps) {
       if (template.appliesToHammerKind && template.appliesToHammerKind !== 'NONE') {
         setAppliesToHammerKind(template.appliesToHammerKind as Exclude<HammerKind, 'NONE'>);
       }
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      setSections((template.sections ?? []).map((s: any) => ({
+      setSections((template.sections ?? []).map((s: TemplateSectionResponse) => ({
         _key: uid(),
         title: s.title ?? '',
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        items: (s.items ?? []).map((it: any) => ({
+        items: (s.items ?? []).map((it: TemplateSectionResponse['items'][number]) => ({
           _key: uid(),
           text: it.text ?? '',
           answerType: (it.answerType ?? 'YES_NO') as AnswerType,
