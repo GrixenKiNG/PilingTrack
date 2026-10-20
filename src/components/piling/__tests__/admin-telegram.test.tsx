@@ -23,8 +23,15 @@ const mocks = vi.hoisted(() => ({ authFetch: vi.fn() }));
 vi.mock('@/lib/api', () => ({ authFetch: mocks.authFetch }));
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 vi.mock('framer-motion', () => ({
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test: cast to a mock shape or to reach internals not in the public type
-  motion: { div: ({ children, initial: _initial, animate: _animate, transition: _transition, ...props }: any) => <div {...props}>{children}</div> },
+  motion: {
+    div: ({
+      children,
+      initial,
+      animate,
+      transition,
+      ...props
+    }: React.HTMLAttributes<HTMLDivElement> & { initial?: unknown; animate?: unknown; transition?: unknown }) => <div {...props}>{children}</div>,
+  },
 }));
 
 import { AdminTelegram } from '../admin-telegram';
