@@ -235,7 +235,7 @@ services:
   # PgBouncer — Connection Pooling (правило #19)
   # ============================================================
   pgbouncer:
-    image: edoburu/pgbouncer:latest
+    image: edoburu/pgbouncer:v1.25.1-p0
     container_name: pilingtrack-pgbouncer
     restart: unless-stopped
     ports:
@@ -381,7 +381,7 @@ services:
   # PgAdmin — Database Management (dev/stage only)
   # ============================================================
   pgadmin:
-    image: dpage/pgadmin4:latest
+    image: dpage/pgadmin4:9.11.0
     container_name: pilingtrack-pgadmin
     restart: unless-stopped
     ports:

@@ -12,7 +12,7 @@
 
 services:
   prometheus:
-    image: prom/prometheus:latest
+    image: prom/prometheus:v3.11.3
     container_name: pilingtrack-prometheus
     ports:
       - '127.0.0.1:9090:9090'
@@ -52,7 +52,7 @@ services:
       options: { max-size: '10m', max-file: '3' }
 
   grafana:
-    image: grafana/grafana:latest
+    image: grafana/grafana:13.0.1
     container_name: pilingtrack-grafana
     ports:
       - '127.0.0.1:3010:3000'
@@ -81,7 +81,7 @@ services:
       options: { max-size: '10m', max-file: '3' }
 
   node-exporter:
-    image: prom/node-exporter:latest
+    image: prom/node-exporter:v1.11.1
     container_name: pilingtrack-node-exporter
     command:
       - '--path.rootfs=/host'
@@ -99,7 +99,7 @@ services:
       options: { max-size: '5m', max-file: '3' }
 
   postgres-exporter:
-    image: prometheuscommunity/postgres-exporter:latest
+    image: prometheuscommunity/postgres-exporter:v0.19.1
     container_name: pilingtrack-postgres-exporter
     environment:
       - DATA_SOURCE_NAME=postgresql://${POSTGRES_USER:-piling}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-pilingtrack}?sslmode=disable
@@ -116,7 +116,7 @@ services:
       options: { max-size: '5m', max-file: '3' }
 
   alertmanager:
-    image: prom/alertmanager:latest
+    image: prom/alertmanager:v0.32.1
     container_name: pilingtrack-alertmanager
     ports:
       - '127.0.0.1:9093:9093'
@@ -149,7 +149,7 @@ services:
       options: { max-size: '5m', max-file: '3' }
 
   redis-exporter:
-    image: oliver006/redis_exporter:latest
+    image: oliver006/redis_exporter:v1.83.0
     container_name: pilingtrack-redis-exporter
     command:
       - '--redis.addr=redis://redis:6379'
