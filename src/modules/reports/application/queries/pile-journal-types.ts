@@ -8,10 +8,9 @@ import {
   suggestAcceptance,
   type DrivingSet,
   type PileAcceptanceValue,
-} from '@/modules/operator-mobile/domain/pile-passport';
+} from '@/lib/pile-passport';
 
-// Единственная точка, где журнал забивки берёт правила из operator-mobile
-// (граница слоёв: одно grandfathered-нарушение, как было в одном файле до W46).
+// Единственная точка, где журнал забивки берёт правила паспорта сваи (общие с operator-mobile, src/lib)
 export {
   actualRefusalMm,
   drivingComplete,
@@ -36,7 +35,7 @@ export type { DrivingSet, PileAcceptanceValue };
  *
  * ПОЧЕМУ ОТКАЗ СЧИТАЕТСЯ ЗДЕСЬ, А НЕ ХРАНИТСЯ. В паспорте лежат замеры
  * залогов; отказ — их среднее. Правило одно на весь продукт
- * (`operator-mobile/domain/pile-passport`), и телефон машиниста, и этот экран
+ * (`lib/pile-passport`), и телефон машиниста, и этот экран
  * показывают одно число.
  *
  * ПОЧЕМУ ТИПЫ ОТДЕЛЬНО (W46). Строку журнала собирает список, считает агрегат

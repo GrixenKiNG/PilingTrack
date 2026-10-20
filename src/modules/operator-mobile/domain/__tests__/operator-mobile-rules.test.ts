@@ -12,7 +12,7 @@ import {buildAttempt, KNOWLEDGE_BANK, scoreAttempt} from '../knowledge-bank';
 import {checkOperatorDocuments, isIdentityValid} from '../operator-admission';
 import {
   actualRefusalMm, drivingComplete, journalRefusalMm, validatePassport,
-} from '../pile-passport';
+} from '@/lib/pile-passport';
 import {briefingUpToDate, knowledgeValid} from '../operator-credentials';
 import {resolveShiftConditions, selectChecklistItems} from '../shift-conditions';
 import {admissionAccepted, derivePhase, missingPrerequisites} from '../shift-phases';

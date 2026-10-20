@@ -28,4 +28,4 @@ export {
 } from './application/knowledge-attempt';
 export type {
   PileAcceptanceValue,
-} from './domain/pile-passport';
+} from '@/lib/pile-passport';

@@ -16,10 +16,10 @@ export {
   refusalExceedsDesign,
   setRefusalMm,
   validatePassport,
-} from './domain/pile-passport';
+} from '@/lib/pile-passport';
 export type {
   PileAcceptanceValue,
-} from './domain/pile-passport';
+} from '@/lib/pile-passport';
 export {
   PHASE_CHECKLIST,
   PHASE_LABELS,

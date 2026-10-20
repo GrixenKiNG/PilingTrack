@@ -12,7 +12,7 @@ import {writeReportAuditRow} from '@/modules/reports/server';
 import {
   DOWNTIME_MAX_HOURS, DOWNTIME_STEP_HOURS, downtimeHoursBetween, isWholeDowntimeStep,
 } from '@/lib/downtime-hours';
-import {validatePassport} from '../../domain/pile-passport';
+import {validatePassport} from '@/lib/pile-passport';
 import {safetyChecklistPeriod} from '../../domain/safety-checklist-period';
 import {findDowntimeConflict} from '../../domain/downtime-interval';
 import {SHIFT_WINDOW} from '../../domain/shift-window';

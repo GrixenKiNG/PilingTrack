@@ -1,5 +1,4 @@
 src/modules/reports/application/domain-events.ts|@/services/notifications/durable-alert-delivery|modules/ may not import from services/ (migration frozen)
-src/modules/reports/application/queries/pile-journal-types.ts|@/modules/operator-mobile/domain/pile-passport|modules/reports may not import from modules/operator-mobile (cross-module)
 src/modules/system/application/queries/system-service.ts|@/services/tenancy/tenant-context-service|modules/ may not import from services/ (migration frozen)
 src/modules/telemetry/index.ts|@/services/telemetry/device-key-service|modules/ may not import from services/ (migration frozen)
 src/modules/telemetry/index.ts|@/services/telemetry/telemetry-ingestion-service|modules/ may not import from services/ (migration frozen)
