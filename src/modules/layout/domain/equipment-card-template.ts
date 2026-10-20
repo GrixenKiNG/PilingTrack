@@ -1,0 +1,132 @@
+/**
+ * Equipment-card surface template: block catalog keys, default template and
+ * validator for the template-driven tile view on /admin/equipment. Pure
+ * module (no React) — imported by the server layout service as well.
+ *
+ * The default template mirrors the hand-built EquipmentTile card: centered
+ * brand logo on top, then name/model, status+site, operator+engine hours,
+ * today's metrics, maintenance flag and quick links.
+ */
+
+import {
+  cloneLayoutTemplate,
+  createTemplateValidator,
+  type LayoutBlock,
+  type LayoutBlockStyle,
+  type LayoutTemplate,
+} from './layout-template';
+
+export const EQUIPMENT_CARD_DATA_KEYS = [
+  'brandLogo',
+  'identity',
+  'status',
+  'site',
+  'operator',
+  'engineHours',
+  'todayPiles',
+  'todayDrilling',
+  'todayDowntime',
+  'maintenanceAlert',
+  'quickLinks',
+] as const;
+
+export type EquipmentCardDataKey = (typeof EQUIPMENT_CARD_DATA_KEYS)[number];
+
+export interface EquipmentCardBlock extends LayoutBlock {
+  dataKey?: EquipmentCardDataKey;
+}
+
+export interface EquipmentCardTemplate extends LayoutTemplate {
+  blocks: EquipmentCardBlock[];
+}
+
+/**
+ * Значения по умолчанию задаются шестнадцатеричными кодами, а не токенами
+ * `var(--…)`, намеренно: шаблон редактируется в конструкторе через
+ * `<input type="color">` (layout-inspector.tsx), а он принимает только hex —
+ * с CSS-переменной пикер сбрасывается в чёрный. Поэтому здесь стоят точные
+ * hex-эквиваленты токенов палитры, снятые с живого CSS 2026-08-10:
+ *   --card #ffffff · --foreground #101010 · --border #e2e2e2
+ *   предупреждение: фон #fdf4ea, текст #7e4600, рамка #f7ddc0
+ * Меняются они вместе с палитрой в globals.css.
+ */
+const BASE_STYLE: LayoutBlockStyle = {
+  background: '#ffffff',
+  color: '#101010',
+  borderColor: '#e2e2e2',
+  borderWidth: 1,
+  borderRadius: 12,
+  padding: 8,
+  fontSize: 12,
+  fontWeight: 600,
+  textAlign: 'left',
+  alignItems: 'center',
+};
+
+function dataBlock(
+  id: string,
+  dataKey: EquipmentCardDataKey,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  style: Partial<LayoutBlockStyle> = {},
+): EquipmentCardBlock {
+  return {
+    id,
+    kind: 'data',
+    dataKey,
+    x,
+    y,
+    width,
+    height,
+    visible: true,
+    style: { ...BASE_STYLE, ...style },
+  };
+}
+
+export const DEFAULT_EQUIPMENT_CARD_TEMPLATE: EquipmentCardTemplate = {
+  version: 1,
+  card: {
+    width: 300,
+    minHeight: 480,
+    rowHeight: 24,
+    gap: 8,
+    background: '#ffffff',
+    borderColor: '#e2e2e2',
+    borderWidth: 1,
+    borderRadius: 16,
+    padding: 12,
+  },
+  blocks: [
+    dataBlock('brand-logo', 'brandLogo', 0, 0, 12, 6, {
+      borderWidth: 0,
+      background: 'transparent',
+      textAlign: 'center',
+    }),
+    dataBlock('identity', 'identity', 0, 6, 12, 2, { borderWidth: 0, fontSize: 14 }),
+    dataBlock('status', 'status', 0, 8, 6, 2),
+    dataBlock('site', 'site', 6, 8, 6, 2),
+    dataBlock('operator', 'operator', 0, 10, 6, 2),
+    dataBlock('engine-hours', 'engineHours', 6, 10, 6, 2),
+    dataBlock('today-piles', 'todayPiles', 0, 12, 4, 2),
+    dataBlock('today-drilling', 'todayDrilling', 4, 12, 4, 2),
+    dataBlock('today-downtime', 'todayDowntime', 8, 12, 4, 2),
+    dataBlock('maintenance-alert', 'maintenanceAlert', 0, 14, 12, 2, {
+      background: '#fdf4ea',
+      color: '#7e4600',
+      borderColor: '#f7ddc0',
+    }),
+    dataBlock('quick-links', 'quickLinks', 0, 16, 12, 2, { borderWidth: 0, background: 'transparent' }),
+  ],
+};
+
+export function cloneEquipmentCardTemplate(template: EquipmentCardTemplate): EquipmentCardTemplate {
+  return cloneLayoutTemplate(template);
+}
+
+const validate = createTemplateValidator(EQUIPMENT_CARD_DATA_KEYS);
+
+export function validateEquipmentCardTemplate(value: unknown): EquipmentCardTemplate | null {
+  return validate(value) as EquipmentCardTemplate | null;
+}

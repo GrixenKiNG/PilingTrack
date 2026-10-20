@@ -1,11 +1,6 @@
 src/core/event-bus/index.ts|@/services/reports/domain-events|core/ may not import from services/
 src/core/media/media-auth.ts|@/services/auth/authorization-service|core/ may not import from services/
 src/modules/crews/application/queries/crew-query.service.ts|@/services/auth/authorization-service|modules/ may not import from services/ (migration frozen)
-src/modules/layout/domain/surfaces.ts|@/components/piling/admin-equipment/equipment-card-template|modules/ may not import from components/
-src/modules/layout/domain/surfaces.ts|@/components/piling/analytics-dashboard/kpi-catalog|modules/ may not import from components/
-src/modules/layout/domain/surfaces.ts|@/components/piling/main-dashboard/kpi-catalog|modules/ may not import from components/
-src/modules/layout/domain/surfaces.ts|@/components/piling/monitoring/equipment-tile-template|modules/ may not import from components/
-src/modules/monitoring/application/template-service.ts|@/components/piling/monitoring/equipment-tile-template|modules/ may not import from components/
 src/modules/operator-mobile/application/commands/production-corrections.ts|@/services/reports/audit-service|modules/ may not import from services/ (migration frozen)
 src/modules/operator-mobile/application/commands/production.ts|@/services/reports/audit-service|modules/ may not import from services/ (migration frozen)
 src/modules/operator-mobile/application/commands/shift-close.ts|@/services/reports/audit-service|modules/ may not import from services/ (migration frozen)

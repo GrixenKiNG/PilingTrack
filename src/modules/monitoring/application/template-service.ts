@@ -5,7 +5,7 @@
  * clients migrate to /api/layout/[surfaceId].
  */
 
-import type { EquipmentTileTemplate } from '@/components/piling/monitoring/equipment-tile-template';
+import type { EquipmentTileTemplate } from '@/modules/layout/client';
 import { getLayout, saveLayout } from '@/modules/layout';
 import { MONITORING_EQUIPMENT_TILE_SURFACE_ID } from '@/modules/layout';
 

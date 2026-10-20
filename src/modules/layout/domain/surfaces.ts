@@ -16,23 +16,23 @@
 import {
   DEFAULT_EQUIPMENT_TILE_TEMPLATE,
   EQUIPMENT_TILE_DATA_KEYS,
-} from '@/components/piling/monitoring/equipment-tile-template';
+} from './equipment-tile-template';
 import {
   DEFAULT_EQUIPMENT_CARD_TEMPLATE,
   EQUIPMENT_CARD_DATA_KEYS,
-} from '@/components/piling/admin-equipment/equipment-card-template';
+} from './equipment-card-template';
 import { createTemplateValidator } from './layout-template';
 import { createPageLayoutValidator } from './page-layout-template';
 import {
   ANALYTICS_DASHBOARD_SURFACE_ID,
   ANALYTICS_DASHBOARD_WIDGET_IDS,
   DEFAULT_ANALYTICS_DASHBOARD_TEMPLATE,
-} from '@/components/piling/analytics-dashboard/kpi-catalog';
+} from './analytics-dashboard-catalog';
 import {
   MAIN_DASHBOARD_SURFACE_ID,
   MAIN_DASHBOARD_WIDGET_IDS,
   DEFAULT_MAIN_DASHBOARD_TEMPLATE,
-} from '@/components/piling/main-dashboard/kpi-catalog';
+} from './main-dashboard-catalog';
 
 export const MONITORING_EQUIPMENT_TILE_SURFACE_ID = 'monitoring-equipment-tile';
 export const EQUIPMENT_CARD_SURFACE_ID = 'equipment-card';

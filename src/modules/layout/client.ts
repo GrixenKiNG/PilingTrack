@@ -4,3 +4,7 @@
  */
 export * from './domain/layout-template';
 export * from './domain/page-layout-template';
+export * from './domain/equipment-tile-template';
+export * from './domain/equipment-card-template';
+export * from './domain/analytics-dashboard-catalog';
+export * from './domain/main-dashboard-catalog';
