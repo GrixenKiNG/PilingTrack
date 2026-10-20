@@ -25,7 +25,7 @@ const ACTION_LABELS: Record<string, string> = {
   'user.updated': 'Пользователь изменён',
   'user.deleted': 'Пользователь удалён',
   // Виды документов, документы работника и допуски к технике пишутся в тот же
-  // контур `users` (см. services/users/user-documents.ts и
+  // контур `users` (см. modules/users/user-documents.ts и
   // api/safety/equipment-permits). Без этих строк панель карточки показывала
   // машинный код вида «user.document.updated».
   'user.document_type.created': 'Заведён вид документа работника',

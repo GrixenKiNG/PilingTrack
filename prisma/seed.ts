@@ -2,7 +2,7 @@ import { PrismaClient } from '../src/generated/postgres-client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { hashSync } from 'bcryptjs';
 import { initializeTenantDictionaries } from '../src/services/dictionaries/tenant-dictionary-initializer';
-import { updateUser } from '../src/services/users/user-service';
+import { updateUser } from '../src/modules/users';
 import { db as serviceDb } from '../src/lib/db';
 import { applyTenantGuc } from '../src/core/security/tenant-rls';
 import { runWithTenantContext, setRequestTenantId } from '../src/core/security/tenant-context';

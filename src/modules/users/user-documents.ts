@@ -15,13 +15,15 @@
  *
  * Проверки прав и тенанта, справочник видов документов вынесены в соседние
  * модули (`user-document-access.ts`, `user-document-types.ts`) и ре-экспортируются
- * отсюда: точка входа остаётся прежней — `@/services/users/user-documents`.
+ * отсюда: точка входа остаётся прежней — `@/modules/users`.
  */
 
 import { db } from '@/lib/db';
 import { ServiceError } from '@/lib/service-error';
+// eslint-disable-next-line no-restricted-imports -- auth/audit остаются в services/ до их переноса (CLAUDE.md); поведение не меняется
 import { can } from '@/services/auth/authorization-service';
 import { documentExpiry } from '@/lib/document-expiry';
+// eslint-disable-next-line no-restricted-imports -- auth/audit остаются в services/ до их переноса (CLAUDE.md); поведение не меняется
 import { recordAuditEvent } from '@/services/audit/audit-service';
 import { evaluateOperatorClearance, type OperatorClearance } from './operator-clearance';
 import {

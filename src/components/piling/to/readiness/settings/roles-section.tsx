@@ -58,7 +58,7 @@ const ABILITY_LABEL: Record<ReadinessAbility, string> = {
 const UNSCOPED_ROLES = new Set(['ADMIN', 'DISPATCHER', 'FOREMAN', 'SAFETY_ENGINEER']);
 
 /**
- * Форма из `listUsers` (`services/users/user-service.ts`): назначенные объекты
+ * Форма из `listUsers` (`modules/users/user-service.ts`): назначенные объекты
  * приходят полем `assignedSites`, уже развёрнутым в площадки. Связь в базе
  * называется `sites` и хранит промежуточные записи — на неё легко ошибиться,
  * и тогда объекты не найдутся ни у кого.

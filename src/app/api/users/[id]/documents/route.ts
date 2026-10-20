@@ -23,7 +23,7 @@ const createSchema = z.object({
  * Права проверяет сервис: работник ведёт свои документы сам, чужие —
  * администратор, читает чужие ещё диспетчер и инженер ОТ. Проверка «свой или
  * чужой» требует знать и действующего пользователя, и работника из адреса,
- * поэтому она живёт в одном месте (services/users/user-documents.ts), а не
+ * поэтому она живёт в одном месте (modules/users/user-documents.ts), а не
  * разъезжается по маршрутам через assertCan.
  */
 function actorContext(user: { id: string; role: string; tenantId?: string | null }) {
