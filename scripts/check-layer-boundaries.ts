@@ -7,6 +7,8 @@
  *   - modules/X/  — DDD domain; may depend on core/ and on its own module
  *                   subtree and another module public API, but NOT on app/, components/,
  *                   or another module internals.
+ *   - app/, components/ — may import modules only through the public API
+ *                   (@/modules/<x>); modules/ may not add imports from services/.
  *   - services/   — cross-cutting glue; may depend on core/ and modules/,
  *                   but NOT on app/ or components/.
  *
@@ -106,6 +108,15 @@ function checkImport(fromInfo: { layer: Layer; module?: string }, importPath: st
   if (fromInfo.layer === 'components' && isModuleServerEntry(importPath)) {
     return 'components/ may not import module server entry points';
   }
+  // Ratchet: the unfinished services/ -> modules/ migration is frozen, so new
+  // imports in the legacy direction are refused; old ones stay in the baseline.
+  if (fromInfo.layer === 'modules' && toInfo.layer === 'services') {
+    return 'modules/ may not import from services/ (migration frozen)';
+  }
+  if ((fromInfo.layer === 'app' || fromInfo.layer === 'components')
+      && toInfo.layer === 'modules' && !isPublicModuleEntry(importPath)) {
+    return `${fromInfo.layer}/ may not import module internals (use @/modules/<x>)`;
+  }
   // CLAUDE.md allows public module APIs; internal implementation paths stay private.
   if (fromInfo.layer === 'modules' && toInfo.layer === 'modules'
       && fromInfo.module && toInfo.module && fromInfo.module !== toInfo.module
@@ -122,7 +133,7 @@ async function main() {
   const violations: Violation[] = [];
   for (const file of files) {
     const fromInfo = classify(file);
-    if (FORBIDDEN[fromInfo.layer].length === 0 && fromInfo.layer !== 'modules') continue;
+    if (!['core', 'services', 'modules', 'app', 'components'].includes(fromInfo.layer)) continue;
 
     const text = await fs.readFile(file, 'utf8');
     for (const { line, importPath } of importSpecifiers(text)) {
