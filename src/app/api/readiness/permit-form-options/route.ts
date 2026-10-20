@@ -1,6 +1,6 @@
 import type {NextRequest} from 'next/server';
-import {ReadinessCommandError} from '@/modules/readiness/application/command-pipeline/errors';
-import {withReadinessRequestTransaction} from '@/modules/readiness/infrastructure/tenant-transaction';
+import {ReadinessCommandError} from '@/modules/readiness/server';
+import {withReadinessRequestTransaction} from '@/modules/readiness/server';
 import {resolveReadinessRequestContext} from '../_shared/request-context';
 import {readinessErrorResponse, readinessResponse} from '../_shared/response';
 import {withApi} from '@/core/api-wrapper';

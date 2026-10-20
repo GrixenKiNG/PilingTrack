@@ -1,8 +1,8 @@
 import type {NextRequest} from 'next/server';
-import {ReadinessCommandError} from '@/modules/readiness/application/command-pipeline/errors';
+import {ReadinessCommandError} from '@/modules/readiness/server';
 import {submitWorkPermitCommand} from '@/modules/readiness/application/permits/commands';
 import {versionedCommandSchema} from '@/modules/readiness/application/permits/schemas';
-import {withReadinessSerializableTransaction} from '@/modules/readiness/infrastructure/tenant-transaction';
+import {withReadinessSerializableTransaction} from '@/modules/readiness/server';
 import {withReadinessCommand} from '../../../_shared/route-adapter';
 import {readinessResponse} from '../../../_shared/response';
 

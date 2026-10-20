@@ -1,5 +1,5 @@
 import {NextResponse} from 'next/server';
-import {ReadinessCommandError} from '@/modules/readiness/application/command-pipeline/errors';
+import {ReadinessCommandError} from '@/modules/readiness/server';
 
 export function readinessResponse(input: {
   body: unknown;

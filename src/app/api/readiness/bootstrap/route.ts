@@ -5,7 +5,7 @@ import { attachRequestIdHeader, getRequestId } from '@/lib/request-context';
 import { isActingRole } from '@/lib/types';
 import { can } from '@/services/auth/authorization-service';
 import { queryReadinessBootstrap } from '@/modules/readiness/application/bootstrap-query';
-import { withReadinessRequestTransaction } from '@/modules/readiness/infrastructure/tenant-transaction';
+import { withReadinessRequestTransaction } from '@/modules/readiness/server';
 import {withApi} from '@/core/api-wrapper';
 
 export const runtime = 'nodejs';

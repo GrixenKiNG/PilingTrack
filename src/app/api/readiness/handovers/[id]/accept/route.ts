@@ -1,8 +1,8 @@
-import {ReadinessCommandError} from '@/modules/readiness/application/command-pipeline/errors';
+import {ReadinessCommandError} from '@/modules/readiness/server';
 import type {NextRequest} from 'next/server';
 import {acceptHandoverCommand} from '@/modules/readiness/application/shifts/commands'; import {acceptHandoverSchema} from '@/modules/readiness/application/shifts/schemas';
 import {HandoverRepository} from '@/modules/readiness/infrastructure/shifts/handover-repository';
-import {withReadinessSerializableTransaction, withReadinessTenantTransaction} from '@/modules/readiness/infrastructure/tenant-transaction'; import {readinessResponse} from '../../../_shared/response'; import {withReadinessCommand} from '../../../_shared/route-adapter';
+import {withReadinessSerializableTransaction, withReadinessTenantTransaction} from '@/modules/readiness/server'; import {readinessResponse} from '../../../_shared/response'; import {withReadinessCommand} from '../../../_shared/route-adapter';
 import { readJsonBody } from '@/core/api-wrapper';
 
 export const runtime = 'nodejs';

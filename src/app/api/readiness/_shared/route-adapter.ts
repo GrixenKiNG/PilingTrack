@@ -1,6 +1,6 @@
 import type {NextRequest, NextResponse} from 'next/server';
 import {withMutation, type ApiWrapperOptions} from '@/core/api-wrapper';
-import {ReadinessCommandError} from '@/modules/readiness/application/command-pipeline/errors';
+import {ReadinessCommandError} from '@/modules/readiness/server';
 import {resolveReadinessRequestContext, type ReadinessRequestContext} from './request-context';
 import {readinessErrorResponse} from './response';
 
