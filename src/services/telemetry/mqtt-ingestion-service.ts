@@ -134,7 +134,7 @@ export async function startMqttIngestion(): Promise<{ stop: () => Promise<void> 
   }
 
   // Dynamic import to avoid requiring mqtt package when not used
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- telemetry enum/Prisma cast at the ingestion boundary
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- тип модуля mqtt недоступен без @types/mqtt
   let mqtt: any;
   try {
     // @ts-expect-error mqtt is optional — install with: npm install mqtt
@@ -197,8 +197,8 @@ export async function startMqttIngestion(): Promise<{ stop: () => Promise<void> 
 export async function stopMqttIngestion(): Promise<void> {
   if (!mqttClient) return;
   
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- telemetry enum/Prisma cast at the ingestion boundary
-  const client = mqttClient as any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- сужаем до нужного интерфейса вместо any
+  const client = mqttClient as { end: (callback: () => void) => void };
   await new Promise<void>((resolve) => {
     client.end(() => resolve());
   });
