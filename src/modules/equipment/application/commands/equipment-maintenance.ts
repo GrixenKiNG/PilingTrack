@@ -261,8 +261,13 @@ export async function updateMaintenance(
     // самой записи: приёмка, прошедшая между чтением и записью, или второй
     // такой же переход (двойное нажатие) дали бы правку принятого наряда и
     // второе показание счётчика.
+    //
+    // Условие по статусу ставится всякий раз, когда запись пишет статус, а не
+    // только при его смене: форма, открытая на «Запланирован», шлёт этот же
+    // статус обратно, и без условия она переоткрывала наряд, который другой
+    // механик успел закрыть между чтением и записью.
     const record = await tx.maintenanceRecord.update({
-      where: { id: recordId, acceptedById: null, ...(statusChanged ? { status: existing.status } : {}) },
+      where: { id: recordId, acceptedById: null, ...(input.status !== undefined ? { status: existing.status } : {}) },
       data,
     }).catch(rethrowConcurrentChange);
     // Закрытый наряд двигает регламент — иначе моточасы растут, порог стоит,
@@ -312,8 +317,11 @@ export async function acceptMaintenance(
 
   return db.$transaction(async (tx) => {
     const record = await tx.maintenanceRecord.update({
-      // Повтор проверок в самой записи — см. updateMaintenance.
-      where: { id: recordId, acceptedById: null, status: existing.status },
+      // Повтор проверок в самой записи — см. updateMaintenance. Описание работ
+      // входит в условие: assertWorkDescribed выше читает его до транзакции, и
+      // без условия наряд, у которого механик успел стереть описание, принимался
+      // пустым — в обход правила, ради которого стоит эта проверка.
+      where: { id: recordId, acceptedById: null, status: existing.status, workDone: existing.workDone },
       data: {
         acceptedById: ctx.userId,
         acceptedAt: new Date(),

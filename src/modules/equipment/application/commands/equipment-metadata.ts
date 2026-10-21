@@ -9,6 +9,7 @@
  */
 
 import { db } from '@/lib/db';
+import { ServiceError } from '@/lib/service-error';
 import type { EquipmentMetadataInput } from '@/lib/validation-schemas';
 import { addMeterReading, recordMeterReadingInTx } from './meter-reading';
 
@@ -106,6 +107,18 @@ export async function updateEquipmentMetadata(
       select: { engineHoursTotal: true },
     });
     if (current?.engineHoursTotal === hours) recordAsReading = false;
+  }
+
+  // Поля карточки и показание счётчика — две записи. Без внешней транзакции
+  // запись полей уже фиксировалась, а сбой показания оставлял новый
+  // инвентарный номер при старой наработке и ошибке в ответе. Поэтому, когда
+  // пишутся обе части, открываем одну транзакцию. Проверку значения показания
+  // делаем до записи: внутренний путь (recordMeterReadingInTx) её не знает.
+  if (!tx && recordAsReading && Object.keys(data).length > 0) {
+    if (!Number.isInteger(hours) || (hours as number) < 0) {
+      throw new ServiceError('Показание моточасов должно быть целым числом ≥ 0', 400);
+    }
+    return db.$transaction((inner) => updateEquipmentMetadata(equipmentId, input, ctx, inner as typeof db));
   }
 
   const wroteMetadata = Object.keys(data).length > 0;

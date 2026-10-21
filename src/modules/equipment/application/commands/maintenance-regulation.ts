@@ -96,6 +96,10 @@ export async function advanceMaintenanceRegulation(
 
   for (const plan of plans) {
     if (plan.type !== input.record.type) continue;
+    // Факт регламента — самое свежее обслуживание. Приёмка или правка более
+    // старого наряда не должна откатывать его назад: порог следующего ТО
+    // считается от этого факта, и откат занижал бы наработку до срока.
+    if (plan.lastDoneAt && plan.lastDoneAt.getTime() > doneAt.getTime()) continue;
     // Локальная копия обновляется тоже: проекция ниже должна видеть новый факт,
     // а не то, что лежало в базе до закрытия наряда.
     if (doneHours != null) plan.lastDoneHours = doneHours;
