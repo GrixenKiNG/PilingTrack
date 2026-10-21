@@ -190,6 +190,10 @@ export async function createCrew(command: CreateCrewCommand) {
     throw new ServiceError('Не удалось создать бригаду', 500);
   }
 
+  // Кэш списка сбрасываем сразу после коммита, до чтения ответа и аудита: сбой
+  // любого из них после записи оставлял бы в кэше устаревший список до TTL.
+  await invalidateCrews();
+
   const created = await db.crew.findUnique({
     where: { id: aggregate.getState().id },
     include: crewWriteResponseInclude,
@@ -203,7 +207,6 @@ export async function createCrew(command: CreateCrewCommand) {
     metadata: crewAuditSnapshot(aggregate.getState(), assistantRows.map((r) => r.name)),
   });
 
-  await invalidateCrews();
   return created;
 }
 
@@ -313,6 +316,9 @@ export async function updateCrew(command: UpdateCrewCommand) {
     },
   });
 
+  // Сразу после коммита, до чтения ответа и аудита — см. createCrew.
+  await invalidateCrews();
+
   const updated = await db.crew.findUnique({
     where: { id: command.crewId },
     include: crewWriteResponseInclude,
@@ -332,7 +338,6 @@ export async function updateCrew(command: UpdateCrewCommand) {
     },
   });
 
-  await invalidateCrews();
   return updated;
 }
 
@@ -359,6 +364,9 @@ export async function deleteCrew(command: DeleteCrewCommand) {
   aggregate.deactivate(command.userId);
   await repo.save(aggregate);
 
+  // Сразу после коммита, до аудита — см. createCrew.
+  await invalidateCrews();
+
   await recordAuditEvent({
     action: 'crew.deleted',
     scope: 'crews',
@@ -367,6 +375,5 @@ export async function deleteCrew(command: DeleteCrewCommand) {
     metadata: { ...snapshot, deactivated: true },
   });
 
-  await invalidateCrews();
   return { success: true, deactivated: true };
 }
