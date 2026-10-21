@@ -110,6 +110,7 @@ export function createSpan(operationName: string): {
   operationName: string;
   startTime: number;
   end: () => TraceContext | undefined;
+  _childContext?: TraceContext;
 } {
   const parentContext = traceContext.getStore();
   const spanId = crypto.randomUUID().slice(0, 16);
@@ -139,8 +140,7 @@ export function createSpan(operationName: string): {
       return parentContext;
     },
     _childContext: childContext,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
-  } as any;
+  };
 }
 
 // ============================================================
