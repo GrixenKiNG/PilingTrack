@@ -23,8 +23,8 @@ const mocks = vi.hoisted(() => ({
   mockSiteFindMany: vi.fn().mockResolvedValue([]),
 }));
 
-vi.mock('@/lib/db', () => ({
-  db: {
+vi.mock('@/lib/db', () => {
+  const client = {
     report: {
       findUnique: mocks.mockReportFindUnique,
       findMany: mocks.mockReportFindMany,
@@ -40,8 +40,16 @@ vi.mock('@/lib/db', () => ({
       update: mocks.mockOutboxUpdate,
       count: vi.fn().mockResolvedValue(0),
     },
-  },
-}));
+    // Пересчёт тренда берёт advisory-замок и работает внутри транзакции.
+    $executeRaw: vi.fn().mockResolvedValue(1),
+  };
+  return {
+    db: {
+      ...client,
+      $transaction: (work: (tx: typeof client) => Promise<unknown>) => work(client),
+    },
+  };
+});
 
 vi.mock('@/lib/logger', () => ({
   logger: {
