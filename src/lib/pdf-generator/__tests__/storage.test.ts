@@ -168,10 +168,9 @@ describe('временные PDF: S3', () => {
     expect(await readPdfResult(JOB_ID)).toEqual(PDF_BYTES);
   });
 
-  // дефект: удаление из S3 глушит любую ошибку (W133-EMPTY-CATCH-BLOCKS #8), а
-  // не только «объекта уже нет»: отказ доступа к бакету остаётся незамеченным
-  // и вызывающим, и логом — файл живёт в S3 дальше.
-  it.fails('сбой удаления в S3 не проходит молча', async () => {
+  // Удаление из S3 глушит только «объекта уже нет» (W133-EMPTY-CATCH-BLOCKS #8);
+  // отказ доступа к бакету должен быть виден вызывающему.
+  it('сбой удаления в S3 не проходит молча', async () => {
     useS3Storage();
     mocks.deleteFile.mockRejectedValue(new Error('Access Denied'));
 

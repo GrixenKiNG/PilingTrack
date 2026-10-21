@@ -73,8 +73,11 @@ export async function deletePdfResult(jobId: string): Promise<void> {
     try {
       const { deleteFile } = await import('@/core/storage/s3-service');
       await deleteFile(pdfS3Key(jobId));
-    } catch {
-      // Object may already be gone (TTL or manual cleanup).
+    } catch (error) {
+      // Объекта уже может не быть (TTL или ручная очистка) — это не ошибка.
+      // Любой другой отказ (доступ, сеть) пробрасываем: файл остался в S3.
+      const name = (error as { name?: string }).name;
+      if (name !== 'NoSuchKey' && name !== 'NotFound') throw error;
     }
     return;
   }

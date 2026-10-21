@@ -99,6 +99,9 @@ export class Bulkhead {
       entry.timeoutId = setTimeout(() => {
         if (entry.settled) return; // Already settled by processQueue
         entry.settled = true;
+        // Истёкшая запись не должна занимать место в очереди.
+        const index = this.queue.indexOf(entry);
+        if (index !== -1) this.queue.splice(index, 1);
         this.totalTimedOut++;
         this.totalRejected++;
         reject(

@@ -212,8 +212,8 @@ describe('Bulkhead', () => {
     await expect(bulkhead.execute(async () => 'после таймаута')).resolves.toBe('после таймаута');
   });
 
-  it.fails(
-    'снимает истёкшую по таймауту задачу с очереди (дефект: запись остаётся и занимает maxQueueSize)',
+  it(
+    'снимает истёкшую по таймауту задачу с очереди (запись не должна занимать maxQueueSize)',
     async () => {
       const bulkhead = new Bulkhead({
         maxConcurrency: 1,
@@ -229,11 +229,16 @@ describe('Bulkhead', () => {
       await vi.advanceTimersByTimeAsync(1000);
       await waitingRejected;
 
-      // дефект: таймаут ожидания отклоняет промис, но запись не удаляется из this.queue,
-      // поэтому мёртвая запись считается в queuedRequests и продолжает занимать maxQueueSize —
-      // следующий запрос получает 503, хотя очередь фактически пуста.
+      // таймаут ожидания обязан убрать запись из this.queue: иначе она считается в
+      // queuedRequests и занимает maxQueueSize — следующий запрос получил бы 503.
       expect(bulkhead.getStats().queuedRequests, 'истёкшая запись должна покинуть очередь').toBe(0);
-      await expect(bulkhead.execute(async () => 'новая')).resolves.toBe('новая');
+      // Слот ещё занят зависшей задачей, поэтому новый запрос принимается в очередь
+      // (а не отклоняется 503 из-за мёртвой записи) и сам отпадает по своему таймауту.
+      const next = bulkhead.execute(async () => 'новая');
+      const nextRejected = expect(next).rejects.toBeInstanceOf(BulkheadRejectError);
+      expect(bulkhead.getStats().queuedRequests).toBe(1);
+      await vi.advanceTimersByTimeAsync(1000);
+      await nextRejected;
     }
   );
 });
