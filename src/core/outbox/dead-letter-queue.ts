@@ -13,6 +13,7 @@
  *   const stats = await deadLetterQueue.getStats();
  */
 
+import type { Prisma } from '@/generated/postgres-client/client';
 import { db } from '@/lib/db';
 import { logger } from '@/lib/logger';
 import { getRequestTenantId } from '@/core/security/tenant-context';
@@ -63,8 +64,7 @@ export async function moveToDlq(
       data: {
         eventType,
         aggregateId,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Prisma JSON column / event payload is an arbitrary serializable shape
-        payload: payload as any,
+        payload: payload as Prisma.InputJsonValue,
         errorMessage: errorMessage.substring(0, 2000),
         attempts,
         sourceOutboxId: outboxId,
@@ -159,8 +159,7 @@ export async function retryDlqEntry(id: string): Promise<DlqRetryResult> {
           aggregateId: entry.aggregateId ?? 'unknown',
           aggregateType: entry.aggregateType ?? 'Report',
           tenantId: entry.tenantId,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Prisma JSON column / event payload is an arbitrary serializable shape
-          payload: entry.payload as any,
+          payload: entry.payload as Prisma.InputJsonValue,
           attempts: 0,
           // Второй потребитель это событие уже обработал: повтор будит только
           // того, кто упал. Старые строки (consumer = NULL) — оба, как раньше.
