@@ -18,6 +18,7 @@
 
 import { db, DEFAULT_TX_OPTIONS } from '@/lib/db';
 import { ServiceError } from '@/lib/service-error';
+import { logger } from '@/lib/logger';
 import {
   assertReportOwnerOnSite,
   resolveAccessibleUserId,
@@ -335,7 +336,15 @@ export async function upsertReport(
   // Phase 5.5: Post-commit audit side effects (structured logger + feedback
   // events). These don't need to be atomic with the save — if they fail,
   // the report is still persisted and the audit row is safely in place.
-  await recordPostCommitAuditEvent(persisted.auditRecord);
+  //
+  // Сбой здесь не должен превращаться в ошибку сохранения: отчёт уже
+  // зафиксирован, и пользователь, увидев отказ, повторил бы отправку. Пишем в
+  // журнал и отдаём сохранённый отчёт.
+  try {
+    await recordPostCommitAuditEvent(persisted.auditRecord);
+  } catch (error) {
+    logger.error('Посткоммитный аудит отчёта не выполнен', { reportId: input.reportId, error });
+  }
 
   // Phase 6: Fetch the persisted report with relations for the response
   const report = await db.report.findUnique({
