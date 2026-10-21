@@ -9,11 +9,12 @@
 import { db } from '@/lib/db';
 import { ServiceError } from '@/lib/service-error';
 import type { PmTriggerType } from './pm-scheduler';
+import type { MaintenanceType } from '@/generated/postgres-client';
 
 export interface MaintenancePlanInput {
   equipmentId: string;
   title: string;
-  type?: string;            // MaintenanceType — defaults to TO1
+  type?: MaintenanceType;            // MaintenanceType — defaults to TO1
   triggerType: PmTriggerType;
   intervalHours?: number | null;
   intervalDays?: number | null;
@@ -58,8 +59,7 @@ export async function createMaintenancePlan(input: MaintenancePlanInput, ctx: { 
       tenantId: ctx.tenantId,
       equipmentId: input.equipmentId,
       title: input.title.trim(),
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- MaintenanceType enum cast at the command boundary
-      type: (input.type as any) ?? 'TO1',
+      type: input.type ?? 'TO1',
       triggerType: input.triggerType,
       intervalHours: input.triggerType === 'HOURS' ? input.intervalHours ?? null : null,
       intervalDays: input.triggerType === 'CALENDAR' ? input.intervalDays ?? null : null,
