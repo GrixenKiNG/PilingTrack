@@ -83,6 +83,7 @@ export const usePilingStore = create<PilingStore>()(
         set({
           currentUser: user,
           actingAs: null,
+          selectedSiteId: null,
           currentPage: getDefaultPage(user.role),
         });
       },

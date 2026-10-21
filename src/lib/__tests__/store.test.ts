@@ -92,9 +92,7 @@ describe('usePilingStore — поведение', () => {
     expect(state.localFeedbackEvents).toEqual([]);
   });
 
-  it.fails('дефект: login не сбрасывает selectedSiteId — только logout это делает', () => {
-    // login() сбрасывает только actingAs и currentPage, но НЕ selectedSiteId.
-    // logout() сбрасывает всё включая selectedSiteId.
+  it('login сбрасывает selectedSiteId: объект прошлого пользователя не переносится', () => {
     usePilingStore.getState().setActingAs('MECHANIC');
     usePilingStore.getState().setSelectedSite('site-456');
 
@@ -107,7 +105,7 @@ describe('usePilingStore — поведение', () => {
 
     const state = usePilingStore.getState();
     expect(state.actingAs).toBeNull();
-    expect(state.selectedSiteId).toBeNull(); // дефект: остаётся 'site-456'
+    expect(state.selectedSiteId).toBeNull();
     expect(state.currentPage).toBe('admin-dashboard');
   });
 
@@ -179,10 +177,8 @@ describe('usePilingStore — поведение', () => {
     expect(usePilingStore.getState().currentPage).toBe('operator-dashboard');
   });
 
-  it.fails('дефект: persist не сохраняет currentPage — после перезагрузки страницы сбрасывается на login', async () => {
-    // Persist настроен с partialize, который НЕ включает currentPage.
-    // Это ожидаемое поведение по дизайну (страница всегда login при загрузке),
-    // но если требование изменится — тест укажет на расхождение.
+  it('persist не сохраняет currentPage — после перезагрузки страница всегда login', async () => {
+    // partialize не включает currentPage: так задумано, вход всегда начинается с login.
     usePilingStore.getState().navigate('report-form');
     usePilingStore.getState().login({
       id: 'user-5',
@@ -191,10 +187,10 @@ describe('usePilingStore — поведение', () => {
       role: 'OPERATOR',
     });
 
-    // Имитируем перезагрузку: создаём новый стор, который прочитает из localStorage
+    // Имитируем перезагрузку: сбрасываем кэш модулей, новый стор читает localStorage
+    vi.resetModules();
     const { usePilingStore: restoredStore } = await import('@/lib/store');
 
-    // currentPage НЕ восстанавливается — это текущее поведение
-    expect(restoredStore.getState().currentPage).toBe('report-form');
+    expect(restoredStore.getState().currentPage).toBe('login');
   });
 });
