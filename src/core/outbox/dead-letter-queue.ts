@@ -121,8 +121,11 @@ export async function moveToDlq(
       });
     });
   } catch (dlqError) {
-    // Last resort — log to console
     logger.error('DLQ: failed to move event to DLQ', dlqError);
+    // Не глотаем: издатель после moveToDlq помечает строку outbox обработанной,
+    // и проглоченный сбой записи означал бы событие, которого нет ни в DLQ, ни
+    // в очереди повтора. Пробрасываем, и издатель оставит строку необработанной.
+    throw dlqError;
   }
 }
 

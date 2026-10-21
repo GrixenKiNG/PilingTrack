@@ -186,23 +186,38 @@ async function consumeOutboxEvents(
         // Delivery handlers may have committed partial receipts since this batch was read.
         const latest = await db.outboxEvent.findUnique({ where: { id: outboxEvent.id }, select: { payload: true } });
         // Max retries exceeded — move to DLQ for manual inspection
-        await moveToDlq(
-          outboxEvent.id,
-          outboxEvent.type,
-          outboxEvent.aggregateId,
-          latest?.payload ?? outboxEvent.payload,
-          error,
-          attempts,
-          {
-            tenantId: outboxEvent.tenantId ?? null,
-            aggregateType: outboxEvent.aggregateType,
-            consumer: consumerColumn,
-            alertEnabled: async (tenantId) => {
-              const { isNotificationEnabled } = await import('@/modules/settings');
-              return isNotificationEnabled(tenantId, 'deliveryFailures');
+        try {
+          await moveToDlq(
+            outboxEvent.id,
+            outboxEvent.type,
+            outboxEvent.aggregateId,
+            latest?.payload ?? outboxEvent.payload,
+            error,
+            attempts,
+            {
+              tenantId: outboxEvent.tenantId ?? null,
+              aggregateType: outboxEvent.aggregateType,
+              consumer: consumerColumn,
+              alertEnabled: async (tenantId) => {
+                const { isNotificationEnabled } = await import('@/modules/settings');
+                return isNotificationEnabled(tenantId, 'deliveryFailures');
+              },
             },
-          },
-        );
+          );
+        } catch (dlqError) {
+          // Запись в DLQ не удалась: строку НЕ помечаем обработанной. Иначе
+          // событие пропало бы без следа — его нет ни в DLQ, ни в очереди
+          // повтора. Оно останется необработанным, и следующий проход снова
+          // дойдёт до DLQ. Остальные события пачки это не останавливает.
+          logger.error('Outbox: не удалось записать событие в DLQ, оставлено для повтора', {
+            consumer: consumerColumn,
+            eventId: outboxEvent.id,
+            type: outboxEvent.type,
+            attempts,
+            error: dlqError instanceof Error ? dlqError.message : String(dlqError),
+          });
+          continue;
+        }
         // Claim this consumer's column so the row is not re-fetched on the
         // next tick. moveToDlq only writes to DeadLetterQueue; without this
         // claim, the polling loop re-picks the row, the handler fails again,
