@@ -15,7 +15,6 @@ class MockRedis {
 }
 
 // Define global Redis for type reference
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- test: cast to a mock shape or to reach internals not in the public type
 (globalThis as unknown as { Redis: typeof MockRedis }).Redis = MockRedis;
 
 vi.mock('ioredis', () => ({
@@ -25,7 +24,6 @@ vi.mock('ioredis', () => ({
 
 const mockWorkerOn = vi.fn().mockReturnThis();
 const mockWorkerClose = vi.fn().mockResolvedValue(undefined);
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- test: cast to a mock shape or to reach internals not in the public type
 const MockWorker = vi.fn().mockImplementation(function(this: Record<string, unknown>) {
   this.on = mockWorkerOn;
   this.close = mockWorkerClose;
