@@ -1,11 +1,28 @@
 import {capturedClock} from '../../domain/evaluation/clock';
 import {createDeduplicatedSnapshot} from '../../infrastructure/snapshots/snapshot-repository';
-import {withReadinessWorkerTransaction} from '../../infrastructure/tenant-transaction';
+import {withReadinessWorkerTransaction, type ReadinessTransaction} from '../../infrastructure/tenant-transaction';
 import {evaluateAuthoritativeReadiness} from '../readiness-score';
 import {advanceCurrentReadiness} from '../projection/current-read-model';
 import {ReadinessBackfillProgressRepository} from './progress-repository';
 
 export const READINESS_BACKFILL_BATCH_SIZE = 200;
+
+/**
+ * Точка возобновления посчитана по текущим правилам, если у её установки есть
+ * снимок миграции по опубликованной редакции. Снимок пишется в той же транзакции,
+ * что и сама точка, поэтому его наличие означает, что пачка прошла по этим правилам.
+ */
+async function checkpointUsesCurrentRules(tx: ReadinessTransaction, tenantId: string, equipmentId: string) {
+  const rules = await tx.readinessRuleSet.findFirst({
+    where: {tenantId, status: 'PUBLISHED'}, orderBy: {updatedAt: 'desc'}, select: {id: true},
+  });
+  const snapshot = await tx.readinessScoreSnapshot.findFirst({
+    where: {tenantId, equipmentId, triggerType: 'MIGRATION',
+      ruleSetId: rules?.id ?? 'missing-published-readiness-rules'},
+    select: {id: true},
+  });
+  return snapshot !== null;
+}
 
 export async function backfillTenantReadiness(input: {
   tenantId: string;
@@ -14,8 +31,17 @@ export async function backfillTenantReadiness(input: {
 }) {
   const clock = new Date((input.clock ?? new Date()).getTime());
   const batchSize = input.batchSize ?? READINESS_BACKFILL_BATCH_SIZE;
-  await withReadinessWorkerTransaction(input.tenantId, (tx) =>
-    new ReadinessBackfillProgressRepository(tx).start(input.tenantId));
+  await withReadinessWorkerTransaction(input.tenantId, async (tx) => {
+    const progressRepo = new ReadinessBackfillProgressRepository(tx);
+    await progressRepo.start(input.tenantId);
+    const progress = await progressRepo.get(input.tenantId);
+    // Правила сменились после прерванного прогона: установки до точки стоят на
+    // старых правилах, и продолжать с точки нельзя — начинаем с первой установки.
+    if (progress?.lastEquipmentId
+      && !await checkpointUsesCurrentRules(tx, input.tenantId, progress.lastEquipmentId)) {
+      await progressRepo.restartCursor(input.tenantId);
+    }
+  });
 
   try {
     while (true) {

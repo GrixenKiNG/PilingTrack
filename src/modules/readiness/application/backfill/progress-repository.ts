@@ -34,6 +34,13 @@ export class ReadinessBackfillProgressRepository {
     });
   }
 
+  /** Новые правила: прогон идёт заново с первой установки, счётчик обнуляется. */
+  restartCursor(tenantId: string) {
+    return this.tx.readinessBackfillProgress.update({
+      where: {tenantId}, data: {lastEquipmentId: null, processedCount: 0},
+    });
+  }
+
   checkpoint(input: {tenantId: string; lastEquipmentId: string; processed: number}) {
     return this.tx.readinessBackfillProgress.update({
       where: {tenantId: input.tenantId},
