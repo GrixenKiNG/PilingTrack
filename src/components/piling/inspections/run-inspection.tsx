@@ -27,6 +27,7 @@ import { InspectionItemPhotos } from './inspection-item-photos';
 import { YesNoControl, Status4Control, DoneControl, MeasureControl } from './inspection-controls';
 import { InspectionLoadError, catchText, extractApiError, isRetryableLoadError, loadErrorText } from './inspection-api-error';
 import {useLocalFormDraft} from '../operator-mobile/use-local-form-draft';
+import { useInspectionSaveQueue } from './use-inspection-save-queue';
 
 // ---------- types ----------
 
@@ -63,6 +64,8 @@ interface InspectionDetail {
   equipment: { id: string; name: string; model: string | null } | null;
   /** Половина смены: осмотр приёмки или осмотр после работ. */
   phase: 'PRE_SHIFT' | 'POST_SHIFT' | null;
+  /** Версия осмотра: набор ответов заменяется целиком, сервер сверяет её при сохранении. */
+  updatedAt?: string;
   templateSnapshot: SnapItem[];
   answers: SavedAnswer[];
 }
@@ -108,6 +111,9 @@ export function RunInspection({ inspectionId, onExit }: { inspectionId: string; 
 
   const [saving, setSaving] = useState(false);
   const [completing, setCompleting] = useState(false);
+
+  // Очередь сохранений с версией осмотра (updatedAt): см. хук.
+  const enqueueSave = useInspectionSaveQueue(inspection?.updatedAt);
 
   // sign dialog
   const [signedByName, setSignedByName] = useState('');
@@ -207,14 +213,24 @@ export function RunInspection({ inspectionId, onExit }: { inspectionId: string; 
     });
   };
 
+  // PUT ответов по очереди. Каждое сохранение уходит с версией, пришедшей в
+  // ответе на предыдущее: сервер отклонит набор, основанный на устаревшем
+  // осмотре, вместо того чтобы стереть ответы другого клиента. Нет версии
+  // (сервер её не прислал) — запрос идёт как раньше.
+  const putAnswers = (): Promise<Response> => enqueueSave((expectedUpdatedAt) =>
+    authFetch(`/api/inspections/${inspectionId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        answers: buildAnswerPayload(),
+        ...(expectedUpdatedAt ? { expectedUpdatedAt } : {}),
+      }),
+    }));
+
   const saveDraft = async (options?: { silent?: boolean }) => {
     setSaving(true);
     try {
-      const res = await authFetch(`/api/inspections/${inspectionId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ answers: buildAnswerPayload() }),
-      });
+      const res = await putAnswers();
       // Текст отказа разбирается по статусу: 401/CSRF-403 приходят английскими,
       // не-JSON тело (прокси) давало браузерное «Unexpected end of JSON input».
       if (!res.ok) throw new Error(await extractApiError(res, 'Не удалось сохранить черновик'));
@@ -237,11 +253,7 @@ export function RunInspection({ inspectionId, onExit }: { inspectionId: string; 
     setCompleting(true);
     try {
       // Save answers first
-      const putRes = await authFetch(`/api/inspections/${inspectionId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ answers: buildAnswerPayload() }),
-      });
+      const putRes = await putAnswers();
       if (!putRes.ok) throw new Error(await extractApiError(putRes, 'Не удалось сохранить осмотр'));
       setSavedAnswers(answers);
       clearLocalDraft();
