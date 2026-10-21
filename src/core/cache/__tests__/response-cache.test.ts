@@ -149,34 +149,54 @@ describe('склейка запросов и сброс', () => {
     expect(await secondResponse.json()).toEqual({ ok: true });
   });
 
-  it('сброс по префиксу с организацией снимает только её ячейки', async () => {
-    const fetchOrion = vi.fn(async () => json({ tenant: 'orion' }));
-    const fetchMimecast = vi.fn(async () => json({ tenant: 'mimecast' }));
+  it('сброс по префиксу с организацией снимает только её ячейки — повторный запрос возвращает свежий ответ', async () => {
+    let orionVersion = 1;
+    let mimecastVersion = 1;
+    const fetchOrion = vi.fn(async () => json({ tenant: 'orion', version: orionVersion++ }));
+    const fetchMimecast = vi.fn(async () => json({ tenant: 'mimecast', version: mimecastVersion++ }));
 
-    await cache.getOrFetch({ endpoint: 'GET:/api/reports', tenantId: 'orion' }, fetchOrion);
-    await cache.getOrFetch({ endpoint: 'GET:/api/reports', tenantId: 'mimecast' }, fetchMimecast);
+    // Первый запрос — кладёт в кэш
+    const orionFirst = await cache.getOrFetch({ endpoint: 'GET:/api/reports', tenantId: 'orion' }, fetchOrion);
+    const mimecastFirst = await cache.getOrFetch({ endpoint: 'GET:/api/reports', tenantId: 'mimecast' }, fetchMimecast);
 
+    expect(await orionFirst.json()).toEqual({ tenant: 'orion', version: 1 });
+    expect(await mimecastFirst.json()).toEqual({ tenant: 'mimecast', version: 1 });
+
+    // Инвалидация только orion
     cache.invalidate('GET:/api/reports', { tenantId: 'orion' });
 
-    await cache.getOrFetch({ endpoint: 'GET:/api/reports', tenantId: 'orion' }, fetchOrion);
-    await cache.getOrFetch({ endpoint: 'GET:/api/reports', tenantId: 'mimecast' }, fetchMimecast);
+    // Повторный запрос orion должен вернуть НОВОЕ значение (версия 2)
+    const orionAfterInvalidate = await cache.getOrFetch({ endpoint: 'GET:/api/reports', tenantId: 'orion' }, fetchOrion);
+    expect(await orionAfterInvalidate.json()).toEqual({ tenant: 'orion', version: 2 });
 
+    // mimecast не должен инвалидироваться — возвращает старое значение
+    const mimecastAfterInvalidate = await cache.getOrFetch({ endpoint: 'GET:/api/reports', tenantId: 'mimecast' }, fetchMimecast);
+    expect(await mimecastAfterInvalidate.json()).toEqual({ tenant: 'mimecast', version: 1 });
+
+    // Проверка вызовов как дополнительная гарантия
     expect(fetchOrion).toHaveBeenCalledTimes(2);
     expect(fetchMimecast).toHaveBeenCalledTimes(1);
   });
 
-  it.fails('сброс по организации не задевает организацию, чей id начинается так же', async () => {
+  it.fails('сброс по организации не задевает организацию, чей id начинается так же — повторный запрос возвращает тот же ответ', async () => {
     // дефект: invalidate ищет организацию подстрокой — `key.includes('t:orion')`
     // совпадает и с ключом `t:orion2`, поэтому сброс одной организации снимает
     // и ячейку соседней.
-    const fetchNeighbour = vi.fn(async () => json({ tenant: 'orion2' }));
+    let neighbourVersion = 1;
+    const fetchNeighbour = vi.fn(async () => json({ tenant: 'orion2', version: neighbourVersion++ }));
 
-    await cache.getOrFetch({ endpoint: 'GET:/api/reports', tenantId: 'orion2' }, fetchNeighbour);
+    // Первый запрос — кладёт в кэш
+    const first = await cache.getOrFetch({ endpoint: 'GET:/api/reports', tenantId: 'orion2' }, fetchNeighbour);
+    expect(await first.json()).toEqual({ tenant: 'orion2', version: 1 });
 
+    // Инвалидация orion (не orion2)
     cache.invalidate('GET:/api/reports', { tenantId: 'orion' });
 
-    await cache.getOrFetch({ endpoint: 'GET:/api/reports', tenantId: 'orion2' }, fetchNeighbour);
+    // Повторный запрос orion2 должен вернуть ТО ЖЕ значение (версия 1), так как кэш не должен был сброситься
+    const afterInvalidate = await cache.getOrFetch({ endpoint: 'GET:/api/reports', tenantId: 'orion2' }, fetchNeighbour);
+    expect(await afterInvalidate.json()).toEqual({ tenant: 'orion2', version: 1 });
 
+    // Проверка вызовов как дополнительная гарантия — источник не должен вызываться повторно
     expect(fetchNeighbour).toHaveBeenCalledTimes(1);
   });
 });
