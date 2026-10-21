@@ -29,6 +29,45 @@ import {
   type AnswerType, type BlockType, type HammerKind, type SectionDraft,
 } from './template-editor-parts';
 
+// ─── API response types (narrowed from Prisma payload) ────────────────────────
+interface TemplateSectionResponse {
+  id: string;
+  tenantId: string;
+  templateId: string;
+  title: string;
+  order: number;
+  items: TemplateItemResponse[];
+}
+interface TemplateItemResponse {
+  id: string;
+  tenantId: string;
+  sectionId: string;
+  text: string;
+  answerType: AnswerType;
+  unit: string | null;
+  norm: string | null;
+  provenance: string | null;
+  photoRequired: boolean;
+  required: boolean;
+  createsDefect: boolean;
+  defectSeverity: string | null;
+  order: number;
+}
+interface TemplateResponse {
+  id: string;
+  tenantId: string;
+  name: string;
+  level: InspectionLevel;
+  blockType: BlockType;
+  appliesToModel: string | null;
+  appliesToHammerKind: HammerKind | null;
+  isActive: boolean;
+  createdById: string | null;
+  createdAt: Date | string;
+  updatedAt: Date | string;
+  sections: TemplateSectionResponse[];
+}
+
 // ─── Main component ───────────────────────────────────────────────────────────
 
 /**
@@ -89,7 +128,7 @@ export function TemplateEditor({ templateId }: TemplateEditorProps) {
         setLoadError(new InspectionLoadError(res.status));
         return;
       }
-      const { template } = await res.json();
+      const { template } = await res.json() as { template: TemplateResponse };
       setLoadError(null);
       setArchived(template.isActive === false);
       setName(template.name ?? '');
@@ -99,12 +138,10 @@ export function TemplateEditor({ templateId }: TemplateEditorProps) {
       if (template.appliesToHammerKind && template.appliesToHammerKind !== 'NONE') {
         setAppliesToHammerKind(template.appliesToHammerKind as Exclude<HammerKind, 'NONE'>);
       }
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      setSections((template.sections ?? []).map((s: any) => ({
+      setSections((template.sections ?? []).map((s: TemplateSectionResponse) => ({
         _key: uid(),
         title: s.title ?? '',
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        items: (s.items ?? []).map((it: any) => ({
+        items: (s.items ?? []).map((it: TemplateItemResponse) => ({
           _key: uid(),
           text: it.text ?? '',
           answerType: (it.answerType ?? 'YES_NO') as AnswerType,
