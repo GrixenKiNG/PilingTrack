@@ -185,9 +185,9 @@ describe('SchemaRegistry — регистрация схемы', () => {
   });
 });
 
-describe('SchemaRegistry — известные дефекты проверки совместимости', () => {
-  it.fails(
-    'дефект: BACKWARD не замечает сужение типа существующего обязательного поля',
+describe('SchemaRegistry — проверка совместимости типов и обязательных полей', () => {
+  it(
+    'BACKWARD замечает смену типа существующего обязательного поля',
     () => {
       const registry = new SchemaRegistry();
       registry.register({
@@ -197,9 +197,7 @@ describe('SchemaRegistry — известные дефекты проверки 
         compatibility: 'BACKWARD',
       });
 
-      // дефект: checkCompatibility сравнивает только списки required и наличие
-      // свойств, но не их типы, поэтому v2 с id: number считается совместимой;
-      // при этом старые события ({ id: 'uuid' }) перестают проходить validate.
+      // v2 с id: number не принимает старые события ({ id: 'uuid' }).
       expect(() =>
         registry.register({
           id: 'order.created',
@@ -211,12 +209,13 @@ describe('SchemaRegistry — известные дефекты проверки 
           compatibility: 'BACKWARD',
         })
       ).toThrow(/not BACKWARD-compatible with v1/);
-      expect(() => registry.validate('order.created', 2, { id: 'a', siteId: 'b' })).toThrow();
+      // Отказ при регистрации: v2 не попадает в реестр.
+      expect(registry.getAllVersions('order.created')).toEqual([1]);
     }
   );
 
-  it.fails(
-    'дефект: обязательное поле с default пропускается при регистрации, но старые события без него не валидируются',
+  it(
+    'новое обязательное поле не считается совместимым даже с default: validate его не подставляет',
     () => {
       const registry = new SchemaRegistry();
       registry.register({
@@ -226,25 +225,23 @@ describe('SchemaRegistry — известные дефекты проверки 
         compatibility: 'BACKWARD',
       });
 
-      // регистрация проходит: default считается достаточным для совместимости
-      registry.register({
-        id: 'order.created',
-        version: 2,
-        schema: {
-          ...v1Schema,
-          required: [...v1Schema.required, 'source'],
-          properties: {
-            ...v1Schema.properties,
-            source: { type: 'string', default: 'manual' },
+      // Ajv работает без useDefaults (payload событий не мутируем), поэтому старое
+      // событие без source v2 не пройдёт — регистрация такой схемы должна отказать.
+      expect(() =>
+        registry.register({
+          id: 'order.created',
+          version: 2,
+          schema: {
+            ...v1Schema,
+            required: [...v1Schema.required, 'source'],
+            properties: {
+              ...v1Schema.properties,
+              source: { type: 'string', default: 'manual' },
+            },
           },
-        },
-        compatibility: 'BACKWARD',
-      });
-
-      // дефект: Ajv создан без useDefaults, поэтому default не подставляется
-      // и старое событие без source отклоняется, хотя проверка совместимости
-      // обещала обратную совместимость.
-      expect(registry.validate('order.created', 2, { id: 'a', siteId: 'b' })).toBe(true);
+          compatibility: 'BACKWARD',
+        })
+      ).toThrow(/not BACKWARD-compatible with v1/);
     }
   );
 });

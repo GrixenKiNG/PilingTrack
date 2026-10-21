@@ -6,6 +6,15 @@ function shouldLogSchemaRegistration(): boolean {
   return process.env.LOG_SCHEMA_REGISTRATION === 'true';
 }
 
+/** Новый тип принимает все значения старого (integer входит в number). Тип не задан — не сравниваем. */
+function typeAccepts(newType: unknown, oldType: unknown): boolean {
+  if (newType === undefined || oldType === undefined) return true;
+  const next = ([] as unknown[]).concat(newType);
+  return ([] as unknown[]).concat(oldType).every(
+    (type) => next.includes(type) || (type === 'integer' && next.includes('number')),
+  );
+}
+
 export type CompatibilityMode = 'BACKWARD' | 'FORWARD' | 'FULL' | 'NONE';
 
 export interface SchemaDef {
@@ -157,12 +166,16 @@ export class SchemaRegistry {
 
     if (mode === 'BACKWARD' || mode === 'FULL') {
       for (const field of newRequired) {
+        // default не спасает: Ajv работает без useDefaults, старое событие без поля не пройдёт.
         if (!oldRequired.includes(field)) {
-          const prop = newProps[field];
-          if (!prop || prop.default === undefined) {
-            logger.warn('New required field without default — backward incompatible', { field });
-            return false;
-          }
+          logger.warn('New required field — backward incompatible', { field });
+          return false;
+        }
+      }
+      for (const field of Object.keys(oldProps)) {
+        if (newProps[field] && !typeAccepts(newProps[field].type, oldProps[field].type)) {
+          logger.warn('Property type changed — backward incompatible', { field });
+          return false;
         }
       }
     }
@@ -175,9 +188,6 @@ export class SchemaRegistry {
         }
       }
     }
-
-    // suppress unused variable warning — oldProps reserved for future deeper checks
-    void oldProps;
 
     return true;
   }
