@@ -75,7 +75,7 @@ const currentSamplingConfig: SamplingConfig = { ...DEFAULT_SAMPLING_CONFIG };
  * Check if ingestion is within the rate limit.
  * Returns false if rate exceeded.
  */
-function checkIngestRateLimit(): boolean {
+function checkIngestRateLimit(count = 1): boolean {
   const now = Date.now();
   const elapsed = now - ingestWindowStart;
 
@@ -85,8 +85,9 @@ function checkIngestRateLimit(): boolean {
     ingestWindowStart = now;
   }
 
-  ingestCountWindow++;
-  return ingestCountWindow <= MAX_INGEST_RATE;
+  if (ingestCountWindow + count > MAX_INGEST_RATE) return false;
+  ingestCountWindow += count;
+  return true;
 }
 
 /**
@@ -222,8 +223,8 @@ export async function ingestTelemetryBatch(
     throw new Error('ingestTelemetryBatch: tenantId is required on every record');
   }
 
-  // Rate limit check for batch
-  if (!checkIngestRateLimit()) {
+  // Rate limit check for batch: лимит считается по записям пачки
+  if (!checkIngestRateLimit(records.length)) {
     throw new Error('Telemetry ingest rate limit exceeded (max 1000 records/sec)');
   }
 

@@ -224,8 +224,8 @@ function validateTelemetry(data: unknown): ValidationResult {
 
   if (telemetry.value === undefined || telemetry.value === null) {
     errors.push('Поле value обязательно');
-  } else if (typeof telemetry.value !== 'number') {
-    errors.push('Поле value должно быть числом');
+  } else if (typeof telemetry.value !== 'number' || !Number.isFinite(telemetry.value)) {
+    errors.push('Поле value должно быть конечным числом');
   }
 
   // Valid telemetry types.
@@ -260,19 +260,41 @@ function validateTelemetry(data: unknown): ValidationResult {
     errors.push(`Неизвестный тип: ${telemetry.type}. Допустимые типы: ${validTypes.join(', ')}`);
   }
 
-  // GPS coordinates validation
-  if (telemetry.latitude !== undefined) {
-    const lat = Number(telemetry.latitude);
-    if (lat < -90 || lat > 90) {
-      errors.push('latitude должен быть в диапазоне от -90 до 90');
+  // GPS coordinates validation. Пустая строка, булево и массив при Number()
+  // дают 0 — числом считаем только число или непустую числовую строку.
+  const coordinate = (value: unknown): number => {
+    if (typeof value === 'number') return value;
+    if (typeof value === 'string' && value.trim() !== '') return Number(value);
+    return NaN;
+  };
+
+  if (telemetry.latitude !== undefined && telemetry.latitude !== null) {
+    const lat = coordinate(telemetry.latitude);
+    if (!Number.isFinite(lat) || lat < -90 || lat > 90) {
+      errors.push('latitude должен быть числом в диапазоне от -90 до 90');
     }
   }
 
-  if (telemetry.longitude !== undefined) {
-    const lon = Number(telemetry.longitude);
-    if (lon < -180 || lon > 180) {
-      errors.push('longitude должен быть в диапазоне от -180 до 180');
+  if (telemetry.longitude !== undefined && telemetry.longitude !== null) {
+    const lon = coordinate(telemetry.longitude);
+    if (!Number.isFinite(lon) || lon < -180 || lon > 180) {
+      errors.push('longitude должен быть числом в диапазоне от -180 до 180');
     }
+  }
+
+  if (telemetry.unit !== undefined && telemetry.unit !== null && typeof telemetry.unit !== 'string') {
+    errors.push('Поле unit должно быть строкой');
+  }
+
+  if (telemetry.timestamp !== undefined && telemetry.timestamp !== null
+    && ((typeof telemetry.timestamp !== 'string' && typeof telemetry.timestamp !== 'number')
+      || Number.isNaN(new Date(telemetry.timestamp).getTime()))) {
+    errors.push('Поле timestamp должно быть датой (ISO 8601 или миллисекунды)');
+  }
+
+  if (telemetry.metadata !== undefined && telemetry.metadata !== null
+    && (typeof telemetry.metadata !== 'object' || Array.isArray(telemetry.metadata))) {
+    errors.push('Поле metadata должно быть объектом');
   }
 
   return {

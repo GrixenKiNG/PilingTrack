@@ -196,8 +196,8 @@ export const POST = withApi(async (request: NextRequest) => {
       value: validated.data.value,
       siteId: validated.data.siteId || undefined,
       unit: validated.data.unit || undefined,
-      latitude: validated.data.latitude || undefined,
-      longitude: validated.data.longitude || undefined,
+      latitude: validated.data.latitude ?? undefined,
+      longitude: validated.data.longitude ?? undefined,
       metadata: validated.data.metadata || undefined,
       timestamp: validated.data.timestamp
         ? new Date(validated.data.timestamp)
