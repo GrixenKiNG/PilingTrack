@@ -1,4 +1,5 @@
 import { db } from '@/lib/db';
+import type { Prisma } from '@/generated/postgres-client';
 import type {
   FeedbackEventAudience,
   FeedbackEventDTO,
@@ -124,8 +125,7 @@ export async function recordFeedbackEvent(input: CreateFeedbackEventInput) {
       actorRole: input.actor?.role || null,
       targetId: input.targetId || null,
       requestId: input.requestId || null,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Prisma JSON column / event payload is an arbitrary serializable shape
-      metadata: (input.metadata as any) || undefined,
+      metadata: (input.metadata as Prisma.InputJsonValue) || undefined,
     },
   });
 }

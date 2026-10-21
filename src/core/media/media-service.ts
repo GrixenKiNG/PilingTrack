@@ -50,6 +50,7 @@ import {
   type MediaUploadRequest,
   type MediaUploadResponse,
 } from './media-content';
+import type { Media } from '@/generated/postgres-client/client';
 
 // Re-export the content layer so existing importers keep working unchanged.
 export {
@@ -432,8 +433,7 @@ export class MediaService {
       orderBy: { createdAt: 'desc' },
     });
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
-    return media.map((m: any) => this.toMediaRecord(m));
+    return media.map((m: Media) => this.toMediaRecord(m));
   }
 
   /**
@@ -477,8 +477,7 @@ export class MediaService {
   /**
    * Convert DB model to public MediaRecord.
    */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
-  private toMediaRecord(media: any): MediaRecord {
+  private toMediaRecord(media: Media): MediaRecord {
     return {
       id: media.id,
       fileName: media.fileName,
@@ -486,7 +485,10 @@ export class MediaService {
       fileSize: media.fileSize,
       key: media.key,
       thumbnailKey: media.thumbnailKey,
-      tenantId: media.tenantId,
+      // Prisma schema allows nullable tenantId, but MediaRecord requires string.
+      // Service always sets tenantId on create; non-null assertion is safe here.
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null invariant established by service create logic
+      tenantId: media.tenantId!,
       userId: media.userId,
       entityType: media.entityType,
       entityId: media.entityId,

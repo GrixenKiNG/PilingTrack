@@ -52,8 +52,8 @@ export interface CacheKey {
   userId?: string;
 }
 
-interface CacheEntry<T = unknown> {
-  value: T;
+interface CacheEntry {
+  value: NextResponse<unknown>;
   createdAt: number;
   lastAccessedAt: number;
   hitCount: number;
@@ -197,8 +197,7 @@ export class ResponseCache {
     }
 
     this.cache.set(cacheKey, {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
-      value: cloneResponse(value) as any,
+      value: cloneResponse(value),
       createdAt: Date.now(),
       lastAccessedAt: Date.now(),
       hitCount: 0,

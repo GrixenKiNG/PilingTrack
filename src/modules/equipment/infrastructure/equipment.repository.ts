@@ -1,3 +1,4 @@
+import type { Prisma } from '@/generated/postgres-client/client';
 import { db } from '@/lib/db';
 import { EquipmentAggregate } from '../domain';
 import { toPrismaData, fromPrismaToState, toOutboxData } from './equipment.prisma.mapper';
@@ -19,8 +20,7 @@ export class PrismaEquipmentRepository implements EquipmentRepository {
     // outbox write silently lost the domain event while the equipment
     // change stuck. site.repository.ts / report.repository.ts (the
     // DDD-migration reference) already use this same pattern.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Prisma interactive-transaction callback client type isn't cleanly exported
-    await db.$transaction(async (tx: any) => {
+    await db.$transaction(async (tx: Prisma.TransactionClient) => {
       await tx.equipment.upsert({
         where: { id: s.id },
         create: pd,

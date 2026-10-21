@@ -8,7 +8,8 @@ export function renderPdf(draw: (doc: PdfDoc) => void): Promise<Buffer> {
     // font: false — skip loading the built-in Helvetica.afm at construction time.
     // Bundlers (Turbopack/webpack) do not reliably include pdfkit's internal .afm
     // assets, so we register our own TTF fonts in registerFonts() right after.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
+    // PDFKit types declare font?: string | undefined, but runtime accepts false to disable the default font.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- PDFKit types don't allow false for font option
     const doc = new PDFDocument({ size: 'A4', margin: 0, bufferPages: true, font: false as any });
     const chunks: Buffer[] = [];
 
