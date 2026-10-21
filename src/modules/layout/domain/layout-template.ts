@@ -67,6 +67,9 @@ const TEXT_ALIGNS = new Set(['left', 'center', 'right']);
 const ITEM_ALIGNS = new Set(['start', 'center', 'end']);
 const IMAGE_FITS = new Set(['contain', 'cover']);
 
+/** 200 блоков с текстом до 2000 символов и стилем — запас над реальным максимумом. */
+const MAX_TEMPLATE_JSON_LENGTH = 600_000;
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
@@ -106,8 +109,8 @@ function isValidCard(value: unknown): value is LayoutTemplate['card'] {
     isFiniteInRange(value.minHeight, 240, 2400) &&
     isFiniteInRange(value.rowHeight, 12, 96) &&
     isFiniteInRange(value.gap, 0, 32) &&
-    typeof value.background === 'string' &&
-    typeof value.borderColor === 'string' &&
+    isShortString(value.background, 200) &&
+    isShortString(value.borderColor, 200) &&
     isFiniteInRange(value.borderWidth, 0, 12) &&
     isFiniteInRange(value.borderRadius, 0, 64) &&
     isFiniteInRange(value.padding, 0, 64)
@@ -146,6 +149,8 @@ export function createTemplateValidator(dataKeys: readonly string[]): LayoutTemp
       return null;
     }
     if (value.blocks.length > 200) return null;
+    // Неизвестные поля не вычищаются, поэтому размер всей записи ограничен целиком.
+    if (JSON.stringify(value).length > MAX_TEMPLATE_JSON_LENGTH) return null;
     if (!value.blocks.every(isValidBlock)) return null;
     const ids = value.blocks.map((block) => (block as LayoutBlock).id);
     if (new Set(ids).size !== ids.length) return null;

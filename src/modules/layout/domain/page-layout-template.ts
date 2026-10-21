@@ -39,6 +39,9 @@ export function clonePageLayoutTemplate(template: PageLayoutTemplate): PageLayou
   return JSON.parse(JSON.stringify(template)) as PageLayoutTemplate;
 }
 
+/** 100 виджетов с settings до 4000 символов — запас над реальным максимумом. */
+const MAX_PAGE_LAYOUT_JSON_LENGTH = 450_000;
+
 export type PageLayoutValidator = (value: unknown) => PageLayoutTemplate | null;
 
 /**
@@ -65,6 +68,8 @@ export function createPageLayoutValidator(catalogIds: readonly string[]): PageLa
   return function validatePageLayout(value: unknown): PageLayoutTemplate | null {
     if (!isRecord(value) || value.version !== 1 || !Array.isArray(value.widgets)) return null;
     if (value.widgets.length > 100) return null;
+    // Неизвестные поля не вычищаются, поэтому размер всей записи ограничен целиком.
+    if (JSON.stringify(value).length > MAX_PAGE_LAYOUT_JSON_LENGTH) return null;
     if (!value.widgets.every(isValidWidget)) return null;
     const ids = value.widgets.map((w) => (w as PageWidgetPlacement).id);
     if (new Set(ids).size !== ids.length) return null;
