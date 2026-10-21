@@ -54,7 +54,10 @@ export const POST = withApi(
 
     // Rate limited
     if (result.rateLimited) {
-      await recordAuditEvent({
+      // Запись следа — best-effort (см. modules/audit): событие уже не отменить,
+      // а await добавлял два лишних обращения к базе к latency каждой неудачной
+      // попытки (усиление lockout-DoS). Ошибки write внутри уже глушатся.
+      recordAuditEvent({
         action: 'auth.login.rate_limited',
         scope: 'auth',
         tenantId: tenantContext.tenantId,
@@ -70,7 +73,7 @@ export const POST = withApi(
     }
 
     if (!result.user) {
-      await recordAuditEvent({
+      recordAuditEvent({
         action: 'auth.login.failed',
         scope: 'auth',
         tenantId: tenantContext.tenantId,
@@ -81,7 +84,7 @@ export const POST = withApi(
       return createJsonResponse({ error: 'Неверный email или пароль', requestId }, { status: 401 }, requestId);
     }
 
-    await recordAuditEvent({
+    recordAuditEvent({
       action: 'auth.login.succeeded',
       scope: 'auth',
       actorId: result.user.id,
