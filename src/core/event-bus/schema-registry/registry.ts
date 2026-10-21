@@ -72,6 +72,14 @@ export class SchemaRegistry {
   /**
    * Validate event payload against its schema.
    * Returns true if valid, throws on failure.
+   *
+   * ВНИМАНИЕ (21.10.2026): ни одно место публикации или обработки событий сейчас
+   * не вызывает validate() — реестр при старте заполняется, но события им не
+   * проверяются. Поэтому режим для неизвестной версии («схема не найдена»)
+   * пока ни на что не влияет. Он fail-open: проверка пропускается с
+   * предупреждением. Когда проверку подключат к публикации, для событий с
+   * неизвестной версией нужен fail-closed — иначе неверная схема пропустит
+   * любой payload. Подробности: night-logs/analysis-22.md.
    */
   validate(eventType: string, version: number, payload: unknown): boolean {
     const key = `${eventType}.v${version}`;
