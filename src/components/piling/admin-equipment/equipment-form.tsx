@@ -395,7 +395,7 @@ export function withoutUnchangedHours(
 }
 
 export function formStateToPayload(state: EquipmentFormState): Record<string, unknown> {
-  const num = (s: string) => (s.trim() === '' ? null : Number(s));
+  const num = (s: string) => (s.trim() === '' ? null : Number(s.trim().replace(',', '.')));
   const str = (s: string) => (s.trim() === '' ? null : s.trim());
 
   return {

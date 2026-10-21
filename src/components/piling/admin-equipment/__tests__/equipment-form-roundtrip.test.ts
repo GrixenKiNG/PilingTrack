@@ -179,26 +179,12 @@ describe('equipment-form roundtrip (W63)', () => {
     expect(payload.engineHoursTotal).toBe(3000);
   });
 
-  // Фактическое поведение: `Number('1,5')` = NaN, а `JSON.stringify` зануляет
-  // NaN → поле уходит на сервер как null (молчаливая очистка). Поля объявлены
-  // `type="number"`, браузер запятую через value не отдаёт, но чистая функция
-  // от такого ввода не защищена — фиксируем.
-  it('4b. «1,5» в дробном поле даёт NaN (фактическое поведение)', () => {
-    const payload = formStateToPayload({ ...EMPTY_EQUIPMENT_FORM, weightTons: '1,5', enginePower: '1,5' });
-    expect(Number.isNaN(payload.weightTons)).toBe(true);
-    expect(Number.isNaN(payload.enginePower)).toBe(true);
-    // На проводе NaN превращается в null.
-    const wire = JSON.parse(JSON.stringify(payload)) as Record<string, unknown>;
-    expect(wire.weightTons).toBeNull();
-    expect(wire.enginePower).toBeNull();
-  });
-
-  it.fails('4c. «1,5» должно читаться как 1,5, но Number даёт NaN (находка)', () => {
+  it('4c. «1,5» в весе читается как 1,5', () => {
     const payload = formStateToPayload({ ...EMPTY_EQUIPMENT_FORM, weightTons: '1,5' });
     expect(payload.weightTons).toBe(1.5);
   });
 
-  it.fails('4d. «1,5» в мощности должно читаться как 1,5, но Number даёт NaN (находка)', () => {
+  it('4d. «1,5» в мощности читается как 1,5', () => {
     const payload = formStateToPayload({ ...EMPTY_EQUIPMENT_FORM, enginePower: '1,5' });
     expect(payload.enginePower).toBe(1.5);
   });

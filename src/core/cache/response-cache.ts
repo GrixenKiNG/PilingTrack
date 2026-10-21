@@ -247,8 +247,10 @@ export class ResponseCache {
 
     for (const [key] of this.cache) {
       if (key.startsWith(prefixPattern)) {
-        if (scope?.tenantId && !key.includes(`t:${scope.tenantId}`)) continue;
-        if (scope?.userId && !key.includes(`u:${scope.userId}`)) continue;
+        // Части ключа разделены «|» — сравниваем целиком, иначе `t:orion` совпадёт и с `t:orion2`.
+        const parts = key.split('|');
+        if (scope?.tenantId && !parts.includes(`t:${scope.tenantId}`)) continue;
+        if (scope?.userId && !parts.includes(`u:${scope.userId}`)) continue;
         this.cache.delete(key);
       }
     }
