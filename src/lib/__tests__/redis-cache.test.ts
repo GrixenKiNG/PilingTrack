@@ -204,10 +204,9 @@ describe('кэш Redis', () => {
     expect(await cache.get('analytics:sites:v3:mkm:2026-10')).toEqual({ total: 2 });
   });
 
-  // дефект: getOrSet пишет в кэш и null, а get считает null промахом
-  // (`if (cached !== null)`), поэтому «источник ответил пусто» не кэшируется и
-  // каждый запрос снова идёт наружу (AU52-S4-WEATHER, находка 9).
-  it.fails('getOrSet не пересчитывает значение, закэшированное как null', async () => {
+  // getOrSet пишет в кэш и null: «источник ответил пусто» — тоже ответ, и повторный
+  // запрос не должен идти наружу (AU52-S4-WEATHER, находка 9).
+  it('getOrSet не пересчитывает значение, закэшированное как null', async () => {
     const { cache } = await load();
     const compute = vi.fn(async () => null);
 

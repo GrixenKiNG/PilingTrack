@@ -208,16 +208,36 @@ function buildKey(key: string): string {
  * Get a value from cache.
  */
 export async function get<T>(key: string): Promise<T | null> {
+  return (await lookup<T>(key)).value;
+}
+
+/**
+ * Как get, но отличает «записано null» от «записи нет»: нужен getOrSet, чтобы
+ * пустой ответ источника кэшировался, а не запрашивался заново каждый раз.
+ */
+async function lookup<T>(key: string): Promise<{ hit: boolean; value: T | null }> {
   const client = await getRedisClient();
-  if (!client) return null;
+  if (!client) return { hit: false, value: null };
 
   try {
     return await redisCircuitBreaker.execute(async () => {
       const raw = await client.get(buildKey(key));
-      return deserialize<T>(raw);
+      // Запись есть, если сырое значение разобралось в обёртку {d}; повреждённая — промах.
+      const hit = isCacheEntry(raw);
+      return { hit, value: hit ? deserialize<T>(raw) : null };
     });
   } catch {
-    return null;
+    return { hit: false, value: null };
+  }
+}
+
+function isCacheEntry(raw: string | null): boolean {
+  if (!raw) return false;
+  try {
+    const parsed = JSON.parse(raw);
+    return typeof parsed === 'object' && parsed !== null && 'd' in parsed;
+  } catch {
+    return false;
   }
 }
 
@@ -254,8 +274,8 @@ export async function getOrSet<T>(
   options?: CacheOptions
 ): Promise<T> {
   // Try cache first
-  const cached = await get<T>(key);
-  if (cached !== null) return cached;
+  const cached = await lookup<T>(key);
+  if (cached.hit) return cached.value as T;
 
   // Cache miss — compute
   const value = await compute();

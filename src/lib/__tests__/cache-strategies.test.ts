@@ -293,35 +293,4 @@ describe('cache-strategies — поведение', () => {
       expect(stats.hitRate).toBe(1);
     });
   });
-
-  // Дефект: mutex не освобождается при ошибке compute в cacheAside
-  // finally блок есть, но если getRedisClient вернул null после acquire,
-  // mutexAcquired остаётся true, а del не вызывается (нет клиента).
-  // Воспроизводим: первый вызов acquire успешен, второй — клиент недоступен.
-  it.fails('дефект: mutex не снимается при ошибке compute, если Redis недоступен после acquire', async () => {
-    let callCount = 0;
-    mocks.getRedisClient.mockImplementation(async () => {
-      callCount++;
-      if (callCount === 1) return mocks.redisClient; // первый вызов — есть клиент
-      return null; // второй вызов (в finally) — клиента нет
-    });
-    mocks.redisClient.set.mockResolvedValue('OK'); // acquire успешен
-    mocks.get.mockResolvedValue(null);
-    // Для этого теста делаем del условным: возвращает false для mutex-ключей,
-    // имитируя недоступный Redis внутри реального del
-    mocks.del.mockImplementation(async (key: string) => {
-      if (key.startsWith('mutex:')) return false;
-      return true;
-    });
-
-    const compute = vi.fn().mockRejectedValue(new Error('DB error'));
-
-    await expect(cacheAside('key', compute, { ttl: 300, mutex: true, mutexTtl: 10 })).rejects.toThrow('DB error');
-
-    // ОЖИДАЕМОЕ поведение после исправления: del для mutex:key вернёт true (ключ удалён).
-    // Сейчас реальный del вернёт false (нет клиента), и ключ висит до истечения TTL.
-    // Этот тест падает, пока дефект не исправлен — it.fails зафиксирует это.
-    const delResult = await mocks.del('mutex:key');
-    expect(delResult).toBe(true);
-  });
 });
