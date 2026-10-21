@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const m = vi.hoisted(() => {
   const tx = {
-    site: { update: vi.fn(), findUnique: vi.fn(), create: vi.fn() },
+    site: { updateMany: vi.fn(), findUnique: vi.fn(), create: vi.fn() },
     sitePilePlan: { deleteMany: vi.fn(), create: vi.fn(), createMany: vi.fn() },
     siteDrillingPlan: { deleteMany: vi.fn(), create: vi.fn(), createMany: vi.fn() },
   };
@@ -28,13 +28,14 @@ describe('updateSiteWithPlans safety', () => {
     vi.clearAllMocks();
     m.siteFindFirst.mockResolvedValue({ id: 's1', tenantId: 't1', name: 'Site', plannedPiles: 10, plannedDrilling: 20 });
     m.tx.site.findUnique.mockResolvedValue({ id: 's1', name: 'Site', plannedPiles: 10, plannedDrilling: 15 });
+    m.tx.site.updateMany.mockResolvedValue({ count: 1 });
   });
 
   it('preserves omitted pile plans while replacing supplied drilling plans', async () => {
     await updateSiteWithPlans('s1', { drillingPlans: [{ diameter: 300, count: 3, metersPerUnit: 5 }] }, { tenantId: 't1', actorId: 'a1' });
     expect(m.tx.sitePilePlan.deleteMany).not.toHaveBeenCalled();
     expect(m.tx.siteDrillingPlan.deleteMany).toHaveBeenCalledWith({ where: { siteId: 's1' } });
-    expect(m.tx.site.update).toHaveBeenCalledWith(expect.objectContaining({
+    expect(m.tx.site.updateMany).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({ plannedPiles: undefined, plannedDrilling: 15 }),
     }));
   });

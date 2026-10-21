@@ -174,9 +174,10 @@ export async function updateSiteWithPlans(siteId: string, input: {
     : undefined;
 
   const updated = await db.$transaction(async (tx) => {
-    // Update site fields
-    await tx.site.update({
-      where: { id: siteId },
+    // Условие по updatedAt: безусловная запись воскрешала бы объект, удалённый
+    // или изменённый другим администратором после нашего чтения.
+    const claimed = await tx.site.updateMany({
+      where: { id: siteId, tenantId: ctx.tenantId, updatedAt: existing.updatedAt },
       data: {
         name: input.name !== undefined ? input.name.trim() : undefined,
         plannedPiles: hasPilePlans ? normalized.plannedPiles : input.plannedPiles,
@@ -186,6 +187,7 @@ export async function updateSiteWithPlans(siteId: string, input: {
         ...(completionDate && { completionDate }),
       },
     });
+    if (claimed.count !== 1) throw new ServiceError('Объект изменён или удалён. Обновите список.', 409);
 
     // Delete old plans
     if (hasPilePlans) await tx.sitePilePlan.deleteMany({ where: { siteId } });
@@ -288,10 +290,11 @@ export async function hardDeleteSite(siteId: string, ctx: SiteCommandContext) {
 export async function setSiteCompleted(siteId: string, completed: boolean, ctx: SiteCommandContext) {
   const site = await requireTenantSite(siteId, ctx.tenantId);
 
-  await db.site.update({
-    where: { id: siteId },
+  const claimed = await db.site.updateMany({
+    where: { id: siteId, tenantId: ctx.tenantId, updatedAt: site.updatedAt },
     data: { completionDate: completed ? new Date() : null },
   });
+  if (claimed.count !== 1) throw new ServiceError('Объект изменён или удалён. Обновите список.', 409);
 
   await recordAuditEvent({
     action: completed ? 'site.completed' : 'site.completion_cleared',
