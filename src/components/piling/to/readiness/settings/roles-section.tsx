@@ -166,7 +166,9 @@ export function RolesSettings({ bootstrap }: RolesSettingsProps) {
       const response = await authFetch('/api/readiness/access-matrix', {
         method: 'PUT',
         headers: { 'content-type': 'application/json', 'idempotency-key': crypto.randomUUID() },
-        body: JSON.stringify({ grants: next }),
+        // Версия, на которой основана правка: сервер откажет, если матрицу уже
+        // сохранил другой администратор, вместо того чтобы стереть его правку.
+        body: JSON.stringify({ grants: next, version: (state?.draft ?? state?.published)?.version }),
       });
       if (!response.ok) throw new Error((await response.json().catch(() => ({}))).error?.message ?? 'Не удалось сохранить');
       setState((await response.json()).data as AccessMatrixState);

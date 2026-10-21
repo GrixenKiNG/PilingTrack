@@ -18,6 +18,7 @@ import {
 } from '../domain/access-matrix';
 import { bumpVersion } from '../domain/readiness-rules';
 import { recordChainedReadinessAudit } from '../infrastructure/audit/record-audit';
+import { ReadinessCommandError } from './command-pipeline/errors';
 
 export interface AccessMatrixState {
   published: ReadinessAccessMatrix;
@@ -169,6 +170,19 @@ export async function saveAccessMatrixDraft(
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`readiness-draft:matrix:${tenantId}`}))`;
 
     const state = await getAccessMatrix(tenantId, tx);
+    // Экран присылает матрицу целиком, поэтому правка, основанная на устаревшей
+    // версии, молча стёрла бы то, что второй администратор сохранил после
+    // загрузки. Версия, на которой основана правка, сверяется с текущей под
+    // замком. Тело без версии пропускается: так вели себя прежние клиенты.
+    const expectedVersion = typeof patch === 'object' && patch !== null
+      ? (patch as { version?: unknown }).version
+      : undefined;
+    if (typeof expectedVersion === 'string' && expectedVersion !== (state.draft ?? state.published).version) {
+      throw new ReadinessCommandError(
+        'VERSION_CONFLICT', 409,
+        'Матрица доступов изменена другим пользователем. Обновите страницу и повторите правку',
+      );
+    }
     const next = sanitizeAccessMatrix(patch, state.draft ?? state.published);
     const existing = await tx.readinessAccessMatrix.findFirst({
       where: { tenantId, status: 'DRAFT' },
