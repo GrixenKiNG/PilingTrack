@@ -2,6 +2,7 @@
  * Crew Repository
  */
 
+import type { Prisma } from '@/generated/postgres-client/client';
 import { db, DEFAULT_TX_OPTIONS } from '@/lib/db';
 import { CrewAggregate } from '../domain';
 import { toPrismaData, fromPrismaToState, toOutboxData } from './crew.prisma.mapper';
@@ -12,8 +13,7 @@ import { toPrismaData, fromPrismaToState, toOutboxData } from './crew.prisma.map
  * tx rolls back, those side-effects roll back too. Mirrors the report repo.
  */
 export interface CrewSaveHooks {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Prisma interactive-transaction callback client type isn't cleanly exported
-  onBeforeCommit?: (tx: any) => Promise<void>;
+  onBeforeCommit?: (tx: Prisma.TransactionClient) => Promise<void>;
 }
 
 export interface CrewRepository {
@@ -27,8 +27,7 @@ export class PrismaCrewRepository implements CrewRepository {
     const persistenceData = toPrismaData(aggregate);
     const pendingEvents = aggregate.getPendingEvents();
     // Transactional outbox: crew data + outbox events + caller hooks in one tx
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Prisma interactive-transaction callback client type isn't cleanly exported
-    await db.$transaction(async (tx: any) => {
+    await db.$transaction(async (tx: Prisma.TransactionClient) => {
       await tx.crew.upsert({
         where: { id: state.id },
         create: persistenceData,
@@ -53,8 +52,7 @@ export class PrismaCrewRepository implements CrewRepository {
             aggregateId: data.aggregateId,
             aggregateType: data.aggregateType,
             tenantId: data.tenantId,
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Prisma JSON column / event payload is an arbitrary serializable shape
-            payload: data.payload as any,
+            payload: data.payload as Prisma.InputJsonValue,
           };
         });
         await tx.outboxEvent.createMany({ data: outboxRecords });
