@@ -192,7 +192,7 @@ export async function createCrew(command: CreateCrewCommand) {
 
   // Кэш списка сбрасываем сразу после коммита, до чтения ответа и аудита: сбой
   // любого из них после записи оставлял бы в кэше устаревший список до TTL.
-  await invalidateCrews();
+  if (site.tenantId) await invalidateCrews(site.tenantId);
 
   const created = await db.crew.findUnique({
     where: { id: aggregate.getState().id },
@@ -317,7 +317,7 @@ export async function updateCrew(command: UpdateCrewCommand) {
   });
 
   // Сразу после коммита, до чтения ответа и аудита — см. createCrew.
-  await invalidateCrews();
+  await invalidateCrews(command.tenantId);
 
   const updated = await db.crew.findUnique({
     where: { id: command.crewId },
@@ -365,7 +365,7 @@ export async function deleteCrew(command: DeleteCrewCommand) {
   await repo.save(aggregate);
 
   // Сразу после коммита, до аудита — см. createCrew.
-  await invalidateCrews();
+  await invalidateCrews(command.tenantId);
 
   await recordAuditEvent({
     action: 'crew.deleted',

@@ -6,7 +6,7 @@
  * Implements cache-aside pattern with stampede protection.
  *
  * Cache key patterns:
- *   crews:all          — All crews
+ *   crews:{tenant}:all — Active crews of one organization
  *   dictionary:{type}  — Dictionary items by type
  *
  * TTL defaults:
@@ -34,11 +34,12 @@ const TTL = {
 // Crews
 // ============================================================
 
-export async function getCachedCrewsAll() {
+export async function getCachedCrewsAll(tenantId: string) {
   return cacheAside(
-    'crews:all',
+    `crews:${tenantId}:all`,
     () => db.crew.findMany({
-      where: { isActive: true },
+      // У бригады нет своего tenantId — её организация это организация объекта.
+      where: { isActive: true, site: { tenantId } },
       include: {
         operator: { select: { id: true, name: true } },
         equipment: { select: { id: true, name: true } },
@@ -123,8 +124,8 @@ export function invalidateReports(): void {
   getResponseCache('reports').invalidate('GET:/api/reports');
 }
 
-export async function invalidateCrews(): Promise<void> {
-  await cacheAsideInvalidate('crews:all');
+export async function invalidateCrews(tenantId: string): Promise<void> {
+  await cacheAsideInvalidate(`crews:${tenantId}:all`);
   recordDeletion();
 }
 
