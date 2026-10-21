@@ -9,20 +9,28 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { siteFindUniqueMock, dailySummariesMock, upsertMock, infoMock } = vi.hoisted(() => ({
+const { siteFindUniqueMock, dailySummariesMock, upsertMock, infoMock, lockMock } = vi.hoisted(() => ({
   siteFindUniqueMock: vi.fn(),
   dailySummariesMock: vi.fn(),
   upsertMock: vi.fn(),
   infoMock: vi.fn(),
+  lockMock: vi.fn(),
 }));
 
-vi.mock('@/lib/db', () => ({
-  db: {
+vi.mock('@/lib/db', () => {
+  const client = {
     site: { findUnique: siteFindUniqueMock },
     siteDailySummary: { findMany: dailySummariesMock },
     siteWeeklyTrend: { upsert: upsertMock },
-  },
-}));
+    $executeRaw: lockMock,
+  };
+  return {
+    db: {
+      ...client,
+      $transaction: (work: (tx: typeof client) => Promise<unknown>) => work(client),
+    },
+  };
+});
 
 vi.mock('@/lib/logger', () => ({
   logger: { info: infoMock, error: vi.fn(), warn: vi.fn(), debug: vi.fn() },
@@ -46,6 +54,8 @@ describe('projectWeeklyTrend — отсутствующий или невиди�
     dailySummariesMock.mockResolvedValue([]);
     upsertMock.mockReset();
     infoMock.mockReset();
+    lockMock.mockReset();
+    lockMock.mockResolvedValue(1);
   });
 
   it('объекта нет, контекст совпал с ожидаемой организацией → выход без ошибки, upsert не вызван', async () => {
@@ -113,5 +123,8 @@ describe('projectWeeklyTrend — отсутствующий или невиди�
         create: expect.objectContaining({ tenantId: 'tenant-a', totalPiles: 8, pilesTrend: 'UP' }),
       })
     );
+    // Замок на объект и неделю взят до чтения сводок.
+    expect(lockMock).toHaveBeenCalledTimes(1);
+    expect(lockMock.mock.invocationCallOrder[0]).toBeLessThan(dailySummariesMock.mock.invocationCallOrder[0]);
   });
 });

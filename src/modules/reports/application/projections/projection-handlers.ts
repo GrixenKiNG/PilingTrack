@@ -82,80 +82,89 @@ export async function projectWeeklyTrend(
   }
   const tenantId = site.tenantId;
 
-  const dailySummaries = await db.siteDailySummary.findMany({
-    where: {
-      siteId,
-      date: { gte: weekStart, lte: weekEnd },
-    },
-    orderBy: { date: 'asc' },
-  });
+  // Чтение сводок и запись тренда — одна транзакция под замком на объект и неделю,
+  // взятым ДО чтения. Без замка пересчёт, начавшийся раньше и прочитавший старые
+  // данные, мог записаться последним и затереть результат более нового: тренд
+  // показывал бы прошлое состояние до следующего события. Теперь второй
+  // пересчёт ждёт первый и читает уже свежие данные. Чтение и запись идут через
+  // tx, чтобы контекст организации (RLS) применялся внутри транзакции.
+  await db.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`weekly-trend:${siteId}:${weekStart}`}))`;
+    const dailySummaries = await tx.siteDailySummary.findMany({
+      where: {
+        siteId,
+        date: { gte: weekStart, lte: weekEnd },
+      },
+      orderBy: { date: 'asc' },
+    });
 
-  const dailyMetrics = dailySummaries.map((summary) => ({
-    date: summary.date,
-    piles: summary.totalPiles,
-    drilling: summary.totalDrilling,
-    downtime: summary.totalDowntime,
-    reports: summary.reportCount,
-  }));
+    const dailyMetrics = dailySummaries.map((summary) => ({
+      date: summary.date,
+      piles: summary.totalPiles,
+      drilling: summary.totalDrilling,
+      downtime: summary.totalDowntime,
+      reports: summary.reportCount,
+    }));
 
-  const totalPiles = dailySummaries.reduce((sum, summary) => sum + summary.totalPiles, 0);
-  const totalDrilling = dailySummaries.reduce((sum, summary) => sum + summary.totalDrilling, 0);
-  const totalDowntime = dailySummaries.reduce((sum, summary) => sum + summary.totalDowntime, 0);
-  const reportCount = dailySummaries.reduce((sum, summary) => sum + summary.reportCount, 0);
+    const totalPiles = dailySummaries.reduce((sum, summary) => sum + summary.totalPiles, 0);
+    const totalDrilling = dailySummaries.reduce((sum, summary) => sum + summary.totalDrilling, 0);
+    const totalDowntime = dailySummaries.reduce((sum, summary) => sum + summary.totalDowntime, 0);
+    const reportCount = dailySummaries.reduce((sum, summary) => sum + summary.reportCount, 0);
 
-  let pilesTrend: string | null = null;
-  let drillingTrend: string | null = null;
-  let downtimeTrend: string | null = null;
+    let pilesTrend: string | null = null;
+    let drillingTrend: string | null = null;
+    let downtimeTrend: string | null = null;
 
-  if (dailySummaries.length >= 2) {
-    const last = dailySummaries[dailySummaries.length - 1];
-    const previous = dailySummaries[dailySummaries.length - 2];
+    if (dailySummaries.length >= 2) {
+      const last = dailySummaries[dailySummaries.length - 1];
+      const previous = dailySummaries[dailySummaries.length - 2];
 
-    pilesTrend =
-      last.totalPiles > previous.totalPiles
-        ? 'UP'
-        : last.totalPiles < previous.totalPiles
-          ? 'DOWN'
-          : 'STABLE';
-    drillingTrend =
-      last.totalDrilling > previous.totalDrilling
-        ? 'UP'
-        : last.totalDrilling < previous.totalDrilling
-          ? 'DOWN'
-          : 'STABLE';
-    downtimeTrend =
-      last.totalDowntime < previous.totalDowntime
-        ? 'UP'
-        : last.totalDowntime > previous.totalDowntime
-          ? 'DOWN'
-          : 'STABLE';
-  }
+      pilesTrend =
+        last.totalPiles > previous.totalPiles
+          ? 'UP'
+          : last.totalPiles < previous.totalPiles
+            ? 'DOWN'
+            : 'STABLE';
+      drillingTrend =
+        last.totalDrilling > previous.totalDrilling
+          ? 'UP'
+          : last.totalDrilling < previous.totalDrilling
+            ? 'DOWN'
+            : 'STABLE';
+      downtimeTrend =
+        last.totalDowntime < previous.totalDowntime
+          ? 'UP'
+          : last.totalDowntime > previous.totalDowntime
+            ? 'DOWN'
+            : 'STABLE';
+    }
 
-  await db.siteWeeklyTrend.upsert({
-    where: { siteId_weekStart: { siteId, weekStart } },
-    create: {
-      siteId,
-      tenantId,
-      weekStart,
-      weekEnd,
-      dailyMetrics: dailyMetrics as never,
-      totalPiles,
-      totalDrilling,
-      totalDowntime,
-      reportCount,
-      pilesTrend,
-      drillingTrend,
-      downtimeTrend,
-    },
-    update: {
-      dailyMetrics: dailyMetrics as never,
-      totalPiles,
-      totalDrilling,
-      totalDowntime,
-      reportCount,
-      pilesTrend,
-      drillingTrend,
-      downtimeTrend,
-    },
+    await tx.siteWeeklyTrend.upsert({
+      where: { siteId_weekStart: { siteId, weekStart } },
+      create: {
+        siteId,
+        tenantId,
+        weekStart,
+        weekEnd,
+        dailyMetrics: dailyMetrics as never,
+        totalPiles,
+        totalDrilling,
+        totalDowntime,
+        reportCount,
+        pilesTrend,
+        drillingTrend,
+        downtimeTrend,
+      },
+      update: {
+        dailyMetrics: dailyMetrics as never,
+        totalPiles,
+        totalDrilling,
+        totalDowntime,
+        reportCount,
+        pilesTrend,
+        drillingTrend,
+        downtimeTrend,
+      },
+    });
   });
 }
