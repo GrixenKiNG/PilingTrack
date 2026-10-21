@@ -149,7 +149,8 @@ export function contentMatchesMagicBytes(contentType: string, bytes: Buffer): bo
     'application/msword': (b) => b.length >= 8 && b.subarray(0, 8).equals(Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1])),
     // .docx is a ZIP container — PK\x03\x04 (regular), \x05\x06 (empty), \x07\x08 (spanned).
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document': (b) =>
-      b.length >= 4 && b[0] === 0x50 && b[1] === 0x4b && (b[2] === 0x03 || b[2] === 0x05 || b[2] === 0x07),
+      b.length >= 4 && b[0] === 0x50 && b[1] === 0x4b
+      && ((b[2] === 0x03 && b[3] === 0x04) || (b[2] === 0x05 && b[3] === 0x06) || (b[2] === 0x07 && b[3] === 0x08)),
   };
 
   const check = checks[contentType];

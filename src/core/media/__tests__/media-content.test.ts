@@ -102,10 +102,9 @@ describe('DEFAULT_MEDIA_CONFIG: лимит и согласованность all
 });
 
 describe('contentMatchesMagicBytes: дефект проверки ZIP-заголовка', () => {
-  it.fails('отвергает ZIP-заголовок с неверным четвёртым байтом', () => {
-    // дефект: для .docx сверяются только три байта (PK\x03/05/07), а четвёртый
-    // не проверяется. 50 4B 03 07 не является заголовком ZIP (local file
-    // header — 03 04, empty archive — 05 06, spanned — 07 08), но проходит.
+  it('отвергает ZIP-заголовок с неверным четвёртым байтом', () => {
+    // 50 4B 03 07 не является заголовком ZIP (local file header — 03 04,
+    // empty archive — 05 06, spanned — 07 08): сверяются все четыре байта.
     expect(contentMatchesMagicBytes(DOCX, Buffer.from([0x50, 0x4b, 0x03, 0x07]))).toBe(false);
   });
 });

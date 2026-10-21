@@ -122,7 +122,7 @@ function buildParts(sheets: XlsxSheet[]): Record<string, string> {
     '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" ' +
     'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>' +
     sheets
-      .map((sheet, i) => `<sheet name="${xmlEscape(sanitize(sheet.name)).slice(0, 31)}" sheetId="${i + 1}" r:id="rId${i + 1}"/>`)
+      .map((sheet, i) => `<sheet name="${xmlEscape(sanitize(sheet.name).slice(0, 31))}" sheetId="${i + 1}" r:id="rId${i + 1}"/>`)
       .join('') +
     '</sheets></workbook>';
 
