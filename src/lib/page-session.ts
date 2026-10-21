@@ -47,9 +47,7 @@ export async function readPageSessionUser(): Promise<PageSessionUser | null> {
 
   return runWithTenantContext(async () => {
     const claimedTenantId = tokenTenantId(payload);
-    if (claimedTenantId !== undefined) {
-      setRequestTenantId(claimedTenantId);
-    }
+    setRequestTenantId(claimedTenantId);
 
     const user = await db.user.findUnique({
       where: { id: payload.sub },
@@ -66,7 +64,7 @@ export async function readPageSessionUser(): Promise<PageSessionUser | null> {
 
     // Токен утверждает одну организацию, строка говорит другую — пользователя
     // перевели, а токен остался старый.
-    if (claimedTenantId !== undefined && user.tenantId !== claimedTenantId) {
+    if (user.tenantId !== claimedTenantId) {
       return null;
     }
 

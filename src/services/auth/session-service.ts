@@ -50,12 +50,11 @@ interface SessionPayload extends JWTPayload {
 }
 
 /**
- * Организация, которую утверждает токен, или `undefined`, если он её не несёт
- * (версия 1). Различие важное: `null` — «пользователь без организации», а
- * `undefined` — «токен об этом не говорит, спрашивай базу».
+ * Организация, которую утверждает токен; `null` — «пользователь без
+ * организации».
  */
-export function tokenTenantId(payload: SessionPayload): string | null | undefined {
-  return payload.v >= SESSION_TOKEN_VERSION ? payload.tenantId ?? null : undefined;
+export function tokenTenantId(payload: SessionPayload): string | null {
+  return payload.tenantId ?? null;
 }
 
 let devFallbackWarned = false;

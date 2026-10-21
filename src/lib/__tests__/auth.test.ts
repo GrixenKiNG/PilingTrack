@@ -15,9 +15,8 @@ const mocks = vi.hoisted(() => ({
 vi.mock('@/services/auth/session-service', () => ({
   readSessionToken: mocks.readSessionToken,
   verifySessionToken: mocks.verifySessionToken,
-  // Настоящая реализация: версия 2 отдаёт организацию, версия 1 — undefined.
-  tokenTenantId: (payload: { v?: number; tenantId?: string | null }) =>
-    (payload.v ?? 1) >= 2 ? payload.tenantId ?? null : undefined,
+  // Настоящая реализация.
+  tokenTenantId: (payload: { tenantId?: string | null }) => payload.tenantId ?? null,
 }));
 
 vi.mock('@/core/security/tenant-context', () => ({
@@ -171,22 +170,6 @@ describe('requireAuth', () => {
     // Ровно этот порядок и есть условие перевода политик в fail-closed:
     // строгая политика не отдаст строку, пока контекст не выставлен.
     expect(mocks.calls.indexOf('setTenant:orion')).toBeLessThan(mocks.calls.indexOf('findUnique'));
-  });
-
-  it('токен версии 1 организацию не несёт — порядок прежний, чтение первым', async () => {
-    mocks.verifySessionToken.mockResolvedValue({
-      sub: 'user-1', sv: 0, type: 'session', v: 1,
-    });
-    mocks.findUnique.mockImplementation(() => {
-      mocks.calls.push('findUnique');
-      return Promise.resolve(userRow());
-    });
-
-    const { requireAuth } = await import('../auth');
-    const result = await requireAuth(createRequest());
-
-    expect(result.error).toBeNull();
-    expect(mocks.calls.indexOf('findUnique')).toBeLessThan(mocks.calls.indexOf('setTenant:orion'));
   });
 
   it('токен с чужой организацией отклоняется, даже когда счётчик версии совпал', async () => {

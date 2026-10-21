@@ -80,13 +80,9 @@ async function resolveSessionUser(token: string): Promise<SessionResolution> {
 
     // Организация выставляется ДО чтения строки пользователя, а не после.
     // Иначе получается замкнутый круг: строгая политика RLS требует контекст,
-    // чтобы отдать строку, а контекст берётся из этой самой строки. Токен
-    // версии 1 организацию не несёт — там порядок прежний, и это работает,
-    // пока политики в режиме аудита.
+    // чтобы отдать строку, а контекст берётся из этой самой строки.
     const claimedTenantId = tokenTenantId(payload);
-    if (claimedTenantId !== undefined) {
-      setRequestTenantId(claimedTenantId);
-    }
+    setRequestTenantId(claimedTenantId);
 
     const user = await db.user.findUnique({
       where: { id: payload.sub },
@@ -112,7 +108,7 @@ async function resolveSessionUser(token: string): Promise<SessionResolution> {
     // запрос уже идёт под организацией из токена. Штатно этот случай
     // закрывает отзыв по sessionVersion, проверка здесь — на случай, если
     // счётчик забыли увеличить.
-    if (claimedTenantId !== undefined && user.tenantId !== claimedTenantId) {
+    if (user.tenantId !== claimedTenantId) {
       authUserCache.delete(token);
       return { payloadValid: true, user: null };
     }
