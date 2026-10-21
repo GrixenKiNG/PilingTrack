@@ -146,11 +146,9 @@ describe('версии и содержимое токена', () => {
       .sign(new TextEncoder().encode(SECRET));
   }
 
-  it('принимает токен версии 1 и не берёт из него организацию', async () => {
+  it('отвергает токен версии 1: окно перехода на версию 2 закрыто', async () => {
     const s = await load();
-    const payload = await s.verifyTokenSignature(await signed({type: 'session', v: 1}));
-    expect(payload).not.toBeNull();
-    expect(s.tokenTenantId(payload as NonNullable<typeof payload>)).toBeUndefined();
+    expect(await s.verifyTokenSignature(await signed({type: 'session', v: 1}))).toBeNull();
   });
 
   it('токен версии 2 несёт организацию, а отсутствие организации — это null', async () => {

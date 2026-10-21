@@ -31,14 +31,10 @@ export interface SessionUser {
 const SESSION_TOKEN_VERSION = 2;
 
 /**
- * Какие версии принимаем при проверке.
- *
- * Единица остаётся принятой на время смены формата: токены живут 12 часов,
- * значит выданные до выкладки рассосутся сами за половину суток. Убрать 1 из
- * списка можно любым следующим изменением — но не раньше, иначе выкладка
- * разлогинит всех разом.
+ * Какие версии принимаем при проверке. Единица убрана: версия 2 на проде с
+ * 19.08.2026, токены живут 12 часов, выданные ранее давно истекли.
  */
-const ACCEPTED_SESSION_TOKEN_VERSIONS: readonly number[] = [1, SESSION_TOKEN_VERSION];
+const ACCEPTED_SESSION_TOKEN_VERSIONS: readonly number[] = [SESSION_TOKEN_VERSION];
 
 interface SessionPayload extends JWTPayload {
   sub: string;
