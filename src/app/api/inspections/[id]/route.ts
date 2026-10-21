@@ -20,6 +20,9 @@ const answersSchema = z.object({
       photoCount: z.number().int().min(0).optional(),
     })
   ),
+  // Версия осмотра (updatedAt), на которой основан набор. Необязательна: клиенты
+  // без неё ведут себя как раньше; с ней устаревший набор не затрёт свежий.
+  expectedUpdatedAt: z.string().datetime().optional(),
 });
 
 export const GET = withApi(
@@ -61,8 +64,12 @@ export const PUT = withMutation(
       );
     }
     try {
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
-      const inspection = await saveAnswers(id, parsed.data.answers, { tenantId, performerId: user!.role === 'OPERATOR' ? user!.id : null });
+      const inspection = await saveAnswers(
+        id, parsed.data.answers,
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
+        { tenantId, performerId: user!.role === 'OPERATOR' ? user!.id : null },
+        parsed.data.expectedUpdatedAt ? new Date(parsed.data.expectedUpdatedAt) : undefined,
+      );
       await recordAuditEvent({
         action: 'inspection.answers_saved', scope: 'inspections', actorId: user?.id,
         targetId: id, tenantId, metadata: { answerCount: parsed.data.answers.length },

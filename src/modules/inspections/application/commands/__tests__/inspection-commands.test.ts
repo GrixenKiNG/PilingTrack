@@ -263,12 +263,13 @@ describe('completeInspection', () => {
     expect(m.recUpdateMany.mock.calls[0][0].where).toMatchObject({ id: 'rec1', tenantId: 'orion' });
   });
   it.each(['HIGH', 'CRITICAL', 'NORMAL'])('queues only new dangerous %s defects in the completion transaction', async (severity) => {
-    m.insFindUnique.mockResolvedValue({
+    const draft = {
       id: 'ins1', tenantId: 'orion', status: 'DRAFT', equipmentId: 'eq1', performedById: 'u1',
       templateSnapshot: [{ id: 'i1', text: 'Течь гидравлики', answerType: 'YES_NO', required: true,
         photoRequired: false, createsDefect: true, defectSeverity: severity }],
       answers: [{ itemId: 'i1', result: 'NO', photoCount: 0 }],
-    });
+    };
+    m.insFindUnique.mockResolvedValue(draft);
     m.insFindUniqueOrThrow.mockResolvedValue({ id: 'ins1', status: 'COMPLETED' });
     m.defectCreate.mockResolvedValue({ id: 'd1' });
     m.recCreate.mockResolvedValue({ id: 'rec-repair' });
@@ -298,6 +299,8 @@ describe('completeInspection', () => {
     await completeInspectionWithOutcome('ins1', { tenantId: 'orion', signedByName: 'Иванов' });
     expect(m.defectCreate).not.toHaveBeenCalled();
     expect(m.outboxAlertCreate).not.toHaveBeenCalled();
+    // Повтор: после неудачного захвата чтение уже видит завершённый осмотр.
+    m.insFindUnique.mockResolvedValueOnce(draft).mockResolvedValueOnce({ ...draft, status: 'COMPLETED' });
     m.insUpdateMany.mockResolvedValue({ count: 0 });
     await completeInspectionWithOutcome('ins1', { tenantId: 'orion', signedByName: 'Иванов' });
     expect(m.defectCreate).not.toHaveBeenCalled();
@@ -341,11 +344,13 @@ describe('completeInspection', () => {
     // Обрыв связи, двойное нажатие, ретрай телефона. Раньше второй запрос
     // доходил до конца и заводил вторые моточасы — а от них считаются сроки
     // планового ТО.
-    m.insFindUnique.mockResolvedValue({
+    const draft = {
       id: 'ins1', tenantId: 'orion', status: 'DRAFT', equipmentId: 'eq1', engineHours: 1200,
       templateSnapshot: [{ id: 'i1', answerType: 'YES_NO', required: true, photoRequired: false }],
       answers: [{ itemId: 'i1', result: 'YES', photoCount: 0 }],
-    });
+    };
+    // Первое чтение видит черновик; после неудачного захвата осмотр уже завершён.
+    m.insFindUnique.mockResolvedValueOnce(draft).mockResolvedValueOnce({ ...draft, status: 'COMPLETED' });
     m.insUpdateMany.mockResolvedValue({ count: 0 });
 
     const { inspection: res } = await completeInspectionWithOutcome('ins1', { tenantId: 'orion', signedByName: 'Иванов' });
@@ -364,11 +369,12 @@ describe('completeInspection', () => {
    * (F-R84-INSPECTION-DUP-EVENT).
    */
   it('сообщает признак повтора: первый вызов false, второй true', async () => {
-    m.insFindUnique.mockResolvedValue({
+    const draft = {
       id: 'ins1', tenantId: 'orion', status: 'DRAFT', equipmentId: 'eq1',
       templateSnapshot: [{ id: 'i1', answerType: 'YES_NO', required: true, photoRequired: false }],
       answers: [{ itemId: 'i1', result: 'YES', photoCount: 0 }],
-    });
+    };
+    m.insFindUnique.mockResolvedValue(draft);
     m.insUpdateMany.mockResolvedValue({ count: 1 });
     m.insFindUniqueOrThrow.mockResolvedValue({ id: 'ins1', status: 'COMPLETED', equipmentId: 'eq1' });
 
@@ -377,6 +383,7 @@ describe('completeInspection', () => {
     expect(first.inspection).toMatchObject({ status: 'COMPLETED' });
 
     // Повтор: строка осмотра уже завершена, условный переход не состоялся.
+    m.insFindUnique.mockResolvedValueOnce(draft).mockResolvedValueOnce({ ...draft, status: 'COMPLETED' });
     m.insUpdateMany.mockResolvedValue({ count: 0 });
     const second = await completeInspectionWithOutcome('ins1', { tenantId: 'orion', signedByName: 'Иванов' });
     expect(second.replayed).toBe(true);

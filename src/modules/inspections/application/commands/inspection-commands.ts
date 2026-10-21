@@ -262,10 +262,18 @@ async function countInspectionPhotos(
   return counts;
 }
 
+/**
+ * `expectedUpdatedAt` — версия осмотра (updatedAt), на которой основан набор
+ * ответов у клиента. Набор заменяется целиком, поэтому без версии клиент с
+ * устаревшими данными молча стирал более свежие ответы другого клиента. Если
+ * версия прислана и строка успела измениться, запись отклоняется. Клиенты,
+ * которые версию не шлют, ведут себя как раньше.
+ */
 export async function saveAnswers(
   id: string,
   answers: AnswerInput[],
   ctx: { tenantId: string; performerId?: string | null },
+  expectedUpdatedAt?: Date,
 ) {
   if (!ctx.tenantId) throw new ServiceError('tenantId is required', 400);
   const ins = await db.inspection.findUnique({
@@ -295,9 +303,21 @@ export async function saveAnswers(
     // встаёт на блокировке строки осмотра, а после коммита первого удаляет
     // его ответы и пишет свои: в базе остаётся ровно один набор.
     const claimed = await tx.inspection.updateMany({
-      where: { id, tenantId: ctx.tenantId, status: { not: 'COMPLETED' } },
+      where: {
+        id, tenantId: ctx.tenantId, status: { not: 'COMPLETED' },
+        ...(expectedUpdatedAt ? { updatedAt: expectedUpdatedAt } : {}),
+      },
       data: { updatedAt: now },
     });
+    if (claimed.count === 0 && expectedUpdatedAt) {
+      // Версия прислана: отказ значит либо «завершён», либо «ответы уже
+      // заменил другой клиент». Различаем, чтобы человек понял, что делать.
+      const current = await tx.inspection.findUnique({ where: { id }, select: { status: true } });
+      if (!current) throw new ServiceError('Осмотр не найден — обновите список.', 404);
+      if (current.status !== 'COMPLETED') {
+        throw new ServiceError('Осмотр изменён другим запросом. Обновите осмотр и повторите.', 409);
+      }
+    }
     if (claimed.count === 0) {
       // Осмотр завершили, пока писали ответы. По завершённым ответам уже
       // посчитаны и подпись, и решение о допуске машины — переписывать их
@@ -411,19 +431,28 @@ export async function completeInspectionWithOutcome(
     //
     // `updateMany` с условием на статус делает переход одноразовым: второй
     // запрос не поменяет ни строки и выйдет отсюда, ничего не записав.
+    //
+    // Условие по `updatedAt` — версия осмотра на момент чтения ответов выше.
+    // saveAnswers двигает её при каждом сохранении, поэтому ответы, сохранённые
+    // между чтением и этой записью, делают условие ложным: иначе осмотр
+    // подписывался бы и допускался по устаревшему набору ответов, а баллы и
+    // дефекты считались бы по нему.
     const claimed = await tx.inspection.updateMany({
-      where: { id, tenantId: ctx.tenantId, status: { not: 'COMPLETED' } },
+      where: { id, tenantId: ctx.tenantId, status: { not: 'COMPLETED' }, updatedAt: ins.updatedAt },
       data: { status: 'COMPLETED', healthScore, signedByName: ctx.signedByName, signedAt: now },
     });
     if (claimed.count === 0) {
+      const current = await tx.inspection.findUnique({ where: { id }, include: { answers: true } });
+      // Осмотр не завершён, но версия сдвинулась: ответы изменили, пока шёл
+      // расчёт. Завершать по старым нельзя, пусть пользователь проверит новые.
+      if (current && current.status !== 'COMPLETED') {
+        throw new ServiceError('Ответы осмотра изменились. Проверьте их и завершите осмотр заново.', 409);
+      }
       // Осмотр уже завершён — это не ошибка, а повтор. Возвращаем то, что
       // есть: телефон получит тот же ответ, что и с первой попытки.
       // `replayed: true` — перехода не было, вызывающий не должен повторять
       // побочные действия (запись события в ленту).
-      return {
-        inspection: await tx.inspection.findUnique({ where: { id }, include: { answers: true } }),
-        replayed: true,
-      };
+      return { inspection: current, replayed: true };
     }
     const inspection = await tx.inspection.findUniqueOrThrow({ where: { id } });
     // Запись ТО заводится вместе с осмотром и закрывается вместе с ним. Без
