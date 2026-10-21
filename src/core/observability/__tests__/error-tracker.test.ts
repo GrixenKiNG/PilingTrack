@@ -112,22 +112,21 @@ describe('работа без внешнего сервиса', () => {
 });
 
 describe('контекст и секреты', () => {
-  it.fails('не сохраняет в памяти пароль и токен из контекста', () => {
+  it('не сохраняет в памяти пароль и токен из контекста', () => {
     const d = newDomain('secrets');
 
     recordError({
       domain: d,
       error: new Error('не удалось войти'),
-      context: { password: 'Пароль123', token: 'Bearer eyJhbGciOi' },
+      context: { password: 'Пароль123', token: 'Bearer eyJhbGciOi', nested: { authorization: 'Bearer zzz' }, orderId: 7 },
     });
 
-    // дефект: context кладётся в records как есть (error-tracker.ts:46-51).
-    // Редактирования секретов, как в logger (X9), здесь нет, поэтому пароль и
-    // токен живут в памяти процесса до prune — если вызывающий положит их в
-    // контекст, трекер их сохранит.
+    // Секреты вырезаются так же, как в logger, а обычные поля остаются.
     const context = lastRecord(d)?.context ?? {};
     expect(JSON.stringify(context)).not.toContain('Пароль123');
     expect(JSON.stringify(context)).not.toContain('eyJhbGciOi');
+    expect(JSON.stringify(context)).not.toContain('Bearer zzz');
+    expect(context).toMatchObject({ orderId: 7 });
   });
 });
 

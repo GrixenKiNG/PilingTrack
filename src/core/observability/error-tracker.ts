@@ -10,6 +10,18 @@
  * For multi-instance, switch to Redis-based counter.
  */
 
+import { isSensitiveKey } from '@/lib/logger';
+
+/** Копия контекста без секретов — в памяти процесса они не нужны. */
+function redactContext(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(redactContext);
+  if (value && typeof value === 'object' && Object.getPrototypeOf(value) === Object.prototype) {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, inner]) => [key, isSensitiveKey(key) && inner != null ? '[REDACTED]' : redactContext(inner)]),
+    );
+  }
+  return value;
+}
 
 interface ErrorRecord {
   domain: string;
@@ -46,7 +58,7 @@ class ErrorTracker {
     this.records.push({
       domain: record.domain,
       error: record.error,
-      context: record.context || {},
+      context: redactContext(record.context || {}) as Record<string, unknown>,
       timestamp: Date.now(),
     });
 

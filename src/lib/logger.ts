@@ -42,6 +42,13 @@ function getMinLevel(): LogLevel {
   return process.env.NODE_ENV === 'production' ? 'info' : 'debug';
 }
 
+/** Ключ содержит секрет: пароль, токен, куки, телефон и т. п. */
+export function isSensitiveKey(key: string): boolean {
+  const normalized = key.toLowerCase().replace(/[-_]/g, '');
+  return /password|authorization|cookie|secret|initdata|phone|email/.test(normalized)
+    || /token(?:hash|value)?$/.test(normalized);
+}
+
 function formatEntry(
   level: LogLevel,
   message: string,
@@ -54,12 +61,9 @@ function formatEntry(
     ...data,
   };
 
-  return JSON.stringify(entry, (key, value: unknown) => {
-    const normalized = key.toLowerCase().replace(/[-_]/g, '');
-    const sensitive = /password|authorization|cookie|secret|initdata|phone|email/.test(normalized)
-      || /token(?:hash|value)?$/.test(normalized);
-    return sensitive && value != null ? '[REDACTED]' : value;
-  });
+  return JSON.stringify(entry, (key, value: unknown) =>
+    isSensitiveKey(key) && value != null ? '[REDACTED]' : value
+  );
 }
 
 function shouldLog(level: LogLevel): boolean {
