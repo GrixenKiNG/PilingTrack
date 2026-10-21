@@ -23,6 +23,14 @@ const RULE_NOTIFICATION_KEYS: Record<string, 'criticalDefect' | 'incidents'> = {
 /** Окно дедупликации алертов с `dedupeKey`: правки отчёта идут в 24-часовом окне. */
 const DEDUPE_TTL_SECONDS = 48 * 60 * 60;
 
+/** Метка в payload строки outbox: алерт уже ушёл, повтор только дописывает published. */
+const SENT_MARKER = 'telegramAlertSent';
+
+function hasSentMarker(payload: unknown): boolean {
+  return !!payload && typeof payload === 'object' && !Array.isArray(payload)
+    && (payload as Record<string, unknown>)[SENT_MARKER] === true;
+}
+
 /** Existing outbox backoff and DLQ handle thrown delivery errors. */
 export async function deliverQueuedAlert(event: {id?: string; tenantId?: string | null; data?: unknown}) {
   if (!event.id || !event.tenantId) throw new Error('Alert delivery requires event and tenant identity');
@@ -43,50 +51,80 @@ export async function deliverQueuedAlert(event: {id?: string; tenantId?: string 
   // по умолчанию и выключатель владельца молча игнорировался бы.
   const suppressed = key ? !await isNotificationEnabled(tenantId, key) : false;
   // Дедуп (F-R33-2): тот же простой приходит заново при каждом сохранении отчёта.
+  // Клиент Redis берём до транзакции, а сам ключ читаем ПОД блокировкой строки:
+  // два параллельных события с общим ключом иначе оба видят «не отправлено».
   // Нет Redis или он упал — шлём без дедупа: дубль лучше молчания.
   let redis: Awaited<ReturnType<typeof getRedisClient>> = null;
-  let duplicate = false;
   if (alert.dedupeKey && !suppressed) {
     try {
       redis = await getRedisClient();
-      duplicate = !!redis && !!await redis.get(alert.dedupeKey);
     } catch (err) {
       logger.warn('Alert dedupe check failed, sending anyway', {
         eventId: event.id, error: err instanceof Error ? err.message : String(err),
       });
-      redis = null;
     }
   }
   let sent = false;
+  let publishError: unknown;
   // Serialize competing workers; a replay of an already delivered row is a no-op.
   // Telegram does not support idempotency keys: an ambiguous network failure can
   // still repeat a message. Include the stable event id for recognition.
-  const complete = await db.$transaction(async tx => {
-    await tx.$queryRaw`SELECT id FROM "OutboxEvent" WHERE id = ${event.id} AND "tenantId" = ${event.tenantId} FOR UPDATE`;
-    const row = await tx.outboxEvent.findFirst({where: {id: event.id, tenantId: event.tenantId}});
+  let dedupeKeySet = false;
+  let complete: boolean;
+  try {
+    complete = await db.$transaction(async tx => {
+      await tx.$queryRaw`SELECT id FROM "OutboxEvent" WHERE id = ${event.id} AND "tenantId" = ${event.tenantId} FOR UPDATE`;
+      const row = await tx.outboxEvent.findFirst({where: {id: event.id, tenantId: event.tenantId}});
     if (!row || row.published) return true;
-    if (!suppressed && !duplicate) {
-      const progress = createTelegramDeliveryProgress(row.payload, async payload => {
-        await tx.outboxEvent.update({where: {id: row.id}, data: {payload}});
-      });
-      const delivered = await telegramNotifier.sendAlert({...alert, message: alert.message + '\nСобытие: ' + event.id}, progress);
-      // Commit acknowledged chats before throwing to the outbox retry loop.
-      if (!delivered) return false;
-      sent = true;
-    }
-    await tx.outboxEvent.update({where: {id: row.id}, data: {published: true, publishedAt: new Date(), lastError: null}});
-    return true;
-  }, {timeout: 60_000});
-  if (!complete) throw new Error('Telegram delivery failed; retained for retry');
-  // Ключ ставим только ПОСЛЕ успешной отправки: неудачная попытка должна
-  // остаться возможной к повтору, а не глушиться собственным дедупом.
-  if (sent && redis && alert.dedupeKey) {
-    try {
-      await redis.set(alert.dedupeKey, '1', 'EX', DEDUPE_TTL_SECONDS);
-    } catch (err) {
-      logger.warn('Alert dedupe key not set', {
-        eventId: event.id, error: err instanceof Error ? err.message : String(err),
-      });
-    }
+      let duplicate = false;
+      if (redis && alert.dedupeKey && !suppressed) {
+        try {
+          duplicate = !!await redis.get(alert.dedupeKey);
+        } catch (err) {
+          logger.warn('Alert dedupe check failed, sending anyway', {
+            eventId: event.id, error: err instanceof Error ? err.message : String(err),
+          });
+        }
+      }
+      if (!suppressed && !duplicate && !hasSentMarker(row.payload)) {
+        const progress = createTelegramDeliveryProgress(row.payload, async payload => {
+          await tx.outboxEvent.update({where: {id: row.id}, data: {payload}});
+        });
+        const delivered = await telegramNotifier.sendAlert({...alert, message: alert.message + '\nСобытие: ' + event.id}, progress);
+        // Commit acknowledged chats before throwing to the outbox retry loop.
+        if (!delivered) return false;
+        sent = true;
+        // Ключ ставим внутри транзакции, под блокировкой: параллельное событие с
+        // тем же ключом увидит его, а не уйдёт второй раз.
+        if (redis && alert.dedupeKey) {
+          try {
+            await redis.set(alert.dedupeKey, '1', 'EX', DEDUPE_TTL_SECONDS);
+            dedupeKeySet = true;
+          } catch (err) {
+            logger.warn('Alert dedupe key not set', {
+              eventId: event.id, error: err instanceof Error ? err.message : String(err),
+            });
+          }
+        }
+        // Отметка «отправлено» живёт в той же строке: если запись published ниже
+        // не удастся, транзакция всё равно фиксирует отметку, и повтор не шлёт заново.
+        const fresh = await tx.outboxEvent.findFirst({where: {id: row.id, tenantId: event.tenantId}});
+        const base = fresh?.payload && typeof fresh.payload === 'object' && !Array.isArray(fresh.payload) ? fresh.payload : {};
+        await tx.outboxEvent.update({where: {id: row.id}, data: {payload: {...base, [SENT_MARKER]: true}}});
+      }
+      try {
+        await tx.outboxEvent.update({where: {id: row.id}, data: {published: true, publishedAt: new Date(), lastError: null}});
+      } catch (err) {
+        if (!sent) throw err;
+        publishError = err;
+      }
+      return true;
+    }, {timeout: 60_000});
+  } catch (err) {
+    // Транзакция откатилась вместе с отметкой: ключ дедупа не должен глушить повтор.
+    if (dedupeKeySet && redis && alert.dedupeKey) await redis.del(alert.dedupeKey).catch(() => undefined);
+    throw err;
   }
+  if (publishError) throw publishError;
+  if (!complete) throw new Error('Telegram delivery failed; retained for retry');
 }
