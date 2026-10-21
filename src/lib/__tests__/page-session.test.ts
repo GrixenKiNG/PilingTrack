@@ -116,14 +116,11 @@ describe('readPageSessionUser', () => {
     await expect(readPageSessionUser()).resolves.toBeNull();
   });
 
-  it('токен версии 1 без организации: номер версии сессии считается нулевым', async () => {
+  it('токен версии 1 без организации у пользователя с организацией — null (fail closed)', async () => {
     mocks.payload = { sub: 'user-1', v: 1 };
     mocks.user = { role: 'OPERATOR', isActive: true, sessionVersion: 0, tenantId: 'tenant-a' };
 
-    await expect(readPageSessionUser()).resolves.toEqual({
-      role: 'OPERATOR',
-      isActive: true,
-      sessionVersion: 0,
-    });
+    await expect(readPageSessionUser()).resolves.toBeNull();
   });
+
 });
