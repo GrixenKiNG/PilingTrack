@@ -3,6 +3,7 @@
  */
 
 import { db, DEFAULT_TX_OPTIONS } from '@/lib/db';
+import { ServiceError } from '@/lib/service-error';
 import { CrewAggregate } from '../domain';
 import { toPrismaData, fromPrismaToState, toOutboxData } from './crew.prisma.mapper';
 
@@ -21,6 +22,13 @@ export interface CrewRepository {
   findById(id: string): Promise<CrewAggregate | null>;
 }
 
+/**
+ * updatedAt строки на момент чтения. Агрегат сам двигает state.updatedAt в
+ * «сейчас» при любой правке, поэтому ожидаемую версию берём не из состояния, а
+ * запоминаем при загрузке. Нет записи — бригада новая и пишется через create.
+ */
+const loadedVersions = new WeakMap<CrewAggregate, Date>();
+
 export class PrismaCrewRepository implements CrewRepository {
   async save(aggregate: CrewAggregate, hooks?: CrewSaveHooks): Promise<void> {
     const state = aggregate.getState();
@@ -29,17 +37,29 @@ export class PrismaCrewRepository implements CrewRepository {
     // Transactional outbox: crew data + outbox events + caller hooks in one tx
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Prisma interactive-transaction callback client type isn't cleanly exported
     await db.$transaction(async (tx: any) => {
-      await tx.crew.upsert({
-        where: { id: state.id },
-        create: persistenceData,
-        update: {
-          name: persistenceData.name,
-          operatorId: persistenceData.operatorId,
-          equipmentId: persistenceData.equipmentId,
-          siteId: persistenceData.siteId,
-          isActive: persistenceData.isActive,
-        },
-      });
+      const loadedAt = loadedVersions.get(aggregate);
+      if (loadedAt) {
+        // Загруженную бригаду пишем условно по updatedAt, прочитанному в
+        // findById. Безусловный upsert отдавал бы победу последнему писателю:
+        // устаревший запрос затирал переименование, возвращал расформированную
+        // бригаду и воскрешал удалённую. Условие делает потерю обновления
+        // конфликтом, который видит вызывающий.
+        const claimed = await tx.crew.updateMany({
+          where: { id: state.id, updatedAt: loadedAt },
+          data: {
+            name: persistenceData.name,
+            operatorId: persistenceData.operatorId,
+            equipmentId: persistenceData.equipmentId,
+            siteId: persistenceData.siteId,
+            isActive: persistenceData.isActive,
+          },
+        });
+        if (claimed.count !== 1) {
+          throw new ServiceError('Бригада изменена или удалена другим запросом. Обновите список.', 409);
+        }
+      } else {
+        await tx.crew.create({ data: persistenceData });
+      }
 
       if (pendingEvents.length > 0) {
         // Platform ADMIN may have another tenant: the crew belongs to its Site.
@@ -74,7 +94,9 @@ export class PrismaCrewRepository implements CrewRepository {
   async findById(id: string): Promise<CrewAggregate | null> {
     const prismaCrew = await db.crew.findUnique({ where: { id } });
     if (!prismaCrew) return null;
-    return CrewAggregate.reconstitute(fromPrismaToState(prismaCrew));
+    const aggregate = CrewAggregate.reconstitute(fromPrismaToState(prismaCrew));
+    loadedVersions.set(aggregate, prismaCrew.updatedAt);
+    return aggregate;
   }
 }
 

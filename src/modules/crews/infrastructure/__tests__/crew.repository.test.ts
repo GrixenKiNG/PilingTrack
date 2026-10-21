@@ -14,7 +14,7 @@ import { CrewAggregate } from '../../domain';
 const { tx, transactionMock } = vi.hoisted(() => {
   const tx = {
     site: { findUnique: vi.fn() },
-    crew: { upsert: vi.fn().mockResolvedValue({}) },
+    crew: { create: vi.fn().mockResolvedValue({}) },
     outboxEvent: { createMany: vi.fn().mockResolvedValue({}) },
   };
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test transaction shim
@@ -42,7 +42,7 @@ describe('PrismaCrewRepository.save — outbox tenantId', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     tx.site.findUnique.mockResolvedValue({ tenantId: "tenant-site" });
-    tx.crew.upsert.mockResolvedValue({});
+    tx.crew.create.mockResolvedValue({});
     tx.outboxEvent.createMany.mockResolvedValue({});
   });
 

@@ -12,7 +12,7 @@ import { SiteAggregate } from '../../domain';
 
 const { tx, transactionMock } = vi.hoisted(() => {
   const tx = {
-    site: { upsert: vi.fn().mockResolvedValue({}) },
+    site: { create: vi.fn().mockResolvedValue({}) },
     outboxEvent: { createMany: vi.fn().mockResolvedValue({}) },
   };
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test transaction shim
@@ -35,7 +35,7 @@ describe('PrismaSiteRepository.save — outbox tenantId', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    tx.site.upsert.mockResolvedValue({});
+    tx.site.create.mockResolvedValue({});
     tx.outboxEvent.createMany.mockResolvedValue({});
   });
 
