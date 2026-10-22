@@ -153,14 +153,38 @@ describe('getEquipmentAnalytics — maintenance flags delegate to checkMaintenan
     }));
     queryRaw.mockResolvedValueOnce(rows).mockResolvedValueOnce([]);
     groupBy.mockResolvedValue([
-      ...rows.map((row) => ({ equipmentId: row.equipmentId, _min: { value: 0 }, _max: { value: 0.05 } })),
-      { equipmentId: 'outside-fleet', _min: { value: 0 }, _max: { value: 100 } },
+      ...rows.map((row) => ({ equipmentId: row.equipmentId, _min: { value: 0 }, _max: { value: 0.05 }, _count: { _all: 2 } })),
+      { equipmentId: 'outside-fleet', _min: { value: 0 }, _max: { value: 100 }, _count: { _all: 2 } },
     ]);
 
     const result = await getEquipmentAnalytics({ dateFrom: '2026-01-01', dateTo: '2026-12-31', tenantId: 'orion' });
 
     expect(result.equipment[0]).toMatchObject({ pileMeters: 12.1, drillingMeters: 12.1, downtimeHours: 0.1, fuelLiters: 0.1 });
     expect(result.fleet).toMatchObject({ pileMeters: 482, drillingMeters: 482, downtimeHours: 2, fuelLiters: 2 });
+  });
+
+  it.each([0, 1, 2])('distinguishes unknown fuel from measured zero (%i samples)', async (count) => {
+    queryRaw.mockResolvedValueOnce([equipmentRow()]).mockResolvedValueOnce([]);
+    groupBy.mockResolvedValue(count ? [
+      { equipmentId: 'e1', _min: { value: 100 }, _max: { value: 100 }, _count: { _all: count } },
+    ] : []);
+
+    const result = await getEquipmentAnalytics({ dateFrom: '2026-01-01', dateTo: '2026-01-31', tenantId: 'orion' });
+
+    expect(result.equipment[0].fuelLiters).toBe(count >= 2 ? 0 : null);
+    expect(result.fleet.fuelLiters).toBe(count >= 2 ? 0 : null);
+  });
+
+  it('does not present a partial fuel sum as the whole fleet consumption', async () => {
+    queryRaw.mockResolvedValueOnce([equipmentRow(), equipmentRow({ equipmentId: 'e2' })]).mockResolvedValueOnce([]);
+    groupBy.mockResolvedValue([
+      { equipmentId: 'e1', _min: { value: 100 }, _max: { value: 125 }, _count: { _all: 2 } },
+    ]);
+
+    const result = await getEquipmentAnalytics({ dateFrom: '2026-01-01', dateTo: '2026-01-31', tenantId: 'orion' });
+
+    expect(result.equipment.map((row) => row.fuelLiters)).toEqual([25, null]);
+    expect(result.fleet.fuelLiters).toBeNull();
   });
 
   it('marks a service date inside the soon window as soon, not overdue', async () => {

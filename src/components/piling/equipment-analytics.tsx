@@ -39,7 +39,7 @@ interface EquipmentRow {
   drillingCount: number;
   drillingMeters: number;
   downtimeHours: number;
-  fuelLiters: number;
+  fuelLiters: number | null;
   engineHoursTotal: number | null;
   nextMaintenanceAtHours: number | null;
   nextMaintenanceDate: string | null;
@@ -60,7 +60,7 @@ interface AnalyticsResult {
     drillingCount: number;
     drillingMeters: number;
     downtimeHours: number;
-    fuelLiters: number;
+    fuelLiters: number | null;
     maintenanceDueCount: number;
   };
   equipment: EquipmentRow[];
@@ -121,6 +121,8 @@ export function EquipmentAnalytics() {
     rows.sort((a, b) => {
       const av = a[sortKey];
       const bv = b[sortKey];
+      if (av == null) return bv == null ? 0 : 1;
+      if (bv == null) return -1;
       const cmp = typeof av === 'string' && typeof bv === 'string'
         ? av.localeCompare(bv)
         : (av as number) - (bv as number);
@@ -192,7 +194,7 @@ function KpiTiles({ fleet }: { fleet: AnalyticsResult['fleet'] }) {
     { label: 'Сваи', icon: HardHat, value: formatCountMeters(fleet.piles, fleet.pileMeters), detail: 'за период' },
     { label: 'Бурение', icon: Drill, value: formatCountMeters(fleet.drillingCount, fleet.drillingMeters), detail: 'за период' },
     { label: 'Простой', icon: Clock, value: fmtHours(fleet.downtimeHours), detail: 'суммарно' },
-    { label: 'Топливо', icon: Fuel, value: fleet.fuelLiters > 0 ? `${fmt(fleet.fuelLiters)} л` : '—', detail: fleet.fuelLiters > 0 ? 'расход за период' : 'нужна телеметрия' },
+    { label: 'Топливо', icon: Fuel, value: fleet.fuelLiters != null ? `${fmt(fleet.fuelLiters)} л` : '—', detail: fleet.fuelLiters != null ? 'расход по телеметрии' : 'недостаточно телеметрии' },
     { label: 'ТО', icon: Wrench, value: String(fleet.maintenanceDueCount), detail: 'скоро / просрочено', alert: fleet.maintenanceDueCount > 0 },
   ];
   return (
@@ -292,7 +294,7 @@ function FleetTable({
                 <Stat label="Отчётов" value={String(r.reportCount)} />
                 <Stat label="Утилизация" value={`${Math.round((r.activeDays / Math.max(periodDays, 1)) * 100)}%`} sub={`${r.activeDays}/${periodDays} дн`} />
                 <Stat label="Простой" value={fmtHours(r.downtimeHours)} />
-                <Stat label="Топливо" value={r.fuelLiters > 0 ? `${fmt(r.fuelLiters)} л` : '—'} />
+                <Stat label="Топливо" value={r.fuelLiters != null ? `${fmt(r.fuelLiters)} л` : '—'} />
               </dl>
             </button>
           ))}
@@ -337,7 +339,7 @@ function FleetTable({
                 <span className="text-2xs text-muted-foreground"> ({r.activeDays}/{periodDays} дн)</span>
               </td>
               <td className="px-3 py-2 text-right font-mono">{fmtHours(r.downtimeHours)}</td>
-              <td className="px-3 py-2 text-right font-mono">{r.fuelLiters > 0 ? `${fmt(r.fuelLiters)} л` : '—'}</td>
+              <td className="px-3 py-2 text-right font-mono">{r.fuelLiters != null ? `${fmt(r.fuelLiters)} л` : '—'}</td>
               <td className="px-3 py-2 text-right">
                 {r.maintenanceOverdue
                   ? <span className="rounded bg-destructive/10 px-1.5 py-0.5 text-2xs font-medium text-destructive-strong">просрочено</span>

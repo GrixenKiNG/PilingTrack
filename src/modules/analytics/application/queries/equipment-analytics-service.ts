@@ -12,7 +12,7 @@ import { zonedDayStartUtc } from '@/lib/timezone';
  *
  * Fuel is the only metric not derivable from reports — it comes from the
  * telematics `fuel_total` cumulative counter (period usage = max − min per
- * rig). With no box connected it's simply 0.
+ * rig). Without at least two readings the consumption is unknown (null).
  */
 
 interface EquipmentRow {
@@ -160,14 +160,17 @@ export async function getEquipmentAnalytics(params: EquipmentAnalyticsParams) {
     },
     _min: { value: true },
     _max: { value: true },
+    _count: { _all: true },
   });
   const fuelByEquipment = new Map<string, number>();
   for (const g of fuelGrouped) {
-    const used = (g._max.value ?? 0) - (g._min.value ?? 0);
-    if (used > 0) fuelByEquipment.set(g.equipmentId, used);
+    if (g._count._all < 2 || g._min.value == null || g._max.value == null) continue;
+    const used = g._max.value - g._min.value;
+    if (used >= 0) fuelByEquipment.set(g.equipmentId, used);
   }
 
   const equipment = rows.map((row) => {
+    const fuelLiters = fuelByEquipment.get(row.equipmentId);
     const due = checkMaintenanceDue({
       nextMaintenanceDate: row.nextMaintenanceDate ? row.nextMaintenanceDate.toISOString() : null,
       nextMaintenanceAtHours: row.nextMaintenanceAtHours,
@@ -185,7 +188,7 @@ export async function getEquipmentAnalytics(params: EquipmentAnalyticsParams) {
       drillingCount: row.drillingCount,
       drillingMeters: round1(row.drillingMeters),
       downtimeHours: round1(row.downtimeHours),
-      fuelLiters: round1(fuelByEquipment.get(row.equipmentId) ?? 0),
+      fuelLiters: fuelLiters == null ? null : round1(fuelLiters),
       engineHoursTotal: row.engineHoursTotal,
       nextMaintenanceAtHours: row.nextMaintenanceAtHours,
       nextMaintenanceDate: row.nextMaintenanceDate ? row.nextMaintenanceDate.toISOString() : null,
@@ -205,7 +208,10 @@ export async function getEquipmentAnalytics(params: EquipmentAnalyticsParams) {
     drillingCount: equipment.reduce((s, e) => s + e.drillingCount, 0),
     drillingMeters: round1(rows.reduce((s, e) => s + e.drillingMeters, 0)),
     downtimeHours: round1(rows.reduce((s, e) => s + e.downtimeHours, 0)),
-    fuelLiters: round1(rows.reduce((s, e) => s + (fuelByEquipment.get(e.equipmentId) ?? 0), 0)),
+    // Частичная сумма не описывает расход всего парка.
+    fuelLiters: rows.length > 0 && rows.every((row) => fuelByEquipment.has(row.equipmentId))
+      ? round1(rows.reduce((sum, row) => sum + (fuelByEquipment.get(row.equipmentId) ?? 0), 0))
+      : null,
     maintenanceDueCount: equipment.filter((e) => e.maintenanceDue).length,
   };
 
