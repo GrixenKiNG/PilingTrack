@@ -8,8 +8,14 @@ import { createFixture } from './helpers/disposable-db';
 const state = vi.hoisted(() => ({ db: undefined as PrismaClient | undefined }));
 vi.mock('@/lib/db', () => ({ get db() { return state.db; }, DEFAULT_TX_OPTIONS: { timeout: 10_000, maxWait: 5_000 } }));
 // Keep the real command and SQL; avoid booting unrelated equipment/worker services.
-vi.mock('@/modules/equipment', async () => ({ recordMeterReadingInTx: (await import('../../src/modules/equipment/application/commands/meter-reading')).recordMeterReadingInTx }));
-vi.mock('@/modules/readiness/server', async () => ({ requestReadinessSnapshot: (await import('../../src/modules/readiness/application/projection/request-snapshot')).requestReadinessSnapshot }));
+vi.mock('@/modules/equipment', async () => ({
+  recordMeterReadingInTx: (await import('../../src/modules/equipment/application/commands/meter-reading')).recordMeterReadingInTx,
+  advanceMaintenanceRegulation: (await import('../../src/modules/equipment/application/commands/maintenance-regulation')).advanceMaintenanceRegulation,
+}));
+vi.mock('@/modules/readiness/server', async () => ({
+  requestReadinessSnapshot: (await import('../../src/modules/readiness/application/projection/request-snapshot')).requestReadinessSnapshot,
+  OPEN_MAINTENANCE: (await import('../../src/modules/readiness/application/readiness-score')).OPEN_MAINTENANCE,
+}));
 
 const appUrl = process.env.INTEGRATION_DATABASE_URL_APP;
 const enabled = Boolean(process.env.INTEGRATION_DATABASE_URL_OWNER && appUrl);
@@ -70,6 +76,33 @@ describe.skipIf(!enabled)('Tech Readiness real source → outbox → snapshot �
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({ projected: false, payload: { triggerType: 'INSPECTION_COMPLETED', inspectionId: inspectionId() } });
     expect((await fixture.owner.query('SELECT status FROM "Inspection" WHERE id = $1', [inspectionId()])).rows).toEqual([{ status: 'COMPLETED' }]);
+  });
+  it('закрытие ТО осмотром переносит реальный регламент; повтор сохраняет тот же срок', async () => {
+    const equipment = fixture.id(tenant(), 'Equipment');
+    const plan = tenant() + '-plan';
+    const record = tenant() + '-maintenance';
+    try {
+      await fixture.owner.query('UPDATE "Equipment" SET "engineHoursTotal"=1100,"nextMaintenanceAtHours"=1000 WHERE id=$1', [equipment]);
+      await fixture.owner.query('INSERT INTO "MaintenancePlan" (id,"tenantId","equipmentId",title,type,"triggerType","intervalHours","lastDoneHours","updatedAt") VALUES ($1,$2,$3,$1,$4,$5,250,750,now())', [plan, tenant(), equipment, 'TO1', 'HOURS']);
+      await fixture.owner.query('INSERT INTO "MaintenanceRecord" (id,"tenantId","equipmentId",title,type,status,"updatedAt") VALUES ($1,$2,$3,$1,$4,$5,now())', [record, tenant(), equipment, 'TO1', 'IN_PROGRESS']);
+      await fixture.owner.query('UPDATE "Inspection" SET level=$1,"maintenanceRecordId"=$2,"engineHours"=1100 WHERE id=$3', ['TO1', record, inspectionId()]);
+      await finish();
+      const state = async () => ({
+        plan: (await fixture.owner.query('SELECT "lastDoneHours","lastDoneAt" FROM "MaintenancePlan" WHERE id=$1', [plan])).rows[0],
+        equipment: (await fixture.owner.query('SELECT "nextMaintenanceAtHours" FROM "Equipment" WHERE id=$1', [equipment])).rows[0],
+      });
+      const done = await state();
+      expect(done.plan.lastDoneHours).toBe(1100);
+      expect(done.plan.lastDoneAt).toBeInstanceOf(Date);
+      expect(done.equipment.nextMaintenanceAtHours).toBe(1350);
+      expect((await finish()).replayed).toBe(true);
+      expect(await state()).toEqual(done);
+    } finally {
+      await fixture.owner.query('UPDATE "Inspection" SET "maintenanceRecordId"=NULL WHERE id=$1', [inspectionId()]);
+      await fixture.owner.query('DELETE FROM "MaintenanceRecord" WHERE id=$1', [record]);
+      await fixture.owner.query('DELETE FROM "MaintenancePlan" WHERE id=$1', [plan]);
+      await fixture.owner.query('DELETE FROM "MeterReading" WHERE "equipmentId"=$1', [equipment]);
+    }
   });
   it('rejects another tenant and leaves its source unchanged', async () => {
     const other = fixture.tenants[1];

@@ -3,7 +3,7 @@ import { enqueueCriticalDefects } from '@/core/notifications/durable-alert';
 import { recordAuditEvent } from '@/modules/audit';
 import type { Prisma } from '@/generated/postgres-client/client';
 import { ServiceError } from '@/lib/service-error';
-import { recordMeterReadingInTx } from '@/modules/equipment';
+import { advanceMaintenanceRegulation, recordMeterReadingInTx } from '@/modules/equipment';
 import { createRepairOrderForDefect, OPEN_MAINTENANCE, requestReadinessSnapshot } from '@/modules/readiness/server';
 import { computeHealthScore, findMissing, type SnapItem, type AnswerLike } from '../../domain/inspection-logic';
 import { inspectionDefectKey, planDefectsFromInspection, type DefectRuleItem } from '../../domain/defect-rules';
@@ -460,10 +460,19 @@ export async function completeInspectionWithOutcome(
     // обслуживания копил мнимые незакрытые работы, а производная готовность
     // считала машину требующей внимания сразу после успешного осмотра.
     if (ins.maintenanceRecordId) {
-      await tx.maintenanceRecord.updateMany({
+      const closed = await tx.maintenanceRecord.updateMany({
         where: { id: ins.maintenanceRecordId, tenantId: ctx.tenantId, status: { in: [...OPEN_MAINTENANCE] } },
         data: { status: 'DONE', completedAt: now, engineHoursAtService: ins.engineHours ?? undefined },
       });
+      if (closed.count === 1) {
+        const record = await tx.maintenanceRecord.findUniqueOrThrow({
+          where: { id: ins.maintenanceRecordId },
+          select: { type: true, engineHoursAtService: true, completedAt: true },
+        });
+        await advanceMaintenanceRegulation(tx as typeof db, {
+          tenantId: ctx.tenantId, equipmentId: ins.equipmentId, record, now,
+        });
+      }
     }
     // Моточасы, снятые при осмотре, — это настоящее показание счётчика, и оно
     // обязано попасть в журнал наработки. Раньше число оставалось внутри

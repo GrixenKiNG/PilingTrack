@@ -8,6 +8,7 @@ export { updateEquipmentMetadata } from './application/commands/equipment-metada
 export { createEquipmentDocument, updateEquipmentDocument, deleteEquipmentDocument } from './application/commands/equipment-document';
 export type { EquipmentDocumentInput, EquipmentDocumentType } from './application/commands/equipment-document';
 export { createMaintenance, updateMaintenance, deleteMaintenance, acceptMaintenance } from './application/commands/equipment-maintenance';
+export { advanceMaintenanceRegulation } from './application/commands/maintenance-regulation';
 export type { MaintenanceInput, MaintenanceType, MaintenanceStatus, MaintenancePriority } from './application/commands/equipment-maintenance';
 export { addMeterReading, deleteMeterReading, recordMeterReadingInTx, checkMeterReading, canDecreaseMeter, METER_JUMP_WARN_HOURS } from './application/commands/meter-reading';
 export type { MeterReadingInput, MeterSource, AddMeterReadingResult, MeterReadingContext } from './application/commands/meter-reading';

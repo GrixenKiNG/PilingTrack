@@ -5,6 +5,7 @@ const m = vi.hoisted(() => ({
   insUpdateMany: vi.fn(), insFindUniqueOrThrow: vi.fn(),
   ansDeleteMany: vi.fn(), ansCreateMany: vi.fn(),
   recCreate: vi.fn(), recUpdateMany: vi.fn(), outboxCreate: vi.fn(), outboxAlertCreate: vi.fn(),
+  recFind: vi.fn(), advanceRegulation: vi.fn(),
   crewFindFirst: vi.fn(),
   defectFindMany: vi.fn(), defectCreate: vi.fn(),
   // Снимки к пунктам осмотра считаются по Media, а не по числу из запроса.
@@ -17,6 +18,7 @@ const m = vi.hoisted(() => ({
   audit: vi.fn(),
 }));
 vi.mock('@/modules/audit', () => ({ recordAuditEvent: m.audit }));
+vi.mock('@/modules/equipment/application/commands/maintenance-regulation', () => ({advanceMaintenanceRegulation: m.advanceRegulation}));
 vi.mock('@/lib/db', () => {
   const client = {
     checklistTemplate: { findUnique: m.tplFindUnique, findMany: m.tplFindMany },
@@ -26,7 +28,7 @@ vi.mock('@/lib/db', () => {
       updateMany: m.insUpdateMany, findUniqueOrThrow: m.insFindUniqueOrThrow,
     },
     inspectionAnswer: { deleteMany: m.ansDeleteMany, createMany: m.ansCreateMany },
-    maintenanceRecord: { create: m.recCreate, updateMany: m.recUpdateMany },
+    maintenanceRecord: { create: m.recCreate, updateMany: m.recUpdateMany, findUniqueOrThrow: m.recFind },
     equipmentDefect: { findMany: m.defectFindMany, create: m.defectCreate },
     crew: { findFirst: m.crewFindFirst },
     outboxEvent: { createMany: m.outboxCreate, create: m.outboxAlertCreate },
@@ -55,6 +57,7 @@ beforeEach(() => {
   // Замок ничего не возвращает — $executeRaw отдаёт число затронутых строк.
   m.executeRaw.mockResolvedValue(1);
   m.defectFindMany.mockResolvedValue([]);
+  m.recFind.mockResolvedValue({type: 'TO1', engineHoursAtService: 1100, completedAt: new Date('2026-10-22T12:00:00Z')});
 });
 
 describe('startInspection', () => {
@@ -261,6 +264,13 @@ describe('completeInspection', () => {
     await completeInspectionWithOutcome('ins1', { tenantId: 'orion', signedByName: 'Иванов' });
     expect(status).toBe(initialStatus === 'IN_PROGRESS' ? 'DONE' : initialStatus);
     expect(m.recUpdateMany.mock.calls[0][0].where).toMatchObject({ id: 'rec1', tenantId: 'orion' });
+    if (initialStatus === 'IN_PROGRESS') {
+      expect(m.advanceRegulation).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+        tenantId: 'orion', equipmentId: 'eq1', record: expect.objectContaining({type: 'TO1', engineHoursAtService: 1100}),
+      }));
+    } else {
+      expect(m.advanceRegulation).not.toHaveBeenCalled();
+    }
   });
   it.each(['HIGH', 'CRITICAL', 'NORMAL'])('queues only new dangerous %s defects in the completion transaction', async (severity) => {
     const draft = {
