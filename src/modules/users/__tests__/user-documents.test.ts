@@ -241,6 +241,16 @@ describe('evaluateOperatorClearance', () => {
     expect(result.blockers[0].reason).toBe('expired');
   });
 
+  it.each([-1, 0, 1])('проверяет точный момент истечения: смещение %i мс', (offset) => {
+    const result = evaluateOperatorClearance([type], [
+      { typeId: type.id, expiresAt: new Date(now.getTime() + offset) },
+    ], now);
+
+    expect(result.cleared).toBe(offset >= 0);
+    expect(result.documents[0].status).toBe(offset < 0 ? 'expired' : 'expiring');
+    if (offset < 0) expect(result.blockers[0].daysLeft).toBe(-1);
+  });
+
   it('истекающий документ предупреждает, но допуска не снимает', () => {
     const result = evaluateOperatorClearance([type], [{ typeId: 'type-1', expiresAt: day(10) }], now);
     expect(result.cleared).toBe(true);

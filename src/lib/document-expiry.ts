@@ -34,8 +34,11 @@ export function documentExpiry(
 
   // Округляем вверх: документ, истекающий сегодня в 23:59, — это «остался 1
   // день», а не «ноль». Ноль в интерфейсе читается как «уже всё».
-  const daysLeft = Math.ceil((expiry.getTime() - now.getTime()) / DAY_MS);
-  if (daysLeft < 0) return { status: 'expired', daysLeft };
+  const remaining = expiry.getTime() - now.getTime();
+  // Статус определяется моментом истечения: округление вверх превращало
+  // первые сутки просрочки в «0 дней осталось» и сохраняло допуск.
+  if (remaining < 0) return { status: 'expired', daysLeft: Math.floor(remaining / DAY_MS) };
+  const daysLeft = Math.ceil(remaining / DAY_MS);
   if (daysLeft <= leadTimeDays) return { status: 'expiring', daysLeft };
   return { status: 'ok', daysLeft };
 }
