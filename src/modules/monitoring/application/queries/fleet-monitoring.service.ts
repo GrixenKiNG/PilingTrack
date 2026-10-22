@@ -223,17 +223,6 @@ export async function getFleetSnapshot(opts: FleetSnapshotOptions): Promise<Flee
     },
   });
 
-  // Analytics rows are linked by Report.reportId (string), not Report.id.
-  // Keep them in a single map lookup.
-  const reportIds = reports.map((r) => r.reportId);
-  const analyticsRows = reportIds.length
-    ? await db.reportAnalytics.findMany({
-        where: { reportId: { in: reportIds } },
-        select: { reportId: true, totalPiles: true, totalDrilling: true, totalDowntime: true },
-      })
-    : [];
-  const analyticsByReport = new Map(analyticsRows.map((a) => [a.reportId, a]));
-
   // Group reports per equipment (already sorted by date desc).
   const reportsByEquipment = new Map<string, typeof reports>();
   for (const r of reports) {
@@ -269,22 +258,18 @@ export async function getFleetSnapshot(opts: FleetSnapshotOptions): Promise<Flee
       todayTotals = { piles: 0, pileMeters: 0, drillingCount: 0, drillingMeters: 0, downtimeHours: 0 };
       const downtimeByReason = new Map<string, { duration: number; comment: string | null }>();
       for (const r of todays) {
-        // Prefer the precomputed ReportAnalytics projection (consistent with
-        // the admin analytics screens), but fall back to summing the raw
-        // report rows — already loaded above — when the projection is missing
-        // or lagging. Skipping the report entirely (the previous `continue`)
-        // left a card showing status "active" with all-zero totals.
-        const a = analyticsByReport.get(r.reportId);
+        // Все итоги — из загруженных строк отчёта. Проекция может отставать
+        // после правки: её количество свай расходилось с текущими метрами.
         const piles = r.piles ?? [];
         const drillings = r.drillings ?? [];
-        todayTotals.piles += a?.totalPiles ?? piles.reduce((sum, pile) => sum + pile.count, 0);
+        todayTotals.piles += piles.reduce((sum, pile) => sum + pile.count, 0);
         todayTotals.pileMeters += piles.reduce(
           (sum, pile) => sum + pile.count * pileLengthMeters({ gradeLengthMm: pile.pileGrade?.lengthMm }),
           0,
         );
         todayTotals.drillingCount += drillings.reduce((sum, drilling) => sum + (drilling.count || 1), 0);
-        todayTotals.drillingMeters += a?.totalDrilling ?? drillings.reduce((sum, drilling) => sum + (drilling.meters || 0), 0);
-        todayTotals.downtimeHours += a?.totalDowntime ?? (r.downtimes ?? []).reduce((sum, downtime) => sum + (downtime.duration || 0), 0);
+        todayTotals.drillingMeters += drillings.reduce((sum, drilling) => sum + (drilling.meters || 0), 0);
+        todayTotals.downtimeHours += (r.downtimes ?? []).reduce((sum, downtime) => sum + (downtime.duration || 0), 0);
         for (const downtime of r.downtimes ?? []) {
           const reasonName = downtime.reason?.name ?? 'Причина не указана';
           const current = downtimeByReason.get(reasonName) ?? { duration: 0, comment: null };

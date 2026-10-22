@@ -182,7 +182,8 @@ describe('getFleetSnapshot — inventory fields and operators on shift', () => {
       },
     ]);
     analyticsFindMany.mockResolvedValue([
-      { reportId: 'R-1248', totalPiles: 18, totalDrilling: 42, totalDowntime: 2 },
+      // Проекция от предыдущей версии отчёта не должна менять текущие итоги.
+      { reportId: 'R-1248', totalPiles: 2, totalDrilling: 7, totalDowntime: 0 },
     ]);
 
     const snap = await getFleetSnapshot({ tenantId: 'orion' });
@@ -204,6 +205,7 @@ describe('getFleetSnapshot — inventory fields and operators on shift', () => {
       downtimeHours: 2,
     });
     expect(card.downtimeReason).toBe('Ожидание: ожидание бетона');
+    expect(snap.totals).toMatchObject({ pilesToday: 18, pileMetersToday: 126, drillingToday: 42, downtimeHoursToday: 2 });
   });
 
   it('marks equipment as repair when an active repair maintenance record exists', async () => {
