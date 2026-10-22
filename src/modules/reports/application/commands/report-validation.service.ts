@@ -110,14 +110,17 @@ export function validateReportInput(input: {
   piles?: Array<{ pileGradeId: string; count: number }>;
   drillings?: Array<{ typeId: string; meters: number; count?: number }>;
   downtimes?: Array<{ reasonId: string; duration: number }>;
-}) {
+}, options: { checkShiftWindow?: boolean } = {}) {
   validateReportRequiredFields(input);
   // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null invariant established earlier in this function
   validateReportDateNotInFuture(input.date!);
   validatePileEntries(input.piles);
   validateDrillingEntries(input.drillings);
   validateDowntimeEntries(input.downtimes);
-  validateDowntimeWithinShift(input.shiftStart, input.shiftEnd, input.downtimes);
+  // Сохранение отчёта проверяет окно смены само, вместе с сохранёнными поправками.
+  if (options.checkShiftWindow ?? true) {
+    validateDowntimeWithinShift(input.shiftStart, input.shiftEnd, input.downtimes);
+  }
 }
 
 /**

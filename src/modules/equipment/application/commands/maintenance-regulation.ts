@@ -23,7 +23,7 @@
  * мог сдвинуться из-за правки самого регламента.
  */
 
-import { db } from '@/lib/db';
+import type { Prisma } from '@/generated/postgres-client/client';
 import { evaluatePlanDue, type PlanForEval } from '@/lib/pm-due';
 
 /** Регламент в объёме, который нужен проекции. */
@@ -74,7 +74,7 @@ interface ClosedRecord {
  * Вызывается внутри транзакции команды ТО — вместе с самой записью наряда.
  */
 export async function advanceMaintenanceRegulation(
-  tx: typeof db,
+  tx: Pick<Prisma.TransactionClient, 'maintenancePlan' | 'equipment'>,
   input: { tenantId: string; equipmentId: string; record: ClosedRecord; now?: Date },
 ): Promise<void> {
   const plans = await tx.maintenancePlan.findMany({

@@ -228,6 +228,15 @@ describe('Report Validation', () => {
     it('should throw for missing required fields', () => {
       expect(() => validateReportInput({})).toThrow('Заполните обязательные поля отчёта.');
     });
+
+    it('проверяет окно смены, пока вызывающий не берёт его на себя', () => {
+      const input = {
+        reportId: 'r1', siteId: 's1', userId: 'u1', date: new Date().toISOString().split('T')[0],
+        shiftStart: '08:00', shiftEnd: '20:00', downtimes: [{ reasonId: 'r1', duration: 15 }],
+      };
+      expect(() => validateReportInput(input)).toThrow();
+      expect(() => validateReportInput(input, { checkShiftWindow: false })).not.toThrow();
+    });
   });
 
   describe('validateAgainstSitePlans', () => {

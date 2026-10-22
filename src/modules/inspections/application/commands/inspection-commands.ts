@@ -469,7 +469,7 @@ export async function completeInspectionWithOutcome(
           where: { id: ins.maintenanceRecordId },
           select: { type: true, engineHoursAtService: true, completedAt: true },
         });
-        await advanceMaintenanceRegulation(tx as typeof db, {
+        await advanceMaintenanceRegulation(tx, {
           tenantId: ctx.tenantId, equipmentId: ins.equipmentId, record, now,
         });
       }

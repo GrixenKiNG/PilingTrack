@@ -98,7 +98,7 @@ export async function createMaintenance(
       },
     });
     if (status === 'DONE') {
-      await advanceMaintenanceRegulation(tx as typeof db, {
+      await advanceMaintenanceRegulation(tx, {
         tenantId: ctx.tenantId, equipmentId: record.equipmentId, record,
       });
       await recordServiceHours(tx as typeof db, record, ctx.tenantId, ctx.createdById);
@@ -273,7 +273,7 @@ export async function updateMaintenance(
     // Закрытый наряд двигает регламент — иначе моточасы растут, порог стоит,
     // и «ТО просрочено» в готовности не гаснет никогда.
     if (data.status === 'DONE') {
-      await advanceMaintenanceRegulation(tx as typeof db, {
+      await advanceMaintenanceRegulation(tx, {
         tenantId: ctx.tenantId, equipmentId: record.equipmentId, record,
       });
     }
@@ -333,7 +333,7 @@ export async function acceptMaintenance(
     // Приёмка — второй проход по тому же наряду. Сдвиг регламента идемпотентен
     // (порог считается из записи, а не приращением), поэтому повтор безопасен и
     // страхует случай, когда наряд принят без явного перехода в DONE.
-    await advanceMaintenanceRegulation(tx as typeof db, {
+    await advanceMaintenanceRegulation(tx, {
       tenantId: ctx.tenantId, equipmentId: record.equipmentId, record,
     });
     // Только если наряд закрывается приёмкой, а не был закрыт раньше: иначе

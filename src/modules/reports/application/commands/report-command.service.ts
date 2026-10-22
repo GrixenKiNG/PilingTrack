@@ -86,7 +86,7 @@ export async function upsertReport(
 ): Promise<UpsertReportResult> {
   // Phase 1: Validation (fast, no DB)
   // Сумму проверяем ниже вместе с сохранёнными встречными поправками.
-  validateReportInput({ ...input, shiftStart: undefined, shiftEnd: undefined });
+  validateReportInput(input, { checkShiftWindow: false });
   await assertReportOwnerOnSite(input.userId, input.siteId, input.tenantId);
 
   // Site plans are checked inside the save transaction (see Phase 5).
