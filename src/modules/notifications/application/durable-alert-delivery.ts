@@ -51,8 +51,8 @@ export async function deliverQueuedAlert(event: {id?: string; tenantId?: string 
   // по умолчанию и выключатель владельца молча игнорировался бы.
   const suppressed = key ? !await isNotificationEnabled(tenantId, key) : false;
   // Дедуп (F-R33-2): тот же простой приходит заново при каждом сохранении отчёта.
-  // Клиент Redis берём до транзакции, а сам ключ читаем ПОД блокировкой строки:
-  // два параллельных события с общим ключом иначе оба видят «не отправлено».
+  // Клиент Redis берём до транзакции, а ключ читаем под общим advisory-замком:
+  // блокировка одной строки outbox не защищает другое событие с тем же ключом.
   // Нет Redis или он упал — шлём без дедупа: дубль лучше молчания.
   let redis: Awaited<ReturnType<typeof getRedisClient>> = null;
   if (alert.dedupeKey && !suppressed) {
@@ -73,9 +73,12 @@ export async function deliverQueuedAlert(event: {id?: string; tenantId?: string 
   let complete: boolean;
   try {
     complete = await db.$transaction(async tx => {
+      if (redis && alert.dedupeKey && !suppressed) {
+        await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`alert:${tenantId}:${alert.dedupeKey}`}))::text`;
+      }
       await tx.$queryRaw`SELECT id FROM "OutboxEvent" WHERE id = ${event.id} AND "tenantId" = ${event.tenantId} FOR UPDATE`;
       const row = await tx.outboxEvent.findFirst({where: {id: event.id, tenantId: event.tenantId}});
-    if (!row || row.published) return true;
+      if (!row || row.published) return true;
       let duplicate = false;
       if (redis && alert.dedupeKey && !suppressed) {
         try {

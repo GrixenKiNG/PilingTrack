@@ -63,7 +63,7 @@ vi.mock('@/core/notifications/telegram', () => ({
 import {deliverQueuedAlert} from '../durable-alert-delivery';
 
 const tx = {
-  $queryRaw: vi.fn(async () => []),
+  $queryRaw: vi.fn(async (_sql: TemplateStringsArray, ..._values: string[]) => []),
   outboxEvent: {
     findFirst: vi.fn(async ({
       where,
@@ -121,26 +121,36 @@ beforeEach(() => {
   h.get.mockReset();
   h.get.mockImplementation(async key => h.keys.get(key) ?? null);
 
-  let tail: Promise<void> = Promise.resolve();
+  // Разные строки выполняются параллельно. Сериализуем только реальные
+  // ключи блокировки: строку outbox или общий advisory-ключ дедупликации.
+  const locks = new Map<string, Promise<void>>();
 
   h.transaction.mockImplementation(
     async (work: (client: typeof tx) => Promise<unknown>) => {
-      const previous = tail;
-      let release: () => void = () => {};
-      tail = new Promise<void>(resolve => {
-        release = resolve;
-      });
-      await previous;
-
-      const snapshot = structuredClone(h.rows);
+      const releases: Array<() => void> = [];
+      const snapshots = new Map<string, Row>();
+      const client = {
+        ...tx,
+        $queryRaw: vi.fn(async (sql: TemplateStringsArray, ...values: string[]) => {
+          const advisory = sql.join('').includes('pg_advisory_xact_lock');
+          const key = advisory ? `advisory:${values[0]}` : `row:${values[1]}:${values[0]}`;
+          const previous = locks.get(key) ?? Promise.resolve();
+          locks.set(key, new Promise<void>(resolve => releases.push(resolve)));
+          await previous;
+          if (!advisory) {
+            const row = h.rows.get(values[0]);
+            if (row) snapshots.set(row.id, structuredClone(row));
+          }
+          return [];
+        }),
+      };
       try {
-        return await work(tx);
+        return await work(client);
       } catch (error) {
-        h.rows.clear();
-        for (const [id, row] of snapshot) h.rows.set(id, row);
+        for (const [id, row] of snapshots) h.rows.set(id, row);
         throw error;
       } finally {
-        release();
+        for (const release of releases.reverse()) release();
       }
     },
   );
@@ -189,5 +199,25 @@ describe('XP44 durable alert delivery', () => {
 
     expect(h.sendAlert).toHaveBeenCalledTimes(1);
     expect(h.rows.get(event.id)?.published).toBe(true);
+  });
+
+  it('allows different dedupe keys to send while another delivery is pending', async () => {
+    const first = queuedEvent('event-slow', 'slow-key');
+    const second = queuedEvent('event-independent', 'other-key');
+    let release: () => void = () => {};
+    const gate = new Promise<void>(resolve => { release = resolve; });
+    h.sendAlert.mockImplementationOnce(async () => { await gate; return true; });
+
+    const pending = deliverQueuedAlert(first);
+    try {
+      await vi.waitFor(() => expect(h.sendAlert).toHaveBeenCalledTimes(1));
+      await deliverQueuedAlert(second);
+      expect(h.rows.get(second.id)?.published).toBe(true);
+      expect(h.rows.get(first.id)?.published).toBe(false);
+    } finally {
+      release();
+      await pending;
+    }
+    expect(h.sendAlert).toHaveBeenCalledTimes(2);
   });
 });
