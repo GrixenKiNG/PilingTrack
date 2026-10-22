@@ -111,6 +111,25 @@ describe('Report Command Service', () => {
     mockDb.report.findUnique.mockResolvedValue(mockReport);
   });
 
+  it('сохраняет отрицательные мобильные поправки в агрегате и итогах при правке формы', async () => {
+    const seed = ReportAggregate.create({reportId: 'report-1', userId: 'user-1', siteId: 'site-1', date: '2026-04-05'}).getState();
+    const piles = [{id: 'p1', pileGradeId: 'grade-1', count: 10}, {id: 'pc', pileGradeId: 'grade-1', count: -3, correctsId: 'p1'}];
+    const drillings = [{id: 'd1', typeId: 'type-1', count: 10, metersPerUnit: 2, meters: 20}, {id: 'dc', typeId: 'type-1', count: -3, metersPerUnit: 2, meters: -6, correctsId: 'd1'}];
+    const downtimes = [{id: 't1', reasonId: 'reason-1', duration: 20}, {id: 'tc', reasonId: 'reason-1', duration: -10, correctsId: 't1'}];
+    mockRepoFindById.mockResolvedValue(ReportAggregate.reconstitute({...seed, piles, drillings, downtimes}));
+    await upsertReport({reportId: seed.reportId, userId: seed.userId, siteId: seed.siteId, date: seed.date,
+      expectedVersion: seed.version, shiftStart: '07:00', shiftEnd: '19:00',
+      piles: [piles[0]], drillings: [drillings[0]], downtimes: [downtimes[0]],
+    }, {enforceEditWindow: false});
+    const saved = mockRepoSave.mock.calls[0][0] as ReportAggregate;
+    expect(saved.getTotalPiles()).toBe(7);
+    expect(saved.getTotalDrilling()).toBe(14);
+    expect(saved.getTotalDowntime()).toBe(10);
+    expect(saved.getState().piles).toContainEqual(piles[1]);
+    expect(saved.getState().drillings).toContainEqual(drillings[1]);
+    expect(saved.getState().downtimes).toContainEqual(downtimes[1]);
+  });
+
   /*
     ВЛАДЕЛЕЦ ОТЧЁТА НА ОБЪЕКТЕ — ПО НАЗНАЧЕНИЮ ИЛИ ПО БРИГАДЕ (аудит 16.10.2026, P1 AU39-04).
     Команда обязана спрашивать проверку, которая учитывает бригаду, и передавать ей

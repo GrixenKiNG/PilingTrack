@@ -61,4 +61,26 @@ describe.skipIf(!process.env.CODEX_STAND_URL || !process.env.INTEGRATION_DATABAS
     const stored = await fixture.owner.query('SELECT "endingEngineHours", "endingFuelPercent" FROM "Report" WHERE id=$1',[fixture.id(tenant,'Report')]);
     expect(stored.rows[0]).toEqual({endingEngineHours:1234,endingFuelPercent:null});
   });
+  it('сохраняет мобильную поправку через веб-форму и защищает её исходную запись', async () => {
+    const reportId = fixture.id(tenant, 'Report');
+    const original = (await fixture.owner.query('SELECT id,count FROM "PileWork" WHERE "reportId"=$1', [reportId])).rows[0];
+    const correctionId = tenant + '-correction';
+    await fixture.owner.query('INSERT INTO "PileWork" (id,"tenantId","reportId","pileGradeId",count,"correctsId","correctionNote") VALUES ($1,$2,$3,$4,-2,$5,$6)', [correctionId, tenant, reportId, grade, original.id, 'Ошибка ввода']);
+    await fixture.owner.query('UPDATE "Report" SET version=version+1 WHERE id=$1', [reportId]);
+    const version = (await fixture.owner.query('SELECT version FROM "Report" WHERE id=$1', [reportId])).rows[0].version;
+    const save = (piles: unknown[], v: number) => fetch(base+'/api/reports/upsert', {
+      method: 'POST', headers: {Cookie: cookie, Origin: base, 'Content-Type': 'application/json', 'Idempotency-Key': randomUUID()},
+      body: JSON.stringify({reportId, siteId: fixture.id(tenant,'Site'), date: '2026-10-02', version: v, piles}),
+    });
+    const response = await save([{id: original.id, pileGradeId: grade, count: original.count}], version);
+    expect(response.status, JSON.stringify(await response.json())).toBe(200);
+    const saved = (await fixture.owner.query('SELECT id,count,"correctsId","correctionNote" FROM "PileWork" WHERE "reportId"=$1 ORDER BY id', [reportId])).rows;
+    expect(saved).toContainEqual({id: correctionId, count: -2, correctsId: original.id, correctionNote: 'Ошибка ввода'});
+    expect(saved.reduce((sum, row) => sum + row.count, 0)).toBe(original.count - 2);
+    const snapshot = (await fixture.owner.query('SELECT data FROM "ReportVersion" WHERE "reportId"=$1 AND version=$2', [reportId, version + 1])).rows[0].data;
+    expect(snapshot.piles).toContainEqual(expect.objectContaining({id: correctionId, count: -2, correctsId: original.id}));
+    const removal = await save([], version + 1);
+    expect(removal.status, JSON.stringify(await removal.json())).toBe(409);
+    expect((await fixture.owner.query('SELECT id,count,"correctsId","correctionNote" FROM "PileWork" WHERE "reportId"=$1 ORDER BY id', [reportId])).rows).toEqual(saved);
+  });
 });

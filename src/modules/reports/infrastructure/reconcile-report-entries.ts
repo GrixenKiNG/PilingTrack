@@ -6,13 +6,15 @@ type Entry = {
   reasonId?: string | null; duration?: number; comment?: string | null;
 };
 const value = (entry: Entry, key: string): unknown => (entry as Record<string, unknown>)[key];
-type StoredEntry = Entry & { id: string; passport?: unknown };
+type StoredEntry = Entry & { id: string; passport?: unknown; correctsId?: string | null };
 
 /** Match legacy payloads without losing the identity of unchanged work. */
 export function reconcileReportEntries(
   stored: StoredEntry[], incoming: Entry[], fields: string[], groupFields: string[],
 ) {
   const unused = new Map(stored.map((row) => [row.id, row]));
+  const correctedIds = new Set(stored.map(row => row.correctsId).filter(Boolean));
+  const immutable = (row: StoredEntry) => Boolean(row.correctsId || correctedIds.has(row.id));
   const matches = new Map<number, StoredEntry>();
   const equal = (a: Entry, b: Entry, keys: string[]) => keys.every((key) =>
     (value(a, key) ?? null) === (value(b, key) ?? null));
@@ -29,7 +31,7 @@ export function reconcileReportEntries(
     incoming.forEach((row, index) => {
       if (matches.has(index)) return;
       const previous = [...unused.values()].find((candidate) =>
-        (!candidate.passport || equal(candidate, row, fields)) && equal(candidate, row, keys));
+        (!(candidate.passport || immutable(candidate)) || equal(candidate, row, fields)) && equal(candidate, row, keys));
       if (previous) {
         matches.set(index, previous);
         unused.delete(previous.id);
@@ -37,9 +39,15 @@ export function reconcileReportEntries(
     });
   }
   for (const [index, previous] of matches) {
+    if (immutable(previous) && !equal(previous, incoming[index], fields)) {
+      throw new ServiceError('Запись с поправками неизменяема. Сохраните исходную запись и историю поправок.', 409);
+    }
     if (previous.passport && !equal(previous, incoming[index], fields)) {
       throw new ServiceError('Свая имеет паспорт. Изменяйте её через журнал свай, сохраняя исполнительные данные.', 409);
     }
+  }
+  if ([...unused.values()].some(immutable)) {
+    throw new ServiceError('Нельзя удалить запись с поправками или её историю.', 409);
   }
   if ([...unused.values()].some((row) => row.passport)) {
     throw new ServiceError('Нельзя удалить из отчёта сваю с паспортом. Откройте журнал свай.', 409);

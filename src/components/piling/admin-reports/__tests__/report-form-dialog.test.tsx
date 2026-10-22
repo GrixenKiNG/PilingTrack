@@ -62,6 +62,20 @@ const editReport = {
 } as unknown as ReportDTO;
 
 describe('ReportFormDialog — pile meters total', () => {
+  it('показывает поправки в итогах, но не отправляет их как новую отрицательную выработку', async () => {
+    authFetchMock.mockResolvedValue({ok: true});
+    render(<ReportFormDialog open onClose={vi.fn()} onSuccess={vi.fn()} loadingReferenceData={false} dictionaryError={null}
+      operators={[]} sites={[]} pileGrades={[{id: 'g1', name: 'С90.30', isActive: true, lengthMm: 9000}]}
+      drillingTypes={[]} downtimeReasons={[]} equipment={[]}
+      editReport={{...editReport, piles: [...editReport.piles, {...editReport.piles[0], id: 'pc', count: -2, correctsId: 'p1'}]}}
+    />);
+    expect(screen.getByText('3 шт. / 27,0 м.п.')).toBeTruthy();
+    expect(screen.getAllByRole('button', {name: /Удалить сваю/}).every(button => (button as HTMLButtonElement).disabled)).toBe(true);
+    fireEvent.click(screen.getByRole('button', {name: /Сохранить/}));
+    await waitFor(() => expect(authFetchMock).toHaveBeenCalled());
+    const body = JSON.parse(authFetchMock.mock.calls.at(-1)?.[1].body ?? '{}');
+    expect(body.piles).toEqual([{id: 'p1', pileGradeId: 'g1', count: 5}]);
+  });
   it('computes the total from PileGrade.lengthMm, not a 3-digit regex on the name', () => {
     render(
       <ReportFormDialog

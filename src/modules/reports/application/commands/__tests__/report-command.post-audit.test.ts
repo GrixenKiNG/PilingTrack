@@ -71,6 +71,7 @@ vi.mock('../../../infrastructure', () => ({
 
 vi.mock('../report-validation.service', () => ({
   validateReportInput: vi.fn(),
+  validateDowntimeWithinShift: vi.fn(),
   validatePicketsBelongToSite: vi.fn(),
   validateAgainstSitePlans: vi.fn(),
 }));

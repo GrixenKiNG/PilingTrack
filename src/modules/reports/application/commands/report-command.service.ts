@@ -27,7 +27,7 @@ import {
 import { ReportAggregate } from '../../domain';
 import { getReportRepository } from '../../infrastructure';
 import { UpsertReportCommand, UpsertReportResult } from './upsert-report.command';
-import { validateReportInput, validateAgainstSitePlans, validatePicketsBelongToSite } from './report-validation.service';
+import { validateReportInput, validateAgainstSitePlans, validatePicketsBelongToSite, validateDowntimeWithinShift } from './report-validation.service';
 import {
   writeReportAuditRow,
   recordPostCommitAuditEvent,
@@ -85,7 +85,8 @@ export async function upsertReport(
   } = { enforceEditWindow: true }
 ): Promise<UpsertReportResult> {
   // Phase 1: Validation (fast, no DB)
-  validateReportInput(input);
+  // Сумму проверяем ниже вместе с сохранёнными встречными поправками.
+  validateReportInput({ ...input, shiftStart: undefined, shiftEnd: undefined });
   await assertReportOwnerOnSite(input.userId, input.siteId, input.tenantId);
 
   // Site plans are checked inside the save transaction (see Phase 5).
@@ -225,9 +226,10 @@ export async function upsertReport(
       aggregate = ReportAggregate.reconstitute({
         ...existingState,
         status: 'draft',
-        piles: [],
-        drillings: [],
-        downtimes: [],
+        // Поправки неизменяемы и берутся только из БД, не из формы.
+        piles: existingState.piles.filter(row => row.correctsId),
+        drillings: existingState.drillings.filter(row => row.correctsId),
+        downtimes: existingState.downtimes.filter(row => row.correctsId),
       });
     } else {
       // Provenance: freeze the operator's crew onto the report at creation time.
@@ -280,6 +282,8 @@ export async function upsertReport(
 
     // Phase 3: Apply entries through aggregate (validates business rules)
     applyEntriesToAggregate(aggregate, input, options.actor);
+    const state = aggregate.getState();
+    validateDowntimeWithinShift(state.shiftStart, state.shiftEnd, state.downtimes);
 
     // Phase 4: Submit (draft → submitted)
     aggregate.submit(

@@ -10,6 +10,16 @@ const rows = [
 ];
 
 describe('report work identity and passport protection', () => {
+  it('сохраняет встречные поправки и запрещает менять или удалять исходную запись', () => {
+    const original = {id: 'original', pileGradeId: 'grade', count: 10};
+    const correction = {id: 'correction', pileGradeId: 'grade', count: -3, correctsId: original.id};
+    const stored = [original, correction];
+    expect(reconcileReportEntries(stored, stored, fields, group).removeIds).toEqual([]);
+    expect(() => reconcileReportEntries(stored, [correction], fields, group)).toThrow('поправками');
+    expect(() => reconcileReportEntries(stored, [original], fields, group)).toThrow('поправками');
+    expect(() => reconcileReportEntries(stored, [original, {...correction, count: -2}], fields, group)).toThrow('неизменяема');
+    expect(() => reconcileReportEntries(stored, [{...original, count: 9}, correction], fields, group)).toThrow('неизменяема');
+  });
   it('preserves signed work when an old client reorders rows and changes a batch', () => {
     const result = reconcileReportEntries(rows, [
       { pileGradeId: 'grade', count: 5 },

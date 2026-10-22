@@ -324,6 +324,7 @@ export interface ReportListItemDTO {
 
 export interface PileWorkDTO {
   id: string;
+  correctsId?: string | null;
   picketId: string | null;
   pileGradeId: string;
   count: number;
@@ -331,6 +332,7 @@ export interface PileWorkDTO {
 
 export interface LeaderDrillingDTO {
   id: string;
+  correctsId?: string | null;
   picketId: string | null;
   typeId: string;
   count: number;
@@ -340,6 +342,7 @@ export interface LeaderDrillingDTO {
 
 export interface ReportDowntimeDTO {
   id: string;
+  correctsId?: string | null;
   reasonId: string;
   duration: number;
   comment: string | null;

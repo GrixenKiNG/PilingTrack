@@ -32,9 +32,9 @@ import { getTodayInTimezone } from '@/lib/timezone';
 
 interface OperatorUser { id: string; name: string; }
 
-interface PileEntry { id: string; picketId?: string | null; pileGradeId: string; count: number; }
-interface DrillingEntry { id: string; picketId?: string | null; typeId: string; count: number; metersPerUnit: number; meters: number; }
-interface DowntimeEntry { id: string; reasonId: string; duration: number; comment: string; }
+interface PileEntry { id: string; correctsId?: string | null; picketId?: string | null; pileGradeId: string; count: number; }
+interface DrillingEntry { id: string; correctsId?: string | null; picketId?: string | null; typeId: string; count: number; metersPerUnit: number; meters: number; }
+interface DowntimeEntry { id: string; correctsId?: string | null; reasonId: string; duration: number; comment: string; }
 
 interface ReportFormDialogProps {
   open: boolean;
@@ -69,11 +69,12 @@ export function ReportFormDialog({
   const [formEquipmentId, setFormEquipmentId] = useState(editReport?.equipment?.id || '');
 
   const [formPiles, setFormPiles] = useState<PileEntry[]>(
-    (editReport?.piles || []).map((p) => ({ id: p.id, picketId: p.picketId, pileGradeId: p.pileGradeId, count: p.count }))
+    (editReport?.piles || []).map((p) => ({ id: p.id, correctsId: p.correctsId, picketId: p.picketId, pileGradeId: p.pileGradeId, count: p.count }))
   );
   const [formDrillings, setFormDrillings] = useState<DrillingEntry[]>(
     (editReport?.drillings || []).map((d) => ({
       id: d.id,
+      correctsId: d.correctsId,
       picketId: d.picketId,
       typeId: d.typeId,
       count: d.count || 1,
@@ -82,7 +83,7 @@ export function ReportFormDialog({
     }))
   );
   const [formDowntimes, setFormDowntimes] = useState<DowntimeEntry[]>(
-    (editReport?.downtimes || []).map((dt) => ({ id: dt.id, reasonId: dt.reasonId, duration: dt.duration, comment: dt.comment || '' }))
+    (editReport?.downtimes || []).map((dt) => ({ id: dt.id, correctsId: dt.correctsId, reasonId: dt.reasonId, duration: dt.duration, comment: dt.comment || '' }))
   );
 
   const [showFormDowntime, setShowFormDowntime] = useState((editReport?.downtimes?.length || 0) > 0);
@@ -188,8 +189,8 @@ export function ReportFormDialog({
           version: editReport?.version,
           shiftStart: formShiftStart, shiftEnd: formShiftEnd,
           equipmentId: formEquipmentId || undefined,
-          piles: formPiles.map((p) => ({ id: editReport?.piles.some(row => row.id === p.id) ? p.id : undefined, picketId: p.picketId || undefined, pileGradeId: p.pileGradeId, count: p.count })),
-          drillings: formDrillings.map((d) => ({
+          piles: formPiles.filter(row => !row.correctsId).map((p) => ({ id: editReport?.piles.some(row => row.id === p.id) ? p.id : undefined, picketId: p.picketId || undefined, pileGradeId: p.pileGradeId, count: p.count })),
+          drillings: formDrillings.filter(row => !row.correctsId).map((d) => ({
             id: editReport?.drillings.some(row => row.id === d.id) ? d.id : undefined,
             picketId: d.picketId || undefined,
             typeId: d.typeId,
@@ -197,7 +198,7 @@ export function ReportFormDialog({
             metersPerUnit: d.metersPerUnit,
             meters: d.meters,
           })),
-          downtimes: formDowntimes.map((d) => ({ id: editReport?.downtimes.some(row => row.id === d.id) ? d.id : undefined, reasonId: d.reasonId, duration: d.duration, comment: d.comment || undefined })),
+          downtimes: formDowntimes.filter(row => !row.correctsId).map((d) => ({ id: editReport?.downtimes.some(row => row.id === d.id) ? d.id : undefined, reasonId: d.reasonId, duration: d.duration, comment: d.comment || undefined })),
         }),
       });
       if (!res.ok) {
@@ -250,6 +251,9 @@ export function ReportFormDialog({
           ) : null}
           {/* Пустые «Марка сваи / Тип скважины / Причина простоя» — это отказ чтения
               справочников, а не «в системе нет данных». */}
+          {[...formPiles, ...formDrillings, ...formDowntimes].some(row => row.correctsId) && (
+            <p className="text-xs text-muted-foreground">Поправки включены в итоги. Исходные записи и история поправок сохраняются без изменений.</p>
+          )}
           {dictionaryError ? (
             <p role="alert" className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive-strong">
               {dictionaryError}
@@ -337,7 +341,7 @@ export function ReportFormDialog({
                         <span className="block">{pile.count} шт.</span>
                         <span className="block text-xs text-muted-foreground">{formatFixed(getPileMeters(pile.pileGradeId, pile.count), 1)} м.п.</span>
                       </span>
-                      <button onClick={() => setFormPiles((prev) => prev.filter((p) => p.id !== pile.id))}
+                      <button disabled={Boolean(pile.correctsId || formPiles.some(row => row.correctsId === pile.id))} onClick={() => setFormPiles((prev) => prev.filter((p) => p.id !== pile.id))}
                         aria-label={`Удалить сваю ${getPileGradeName(pile.pileGradeId)}`}
                         title="Удалить сваю"
                         className="min-h-11 min-w-11 rounded flex items-center justify-center hover:bg-destructive/10 text-muted-foreground hover:text-destructive-strong transition-colors"><Trash2 className="w-3 h-3" /></button>
@@ -377,7 +381,7 @@ export function ReportFormDialog({
                         <span className="block">{d.count} шт. x {formatNumber(d.metersPerUnit)} м</span>
                         <span className="block text-xs text-muted-foreground">{formatNumber(d.meters)} м</span>
                       </span>
-                      <button onClick={() => setFormDrillings((prev) => prev.filter((dr) => dr.id !== d.id))}
+                      <button disabled={Boolean(d.correctsId || formDrillings.some(row => row.correctsId === d.id))} onClick={() => setFormDrillings((prev) => prev.filter((dr) => dr.id !== d.id))}
                         aria-label={`Удалить бурение ${getDrillTypeName(d.typeId)}`}
                         title="Удалить бурение"
                         className="min-h-11 min-w-11 rounded flex items-center justify-center hover:bg-destructive/10 text-muted-foreground hover:text-destructive-strong transition-colors"><Trash2 className="w-3 h-3" /></button>
@@ -419,8 +423,8 @@ export function ReportFormDialog({
                           {dt.comment && <p className="text-3xs text-muted-foreground truncate">{dt.comment}</p>}
                         </div>
                         <div className="flex items-center gap-2">
-                          <span className="font-mono font-semibold text-warning-strong">{formatDowntimeHours(dt.duration)}</span>
-                          <button onClick={() => setFormDowntimes((prev) => prev.filter((d) => d.id !== dt.id))}
+                          <span className="font-mono font-semibold text-warning-strong">{dt.duration < 0 ? '−' : ''}{formatDowntimeHours(Math.abs(dt.duration))}</span>
+                          <button disabled={Boolean(dt.correctsId || formDowntimes.some(row => row.correctsId === dt.id))} onClick={() => setFormDowntimes((prev) => prev.filter((d) => d.id !== dt.id))}
                             aria-label={`Удалить простой ${getDtReasonName(dt.reasonId)}`}
                             title="Удалить простой"
                             className="min-h-11 min-w-11 rounded flex items-center justify-center hover:bg-destructive/10 text-muted-foreground hover:text-destructive-strong transition-colors"><Trash2 className="w-3 h-3" /></button>
