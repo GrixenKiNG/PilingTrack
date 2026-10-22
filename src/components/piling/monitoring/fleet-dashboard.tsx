@@ -26,7 +26,7 @@ import { cn } from '@/lib/utils';
 import { authFetch } from '@/lib/api';
 import { formatCountMeters, formatHours, formatRelative, formatRuDate } from '@/lib/format';
 import { useMinSkeletonDuration } from '@/components/piling/async-ui';
-import { KpiTile, KPI_GRID, kpiGridStyle } from '@/components/piling/kpi-tile';
+import { KpiTile } from '@/components/piling/kpi-tile';
 import type { EquipmentStatus, FleetCard, FleetSnapshot } from '@/components/piling/admin-equipment/fleet-types';
 import { EquipmentCard } from './equipment-card';
 import { useEquipmentTileTemplate } from './use-equipment-tile-template';
@@ -330,7 +330,7 @@ function StatusBar({ snap, conn }: { snap: FleetSnapshot; conn: Connection }) {
         </div>
       </div>
 
-      <div className={cn(KPI_GRID, 'mt-4')} style={kpiGridStyle(6)}>
+      <div className="mt-4 grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 250px), 1fr))' }}>
         {/* Итоги дня считаются по сданным отчётам, а не по открытым сменам. */}
         <KpiTile icon="pile-driving" label="Сваи" tone="info" value={formatCountMeters(snap.totals.pilesToday, snap.totals.pileMetersToday)}
           detail="по сданным отчётам" />
