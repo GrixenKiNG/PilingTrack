@@ -104,6 +104,28 @@ describe.skipIf(!enabled)('M6–M8 on disposable migrated Postgres', () => {
     }
   });
 
+  it('не засчитывает инструктаж до подписи работника в личном допуске и общей сводке', async () => {
+    const {querySelfSafetyView} = await import('@/modules/safety/application/self-clearance-query');
+    const {querySafetyClearanceOverview} = await import('@/modules/safety/application/clearance-overview-query');
+    const userId = fixture.id(tenant, 'User');
+    const id = fixture.id(tenant, 'BriefingRecord');
+    const view = () => inContext(() => querySelfSafetyView({tenantId: tenant, userId}));
+    const overview = () => inContext(() => querySafetyClearanceOverview({tenantId: tenant, mayReadAllDocuments: true}));
+    const before = await view();
+    const instruction = before.briefings.required[0];
+    expect(instruction).toBeDefined();
+    await fixture.owner.query('UPDATE "BriefingRecord" SET "documentCode"=$1,"documentVersion"=$2,"instructorId"=$3,"instructorSignedAt"=now(),"employeeSignedAt"=NULL WHERE id=$4', [instruction.code, instruction.version, userId, id]);
+    const pending = await view();
+    expect(pending.briefings.pending).toHaveLength(before.briefings.pending.length);
+    expect(pending.history.find(row => row.id === id)?.awaitingEmployeeSignature).toBe(true);
+    const pendingOverview = await overview();
+    await fixture.owner.query('UPDATE "BriefingRecord" SET "employeeSignedAt"=now() WHERE id=$1', [id]);
+    expect((await view()).briefings.pending).toHaveLength(before.briefings.pending.length - 1);
+    const signedOverview = await overview();
+    expect(signedOverview.rows.find(row => row.userId === userId)?.pendingInstructions)
+      .toHaveLength((pendingOverview.rows.find(row => row.userId === userId)?.pendingInstructions.length ?? 0) - 1);
+  });
+
   it('M7: partial receipts survive a disconnected client/module restart; retry sends only B', async () => {
     const eventId = tenant + '-delivery';
     const alert = { severity: 'high', message: 'Disposable Telegram proof' };

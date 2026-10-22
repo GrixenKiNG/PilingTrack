@@ -91,7 +91,10 @@ export async function querySelfSafetyView(input: {
     // длинной историей нужное прочтение оказалось бы за краем выборки, и он
     // без всякой причины попал бы в «ожидают ознакомления».
     db.briefingRecord.findMany({
-      where: { tenantId: input.tenantId, userId: input.userId, kind: 'INSTRUCTION' },
+      where: {
+        tenantId: input.tenantId, userId: input.userId, kind: 'INSTRUCTION',
+        OR: [{ instructorId: null }, { employeeSignedAt: { not: null } }],
+      },
       select: { documentCode: true, documentVersion: true, recordedAt: true },
       orderBy: { recordedAt: 'desc' },
     }),

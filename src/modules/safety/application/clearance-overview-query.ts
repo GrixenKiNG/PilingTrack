@@ -203,7 +203,10 @@ export async function querySafetyClearanceOverview(input: {
     userIds.length === 0
       ? Promise.resolve<AcquaintanceEntry[]>([])
       : db.briefingRecord.findMany({
-          where: { tenantId, kind: 'INSTRUCTION', userId: { in: userIds } },
+          where: {
+            tenantId, kind: 'INSTRUCTION', userId: { in: userIds },
+            OR: [{ instructorId: null }, { employeeSignedAt: { not: null } }],
+          },
           select: { userId: true, documentCode: true, documentVersion: true, recordedAt: true },
           orderBy: { recordedAt: 'desc' },
         }),

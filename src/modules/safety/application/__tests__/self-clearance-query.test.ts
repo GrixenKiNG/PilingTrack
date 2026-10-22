@@ -81,5 +81,7 @@ describe('личная история инструктажей: состояни
     for (const [args] of mocks.recordsFind.mock.calls) {
       expect(args.where).toMatchObject({tenantId: 'tenant-a', userId: 'operator-a'});
     }
+    const requirements = mocks.recordsFind.mock.calls.find(([args]) => !args.take)?.[0];
+    expect(requirements?.where.OR).toEqual([{instructorId: null}, {employeeSignedAt: {not: null}}]);
   });
 });

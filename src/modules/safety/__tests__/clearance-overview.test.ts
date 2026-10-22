@@ -67,6 +67,11 @@ beforeEach(() => {
 });
 
 describe('Допуск к работе: права и организация', () => {
+  it('ознакомление требует подписи работника либо старой собственной отметки', async () => {
+    await overview();
+    const args = briefingsFindMany.mock.calls.find(([args]) => args.select?.documentCode)?.[0];
+    expect(args?.where.OR).toEqual([{instructorId: null}, {employeeSignedAt: {not: null}}]);
+  });
   it('отказывает без права читать документы всех', async () => {
     await expect(overview({ mayReadAllDocuments: false }))
       .rejects.toThrow('Недостаточно прав для просмотра допусков');
