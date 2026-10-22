@@ -69,10 +69,21 @@ export async function pileJournalTotals(
       COUNT(*) FILTER (WHERE p."acceptance" = 'ACCEPTED')::int AS "accepted",
       COUNT(*) FILTER (WHERE p."acceptance" = 'NEEDS_REDRIVE')::int AS "needsRedrive",
       COUNT(*) FILTER (WHERE p."acceptance" = 'PENDING')::int AS "pending",
-      COUNT(*)::int AS "rows"
+      COUNT(*)::int AS "rows",
+      jsonb_build_object(
+        'siteNames', COALESCE(array_agg(DISTINCT COALESCE(s.name, '—') ORDER BY COALESCE(s.name, '—')), ARRAY[]::text[]),
+        'equipmentNames', COALESCE(array_agg(DISTINCT COALESCE(e.name, ce.name) ORDER BY COALESCE(e.name, ce.name)) FILTER (WHERE COALESCE(e.name, ce.name) IS NOT NULL), ARRAY[]::text[]),
+        'hammerTypes', COALESCE(array_agg(DISTINCT p."hammerType" ORDER BY p."hammerType") FILTER (WHERE p."hammerType" IS NOT NULL), ARRAY[]::text[]),
+        'hammerEnergyKj', COALESCE(array_agg(DISTINCT p."hammerEnergyKj" ORDER BY p."hammerEnergyKj") FILTER (WHERE p."hammerEnergyKj" IS NOT NULL), ARRAY[]::float8[]),
+        'designRefusalMm', COALESCE(array_agg(DISTINCT p."designRefusalMm" ORDER BY p."designRefusalMm") FILTER (WHERE p."designRefusalMm" IS NOT NULL), ARRAY[]::float8[])
+      ) AS "header"
     FROM "PileWork" pw
     LEFT JOIN "Report" r ON r.id = pw."reportId"
     LEFT JOIN "PilePassport" p ON p."pileWorkId" = pw.id
+    LEFT JOIN "Site" s ON s.id = r."siteId"
+    LEFT JOIN "Equipment" e ON e.id = r."equipmentId"
+    LEFT JOIN "Crew" c ON c.id = r."crewId"
+    LEFT JOIN "Equipment" ce ON ce.id = c."equipmentId"
     WHERE pw."tenantId" = ${input.tenantId}
       AND (${siteId}::text IS NULL OR r."siteId" = ${siteId}::text)
       AND (${acceptanceValue}::text IS NULL OR p."acceptance"::text = ${acceptanceValue}::text)
@@ -111,8 +122,8 @@ function printYmd(ymd: string): string {
 }
 
 /**
- * Титул журнала: оборудование и проектные величины — из показанных строк,
- * фактический период работ и итоги — из агрегата всей выборки (`totals`).
+ * Титул журнала: описательные поля, период и итоги — из всей выборки.
+ * Строки служат запасным источником для старых ответов без totals.header.
  *
  * ПОЧЕМУ ОПИСАТЕЛЬНЫЕ ИЗ СТРОК, А НЕ ИЗ ОТДЕЛЬНЫХ ПОЛЕЙ ОБЪЕКТА. Копёр, молот,
  * энергия удара и проектный отказ записаны в каждом паспорте на момент забивки.
@@ -142,11 +153,11 @@ export function pileJournalHeader(
   };
 
   return {
-    siteNames: uniq(rows.map((row) => row.siteName)),
-    equipmentNames: uniq(rows.map((row) => row.equipmentName)),
-    hammerTypes: uniq(rows.map((row) => row.hammerType)),
-    hammerEnergyKj: uniq(rows.map((row) => row.hammerEnergyKj)).sort((a, b) => a - b),
-    designRefusalMm: uniq(rows.map((row) => row.designRefusalMm)).sort((a, b) => a - b),
+    siteNames: totals.header?.siteNames ?? uniq(rows.map((row) => row.siteName)),
+    equipmentNames: totals.header?.equipmentNames ?? uniq(rows.map((row) => row.equipmentName)),
+    hammerTypes: totals.header?.hammerTypes ?? uniq(rows.map((row) => row.hammerType)),
+    hammerEnergyKj: totals.header?.hammerEnergyKj ?? uniq(rows.map((row) => row.hammerEnergyKj)).sort((a, b) => a - b),
+    designRefusalMm: totals.header?.designRefusalMm ?? uniq(rows.map((row) => row.designRefusalMm)).sort((a, b) => a - b),
     dateFrom: periodEdge(totals.drivenFrom),
     dateTo: periodEdge(totals.drivenTo),
     // Единицы не смешиваем: «Свай (всего)» — сваи (Σ count, пачка приносит

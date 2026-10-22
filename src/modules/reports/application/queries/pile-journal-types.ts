@@ -187,6 +187,8 @@ export const PILE_JOURNAL_EXPORT_LIMIT = 20000;
 
 /** Итоги периода — по всему периоду, а не по показанной странице. */
 export interface PileJournalTotals {
+  /** Описательные поля всей выборки; старые ответы могли их не содержать. */
+  header?: Pick<PileJournalHeader, 'siteNames' | 'equipmentNames' | 'hammerTypes' | 'hammerEnergyKj' | 'designRefusalMm'>;
   /** Фактические границы работ всей выборки, ISO UTC; null — работ нет. */
   drivenFrom: string | null;
   drivenTo: string | null;
@@ -213,6 +215,7 @@ export interface PileJournalPage {
 }
 
 export interface RawPileJournalTotals {
+  header: NonNullable<PileJournalTotals['header']>;
   drivenFrom: Date | null;
   drivenTo: Date | null;
   piles: number;

@@ -27,6 +27,14 @@ beforeEach(() => {
 const sentSql = () => (mocks.queryRaw.mock.calls[0][0] as TemplateStringsArray).join('?');
 const sentParams = () => mocks.queryRaw.mock.calls[0].slice(1);
 
+it('титул берёт объекты и параметры за пределами показанной страницы из полного агрегата', async () => {
+  const header = {siteNames: ['A', 'B'], equipmentNames: ['Копёр'], hammerTypes: ['Молот'], hammerEnergyKj: [90], designRefusalMm: [2]};
+  mocks.queryRaw.mockResolvedValue([{...emptyTotals, rows: 501, header}]);
+  const totals = await pileJournalTotals({tenantId: 'tenant-a'}, undefined, null);
+  expect(pileJournalHeader([], totals)).toMatchObject({...header, rowsTotal: 501});
+  expect(sentSql()).toContain('array_agg(DISTINCT');
+});
+
 it('период берёт из всех работ, включая receivedAt, и печатает по поясу организации', async () => {
   mocks.queryRaw.mockResolvedValue([{
     ...emptyTotals, piles: 501, rows: 501,
