@@ -10,6 +10,9 @@ import {writeReportAuditRow} from '@/modules/reports/server';
 import {OperatorCommandError, requireCrew, requireOpenShift, bumpReportVersion, businessReportId, reportAuditActor} from './shared';
 import type {Tx} from './shared';
 import {findByCommand} from './production';
+import {DOWNTIME_MAX_HOURS, isWholeDowntimeStep} from '@/lib/downtime-hours';
+import {validateDowntimeWithinShift} from '@/modules/reports';
+import {SHIFT_WINDOW} from '../../domain/shift-window';
 
 /**
  * След поправки в истории отчёта — «было N → стало M» (F-R34-2).
@@ -67,7 +70,7 @@ export async function correctProduction(input: {
   if (reason.length < 3) {
     throw new OperatorCommandError(400, 'Напишите, почему пришлось поправить');
   }
-  if (input.actual < 0) {
+  if (!Number.isFinite(input.actual) || input.actual < 0) {
     throw new OperatorCommandError(400, 'Итог не может быть отрицательным');
   }
 
@@ -82,7 +85,7 @@ export async function correctProduction(input: {
     // по той же причине (см. logProduction).
     const report = await tx.report.findFirst({
       where: {tenantId: input.tenantId, shiftId: input.shiftId},
-      select: {status: true},
+      select: {status: true, shiftStart: true, shiftEnd: true},
     });
     if (report?.status === 'submitted') {
       throw new OperatorCommandError(
@@ -185,13 +188,23 @@ export async function correctProduction(input: {
       where: {tenantId: input.tenantId, correctsId: original.id},
     });
     const current = original.duration + (corrections._sum.duration ?? 0);
-    // Правка простоя подчиняется тому же правилу, что и запись: полные часы,
-    // неполный вверх. Схема команды округлить это не может — `actual` там один
-    // на сваи, бурение и простой, а часы из них только у простого. Ноль
-    // остаётся нулём: «простоя не было» — законный ответ.
+    // Те же предел и шаг, что при записи. Ноль отменяет простой.
     const actual = input.actual;
+    if (actual > DOWNTIME_MAX_HOURS || !isWholeDowntimeStep(actual)) {
+      throw new OperatorCommandError(400, 'Простой: от 0 до 24 ч с шагом в четверть часа');
+    }
     const delta = Math.round((actual - current) * 100) / 100;
     if (delta === 0) throw new OperatorCommandError(400, 'Число не изменилось');
+    const recorded = await tx.reportDowntime.findMany({
+      where: {tenantId: input.tenantId, reportId: original.reportId}, select: {duration: true},
+    });
+    const window = SHIFT_WINDOW[shift.type];
+    const clock = (hour: number) => `${String(hour % 24).padStart(2, '0')}:00`;
+    validateDowntimeWithinShift(
+      report?.shiftStart ?? clock(window.startHour),
+      report?.shiftEnd ?? clock(window.endHour),
+      [...recorded, {duration: delta}],
+    );
     const created = await tx.reportDowntime.create({
       data: {
         reportId: original.reportId,

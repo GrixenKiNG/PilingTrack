@@ -37,6 +37,7 @@ const tx = {
   crew: {findFirst: vi.fn()},
   report: {findFirst: vi.fn(), findUniqueOrThrow: vi.fn(), update: vi.fn()},
   pileWork: {findUnique: vi.fn(), findFirst: vi.fn(), aggregate: vi.fn(), create: vi.fn()},
+  reportDowntime: {findUnique: vi.fn(), findFirst: vi.fn(), aggregate: vi.fn(), findMany: vi.fn(), create: vi.fn()},
   reportAudit: {create: vi.fn()},
   user: {findFirst: vi.fn().mockResolvedValue({name: 'Иванов', role: 'OPERATOR'})},
 };
@@ -67,6 +68,11 @@ beforeEach(() => {
   // К исходной записи уже была одна поправка на +3.
   tx.pileWork.aggregate.mockResolvedValue({_sum: {count: 3}});
   tx.pileWork.create.mockResolvedValue({id: 'pw-corr-1'});
+  tx.reportDowntime.findUnique.mockResolvedValue(null);
+  tx.reportDowntime.findFirst.mockResolvedValue({id: 'dt-1', reportId: 'report-pk-1', reasonId: 'reason-1', duration: 2, correctsId: null});
+  tx.reportDowntime.aggregate.mockResolvedValue({_sum: {duration: 0}});
+  tx.reportDowntime.findMany.mockResolvedValue([{duration: 2}, {duration: 8}]);
+  tx.reportDowntime.create.mockResolvedValue({id: 'dt-corr-1'});
   tx.report.findUniqueOrThrow.mockResolvedValue({reportId: 'RM-shift-12-2026-09-26'});
   tx.reportAudit.create.mockResolvedValue({});
   withReadinessTenantTransaction.mockImplementation(
@@ -76,6 +82,25 @@ beforeEach(() => {
 });
 
 describe('correctProduction — след поправки в истории отчёта', () => {
+  it.each([500, 24.25, 1.3, NaN, Infinity])('отвергает недопустимые часы %s без записи', async (actual) => {
+    await expect(correctProduction({...input, kind: 'DOWNTIME', entryId: 'dt-1', actual})).rejects.toThrow();
+    expect(tx.reportDowntime.create).not.toHaveBeenCalled();
+    expect(tx.report.update).not.toHaveBeenCalled();
+  });
+
+  it('считает предел смены с учётом остальных простоев и прежних поправок', async () => {
+    await expect(correctProduction({...input, kind: 'DOWNTIME', entryId: 'dt-1', actual: 5})).rejects.toThrow('продолжительность смены');
+    expect(tx.reportDowntime.create).not.toHaveBeenCalled();
+    tx.reportDowntime.aggregate.mockResolvedValue({_sum: {duration: -1}});
+    tx.reportDowntime.findMany.mockResolvedValue([{duration: 2}, {duration: -1}, {duration: 8}]);
+    await expect(correctProduction({...input, kind: 'DOWNTIME', entryId: 'dt-1', actual: 4})).resolves.toMatchObject({was: 1, now: 4});
+    expect(tx.reportDowntime.create).toHaveBeenCalledWith(expect.objectContaining({data: expect.objectContaining({duration: 3})}));
+  });
+
+  it('разрешает отменить простой до нуля', async () => {
+    await expect(correctProduction({...input, kind: 'DOWNTIME', entryId: 'dt-1', actual: 0})).resolves.toMatchObject({now: 0});
+    expect(tx.reportDowntime.create).toHaveBeenCalledWith(expect.objectContaining({data: expect.objectContaining({duration: -2})}));
+  });
   it('пишет строку «updated» с «было → стало» деловым номером отчёта', async () => {
     await expect(correctProduction(input)).resolves.toEqual({
       correctionId: 'pw-corr-1', was: 13, now: 8,
