@@ -1,6 +1,6 @@
 import { db } from '@/lib/db';
 import { enqueueCriticalDefects } from '@/core/notifications/durable-alert';
-import { recordAuditEvent } from '@/modules/audit';
+import { recordAuditEvent, recordAuditEventInTx } from '@/modules/audit';
 import type { Prisma } from '@/generated/postgres-client/client';
 import { ServiceError } from '@/lib/service-error';
 import { advanceMaintenanceRegulation, recordMeterReadingInTx } from '@/modules/equipment';
@@ -351,7 +351,7 @@ export async function saveAnswers(
  */
 export async function completeInspectionWithOutcome(
   id: string,
-  ctx: { tenantId: string; signedByName: string; performerId?: string | null },
+  ctx: { tenantId: string; signedByName: string; performerId?: string | null; actorId?: string | null },
 ) {
   if (!ctx.tenantId) throw new ServiceError('tenantId is required', 400);
   const ins = await db.inspection.findUnique({ where: { id }, include: { answers: true } });
@@ -395,6 +395,11 @@ export async function completeInspectionWithOutcome(
   const plannedDefects = planDefectsFromInspection({
     items: ins.templateSnapshot as unknown as DefectRuleItem[],
     answers: ins.answers.map((a) => ({ itemId: a.itemId, result: a.result, note: a.note })),
+  });
+  // Название установки для следа читаем до транзакции: сбой чтения здесь ничего
+  // не меняет в базе, а внутри транзакции он бы её оборвал.
+  const equipment = await db.equipment.findFirst({
+    where: { id: ins.equipmentId, tenantId: ctx.tenantId }, select: { name: true },
   });
   const now = new Date();
   return db.$transaction(async (tx) => {
@@ -493,6 +498,9 @@ export async function completeInspectionWithOutcome(
     // журнал утонул бы за неделю. Пока прежний дефект по этому пункту открыт,
     // новый не создаётся — вместо этого запись остаётся одна и живёт своим
     // циклом (разбор → устранение).
+    // Дефекты, заведённые именно этим осмотром, — для следа. Дефект, который уже
+    // открыт по этому пункту, новым не считается.
+    let createdDefects = 0;
     if (plannedDefects.length > 0) {
       const openByKey = await tx.equipmentDefect.findMany({
         where: {
@@ -506,6 +514,7 @@ export async function completeInspectionWithOutcome(
       const alreadyOpen = new Set(openByKey.map((row) => row.sourceKey));
       const toCreate = plannedDefects.filter((item) =>
         !alreadyOpen.has(inspectionDefectKey(ins.equipmentId, item.itemId)));
+      createdDefects = toCreate.length;
       for (const planned of toCreate) {
         // Дефект высокого и критического уровня сам заводит заявку ТО (решение 18.10.2026).
         const repairOrderId = await createRepairOrderForDefect(tx, {
@@ -562,6 +571,20 @@ export async function completeInspectionWithOutcome(
           equipmentId: ins.equipmentId, inspectionId: id, triggerOccurredAt: now.toISOString(),
         } as Prisma.InputJsonValue,
       }],
+    });
+    // Завершение осмотра — самый «допусковый» акт: считается балл состояния,
+    // закрывается наряд ТО, пишутся моточасы и заводятся дефекты. След — в той же
+    // транзакции (повтор завершения сюда не доходит, второго события не будет).
+    await recordAuditEventInTx(tx, {
+      action: 'inspection.completed',
+      scope: 'inspections',
+      actorId: ctx.actorId ?? null,
+      targetId: id,
+      tenantId: ctx.tenantId,
+      metadata: {
+        ...(equipment?.name ? { name: equipment.name } : {}),
+        after: { level: inspection.level, healthScore: inspection.healthScore, defectCount: createdDefects },
+      },
     });
     return { inspection, replayed: false };
   });

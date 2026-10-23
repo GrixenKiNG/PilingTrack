@@ -16,13 +16,15 @@ const m = vi.hoisted(() => ({
   // Счётчик открытых транзакций: фиксируем, что запись идёт одной.
   transaction: vi.fn(),
   audit: vi.fn(),
+  // След завершения осмотра пишется в его транзакции; название установки — до неё.
+  auditInTx: vi.fn(), eqFindFirst: vi.fn(),
 }));
-vi.mock('@/modules/audit', () => ({ recordAuditEvent: m.audit }));
+vi.mock('@/modules/audit', () => ({ recordAuditEvent: m.audit, recordAuditEventInTx: m.auditInTx }));
 vi.mock('@/modules/equipment/application/commands/maintenance-regulation', () => ({advanceMaintenanceRegulation: m.advanceRegulation}));
 vi.mock('@/lib/db', () => {
   const client = {
     checklistTemplate: { findUnique: m.tplFindUnique, findMany: m.tplFindMany },
-    equipment: { findUnique: m.eqFindUnique },
+    equipment: { findUnique: m.eqFindUnique, findFirst: m.eqFindFirst },
     inspection: {
       create: m.insCreate, findUnique: m.insFindUnique, update: m.insUpdate,
       updateMany: m.insUpdateMany, findUniqueOrThrow: m.insFindUniqueOrThrow,
@@ -52,6 +54,7 @@ beforeEach(() => {
   Object.values(m).forEach((fn) => fn.mockReset());
   // По умолчанию снимков нет — их наличие тест задаёт явно там, где проверяет.
   m.mediaGroupBy.mockResolvedValue([]);
+  m.eqFindFirst.mockResolvedValue({ name: 'Копёр СП-49' });
   // Захват строки по умолчанию удался: строка найдена и ещё не завершена.
   m.insUpdateMany.mockResolvedValue({ count: 1 });
   // Замок ничего не возвращает — $executeRaw отдаёт число затронутых строк.
@@ -250,6 +253,48 @@ describe('saveAnswers', () => {
 });
 
 describe('completeInspection', () => {
+  const draftInspection = (over: Record<string, unknown> = {}) => ({
+    id: 'ins1', tenantId: 'orion', status: 'DRAFT', equipmentId: 'eq1', performedById: 'u1',
+    templateSnapshot: [], answers: [], ...over,
+  });
+
+  it('пишет след «Осмотр завершён» в той же транзакции: установка, балл, число новых дефектов', async () => {
+    m.insFindUnique.mockResolvedValue(draftInspection());
+    m.insFindUniqueOrThrow.mockResolvedValue({ id: 'ins1', status: 'COMPLETED', level: 'EO', healthScore: 100 });
+    await completeInspectionWithOutcome('ins1', { tenantId: 'orion', signedByName: 'Иванов', actorId: 'u1' });
+    expect(m.auditInTx).toHaveBeenCalledTimes(1);
+    expect(m.auditInTx).toHaveBeenCalledWith(expect.anything(), {
+      action: 'inspection.completed', scope: 'inspections', actorId: 'u1', targetId: 'ins1', tenantId: 'orion',
+      metadata: { name: 'Копёр СП-49', after: { level: 'EO', healthScore: 100, defectCount: 0 } },
+    });
+    expect(m.eqFindFirst).toHaveBeenCalledWith({ where: { id: 'eq1', tenantId: 'orion' }, select: { name: true } });
+  });
+
+  it('повторное завершение второго следа не пишет', async () => {
+    m.insFindUnique.mockResolvedValue(draftInspection());
+    m.insUpdateMany.mockResolvedValue({ count: 0 });
+    m.insFindUnique.mockResolvedValueOnce(draftInspection()).mockResolvedValueOnce({ id: 'ins1', status: 'COMPLETED' });
+    const outcome = await completeInspectionWithOutcome('ins1', { tenantId: 'orion', signedByName: 'Иванов', actorId: 'u1' });
+    expect(outcome.replayed).toBe(true);
+    expect(m.auditInTx).not.toHaveBeenCalled();
+  });
+
+  it('сбой следа не глушится: завершение падает вместе со следом', async () => {
+    m.insFindUnique.mockResolvedValue(draftInspection());
+    m.insFindUniqueOrThrow.mockResolvedValue({ id: 'ins1', status: 'COMPLETED', level: 'EO', healthScore: 100 });
+    const failure = new Error('след не записан');
+    m.auditInTx.mockRejectedValue(failure);
+    await expect(completeInspectionWithOutcome('ins1', { tenantId: 'orion', signedByName: 'Иванов' })).rejects.toBe(failure);
+  });
+
+  it('установка не найдена: след пишется без названия', async () => {
+    m.insFindUnique.mockResolvedValue(draftInspection());
+    m.insFindUniqueOrThrow.mockResolvedValue({ id: 'ins1', status: 'COMPLETED', level: 'EO', healthScore: 80 });
+    m.eqFindFirst.mockResolvedValue(null);
+    await completeInspectionWithOutcome('ins1', { tenantId: 'orion', signedByName: 'Иванов' });
+    expect(m.auditInTx.mock.calls[0][1].metadata).toEqual({ after: { level: 'EO', healthScore: 80, defectCount: 0 } });
+  });
+
   it.each(['CANCELLED', 'DONE', 'IN_PROGRESS'])('completes only open linked maintenance (%s)', async (initialStatus) => {
     let status = initialStatus;
     m.insFindUnique.mockResolvedValue({ id: 'ins1', tenantId: 'orion', status: 'DRAFT',

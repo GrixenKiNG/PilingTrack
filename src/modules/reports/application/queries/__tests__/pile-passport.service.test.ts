@@ -10,25 +10,32 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 type Sheet = { name: string; rows: (string | number | null)[][] };
 
-const { pileWorkFindMany, shiftFindMany, pileTotalsQuery, pileUpdateMany, userFindMany, getSettings, sheets } = vi.hoisted(() => ({
+const { pileWorkFindMany, shiftFindMany, pileTotalsQuery, pileUpdateMany, pileFindFirst, auditInTx, userFindMany, getSettings, sheets } = vi.hoisted(() => ({
   pileWorkFindMany: vi.fn(),
   shiftFindMany: vi.fn(),
   pileTotalsQuery: vi.fn(),
   pileUpdateMany: vi.fn(),
+  pileFindFirst: vi.fn(),
+  auditInTx: vi.fn(),
   userFindMany: vi.fn(),
   getSettings: vi.fn(),
   sheets: { current: [] as Sheet[] },
 }));
 
-vi.mock('@/lib/db', () => ({
-  db: {
+vi.mock('@/lib/db', () => {
+  const db = {
     pileWork: { findMany: pileWorkFindMany },
     shift: { findMany: shiftFindMany },
-    pilePassport: { updateMany: pileUpdateMany },
+    pilePassport: { updateMany: pileUpdateMany, findFirst: pileFindFirst },
     user: { findMany: userFindMany },
     $queryRaw: pileTotalsQuery,
-  },
-}));
+    $transaction: (run: (tx: unknown) => unknown) => run(db),
+  };
+  return { db };
+});
+
+// След решения мастера пишется в той же транзакции, что и решение.
+vi.mock('@/modules/audit', () => ({ recordAuditEventInTx: auditInTx }));
 
 vi.mock('@/modules/settings', () => ({ getSettings }));
 
@@ -506,11 +513,57 @@ describe('D4: сервис требует основание добивки', ()
     expect(pileUpdateMany).not.toHaveBeenCalled();
   });
   it('сохраняет обрезанное основание, а принятие допускает без основания', async () => {
+    pileFindFirst.mockResolvedValue(null);
     pileUpdateMany.mockResolvedValue({ count: 1 });
     await decidePilePassport({ tenantId: 'tenant-a', passportId: 'p1', actorId: 'u1', acceptance: 'NEEDS_REDRIVE', note: '  Достичь проектного отказа  ' });
     expect(pileUpdateMany).toHaveBeenLastCalledWith(expect.objectContaining({ data: expect.objectContaining({ acceptanceNote: 'Достичь проектного отказа' }) }));
     await decidePilePassport({ tenantId: 'tenant-a', passportId: 'p1', actorId: 'u1', acceptance: 'ACCEPTED' });
     expect(pileUpdateMany).toHaveBeenLastCalledWith(expect.objectContaining({ data: expect.objectContaining({ acceptance: 'ACCEPTED', acceptanceNote: null }) }));
+  });
+
+  describe('след решения (F-R34-16) — в той же транзакции', () => {
+    const previous = {
+      pileNumber: 'СВ-7', acceptance: 'ACCEPTED', acceptedById: 'master-1',
+      acceptedAt: new Date('2026-10-01T08:00:00Z'), acceptanceNote: null,
+    };
+
+    beforeEach(() => {
+      pileFindFirst.mockReset();
+      pileUpdateMany.mockReset();
+      auditInTx.mockReset();
+      auditInTx.mockResolvedValue(undefined);
+      pileFindFirst.mockResolvedValue(previous);
+      pileUpdateMany.mockResolvedValue({ count: 1 });
+    });
+
+    it('читает прежнее решение до перезаписи, строго в организации, и пишет до/после', async () => {
+      await decidePilePassport({ tenantId: 'tenant-a', passportId: 'p1', actorId: 'u1', acceptance: 'NEEDS_REDRIVE', note: ' Добить ' });
+      expect(pileFindFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 'p1', tenantId: 'tenant-a' } }));
+      expect(pileFindFirst.mock.invocationCallOrder[0]).toBeLessThan(pileUpdateMany.mock.invocationCallOrder[0]);
+      expect(auditInTx).toHaveBeenCalledWith(expect.anything(), {
+        action: 'pile.passport.decided', scope: 'reports', actorId: 'u1', targetId: 'p1', tenantId: 'tenant-a',
+        metadata: {
+          pileNumber: 'СВ-7',
+          before: { acceptance: 'ACCEPTED', acceptedById: 'master-1', acceptedAt: previous.acceptedAt, acceptanceNote: null },
+          after: { acceptance: 'NEEDS_REDRIVE', acceptedById: 'u1', acceptanceNote: 'Добить' },
+        },
+      });
+    });
+
+    it('паспорта нет в организации: 404, следа нет', async () => {
+      pileFindFirst.mockResolvedValue(null);
+      pileUpdateMany.mockResolvedValue({ count: 0 });
+      await expect(decidePilePassport({ tenantId: 'tenant-b', passportId: 'p1', actorId: 'u1', acceptance: 'ACCEPTED' }))
+        .rejects.toMatchObject({ status: 404 });
+      expect(auditInTx).not.toHaveBeenCalled();
+    });
+
+    it('сбой следа не глушится: решение падает вместе со следом', async () => {
+      const failure = new Error('след не записан');
+      auditInTx.mockRejectedValue(failure);
+      await expect(decidePilePassport({ tenantId: 'tenant-a', passportId: 'p1', actorId: 'u1', acceptance: 'ACCEPTED' }))
+        .rejects.toBe(failure);
+    });
   });
 });
 

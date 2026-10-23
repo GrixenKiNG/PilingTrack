@@ -7,6 +7,7 @@
 
 import { db } from '@/lib/db';
 import { ServiceError } from '@/lib/service-error';
+import { recordAuditEventInTx } from '@/modules/audit';
 import { requestReadinessSnapshot } from '@/modules/readiness/server';
 import { OPEN_MAINTENANCE } from '@/modules/readiness/server';
 import { advanceMaintenanceRegulation } from './maintenance-regulation';
@@ -342,6 +343,17 @@ export async function acceptMaintenance(
       await recordServiceHours(tx as typeof db, record, ctx.tenantId, ctx.userId);
     }
     await requestMaintenanceSnapshot(tx as typeof db, record, ctx.tenantId, 'accepted');
+    // Приёмка закрывает наряд — след в той же транзакции (раньше был «по возможности»,
+    // F-R34-12: сбой записи следа не должен был превращать приёмку в 500; теперь
+    // приёмка без следа недопустима, повтор нажатия безопасен: наряд уже принят → 409).
+    await recordAuditEventInTx(tx, {
+      action: 'maintenance.accepted',
+      scope: 'equipment',
+      actorId: ctx.userId,
+      targetId: recordId,
+      tenantId: ctx.tenantId,
+      metadata: { name: record.title },
+    });
     return record;
   });
 }

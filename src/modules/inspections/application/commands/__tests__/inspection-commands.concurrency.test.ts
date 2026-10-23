@@ -36,6 +36,7 @@ vi.mock('@/lib/db', () => {
     db: {
       ...tx,
       media: { groupBy: h.photos },
+      equipment: { findFirst: vi.fn(async () => ({ name: 'Копёр' })) },
       $transaction: (body: (client: typeof tx) => Promise<unknown>) =>
         body(tx),
     },
@@ -48,6 +49,7 @@ vi.mock('@/core/notifications/durable-alert', () => ({
 
 vi.mock('@/modules/audit', () => ({
   recordAuditEvent: vi.fn(),
+  recordAuditEventInTx: vi.fn(async () => undefined),
 }));
 
 vi.mock('@/modules/equipment', () => ({

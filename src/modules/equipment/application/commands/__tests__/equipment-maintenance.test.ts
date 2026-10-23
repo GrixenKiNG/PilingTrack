@@ -4,7 +4,7 @@ const {
   findUniqueEquipmentMock, createRecMock, findUniqueRecMock, updateRecMock,
   deleteRecMock, outboxCreateManyMock,
   findFirstEquipmentMock, updateEquipmentMock, findManyPlanMock, updatePlanMock,
-  findFirstReadingMock, createReadingMock, executeRawMock,
+  findFirstReadingMock, createReadingMock, executeRawMock, auditInTxMock,
 } = vi.hoisted(() => ({
   findUniqueEquipmentMock: vi.fn(),
   createRecMock: vi.fn(),
@@ -26,7 +26,11 @@ const {
   // Открытый наряд ТО — вход критерия готовности «Обслуживание»: команды
   // заказывают пересчёт снимка в той же транзакции, что и саму запись.
   outboxCreateManyMock: vi.fn(),
+  // След приёмки пишется в той же транзакции, что и сама приёмка.
+  auditInTxMock: vi.fn(),
 }));
+
+vi.mock('@/modules/audit', () => ({ recordAuditEventInTx: auditInTxMock }));
 
 vi.mock('@/lib/db', () => {
   const client = {
@@ -56,6 +60,8 @@ import { projectNextMaintenance } from '../maintenance-regulation';
 // Безопасные значения по умолчанию: у техники без регламентов закрытие наряда
 // не должно ничего двигать, и остальные наборы тестов об этом не знают.
 beforeEach(() => {
+  auditInTxMock.mockReset();
+  auditInTxMock.mockResolvedValue(undefined);
   findFirstEquipmentMock.mockReset();
   updateEquipmentMock.mockReset();
   findManyPlanMock.mockReset();
@@ -317,6 +323,26 @@ describe('acceptMaintenance — приёмка', () => {
     expect(data.acceptedAt).toBeInstanceOf(Date);
     expect(data.status).toBe('DONE');
     expect(data.completedAt).toBeInstanceOf(Date);
+  });
+
+  it('пишет след приёмки в той же транзакции; сбой следа отменяет приёмку', async () => {
+    findUniqueRecMock.mockResolvedValue({ id: 'rec_1', tenantId: 'orion', acceptedById: null, completedAt: null, workDone: 'заменили РВД' });
+    updateRecMock.mockResolvedValue({ id: 'rec_1', equipmentId: 'eq_1', title: 'ТО-1', updatedAt: new Date() });
+    await acceptMaintenance('rec_1', { tenantId: 'orion', userId: 'admin_1' });
+    expect(auditInTxMock).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      action: 'maintenance.accepted', actorId: 'admin_1', targetId: 'rec_1', tenantId: 'orion',
+      metadata: { name: 'ТО-1' },
+    }));
+
+    const failure = new Error('след не записан');
+    auditInTxMock.mockRejectedValue(failure);
+    await expect(acceptMaintenance('rec_1', { tenantId: 'orion', userId: 'admin_1' })).rejects.toBe(failure);
+  });
+
+  it('чужая организация: след не пишется', async () => {
+    findUniqueRecMock.mockResolvedValue({ id: 'rec_1', tenantId: 'other', acceptedById: null, completedAt: null });
+    await expect(acceptMaintenance('rec_1', { tenantId: 'orion', userId: 'admin_1' })).rejects.toThrow();
+    expect(auditInTxMock).not.toHaveBeenCalled();
   });
 
   it('rejects cross-tenant record; writes nothing', async () => {

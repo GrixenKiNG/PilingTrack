@@ -3,9 +3,7 @@ import { z } from 'zod';
 import { readJsonBody, withMutation } from '@/core/api-wrapper';
 import { requireAuth } from '@/lib/auth';
 import { requireTenantId } from '@/lib/tenant';
-import { db } from '@/lib/db';
 import { assertCan } from '@/services/auth/authorization-service';
-import { recordAuditEvent } from '@/modules/audit';
 import { decidePilePassport } from '@/modules/reports';
 
 export const runtime = 'nodejs';
@@ -40,55 +38,16 @@ export const POST = withMutation(
 
     const { id } = await params;
 
-    // Прежнее решение читается ДО перезаписи: acceptance/acceptedById/
-    // acceptedAt/acceptanceNote — те же колонки, и второе решение мастера
-    // стирает первое (F-R34-16). Без снимка «before» в журнале не остаётся,
-    // кто и когда принял сваю, которую потом отправили на добивку.
-    const previous = await db.pilePassport.findFirst({
-      where: { id, tenantId },
-      select: {
-        pileNumber: true,
-        acceptance: true,
-        acceptedById: true,
-        acceptedAt: true,
-        acceptanceNote: true,
-      },
-    });
-
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
+    const actorId = user!.id;
+    // Прежнее решение и след («до/после») читает и пишет сама команда, в одной
+    // транзакции с решением (F-R34-16).
     await decidePilePassport({
       tenantId,
       passportId: id,
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
-      actorId: user!.id,
+      actorId,
       acceptance: parsed.data.acceptance,
       note: parsed.data.note,
-    });
-
-    await recordAuditEvent({
-      action: 'pile.passport.decided',
-      scope: 'reports',
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
-      actorId: user!.id,
-      targetId: id,
-      tenantId,
-      metadata: {
-        pileNumber: previous?.pileNumber ?? null,
-        before: previous
-          ? {
-              acceptance: previous.acceptance,
-              acceptedById: previous.acceptedById,
-              acceptedAt: previous.acceptedAt,
-              acceptanceNote: previous.acceptanceNote,
-            }
-          : null,
-        after: {
-          acceptance: parsed.data.acceptance,
-          // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
-          acceptedById: user!.id,
-          // Тем же правилом, что и команда: пустая причина — отсутствие причины.
-          acceptanceNote: parsed.data.note?.trim() || null,
-        },
-      },
     });
     return NextResponse.json({ ok: true });
   },
