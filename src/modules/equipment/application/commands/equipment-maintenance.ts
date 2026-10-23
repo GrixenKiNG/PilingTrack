@@ -7,7 +7,8 @@
 
 import { db } from '@/lib/db';
 import { ServiceError } from '@/lib/service-error';
-import { recordAuditEventInTx } from '@/modules/audit';
+import { logger } from '@/lib/logger';
+import { recordAuditEvent } from '@/modules/audit';
 import { requestReadinessSnapshot } from '@/modules/readiness/server';
 import { OPEN_MAINTENANCE } from '@/modules/readiness/server';
 import { advanceMaintenanceRegulation } from './maintenance-regulation';
@@ -316,7 +317,7 @@ export async function acceptMaintenance(
   // этой проверки пустой наряд закрывался бы через приёмку в обход правила.
   assertWorkDescribed(existing.workDone);
 
-  return db.$transaction(async (tx) => {
+  const accepted = await db.$transaction(async (tx) => {
     const record = await tx.maintenanceRecord.update({
       // Повтор проверок в самой записи — см. updateMaintenance. Описание работ
       // входит в условие: assertWorkDescribed выше читает его до транзакции, и
@@ -343,19 +344,25 @@ export async function acceptMaintenance(
       await recordServiceHours(tx as typeof db, record, ctx.tenantId, ctx.userId);
     }
     await requestMaintenanceSnapshot(tx as typeof db, record, ctx.tenantId, 'accepted');
-    // Приёмка закрывает наряд — след в той же транзакции (раньше был «по возможности»,
-    // F-R34-12: сбой записи следа не должен был превращать приёмку в 500; теперь
-    // приёмка без следа недопустима, повтор нажатия безопасен: наряд уже принят → 409).
-    await recordAuditEventInTx(tx, {
+    return record;
+  });
+
+  // След приёмки — «по возможности», ПОСЛЕ коммита (решение владельца 24.10.2026,
+  // F-R34-12): принятых нарядов, которые не удалось принять из-за сбоя ленты,
+  // быть не должно. Сбой записи следа только логируется и считается.
+  try {
+    await recordAuditEvent({
       action: 'maintenance.accepted',
       scope: 'equipment',
       actorId: ctx.userId,
       targetId: recordId,
       tenantId: ctx.tenantId,
-      metadata: { name: record.title },
+      metadata: { name: accepted.title },
     });
-    return record;
-  });
+  } catch (err) {
+    logger.error('Maintenance accept: audit write failed', err, { recordId });
+  }
+  return accepted;
 }
 
 export async function deleteMaintenance(

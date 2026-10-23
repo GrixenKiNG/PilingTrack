@@ -14,7 +14,7 @@
   - учётные записи (`modules/users/user-service.ts`): `user.created`, `user.updated` (роль, блокировка, пароль), `user.deleted`; `updateUser` теперь всегда идёт в транзакции (раньше — только когда запрос мог снять права администратора);
   - документы допуска и их виды (`user-documents.ts`, `user-document-types.ts`);
   - охрана труда (`modules/safety`): проведение и подпись инструктажа, выдача и удаление допуска к технике. Запись следа перенесена из маршрутов в команды;
-  - приёмка и закрытие: `acceptMaintenance` (`maintenance.accepted`; прежнее «по возможности», F-R34-12, отменено), `decidePilePassport` (`pile.passport.decided`; «до» читается в той же транзакции), `completeInspectionWithOutcome` (`inspection.completed`; число дефектов — заведённые этим осмотром, название установки читается до транзакции);
+  - приёмка и закрытие: `acceptMaintenance` — исключение: след `maintenance.accepted` пишется «по возможности» ПОСЛЕ коммита (F-R34-12, решение владельца 24.10.2026: принятых нарядов без приёмки не должно быть), `decidePilePassport` (`pile.passport.decided`; «до» читается в той же транзакции), `completeInspectionWithOutcome` (`inspection.completed`; число дефектов — заведённые этим осмотром, название установки читается до транзакции);
   - объекты (`modules/sites`): создание и правка с планами, удаление, отметка завершения, назначения пользователей, узлы схемы (поле, куст, пикет); репозиторий объекта принимает шаг внутри транзакции записи — через него идут `site.updated` / `site.activated` / `site.deactivated`.
 - Тесты: `audit-service.test.ts` (запись идёт через клиент транзакции, сбой уходит наружу, счётчик «по возможности» не растёт), `user-service.test.ts` (след пишется на клиенте транзакции, сбой следа не глушится ни в одном из трёх путей).
 
@@ -29,7 +29,8 @@
 | **В той же транзакции** — учётные записи и права | `modules/users/user-service.ts` | 3 | ✅ сделано |
 | **В той же транзакции** — документы допуска | `modules/users/user-documents.ts`, `user-document-types.ts` | 4 | ✅ сделано |
 | **В той же транзакции** — охрана труда и допуски техники | `modules/safety` (команды), раньше — маршруты `briefings`, `safety/equipment-permits` | 4 | ✅ сделано |
-| **В той же транзакции** — приёмка/закрытие | `acceptMaintenance`, `decidePilePassport`, `completeInspectionWithOutcome` | 3 | ✅ сделано |
+| **В той же транзакции** — приёмка/закрытие | `decidePilePassport`, `completeInspectionWithOutcome` | 2 | ✅ сделано |
+| Допустима потеря — решение владельца | `acceptMaintenance` (приёмка наряда ТО): сбой ленты не должен отменять приёмку | 1 | по возможности, после коммита |
 | **В той же транзакции** — планы и иерархия объекта | `modules/sites/application/commands/*`, маршрут `sites/[id]/hierarchy` | 9 + 2 | ✅ сделано |
 | Допустима потеря, но лучше атомарно | настройки и справочники: `services/dictionaries`, `app/api/settings`, `app/api/telegram/configs` | 13 | оставлено |
 | Допустима потеря | техника и ТО: `app/api/equipment/**`, `maintenance-plans`, `checklist-templates`, `modules/equipment`, `modules/inspections`, `modules/crews`; события отчётов в ленту (`modules/reports`, после коммита) | 29 | оставлено |

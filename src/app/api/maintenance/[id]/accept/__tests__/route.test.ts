@@ -1,9 +1,9 @@
 /**
  * POST /api/maintenance/[id]/accept — приёмка наряда ТО (F-R34-12).
  *
- * След `maintenance.accepted` пишет сама команда `acceptMaintenance` в одной
- * транзакции с приёмкой (проверяется в equipment-maintenance.test.ts); маршрут
- * только передаёт ей организацию и актора и отдаёт её отказы как есть.
+ * След `maintenance.accepted` пишет сама команда `acceptMaintenance` после приёмки,
+ * и его сбой приёмку не отменяет (equipment-maintenance.test.ts); маршрут только
+ * передаёт ей организацию и актора и отдаёт её отказы как есть.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
@@ -53,8 +53,8 @@ describe('POST /api/maintenance/[id]/accept', () => {
     expect(res.status).toBe(409);
   });
 
-  it('сбой команды (в том числе записи следа) — ошибка, а не «успех»', async () => {
-    acceptMaintenanceMock.mockRejectedValue(new Error('след не записан'));
+  it('сбой самой приёмки — ошибка, а не «успех»', async () => {
+    acceptMaintenanceMock.mockRejectedValue(new Error('база недоступна'));
 
     // Общая обёртка превращает непредвиденную ошибку в 500 — приёмка не «прошла».
     const res = await POST(acceptReq(), params());

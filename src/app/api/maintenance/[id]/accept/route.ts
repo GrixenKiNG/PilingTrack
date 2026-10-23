@@ -27,7 +27,7 @@ export const POST = withMutation(
     const { id } = await params;
     try {
       const record = await acceptMaintenance(id, { tenantId, userId: actor.id });
-      // След «Наряд принят» пишет сама команда, в одной транзакции с приёмкой.
+      // След «Наряд принят» пишет сама команда после приёмки; его сбой приёмку не отменяет.
       return NextResponse.json({ record });
     } catch (err) {
       if (err instanceof ServiceError) return NextResponse.json({ error: err.message }, { status: err.status });
