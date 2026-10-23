@@ -2,9 +2,10 @@
  * Общее для ежедневного QA: матрица, вход, реестр покрытия, отлов ошибок.
  * Матрица и пароли лежат вне репозитория (D:/PillingR/qa).
  */
-import { expect, type Page } from '@playwright/test';
+import type { Page } from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
+import { login as loginWithHydration } from '../page-objects/login.page';
 
 export const QA_DIR = 'D:/PillingR/qa';
 const RUN_DIR = process.env.QA_RUN_DIR || path.join(QA_DIR, 'runs', 'manual');
@@ -46,11 +47,8 @@ export async function login(page: Page, email: string) {
     if (!onLogin.test(page.url())) return;
     await page.context().clearCookies();
   }
-  await page.goto('/login');
-  await page.locator('#email').fill(email);
-  await page.locator('#password').fill(password);
-  await page.getByRole('button', { name: 'Войти' }).click();
-  await expect(page).not.toHaveURL(onLogin, { timeout: 90_000 });
+  await page.context().clearCookies();
+  await loginWithHydration(page, email, password);
   await page.context().storageState({ path: stateFile });
 }
 
