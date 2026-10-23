@@ -95,6 +95,13 @@ describe.skipIf(!enabled)('Tech Readiness real source → outbox → snapshot �
       expect(done.plan.lastDoneHours).toBe(1100);
       expect(done.plan.lastDoneAt).toBeInstanceOf(Date);
       expect(done.equipment.nextMaintenanceAtHours).toBe(1350);
+      const event = (await events()).rows.find(row => row.payload.triggerType === 'INSPECTION_COMPLETED');
+      expect(event).toBeDefined();
+      expect(await project(event.id)).toMatchObject({projected: true, duplicate: false});
+      const snapshots = (await fixture.owner.query('SELECT id,facts FROM "ReadinessScoreSnapshot" WHERE "tenantId"=$1', [tenant()])).rows;
+      expect(snapshots).toHaveLength(1);
+      expect(snapshots[0].facts).toMatchObject({maintenanceConfigured: true, maintenanceOverdueHours: 0});
+      expect((await fixture.owner.query('SELECT "snapshotId" FROM "CurrentReadiness" WHERE "tenantId"=$1', [tenant()])).rows).toEqual([{snapshotId: snapshots[0].id}]);
       expect((await finish()).replayed).toBe(true);
       expect(await state()).toEqual(done);
     } finally {

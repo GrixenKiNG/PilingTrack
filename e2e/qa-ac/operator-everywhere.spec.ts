@@ -5,21 +5,17 @@
  * docs/qa-autoclaw/walk-1006 (png не коммитятся).
  */
 import { test, expect, type Page, type Locator } from '@playwright/test';
-import { execSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { login } from '../qa/helpers';
+import { login, OUT_DIR, qaSelect } from '../qa/helpers';
 
-const WALK = 'D:/PillingR/wt-autoclaw/docs/qa-autoclaw/walk-1006';
+const WALK = path.join(OUT_DIR, 'walk');
 const LOGS = path.join(WALK, 'logs');
 fs.mkdirSync(LOGS, { recursive: true });
 const DATA = path.join(WALK, 'walk-data.json');
 
 function db(sql: string): string {
-  return execSync(
-    'docker exec -i pilingtrack-postgres psql -U postgres -d pilingtrack_test -At -v ON_ERROR_STOP=1',
-    { input: sql, encoding: 'utf8', timeout: 60_000, stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true },
-  ).trim();
+  return qaSelect(sql);
 }
 
 function record(entry: Record<string, unknown>) {
@@ -130,12 +126,14 @@ test('журнал забивки: NEW-5 — реальные сваи 04.10 п�
 
 test('карточка Banut 655: NEW-6 — сваи за 04.10 в таблице смен', async ({ page }) => {
   test.setTimeout(8 * 60_000);
+  test.skip(db(`SELECT count(*) FROM "PileWork" WHERE "shiftId"='38354c90-8e45-4e5c-a3bb-aa67ab520da9' AND "pileGradeId" IS NOT NULL`) === '0',
+    'Исторический NEW-6: запуск требует отдельной синтетической смены 38354c90-8e45-4e5c-a3bb-aa67ab520da9 от 04.10.2026 на Banut 655 с двумя сваями длиной 14 м');
   const banut = db(`SELECT id FROM "Equipment" WHERE name ILIKE '%Banut%' ORDER BY "createdAt" LIMIT 1`);
   record({ step: 'NEW-6', banutId: banut });
   await login(page, 'dispatch@piling.ru');
   await page.goto(`/admin/equipment/${banut}`, { waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(5000);
-  await page.mouse.wheel(0, 1700);
+  await page.evaluate(() => window.scrollBy(0, 1700));
   await page.waitForTimeout(1200);
   const txt = await dump(page, 'everywhere-06-банут');
   const db0410 = db(`SELECT COALESCE(SUM(count),0) || '|' || COALESCE(SUM(count*14),0) FROM "PileWork" WHERE "shiftId"='38354c90-8e45-4e5c-a3bb-aa67ab520da9' AND "pileGradeId" IS NOT NULL`);
@@ -162,6 +160,8 @@ test('карточка Banut 655: NEW-6 — сваи за 04.10 в таблиц�
 
 test('главная панель и аналитика: числа дня и отчёты операторов', async ({ page }) => {
   test.setTimeout(8 * 60_000);
+  test.skip(db(`SELECT count(*) FROM "Report" r JOIN "User" u ON u.id=r."userId" WHERE r."tenantId"='orion' AND r.status='submitted' AND r.date='2026-10-06' AND (u.name LIKE '%Краснов%' OR u.name LIKE '%Иванов%' OR u.name LIKE '%Щеголев%')`) === '0',
+    'Историческая аналитика 06.10: запуск требует синтетических сданных отчётов Краснов/Иванов/Щеголев за 06.10.2026 и выбора соответствующего периода; текущая сводка отдельно проверяется release-critical-path');
   await login(page, 'qa-hermes-admin@piling.test');
   await page.goto('/admin', { waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(5000);
