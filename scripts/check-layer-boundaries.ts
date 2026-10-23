@@ -97,6 +97,18 @@ function resolveAlias(importPath: string): string | null {
   return null;
 }
 
+/**
+ * Direction between the fleet-readiness modules: dependencies go DOWN only,
+ * readiness -> inspections -> equipment -> audit/settings. A module absent from
+ * this table is not constrained. Existing reverse imports sit in the baseline
+ * (it may only shrink); new ones fail. Target scheme: docs/adr (module relations).
+ */
+const MODULE_DEPENDENCIES: Record<string, readonly string[]> = {
+  equipment: ['audit', 'settings'],
+  inspections: ['equipment', 'audit', 'settings'],
+  readiness: ['inspections', 'equipment', 'users', 'audit', 'settings'],
+};
+
 function checkImport(fromInfo: { layer: Layer; module?: string }, importPath: string): string | null {
   const aliased = resolveAlias(importPath);
   if (!aliased) return null; // npm package or relative — skip.
@@ -116,6 +128,13 @@ function checkImport(fromInfo: { layer: Layer; module?: string }, importPath: st
   if ((fromInfo.layer === 'app' || fromInfo.layer === 'components')
       && toInfo.layer === 'modules' && !isPublicModuleEntry(importPath)) {
     return `${fromInfo.layer}/ may not import module internals (use @/modules/<x>)`;
+  }
+  if (fromInfo.layer === 'modules' && toInfo.layer === 'modules'
+      && fromInfo.module && toInfo.module && fromInfo.module !== toInfo.module) {
+    const allowed = MODULE_DEPENDENCIES[fromInfo.module];
+    if (allowed && !allowed.includes(toInfo.module)) {
+      return `modules/${fromInfo.module} may not depend on modules/${toInfo.module} (direction: readiness -> inspections -> equipment)`;
+    }
   }
   // CLAUDE.md allows public module APIs; internal implementation paths stay private.
   if (fromInfo.layer === 'modules' && toInfo.layer === 'modules'

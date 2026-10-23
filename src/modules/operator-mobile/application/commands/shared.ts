@@ -15,6 +15,8 @@ import {checkOperatorDocuments} from '../../domain/operator-admission';
 import {BRIEFING_DOCUMENT_TYPE, KNOWLEDGE_DOCUMENT_TYPE} from '../../domain/operator-credentials';
 import {productionRefusal, productionBlocks} from '../../domain/production-permit';
 import {ENGINE_HOURS_REPLACEMENT_NOTE} from '../../contracts';
+import {recordMeterReadingInTx} from '@/modules/equipment/server';
+import {ServiceError} from '@/lib/service-error';
 
 
 export class OperatorCommandError extends Error {
@@ -170,73 +172,39 @@ export function requireDowntimeReason(tx: Tx, tenantId: string, id: string) {
 }
 
 /**
- * Моточасы: журнал показаний — источник истины, поле в карточке техники —
- * денормализованный кэш последнего значения. Обновляем оба, иначе списки
- * техники показывают вчерашнюю наработку.
+ * Моточасы: запись и правила («назад не идёт», сверка с карточкой установки,
+ * блокировка строки, пересчёт кэша и заказ снимка готовности) живут в
+ * `equipment` и одни для всех. Здесь остаются только то, что принадлежит
+ * контуру оператора: пометка замены счётчика (решение владельца 07.10.2026) и
+ * текст отказа с подсказкой для экрана.
  */
 export async function recordMeter(tx: Tx, input: {
   tenantId: string; equipmentId: string; engineHours: number;
   operatorId: string; note: string; now: Date;
   meterReplaced?: boolean;
 }) {
-  /*
-    СРАВНИВАЕМ С ОБОИМИ ИСТОЧНИКАМИ НАРАБОТКИ, А НЕ ТОЛЬКО С ЖУРНАЛОМ.
-
-    Журнал показаний ведётся с момента, как машину начали снимать с телефона, а
-    наработка в карточке установки есть с самого её заведения — её вносит
-    администратор. У новой машины журнал ПУСТ, и проверка «меньше предыдущего»
-    не срабатывала вовсе: в карточке стояло 100 м/ч, первый же послесменный
-    ввод 99 проходил, и 99 уезжало и в карточку, и в закрытый отчёт. Наработка
-    машины уменьшилась на глазах, а вместе с ней поехали планы ТО, которые от
-    неё считаются.
-
-    Берём максимум из двух. Исключение — явно подтверждённая замена счётчика;
-    её сохраняем пометкой в журнале (решение владельца 07.10.2026).
-  */
-  const [previous, equipment] = await Promise.all([
-    tx.meterReading.findFirst({
-      where: {tenantId: input.tenantId, equipmentId: input.equipmentId},
-      orderBy: {recordedAt: 'desc'},
-      select: {engineHours: true},
-    }),
-    tx.equipment.findFirst({
-      where: {tenantId: input.tenantId, id: input.equipmentId},
-      select: {engineHoursTotal: true},
-    }),
-  ]);
-
-  const known = [previous?.engineHours, equipment?.engineHoursTotal]
-    .filter((value): value is number => typeof value === 'number');
-  const floor = known.length > 0 ? Math.max(...known) : null;
-
-  if (floor !== null && input.engineHours < floor && !input.meterReplaced) {
-    throw new OperatorCommandError(
-      400,
-      `Моточасы меньше известной наработки (${floor}). Проверьте цифру или отметьте «Счётчик заменён», если установлен новый прибор.`,
-    );
-  }
-
   const note = input.meterReplaced
     && input.note !== ENGINE_HOURS_REPLACEMENT_NOTE
     && !input.note.startsWith(`${ENGINE_HOURS_REPLACEMENT_NOTE}; `)
     ? `${ENGINE_HOURS_REPLACEMENT_NOTE}; ${input.note}`
     : input.note;
 
-  await tx.meterReading.create({
-    data: {
-      tenantId: input.tenantId,
-      equipmentId: input.equipmentId,
-      recordedAt: input.now,
-      engineHours: input.engineHours,
-      source: 'MANUAL',
-      recordedById: input.operatorId,
-      note,
-    },
-  });
-  await tx.equipment.update({
-    where: {tenantId_id: {tenantId: input.tenantId, id: input.equipmentId}},
-    data: {engineHoursTotal: input.engineHours},
-  });
+  try {
+    await recordMeterReadingInTx(
+      tx as unknown as Parameters<typeof recordMeterReadingInTx>[0],
+      input.equipmentId,
+      {engineHours: input.engineHours, recordedAt: input.now, source: 'MANUAL', note},
+      {tenantId: input.tenantId, recordedById: input.operatorId, allowDecrease: input.meterReplaced === true},
+    );
+  } catch (error) {
+    if (error instanceof ServiceError && error.status === 422) {
+      throw new OperatorCommandError(
+        400,
+        `${error.message} Проверьте цифру или отметьте «Счётчик заменён», если установлен новый прибор.`,
+      );
+    }
+    throw error;
+  }
 }
 
 

@@ -1,4 +1,8 @@
 src/modules/audit/audit-service.ts|@/services/feedback/feedback-event-service|modules/ may not import from services/ (migration frozen)
+src/modules/equipment/application/commands/equipment-maintenance.ts|@/modules/readiness/server|modules/equipment may not depend on modules/readiness (direction: readiness -> inspections -> equipment)
+src/modules/equipment/application/commands/meter-reading.ts|@/modules/readiness/server|modules/equipment may not depend on modules/readiness (direction: readiness -> inspections -> equipment)
+src/modules/equipment/application/commands/pm-scheduler.ts|@/modules/readiness/server|modules/equipment may not depend on modules/readiness (direction: readiness -> inspections -> equipment)
+src/modules/inspections/application/commands/inspection-commands.ts|@/modules/readiness/server|modules/inspections may not depend on modules/readiness (direction: readiness -> inspections -> equipment)
 src/modules/system/application/queries/system-service.ts|@/services/tenancy/tenant-context-service|modules/ may not import from services/ (migration frozen)
 src/modules/telemetry/index.ts|@/services/telemetry/device-key-service|modules/ may not import from services/ (migration frozen)
 src/modules/telemetry/index.ts|@/services/telemetry/telemetry-ingestion-service|modules/ may not import from services/ (migration frozen)

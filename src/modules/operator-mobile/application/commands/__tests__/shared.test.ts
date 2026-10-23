@@ -1,7 +1,10 @@
 // @vitest-environment node
 import {describe, expect, it, vi} from 'vitest';
 
-vi.mock('@/modules/readiness/server', () => ({withReadinessTenantTransaction: vi.fn()}));
+vi.mock('@/modules/readiness/server', () => ({
+  withReadinessTenantTransaction: vi.fn(),
+  requestReadinessSnapshot: vi.fn().mockResolvedValue(undefined),
+}));
 
 import {recordMeter, requirePileGrade} from '../shared';
 
@@ -53,12 +56,12 @@ describe('recordMeter — замена счётчика', () => {
     return {
       meterReading: {
         findFirst: vi.fn().mockResolvedValue(previous === null ? null : {engineHours: previous}),
-        create: vi.fn().mockResolvedValue({id: 'meter-1'}),
+        create: vi.fn().mockResolvedValue({id: 'meter-1', engineHours: 0, recordedAt: new Date()}),
       },
       equipment: {
         findFirst: vi.fn().mockResolvedValue({engineHoursTotal: cached}),
-        update: vi.fn().mockResolvedValue({}),
       },
+      $executeRaw: vi.fn().mockResolvedValue(1),
     };
   }
 
@@ -66,34 +69,38 @@ describe('recordMeter — замена счётчика', () => {
     const tx = meterTx(3000, 3000);
     await expect(recordMeter(tx as never, input)).rejects.toMatchObject({status: 400});
     expect(tx.meterReading.create).not.toHaveBeenCalled();
-    expect(tx.equipment.update).not.toHaveBeenCalled();
+    expect(tx.$executeRaw).toHaveBeenCalledTimes(1); // только блокировка строки, кэш не пересчитывался
   });
 
   it('принимает заменённый счётчик с меньшим показанием и сохраняет пометку', async () => {
     const tx = meterTx(3000, 3000);
     await recordMeter(tx as never, {...input, meterReplaced: true});
-    expect(tx.meterReading.create).toHaveBeenCalledWith({data: expect.objectContaining({
+    expect(tx.meterReading.create).toHaveBeenCalledWith(expect.objectContaining({data: expect.objectContaining({
       engineHours: 99, note: 'Счётчик заменён; ЕО после работы',
-    })});
-    expect(tx.equipment.update).toHaveBeenCalledWith({
-      where: {tenantId_id: {tenantId: 'tenant-a', id: 'eq-1'}},
-      data: {engineHoursTotal: 99},
-    });
+    })}));
     tx.meterReading.findFirst.mockResolvedValue({engineHours: 99});
     tx.equipment.findFirst.mockResolvedValue({engineHoursTotal: 99});
     await recordMeter(tx as never, {...input, engineHours: 100});
-    expect(tx.equipment.update).toHaveBeenLastCalledWith(expect.objectContaining({data: {engineHoursTotal: 100}}));
+    expect(tx.meterReading.create).toHaveBeenLastCalledWith(expect.objectContaining({data: expect.objectContaining({engineHours: 100})}));
   });
 
   it('не требует большой цифры при пустом журнале и замене счётчика в карточке', async () => {
     const tx = meterTx(null, 3000);
     await recordMeter(tx as never, {...input, meterReplaced: true});
-    expect(tx.equipment.update).toHaveBeenCalledWith(expect.objectContaining({data: {engineHoursTotal: 99}}));
+    expect(tx.meterReading.create).toHaveBeenCalledWith(expect.objectContaining({data: expect.objectContaining({engineHours: 99})}));
+  });
+
+  it('при пустом журнале сверяет с наработкой в карточке и отказывает с подсказкой для экрана', async () => {
+    const tx = meterTx(null, 100);
+    await expect(recordMeter(tx as never, input)).rejects.toMatchObject({
+      status: 400, message: expect.stringContaining('Счётчик заменён'),
+    });
+    expect(tx.meterReading.create).not.toHaveBeenCalled();
   });
 
   it('не дублирует уже переданную пометку замены', async () => {
     const tx = meterTx(3000, 3000);
     await recordMeter(tx as never, {...input, note: 'Счётчик заменён; ЕО после работы', meterReplaced: true});
-    expect(tx.meterReading.create).toHaveBeenCalledWith({data: expect.objectContaining({note: 'Счётчик заменён; ЕО после работы'})});
+    expect(tx.meterReading.create).toHaveBeenCalledWith(expect.objectContaining({data: expect.objectContaining({note: 'Счётчик заменён; ЕО после работы'})}));
   });
 });

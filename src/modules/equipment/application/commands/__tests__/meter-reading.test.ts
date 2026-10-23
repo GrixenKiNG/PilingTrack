@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const {
   findUniqueEquipmentMock, findFirstMock, createReadingMock, executeRawMock,
-  outboxCreateManyMock, deleteReadingMock, findUniqueReadingMock, txMock,
+  outboxCreateManyMock, deleteReadingMock, findUniqueReadingMock, txMock, cardTotalMock,
 } = vi.hoisted(() => ({
   findUniqueEquipmentMock: vi.fn(),
   findFirstMock: vi.fn(),
@@ -16,12 +16,15 @@ const {
   deleteReadingMock: vi.fn(),
   findUniqueReadingMock: vi.fn(),
   txMock: vi.fn(),
+  // Наработка в карточке установки (кэш): её вносит администратор, журнал может быть пуст.
+  cardTotalMock: vi.fn(),
 }));
 
 vi.mock('@/lib/db', () => {
   const tx = {
     meterReading: { findFirst: findFirstMock, create: createReadingMock, delete: deleteReadingMock },
     outboxEvent: { createMany: outboxCreateManyMock },
+    equipment: { findFirst: cardTotalMock },
     $executeRaw: executeRawMock,
   };
   return {
@@ -53,6 +56,8 @@ describe('addMeterReading', () => {
     findUniqueEquipmentMock.mockResolvedValue({ id: 'eq_1' });
     createReadingMock.mockResolvedValue({ id: 'mr_1', engineHours: 5670, recordedAt: new Date() });
     outboxCreateManyMock.mockResolvedValue({ count: 1 });
+    cardTotalMock.mockReset();
+    cardTotalMock.mockResolvedValue({ engineHoursTotal: null });
   });
 
   it('заказывает пересчёт готовности в той же транзакции', async () => {
@@ -115,6 +120,24 @@ describe('addMeterReading', () => {
     // Только блокировка строки; кэш не пересчитывался.
     expect(executeRawMock).toHaveBeenCalledTimes(1);
     expect(sqlOf(executeRawMock.mock.calls[0])).toMatch(/FOR UPDATE/);
+  });
+
+  it('журнал пуст, в карточке 100 м/ч: показание 99 без права снижения отклоняется', async () => {
+    // Карточку внёс администратор, журнал ведётся только с первого снятия с телефона.
+    findFirstMock.mockResolvedValue(null);
+    cardTotalMock.mockResolvedValue({ engineHoursTotal: 100 });
+    await expect(addMeterReading('eq_1', { engineHours: 99 }, { tenantId: 'orion' }))
+      .rejects.toMatchObject({ status: 422 });
+    expect(createReadingMock).not.toHaveBeenCalled();
+  });
+
+  it('журнал пуст, в карточке 100 м/ч: замена счётчика с правом снижения проходит с предупреждением', async () => {
+    findFirstMock.mockResolvedValue(null);
+    cardTotalMock.mockResolvedValue({ engineHoursTotal: 100 });
+    createReadingMock.mockResolvedValue({ id: 'mr_1', engineHours: 99, recordedAt: new Date() });
+    const result = await addMeterReading('eq_1', { engineHours: 99 }, { tenantId: 'orion', allowDecrease: true });
+    expect(result.warning).toContain('меньше предыдущего');
+    expect(createReadingMock).toHaveBeenCalled();
   });
 
   it('разрешает снижение с предупреждением, когда счётчик заменили', async () => {

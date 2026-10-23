@@ -202,8 +202,22 @@ export async function recordMeterReadingInTx(
     if (duplicate) return { reading: duplicate, warning: null };
   }
 
-  const prev = await latestReading(tx, equipmentId);
-  const verdict = checkMeterReading(input.engineHours, prev?.engineHours ?? null, {
+  // Сверяем с обоими источниками наработки, а не только с журналом: журнал
+  // ведётся с первого снятия с телефона, а наработку в карточке вносит
+  // администратор при заведении установки. У новой машины журнал пуст, и без
+  // карточки показание меньше внесённой проходило (в карточке 100, ввод 99).
+  const [prev, card] = await Promise.all([
+    latestReading(tx, equipmentId),
+    tx.equipment.findFirst({
+      where: { id: equipmentId, tenantId: ctx.tenantId },
+      select: { engineHoursTotal: true },
+    }),
+  ]);
+  const known = [prev?.engineHours, card?.engineHoursTotal].filter(
+    (v): v is number => typeof v === 'number',
+  );
+  const floor = known.length > 0 ? Math.max(...known) : null;
+  const verdict = checkMeterReading(input.engineHours, floor, {
     allowDecrease: ctx.allowDecrease,
   });
   // 422, а не 400: число само по себе корректно, его отвергает правило учёта.

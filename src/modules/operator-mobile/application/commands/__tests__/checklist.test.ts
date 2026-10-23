@@ -119,10 +119,11 @@ beforeEach(() => {
 describe('submitChecklist — пометка замены счётчика', () => {
   it.each(['Счётчик заменён', 'Счётчик заменён; Установлен новый прибор'])('передаёт явную пометку %s в журнал', async (note) => {
     await submitChecklist({...input, answers: [{itemId: 'meter-after', answer: 'OK', measures: {engineHours: 99}, note}]});
-    expect(tx.meterReading.create).toHaveBeenCalledWith({data: expect.objectContaining({
+    expect(tx.meterReading.create).toHaveBeenCalledWith(expect.objectContaining({data: expect.objectContaining({
       engineHours: 99, note: `${note}; ЕО до работы`,
-    })});
-    expect(tx.equipment.update).toHaveBeenCalledWith(expect.objectContaining({data: {engineHoursTotal: 99}}));
+    })}));
+    // Кэш наработки теперь пересчитывает сама база под блокировкой строки установки.
+    expect(tx.$executeRaw).toHaveBeenCalled();
   });
 
   it.each(['Проверил показание', 'Счётчик заменён ли?'])('обычное примечание %s не разрешает уменьшить показание', async (note) => {
