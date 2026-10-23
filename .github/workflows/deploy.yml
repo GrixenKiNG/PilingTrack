@@ -62,12 +62,14 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           [[ "$DEPLOY_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo '::error::Provide a full lowercase commit SHA'; exit 1; }
-          RUNS=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?head_sha=$DEPLOY_SHA&branch=main&event=push&per_page=1")
-          echo "$RUNS" | jq -e --arg sha "$DEPLOY_SHA" '
-            .workflow_runs[0] |
-            .head_sha == $sha and .head_branch == "main" and .event == "push" and
-            .status == "completed" and .conclusion == "success"
-          ' > /dev/null || { echo '::error::Latest CI run for this SHA on main has not passed'; exit 1; }
+          for WORKFLOW in ci.yml integration.yml; do
+            RUNS=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/$WORKFLOW/runs?head_sha=$DEPLOY_SHA&branch=main&event=push&per_page=1")
+            echo "$RUNS" | jq -e --arg sha "$DEPLOY_SHA" '
+              .workflow_runs[0] |
+              .head_sha == $sha and .head_branch == "main" and .event == "push" and
+              .status == "completed" and .conclusion == "success"
+            ' > /dev/null || { echo "::error::Latest $WORKFLOW run for this SHA on main has not passed"; exit 1; }
+          done
 
       - name: Checkout main
         uses: actions/checkout@v4
