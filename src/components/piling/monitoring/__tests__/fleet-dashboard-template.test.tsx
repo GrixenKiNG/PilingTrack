@@ -63,11 +63,11 @@ describe('FleetDashboard shared equipment template', () => {
         return { ok: true, json: async () => snapshot };
       }
       if (url === '/api/layout/monitoring-equipment-tile' && method === 'GET') {
-        return { ok: true, json: async () => serverTemplate };
+        return new Response(JSON.stringify(serverTemplate), { headers: { ETag: '"fixture-row:2026-01-01T00:00:00.000Z"' } });
       }
       if (url === '/api/layout/monitoring-equipment-tile' && method === 'PUT') {
         serverTemplate = JSON.parse(init?.body as string);
-        return { ok: true, json: async () => serverTemplate };
+        return new Response(JSON.stringify(serverTemplate), { headers: { ETag: '"fixture-row:2026-01-01T00:00:00.000Z"' } });
       }
       throw new Error(`Unexpected authFetch: ${method} ${url}`);
     });

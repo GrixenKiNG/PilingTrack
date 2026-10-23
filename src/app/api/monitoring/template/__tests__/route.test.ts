@@ -8,8 +8,9 @@ const { requireAuthMock, saveTemplateMock } = vi.hoisted(() => ({
 
 vi.mock('@/lib/auth', () => ({ requireAuth: requireAuthMock }));
 vi.mock('@/lib/csrf-protection', () => ({ withCsrf: () => null }));
-vi.mock('@/modules/monitoring', () => ({ getTemplate: vi.fn(), saveTemplate: saveTemplateMock }));
+vi.mock('@/modules/layout', async (importOriginal) => ({ ...await importOriginal<typeof import('@/modules/layout')>(), getLayoutSnapshot: vi.fn(), saveLayoutSnapshot: saveTemplateMock }));
 
+import { LayoutConflictError } from '@/modules/layout';
 import { PUT } from '../route';
 
 const request = (body: string) => new NextRequest('http://localhost/api/monitoring/template', {
@@ -30,6 +31,11 @@ describe('PUT /api/monitoring/template', () => {
       user: { id: 'admin', role: 'ADMIN', tenantId: 'tenant-1' },
       error: null,
     });
+  });
+
+  it('конфликт версии — 409, а не 503', async () => {
+    saveTemplateMock.mockRejectedValue(new LayoutConflictError());
+    expect((await PUT(request('{}'))).status).toBe(409);
   });
 
   it('ошибка проверки шаблона — 400', async () => {

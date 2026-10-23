@@ -15,13 +15,16 @@
 
 import {
   DEFAULT_EQUIPMENT_TILE_TEMPLATE,
-  EQUIPMENT_TILE_DATA_KEYS,
+  validateEquipmentTileTemplate,
+  type EquipmentTileTemplate,
 } from './equipment-tile-template';
 import {
   DEFAULT_EQUIPMENT_CARD_TEMPLATE,
-  EQUIPMENT_CARD_DATA_KEYS,
+  validateEquipmentCardTemplate,
+  type EquipmentCardTemplate,
 } from './equipment-card-template';
-import { createTemplateValidator } from './layout-template';
+import type { LayoutTemplate } from './layout-template';
+import type { PageLayoutTemplate } from './page-layout-template';
 import { createPageLayoutValidator } from './page-layout-template';
 import {
   ANALYTICS_DASHBOARD_SURFACE_ID,
@@ -40,30 +43,35 @@ export { ANALYTICS_DASHBOARD_SURFACE_ID, MAIN_DASHBOARD_SURFACE_ID };
 
 export type LayoutSurfaceKind = 'card-blocks' | 'page-layout';
 
-/** Any persisted template (card-blocks grid or page-layout widget list). */
-export interface PersistedTemplate {
-  version: number;
+/** Surface identifiers determine the stored template shape. */
+export interface SurfaceTemplateMap {
+  [MONITORING_EQUIPMENT_TILE_SURFACE_ID]: EquipmentTileTemplate;
+  [EQUIPMENT_CARD_SURFACE_ID]: EquipmentCardTemplate;
+  [ANALYTICS_DASHBOARD_SURFACE_ID]: PageLayoutTemplate;
+  [MAIN_DASHBOARD_SURFACE_ID]: PageLayoutTemplate;
 }
+export type SurfaceId = keyof SurfaceTemplateMap;
+export type PersistedTemplate = SurfaceTemplateMap[SurfaceId];
+type SurfaceConfig<S extends SurfaceId> = {
+  id: S;
+  kind: SurfaceTemplateMap[S] extends LayoutTemplate ? 'card-blocks' : 'page-layout';
+  defaultTemplate: SurfaceTemplateMap[S];
+  validate: (value: unknown) => SurfaceTemplateMap[S] | null;
+};
+export type LayoutSurfaceConfig = { [S in SurfaceId]: SurfaceConfig<S> }[SurfaceId];
 
-export interface LayoutSurfaceConfig {
-  id: string;
-  kind: LayoutSurfaceKind;
-  defaultTemplate: PersistedTemplate;
-  validate: (value: unknown) => PersistedTemplate | null;
-}
-
-const LAYOUT_SURFACES: Record<string, LayoutSurfaceConfig> = {
+const LAYOUT_SURFACES: { [S in SurfaceId]: SurfaceConfig<S> } = {
   [MONITORING_EQUIPMENT_TILE_SURFACE_ID]: {
     id: MONITORING_EQUIPMENT_TILE_SURFACE_ID,
     kind: 'card-blocks',
     defaultTemplate: DEFAULT_EQUIPMENT_TILE_TEMPLATE,
-    validate: createTemplateValidator(EQUIPMENT_TILE_DATA_KEYS),
+    validate: validateEquipmentTileTemplate,
   },
   [EQUIPMENT_CARD_SURFACE_ID]: {
     id: EQUIPMENT_CARD_SURFACE_ID,
     kind: 'card-blocks',
     defaultTemplate: DEFAULT_EQUIPMENT_CARD_TEMPLATE,
-    validate: createTemplateValidator(EQUIPMENT_CARD_DATA_KEYS),
+    validate: validateEquipmentCardTemplate,
   },
   [ANALYTICS_DASHBOARD_SURFACE_ID]: {
     id: ANALYTICS_DASHBOARD_SURFACE_ID,
@@ -79,8 +87,14 @@ const LAYOUT_SURFACES: Record<string, LayoutSurfaceConfig> = {
   },
 };
 
+export function getSurfaceConfig<S extends SurfaceId>(surfaceId: S): SurfaceConfig<S>;
+export function getSurfaceConfig(surfaceId: string): LayoutSurfaceConfig | null;
 export function getSurfaceConfig(surfaceId: string): LayoutSurfaceConfig | null {
-  return Object.prototype.hasOwnProperty.call(LAYOUT_SURFACES, surfaceId)
-    ? LAYOUT_SURFACES[surfaceId]
-    : null;
+  switch (surfaceId) {
+    case MONITORING_EQUIPMENT_TILE_SURFACE_ID: return LAYOUT_SURFACES[surfaceId];
+    case EQUIPMENT_CARD_SURFACE_ID: return LAYOUT_SURFACES[surfaceId];
+    case ANALYTICS_DASHBOARD_SURFACE_ID: return LAYOUT_SURFACES[surfaceId];
+    case MAIN_DASHBOARD_SURFACE_ID: return LAYOUT_SURFACES[surfaceId];
+    default: return null;
+  }
 }

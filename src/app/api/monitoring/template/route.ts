@@ -3,14 +3,14 @@
  *
  * Server-persisted equipment tile template for the /monitoring dashboard.
  * GET returns the tenant's saved template, or the default if none is saved.
- * PUT is ADMIN-only and validates + upserts the template.
+ * PUT is ADMIN-only and requires the revision returned by GET (If-Match).
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { requireTenantId } from '@/lib/tenant';
 import { requireAuth } from '@/lib/auth';
 import { withApi, withMutation } from '@/core/api-wrapper';
-import { getTemplate, saveTemplate } from '@/modules/monitoring';
+import { getLayoutSnapshot, saveLayoutSnapshot, LayoutConflictError, MONITORING_EQUIPMENT_TILE_SURFACE_ID } from '@/modules/layout';
 import { resolveEffectiveRole } from '@/lib/types';
 import { logger } from '@/lib/logger';
 
@@ -21,7 +21,8 @@ export const GET = withApi(async (request: NextRequest) => {
   if (error) return error;
   // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
   const tenantId = requireTenantId(user!);
-  return NextResponse.json(await getTemplate(tenantId));
+  const snapshot = await getLayoutSnapshot(tenantId, MONITORING_EQUIPMENT_TILE_SURFACE_ID);
+  return NextResponse.json(snapshot.template, { headers: { ETag: snapshot.revision } });
 }, { domain: 'monitoring' });
 
 export const PUT = withMutation(async (request: NextRequest) => {
@@ -39,9 +40,10 @@ export const PUT = withMutation(async (request: NextRequest) => {
   }
   try {
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
-    const saved = await saveTemplate(tenantId, body, user!.id);
-    return NextResponse.json(saved);
+    const saved = await saveLayoutSnapshot(tenantId, MONITORING_EQUIPMENT_TILE_SURFACE_ID, body, user!.id, undefined, request.headers.get('If-Match'));
+    return NextResponse.json(saved.template, { headers: { ETag: saved.revision } });
   } catch (err) {
+    if (err instanceof LayoutConflictError) return NextResponse.json({ error: err.message }, { status: 409 });
     // `TypeError` — шаблон не прошёл проверку. Всё остальное — сбой базы или
     // кэша: админу не нужно «править верные данные», нужно повторить позже.
     if (err instanceof TypeError) return NextResponse.json({ error: 'Некорректные данные' }, { status: 400 });

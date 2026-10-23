@@ -12,10 +12,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
  *    портить следующие).
  */
 
-const { findUniqueMock, findManyMock, upsertMock, deleteManyMock } = vi.hoisted(() => ({
+const { findUniqueMock, findManyMock, createMock, deleteManyMock } = vi.hoisted(() => ({
   findUniqueMock: vi.fn(),
   findManyMock: vi.fn(),
-  upsertMock: vi.fn(),
+  createMock: vi.fn(),
   deleteManyMock: vi.fn(),
 }));
 
@@ -24,7 +24,7 @@ vi.mock('@/lib/db', () => ({
     moduleLayoutTemplate: {
       findUnique: findUniqueMock,
       findMany: findManyMock,
-      upsert: upsertMock,
+      create: createMock,
       deleteMany: deleteManyMock,
     },
   },
@@ -242,7 +242,7 @@ describe('layout-service — слияние override -> base -> умолчани
   beforeEach(() => {
     findUniqueMock.mockReset();
     findManyMock.mockReset();
-    upsertMock.mockReset();
+    createMock.mockReset();
     deleteManyMock.mockReset();
   });
 
@@ -264,8 +264,8 @@ describe('layout-service — слияние override -> base -> умолчани
     const override = { ...base, blocks: [] };
     findUniqueMock.mockImplementation(async (args: { where: { tenantId_surfaceId_entityId: { entityId: string } } }) => {
       const { entityId } = args.where.tenantId_surfaceId_entityId;
-      if (entityId === 'rig-1') return { template: override };
-      if (entityId === BASE_ENTITY) return { template: base };
+      if (entityId === 'rig-1') return { id: 'row', updatedAt: new Date('2026-01-01'), template: override };
+      if (entityId === BASE_ENTITY) return { id: 'row', updatedAt: new Date('2026-01-01'), template: base };
       return null;
     });
 
@@ -277,8 +277,8 @@ describe('layout-service — слияние override -> base -> умолчани
     const base = surface(MONITORING_EQUIPMENT_TILE_SURFACE_ID).defaultTemplate;
     findUniqueMock.mockImplementation(async (args: { where: { tenantId_surfaceId_entityId: { entityId: string } } }) => {
       const { entityId } = args.where.tenantId_surfaceId_entityId;
-      if (entityId === 'rig-1') return { template: { version: 99 } }; // мусор в JSONB
-      if (entityId === BASE_ENTITY) return { template: base };
+      if (entityId === 'rig-1') return { id: 'row', updatedAt: new Date('2026-01-01'), template: { version: 99 } }; // мусор в JSONB
+      if (entityId === BASE_ENTITY) return { id: 'row', updatedAt: new Date('2026-01-01'), template: base };
       return null;
     });
 
@@ -317,28 +317,27 @@ describe('layout-service — слияние override -> base -> умолчани
 
   it('saveLayout: невалидный шаблон -> TypeError и никакой записи', async () => {
     await expect(saveLayout('t1', MONITORING_EQUIPMENT_TILE_SURFACE_ID, { version: 2 }, 'u')).rejects.toBeInstanceOf(TypeError);
-    expect(upsertMock).not.toHaveBeenCalled();
+    expect(createMock).not.toHaveBeenCalled();
   });
 
   it('saveLayout: валидный шаблон пишется и возвращается провалидированным', async () => {
-    upsertMock.mockResolvedValue(undefined);
+    findUniqueMock.mockResolvedValue(null);
+    createMock.mockResolvedValue({ id: 'new-row', updatedAt: new Date('2026-01-01') });
     const template = surface(MONITORING_EQUIPMENT_TILE_SURFACE_ID).defaultTemplate;
 
-    const saved = await saveLayout('t1', MONITORING_EQUIPMENT_TILE_SURFACE_ID, template, 'admin-1', 'rig-1');
+    const saved = await saveLayout('t1', MONITORING_EQUIPMENT_TILE_SURFACE_ID, template, 'admin-1', 'rig-1', '"none"');
 
     expect(saved).toEqual(template);
-    const [call] = upsertMock.mock.calls[0];
-    expect(call.where).toEqual({
-      tenantId_surfaceId_entityId: { tenantId: 't1', surfaceId: MONITORING_EQUIPMENT_TILE_SURFACE_ID, entityId: 'rig-1' },
-    });
-    expect(call.create.updatedBy).toBe('admin-1');
+    const [call] = createMock.mock.calls[0];
+    expect(call.data).toMatchObject({ tenantId: 't1', surfaceId: MONITORING_EQUIPMENT_TILE_SURFACE_ID, entityId: 'rig-1', updatedBy: 'admin-1' });
   });
 
   it('deleteLayout: удаляет строго в рамках тенанта, поверхности и сущности', async () => {
     deleteManyMock.mockResolvedValue({ count: 1 });
-    await deleteLayout('t1', EQUIPMENT_CARD_SURFACE_ID, 'rig-9');
+    findUniqueMock.mockResolvedValue({ id: 'row', updatedAt: new Date('2026-01-01') });
+    await deleteLayout('t1', EQUIPMENT_CARD_SURFACE_ID, 'rig-9', '"row:2026-01-01T00:00:00.000Z"');
     expect(deleteManyMock).toHaveBeenCalledWith({
-      where: { tenantId: 't1', surfaceId: EQUIPMENT_CARD_SURFACE_ID, entityId: 'rig-9' },
+      where: { tenantId: 't1', surfaceId: EQUIPMENT_CARD_SURFACE_ID, entityId: 'rig-9', id: 'row', updatedAt: new Date('2026-01-01') },
     });
   });
 });

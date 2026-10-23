@@ -10,13 +10,14 @@ import { getLayout, saveLayout } from '@/modules/layout';
 import { MONITORING_EQUIPMENT_TILE_SURFACE_ID } from '@/modules/layout';
 
 export async function getTemplate(tenantId: string): Promise<EquipmentTileTemplate> {
-  return getLayout(tenantId, MONITORING_EQUIPMENT_TILE_SURFACE_ID) as unknown as Promise<EquipmentTileTemplate>;
+  return getLayout(tenantId, MONITORING_EQUIPMENT_TILE_SURFACE_ID);
 }
 
 export async function saveTemplate(
   tenantId: string,
   template: unknown,
   updatedBy: string,
+  expectedRevision?: string | null,
 ): Promise<EquipmentTileTemplate> {
-  return saveLayout(tenantId, MONITORING_EQUIPMENT_TILE_SURFACE_ID, template, updatedBy) as unknown as Promise<EquipmentTileTemplate>;
+  return saveLayout(tenantId, MONITORING_EQUIPMENT_TILE_SURFACE_ID, template, updatedBy, undefined, expectedRevision);
 }

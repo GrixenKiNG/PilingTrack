@@ -21,6 +21,8 @@ import { cloneLayoutTemplate, type LayoutBlock, type LayoutBlockKind, type Layou
  * показана только для отрисовки, сохранять её нельзя — иначе PUT затрёт
  * настоящую сохранённую раскладку (F-R108-1).
  */
+export const LAYOUT_CONFLICT_MESSAGE = 'Раскладка изменена в другой вкладке. Обновите страницу; ваш черновик не сохранён.';
+
 export const LAYOUT_LOAD_FAILED_MESSAGE = 'Не удалось загрузить вашу раскладку, обновите страницу';
 
 /**
@@ -96,7 +98,7 @@ export interface UseLayoutTemplateOptions<T extends LayoutTemplate> {
   loadLocalSeed?: () => T | null;
   /** Draft discarded without saving (cancel) — clean up draft-only resources. */
   onDraftDiscarded?: (discarded: T, kept: T) => void;
-  /** About to persist `next`, replacing `previous` — clean up removed resources. */
+  /** After persistence succeeds — clean up resources removed from the saved layout. */
   onBeforeSave?: (previous: T, next: T) => void;
   onAfterReset?: () => void;
 }
@@ -110,15 +112,18 @@ export function useLayoutTemplate<T extends LayoutTemplate>(options: UseLayoutTe
   const [draft, setDraft] = useState<T>(() => cloneLayoutTemplate(defaultTemplate));
   const [editing, setEditing] = useState(false);
   const [loadFailed, setLoadFailed] = useState(false);
+  const revisionRef = useRef<string | null>(null);
   const [historyState, setHistoryState] = useState({ canUndo: false, canRedo: false });
   const historyRef = useRef<TemplateHistory<T>>(createTemplateHistory(defaultTemplate));
 
-  const loadTemplate = useCallback(async (): Promise<{ initial: T; failed: boolean }> => {
+  const loadTemplate = useCallback(async (): Promise<{ initial: T; failed: boolean; revision: string | null }> => {
     let serverTemplate = cloneLayoutTemplate(defaultTemplate);
     let failed = false;
+    let revision: string | null = null;
     try {
       const res = await authFetch(endpoint);
       if (res.ok) {
+        revision = res.headers.get('ETag');
         const body: unknown = await res.json();
         serverTemplate = validate(body) ?? serverTemplate;
       } else {
@@ -132,13 +137,13 @@ export function useLayoutTemplate<T extends LayoutTemplate>(options: UseLayoutTe
     }
     // При сбое не подставляем локальный seed: он может быть устаревшим, а
     // показанный шаблон всё равно нельзя сохранять, пока он не перечитан.
-    if (failed) return { initial: serverTemplate, failed: true };
+    if (failed) return { initial: serverTemplate, failed: true, revision };
     const isServerDefault = JSON.stringify(serverTemplate) === JSON.stringify(defaultTemplate);
     if (isServerDefault && loadLocalSeed) {
       const local = loadLocalSeed();
-      if (local && JSON.stringify(local) !== JSON.stringify(defaultTemplate)) return { initial: local, failed: false };
+      if (local && JSON.stringify(local) !== JSON.stringify(defaultTemplate)) return { initial: local, failed: false, revision };
     }
-    return { initial: serverTemplate, failed: false };
+    return { initial: serverTemplate, failed: false, revision };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- reload when the scope (endpoint) changes; surface config is fixed per surfaceId
   }, [endpoint]);
 
@@ -151,8 +156,9 @@ export function useLayoutTemplate<T extends LayoutTemplate>(options: UseLayoutTe
 
   useEffect(() => {
     let active = true;
-    void loadTemplate().then(({ initial, failed }) => {
+    void loadTemplate().then(({ initial, failed, revision }) => {
       if (active) {
+        revisionRef.current = revision;
         applyLoaded(initial);
         setLoadFailed(failed);
       }
@@ -189,12 +195,11 @@ export function useLayoutTemplate<T extends LayoutTemplate>(options: UseLayoutTe
       toast.error(LAYOUT_LOAD_FAILED_MESSAGE);
       return;
     }
-    onBeforeSave?.(template, draft);
     let res: Response;
     try {
       res = await authFetch(endpoint, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(revisionRef.current ? { 'If-Match': revisionRef.current } : {}) },
         body: JSON.stringify(draft),
       });
     } catch {
@@ -203,9 +208,11 @@ export function useLayoutTemplate<T extends LayoutTemplate>(options: UseLayoutTe
       return;
     }
     if (!res.ok) {
-      toast.error(res.status === 403 ? await layoutForbiddenMessage(res) : 'Не удалось сохранить шаблон');
+      toast.error(res.status === 409 ? LAYOUT_CONFLICT_MESSAGE : res.status === 403 ? await layoutForbiddenMessage(res) : 'Не удалось сохранить шаблон');
       return;
     }
+    onBeforeSave?.(template, draft);
+    revisionRef.current = res.headers.get('ETag');
     setTemplate(cloneLayoutTemplate(draft));
     setEditing(false);
   }, [draft, template, endpoint, onBeforeSave, loadFailed]);
@@ -215,17 +222,18 @@ export function useLayoutTemplate<T extends LayoutTemplate>(options: UseLayoutTe
     // base, the base falls back to the hardcoded default.
     let res: Response;
     try {
-      res = await authFetch(endpoint, { method: 'DELETE' });
+      res = await authFetch(endpoint, { method: 'DELETE', headers: revisionRef.current ? { 'If-Match': revisionRef.current } : {} });
     } catch {
       // Обрыв сети: ничего не удалено, можно повторить (F-R108-4).
       toast.error(LAYOUT_OFFLINE_MESSAGE);
       return;
     }
     if (!res.ok) {
-      toast.error(res.status === 403 ? await layoutForbiddenMessage(res) : 'Не удалось сбросить шаблон');
+      toast.error(res.status === 409 ? LAYOUT_CONFLICT_MESSAGE : res.status === 403 ? await layoutForbiddenMessage(res) : 'Не удалось сбросить шаблон');
       return;
     }
-    const { initial, failed } = await loadTemplate();
+    const { initial, failed, revision } = await loadTemplate();
+    revisionRef.current = revision;
     applyLoaded(initial);
     setLoadFailed(failed);
     onAfterReset?.();
