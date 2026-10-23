@@ -6,7 +6,6 @@ import { conductBriefing } from '@/modules/safety';
 import { can } from '@/services/auth/authorization-service';
 import { withMutation } from '@/core/api-wrapper';
 import { ServiceError } from '@/lib/service-error';
-import { recordAuditEvent } from '@/modules/audit';
 
 export const runtime = 'nodejs';
 
@@ -55,11 +54,6 @@ export const POST = withMutation(
           ...data,
           recordedAt: data.recordedAt ? new Date(data.recordedAt) : undefined,
         },
-      });
-      await recordAuditEvent({
-        action: 'briefing.conducted', scope: 'safety', actorId: actor.id,
-        targetId: created.id, tenantId,
-        metadata: { employeeId: data.userId, documentTitle: data.documentTitle, type: data.type },
       });
       return NextResponse.json({ data: created }, { status: 201 });
     } catch (err) {

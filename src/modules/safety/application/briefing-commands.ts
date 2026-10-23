@@ -20,6 +20,7 @@
 
 import { db } from '@/lib/db';
 import { ServiceError } from '@/lib/service-error';
+import { recordAuditEventInTx } from '@/modules/audit';
 import type { BriefingType } from '@/generated/postgres-client/client';
 
 export interface ConductBriefingInput {
@@ -88,24 +89,33 @@ export async function conductBriefing(input: {
     throw new ServiceError('Инструктаж нельзя записать будущей датой', 400);
   }
 
-  return db.briefingRecord.create({
-    data: {
-      tenantId: input.tenantId,
-      userId: employee.id,
-      kind: 'INSTRUCTION',
-      type: payload.type,
-      userName: employee.name,
-      userRole: employee.role,
-      documentCode: payload.documentCode,
-      documentTitle: payload.documentTitle,
-      documentVersion: payload.documentVersion,
-      reason: payload.reason,
-      instructorId: input.actor.id,
-      instructorName: input.actor.name,
-      instructorSignedAt: new Date(),
-      recordedAt,
-    },
-    select: { id: true },
+  // Запись журнала и след — одна транзакция: проведённый инструктаж без следа недопустим.
+  return db.$transaction(async (tx) => {
+    const created = await tx.briefingRecord.create({
+      data: {
+        tenantId: input.tenantId,
+        userId: employee.id,
+        kind: 'INSTRUCTION',
+        type: payload.type,
+        userName: employee.name,
+        userRole: employee.role,
+        documentCode: payload.documentCode,
+        documentTitle: payload.documentTitle,
+        documentVersion: payload.documentVersion,
+        reason: payload.reason,
+        instructorId: input.actor.id,
+        instructorName: input.actor.name,
+        instructorSignedAt: new Date(),
+        recordedAt,
+      },
+      select: { id: true },
+    });
+    await recordAuditEventInTx(tx, {
+      action: 'briefing.conducted', scope: 'safety', actorId: input.actor.id,
+      targetId: created.id, tenantId: input.tenantId,
+      metadata: { employeeId: payload.userId, documentTitle: payload.documentTitle, type: payload.type },
+    });
+    return created;
   });
 }
 
@@ -144,11 +154,17 @@ export async function signBriefingRecord(input: {
   if (isEmployee && record.employeeSignedAt) return { alreadySigned: true };
   if (isInstructor && record.instructorSignedAt) return { alreadySigned: true };
 
-  await db.briefingRecord.update({
-    where: { id: record.id },
-    data: isEmployee
-      ? { employeeSignedAt: new Date() }
-      : { instructorSignedAt: new Date() },
+  await db.$transaction(async (tx) => {
+    await tx.briefingRecord.update({
+      where: { id: record.id },
+      data: isEmployee
+        ? { employeeSignedAt: new Date() }
+        : { instructorSignedAt: new Date() },
+    });
+    await recordAuditEventInTx(tx, {
+      action: 'briefing.signed', scope: 'safety', actorId: input.actorId,
+      targetId: input.recordId, tenantId: input.tenantId,
+    });
   });
   return { alreadySigned: false };
 }
