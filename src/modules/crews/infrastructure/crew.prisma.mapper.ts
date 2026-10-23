@@ -16,7 +16,7 @@ export function toPrismaData(aggregate: CrewAggregate) {
   };
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Prisma row shape boundary in a mapper
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Prisma row shape boundary in a mapper; точный тип Prisma.CrewGetPayload<...> недоступен без импорта сгенерированных типов
 export function fromPrismaToState(prismaCrew: any): CrewInfo {
   return {
     id: prismaCrew.id,
@@ -35,7 +35,7 @@ export function fromPrismaToState(prismaCrew: any): CrewInfo {
 // RLS отдаёт обработчику ноль строк. У бригады своей колонки tenantId нет —
 // организация приходит от объекта (site) через контекст команды, см. вызов в
 // crew.repository.ts. `undefined` — контекст пуст, колонка nullable.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Prisma JSON column / event payload is an arbitrary serializable shape
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Prisma JSON column / event payload is an arbitrary serializable shape; тип события зависит от домена, точный тип требует импорта из domain/events
 export function toOutboxData(event: any, tenantId?: string) {
   return {
     type: event.type,

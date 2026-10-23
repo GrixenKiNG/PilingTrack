@@ -151,8 +151,8 @@ export async function listReportsForReview(
   const sums = await sumSubmittedReports(where);
 
   const page = await paginateQuery(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
-    (args) => db.report.findMany(args as any),
+     
+    (args) => db.report.findMany(args as Parameters<typeof db.report.findMany>[0]),
     { cursor: pagination?.cursor, limit: pagination?.limit ?? 25 },
     {
       where,

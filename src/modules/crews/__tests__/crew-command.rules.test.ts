@@ -68,8 +68,8 @@ vi.mock('@/lib/cached-queries', () => ({
   invalidateCrews: vi.fn().mockResolvedValue(undefined),
 }));
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- test: tx client is the mock db
-const mockRepoSave = vi.fn(async (_aggregate: unknown, hooks?: { onBeforeCommit?: (tx: any) => Promise<void> }) => {
+// test: tx client is the mock db; using unknown since Prisma TransactionClient not imported here
+const mockRepoSave = vi.fn(async (_aggregate: unknown, hooks?: { onBeforeCommit?: (tx: unknown) => Promise<void> }) => {
   if (hooks?.onBeforeCommit) await hooks.onBeforeCommit(mockDb);
 });
 const mockRepoFindById = vi.fn().mockResolvedValue(null);

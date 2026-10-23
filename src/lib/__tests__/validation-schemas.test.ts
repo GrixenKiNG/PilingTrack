@@ -98,7 +98,7 @@ describe('validation-schemas', () => {
     it('defaults status to active', () => {
       const result = createSiteSchema.safeParse({ name: 'Test Site' });
       // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test: cast to a mock shape or to reach internals not in the public type
-      expect((result as any).data.status).toBe('active');
+      expect((result as any).data.status).toBe('active'); // any: точный тип выводится из схемы в другом файле
     });
 
     it('rejects empty name', () => {
@@ -121,13 +121,13 @@ describe('validation-schemas', () => {
     it('defaults qty to 1', () => {
       const result = createEquipmentSchema.safeParse({ name: 'Excavator' });
       // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test: cast to a mock shape or to reach internals not in the public type
-      expect((result as any).data.qty).toBe(1);
+      expect((result as any).data.qty).toBe(1); // any: точный тип выводится из схемы в другом файле
     });
 
     it('defaults isActive to true', () => {
       const result = createEquipmentSchema.safeParse({ name: 'Excavator' });
       // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test: cast to a mock shape or to reach internals not in the public type
-      expect((result as any).data.isActive).toBe(true);
+      expect((result as any).data.isActive).toBe(true); // any: точный тип выводится из схемы в другом файле
     });
 
     it('rejects name too long', () => {
@@ -153,7 +153,7 @@ describe('validation-schemas', () => {
         siteId: 'site-1',
       });
       // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test: cast to a mock shape or to reach internals not in the public type
-      expect((result as any).data.assistantNames).toEqual([]);
+      expect((result as any).data.assistantNames).toEqual([]); // any: точный тип выводится из схемы в другом файле
     });
 
     it('rejects missing operatorId', () => {
@@ -171,7 +171,7 @@ describe('validation-schemas', () => {
 
       expect(result.success).toBe(true);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test: cast to a mock shape or to reach internals not in the public type
-      expect((result as any).data).toEqual({ name: 'Updated Crew' });
+      expect((result as any).data).toEqual({ name: 'Updated Crew' }); // any: точный тип выводится из схемы в другом файле
     });
 
     it('rejects empty crew name updates before domain logic runs', () => {
@@ -196,7 +196,7 @@ describe('validation-schemas', () => {
         date: '2026-04-05',
       });
       // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test: cast to a mock shape or to reach internals not in the public type
-      expect((result as any).data.shiftType).toBe('DAY');
+      expect((result as any).data.shiftType).toBe('DAY'); // any: точный тип выводится из схемы в другом файле
     });
 
     it('defaults status to draft', () => {
@@ -205,7 +205,7 @@ describe('validation-schemas', () => {
         date: '2026-04-05',
       });
       // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test: cast to a mock shape or to reach internals not in the public type
-      expect((result as any).data.status).toBe('draft');
+      expect((result as any).data.status).toBe('draft'); // any: точный тип выводится из схемы в другом файле
     });
 
     it('validates date format', () => {
@@ -258,15 +258,15 @@ describe('validation-schemas', () => {
       const result = paginationSchema.safeParse({ page: '2', limit: '10' });
       expect(result.success).toBe(true);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test: cast to a mock shape or to reach internals not in the public type
-      expect((result as any).data.page).toBe(2);
+      expect((result as any).data.page).toBe(2); // any: точный тип выводится из схемы в другом файле
     });
 
     it('defaults page to 1 and limit to 50', () => {
       const result = paginationSchema.safeParse({});
       // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test: cast to a mock shape or to reach internals not in the public type
-      expect((result as any).data.page).toBe(1);
+      expect((result as any).data.page).toBe(1); // any: точный тип выводится из схемы в другом файле
       // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test: cast to a mock shape or to reach internals not in the public type
-      expect((result as any).data.limit).toBe(50);
+      expect((result as any).data.limit).toBe(50); // any: точный тип выводится из схемы в другом файле
     });
 
     it('rejects page <= 0', () => {
@@ -297,7 +297,7 @@ describe('validation-schemas', () => {
         chatId: '-1001234567890',
       });
       // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test: cast to a mock shape or to reach internals not in the public type
-      expect((result as any).data.enabled).toBe(true);
+      expect((result as any).data.enabled).toBe(true); // any: точный тип выводится из схемы в другом файле
     });
 
     it('rejects empty botToken', () => {
@@ -325,7 +325,7 @@ describe('validation-schemas', () => {
         name: 'Grade A',
       });
       // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test: cast to a mock shape or to reach internals not in the public type
-      expect((result as any).data.isActive).toBe(true);
+      expect((result as any).data.isActive).toBe(true); // any: точный тип выводится из схемы в другом файле
     });
   });
 });

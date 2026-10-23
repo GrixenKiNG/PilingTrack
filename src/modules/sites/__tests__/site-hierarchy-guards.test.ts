@@ -28,8 +28,8 @@ const m = vi.hoisted(() => {
   };
   return {
     tx,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- транзакционный шим для теста
-    transaction: vi.fn((fn: any) => fn(tx)),
+     
+    transaction: vi.fn((fn: unknown) => (fn as (client: typeof tx) => Promise<unknown>)(tx)),
     siteFindFirst: vi.fn(),
     siteDelete: vi.fn(),
     pileFieldCreate: vi.fn(),

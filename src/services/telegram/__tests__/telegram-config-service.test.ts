@@ -197,7 +197,7 @@ describe('createTelegramConfig', () => {
     ['botToken', { label: 'L', chatId: 'c' }],
     ['chatId', { label: 'L', botToken: 't' }],
   ])('throws ServiceError(400) when %s is missing', async (_field, input) => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test: cast to a mock shape or to reach internals not in the public type
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- точный тип входных данных определён в продуктовом коде и не импортируется в тесты; any оставлен намеренно
     await expect(createTelegramConfig(TENANT_A, input as any)).rejects.toBeInstanceOf(ServiceError);
   });
 

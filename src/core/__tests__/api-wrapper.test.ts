@@ -210,8 +210,8 @@ describe('withApi', () => {
 
   it('should map Prisma P2025 to 404', async () => {
     const handler = withApi(async () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test: cast to a mock shape or to reach internals not in the public type
-      const err = new Error('Record not found') as any;
+      // Prisma-ошибка: сужаем через unknown, чтобы задать code без any
+      const err = new Error('Record not found') as Error & { code: string };
       err.code = 'P2025';
       throw err;
     });
@@ -224,8 +224,8 @@ describe('withApi', () => {
 
   it('should map Prisma P2002 to 409', async () => {
     const handler = withApi(async () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test: cast to a mock shape or to reach internals not in the public type
-      const err = new Error('Unique constraint failed on the fields: (`pinLookup`)') as any;
+      // Prisma-ошибка: сужаем через unknown, чтобы задать code без any
+      const err = new Error('Unique constraint failed on the fields: (`pinLookup`)') as Error & { code: string };
       err.code = 'P2002';
       throw err;
     });
@@ -240,8 +240,8 @@ describe('withApi', () => {
   it('should return 500 for unknown Prisma codes', async () => {
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     const handler = withApi(async () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test: cast to a mock shape or to reach internals not in the public type
-      const err = new Error('Unknown') as any;
+      // Prisma-ошибка: сужаем через unknown, чтобы задать code без any
+      const err = new Error('Unknown') as Error & { code: string };
       err.code = 'P9999';
       throw err;
     });
@@ -329,8 +329,8 @@ describe('withMutation', () => {
       allowed: false,
       remaining: 0,
       retryAfter: 30,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test: cast to a mock shape or to reach internals not in the public type
-    } as any);
+    // RateLimiterCheckResult — сужаем через unknown, мок возвращает этот shape
+    } as { allowed: boolean; remaining: number; retryAfter: number });
     const handler = withMutation(async () => NextResponse.json({ ok: true }));
     const res = await handler(mockRequest());
     const body = await res.json();
@@ -373,8 +373,8 @@ describe('withMutation', () => {
   it('исчерпанный лимит источника отвечает 429 до обработчика', async () => {
     vi.mocked(rateLimiter.check).mockResolvedValueOnce({
       allowed: false, remaining: 0, retryAfter: 20,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test: cast to a mock shape
-    } as any);
+    // RateLimiterCheckResult — сужаем через unknown, мок возвращает этот shape
+    } as { allowed: boolean; remaining: number; retryAfter: number });
     const inner = vi.fn(async () => NextResponse.json({ ok: true }));
     const res = await withMutation(inner)(mockRequest('POST'));
 

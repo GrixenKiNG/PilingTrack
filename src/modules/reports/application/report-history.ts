@@ -39,20 +39,25 @@ const NOISE = new Set([
   'lastEditedById', 'lastEditedByName', 'lastEditedByRole', 'id', 'reportId',
 ]);
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
+ 
+// Локальные интерфейсы элементов JSON-массивов (структура соответствует Prisma-моделям)
+interface PileItem { pileGradeId: string; count: number }
+interface DrillingItem { typeId: string; count?: number; meters: number }
+interface DowntimeItem { reasonId: string; duration: number }
+
 function fmtPiles(arr: unknown, names: Record<string, string>): string {
   if (!Array.isArray(arr)) return '—';
-  return arr.map((p: any) => `${names[p.pileGradeId] ?? p.pileGradeId}: ${p.count} шт`).join('; ') || '—';
+  return arr.map((p: PileItem) => `${names[p.pileGradeId] ?? p.pileGradeId}: ${p.count} шт`).join('; ') || '—';
 }
 function fmtDrillings(arr: unknown, names: Record<string, string>): string {
   if (!Array.isArray(arr)) return '—';
-  return arr.map((d: any) => `${names[d.typeId] ?? d.typeId}: ${d.count ?? 1} шт, ${d.meters} м`).join('; ') || '—';
+  return arr.map((d: DrillingItem) => `${names[d.typeId] ?? d.typeId}: ${d.count ?? 1} шт, ${d.meters} м`).join('; ') || '—';
 }
 function fmtDowntimes(arr: unknown, names: Record<string, string>): string {
   if (!Array.isArray(arr)) return '—';
-  return arr.map((d: any) => `${names[d.reasonId] ?? d.reasonId}: ${d.duration} ч`).join('; ') || '—';
+  return arr.map((d: DowntimeItem) => `${names[d.reasonId] ?? d.reasonId}: ${d.duration} ч`).join('; ') || '—';
 }
-/* eslint-enable @typescript-eslint/no-explicit-any */
+ 
 
 function scalar(v: unknown): string { return v === null || v === undefined || v === '' ? '—' : String(v); }
 

@@ -57,8 +57,8 @@ function isPrismaKnownError(err: unknown): err is { code: string; message: strin
 /**
  * Minimal API wrapper — catches ServiceError and Prisma errors, maps to HTTP status.
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function withApi<T extends any[]>(
+ 
+export function withApi<T extends unknown[]>(
   handler: (request: NextRequest, ...args: T) => Promise<NextResponse>,
   _opts?: ApiWrapperOptions
 ) {
@@ -173,8 +173,8 @@ const MUTATION_SOURCE_LIMIT = { maxAttempts: 1800, windowMs: 60_000, blockDurati
  * Wrap a mutation handler with CSRF check + rate limiting + error boundary.
  * Eliminates the need for per-route CSRF/rate-limit boilerplate.
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function withMutation<T extends any[]>(
+ 
+export function withMutation<T extends unknown[]>(
   handler: (request: NextRequest, ...args: T) => Promise<NextResponse>,
   _opts?: ApiWrapperOptions
 ) {

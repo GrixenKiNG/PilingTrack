@@ -24,7 +24,7 @@ export interface UpsertReportCommand {
 }
 
 export interface UpsertReportResult {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- точный тип требует Prisma-схемы и grep по репозиторию/хендлерам; оставлен any для совместимости
   report: any;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
   events: readonly any[];

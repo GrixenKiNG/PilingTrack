@@ -159,10 +159,8 @@ export class SchemaRegistry {
   ): boolean {
     const oldRequired = (oldSchema as { required?: string[] }).required || [];
     const newRequired = (newSchema as { required?: string[] }).required || [];
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
-    const oldProps = (oldSchema as any).properties || {};
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped external/library boundary
-    const newProps = (newSchema as any).properties || {};
+    const oldProps = (oldSchema as { properties?: Record<string, { default?: unknown; type?: unknown }> }).properties || {};
+    const newProps = (newSchema as { properties?: Record<string, { default?: unknown; type?: unknown }> }).properties || {};
 
     if (mode === 'BACKWARD' || mode === 'FULL') {
       for (const field of newRequired) {

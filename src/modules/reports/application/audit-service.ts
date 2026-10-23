@@ -30,7 +30,7 @@ export async function writeReportAuditRow(
   record: AuditRecord,
   tx?: { reportAudit?: { create: (args: unknown) => Promise<unknown> } },
 ): Promise<void> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Prisma interactive-transaction callback client type isn't cleanly exported
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Тип Prisma-клиента (db/tx) не экспортируется в этом модуле; замена требует доступа к Prisma.TransactionClient или типу db из @/lib/db
   const client = (tx ?? db) as any;
   // The reportAudit model may not yet be in the generated Prisma client in
   // some environments — skip silently if so.
