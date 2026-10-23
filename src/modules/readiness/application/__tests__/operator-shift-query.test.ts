@@ -39,7 +39,7 @@ vi.mock('@/lib/db', () => ({
 }));
 
 vi.mock('@/modules/users', () => ({ getOperatorClearance: mocks.getOperatorClearance }));
-vi.mock('@/modules/inspections', () => ({ hasPostShiftSection: mocks.hasPostShiftSection }));
+vi.mock('@/modules/inspections/server', () => ({ hasPostShiftSection: mocks.hasPostShiftSection }));
 
 import { getOperatorShiftFacts } from '../operator-shift-query';
 

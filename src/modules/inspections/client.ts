@@ -14,3 +14,7 @@ export {
 export type {
   LubePoint,
 } from './domain/lubrication-maps';
+export {
+  diffInspectionStates,
+  type StateAnswer,
+} from './domain/state-diff';

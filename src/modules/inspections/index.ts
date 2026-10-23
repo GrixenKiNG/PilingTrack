@@ -8,5 +8,3 @@ export { requiredBlockTypes, selectBlocks, composeChecklist,
 export { sectionPhase, itemsForPhase,
   type ShiftInspectionPhase, type SectionPhase } from './domain/phase-split';
 export { listInspections, getInspection, listToJournal, hasPostShiftSection } from './application/queries/inspection-query.service';
-
-export {diffInspectionStates, type StateAnswer} from './domain/state-diff';

@@ -1,6 +1,6 @@
 import { db } from '@/lib/db';
 import { getOperatorClearance, type ClearanceDocument } from '@/modules/users';
-import { hasPostShiftSection } from '@/modules/inspections';
+import { hasPostShiftSection } from '@/modules/inspections/server';
 import { zonedDayStartUtc } from '@/lib/timezone';
 import { normalizeTenantTimezone, tenantProductionDate } from '../domain/shifts/tenant-production-date';
 

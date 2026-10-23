@@ -49,7 +49,7 @@ vi.mock('../../../infrastructure/shifts/handover-repository', () => ({
 }));
 vi.mock('../start-decision', () => ({evaluateAuthoritativeShiftStart: vi.fn()}));
 vi.mock('@/modules/users', () => ({getOperatorClearance: mocks.clearance}));
-vi.mock('@/modules/inspections', () => ({diffInspectionStates: mocks.diff}));
+vi.mock('@/modules/inspections/client', () => ({diffInspectionStates: mocks.diff}));
 
 const KEY = 'shift-flow-key-1234567890';
 const ctx = (actorRole: string, actingAs: string | null = null, actorId = 'actor'): ShiftCommandContext => ({
