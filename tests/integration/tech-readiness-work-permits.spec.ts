@@ -315,7 +315,6 @@ describe.runIf(Boolean(connectionString))('work permits on disposable PostgreSQL
       result.status === 'fulfilled');
     const failures = outcomes.filter((result): result is PromiseRejectedResult => result.status === 'rejected');
     expect(successes.length).toBeGreaterThanOrEqual(1);
-    expect(failures.every((result) => ['COMMAND_IN_PROGRESS', 'P2034', '40001'].includes(errorCode(result.reason) ?? ''))).toBe(true);
 
     const replay = await run();
     expect(replay).toMatchObject({status: 200, replayed: true});
@@ -325,6 +324,9 @@ describe.runIf(Boolean(connectionString))('work permits on disposable PostgreSQL
     expect(await prisma.auditLog.count({where: {tenantId: tenantA, entityId: id}})).toBe(1);
     expect(await prisma.outboxEvent.count({where: {tenantId: tenantA, aggregateId: id}})).toBe(1);
     expect(await prisma.idempotencyKey.count({where: {tenantId: tenantA, key: 'approval-race-one-key'}})).toBe(1);
+    expect(failures.every((result) => ['COMMAND_IN_PROGRESS', 'P2034', '40001'].includes(errorCode(result.reason) ?? '')),
+      JSON.stringify(failures.map((result) => ({code: errorCode(result.reason), message: String(result.reason)}))),
+    ).toBe(true);
   }, 30_000);
 
   /*
