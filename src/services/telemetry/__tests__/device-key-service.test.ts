@@ -7,7 +7,7 @@
  * - отказ на неизвестном/отозванном устройстве
  * - ключ не возвращается повторно после выпуска (plaintext только один раз)
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 const {
   findUniqueEquipmentMock,
@@ -33,6 +33,18 @@ vi.mock('@/lib/db', () => ({
 }));
 
 import { provisionDeviceKey, authenticateDeviceByKey } from '../device-key-service';
+
+// Секрет задаём сами: в CI DEVICE_KEY_LOOKUP_SECRET задан, и запасной секрет
+// разработки не используется — захардкоженный хеш там не совпадал.
+const TEST_LOOKUP_SECRET = 'test-device-key-lookup-secret';
+
+beforeEach(() => {
+  vi.stubEnv('DEVICE_KEY_LOOKUP_SECRET', TEST_LOOKUP_SECRET);
+});
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
 
 describe('provisionDeviceKey — выпуск ключа устройства', () => {
   beforeEach(() => {
@@ -114,7 +126,7 @@ describe('provisionDeviceKey — выпуск ключа устройства', 
     });
 
     const { createHmac } = await import('crypto');
-    const expectedHash = createHmac('sha256', 'dev-only-device-key-fallback').update(provisioned.key).digest('hex');
+    const expectedHash = createHmac('sha256', TEST_LOOKUP_SECRET).update(provisioned.key).digest('hex');
 
     findUniqueDeviceKeyMock.mockResolvedValue({
       id: 'key-new',
@@ -162,7 +174,7 @@ describe('authenticateDeviceByKey — поведение поиска и вер�
 
     // Вычисляем ожидаемый хеш (в тестах используется dev fallback)
     const { createHmac } = await import('crypto');
-    const expectedHash = createHmac('sha256', 'dev-only-device-key-fallback').update(provisioned.key).digest('hex');
+    const expectedHash = createHmac('sha256', TEST_LOOKUP_SECRET).update(provisioned.key).digest('hex');
 
     findUniqueDeviceKeyMock.mockResolvedValue({
       id: 'key-1',
@@ -197,7 +209,7 @@ describe('authenticateDeviceByKey — поведение поиска и вер�
   it('возвращает null для отозванного ключа', async () => {
     const { createHmac } = await import('crypto');
     const plaintext = 'pkdk_somerevokedkeyxxxxxxxxxxxxxxxxxxxxxxxxxx';
-    const keyHash = createHmac('sha256', 'dev-only-device-key-fallback').update(plaintext).digest('hex');
+    const keyHash = createHmac('sha256', TEST_LOOKUP_SECRET).update(plaintext).digest('hex');
 
     findUniqueDeviceKeyMock.mockResolvedValue({
       id: 'key-revoked',
@@ -217,7 +229,7 @@ describe('authenticateDeviceByKey — поведение поиска и вер�
   it('сравнивает хеш через timingSafeEqual (постоянное время)', async () => {
     const { createHmac } = await import('crypto');
     const plaintext = 'pkdk_timingsafeequaltestkeyxxxxxxxxxxxxxxxxxxx';
-    const keyHash = createHmac('sha256', 'dev-only-device-key-fallback').update(plaintext).digest('hex');
+    const keyHash = createHmac('sha256', TEST_LOOKUP_SECRET).update(plaintext).digest('hex');
 
     findUniqueDeviceKeyMock.mockResolvedValue({
       id: 'key-1',
@@ -239,8 +251,8 @@ describe('authenticateDeviceByKey — поведение поиска и вер�
     const { createHmac } = await import('crypto');
     const realPlaintext = 'pkdk_realkeyxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx';
     const fakePlaintext = 'pkdk_fakekeyxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx';
-    const realHash = createHmac('sha256', 'dev-only-device-key-fallback').update(realPlaintext).digest('hex');
-    const _fakeHash = createHmac('sha256', 'dev-only-device-key-fallback').update(fakePlaintext).digest('hex');
+    const realHash = createHmac('sha256', TEST_LOOKUP_SECRET).update(realPlaintext).digest('hex');
+    const _fakeHash = createHmac('sha256', TEST_LOOKUP_SECRET).update(fakePlaintext).digest('hex');
 
     findUniqueDeviceKeyMock.mockResolvedValue({
       id: 'key-1',
