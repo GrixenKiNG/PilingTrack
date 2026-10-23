@@ -16,6 +16,11 @@ if (label !== '1' || new URL(process.env.BASE_URL || 'http://invalid').hostname 
 const aliases = {};
 const credentials = {};
 const accounts = [];
+const history = {
+  tenantId: 'orion',
+  date: new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Moscow', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date()),
+  reports: [], totalPiles: 14, totalPileMeters: 196, drillingCount: 6, drillingMeters: 21, downtimeHours: 1.5,
+};
 function account(role, alias) {
   const email = `qa-${crypto.randomBytes(8).toString('hex')}@example.invalid`;
   aliases[alias] = email;
@@ -68,6 +73,32 @@ async function seed() {
       for (const [j, email] of [v.operator, v.assistant].entries()) await put('UserSiteAssignment', { id: prefix + '-assign-' + j, userId: uid(email), siteId: prefix + '-site', updatedAt: now });
     }
     for (const [table, id, name, extra] of [['PileGrade', 'qa-grade', 'Synthetic C60', { lengthMm: 6000 }], ['DrillingType', 'qa-drill', 'Synthetic drilling', {}], ['DowntimeReason', 'qa-downtime', 'Synthetic downtime', {}]]) await put(table, { id, tenantId: 'orion', name, normalizedName: name.toLowerCase().replaceAll(' ', ''), ...extra, updatedAt: now });
+    await put('PileGrade', { id: 'qa-history-grade', tenantId: history.tenantId, name: 'Synthetic C140', normalizedName: 'syntheticc140', lengthMm: 14000, updatedAt: now });
+    for (const [n, i] of [0, 1, 5].entries()) {
+      const prefix = 'qa-v' + i;
+      const shiftId = prefix + '-history-shift';
+      const reportId = prefix + '-history-report';
+      const publicId = `SYNTHETIC-${i}-${history.date}`;
+      const piles = [5, 7, 2][n];
+      const start = new Date(`${history.date}T0${6 + n}:00:00+03:00`);
+      const end = new Date(start.getTime() + 3600000);
+      const operatorId = uid(operatorVersions[i].operator);
+      await put('PileField', { id: prefix + '-field', siteId: prefix + '-site', name: 'Synthetic field ' + i, updatedAt: now });
+      await put('Cluster', { id: prefix + '-cluster', fieldId: prefix + '-field', name: 'Synthetic cluster ' + i, updatedAt: now });
+      await put('Picket', { id: prefix + '-picket', clusterId: prefix + '-cluster', name: 'Synthetic picket ' + i, updatedAt: now });
+      await put('Shift', { id: shiftId, tenantId: history.tenantId, equipmentId: prefix + '-equipment', type: 'DAY', state: 'CLOSED', productionDate: history.date, timezone: 'Europe/Moscow', createdById: uid(roles[1].email), lastEditedById: uid(roles[1].email), startedAt: start, closedAt: end, updatedAt: now });
+      await put('Report', { id: reportId, tenantId: history.tenantId, reportId: publicId, userId: operatorId, crewId: prefix + '-crew', equipmentId: prefix + '-equipment', siteId: prefix + '-site', date: history.date, shiftId, shiftStart: `${6 + n}:00`, shiftEnd: `${7 + n}:00`, status: 'submitted', submittedAt: end, updatedAt: now });
+      for (const [j, count] of [1, piles - 1].entries()) {
+        const workId = prefix + '-history-pile-' + j;
+        await put('PileWork', { id: workId, reportId, tenantId: history.tenantId, shiftId, picketId: prefix + '-picket', pileGradeId: 'qa-history-grade', count, occurredAt: start, receivedAt: start });
+        if (j === 0) await put('PilePassport', { id: prefix + '-passport', tenantId: history.tenantId, pileWorkId: workId, clientCommandId: prefix + '-passport-command', pileNumber: `SYNTHETIC_${i}_1`, drivenAt: start, drivenDepthM: 14, recordedById: operatorId, updatedAt: now });
+      }
+      await put('LeaderDrilling', { id: prefix + '-history-drill', reportId, tenantId: history.tenantId, shiftId, picketId: prefix + '-picket', typeId: 'qa-drill', count: 2, metersPerUnit: 3.5, meters: 7, occurredAt: start });
+      await put('ReportDowntime', { id: prefix + '-history-downtime', reportId, tenantId: history.tenantId, shiftId, reasonId: 'qa-downtime', duration: 0.5, occurredAt: start });
+      await put('ReportAnalytics', { id: prefix + '-history-analytics', reportId: publicId, tenantId: history.tenantId, siteId: prefix + '-site', userId: operatorId, status: 'submitted', totalPiles: piles, totalDrilling: 7, totalDowntime: 0.5 });
+      await db.query('INSERT INTO "SiteDailySummary" (id,"siteId",date,"totalPiles","totalDrilling","totalDowntime","reportCount","updatedAt") VALUES ($1,$2,$3,$4,7,0.5,1,$5) ON CONFLICT ("siteId",date) DO UPDATE SET "totalPiles"=EXCLUDED."totalPiles","totalDrilling"=7,"totalDowntime"=0.5,"reportCount"=1,"updatedAt"=EXCLUDED."updatedAt"', [prefix + '-daily', prefix + '-site', history.date, piles, now]);
+      history.reports.push({ id: publicId, shiftId, equipmentId: prefix + '-equipment', equipment: operatorVersions[i].equipment, operator: 'Synthetic OPERATOR ' + accounts.findIndex(a => a.email === operatorVersions[i].operator), piles, pileMeters: piles * 14, pileNumber: `SYNTHETIC_${i}_1` });
+    }
     await db.query('COMMIT');
   } catch (e) { await db.query('ROLLBACK'); throw e; } finally { await db.end(); }
 }
@@ -75,7 +106,8 @@ async function seed() {
 (async () => {
   fs.mkdirSync(dir, { recursive: true });
   await seed();
-  const env = { ...process.env, QA_DIR: path.join(dir, 'fixture'), QA_RUN_DIR: path.join(dir, 'run'), QA_MATRIX_JSON: JSON.stringify({ roles, operatorVersions, excluded: [] }), QA_CREDENTIALS_JSON: JSON.stringify(credentials), QA_ACCOUNT_ALIASES_JSON: JSON.stringify(aliases), POST_MERGE_SMOKE: '1', PLAYWRIGHT_BROWSERS_PATH: process.env.PLAYWRIGHT_BROWSERS_PATH || 'D:/PillingR/tools/ms-playwright' };
+  fs.writeFileSync(path.join(dir, 'history-manifest.json'), JSON.stringify(history, null, 2));
+  const env = { ...process.env, QA_HISTORY_JSON: JSON.stringify(history), QA_DIR: path.join(dir, 'fixture'), QA_RUN_DIR: path.join(dir, 'run'), QA_MATRIX_JSON: JSON.stringify({ roles, operatorVersions, excluded: [] }), QA_CREDENTIALS_JSON: JSON.stringify(credentials), QA_ACCOUNT_ALIASES_JSON: JSON.stringify(aliases), POST_MERGE_SMOKE: '1', PLAYWRIGHT_BROWSERS_PATH: process.env.PLAYWRIGHT_BROWSERS_PATH || 'D:/PillingR/tools/ms-playwright' };
   const healthPort = Number(env.WORKER_HEALTH_PORT);
   if (!Number.isInteger(healthPort) || healthPort < 1 || healthPort > 65535) throw Error('Stand worker health port required');
   const hasWorker = await fetch(`http://127.0.0.1:${healthPort}/health`, { signal: AbortSignal.timeout(1000) }).then(r => r.ok).catch(() => false);

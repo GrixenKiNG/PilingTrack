@@ -14,7 +14,8 @@
 import { expect, test } from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
-import { login, matrix, must, OUT_DIR, QA_DIR, qaSelect } from '../qa/helpers';
+import { login, matrix, must, OUT_DIR, QA_DIR, qaHistory } from '../qa/helpers';
+import { readZipEntries } from './util';
 
 const roleEmail = (role: string) => must(matrix.roles.find((r) => r.role === role), `роль ${role}`).email;
 const ADMIN = roleEmail('ADMIN');
@@ -33,25 +34,24 @@ const hasSession = (email: string) => fs.existsSync(authFile(email));
 
 test('S1: диспетчер — журнал забивки: «Свай (всего)», строка без паспорта, выгрузка .xlsx', async ({ page }) => {
   test.skip(!process.env.POST_MERGE_SMOKE, GATE);
-  test.skip(Number(qaSelect(`SELECT coalesce(sum(count),0) FROM "PileWork" WHERE "tenantId"='orion'`)) <= 1000,
-    'Исторический объём S1: запуск требует отдельного синтетического набора >1000 свай, включая запись без паспорта; пустая одноразовая база не удовлетворяет предусловию');
+  const history = qaHistory();
   test.setTimeout(10 * 60_000);
   await login(page, DISPATCHER);
   await page.goto('/admin/reports?view=piles');
   await expect(page.getByRole('heading', { name: 'Журнал забивки свай' })).toBeVisible({ timeout: 90_000 });
 
-  // Шапка: «Свай (всего)» больше 1000. Значение — соседний <p> метки.
+  // Exact fixture total, including work without a passport.
   const label = page.getByText('Свай (всего)', { exact: true });
   await expect(label).toBeVisible({ timeout: 60_000 });
   const raw = await label.locator('xpath=following-sibling::p[1]').innerText();
   const total = Number(raw.replace(/\s/g, ''));
   expect(Number.isFinite(total), `«Свай (всего)» распознано как число: «${raw}»`).toBe(true);
-  expect(total, `«Свай (всего)» = ${total}`).toBeGreaterThan(1000);
+  expect(total, `«Свай (всего)» = ${total}`).toBe(history.totalPiles);
 
   // В таблице есть строка с пометкой «без паспорта» (сваи, записанные пачкой).
   await expect(page.getByText('без паспорта', { exact: true }).first()).toBeVisible({ timeout: 60_000 });
 
-  // Выгрузка журнала: файл начинается с «PK» (ZIP/OOXML) и больше 10 КБ.
+  // Workbook content is checked instead of a historical size threshold.
   const exportButton = page.getByRole('button', { name: /Выгрузить журнал/ });
   await expect(exportButton).toBeVisible();
   const [download] = await Promise.all([
@@ -62,7 +62,26 @@ test('S1: диспетчер — журнал забивки: «Свай (все
   await download.saveAs(file);
   const buf = fs.readFileSync(file);
   expect(buf.subarray(0, 2).toString('latin1'), 'выгрузка начинается с байтов PK').toBe('PK');
-  expect(buf.length, 'выгрузка больше 10 КБ').toBeGreaterThan(10 * 1024);
+  const entries = readZipEntries(buf);
+  const sheets = await page.evaluate((xmlSheets) => xmlSheets.map(xml => {
+    const doc = new DOMParser().parseFromString(xml, 'application/xml');
+    return [...doc.querySelectorAll('row')].map(row => Object.fromEntries(
+      [...row.querySelectorAll('c')].map(cell => [
+        (cell.getAttribute('r') ?? '').replace(/\d/g, ''),
+        cell.querySelector('t, v')?.textContent ?? '',
+      ]),
+    ));
+  }), [entries['xl/worksheets/sheet1.xml'].toString('utf8'), entries['xl/worksheets/sheet2.xml'].toString('utf8')]);
+  const [title, rows] = sheets;
+  expect(Number(title.find(row => row.A === 'Свай (всего)')?.B)).toBe(history.totalPiles);
+  for (const report of history.reports) {
+    const equipmentRows = rows.filter(row => row.AA === report.equipment);
+    expect(equipmentRows.find(row => row.D === report.pileNumber)?.AG).toBe('1');
+    const bulk = equipmentRows.filter(row => row.AH === 'без паспорта' && !row.D);
+    expect(bulk, `bulk row for ${report.equipment}`).toHaveLength(1);
+    expect(Number(bulk[0].AG)).toBe(report.piles - 1);
+  }
+  expect(rows.filter(row => row.AH === 'без паспорта').reduce((sum, row) => sum + Number(row.AG), 0)).toBe(history.totalPiles - history.reports.length);
 });
 
 test('S2: журнал забивки — фильтр «Все» выбран по умолчанию', async ({ page }) => {

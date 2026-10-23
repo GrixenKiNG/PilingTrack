@@ -29,6 +29,16 @@ const aliases: Record<string, string> = JSON.parse(process.env.QA_ACCOUNT_ALIASE
 
 export const qaAccount = (email: string) => aliases[email] || email;
 
+/** Expected values belong to the synthetic fixture, not a historical DB. */
+export function qaHistory(): {
+  tenantId: string; date: string; totalPiles: number; totalPileMeters: number;
+  drillingCount: number; drillingMeters: number; downtimeHours: number;
+  reports: { id: string; shiftId: string; equipmentId: string; equipment: string; operator: string; piles: number; pileMeters: number; pileNumber: string }[];
+} {
+  if (!process.env.QA_HISTORY_JSON) throw new Error('Run through e2e/fixtures/disposable-qa.mjs: synthetic history is required');
+  return JSON.parse(process.env.QA_HISTORY_JSON);
+}
+
 /** SELECT only, and only inside a labelled disposable database container. */
 export function qaSelect(sql: string): string {
   const container = process.env.INTEGRATION_DB_CONTAINER || '';
