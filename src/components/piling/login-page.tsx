@@ -105,7 +105,7 @@ export function LoginPage() {
         transition={{ duration: 0.3 }}
         className="relative w-full max-w-sm md:max-w-md md:-translate-x-[8cm]"
       >
-        <div className="bg-slate-900/50 backdrop-blur-xl rounded-3xl border border-white/15 shadow-2xl p-6 md:p-10 md:pt-12 md:pb-16">
+        <div className="bg-slate-900/50 transparency-reduce:bg-slate-900 backdrop-blur-xl rounded-3xl border border-white/15 shadow-2xl p-6 md:p-10 md:pt-12 md:pb-16">
           <div className="flex items-center justify-center md:justify-start gap-4 mb-6 md:mb-8">
             <div className="inline-flex items-center justify-center w-14 h-14 md:w-16 md:h-16 rounded-2xl bg-signal text-white shadow-lg shadow-signal/30 shrink-0">
               <HardHat className="w-7 h-7 md:w-8 md:h-8" />
