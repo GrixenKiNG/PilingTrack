@@ -1,4 +1,8 @@
-/** W117: фактические изменения попадают в журнал, отказы и повторы — нет. */
+/**
+ * W117: фактические изменения попадают в журнал, отказы и повторы — нет.
+ * Инструктажи сюда не входят: их след пишется в транзакции самой команды
+ * (`modules/safety`), порядок и повтор проверяет `briefing-commands.test.ts`.
+ */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest, NextResponse } from 'next/server';
 import { ServiceError } from '@/lib/service-error';
@@ -6,7 +10,7 @@ import { ServiceError } from '@/lib/service-error';
 const m = vi.hoisted(() => ({
   auth: vi.fn(), can: vi.fn(), audit: vi.fn(), createTemplate: vi.fn(), updateTemplate: vi.fn(),
   deleteTemplate: vi.fn(), saveAnswers: vi.fn(), createDocument: vi.fn(), addFuel: vi.fn(),
-  createPlan: vi.fn(), conductBriefing: vi.fn(), signBriefing: vi.fn(), review: vi.fn(),
+  createPlan: vi.fn(), review: vi.fn(),
   retry: vi.fn(), discard: vi.fn(), findMedia: vi.fn(), deleteMedia: vi.fn(), accessMedia: vi.fn(),
   crew: vi.fn(),
 }));
@@ -26,7 +30,6 @@ vi.mock('@/modules/inspections', () => ({
 vi.mock('@/modules/equipment', () => ({
   createEquipmentDocument: m.createDocument, addFuelEntry: m.addFuel, createMaintenancePlan: m.createPlan,
 }));
-vi.mock('@/modules/safety', () => ({ conductBriefing: m.conductBriefing, signBriefingRecord: m.signBriefing }));
 vi.mock('@/modules/crews', () => ({ getCrewForOperator: m.crew }));
 vi.mock('@/lib/db', () => ({
   db: { safetyIncident: { updateMany: m.review }, media: { findUnique: m.findMedia } },
@@ -41,8 +44,6 @@ import { PUT as saveAnswers } from '../inspections/[id]/route';
 import { POST as createDocument } from '../equipment/[id]/documents/route';
 import { POST as addFuel } from '../equipment/[id]/fuel/route';
 import { POST as createPlan } from '../maintenance-plans/route';
-import { POST as conductBriefing } from '../briefings/route';
-import { POST as signBriefing } from '../briefings/[id]/sign/route';
 import { POST as reviewIncident } from '../admin/incidents/route';
 import { POST as dlq } from '../admin/dlq/route';
 import { DELETE as deleteMedia } from '../media/[id]/route';
@@ -71,11 +72,6 @@ const cases: Array<{ label: string; handler: unknown; mock: typeof m.audit; meth
   { label: 'создание регламента ТО', handler: createPlan, mock: m.createPlan, method: 'POST',
     body: { equipmentId: 'rig-1', title: 'ТО-1', triggerType: 'HOURS', intervalHours: 100 },
     result: { id: 'created-1', title: 'ТО-1' }, action: 'maintenance.plan.created', targetId: 'created-1' },
-  { label: 'проведение инструктажа', handler: conductBriefing, mock: m.conductBriefing, method: 'POST',
-    body: { userId: 'employee-1', type: 'PRIMARY', documentCode: 'OT-1', documentTitle: 'Охрана труда', documentVersion: '1' },
-    result: { id: 'created-1' }, action: 'briefing.conducted', targetId: 'created-1' },
-  { label: 'подписание инструктажа', handler: signBriefing, mock: m.signBriefing, method: 'POST',
-    result: { alreadySigned: false }, action: 'briefing.signed', targetId: 'entity-1' },
   { label: 'разбор происшествия', handler: reviewIncident, mock: m.review, method: 'POST',
     body: { id: 'incident-1', note: 'Проведён разбор обстоятельств' }, result: { count: 1 },
     action: 'incident.reviewed', targetId: 'incident-1' },
@@ -136,11 +132,6 @@ describe.each(cases)('$label — аудит', (entry) => {
   });
 });
 
-it('повторная подпись не создаёт нового события', async () => {
-  m.signBriefing.mockResolvedValue({ alreadySigned: true });
-  expect((await signBriefing(request('POST'), context)).status).toBe(200);
-  expect(m.audit).not.toHaveBeenCalled();
-});
 it('повторный разбор происшествия не создаёт события', async () => {
   m.review.mockResolvedValue({ count: 0 });
   expect((await reviewIncident(request('POST', { id: 'incident-1', note: 'Повторный разбор обстоятельств' }))).status).toBe(409);
@@ -177,7 +168,7 @@ it.each(cases.filter((entry) => entry.body !== undefined))('$label: неверн
   expect(m.audit).not.toHaveBeenCalled();
 });
 
-it.each(cases.filter((entry) => ![conductBriefing, signBriefing, deleteMedia].some((handler) => handler === entry.handler)))
+it.each(cases.filter((entry) => ![deleteMedia].some((handler) => handler === entry.handler)))
   ('$label: запрет роли не создаёт записи и события', async (entry) => {
     m.can.mockImplementation(() => { throw new ServiceError('Нет права', 403); });
     await expect((entry.handler as Handler)(request(entry.method, entry.body), context)).rejects.toThrow('Нет права');
