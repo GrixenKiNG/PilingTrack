@@ -4,11 +4,16 @@
 
 import { db } from '@/lib/db';
 import { ServiceError } from '@/lib/service-error';
+import type { AuditClient } from '@/modules/audit';
 import { SiteAggregate } from '../domain';
 import { toPrismaData, fromPrismaToState, toOutboxData } from './site.prisma.mapper';
 
 export interface SiteRepository {
-  save(aggregate: SiteAggregate): Promise<void>;
+  /**
+   * `inSameTransaction` выполняется внутри транзакции записи: сбой в нём откатывает
+   * и запись объекта (так пишется след, без которого изменение недопустимо).
+   */
+  save(aggregate: SiteAggregate, inSameTransaction?: (tx: AuditClient) => Promise<void>): Promise<void>;
   findById(id: string, tenantId: string): Promise<SiteAggregate | null>;
 }
 
@@ -20,7 +25,7 @@ export interface SiteRepository {
 const loadedVersions = new WeakMap<SiteAggregate, Date>();
 
 export class PrismaSiteRepository implements SiteRepository {
-  async save(aggregate: SiteAggregate): Promise<void> {
+  async save(aggregate: SiteAggregate, inSameTransaction?: (tx: AuditClient) => Promise<void>): Promise<void> {
     const state = aggregate.getState();
     const persistenceData = toPrismaData(aggregate);
     const pendingEvents = aggregate.getPendingEvents();
@@ -49,6 +54,7 @@ export class PrismaSiteRepository implements SiteRepository {
       if (pendingEvents.length > 0) {
         await tx.outboxEvent.createMany({ data: pendingEvents.map((e) => toOutboxData(e, state.tenantId ?? undefined)) });
       }
+      if (inSameTransaction) await inSameTransaction(tx);
     });
 
     aggregate.clearPendingEvents();

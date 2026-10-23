@@ -10,7 +10,6 @@ export type { SiteDomainEvent, SiteDomainEventType } from './domain/site.events'
 
 // Application
 export {
-  createSite,
   updateSite,
   activateSite,
   deactivateSite,
@@ -22,7 +21,7 @@ export {
   createSiteHierarchyItem,
   deleteSiteHierarchyItem,
 } from './application/commands';
-export type { CreateSiteCommand, UpdateSiteCommand } from './application/commands/site.command';
+export type { UpdateSiteCommand } from './application/commands/site.command';
 
 export {
   getAccessibleSites,

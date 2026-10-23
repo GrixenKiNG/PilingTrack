@@ -38,6 +38,8 @@ vi.mock('@/lib/db', () => ({
   },
 }));
 
+vi.mock('@/modules/audit', () => ({ recordAuditEventInTx: vi.fn(async () => undefined) }));
+
 vi.mock('@/lib/service-error', () => ({
   ServiceError: class ServiceError extends Error {
     status: number;

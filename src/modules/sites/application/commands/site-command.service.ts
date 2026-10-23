@@ -4,32 +4,9 @@
 
 import { db } from '@/lib/db';
 import { ServiceError } from '@/lib/service-error';
-import { recordAuditEvent } from '@/modules/audit';
-import { SiteAggregate } from '../../domain';
+import { recordAuditEventInTx } from '@/modules/audit';
 import { getSiteRepository } from '../../infrastructure';
-import { CreateSiteCommand, UpdateSiteCommand, SiteCommandContext } from './site.command';
-
-export async function createSite(command: CreateSiteCommand) {
-  const aggregate = SiteAggregate.create({
-    name: command.name,
-    tenantId: command.tenantId,
-    plannedPiles: command.plannedPiles,
-    plannedDrilling: command.plannedDrilling,
-    completionDate: command.completionDate,
-  }, command.userId);
-
-  const repo = getSiteRepository();
-  await repo.save(aggregate);
-
-  return db.site.findUnique({
-    where: { id: aggregate.getState().id },
-    include: {
-      users: { include: { user: { select: { id: true, name: true, email: true } } } },
-      pilePlans: { include: { pileGrade: true } },
-      drillingPlans: true,
-    },
-  });
-}
+import { UpdateSiteCommand, SiteCommandContext } from './site.command';
 
 export async function updateSite(command: UpdateSiteCommand, ctx: SiteCommandContext) {
   if (!ctx.tenantId) throw new ServiceError('tenantId is required', 400);
@@ -49,10 +26,8 @@ export async function updateSite(command: UpdateSiteCommand, ctx: SiteCommandCon
     completionDate: command.completionDate,
   }, ctx.actorId);
 
-  await repo.save(aggregate);
-
   const next = aggregate.getState();
-  await recordAuditEvent({
+  await repo.save(aggregate, (tx) => recordAuditEventInTx(tx, {
     action: 'site.updated',
     scope: 'sites',
     actorId: ctx.actorId,
@@ -61,7 +36,7 @@ export async function updateSite(command: UpdateSiteCommand, ctx: SiteCommandCon
       before,
       after: { name: next.name, plannedPiles: next.plannedPiles, plannedDrilling: next.plannedDrilling },
     },
-  });
+  }));
 
   return db.site.findUnique({
     where: { id: command.siteId },
@@ -83,9 +58,10 @@ export async function activateSite(siteId: string, ctx: SiteCommandContext) {
   if (aggregate.getState().isActive) return;
 
   aggregate.activate(ctx.actorId);
-  await repo.save(aggregate);
-  await recordAuditEvent({ action: 'site.activated', scope: 'sites', actorId: ctx.actorId, targetId: siteId,
-    metadata: { tenantId: ctx.tenantId, name: aggregate.getState().name } });
+  await repo.save(aggregate, (tx) => recordAuditEventInTx(tx, {
+    action: 'site.activated', scope: 'sites', actorId: ctx.actorId, targetId: siteId,
+    metadata: { tenantId: ctx.tenantId, name: aggregate.getState().name },
+  }));
 }
 
 export async function deactivateSite(siteId: string, ctx: SiteCommandContext) {
@@ -111,13 +87,11 @@ export async function deactivateSite(siteId: string, ctx: SiteCommandContext) {
 
   const name = aggregate.getState().name;
   aggregate.deactivate(ctx.actorId);
-  await repo.save(aggregate);
-
-  await recordAuditEvent({
+  await repo.save(aggregate, (tx) => recordAuditEventInTx(tx, {
     action: 'site.deactivated',
     scope: 'sites',
     actorId: ctx.actorId,
     targetId: siteId,
     metadata: { tenantId: ctx.tenantId, name },
-  });
+  }));
 }
