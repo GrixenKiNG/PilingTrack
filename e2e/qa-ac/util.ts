@@ -96,12 +96,21 @@ export function writeRunJson(name: string, data: unknown) {
 
 /** Меню с ожиданием: оболочка рисуется после проверки сессии — читаем с повторами. */
 export async function readMenu(page: Page, tries = 6) {
+  const toggle = page.getByRole('button', { name: 'Открыть меню навигации' });
   let menu: { label: string; href: string }[] = [];
   for (let i = 0; i < tries; i++) {
+    if (await toggle.isVisible() && !await page.getByRole('dialog').isVisible()) {
+      await toggle.click();
+      await page.getByRole('dialog').waitFor({ state: 'visible' });
+    }
     menu = await menuLinks(page);
-    if (menu.length) return menu;
+    if (menu.length) {
+      if (await page.getByRole('dialog').isVisible()) await page.keyboard.press('Escape');
+      return menu;
+    }
     await page.waitForTimeout(800);
   }
+  if (await page.getByRole('dialog').isVisible()) await page.keyboard.press('Escape');
   return menu;
 }
 
@@ -203,7 +212,8 @@ function onEntry(out: Record<string, Buffer>, name: string, data: Buffer, method
  * не право роли, а отсутствие заголовка. Origin — тот же localhost:3000.
  */
 export function api(page: Page) {
-  const H = { Origin: 'http://localhost:3000', Referer: 'http://localhost:3000/' };
+  const origin = new URL(page.url()).origin;
+  const H = { Origin: origin, Referer: origin + '/' };
   const merge = (opts?: Record<string, unknown>) => ({
     ...(opts ?? {}),
     headers: { ...H, ...((opts?.headers as Record<string, string>) ?? {}) },

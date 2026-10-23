@@ -16,19 +16,15 @@
  * Запуск: npx playwright test -c playwright.acqa.config.ts audit-fixes-1016.spec.ts
  */
 import { test, expect, type Page, type Locator } from '@playwright/test';
-import { execSync } from 'node:child_process';
-import { login, matrix } from '../qa/helpers';
+import { login, matrix, qaSelect, qaAccount } from '../qa/helpers';
 import { api } from './util';
 
 const ADMIN = matrix.roles.find((r) => r.role === 'ADMIN')?.email ?? '';
-const WORKER = 'qa-audit-1014-operator@piling.test';
-const ASSISTANT = 'qa-audit-1014-assistant@piling.test';
+const WORKER = qaAccount('qa-audit-1014-operator@piling.test');
+const ASSISTANT = qaAccount('qa-audit-1014-assistant@piling.test');
 
 function db(sql: string): string {
-  return execSync(
-    'docker exec -i pilingtrack-postgres psql -U postgres -d pilingtrack_test -At -v ON_ERROR_STOP=1',
-    { input: sql, encoding: 'utf8', timeout: 60_000, stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true },
-  ).trim();
+  return qaSelect(sql);
 }
 
 async function strip(page: Page) {

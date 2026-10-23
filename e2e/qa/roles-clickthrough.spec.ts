@@ -14,17 +14,14 @@ const ACCOUNTS = [
 
 for (const acc of ACCOUNTS) {
   test(`роль ${acc.role}: навигация и кнопки`, async ({ page }) => {
-    // У администратора разделов в несколько раз больше, чем у любой роли:
-    // 28.09 его обход упёрся в общий лимит 10 мин и не дошёл до конца.
-    // Диспетчер видит почти те же разделы: 15.10 его обход упёрся в тот же лимит.
-    if (acc.role === 'ADMIN' || acc.role === 'DISPATCHER') test.setTimeout(40 * 60_000);
+    // Multi-screen crawl needs a separate budget from a single UI assertion.
+    test.setTimeout(8 * 60_000);
     const errs = watchErrors(page);
     const ctx = { role: acc.role, version: '-', module: 'навигация' };
     try {
       await login(page, acc.email);
     } catch (e) {
       coverage({ ...ctx, screen: '/login', element: 'вход', result: 'BLOCKED', evidence: (e as Error).message.split('\n')[0] });
-      test.fail(true, 'вход не удался');
       throw e;
     }
     const landing = new URL(page.url()).pathname;

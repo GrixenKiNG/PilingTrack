@@ -12,21 +12,17 @@
  * Запуск: npx playwright test -c playwright.acqa.config.ts operator-walk.spec.ts
  */
 import { test, expect, type Page, type Locator } from '@playwright/test';
-import { execSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { login } from '../qa/helpers';
+import { login, OUT_DIR, qaSelect, qaAccount } from '../qa/helpers';
 
-const WALK = 'D:/PillingR/wt-autoclaw/docs/qa-autoclaw/walk-1006';
+const WALK = path.join(OUT_DIR, 'walk');
 const LOGS = path.join(WALK, 'logs');
 fs.mkdirSync(LOGS, { recursive: true });
 const DATA = path.join(WALK, 'walk-data.json');
 
 function db(sql: string): string {
-  return execSync(
-    'docker exec -i pilingtrack-postgres psql -U postgres -d pilingtrack_test -At -v ON_ERROR_STOP=1',
-    { input: sql, encoding: 'utf8', timeout: 60_000, stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true },
-  ).trim();
+  return qaSelect(sql);
 }
 
 function record(entry: Record<string, unknown>) {
@@ -333,6 +329,7 @@ async function acceptAdvancesOrExplains(page: Page, label: string): Promise<stri
 const NEXT_STEP_OR_REASON = /Шаг [2-5] из 5|Сдайте её|не закрыта смена|сдать смену/i;
 
 function hasPendingShift(email: string): boolean {
+  email = qaAccount(email);
   return db(`SELECT count(*) FROM "Shift" s JOIN "User" u ON u.id=s."createdById" WHERE u.email='${email}' AND s.state='HANDOVER_PENDING'`) !== '0';
 }
 

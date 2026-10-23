@@ -8,15 +8,13 @@
  * Hermes (черновики, поправки, фильтры) и затем ревьюер.
  */
 import { test } from '@playwright/test';
-import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { coverage, OUT_DIR } from './helpers';
+import { coverage, OUT_DIR, qaSelect } from './helpers';
 
 function select(sql: string): string[][] {
   if (!/^\s*(select|with)\b/i.test(sql)) throw new Error('только SELECT');
-  const out = execFileSync('docker', ['exec', '-i', 'pilingtrack-postgres', 'psql', '-U', 'postgres', '-d', 'pilingtrack_test', '-AtF', '\t'],
-    { input: sql, encoding: 'utf8' });
+  const out = qaSelect(sql);
   return out.trim() ? out.trim().split('\n').map((l) => l.split('\t')) : [];
 }
 

@@ -14,7 +14,7 @@
 import { expect, test } from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
-import { login, matrix, must, OUT_DIR, QA_DIR } from '../qa/helpers';
+import { login, matrix, must, OUT_DIR, QA_DIR, qaSelect } from '../qa/helpers';
 
 const roleEmail = (role: string) => must(matrix.roles.find((r) => r.role === role), `роль ${role}`).email;
 const ADMIN = roleEmail('ADMIN');
@@ -33,6 +33,8 @@ const hasSession = (email: string) => fs.existsSync(authFile(email));
 
 test('S1: диспетчер — журнал забивки: «Свай (всего)», строка без паспорта, выгрузка .xlsx', async ({ page }) => {
   test.skip(!process.env.POST_MERGE_SMOKE, GATE);
+  test.skip(Number(qaSelect(`SELECT coalesce(sum(count),0) FROM "PileWork" WHERE "tenantId"='orion'`)) <= 1000,
+    'Исторический объём S1: запуск требует отдельного синтетического набора >1000 свай, включая запись без паспорта; пустая одноразовая база не удовлетворяет предусловию');
   test.setTimeout(10 * 60_000);
   await login(page, DISPATCHER);
   await page.goto('/admin/reports?view=piles');

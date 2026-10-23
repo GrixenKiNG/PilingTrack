@@ -1,13 +1,14 @@
 /**
  * Общее для ежедневного QA: матрица, вход, реестр покрытия, отлов ошибок.
- * Матрица и пароли лежат вне репозитория (D:/PillingR/qa).
+ * Матрица одноразового стенда и пароли передаются через окружение процесса.
  */
 import type { Page } from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
+import { execFileSync } from 'node:child_process';
 import { login as loginWithHydration } from '../page-objects/login.page';
 
-export const QA_DIR = 'D:/PillingR/qa';
+export const QA_DIR = process.env.QA_DIR || 'D:/PillingR/qa';
 const RUN_DIR = process.env.QA_RUN_DIR || path.join(QA_DIR, 'runs', 'manual');
 export const OUT_DIR = path.join(RUN_DIR, 'playwright');
 fs.mkdirSync(OUT_DIR, { recursive: true });
@@ -21,8 +22,24 @@ export interface Matrix {
   excluded: { email: string }[];
 }
 
-export const matrix: Matrix = JSON.parse(fs.readFileSync(path.join(QA_DIR, 'matrix.json'), 'utf8'));
-const credentials: Record<string, string> = JSON.parse(fs.readFileSync(path.join(QA_DIR, '.credentials.json'), 'utf8'));
+export const matrix: Matrix = JSON.parse(process.env.QA_MATRIX_JSON || fs.readFileSync(path.join(QA_DIR, 'matrix.json'), 'utf8'));
+// Disposable passwords are supplied in memory; never read external credentials.
+const credentials: Record<string, string> = JSON.parse(process.env.QA_CREDENTIALS_JSON || '{}');
+const aliases: Record<string, string> = JSON.parse(process.env.QA_ACCOUNT_ALIASES_JSON || '{}');
+
+export const qaAccount = (email: string) => aliases[email] || email;
+
+/** SELECT only, and only inside a labelled disposable database container. */
+export function qaSelect(sql: string): string {
+  const container = process.env.INTEGRATION_DB_CONTAINER || '';
+  if (!/^codex-pg-[a-f0-9]{12}$/.test(container)) throw new Error('Use scripts/test-db-up.sh for QA SQL');
+  const label = execFileSync('docker', ['inspect', '--format', '{{index .Config.Labels "pilingtrack.codex.test-db"}}', container], { encoding: 'utf8', windowsHide: true }).trim();
+  if (label !== '1') throw new Error('Disposable database label missing');
+  if (!/^\s*(select|with)\b/i.test(sql)) throw new Error('QA SQL accepts SELECT only');
+  return execFileSync('docker', ['exec', '-i', container, 'psql', '-U', 'piling', '-d', 'codex_test', '-qAtF', '\t', '-v', 'ON_ERROR_STOP=1'], {
+    input: `BEGIN READ ONLY;\n${sql};\nCOMMIT;`, encoding: 'utf8', timeout: 60_000, windowsHide: true,
+  }).trim();
+}
 
 const AUTH_DIR = path.join(QA_DIR, '.auth');
 
@@ -33,9 +50,10 @@ const AUTH_DIR = path.join(QA_DIR, '.auth');
  * и переиспользуется, пока сервер её принимает.
  */
 export async function login(page: Page, email: string) {
+  email = qaAccount(email);
   if (matrix.excluded.some((e) => e.email === email)) throw new Error(`${email} исключён владельцем`);
   const password = credentials[email];
-  if (!password) throw new Error(`нет пароля для ${email} — запустите qa-setup.mjs`);
+  if (!password) throw new Error(`нет тестового пароля для ${email} — задайте QA_CREDENTIALS_JSON из одноразового стенда`);
   fs.mkdirSync(AUTH_DIR, { recursive: true });
   const stateFile = path.join(AUTH_DIR, `${email.replace(/[^a-z0-9@._-]/gi, '_')}.json`);
   const onLogin = /\/login(\?|$)/;
@@ -73,10 +91,10 @@ export function watchErrors(page: Page) {
   page.on('pageerror', (e) => errors.push(`JS: ${e.message}`));
   page.on('response', (r) => {
     const url = r.url();
-    if (!url.startsWith('http://localhost:3000')) return;
+    if (new URL(url).origin !== new URL(page.url()).origin) return;
     const s = r.status();
     if (s >= 500 || (s >= 400 && url.includes('/api/') && ![401, 403, 404, 409, 422].includes(s))) {
-      errors.push(`HTTP ${s} ${r.request().method()} ${url.replace('http://localhost:3000', '')}`);
+      errors.push(`HTTP ${s} ${r.request().method()} ${new URL(url).pathname}`);
     }
   });
   return {

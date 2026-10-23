@@ -83,3 +83,32 @@ This optional mode adds only an owned codex-s3 container, a real bucket and a lo
     name: e2e-report
     path: playwright-report/
 ```
+# Одноразовый QA-набор (195 сценариев)
+
+`playwright.qa-disposable.config.ts` собирает те же 65 сценариев в Chromium,
+Mobile Safari и Mobile Chrome. Один worker, без повторов, общий предел — 90 минут.
+Обходы ролей имеют отдельный предел 8 минут. Остальные сценарии сохраняют свои
+явные пределы; глобальный предел действует на весь запуск.
+
+Запускайте `node e2e/fixtures/disposable-qa.mjs` **через командный канал собственного
+`scripts/test-day-stand.cjs`**, чтобы процесс унаследовал адреса, случайные пароли
+БД и ключи только этого стенда. Предварительно поднимите БД через
+`scripts/test-db-up.sh` и с её `INTEGRATION_DATABASE_URL_APP` выполните
+`npm run db:generate`. Для полного экспорта нужен `CODEX_WITH_S3=true`.
+Пример команды в `output/codex-t5/stand-command.json`:
+
+```json
+{"id":"qa-195","args":["e2e/fixtures/disposable-qa.mjs"]}
+```
+
+Fixture проверяет loopback-адреса и Docker-метку одноразовой БД, создаёт собственных
+пользователей со случайными адресами и паролями, справочники и семь бригад.
+Пароли передаются в памяти через `QA_CREDENTIALS_JSON`; внешний
+`.credentials.json` не читается. `QA_MATRIX_JSON` и `QA_ACCOUNT_ALIASES_JSON`
+связывают старые сценарии с этими тестовыми пользователями. SQL-проверки работают
+только в помеченном контейнере и транзакции `READ ONLY`.
+
+Результаты и сессии находятся в `output/qa-stabilize-1023/`.
+Для одного безопасного сбора вместо запуска добавьте `"--list"` в `args`.
+Исторические пропуски не являются успешными проверками: их конкретные
+предусловия нужно восстановить на этом же одноразовом стенде.
