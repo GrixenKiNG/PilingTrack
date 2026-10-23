@@ -44,6 +44,7 @@
     "agents",
     "e2e",
     "playwright.config.ts",
+    "playwright.qa-disposable.config.ts",
     "zai-provider-extension",
     "scripts",
     "tests",
