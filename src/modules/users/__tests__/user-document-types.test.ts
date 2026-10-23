@@ -8,18 +8,22 @@ const { findFirstMock, createMock, updateMock, deleteMock, recordAuditMock } = v
   recordAuditMock: vi.fn(),
 }));
 
-vi.mock('@/modules/audit', () => ({ recordAuditEvent: recordAuditMock }));
+vi.mock('@/modules/audit', () => ({
+  recordAuditEventInTx: (_tx: unknown, event: unknown) => recordAuditMock(event),
+}));
 
-vi.mock('@/lib/db', () => ({
-  db: {
+vi.mock('@/lib/db', () => {
+  const db = {
     userDocumentType: {
       findFirst: findFirstMock,
       create: createMock,
       update: updateMock,
       delete: deleteMock,
     },
-  },
-}));
+    $transaction: (run: (tx: unknown) => unknown) => run(db),
+  };
+  return { db };
+});
 
 // Права НЕ подменяем: проверяем подключение к настоящей матрице ролей.
 import {
@@ -68,6 +72,13 @@ describe('справочник видов документов работник�
     expect(findFirstMock.mock.calls[0][0].where).toEqual({ id: 'foreign', tenantId: 'orion' });
     expect(updateMock).not.toHaveBeenCalled();
     expect(deleteMock).not.toHaveBeenCalled();
+  });
+
+  it('сбой следа не глушится: удаление вида падает вместе со следом', async () => {
+    const failure = new Error('след не записан');
+    recordAuditMock.mockRejectedValue(failure);
+    findFirstMock.mockResolvedValueOnce({ id: 't2', name: 'Старый', _count: { documents: 0 } });
+    await expect(deleteUserDocumentType('t2', ctx(ADMIN))).rejects.toBe(failure);
   });
 
   it('вид с документами не удаляется, а свободный удаляется со следом в аудите', async () => {
