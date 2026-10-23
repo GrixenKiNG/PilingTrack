@@ -2,7 +2,7 @@ import { db } from '@/lib/db';
 import { ServiceError } from '@/lib/service-error';
 import { assertNotSelfAction } from '@/core/security/authorization';
 import { hashPassword } from '@/core/security/password';
-import { recordAuditEvent } from '@/modules/audit';
+import { recordAuditEventInTx } from '@/modules/audit';
 import { type CursorPaginationResult } from '@/lib/pagination-cursor';
 import type { OperationalUserDTO, UserRole } from '@/lib/types';
 import { requireTenantId } from '@/lib/tenant-scope';
@@ -159,31 +159,34 @@ export async function createUser(input: {
   try {
     const hashedPassword = await hashPassword(input.password);
 
-    const createdUser = await db.user.create({
-      data: {
-        tenantId,
-        email: input.email.trim().toLowerCase(),
-        password: hashedPassword,
-        name: input.name.trim(),
-        // Колонка phone — TEXT (без ограничения длины), форма и zod разрешают
-        // 30 знаков. Обрезка до 20 молча съедала хвост длинного номера при
-        // успешном тосте «обновлено» — лишнего ограничения тут быть не должно.
-        phone: String(input.phone || '').trim(),
-        role: input.role || 'OPERATOR',
-      },
-      select: { id: true, email: true, name: true, phone: true, role: true, isActive: true },
-    });
-
-    await recordAuditEvent({
-      action: 'user.created',
-      scope: 'users',
-      actorId: actorUserId || null,
-      targetId: createdUser.id,
-      metadata: {
-        email: createdUser.email,
-        role: createdUser.role,
-        isActive: createdUser.isActive,
-      },
+    // Учётная запись и её след — одна транзакция: без следа запись не появляется.
+    const createdUser = await db.$transaction(async (tx) => {
+      const created = await tx.user.create({
+        data: {
+          tenantId,
+          email: input.email.trim().toLowerCase(),
+          password: hashedPassword,
+          name: input.name.trim(),
+          // Колонка phone — TEXT (без ограничения длины), форма и zod разрешают
+          // 30 знаков. Обрезка до 20 молча съедала хвост длинного номера при
+          // успешном тосте «обновлено» — лишнего ограничения тут быть не должно.
+          phone: String(input.phone || '').trim(),
+          role: input.role || 'OPERATOR',
+        },
+        select: { id: true, email: true, name: true, phone: true, role: true, isActive: true },
+      });
+      await recordAuditEventInTx(tx, {
+        action: 'user.created',
+        scope: 'users',
+        actorId: actorUserId || null,
+        targetId: created.id,
+        metadata: {
+          email: created.email,
+          role: created.role,
+          isActive: created.isActive,
+        },
+      });
+      return created;
     });
 
     return createdUser;
@@ -211,7 +214,7 @@ export interface UpdateUserInput {
  * пользователя и транзакционный advisory-замок. Обычный `db` и клиент
  * транзакции подходят оба.
  */
-export type UserUpdateClient = Pick<typeof db, 'user' | '$executeRaw'>;
+export type UserUpdateClient = Pick<typeof db, 'user' | 'feedbackEvent' | '$executeRaw'>;
 
 export async function updateUser(
   tenantId: string,
@@ -296,23 +299,25 @@ export async function updateUser(
       return { previousUser, updatedUser: updated };
     };
 
-    // Транзакцию открываем только когда запрос вообще может снять права
-    // администратора; если клиент уже транзакционный — берём замок на нём.
-    const mayLoseAdmin = (input.role !== undefined && input.role !== 'ADMIN') || input.isActive === false;
-    const { previousUser, updatedUser } = mayLoseAdmin && client === db
-      ? await db.$transaction((tx) => applyUpdate(tx))
-      : await applyUpdate(client);
-
-    await recordAuditEvent({
-      action: 'user.updated',
-      scope: 'users',
-      actorId: actorUserId || null,
-      targetId: updatedUser.id,
-      metadata: {
-        before: previousUser,
-        after: updatedUser,
-      },
-    });
+    // Правка и её след — одна транзакция (права и блокировка без следа недопустимы);
+    // если клиент уже транзакционный — работаем на нём, замок берётся на нём же.
+    const applyWithAudit = async (tx: UserUpdateClient) => {
+      const result = await applyUpdate(tx);
+      await recordAuditEventInTx(tx, {
+        action: 'user.updated',
+        scope: 'users',
+        actorId: actorUserId || null,
+        targetId: result.updatedUser.id,
+        metadata: {
+          before: result.previousUser,
+          after: result.updatedUser,
+        },
+      });
+      return result;
+    };
+    const { updatedUser } = client === db
+      ? await db.$transaction((tx) => applyWithAudit(tx))
+      : await applyWithAudit(client);
 
     return updatedUser;
   } catch (error) {
@@ -353,7 +358,19 @@ export async function deleteUser(tenantId: string, actorUserId: string, targetUs
   }
 
   try {
-    await db.user.delete({ where: { id: targetUserId, tenantId: scopedTenantId } });
+    await db.$transaction(async (tx) => {
+      await tx.user.delete({ where: { id: targetUserId, tenantId: scopedTenantId } });
+      await recordAuditEventInTx(tx, {
+        action: 'user.deleted',
+        scope: 'users',
+        actorId: actorUserId,
+        targetId: targetUserId,
+        metadata: {
+          email: user.email,
+          role: user.role,
+        },
+      });
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Internal error';
     if (message.includes('Record to delete not found')) {
@@ -364,17 +381,6 @@ export async function deleteUser(tenantId: string, actorUserId: string, targetUs
     }
     throw error;
   }
-
-  await recordAuditEvent({
-    action: 'user.deleted',
-    scope: 'users',
-    actorId: actorUserId,
-    targetId: targetUserId,
-    metadata: {
-      email: user.email,
-      role: user.role,
-    },
-  });
 
   return { success: true };
 }

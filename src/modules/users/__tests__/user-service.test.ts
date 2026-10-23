@@ -11,6 +11,7 @@ const {
   countUserMock,
   executeRawMock,
   queryRawMock,
+  recordAuditInTxMock,
 } = vi.hoisted(() => ({
   createUserMock: vi.fn(),
   deleteUserMock: vi.fn(),
@@ -25,6 +26,7 @@ const {
   // колонки void.
   executeRawMock: vi.fn(),
   queryRawMock: vi.fn(),
+  recordAuditInTxMock: vi.fn(async () => undefined),
 }));
 
 vi.mock('@/lib/db', () => {
@@ -55,7 +57,7 @@ vi.mock('@/core/security/password', () => ({
 vi.mock('@/core/security/authorization', () => ({
   assertNotSelfAction: vi.fn(),
 }));
-vi.mock('@/modules/audit', () => ({ recordAuditEvent: vi.fn(async () => undefined) }));
+vi.mock('@/modules/audit', () => ({ recordAuditEventInTx: recordAuditInTxMock }));
 
 import {
   createUser,
@@ -434,5 +436,54 @@ describe('deleteUser', () => {
       .rejects.toMatchObject({ status: 400 });
     expect(findFirstUserMock).not.toHaveBeenCalled();
     expect(deleteUserMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('след учётной записи — в той же транзакции', () => {
+  const auditFailure = new Error('feedback_event недоступна');
+
+  beforeEach(() => {
+    createUserMock.mockReset();
+    deleteUserMock.mockReset();
+    findFirstUserMock.mockReset();
+    updateUserMock.mockReset();
+    recordAuditInTxMock.mockReset();
+    recordAuditInTxMock.mockResolvedValue(undefined);
+    createUserMock.mockResolvedValue({ ...existingUser, id: 'u1' });
+    updateUserMock.mockResolvedValue({ ...existingUser, name: 'X' });
+    findFirstUserMock.mockResolvedValue({ ...existingUser, crews: [], _count: { reports: 0, sites: 0 } });
+  });
+
+  it('создание пишет след на клиенте транзакции, а не на обычном', async () => {
+    await createUser({ email: 'a@b.ru', password: 'pw', name: 'A', tenantId: 'orion' }, 'admin-1');
+    expect(recordAuditInTxMock).toHaveBeenCalledWith(
+      expect.objectContaining({ user: expect.any(Object), feedbackEvent: expect.any(Object) }),
+      expect.objectContaining({ action: 'user.created', targetId: 'u1' }),
+    );
+  });
+
+  it('сбой следа при создании не возвращает результат (транзакция откатится)', async () => {
+    recordAuditInTxMock.mockRejectedValue(auditFailure);
+    await expect(createUser({ email: 'a@b.ru', password: 'pw', name: 'A', tenantId: 'orion' }, 'admin-1'))
+      .rejects.toBe(auditFailure);
+  });
+
+  it('сбой следа при изменении не глушится', async () => {
+    recordAuditInTxMock.mockRejectedValue(auditFailure);
+    await expect(updateUser('tenant-a', { id: 'user-b', name: 'X' }, 'admin-a')).rejects.toBe(auditFailure);
+  });
+
+  it('изменение без смены прав тоже пишет след в транзакции', async () => {
+    await updateUser('tenant-a', { id: 'user-b', name: 'X' }, 'admin-a');
+    expect(recordAuditInTxMock).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ action: 'user.updated', targetId: 'user-b' }),
+    );
+  });
+
+  it('сбой следа при удалении не глушится', async () => {
+    recordAuditInTxMock.mockRejectedValue(auditFailure);
+    await expect(deleteUser('tenant-a', 'admin-a', 'user-b')).rejects.toBe(auditFailure);
+    expect(deleteUserMock).toHaveBeenCalledTimes(1);
   });
 });

@@ -37,7 +37,7 @@ vi.mock('@/lib/logger', () => ({
   logger: { info: mocks.loggerInfo, warn: mocks.loggerWarn, error: vi.fn(), debug: vi.fn() },
 }));
 
-import { recordAuditEvent } from '../audit-service';
+import { recordAuditEvent, recordAuditEventInTx } from '../audit-service';
 import {
   getAuditFeedbackFailureCount,
   resetAuditFeedbackMetrics,
@@ -1286,5 +1286,33 @@ describe('recordAuditEvent — завершение осмотра', () => {
         message: 'Осмотр завершён — «ЭО-5111»: ЕО, балл 82%.',
       }),
     );
+  });
+});
+
+describe('recordAuditEventInTx — след в транзакции действия', () => {
+  const tx = { user: { findUnique: vi.fn() }, feedbackEvent: { create: vi.fn() } };
+
+  beforeEach(() => {
+    tx.user.findUnique.mockReset();
+    tx.user.findUnique.mockResolvedValue({ name: 'Админ', role: 'ADMIN' });
+  });
+
+  it('пишет через клиент транзакции: и актёра читает, и событие пишет на нём', async () => {
+    await recordAuditEventInTx(tx as never, { action: 'user.created', scope: 'users', actorId: 'a1', targetId: 'u1' });
+
+    expect(tx.user.findUnique).toHaveBeenCalledTimes(1);
+    expect(mocks.userFindUnique).not.toHaveBeenCalled();
+    expect(mocks.recordFeedbackEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'user.created', actor: { id: 'a1', name: 'Админ', role: 'ADMIN' } }),
+      tx,
+    );
+  });
+
+  it('сбой записи НЕ глушится: ошибка уходит наружу и откатывает транзакцию', async () => {
+    const failure = new Error('feedback_event недоступна');
+    mocks.recordFeedbackEvent.mockRejectedValue(failure);
+
+    await expect(recordAuditEventInTx(tx as never, { action: 'user.created', scope: 'users' })).rejects.toBe(failure);
+    expect(getAuditFeedbackFailureCount()).toBe(0);
   });
 });

@@ -110,8 +110,11 @@ function getFeedWhere(user: FeedbackUser) {
   };
 }
 
-export async function recordFeedbackEvent(input: CreateFeedbackEventInput) {
-  return db.feedbackEvent.create({
+export async function recordFeedbackEvent(
+  input: CreateFeedbackEventInput,
+  client: Pick<typeof db, 'feedbackEvent'> = db,
+) {
+  return client.feedbackEvent.create({
     data: {
       level: input.level,
       priority: input.priority || 'MEDIUM',
