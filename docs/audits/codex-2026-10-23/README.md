@@ -12,3 +12,5 @@
 | `readiness-spec-REPORT.md` | I |
 | `qa-fixtures-REPORT.md` | J |
 | `wave1-packet-REPORT.md` | сводка пакета |
+
+`perf-harness/` скопировать в `output/perf-1023/` перед запуском `run.sh`; `measure.ts.txt` переименовать в `measure.ts` (в docs он не должен попадать под `tsc`: пути импорта рассчитаны на `output/perf-1023/`).
