@@ -15,6 +15,7 @@ import {
 } from '@/modules/reports/domain';
 import { projectOutboxEvents } from '../outbox-publisher';
 import { projectWeeklyTrend } from './projection-handlers';
+import { recomputeSiteDailySummary } from '../event-handlers';
 import {consumeReadinessProjectionEvent} from '@/modules/readiness/server';
 import { forEachTenant } from '@/lib/tenant-iteration';
 
@@ -127,6 +128,13 @@ async function projectEvent(event: ReportDomainEvent) {
       enrichedEvent.type.startsWith('Drilling')
     ) {
       if (enrichedEvent.siteId) {
+        // DF-03: недельный тренд читает SiteDailySummary, а день пересчитывает
+        // другой потребитель outbox (published) независимо от этого (projected).
+        // Досчитываем день события из источника здесь — под замком, идемпотентно,
+        // — чтобы неделя не легла на ещё старый итог дня.
+        if (reportDate) {
+          await recomputeSiteDailySummary(enrichedEvent.siteId, reportDate);
+        }
         await projectWeeklyTrend(enrichedEvent.siteId, reportDate, enrichedEvent.tenantId);
       }
     }

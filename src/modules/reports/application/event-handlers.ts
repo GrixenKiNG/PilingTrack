@@ -50,6 +50,7 @@ export function registerAnalyticsEventHandler() {
   on(REPORT_DOMAIN_EVENT_TYPES.REPORT_SUBMITTED, handleReportForAnalyticsCacheInvalidation);
   on(REPORT_DOMAIN_EVENT_TYPES.REPORT_UPDATED,   handleReportForAnalyticsCacheInvalidation);
   on(REPORT_DOMAIN_EVENT_TYPES.REPORT_DELETED,   handleReportForAnalyticsCacheInvalidation);
+  on(REPORT_DOMAIN_EVENT_TYPES.REPORT_DELETED,   handleReportDeleted);
 }
 
 async function handleReportForAnalytics(event: ReportDomainEvent) {
@@ -73,7 +74,12 @@ async function handleReportForAnalytics(event: ReportDomainEvent) {
     // `ReportSubmitted`) не мог подтянуть статус.
     const report = await db.report.findUnique({
       where: { reportId: event.aggregateId },
-      select: { siteId: true, userId: true, tenantId: true, status: true },
+      select: {
+        siteId: true, userId: true, tenantId: true, status: true,
+        piles: { select: { count: true } },
+        drillings: { select: { meters: true } },
+        downtimes: { select: { duration: true } },
+      },
     });
     // W45: ReportUpdated для отчёта, которого уже нет в Report (отчёт удалён).
     // Событие само несёт siteId/userId/tenantId, и прежний код создавал по ним
@@ -122,6 +128,21 @@ async function handleReportForAnalytics(event: ReportDomainEvent) {
       report?.status ||
       (event.type === REPORT_DOMAIN_EVENT_TYPES.REPORT_SUBMITTED ? 'submitted' : 'draft');
 
+    // DF-02: числа — из текущих строк отчёта (как в rebuild.ts), а не из
+    // события: повтор или ретрай старого события иначе возвращал бы прежние
+    // итоги поверх новых. Из события — только когда строки отчёта нет вовсе.
+    const totals = report
+      ? {
+          totalPiles: report.piles.reduce((sum, p) => sum + (p.count || 0), 0),
+          totalDrilling: report.drillings.reduce((sum, d) => sum + (d.meters || 0), 0),
+          totalDowntime: report.downtimes.reduce((sum, d) => sum + (d.duration || 0), 0),
+        }
+      : {
+          totalPiles: (event.data.totalPiles as number) || 0,
+          totalDrilling: (event.data.totalDrilling as number) || 0,
+          totalDowntime: (event.data.totalDowntime as number) || 0,
+        };
+
     await db.reportAnalytics.upsert({
       where: { reportId: event.aggregateId },
       create: {
@@ -130,24 +151,18 @@ async function handleReportForAnalytics(event: ReportDomainEvent) {
         userId,
         tenantId,
         status,
-        totalPiles: (event.data.totalPiles as number) || 0,
-        totalDrilling: (event.data.totalDrilling as number) || 0,
-        totalDowntime: (event.data.totalDowntime as number) || 0,
+        ...totals,
         lastEventAt: new Date(event.occurredAt),
       },
       update: {
         status,
-        totalPiles: (event.data.totalPiles as number) !== undefined
-          ? event.data.totalPiles as number
-          : undefined,
-        totalDrilling: (event.data.totalDrilling as number) !== undefined
-          ? event.data.totalDrilling as number
-          : undefined,
-        totalDowntime: (event.data.totalDowntime as number) !== undefined
-          ? event.data.totalDowntime as number
-          : undefined,
-        lastEventAt: new Date(event.occurredAt),
+        ...totals,
       },
+    });
+    // lastEventAt только вперёд: повтор старого события не откатывает метку.
+    await db.reportAnalytics.updateMany({
+      where: { reportId: event.aggregateId, lastEventAt: { lt: new Date(event.occurredAt) } },
+      data: { lastEventAt: new Date(event.occurredAt) },
     });
   } catch (error) {
     logger.error('Analytics projection failed', error, {
@@ -211,36 +226,65 @@ async function handleReportForAnalyticsCacheInvalidation(event: ReportDomainEven
  */
 export async function recomputeSiteDailySummary(siteId: string, date: string) {
   const { db } = await import('@/lib/db');
-  // Только сданные: черновик идущей смены попадал в итог дня лишь тогда, когда
-  // кто-то другой сдавал отчёт по тому же объекту, — и цифры дня плавали.
-  const reports = await db.report.findMany({
-    where: { siteId, date, status: SUBMITTED_REPORT_STATUS },
-    select: {
-      piles: { select: { count: true } },
-      drillings: { select: { meters: true } },
-      downtimes: { select: { duration: true } },
-    },
-  });
-  const totalPiles = reports.reduce(
-    (sum, r) => sum + r.piles.reduce((a, p) => a + (p.count || 0), 0), 0);
-  const totalDrilling = reports.reduce(
-    (sum, r) => sum + r.drillings.reduce((a, d) => a + (d.meters || 0), 0), 0);
-  const totalDowntime = reports.reduce(
-    (sum, r) => sum + r.downtimes.reduce((a, d) => a + (d.duration || 0), 0), 0);
-  const reportCount = reports.length;
+  // Чтение и запись — одна транзакция под замком на объект и день, взятым ДО
+  // чтения (как у недельного тренда). Без замка пересчёт, прочитавший старые
+  // отчёты, мог записаться после более нового и вернуть прежний итог дня.
+  // Замок держится до коммита и сам снимается; именно `$executeRaw`, не
+  // `$queryRaw` (pg_advisory_xact_lock возвращает void).
+  await db.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`daily-summary:${siteId}:${date}`}))`;
+    // Только сданные: черновик идущей смены попадал в итог дня лишь тогда, когда
+    // кто-то другой сдавал отчёт по тому же объекту, — и цифры дня плавали.
+    const reports = await tx.report.findMany({
+      where: { siteId, date, status: SUBMITTED_REPORT_STATUS },
+      select: {
+        piles: { select: { count: true } },
+        drillings: { select: { meters: true } },
+        downtimes: { select: { duration: true } },
+      },
+    });
+    const totalPiles = reports.reduce(
+      (sum, r) => sum + r.piles.reduce((a, p) => a + (p.count || 0), 0), 0);
+    const totalDrilling = reports.reduce(
+      (sum, r) => sum + r.drillings.reduce((a, d) => a + (d.meters || 0), 0), 0);
+    const totalDowntime = reports.reduce(
+      (sum, r) => sum + r.downtimes.reduce((a, d) => a + (d.duration || 0), 0), 0);
+    const reportCount = reports.length;
 
-  if (reportCount === 0) {
-    // Last report on this day was deleted — drop the row so admin charts
-    // don't show a phantom zero day.
-    await db.siteDailySummary.deleteMany({ where: { siteId, date } });
-    return;
+    if (reportCount === 0) {
+      // Last report on this day was deleted — drop the row so admin charts
+      // don't show a phantom zero day.
+      await tx.siteDailySummary.deleteMany({ where: { siteId, date } });
+      return;
+    }
+
+    await tx.siteDailySummary.upsert({
+      where: { siteId_date: { siteId, date } },
+      create: { siteId, date, totalPiles, totalDrilling, totalDowntime, reportCount },
+      update: { totalPiles, totalDrilling, totalDowntime, reportCount },
+    });
+  });
+}
+
+/**
+ * ReportDeleted: убрать вклад удалённого отчёта из проекций.
+ *
+ * Маршрут удаления делает то же сразу после коммита, но «по возможности»;
+ * упавший там пересчёт не повторялся. Здесь ошибка пробрасывается — outbox
+ * повторит событие или отправит в DLQ. Идемпотентно. Отчёта в базе уже нет,
+ * поэтому объект и дату берём из события (конверт и `data` несут их из снимка).
+ */
+async function handleReportDeleted(event: ReportDomainEvent) {
+  const siteId = event.siteId || (event.data?.siteId as string | undefined);
+  const date = event.data?.date as string | undefined;
+  if (!siteId || !date) {
+    throw new Error(
+      `ReportDeleted: не удалось определить siteId/date для ${event.aggregateId}`,
+    );
   }
-
-  await db.siteDailySummary.upsert({
-    where: { siteId_date: { siteId, date } },
-    create: { siteId, date, totalPiles, totalDrilling, totalDowntime, reportCount },
-    update: { totalPiles, totalDrilling, totalDowntime, reportCount },
-  });
+  const { db } = await import('@/lib/db');
+  await db.reportAnalytics.deleteMany({ where: { reportId: event.aggregateId } });
+  await recomputeSiteDailySummary(siteId, date);
 }
 
 async function handleReportForDailySummary(event: ReportDomainEvent) {

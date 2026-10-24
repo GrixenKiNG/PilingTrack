@@ -16,7 +16,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const {
   findManyMock, upsertMock, deleteManyMock, findUniqueMock, analyticsUpsertMock, invalidateAnalyticsMock,
   outboxFindUnique, outboxUpdate, sendDocument, findFirstMock, isNotifMock, getSettingsMock, sendAlertMock,
-  outboxCreate, userFindFirst, recordAuditEventMock, dbClient,
+  outboxCreate, userFindFirst, recordAuditEventMock, dbClient, analyticsDeleteManyMock,
+  analyticsUpdateManyMock,
 } = vi.hoisted(() => {
   const findManyMock = vi.fn();
   const upsertMock = vi.fn();
@@ -34,21 +35,55 @@ const {
   const outboxCreate = vi.fn();
   const userFindFirst = vi.fn();
   const recordAuditEventMock = vi.fn();
+  const analyticsDeleteManyMock = vi.fn();
+  const analyticsUpdateManyMock = vi.fn();
+
+  // Замок pg_advisory_xact_lock: держится до конца транзакции, ждущие встают
+  // в очередь — как в Postgres. Без этого гонку пересчётов в моке не воспроизвести.
+  const lockTails = new Map<string, Promise<void>>();
+  const makeExecuteRaw = (held: Array<() => void>) =>
+    async (strings: TemplateStringsArray, ...values: unknown[]) => {
+      if (!String(strings[0]).includes('pg_advisory_xact_lock')) return 0;
+      const key = String(values[0]);
+      const prev = lockTails.get(key) ?? Promise.resolve();
+      let release!: () => void;
+      const mine = new Promise<void>((resolve) => { release = resolve; });
+      lockTails.set(key, prev.then(() => mine));
+      await prev;
+      held.push(release);
+      return 0;
+    };
 
   const client = {
     report: { findMany: findManyMock, findUnique: findUniqueMock, findFirst: findFirstMock },
     user: { findFirst: userFindFirst },
     siteDailySummary: { upsert: upsertMock, deleteMany: deleteManyMock },
-    reportAnalytics: { upsert: analyticsUpsertMock },
+    reportAnalytics: {
+      upsert: analyticsUpsertMock,
+      deleteMany: analyticsDeleteManyMock,
+      updateMany: analyticsUpdateManyMock,
+    },
     outboxEvent: { findUnique: outboxFindUnique, update: outboxUpdate, create: outboxCreate },
     $queryRaw: vi.fn(),
-    $transaction: (fn: (tx: unknown) => unknown) => fn(client),
+    $executeRaw: makeExecuteRaw([]),
+    $transaction: async (fn: (tx: unknown) => unknown) => {
+      // У каждой транзакции свой клиент: замки снимаются при её завершении.
+      const held: Array<() => void> = [];
+      const tx = Object.create(client) as typeof client;
+      tx.$executeRaw = makeExecuteRaw(held);
+      try {
+        return await fn(tx);
+      } finally {
+        for (const release of held) release();
+      }
+    },
   };
 
   return {
     findManyMock, upsertMock, deleteManyMock, findUniqueMock, analyticsUpsertMock, invalidateAnalyticsMock,
     outboxFindUnique, outboxUpdate, sendDocument, findFirstMock, isNotifMock, getSettingsMock, sendAlertMock,
-    outboxCreate, userFindFirst, recordAuditEventMock, dbClient: client,
+    outboxCreate, userFindFirst, recordAuditEventMock, dbClient: client, analyticsDeleteManyMock,
+    analyticsUpdateManyMock,
   };
 });
 
@@ -106,7 +141,7 @@ import {
   registerAuditEventHandler,
 } from '../event-handlers';
 import { emitDomainEvent } from '../domain-events';
-import { REPORT_DOMAIN_EVENT_TYPES } from '@/modules/reports/domain';
+import { REPORT_DOMAIN_EVENT_TYPES, type ReportDomainEvent } from '@/modules/reports/domain';
 import { logger } from '@/lib/logger';
 
 // Доставка PDF отчёта в Telegram (R9-1): сбой должен оставлять событие на
@@ -253,6 +288,7 @@ describe('handleReportForAnalytics', () => {
   it('J4: ReportUpdated зеркалит статус отчёта в проекцию', async () => {
     findUniqueMock.mockResolvedValue({
       siteId: 'site_A', userId: 'user-1', tenantId: 'tenant-a', status: 'submitted',
+      piles: [], drillings: [], downtimes: [],
     });
 
     await emitDomainEvent({
@@ -269,6 +305,81 @@ describe('handleReportForAnalytics', () => {
 
     expect(analyticsUpsertMock).toHaveBeenCalled();
     expect(analyticsUpsertMock.mock.calls[0][0].update.status).toBe('submitted');
+  });
+
+  // DF-02: числа проекции брались из самого события. Повтор или ретрай старого
+  // события (5 свай) после нового (9 свай) возвращал прежние числа. Источник
+  // истины — строки отчёта, как в полной пересборке (rebuild.ts).
+  it('DF-02: старое событие не откатывает числа — они берутся из текущих строк отчёта', async () => {
+    findUniqueMock.mockResolvedValue({
+      siteId: 'site_A', userId: 'user-1', tenantId: 'tenant-a', status: 'submitted',
+      piles: [{ count: 9 }], drillings: [{ meters: 12 }], downtimes: [{ duration: 1.5 }],
+    });
+
+    await emitDomainEvent({
+      id: 'evt-df2-old',
+      type: REPORT_DOMAIN_EVENT_TYPES.REPORT_UPDATED,
+      aggregateId: 'report-uuid-df2',
+      aggregateType: 'Report',
+      occurredAt: '2026-04-30T11:00:00.000Z',
+      siteId: 'site_A',
+      userId: 'user-1',
+      tenantId: 'tenant-a',
+      data: { totalPiles: 5, totalDrilling: 6, totalDowntime: 0.5 },
+    });
+
+    const args = analyticsUpsertMock.mock.calls[0][0];
+    expect(args.update).toMatchObject({ totalPiles: 9, totalDrilling: 12, totalDowntime: 1.5 });
+    expect(args.create).toMatchObject({ totalPiles: 9, totalDrilling: 12, totalDowntime: 1.5 });
+  });
+
+  // DF-02: повтор старого события не должен сдвигать lastEventAt назад.
+  it('DF-02: lastEventAt двигается только вперёд', async () => {
+    findUniqueMock.mockResolvedValue({
+      siteId: 'site_A', userId: 'user-1', tenantId: 'tenant-a', status: 'submitted',
+      piles: [], drillings: [], downtimes: [],
+    });
+
+    await emitDomainEvent({
+      id: 'evt-df2-time',
+      type: REPORT_DOMAIN_EVENT_TYPES.REPORT_UPDATED,
+      aggregateId: 'report-uuid-df2t',
+      aggregateType: 'Report',
+      occurredAt: '2026-04-30T11:00:00.000Z',
+      siteId: 'site_A',
+      userId: 'user-1',
+      tenantId: 'tenant-a',
+      data: {},
+    });
+
+    expect(analyticsUpsertMock.mock.calls[0][0].update).not.toHaveProperty('lastEventAt');
+    expect(analyticsUpdateManyMock).toHaveBeenCalledWith({
+      where: { reportId: 'report-uuid-df2t', lastEventAt: { lt: new Date('2026-04-30T11:00:00.000Z') } },
+      data: { lastEventAt: new Date('2026-04-30T11:00:00.000Z') },
+    });
+  });
+
+  it('DF-02: все строки работ удалены — проекция обнуляется, а не хранит числа из события', async () => {
+    findUniqueMock.mockResolvedValue({
+      siteId: 'site_A', userId: 'user-1', tenantId: 'tenant-a', status: 'submitted',
+      piles: [], drillings: [], downtimes: [],
+    });
+
+    await emitDomainEvent({
+      id: 'evt-df2-empty',
+      type: REPORT_DOMAIN_EVENT_TYPES.REPORT_UPDATED,
+      aggregateId: 'report-uuid-df2b',
+      aggregateType: 'Report',
+      occurredAt: '2026-04-30T11:00:00.000Z',
+      siteId: 'site_A',
+      userId: 'user-1',
+      tenantId: 'tenant-a',
+      data: { totalPiles: 5, totalDrilling: 6, totalDowntime: 0.5 },
+    });
+
+    expect(analyticsUpsertMock.mock.calls[0][0].update).toMatchObject({
+      totalPiles: 0, totalDrilling: 0, totalDowntime: 0,
+    });
   });
 
   /*
@@ -389,6 +500,101 @@ describe('recomputeSiteDailySummary', () => {
       totalPiles: 0, totalDrilling: 0, totalDowntime: 0, reportCount: 1,
     });
   });
+
+  // DF-01: пересчёт читает отчёты, а потом отдельно пишет итог. Без замка на
+  // объект и день более ранний пересчёт, прочитавший 5 свай, записывался после
+  // более позднего, прочитавшего 9, и затирал свежий итог.
+  it('DF-01: два конкурирующих пересчёта дня оставляют итог по свежим данным', async () => {
+    let piles = 5;
+    let releaseFirstRead!: () => void;
+    const firstReadGate = new Promise<void>((resolve) => { releaseFirstRead = resolve; });
+    let reads = 0;
+    findManyMock.mockImplementation(async () => {
+      const snapshot = [{ piles: [{ count: piles }], drillings: [], downtimes: [] }];
+      if (++reads === 1) await firstReadGate; // первый пересчёт «завис» после чтения
+      return snapshot;
+    });
+    const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+    const older = recomputeSiteDailySummary('site_A', '2026-04-30');
+    await flush();
+    piles = 9; // отчёт изменился после чтения первым пересчётом
+    const newer = recomputeSiteDailySummary('site_A', '2026-04-30');
+    await flush();
+    releaseFirstRead();
+    await Promise.all([older, newer]);
+
+    const written = upsertMock.mock.calls.map((c) => c[0].update.totalPiles);
+    expect(written[written.length - 1]).toBe(9);
+  });
+
+  it('DF-01: замок берётся на объект и день до чтения отчётов', async () => {
+    const order: string[] = [];
+    const original = dbClient.$transaction;
+    findManyMock.mockImplementation(async () => { order.push('read'); return []; });
+    const spy = vi.spyOn(dbClient, '$transaction').mockImplementation(async (fn) =>
+      original(async (txArg: unknown) => {
+        const tx = txArg as typeof dbClient;
+        const raw = tx.$executeRaw;
+        tx.$executeRaw = (async (strings: TemplateStringsArray, ...values: unknown[]) => {
+          order.push(`lock:${String(values[0])}`);
+          return raw(strings, ...values);
+        }) as typeof raw;
+        return fn(tx);
+      }));
+
+    await recomputeSiteDailySummary('site_A', '2026-04-30');
+    spy.mockRestore();
+
+    expect(order).toEqual(['lock:daily-summary:site_A:2026-04-30', 'read']);
+  });
+});
+
+// DF-04: после коммита удаления сводки пересчитывались в route.ts «по возможности»
+// (try/catch с логом). Упавший пересчёт событие ReportDeleted не повторяло:
+// на него был подписан только сброс кэша. Теперь пересчёт — обработчик события.
+describe('ReportDeleted: durable-очистка проекций (DF-04)', () => {
+  const deletedEvent: ReportDomainEvent = {
+    id: 'evt-del-1',
+    type: REPORT_DOMAIN_EVENT_TYPES.REPORT_DELETED,
+    aggregateId: 'report-uuid-del',
+    aggregateType: 'Report',
+    occurredAt: new Date().toISOString(),
+    siteId: 'site_A',
+    userId: 'user-1',
+    tenantId: 'tenant-a',
+    data: { date: '2026-04-30', siteId: 'site_A' },
+  };
+
+  beforeEach(() => {
+    findManyMock.mockReset();
+    upsertMock.mockReset();
+    deleteManyMock.mockReset();
+    analyticsDeleteManyMock.mockReset();
+    invalidateAnalyticsMock.mockReset();
+    registerAnalyticsEventHandler();
+  });
+
+  it('чистит ReportAnalytics и пересчитывает день по данным из события', async () => {
+    findManyMock.mockResolvedValue([{ piles: [{ count: 4 }], drillings: [], downtimes: [] }]);
+
+    await emitDomainEvent(deletedEvent);
+
+    expect(analyticsDeleteManyMock).toHaveBeenCalledWith({ where: { reportId: 'report-uuid-del' } });
+    expect(findManyMock.mock.calls[0][0].where).toMatchObject({ siteId: 'site_A', date: '2026-04-30' });
+    expect(upsertMock.mock.calls[0][0].update).toMatchObject({ totalPiles: 4, reportCount: 1 });
+  });
+
+  it('сбой пересчёта пробрасывается (outbox повторит), повтор доводит день до источника', async () => {
+    findManyMock.mockRejectedValueOnce(new Error('db down'));
+    await expect(emitDomainEvent(deletedEvent)).rejects.toThrow();
+    expect(upsertMock).not.toHaveBeenCalled();
+
+    findManyMock.mockResolvedValue([]);
+    await emitDomainEvent(deletedEvent);
+
+    expect(deleteManyMock).toHaveBeenCalledWith({ where: { siteId: 'site_A', date: '2026-04-30' } });
+  });
 });
 
 /*
@@ -445,7 +651,7 @@ describe('сброс кэша сводки по объектам (F-R35-2)', () 
   });
 
   it('берёт организацию из отчёта, когда её нет в событии', async () => {
-    findUniqueMock.mockResolvedValue({ tenantId: 'tenant-a' });
+    findUniqueMock.mockResolvedValue({ tenantId: 'tenant-a', piles: [], drillings: [], downtimes: [] });
 
     await emitDomainEvent({
       id: 'evt-cache-3',

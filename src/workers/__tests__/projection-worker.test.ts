@@ -31,7 +31,11 @@ vi.mock('@/lib/db', () => {
     },
     site: { findUnique: mocks.mockSiteFindUnique, findMany: mocks.mockSiteFindMany },
     tenant: { findMany: vi.fn().mockResolvedValue([{ id: 'tenant-1' }]) },
-    siteDailySummary: { upsert: mocks.mockUpsert, findMany: mocks.mockDailyFindMany },
+    siteDailySummary: {
+      upsert: mocks.mockUpsert,
+      findMany: mocks.mockDailyFindMany,
+      deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+    },
     siteWeeklyTrend: { upsert: mocks.mockWeeklyUpsert },
     reportAnalytics: { upsert: mocks.mockUpsert },
     outboxEvent: {
@@ -342,6 +346,50 @@ describe('Projection Worker', () => {
         expect.objectContaining({
           create: expect.objectContaining({ tenantId: 'tenant-1' }),
         })
+      );
+
+      worker.stop();
+    });
+
+    // DF-03: день пересчитывает один потребитель outbox, неделю — другой, и
+    // неделя могла прочитать ещё старый итог дня. Теперь недельная проекция
+    // сначала досчитывает день события из источника.
+    it('DF-03: итог дня события пересчитывается до чтения дня недельным трендом', async () => {
+      const { startProjectionWorker } = await import(
+        '@/modules/reports/application/projections/projection-worker'
+      );
+
+      const event = {
+        id: 'outbox-df3',
+        type: 'ReportUpdated',
+        aggregateId: 'report-1',
+        aggregateType: 'Report',
+        payload: createEvent({ type: 'ReportUpdated', data: { date: '2026-04-09' } }),
+        published: true,
+        attempts: 0,
+        occurredAt: new Date(),
+        createdAt: new Date(),
+      };
+
+      mocks.mockOutboxFindMany.mockResolvedValueOnce([event]).mockResolvedValue([]);
+      mocks.mockOutboxFindUnique.mockResolvedValue({ published: true });
+      mocks.mockOutboxUpdate.mockResolvedValue({});
+      mocks.mockSiteFindUnique.mockResolvedValue({ tenantId: 'tenant-1' });
+      mocks.mockDailyFindMany.mockResolvedValue([]);
+      mocks.mockReportFindMany.mockResolvedValue([
+        { piles: [{ count: 9 }], drillings: [], downtimes: [] },
+      ]);
+
+      const worker = startProjectionWorker(500);
+      await vi.advanceTimersByTimeAsync(500);
+
+      const dailyWrite = mocks.mockUpsert.mock.calls.findIndex(
+        (c) => c[0]?.where?.siteId_date?.date === '2026-04-09',
+      );
+      expect(dailyWrite).toBeGreaterThanOrEqual(0);
+      expect(mocks.mockUpsert.mock.calls[dailyWrite][0].update).toMatchObject({ totalPiles: 9 });
+      expect(mocks.mockUpsert.mock.invocationCallOrder[dailyWrite]).toBeLessThan(
+        mocks.mockDailyFindMany.mock.invocationCallOrder[0],
       );
 
       worker.stop();
