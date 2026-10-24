@@ -79,6 +79,36 @@ export async function deleteTemplate(id: string, tenantId: string) {
   return deactivateTemplateUsing(db, id, tenantId);
 }
 
+/**
+ * Вернуть отключённый шаблон в сборку осмотров.
+ *
+ * Отключённых шаблонов в базе много (замена через updateTemplate оставляет
+ * прежнюю версию неактивной, плюс ручное снятие). Вернуть можно, пока нет
+ * действующего шаблона с тем же ключом сборки — вид блока, уровень ТО, модель и
+ * вид молота: два «Базовых» блока одной модели задвоили бы пункты осмотра.
+ */
+export async function activateTemplate(id: string, tenantId: string) {
+  if (!tenantId) throw new ServiceError('tenantId is required', 400);
+  const existing = await db.checklistTemplate.findUnique({
+    where: { id },
+    select: { id: true, tenantId: true, isActive: true, blockType: true, level: true, appliesToModel: true, appliesToHammerKind: true },
+  });
+  if (!existing || existing.tenantId !== tenantId) throw new ServiceError('Шаблон не найден — обновите список.', 404);
+  if (existing.isActive) return existing;
+  const clash = await db.checklistTemplate.findFirst({
+    where: {
+      tenantId, isActive: true, NOT: { id },
+      blockType: existing.blockType, level: existing.level,
+      appliesToModel: existing.appliesToModel, appliesToHammerKind: existing.appliesToHammerKind,
+    },
+    select: { id: true, name: true },
+  });
+  if (clash) {
+    throw new ServiceError(`Для этой модели и вида ТО уже действует шаблон «${clash.name}». Сначала снимите его.`, 409);
+  }
+  return db.checklistTemplate.update({ where: { id }, data: { isActive: true } });
+}
+
 async function deactivateTemplateUsing(client: TemplateClient, id: string, tenantId: string) {
   if (!tenantId) throw new ServiceError('tenantId is required', 400);
   const existing = await client.checklistTemplate.findUnique({ where: { id }, select: { id: true, tenantId: true } });

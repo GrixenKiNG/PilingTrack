@@ -253,8 +253,9 @@ export function StartInspectionForm() {
                   </div>
                   {!hasBase && (
                     <p className="mt-2 rounded bg-destructive/10 px-2 py-1.5 text-2xs text-destructive-strong">
-                      Нет блока «База» для модели «{selected.model || '—'}». Создайте его в разделе{' '}
+                      Нет блока «База» для модели «{selected.model || '—'}». В разделе{' '}
                       <Link href="/admin/checklists" className="underline">Чек-листы</Link>{' '}
+                      включите отключённый шаблон этого вида ТО (список «Отключённые шаблоны» внизу) или создайте новый
                       (тип «База», применимость «{selected.model || '—'}» или без модели — общий для всех).
                     </p>
                   )}

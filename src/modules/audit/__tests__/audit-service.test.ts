@@ -57,6 +57,7 @@ describe('W117 — понятные события в ленте владель�
     ['inspection.template.created', 'Шаблон осмотра создан'],
     ['inspection.template.replaced', 'Шаблон осмотра заменён'],
     ['inspection.template.deactivated', 'Шаблон осмотра отключён'],
+    ['inspection.template.activated', 'Шаблон осмотра включён'],
     ['inspection.started', 'Осмотр начат'],
     ['inspection.answers_saved', 'Ответы осмотра сохранены'],
     ['briefing.conducted', 'Инструктаж проведён'],

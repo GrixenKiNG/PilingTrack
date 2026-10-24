@@ -9,7 +9,7 @@ import { ServiceError } from '@/lib/service-error';
 
 const m = vi.hoisted(() => ({
   auth: vi.fn(), can: vi.fn(), audit: vi.fn(), createTemplate: vi.fn(), updateTemplate: vi.fn(),
-  deleteTemplate: vi.fn(), saveAnswers: vi.fn(), createDocument: vi.fn(), addFuel: vi.fn(),
+  deleteTemplate: vi.fn(), activateTemplate: vi.fn(), saveAnswers: vi.fn(), createDocument: vi.fn(), addFuel: vi.fn(),
   createPlan: vi.fn(), review: vi.fn(),
   retry: vi.fn(), discard: vi.fn(), findMedia: vi.fn(), deleteMedia: vi.fn(), accessMedia: vi.fn(),
   crew: vi.fn(),
@@ -25,7 +25,7 @@ vi.mock('@/core/api-wrapper', () => ({
 }));
 vi.mock('@/modules/inspections', () => ({
   createTemplate: m.createTemplate, updateTemplate: m.updateTemplate,
-  deleteTemplate: m.deleteTemplate, saveAnswers: m.saveAnswers,
+  deleteTemplate: m.deleteTemplate, activateTemplate: m.activateTemplate, saveAnswers: m.saveAnswers,
 }));
 vi.mock('@/modules/equipment', () => ({
   createEquipmentDocument: m.createDocument, addFuelEntry: m.addFuel, createMaintenancePlan: m.createPlan,
@@ -40,6 +40,7 @@ vi.mock('@/core/media/media-auth', () => ({ assertCanAccessMedia: m.accessMedia 
 
 import { POST as createTemplate } from '../checklist-templates/route';
 import { PUT as updateTemplate, DELETE as deleteTemplate } from '../checklist-templates/[id]/route';
+import { POST as activateTemplate } from '../checklist-templates/[id]/activate/route';
 import { PUT as saveAnswers } from '../inspections/[id]/route';
 import { POST as createDocument } from '../equipment/[id]/documents/route';
 import { POST as addFuel } from '../equipment/[id]/fuel/route';
@@ -60,6 +61,8 @@ const cases: Array<{ label: string; handler: unknown; mock: typeof m.audit; meth
     body: template, result: { id: 'created-1', name: 'Осмотр' }, action: 'inspection.template.replaced', targetId: 'entity-1' },
   { label: 'деактивация шаблона', handler: deleteTemplate, mock: m.deleteTemplate, method: 'DELETE',
     result: {}, action: 'inspection.template.deactivated', targetId: 'entity-1' },
+  { label: 'включение шаблона', handler: activateTemplate, mock: m.activateTemplate, method: 'POST',
+    result: {}, action: 'inspection.template.activated', targetId: 'entity-1' },
   { label: 'сохранение ответов', handler: saveAnswers, mock: m.saveAnswers, method: 'PUT',
     body: { answers: [{ itemId: 'item-1', result: 'YES' }] }, result: { id: 'entity-1' },
     action: 'inspection.answers_saved', targetId: 'entity-1' },

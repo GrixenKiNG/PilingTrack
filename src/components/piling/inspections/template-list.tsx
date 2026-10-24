@@ -7,6 +7,7 @@
  * «Новый шаблон» → /admin/checklists/new.
  * Клик по строке → /admin/checklists/[id].
  * Иконка корзины деактивирует шаблон (DELETE).
+ * Ниже — отключённые шаблоны: «Включить» возвращает шаблон в сборку осмотров.
  */
 
 import { useCallback, useEffect, useState } from 'react';
@@ -56,6 +57,10 @@ export function TemplateList() {
   const [templates, setTemplates] = useState<TemplateRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  // Отключённые шаблоны (в основном списке их нет): без них снятый блок «База»
+  // или ТО-1…ТО-3 нельзя было вернуть, только заводить заново.
+  const [disabled, setDisabled] = useState<TemplateRow[]>([]);
+  const [activatingId, setActivatingId] = useState<string | null>(null);
   // Подтверждение — проектный диалог: он объясняет последствие деактивации,
   // чего не делал браузерный confirm (R123 №7).
   const [pendingDelete, setPendingDelete] = useState<TemplateRow | null>(null);
@@ -75,6 +80,13 @@ export function TemplateList() {
       }
       setTemplates(((await res.json()).templates ?? []) as TemplateRow[]);
       setLoadError(null);
+      // Отключённые — вспомогательный список: его сбой не прячет основной.
+      try {
+        const off = await authFetch('/api/checklist-templates?inactive=1');
+        setDisabled(off.ok ? (((await off.json()).templates ?? []) as TemplateRow[]) : []);
+      } catch {
+        setDisabled([]);
+      }
     } catch {
       setLoadError(new InspectionLoadError(null));
       setTemplates([]);
@@ -85,6 +97,25 @@ export function TemplateList() {
 
   // eslint-disable-next-line react-hooks/set-state-in-effect -- loads data on mount / dependency change; the async loader sets state
   useEffect(() => { void load(); }, [load]);
+
+  const handleActivate = async (target: TemplateRow) => {
+    setActivatingId(target.id);
+    try {
+      const res = await authFetch(`/api/checklist-templates/${target.id}/activate`, { method: 'POST' });
+      if (res.ok) {
+        toast.success('Шаблон включён');
+        await load();
+      } else {
+        // 409 — для этой модели и вида ТО уже действует другой шаблон: сервер называет его.
+        const message = (await res.json().catch(() => ({}))).error;
+        toast.error(typeof message === 'string' && message ? message : 'Не удалось включить шаблон');
+      }
+    } catch (err) {
+      toast.error(catchText(err, 'Не удалось включить шаблон'));
+    } finally {
+      setActivatingId(null);
+    }
+  };
 
   const handleDelete = async (target: TemplateRow) => {
     setDeletingId(target.id);
@@ -169,6 +200,39 @@ export function TemplateList() {
             </li>
           ))}
         </ul>
+      )}
+
+      {!loading && !loadError && disabled.length > 0 && (
+        <details className="mt-6 rounded-lg border bg-card">
+          <summary className="cursor-pointer px-3 py-2.5 text-sm font-medium text-foreground">
+            Отключённые шаблоны ({disabled.length})
+          </summary>
+          <ul className="space-y-1.5 border-t p-2">
+            {disabled.map((t) => (
+              <li key={t.id} className="flex items-center justify-between gap-2 rounded-md bg-muted/50 px-3 py-2 text-sm">
+                <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+                  <span className="min-w-0 truncate text-muted-foreground">{t.name}</span>
+                  <span className={cn('rounded px-1.5 py-0.5 text-2xs font-medium', LEVEL_STYLE[t.level])}>
+                    {LEVEL_LABEL[t.level]}
+                  </span>
+                  {t.appliesToModel && (
+                    <span className="truncate text-xs text-muted-foreground">{t.appliesToModel}</span>
+                  )}
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={activatingId === t.id}
+                  onClick={() => void handleActivate(t)}
+                  aria-label={`Включить шаблон «${t.name}»`}
+                >
+                  Включить
+                </Button>
+              </li>
+            ))}
+          </ul>
+        </details>
       )}
 
       <ConfirmActionDialog

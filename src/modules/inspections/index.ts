@@ -1,5 +1,5 @@
 export { listTemplates, getTemplate } from './application/queries/template-query.service';
-export { createTemplate, updateTemplate, deleteTemplate,
+export { createTemplate, updateTemplate, deleteTemplate, activateTemplate,
   type TemplateInput, type TemplateSectionInput, type TemplateItemInput } from './application/commands/template-commands';
 export { startInspection, startToInspection, saveAnswers, completeInspectionWithOutcome,
   type AnswerInput, type MaintenanceLevel } from './application/commands/inspection-commands';

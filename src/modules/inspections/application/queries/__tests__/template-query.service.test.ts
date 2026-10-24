@@ -14,6 +14,10 @@ describe('listTemplates', () => {
     const arg = findManyMock.mock.calls[0][0];
     expect(arg.where).toEqual({ tenantId: 'orion', isActive: true, level: 'EO' });
   });
+  it('inactive: true возвращает только отключённые шаблоны организации', async () => {
+    await listTemplates('orion', { inactive: true });
+    expect(findManyMock.mock.calls[0][0].where).toEqual({ tenantId: 'orion', isActive: false });
+  });
   it('throws when tenantId empty (fail-closed)', async () => {
     await expect(listTemplates('', {})).rejects.toThrow();
   });

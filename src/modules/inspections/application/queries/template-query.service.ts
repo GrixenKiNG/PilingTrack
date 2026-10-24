@@ -4,11 +4,11 @@ import type { ChecklistLevel } from '@/generated/postgres-client';
 
 export async function listTemplates(
   tenantId: string,
-  filter: { level?: ChecklistLevel } = {},
+  filter: { level?: ChecklistLevel; /** Только отключённые: их администратор может вернуть. */ inactive?: boolean } = {},
 ) {
   if (!tenantId) throw new ServiceError('tenantId is required', 400);
   const templates = await db.checklistTemplate.findMany({
-    where: { tenantId, isActive: true, ...(filter.level ? { level: filter.level } : {}) },
+    where: { tenantId, isActive: !filter.inactive, ...(filter.level ? { level: filter.level } : {}) },
     orderBy: [{ level: 'asc' }, { name: 'asc' }],
     // Счётчики нужны спискам шаблонов: без них экран показывал «0 пунктов»
     // у каждого шаблона, хотя пункты есть.

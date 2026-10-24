@@ -25,6 +25,9 @@ export const INCIDENT_REPORT_DESCRIPTIONS: Record<string, AuditDescription> = {
   'inspection.template.deactivated': {
     level: 'audit', title: 'Шаблон осмотра отключён', message: 'Шаблон больше не используется для новых осмотров.',
   },
+  'inspection.template.activated': {
+    level: 'audit', title: 'Шаблон осмотра включён', message: 'Шаблон снова используется для новых осмотров.',
+  },
   'inspection.started': {
     level: 'audit', title: 'Осмотр начат', message: 'Создана запись осмотра техники.',
   },

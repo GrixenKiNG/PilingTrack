@@ -1,13 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-const { createMock, updateMock, findUniqueMock, transactionMock } = vi.hoisted(() => ({
-  createMock: vi.fn(), updateMock: vi.fn(), findUniqueMock: vi.fn(), transactionMock: vi.fn(),
+const { createMock, updateMock, findUniqueMock, findFirstMock, transactionMock } = vi.hoisted(() => ({
+  createMock: vi.fn(), updateMock: vi.fn(), findUniqueMock: vi.fn(), findFirstMock: vi.fn(), transactionMock: vi.fn(),
 }));
 vi.mock('@/lib/db', () => ({
-  db: { checklistTemplate: { create: createMock, update: updateMock, findUnique: findUniqueMock }, $transaction: transactionMock },
+  db: { checklistTemplate: { create: createMock, update: updateMock, findUnique: findUniqueMock, findFirst: findFirstMock }, $transaction: transactionMock },
 }));
-import { createTemplate, deleteTemplate, updateTemplate } from '../template-commands';
+import { activateTemplate, createTemplate, deleteTemplate, updateTemplate } from '../template-commands';
 
-beforeEach(() => { createMock.mockReset(); updateMock.mockReset(); findUniqueMock.mockReset(); });
+beforeEach(() => { createMock.mockReset(); updateMock.mockReset(); findUniqueMock.mockReset(); findFirstMock.mockReset(); });
 
 describe('updateTemplate — атомарная замена действующего шаблона (W117)', () => {
   type Row = { id: string; tenantId: string; name: string; isActive: boolean };
@@ -107,5 +107,48 @@ describe('deleteTemplate', () => {
   it('throws 404 cross-tenant', async () => {
     findUniqueMock.mockResolvedValue({ id: 't1', tenantId: 'other' });
     await expect(deleteTemplate('t1', 'orion')).rejects.toThrow('Шаблон не найден — обновите список.');
+  });
+});
+
+// Отключённый шаблон вернуть можно, пока нет действующего с тем же ключом сборки:
+// два блока «База» одной модели и вида ТО дублировали бы пункты в осмотре.
+describe('activateTemplate — возврат отключённого шаблона', () => {
+  const row = { id: 'tpl-1', tenantId: 'orion', isActive: false, blockType: 'BASE', level: 'TO1', appliesToModel: 'LRH 100', appliesToHammerKind: null };
+
+  it('включает отключённый шаблон своей организации', async () => {
+    findUniqueMock.mockResolvedValue(row);
+    findFirstMock.mockResolvedValue(null);
+    updateMock.mockResolvedValue({ ...row, isActive: true });
+    await activateTemplate('tpl-1', 'orion');
+    expect(updateMock).toHaveBeenCalledWith({ where: { id: 'tpl-1' }, data: { isActive: true } });
+    expect(findFirstMock.mock.calls[0][0].where).toMatchObject({
+      tenantId: 'orion', isActive: true, blockType: 'BASE', level: 'TO1', appliesToModel: 'LRH 100', appliesToHammerKind: null, NOT: { id: 'tpl-1' },
+    });
+  });
+
+  it('отказывает, если для той же модели и вида ТО уже есть действующий блок', async () => {
+    findUniqueMock.mockResolvedValue(row);
+    findFirstMock.mockResolvedValue({ id: 'other', name: 'ТО-1 — LRH 100 (новый)' });
+    await expect(activateTemplate('tpl-1', 'orion')).rejects.toMatchObject({ status: 409 });
+    expect(updateMock).not.toHaveBeenCalled();
+  });
+
+  it('чужой шаблон и несуществующий — 404', async () => {
+    findUniqueMock.mockResolvedValue({ ...row, tenantId: 'other-tenant' });
+    await expect(activateTemplate('tpl-1', 'orion')).rejects.toMatchObject({ status: 404 });
+    findUniqueMock.mockResolvedValue(null);
+    await expect(activateTemplate('tpl-1', 'orion')).rejects.toMatchObject({ status: 404 });
+    expect(updateMock).not.toHaveBeenCalled();
+  });
+
+  it('уже действующий шаблон не трогает', async () => {
+    findUniqueMock.mockResolvedValue({ ...row, isActive: true });
+    await activateTemplate('tpl-1', 'orion');
+    expect(updateMock).not.toHaveBeenCalled();
+    expect(findFirstMock).not.toHaveBeenCalled();
+  });
+
+  it('без организации — отказ (fail closed)', async () => {
+    await expect(activateTemplate('tpl-1', '')).rejects.toMatchObject({ status: 400 });
   });
 });

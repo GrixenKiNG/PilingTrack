@@ -50,7 +50,8 @@ export const GET = withApi(
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     const tenantId = requireTenantId(user!);
     const level = request.nextUrl.searchParams.get('level') as never;
-    const templates = await listTemplates(tenantId, level ? { level } : {});
+    const inactive = request.nextUrl.searchParams.get('inactive') === '1';
+    const templates = await listTemplates(tenantId, { ...(level ? { level } : {}), ...(inactive ? { inactive } : {}) });
     return NextResponse.json({ templates });
   },
   { domain: 'inspections' }
