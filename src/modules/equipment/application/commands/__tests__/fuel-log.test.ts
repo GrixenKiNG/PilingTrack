@@ -15,7 +15,7 @@ vi.mock('@/lib/db', () => {
   return { db: client };
 });
 
-import { computeFuelConsumption } from '../fuel-log';
+import { computeFuelConsumption, recordOperatorFuelInTx } from '../fuel-log';
 
 // Правило расхода: «сожгли = долили + (было в баке − осталось)». «Было −
 // осталось» выводится из процентов указателя и объёма бака. Без объёма бака
@@ -111,5 +111,48 @@ describe('computeFuelConsumption — расход топлива', () => {
     });
     expect(r.consumedLiters).toBe(100);
     expect(r.perEngineHour).toBe(14.3);
+  });
+});
+// Машинист на ЕО после работы снимает остаток по указателю ДО заправки, а потом
+// доливает. Сводка топлива считает «остаток после долива своей записи», поэтому
+// замер и долив пишутся двумя записями: замер, затем долив на миллисекунду позже.
+describe('recordOperatorFuelInTx — топливо из ЕО машиниста', () => {
+  const at = new Date('2026-10-24T16:00:00.000Z');
+  const ctx = { tenantId: 'tenant-a', recordedById: 'operator-a', note: 'ЕО после работы' };
+  const fakeTx = () => ({ fuelLog: { create: vi.fn().mockResolvedValue({ id: 'f1' }) } });
+
+  it('замер и долив — две записи, долив строго после замера', async () => {
+    const tx = fakeTx();
+    const n = await recordOperatorFuelInTx(tx as never, 'eq-1', { tankPercent: 62, litersAdded: 120, at }, ctx);
+    expect(n).toBe(2);
+    const [reading, topUp] = tx.fuelLog.create.mock.calls.map((c) => c[0].data);
+    expect(reading).toMatchObject({ tenantId: 'tenant-a', equipmentId: 'eq-1', tankPercent: 62, litersAdded: null, source: 'MANUAL', recordedById: 'operator-a' });
+    expect(topUp).toMatchObject({ tankPercent: null, litersAdded: 120 });
+    expect(topUp.recordedAt.getTime()).toBeGreaterThan(reading.recordedAt.getTime());
+  });
+
+  it('только замер — одна запись', async () => {
+    const tx = fakeTx();
+    expect(await recordOperatorFuelInTx(tx as never, 'eq-1', { tankPercent: 40, litersAdded: null, at }, ctx)).toBe(1);
+    expect(tx.fuelLog.create.mock.calls[0][0].data).toMatchObject({ tankPercent: 40, litersAdded: null });
+  });
+
+  it('только долив — одна запись', async () => {
+    const tx = fakeTx();
+    expect(await recordOperatorFuelInTx(tx as never, 'eq-1', { tankPercent: null, litersAdded: 80, at }, ctx)).toBe(1);
+    expect(tx.fuelLog.create.mock.calls[0][0].data).toMatchObject({ tankPercent: null, litersAdded: 80 });
+  });
+
+  it('ноль литров и пустой замер ничего не пишут', async () => {
+    const tx = fakeTx();
+    expect(await recordOperatorFuelInTx(tx as never, 'eq-1', { tankPercent: null, litersAdded: 0, at }, ctx)).toBe(0);
+    expect(tx.fuelLog.create).not.toHaveBeenCalled();
+  });
+
+  it('остаток вне 0–100 % отклоняется, организация обязательна', async () => {
+    const tx = fakeTx();
+    await expect(recordOperatorFuelInTx(tx as never, 'eq-1', { tankPercent: 140, litersAdded: null, at }, ctx)).rejects.toMatchObject({ status: 400 });
+    await expect(recordOperatorFuelInTx(tx as never, 'eq-1', { tankPercent: 50, litersAdded: null, at }, { ...ctx, tenantId: '' })).rejects.toMatchObject({ status: 400 });
+    expect(tx.fuelLog.create).not.toHaveBeenCalled();
   });
 });

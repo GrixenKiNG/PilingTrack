@@ -1,3 +1,4 @@
+import {Prisma} from '@/generated/postgres-client/client';
 import {db} from '@/lib/db';
 
 /**
@@ -25,6 +26,38 @@ export interface EquipmentChecklistRow {
   completedAt: string | null;
   performerName: string | null;
   counts: {ok: number; remark: number; fault: number; na: number};
+  /** Снятое машинистом: моточасы, остаток топлива, долив. null — осмотр ничего не снимал. */
+  readings: EquipmentChecklistReadings | null;
+}
+
+export interface EquipmentChecklistReadings {
+  engineHours: number | null;
+  fuelPercent: number | null;
+  topUps: {coolantL: number | null; hydraulicOilL: number | null; engineOilL: number | null; dieselL: number | null};
+}
+
+const TOP_UP_KEYS = ['coolantL', 'hydraulicOilL', 'engineOilL', 'dieselL'] as const;
+
+function readingsOf(values: unknown[]): EquipmentChecklistReadings | null {
+  const readings: EquipmentChecklistReadings = {
+    engineHours: null, fuelPercent: null,
+    topUps: {coolantL: null, hydraulicOilL: null, engineOilL: null, dieselL: null},
+  };
+  let any = false;
+  for (const value of values) {
+    if (!value || typeof value !== 'object') continue;
+    const record = value as Record<string, unknown>;
+    const num = (key: string) => (typeof record[key] === 'number' && Number.isFinite(record[key]) ? (record[key] as number) : null);
+    const hours = num('engineHours');
+    if (hours !== null) { readings.engineHours = hours; any = true; }
+    const fuel = num('fuelPercent');
+    if (fuel !== null) { readings.fuelPercent = fuel; any = true; }
+    for (const key of TOP_UP_KEYS) {
+      const liters = num(key);
+      if (liters !== null) { readings.topUps[key] = liters; any = true; }
+    }
+  }
+  return any ? readings : null;
 }
 
 export async function listEquipmentChecklistHistory(input: {
@@ -41,7 +74,7 @@ export async function listEquipmentChecklistHistory(input: {
   });
   if (executions.length === 0) return [];
 
-  const [answers, users] = await Promise.all([
+  const [answers, valueRows, users] = await Promise.all([
     db.operatorChecklistAnswerRecord.groupBy({
       by: ['executionId', 'result'],
       _count: {_all: true},
@@ -52,6 +85,11 @@ export async function listEquipmentChecklistHistory(input: {
         executionId: {in: executions.map((item) => item.id)},
         NOT: {itemId: {startsWith: 'topup-'}},
       },
+    }),
+    // Снятые значения лежат в value ответа: моточасы, остаток топлива, литры долива.
+    db.operatorChecklistAnswerRecord.findMany({
+      where: {tenantId: input.tenantId, executionId: {in: executions.map((item) => item.id)}, NOT: {value: {equals: Prisma.DbNull}}},
+      select: {executionId: true, value: true},
     }),
     db.user.findMany({
       where: {tenantId: input.tenantId, id: {in: [...new Set(executions.map((item) => item.startedById))]}},
@@ -77,5 +115,6 @@ export async function listEquipmentChecklistHistory(input: {
     completedAt: item.completedAt ? item.completedAt.toISOString() : null,
     performerName: names.get(item.startedById) ?? null,
     counts: countsOf(item.id),
+    readings: readingsOf(valueRows.filter((row) => row.executionId === item.id).map((row) => row.value)),
   }));
 }

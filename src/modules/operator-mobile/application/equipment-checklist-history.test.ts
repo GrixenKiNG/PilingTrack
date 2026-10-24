@@ -2,7 +2,7 @@ import {beforeEach, describe, expect, it, vi} from 'vitest';
 
 const database = vi.hoisted(() => ({
   operatorChecklistExecution: {findMany: vi.fn()},
-  operatorChecklistAnswerRecord: {groupBy: vi.fn()},
+  operatorChecklistAnswerRecord: {groupBy: vi.fn(), findMany: vi.fn()},
   user: {findMany: vi.fn()},
 }));
 vi.mock('@/lib/db', () => ({db: database}));
@@ -13,6 +13,7 @@ const done = new Date('2026-10-09T04:37:22.000Z');
 beforeEach(() => {
   Object.values(database).forEach((model) => Object.values(model).forEach((fn) => fn.mockReset()));
   database.user.findMany.mockResolvedValue([{id: 'u1', name: 'Иванов И.'}]);
+  database.operatorChecklistAnswerRecord.findMany.mockResolvedValue([]);
 });
 
 describe('история чек-листов машиниста по установке', () => {
@@ -60,5 +61,32 @@ describe('история чек-листов машиниста по устан�
 
     const args = database.operatorChecklistAnswerRecord.groupBy.mock.calls[0][0];
     expect(args.where).toMatchObject({tenantId: 't', NOT: {itemId: {startsWith: 'topup-'}}});
+  });
+
+  it('показывает моточасы, остаток топлива и долив жидкостей, снятые машинистом', async () => {
+    database.operatorChecklistExecution.findMany.mockResolvedValue([
+      {id: 'e1', shiftId: 's1', startedById: 'u1', completedAt: done, template: {templateKey: 'EO_AFTER'}},
+      {id: 'e2', shiftId: 's1', startedById: 'u1', completedAt: done, template: {templateKey: 'EO_BEFORE'}},
+    ]);
+    database.operatorChecklistAnswerRecord.groupBy.mockResolvedValue([]);
+    database.operatorChecklistAnswerRecord.findMany.mockResolvedValue([
+      {executionId: 'e1', value: {engineHours: 108}},
+      {executionId: 'e1', value: {fuelPercent: 62}},
+      {executionId: 'e1', value: {coolantL: 2}},
+      {executionId: 'e1', value: {hydraulicOilL: 5}},
+      {executionId: 'e1', value: {engineOilL: 3}},
+      {executionId: 'e1', value: {dieselL: 120}},
+      {executionId: 'e1', value: {unknownKey: 9}},
+    ]);
+
+    const rows = await listEquipmentChecklistHistory({tenantId: 't', equipmentId: 'eq-1'});
+
+    expect(rows[0].readings).toEqual({
+      engineHours: 108, fuelPercent: 62,
+      topUps: {coolantL: 2, hydraulicOilL: 5, engineOilL: 3, dieselL: 120},
+    });
+    expect(rows[1].readings).toBeNull();
+    const args = database.operatorChecklistAnswerRecord.findMany.mock.calls[0][0];
+    expect(args.where).toMatchObject({tenantId: 't', executionId: {in: ['e1', 'e2']}});
   });
 });

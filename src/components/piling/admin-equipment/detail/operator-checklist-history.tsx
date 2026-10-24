@@ -14,6 +14,26 @@ import { formatRuDate } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import type { EquipmentChecklistRow } from '@/modules/operator-mobile';
 
+const TOP_UP_LABELS: ReadonlyArray<readonly [keyof NonNullable<EquipmentChecklistRow['readings']>['topUps'], string]> = [
+  ['dieselL', 'дизель'],
+  ['engineOilL', 'моторное масло'],
+  ['hydraulicOilL', 'гидравлическое масло'],
+  ['coolantL', 'антифриз'],
+];
+
+/** «Моточасы 108 · топливо 62 % · долив: дизель 120 л, моторное масло 3 л» — только то, что снято. */
+function readingsText(readings: EquipmentChecklistRow['readings']): string | null {
+  if (!readings) return null;
+  const parts: string[] = [];
+  if (readings.engineHours !== null) parts.push(`моточасы ${readings.engineHours}`);
+  if (readings.fuelPercent !== null) parts.push(`топливо ${readings.fuelPercent} %`);
+  const topUps = TOP_UP_LABELS
+    .filter(([key]) => (readings.topUps[key] ?? 0) > 0)
+    .map(([key, label]) => `${label} ${readings.topUps[key]} л`);
+  if (topUps.length > 0) parts.push(`долив: ${topUps.join(', ')}`);
+  return parts.length > 0 ? parts.join(' · ') : null;
+}
+
 export function OperatorChecklistHistory({ equipmentId, onlyEo = false, title }: {
   equipmentId: string;
   /** В журнале ТО нужны только ЕО; предсменный осмотр — в списке осмотров. */
@@ -70,6 +90,9 @@ export function OperatorChecklistHistory({ equipmentId, onlyEo = false, title }:
                 {row.counts.remark > 0 && <span className="text-warning-strong">Замечаний: {row.counts.remark}</span>}
                 {row.counts.fault > 0 && <span className={cn('font-semibold text-destructive-strong')}>Неисправностей: {row.counts.fault}</span>}
               </span>
+              {readingsText(row.readings) && (
+                <span className="basis-full text-xs text-muted-foreground">{readingsText(row.readings)}</span>
+              )}
             </li>
           ))}
         </ul>

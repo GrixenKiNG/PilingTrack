@@ -76,3 +76,27 @@ describe('ReportDetailDialog — pile meters', () => {
     expect(screen.getByText('5 шт.')).toBeTruthy();
   });
 });
+
+describe('ReportDetailDialog — показания на конец смены', () => {
+  const renderWith = (extra: Partial<ReportDTO>) => render(
+    <ReportDetailDialog
+      report={{ ...report, ...extra } as ReportDTO}
+      onClose={vi.fn()}
+      onPreviewPdf={vi.fn()}
+      formatDate={(d) => d}
+      formatLastEditor={() => '—'}
+    />,
+  );
+
+  it('показывает моточасы и остаток топлива, снятые машинистом при закрытии', () => {
+    renderWith({ endingEngineHours: 108, endingFuelPercent: 62 });
+    expect(screen.getByText('108 м/ч')).toBeTruthy();
+    expect(screen.getByText('62 %')).toBeTruthy();
+  });
+
+  it('без показаний строк нет (ноль топлива показывается, пропуск — нет)', () => {
+    renderWith({ endingEngineHours: null, endingFuelPercent: 0 });
+    expect(screen.queryByText('Моточасы на конец смены')).toBeNull();
+    expect(screen.getByText('0 %')).toBeTruthy();
+  });
+});

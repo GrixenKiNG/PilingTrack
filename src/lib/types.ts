@@ -302,6 +302,9 @@ export interface ReportDTO {
   piles: (PileWorkDTO & { pileGrade: PileGradeDTO })[];
   drillings: (LeaderDrillingDTO & { type: DrillingTypeDTO })[];
   downtimes: (ReportDowntimeDTO & { reason: DowntimeReasonDTO })[];
+  /** Моточасы и остаток топлива на конец смены — снимает машинист при закрытии. */
+  endingEngineHours?: number | null;
+  endingFuelPercent?: number | null;
   /** Computed server-side in one batched media query (listReportsForReview). */
   hasPhotos?: boolean;
   /** First completed photo of the report, for the list thumbnail. */

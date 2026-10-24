@@ -33,6 +33,9 @@ const fmtDate = (value: string) => {
 // Production day for a date input default (today).
 const todayInput = () => getTodayInTimezone();
 
+/** «Сегодня» уходит с настоящим моментом: дата без времени — это 00:00 UTC, ночью по Москве уже будущее. */
+const toRecordedAt = (day: string) => (day === todayInput() ? new Date().toISOString() : day);
+
 export function MeterReadingsPanel({
   equipmentId,
   onChanged,
@@ -104,7 +107,7 @@ export function MeterReadingsPanel({
       const res = await authFetch(`/api/equipment/${equipmentId}/meter-readings`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ engineHours, recordedAt, note }),
+        body: JSON.stringify({ engineHours, recordedAt: toRecordedAt(recordedAt), note }),
       });
       if (!res.ok) {
         const msg = (await res.json().catch(() => ({}))).error ?? 'Не удалось сохранить показание';

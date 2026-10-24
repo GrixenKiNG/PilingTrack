@@ -27,6 +27,25 @@ describe('OperatorChecklistHistory — ЕО машиниста в карточк
     expect(authFetch).toHaveBeenCalledWith('/api/equipment/eq-1/operator-checklists');
   });
 
+  it('показывает моточасы, остаток топлива и долив, снятые машинистом', async () => {
+    respond([{
+      ...row('e1', 'EO_AFTER', 'ЕО после смены'),
+      readings: { engineHours: 108, fuelPercent: 62, topUps: { coolantL: 2, hydraulicOilL: 5, engineOilL: 3, dieselL: 120 } },
+    }]);
+    render(<OperatorChecklistHistory equipmentId="eq-1" title="Осмотры" />);
+
+    expect(await screen.findByText(
+      'моточасы 108 · топливо 62 % · долив: дизель 120 л, моторное масло 3 л, гидравлическое масло 5 л, антифриз 2 л',
+    )).toBeInTheDocument();
+  });
+
+  it('если машинист ничего не снимал, строки показаний нет', async () => {
+    respond([{ ...row('e1', 'EO_BEFORE', 'ЕО до смены'), readings: null }]);
+    render(<OperatorChecklistHistory equipmentId="eq-1" title="Осмотры" />);
+    expect(await screen.findByText('ЕО до смены')).toBeInTheDocument();
+    expect(screen.queryByText(/моточасы|топливо/)).not.toBeInTheDocument();
+  });
+
   it('в журнале ТО (onlyEo) предсменный осмотр не показывается', async () => {
     respond([row('e1', 'EO_AFTER', 'ЕО после смены'), row('e2', 'PRESHIFT_INSPECTION', 'Предсменный осмотр')]);
     render(<OperatorChecklistHistory equipmentId="eq-1" onlyEo title="ЕО машиниста по сменам" />);

@@ -48,6 +48,23 @@ describe('дата ручной записи — день Москвы, а не 
       method: 'POST', body: expect.stringContaining('"recordedAt":"2026-09-24"'),
     }));
   });
+
+  // «Сегодня» без времени сохранялось как 00:00 UTC: ночью по Москве это будущее,
+  // и запись выпадала из сводки (прогон по ролям 24.10.2026). Сегодняшняя дата
+  // уходит с настоящим моментом.
+  it.each([
+    { Component: FuelPanel, add: 'Добавить запись', placeholder: 'напр. 200', path: 'fuel' },
+    { Component: MeterReadingsPanel, add: 'Добавить показание', placeholder: 'напр. 5670', path: 'meter-readings' },
+  ])('$path: дата «сегодня» уходит с временем, а не полуночью UTC', ({ Component, add, placeholder, path }) => {
+    render(<Component equipmentId="eq-1" />);
+    fireEvent.click(screen.getByRole('button', { name: add }));
+    fireEvent.change(screen.getByPlaceholderText(placeholder), { target: { value: '100' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить' }));
+    const post = mocks.authFetch.mock.calls.find(([url, init]) => url === `/api/equipment/eq-1/${path}` && init?.method === 'POST');
+    if (!post) throw new Error('POST не отправлен');
+    const sent = JSON.parse((post[1] as { body: string }).body);
+    expect(sent.recordedAt).toBe('2026-09-25T21:30:00.000Z');
+  });
 });
 
 beforeEach(() => {

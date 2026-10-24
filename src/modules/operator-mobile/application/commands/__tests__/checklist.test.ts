@@ -68,6 +68,7 @@ const tx = {
   operatorShiftEvidence: {findFirst: vi.fn(), findUnique: vi.fn(), create: vi.fn()},
   equipmentDefect: {findFirst: vi.fn(), create: vi.fn()},
   meterReading: {findFirst: vi.fn(), create: vi.fn()},
+  fuelLog: {create: vi.fn()},
   equipment: {findFirst: vi.fn(), update: vi.fn()},
   $executeRaw: vi.fn(),
 };
@@ -137,6 +138,30 @@ describe('submitChecklist — пометка замены счётчика', () 
       {itemId: 'glass', answer: 'OK', note: 'Счётчик заменён'},
     ]})).rejects.toMatchObject({status: 400});
     expect(tx.meterReading.create).not.toHaveBeenCalled();
+  });
+});
+
+describe('submitChecklist — топливо из ЕО после работы', () => {
+  const fuelAnswers = (measures: Record<string, number>[]): ChecklistAnswer[] => measures.map((m, i) => (
+    {itemId: i === 0 ? 'fuel-level' : 'topup-diesel', answer: 'OK', measures: m}
+  ));
+
+  it('остаток и долив дизеля уходят в журнал топлива установки двумя записями', async () => {
+    await submitChecklist({...input, answers: fuelAnswers([{fuelPercent: 62}, {dieselL: 120}])});
+    const rows = tx.fuelLog.create.mock.calls.map(([arg]) => arg.data);
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toMatchObject({tenantId: 'tenant-a', equipmentId: 'eq-1', tankPercent: 62, litersAdded: null, recordedById: 'operator-a'});
+    expect(rows[1]).toMatchObject({tankPercent: null, litersAdded: 120});
+  });
+
+  it('без остатка и долива журнал топлива не трогается', async () => {
+    await submitChecklist({...input, answers: []});
+    expect(tx.fuelLog.create).not.toHaveBeenCalled();
+  });
+
+  it('масло и антифриз в журнал ТОПЛИВА не попадают', async () => {
+    await submitChecklist({...input, answers: [{itemId: 'topup-engine-oil', answer: 'OK', measures: {engineOilL: 3}}]});
+    expect(tx.fuelLog.create).not.toHaveBeenCalled();
   });
 });
 

@@ -14,6 +14,7 @@ import type {ChecklistStage, ShiftCondition} from '../../domain/checklist-types'
 import {collectDefectDrafts, validateChecklistRun, type ChecklistAnswer} from '../../domain/checklist-run';
 import {selectChecklistItems} from '../../domain/shift-conditions';
 import {missingPrerequisites} from '../../domain/shift-phases';
+import {recordOperatorFuelInTx} from '@/modules/equipment/server';
 import {OperatorCommandError, requireCrew, requireOpenShift, recordEvidence, requireConfirmedImages, recordMeter} from './shared';
 import type {Tx} from './shared';
 import {ENGINE_HOURS_REPLACEMENT_NOTE} from '../../contracts';
@@ -266,6 +267,18 @@ export async function submitChecklist(input: {
         clientCommandId: `${input.clientCommandId}:fuel`,
         now,
       });
+    }
+
+    // Остаток по указателю и долив дизеля — это ещё и журнал топлива установки, откуда
+    // его читают карточка техники, сводка расхода и аналитика. Масло и антифриз туда
+    // не идут: они остаются в свидетельствах смены и в истории осмотров.
+    const dieselTopUp = findMeasure(input.answers, 'dieselL');
+    if (fuel !== null || (dieselTopUp !== null && dieselTopUp > 0)) {
+      await recordOperatorFuelInTx(tx, input.equipmentId, {
+        tankPercent: fuel === null ? null : Math.round(fuel),
+        litersAdded: dieselTopUp === null ? null : Math.round(dieselTopUp),
+        at: now,
+      }, {tenantId: input.tenantId, recordedById: input.operatorId, note: definition.title});
     }
 
     const fluids = input.answers

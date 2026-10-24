@@ -12,6 +12,7 @@
  * выбрасывается — становится резервным источником. Схема не меняется.
  */
 
+import type { Prisma } from '@/generated/postgres-client/client';
 import { db } from '@/lib/db';
 import { ServiceError } from '@/lib/service-error';
 import type { MeterSource } from './meter-reading';
@@ -145,4 +146,49 @@ export async function deleteFuelEntry(
     throw new ServiceError('Запись о топливе не найдена', 404);
   }
   await db.fuelLog.delete({ where: { id: entryId } });
+}
+
+/**
+ * Топливо из ЕО машиниста — внутри транзакции команды осмотра.
+ *
+ * Машинист снимает остаток по указателю ДО заправки и потом доливает. Сводка
+ * (`summarizeManualFuel`) считает остаток записи уже с её доливом, поэтому здесь
+ * две записи: замер, а затем долив на миллисекунду позже. Долив тогда попадает в
+ * баланс следующего периода, а не искажает текущий. Возвращает число записей.
+ */
+export async function recordOperatorFuelInTx(
+  tx: Pick<Prisma.TransactionClient, 'fuelLog'>,
+  equipmentId: string,
+  input: { tankPercent: number | null; litersAdded: number | null; at: Date },
+  ctx: { tenantId: string; recordedById: string; note?: string },
+): Promise<number> {
+  if (!ctx.tenantId) throw new ServiceError('Не определена организация пользователя', 400); // fail-closed (IDOR guard)
+  const tankPercent = asInt(input.tankPercent);
+  const litersAdded = asInt(input.litersAdded);
+  if (tankPercent != null && (tankPercent < 0 || tankPercent > 100)) {
+    throw new ServiceError('Остаток топлива — от 0 до 100 %', 400);
+  }
+  if (litersAdded != null && litersAdded < 0) {
+    throw new ServiceError('Долив не может быть отрицательным', 400);
+  }
+
+  const base = {
+    tenantId: ctx.tenantId,
+    equipmentId,
+    source: 'MANUAL' as const,
+    recordedById: ctx.recordedById,
+    note: ctx.note ?? '',
+  };
+  let written = 0;
+  if (tankPercent != null) {
+    await tx.fuelLog.create({ data: { ...base, recordedAt: input.at, tankPercent, litersAdded: null } });
+    written += 1;
+  }
+  if (litersAdded != null && litersAdded > 0) {
+    await tx.fuelLog.create({
+      data: { ...base, recordedAt: new Date(input.at.getTime() + 1), tankPercent: null, litersAdded },
+    });
+    written += 1;
+  }
+  return written;
 }

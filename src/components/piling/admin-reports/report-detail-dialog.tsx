@@ -55,6 +55,12 @@ export function ReportDetailDialog({
                 <p className="text-xs text-muted-foreground">Установка</p>
                 <p className="font-medium">{report.equipment?.name || '—'}</p>
               </div>
+              {report.endingEngineHours != null && (
+                <div><p className="text-xs text-muted-foreground">Моточасы на конец смены</p><p className="font-mono">{report.endingEngineHours} м/ч</p></div>
+              )}
+              {report.endingFuelPercent != null && (
+                <div><p className="text-xs text-muted-foreground">Остаток топлива на конец</p><p className="font-mono">{report.endingFuelPercent} %</p></div>
+              )}
               <div className="col-span-2">
                 <p className="text-xs text-muted-foreground">Последнее редактирование</p>
                 <p className="font-medium">{formatLastEditor(report)}</p>

@@ -47,6 +47,9 @@ const fmtDate = (value: string) => {
 
 const todayInput = () => getTodayInTimezone();
 
+/** «Сегодня» уходит с настоящим моментом: дата без времени — это 00:00 UTC, ночью по Москве уже будущее. */
+const toRecordedAt = (day: string) => (day === todayInput() ? new Date().toISOString() : day);
+
 export function FuelPanel({ equipmentId }: { equipmentId: string }) {
   const [entries, setEntries] = useState<FuelEntry[]>([]);
   const [summary, setSummary] = useState<FuelSummary | null>(null);
@@ -111,7 +114,7 @@ export function FuelPanel({ equipmentId }: { equipmentId: string }) {
         body: JSON.stringify({
           litersAdded: liters.trim() === '' ? null : Number(liters),
           tankPercent: percent.trim() === '' ? null : Number(percent),
-          recordedAt,
+          recordedAt: toRecordedAt(recordedAt),
           note,
         }),
       });
