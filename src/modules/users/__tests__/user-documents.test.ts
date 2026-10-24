@@ -15,11 +15,11 @@ const { findFirstUserMock, findFirstTypeMock, findManyTypeMock, findManyDocMock,
 
 // След пишется в audit-service; подменяем его, чтобы поймать metadata события.
 vi.mock('@/modules/audit', () => ({
-  recordAuditEvent: recordAuditMock,
+  recordAuditEventInTx: (_tx: unknown, event: unknown) => recordAuditMock(event),
 }));
 
-vi.mock('@/lib/db', () => ({
-  db: {
+vi.mock('@/lib/db', () => {
+  const db = {
     user: { findFirst: findFirstUserMock },
     userDocumentType: { findFirst: findFirstTypeMock, findMany: findManyTypeMock },
     media: { findUnique: mediaFindUniqueMock },
@@ -30,8 +30,10 @@ vi.mock('@/lib/db', () => ({
       update: updateDocMock,
       delete: vi.fn(),
     },
-  },
-}));
+    $transaction: (run: (tx: unknown) => unknown) => run(db),
+  };
+  return { db };
+});
 
 // Права НЕ подменяем: смысл этих проверок — что маршрут документов подключён к
 // настоящей матрице ролей, а не к её представлению в тесте.
@@ -313,6 +315,19 @@ describe('след правки документа — прежний срок (
     const event = recordAuditMock.mock.calls[0][0];
     expect(event.action).toBe('user.document.created');
     expect(event.metadata.before).toBeUndefined();
+  });
+
+  // Работник ведёт свои документы сам, и след — единственный контроль: без него
+  // правка не должна состояться (след пишется в той же транзакции).
+  it('сбой следа не глушится: создание и правка документа падают вместе со следом', async () => {
+    const failure = new Error('след не записан');
+    recordAuditMock.mockRejectedValue(failure);
+    createDocMock.mockResolvedValue({ id: 'doc_2', typeId: 'type_1', expiresAt: new Date('2027-01-01T00:00:00Z') });
+
+    await expect(createUserDocument('usr_other', { typeId: 'type_1', expiresAt: '2027-01-01' }, ctx(ADMIN)))
+      .rejects.toBe(failure);
+    await expect(updateUserDocument('usr_other', 'doc_1', { expiresAt: '2027-01-01' }, ctx(ADMIN)))
+      .rejects.toBe(failure);
   });
 
   // NIGHT-DOC-001: смена вида на «со сроком» не должна оставлять срок пустым.

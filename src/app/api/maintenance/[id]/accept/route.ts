@@ -5,8 +5,6 @@ import { assertCan, assertRole } from '@/services/auth/authorization-service';
 import { acceptMaintenance } from '@/modules/equipment';
 import { withMutation } from '@/core/api-wrapper';
 import { ServiceError } from '@/services/service-error';
-import { logger } from '@/lib/logger';
-import { recordAuditEvent } from '@/modules/audit';
 
 export const runtime = 'nodejs';
 
@@ -29,20 +27,7 @@ export const POST = withMutation(
     const { id } = await params;
     try {
       const record = await acceptMaintenance(id, { tenantId, userId: actor.id });
-      // Best-effort (F-R34-12): наряд уже принят — сбой записи следа не должен
-      // превращать успешную приёмку в 500.
-      try {
-        await recordAuditEvent({
-          action: 'maintenance.accepted',
-          scope: 'equipment',
-          actorId: actor.id,
-          targetId: id,
-          tenantId,
-          metadata: { name: record.title },
-        });
-      } catch (err) {
-        logger.error('Maintenance accept: audit write failed', err, { recordId: id });
-      }
+      // След «Наряд принят» пишет сама команда после приёмки; его сбой приёмку не отменяет.
       return NextResponse.json({ record });
     } catch (err) {
       if (err instanceof ServiceError) return NextResponse.json({ error: err.message }, { status: err.status });

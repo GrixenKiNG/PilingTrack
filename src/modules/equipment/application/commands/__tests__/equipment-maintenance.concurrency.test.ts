@@ -31,6 +31,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('@/lib/db', () => ({ db: mocks.db }));
+vi.mock('@/modules/audit', () => ({ recordAuditEvent: vi.fn(async () => undefined) }));
 vi.mock('@/modules/readiness/server', () => ({
   OPEN_MAINTENANCE: ['PLANNED', 'ASSIGNED', 'IN_PROGRESS', 'ON_HOLD'],
   requestReadinessSnapshot: mocks.snapshot,

@@ -1,5 +1,6 @@
 import { db } from '@/lib/db';
 import { ServiceError } from '@/lib/service-error';
+import { recordAuditEventInTx } from '@/modules/audit';
 
 /**
  * Журнал забивки свай — публичный фасад (W46).
@@ -61,16 +62,49 @@ export async function decidePilePassport(input: {
     throw new ServiceError('Укажите, почему свая идёт на добивку', 400);
   }
 
-  // Строгое равенство по организации: чужой паспорт этим решением не тронуть.
-  const updated = await db.pilePassport.updateMany({
-    where: { id: input.passportId, tenantId: input.tenantId },
-    data: {
-      acceptance: input.acceptance,
-      acceptedById: input.actorId,
-      acceptedAt: new Date(),
-      acceptanceNote: note,
-    },
-  });
+  await db.$transaction(async (tx) => {
+    // Прежнее решение читается ДО перезаписи: acceptance/acceptedById/
+    // acceptedAt/acceptanceNote — те же колонки, и второе решение мастера
+    // стирает первое (F-R34-16). Без снимка «before» в журнале не остаётся,
+    // кто и когда принял сваю, которую потом отправили на добивку.
+    const previous = await tx.pilePassport.findFirst({
+      where: { id: input.passportId, tenantId: input.tenantId },
+      select: {
+        pileNumber: true, acceptance: true, acceptedById: true, acceptedAt: true, acceptanceNote: true,
+      },
+    });
 
-  if (updated.count === 0) throw new ServiceError('Паспорт сваи не найден', 404);
+    // Строгое равенство по организации: чужой паспорт этим решением не тронуть.
+    const updated = await tx.pilePassport.updateMany({
+      where: { id: input.passportId, tenantId: input.tenantId },
+      data: {
+        acceptance: input.acceptance,
+        acceptedById: input.actorId,
+        acceptedAt: new Date(),
+        acceptanceNote: note,
+      },
+    });
+    if (updated.count === 0) throw new ServiceError('Паспорт сваи не найден', 404);
+
+    // Решение мастера — след в той же транзакции.
+    await recordAuditEventInTx(tx, {
+      action: 'pile.passport.decided',
+      scope: 'reports',
+      actorId: input.actorId,
+      targetId: input.passportId,
+      tenantId: input.tenantId,
+      metadata: {
+        pileNumber: previous?.pileNumber ?? null,
+        before: previous
+          ? {
+              acceptance: previous.acceptance,
+              acceptedById: previous.acceptedById,
+              acceptedAt: previous.acceptedAt,
+              acceptanceNote: previous.acceptanceNote,
+            }
+          : null,
+        after: { acceptance: input.acceptance, acceptedById: input.actorId, acceptanceNote: note },
+      },
+    });
+  });
 }

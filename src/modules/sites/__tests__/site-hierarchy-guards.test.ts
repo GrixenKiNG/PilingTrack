@@ -17,29 +17,37 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const m = vi.hoisted(() => {
-  // Клиент интерактивной транзакции: удаление узла и подсчёт выработки идут в нём.
+  // Клиент интерактивной транзакции: создание и удаление узла, подсчёт выработки
+  // и след идут в нём. Чтение и запись узлов используют те же моки, что и `db`.
+  const shared = {
+    siteDelete: vi.fn(),
+    pileFieldCreate: vi.fn(),
+    pileFieldFindFirst: vi.fn(),
+    pileFieldDelete: vi.fn(),
+    clusterCreate: vi.fn(),
+    clusterFindFirst: vi.fn(),
+    clusterDelete: vi.fn(),
+    picketCreate: vi.fn(),
+    picketFindFirst: vi.fn(),
+    picketDelete: vi.fn(),
+  };
   const tx = {
     $queryRaw: vi.fn(),
     pileWork: { count: vi.fn() },
     leaderDrilling: { count: vi.fn() },
-    pileField: { findFirst: vi.fn(), delete: vi.fn() },
-    cluster: { findFirst: vi.fn(), delete: vi.fn() },
-    picket: { findFirst: vi.fn(), delete: vi.fn() },
+    site: { delete: shared.siteDelete },
+    pileField: { create: shared.pileFieldCreate, findFirst: shared.pileFieldFindFirst, delete: shared.pileFieldDelete },
+    cluster: { create: shared.clusterCreate, findFirst: shared.clusterFindFirst, delete: shared.clusterDelete },
+    picket: { create: shared.picketCreate, findFirst: shared.picketFindFirst, delete: shared.picketDelete },
   };
   return {
     tx,
-     
+    ...shared,
     transaction: vi.fn((fn: unknown) => (fn as (client: typeof tx) => Promise<unknown>)(tx)),
     siteFindFirst: vi.fn(),
-    siteDelete: vi.fn(),
-    pileFieldCreate: vi.fn(),
-    pileFieldFindFirst: vi.fn(),
-    clusterCreate: vi.fn(),
-    clusterFindFirst: vi.fn(),
-    picketCreate: vi.fn(),
-    picketFindFirst: vi.fn(),
     crewCount: vi.fn(),
     reportCount: vi.fn(),
+    auditInTx: vi.fn(),
   };
 });
 
@@ -54,7 +62,7 @@ vi.mock('@/lib/db', () => ({
     report: { count: m.reportCount },
   },
 }));
-vi.mock('@/modules/audit', () => ({ recordAuditEvent: vi.fn() }));
+vi.mock('@/modules/audit', () => ({ recordAuditEventInTx: m.auditInTx }));
 
 import {
   createSiteHierarchyItem,
@@ -233,5 +241,72 @@ describe('hardDeleteSite — запрет при отчётах', () => {
     await expect(hardDeleteSite('s1', { tenantId: '', actorId: 'a1' })).rejects.toThrow('tenantId is required');
     expect(m.siteDelete).not.toHaveBeenCalled();
     expect(m.reportCount).not.toHaveBeenCalled();
+  });
+});
+
+// ────────────────────────────────────────────
+// След схемы объекта (F-R34-15) — в той же транзакции
+// ────────────────────────────────────────────
+
+describe('след схемы объекта пишется в транзакции узла', () => {
+  beforeEach(() => {
+    m.auditInTx.mockReset();
+    m.auditInTx.mockResolvedValue(undefined);
+  });
+
+  it('создание узла: след с типом, именем и id узла', async () => {
+    m.pileFieldCreate.mockResolvedValue({ id: 'f1', name: 'Поле А', siteId: 's1' });
+    await createSiteHierarchyItem({ siteId: 's1', type: 'field', name: 'Поле А' }, ctx);
+    expect(m.auditInTx).toHaveBeenCalledWith(m.tx, {
+      action: 'site.hierarchy.created', scope: 'sites', actorId: 'a1', targetId: 's1', tenantId: 't1',
+      metadata: { type: 'field', name: 'Поле А', itemId: 'f1' },
+    });
+  });
+
+  it('сбой следа при создании не глушится: узел не возвращается', async () => {
+    m.pileFieldCreate.mockResolvedValue({ id: 'f1', name: 'Поле А', siteId: 's1' });
+    const failure = new Error('след не записан');
+    m.auditInTx.mockRejectedValue(failure);
+    await expect(createSiteHierarchyItem({ siteId: 's1', type: 'field', name: 'Поле А' }, ctx)).rejects.toBe(failure);
+  });
+
+  it('родитель чужого объекта: 404 и следа нет', async () => {
+    m.pileFieldFindFirst.mockResolvedValue(null);
+    await expect(createSiteHierarchyItem({ siteId: 's1', type: 'cluster', name: 'К1', parentId: 'foreign' }, ctx))
+      .rejects.toMatchObject({ status: 404 });
+    expect(m.auditInTx).not.toHaveBeenCalled();
+  });
+
+  it('удаление узла: след с именем, прочитанным до удаления', async () => {
+    m.tx.picket.findFirst.mockResolvedValue({ id: 'p1', name: 'ПК-12' });
+    m.tx.pileWork.count.mockResolvedValue(0);
+    m.tx.leaderDrilling.count.mockResolvedValue(0);
+    await deleteSiteHierarchyItem('s1', 'picket', 'p1', ctx);
+    expect(m.auditInTx).toHaveBeenCalledWith(m.tx, {
+      action: 'site.hierarchy.deleted', scope: 'sites', actorId: 'a1', targetId: 's1', tenantId: 't1',
+      metadata: { type: 'picket', name: 'ПК-12', itemId: 'p1' },
+    });
+    expect(m.tx.picket.delete.mock.invocationCallOrder[0]).toBeLessThan(m.auditInTx.mock.invocationCallOrder[0]);
+  });
+
+  it('удаление узла с выработкой: отказ, ни удаления, ни следа', async () => {
+    m.tx.picket.findFirst.mockResolvedValue({ id: 'p1', name: 'ПК-12' });
+    m.tx.pileWork.count.mockResolvedValue(3);
+    m.tx.leaderDrilling.count.mockResolvedValue(0);
+    await expect(deleteSiteHierarchyItem('s1', 'picket', 'p1', ctx)).rejects.toMatchObject({ status: 409 });
+    expect(m.tx.picket.delete).not.toHaveBeenCalled();
+    expect(m.auditInTx).not.toHaveBeenCalled();
+  });
+
+  it('удаление объекта: след в той же транзакции, сбой следа не глушится', async () => {
+    m.crewCount.mockResolvedValue(0);
+    m.reportCount.mockResolvedValue(0);
+    m.siteFindFirst.mockResolvedValue({ id: 's1', tenantId: 't1', name: 'Объект' });
+    await hardDeleteSite('s1', ctx);
+    expect(m.auditInTx).toHaveBeenCalledWith(m.tx, expect.objectContaining({ action: 'site.deleted', targetId: 's1' }));
+
+    const failure = new Error('след не записан');
+    m.auditInTx.mockRejectedValue(failure);
+    await expect(hardDeleteSite('s1', ctx)).rejects.toBe(failure);
   });
 });

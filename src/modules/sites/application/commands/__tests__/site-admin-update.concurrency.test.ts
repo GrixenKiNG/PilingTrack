@@ -23,7 +23,7 @@ vi.mock('@/lib/db', () => ({
   },
 }));
 
-vi.mock('@/modules/audit', () => ({ recordAuditEvent: vi.fn() }));
+vi.mock('@/modules/audit', () => ({ recordAuditEventInTx: vi.fn(async () => undefined) }));
 
 import { updateSiteWithPlans, setSiteCompleted } from '../site-admin-command.service';
 import { db } from '@/lib/db';
@@ -59,7 +59,7 @@ describe('updateSiteWithPlans — конкурентная правка', () => 
 
 describe('setSiteCompleted — конкурентная правка', () => {
   it('при изменении объекта между чтением и записью — 409', async () => {
-    vi.mocked(db.site.updateMany).mockResolvedValue({ count: 0 } as never);
+    txState.tx.site.updateMany.mockResolvedValue({ count: 0 });
 
     await expect(setSiteCompleted('s1', true, ctx)).rejects.toMatchObject({ status: 409 });
   });
@@ -67,7 +67,7 @@ describe('setSiteCompleted — конкурентная правка', () => {
   it('пишет отметку условно по updatedAt и организации', async () => {
     await setSiteCompleted('s1', true, ctx);
 
-    expect(db.site.updateMany).toHaveBeenCalledWith(
+    expect(txState.tx.site.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({ where: { id: 's1', tenantId: 't1', updatedAt: readAt } }),
     );
   });

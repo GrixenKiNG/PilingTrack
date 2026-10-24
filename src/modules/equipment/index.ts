@@ -24,3 +24,6 @@ export type { CreateEquipmentCommand, UpdateEquipmentCommand } from './applicati
 export { getAccessibleEquipment, getEquipmentById, getEquipmentByIdOrThrow, getEquipmentDetails, getMaintenanceById, listAllEquipment, listAllMaintenance, listEquipmentWithCrewCounts, listEquipmentCatalog, listMaintenance, listMeterReadings, listFuelLog, getFuelSummary, listMaintenancePlans, getFleetKpiData } from './application/queries/equipment-query.service';
 export type { MaintenanceListFilter } from './application/queries/equipment-query.service';
 export { getEquipmentRepository } from './infrastructure/equipment.repository';
+
+export { readFuelConsumptions } from './application/queries/fuel-consumption';
+export type { FuelConsumption as ResolvedFuelConsumption } from './domain/fuel-consumption';

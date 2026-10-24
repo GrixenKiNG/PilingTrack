@@ -4,7 +4,7 @@ const {
   findUniqueEquipmentMock, createRecMock, findUniqueRecMock, updateRecMock,
   deleteRecMock, outboxCreateManyMock,
   findFirstEquipmentMock, updateEquipmentMock, findManyPlanMock, updatePlanMock,
-  findFirstReadingMock, createReadingMock, executeRawMock,
+  findFirstReadingMock, createReadingMock, executeRawMock, auditInTxMock,
 } = vi.hoisted(() => ({
   findUniqueEquipmentMock: vi.fn(),
   createRecMock: vi.fn(),
@@ -26,7 +26,12 @@ const {
   // Открытый наряд ТО — вход критерия готовности «Обслуживание»: команды
   // заказывают пересчёт снимка в той же транзакции, что и саму запись.
   outboxCreateManyMock: vi.fn(),
+  // След приёмки пишется после коммита и приёмку не отменяет (решение владельца 24.10.2026).
+  auditInTxMock: vi.fn(),
 }));
+
+vi.mock('@/modules/audit', () => ({ recordAuditEvent: auditInTxMock }));
+vi.mock('@/lib/logger', () => ({ logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() } }));
 
 vi.mock('@/lib/db', () => {
   const client = {
@@ -56,6 +61,8 @@ import { projectNextMaintenance } from '../maintenance-regulation';
 // Безопасные значения по умолчанию: у техники без регламентов закрытие наряда
 // не должно ничего двигать, и остальные наборы тестов об этом не знают.
 beforeEach(() => {
+  auditInTxMock.mockReset();
+  auditInTxMock.mockResolvedValue(undefined);
   findFirstEquipmentMock.mockReset();
   updateEquipmentMock.mockReset();
   findManyPlanMock.mockReset();
@@ -317,6 +324,29 @@ describe('acceptMaintenance — приёмка', () => {
     expect(data.acceptedAt).toBeInstanceOf(Date);
     expect(data.status).toBe('DONE');
     expect(data.completedAt).toBeInstanceOf(Date);
+  });
+
+  it('пишет след приёмки; сбой следа приёмку не отменяет — принятых нарядов без приёмки не бывает', async () => {
+    findUniqueRecMock.mockResolvedValue({ id: 'rec_1', tenantId: 'orion', acceptedById: null, completedAt: null, workDone: 'заменили РВД' });
+    updateRecMock.mockResolvedValue({ id: 'rec_1', equipmentId: 'eq_1', title: 'ТО-1', updatedAt: new Date() });
+    await acceptMaintenance('rec_1', { tenantId: 'orion', userId: 'admin_1' });
+    expect(auditInTxMock).toHaveBeenCalledWith(expect.objectContaining({
+      action: 'maintenance.accepted', actorId: 'admin_1', targetId: 'rec_1', tenantId: 'orion',
+      metadata: { name: 'ТО-1' },
+    }));
+    // След пишется после того, как приёмка записана.
+    expect(auditInTxMock.mock.invocationCallOrder[0]).toBeGreaterThan(updateRecMock.mock.invocationCallOrder[0]);
+
+    auditInTxMock.mockRejectedValue(new Error('лента недоступна'));
+    findUniqueRecMock.mockResolvedValue({ id: 'rec_1', tenantId: 'orion', acceptedById: null, completedAt: null, workDone: 'заменили РВД' });
+    const record = await acceptMaintenance('rec_1', { tenantId: 'orion', userId: 'admin_1' });
+    expect(record).toMatchObject({ id: 'rec_1' });
+  });
+
+  it('чужая организация: след не пишется', async () => {
+    findUniqueRecMock.mockResolvedValue({ id: 'rec_1', tenantId: 'other', acceptedById: null, completedAt: null });
+    await expect(acceptMaintenance('rec_1', { tenantId: 'orion', userId: 'admin_1' })).rejects.toThrow();
+    expect(auditInTxMock).not.toHaveBeenCalled();
   });
 
   it('rejects cross-tenant record; writes nothing', async () => {

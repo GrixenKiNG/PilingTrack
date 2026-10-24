@@ -4,7 +4,7 @@
  * EquipmentAnalytics — fleet analytics page (панель управления → after DLQ).
  *
  * MVP scope (Вариант 1): everything derives from report data + equipment
- * passport, except fuel which comes from the telematics `fuel_total` counter.
+ * passport; fuel chooses valid telemetry, then the manual journal.
  * Reads GET /api/admin/equipment-analytics?dateFrom&dateTo[&siteId].
  *   - KPI tiles for the fleet
  *   - sortable per-rig table (click a row → the rig's page)
@@ -23,6 +23,7 @@ import { QueryErrorBanner } from '@/components/piling/async-ui';
 import { KPI_GRID, KpiTile, kpiGridStyle } from '@/components/piling/kpi-tile';
 import { KIND_LABELS } from '@/components/piling/admin-equipment/equipment-form';
 import type { EquipmentKindDTO } from '@/lib/types';
+import type { ResolvedFuelConsumption as FuelConsumption } from '@/modules/equipment';
 import { appPageRoute } from '@/lib/routes';
 import { cn } from '@/lib/utils';
 import { formatCountMeters } from '@/lib/format';
@@ -40,6 +41,7 @@ interface EquipmentRow {
   drillingMeters: number;
   downtimeHours: number;
   fuelLiters: number | null;
+  fuelConsumption: FuelConsumption;
   engineHoursTotal: number | null;
   nextMaintenanceAtHours: number | null;
   nextMaintenanceDate: string | null;
@@ -52,6 +54,7 @@ interface AnalyticsResult {
   dateFrom: string;
   dateTo: string;
   periodDays: number;
+  fuelScopeNote: string | null;
   fleet: {
     totalEquipment: number;
     activeCount: number;
@@ -61,6 +64,7 @@ interface AnalyticsResult {
     drillingMeters: number;
     downtimeHours: number;
     fuelLiters: number | null;
+    fuelSources: Record<FuelConsumption['source'], number>;
     maintenanceDueCount: number;
   };
   equipment: EquipmentRow[];
@@ -138,7 +142,7 @@ export function EquipmentAnalytics() {
 
   // Тач-таргеты ≥44px у кнопок периода на мобильном, компактно на десктопе.
   const chip = 'min-h-11 rounded-md border border-border px-3 py-2 text-sm text-muted-foreground hover:bg-muted sm:min-h-0 sm:py-1 sm:text-xs';
-  const dateInput = 'min-h-10 rounded-md border border-border bg-card px-2 py-2 text-sm sm:min-h-0 sm:py-1';
+  const dateInput = 'min-h-10 max-sm:min-h-11 rounded-md border border-border bg-card px-2 py-2 text-sm sm:min-h-0 sm:py-1';
 
   return (
     <div className="space-y-5 p-4 lg:p-6">
@@ -180,6 +184,7 @@ export function EquipmentAnalytics() {
       ) : data ? (
         <>
           <KpiTiles fleet={data.fleet} />
+          {data.fuelScopeNote && <p className="text-sm text-muted-foreground">{data.fuelScopeNote}</p>}
           <FleetTable rows={sorted} sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} periodDays={data.periodDays} onOpen={(id) => router.push(`${appPageRoute('admin-equipment')}/${id}`)} />
           <DowntimePareto rows={data.downtimePareto} />
         </>
@@ -194,7 +199,7 @@ function KpiTiles({ fleet }: { fleet: AnalyticsResult['fleet'] }) {
     { label: 'Сваи', icon: HardHat, value: formatCountMeters(fleet.piles, fleet.pileMeters), detail: 'за период' },
     { label: 'Бурение', icon: Drill, value: formatCountMeters(fleet.drillingCount, fleet.drillingMeters), detail: 'за период' },
     { label: 'Простой', icon: Clock, value: fmtHours(fleet.downtimeHours), detail: 'суммарно' },
-    { label: 'Топливо', icon: Fuel, value: fleet.fuelLiters != null ? `${fmt(fleet.fuelLiters)} л` : '—', detail: fleet.fuelLiters != null ? 'расход по телеметрии' : 'недостаточно телеметрии' },
+    { label: 'Топливо', icon: Fuel, value: fleet.fuelLiters != null ? `${fmt(fleet.fuelLiters)} л` : '—', detail: fleet.fuelLiters != null ? `телеметрия: ${fleet.fuelSources.telemetry}, журнал: ${fleet.fuelSources.manual}` : 'недостаточно данных по парку' },
     { label: 'ТО', icon: Wrench, value: String(fleet.maintenanceDueCount), detail: 'скоро / просрочено', alert: fleet.maintenanceDueCount > 0 },
   ];
   return (
@@ -262,7 +267,7 @@ function FleetTable({
           <select
             value={sortKey}
             onChange={(e) => onSort(e.target.value as SortKey)}
-            className="min-h-10 flex-1 rounded-md border border-border bg-card px-2 py-2 text-sm text-foreground"
+            className="min-h-10 max-sm:min-h-11 flex-1 rounded-md border border-border bg-card px-2 py-2 text-sm text-foreground"
           >
             {FLEET_COLUMNS.map((c) => (
               <option key={c.k} value={c.k}>{c.label}{sortKey === c.k ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''}</option>
@@ -294,7 +299,7 @@ function FleetTable({
                 <Stat label="Отчётов" value={String(r.reportCount)} />
                 <Stat label="Утилизация" value={`${Math.round((r.activeDays / Math.max(periodDays, 1)) * 100)}%`} sub={`${r.activeDays}/${periodDays} дн`} />
                 <Stat label="Простой" value={fmtHours(r.downtimeHours)} />
-                <Stat label="Топливо" value={r.fuelLiters != null ? `${fmt(r.fuelLiters)} л` : '—'} />
+                <Stat label="Топливо" value={`${fuelValue(r.fuelConsumption)} · ${fuelSource(r.fuelConsumption)}`} />
               </dl>
             </button>
           ))}
@@ -339,7 +344,7 @@ function FleetTable({
                 <span className="text-2xs text-muted-foreground"> ({r.activeDays}/{periodDays} дн)</span>
               </td>
               <td className="px-3 py-2 text-right font-mono">{fmtHours(r.downtimeHours)}</td>
-              <td className="px-3 py-2 text-right font-mono">{r.fuelLiters != null ? `${fmt(r.fuelLiters)} л` : '—'}</td>
+              <td className="px-3 py-2 text-right font-mono" title={fuelSource(r.fuelConsumption)}>{fuelValue(r.fuelConsumption)}<span className="block text-sm text-muted-foreground sm:text-2xs">{fuelSource(r.fuelConsumption)}</span></td>
               <td className="px-3 py-2 text-right">
                 {r.maintenanceOverdue
                   ? <span className="rounded bg-destructive/10 px-1.5 py-0.5 text-2xs font-medium text-destructive-strong">просрочено</span>
@@ -409,4 +414,13 @@ function fmtHours(hours: number): string {
   if (mins === 0) return `${whole} ч`;
   if (whole === 0) return `${mins} мин`;
   return `${whole} ч ${mins} мин`;
+}
+
+function fuelValue(fuel: FuelConsumption): string {
+  return fuel.liters != null ? `${fmt(fuel.liters)} л` : '—';
+}
+
+function fuelSource(fuel: FuelConsumption): string {
+  const source = { telemetry: 'Телеметрия', manual: 'Ручной журнал', none: 'Нет источника' }[fuel.source];
+  return fuel.quality === 'insufficient' ? `${source} · недостаточно данных` : source;
 }

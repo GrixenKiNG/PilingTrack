@@ -221,7 +221,7 @@ export function Section({ icon: Icon, title, count, dominant, footerLabel, onFoo
         <button
           type="button"
           onClick={onFooter}
-          className="flex w-full items-center justify-between border-t border-border px-3 py-2 text-left text-xs font-medium text-info-strong hover:bg-info/10"
+          className="flex w-full max-sm:min-h-11 max-sm:text-sm items-center justify-between border-t border-border px-3 py-2 text-left text-xs font-medium text-info-strong hover:bg-info/10"
         >
           {footerLabel}
           <span aria-hidden="true">›</span>

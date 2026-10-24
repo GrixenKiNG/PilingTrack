@@ -16,6 +16,7 @@
 
 import { db } from '@/lib/db';
 import { ServiceError } from '@/lib/service-error';
+import { recordAuditEventInTx } from '@/modules/audit';
 import type {
   EquipmentKind, EquipmentPermitStatus, EquipmentWorkScope,
 } from '@/generated/postgres-client/client';
@@ -134,26 +135,39 @@ export async function upsertEquipmentPermit(input: {
     grantedByName: input.actor.name,
   };
 
-  return db.userEquipmentPermit.upsert({
-    where: {
-      tenantId_userId_equipmentKind_equipmentModel_scope: {
+  // Допуск и след — одна транзакция: выданный допуск без следа недопустим.
+  return db.$transaction(async (tx) => {
+    const saved = await tx.userEquipmentPermit.upsert({
+      where: {
+        tenantId_userId_equipmentKind_equipmentModel_scope: {
+          tenantId: input.tenantId,
+          userId: employee.id,
+          equipmentKind: input.payload.equipmentKind,
+          equipmentModel: model,
+          scope: input.payload.scope,
+        },
+      },
+      create: {
         tenantId: input.tenantId,
         userId: employee.id,
         equipmentKind: input.payload.equipmentKind,
         equipmentModel: model,
         scope: input.payload.scope,
+        ...data,
       },
-    },
-    create: {
+      update: data,
+      select: { id: true },
+    });
+    const { validUntil, ...rest } = input.payload;
+    await recordAuditEventInTx(tx, {
+      action: 'user.equipment_permit.saved',
+      scope: 'users',
+      actorId: input.actor.id,
+      targetId: input.userId,
       tenantId: input.tenantId,
-      userId: employee.id,
-      equipmentKind: input.payload.equipmentKind,
-      equipmentModel: model,
-      scope: input.payload.scope,
-      ...data,
-    },
-    update: data,
-    select: { id: true },
+      metadata: { permitId: saved.id, ...rest, validUntil: validUntil?.toISOString() ?? null },
+    });
+    return saved;
   });
 }
 
@@ -166,6 +180,7 @@ export async function upsertEquipmentPermit(input: {
  */
 export async function deleteEquipmentPermit(input: {
   tenantId: string;
+  actorId: string;
   permitId: string;
   mayManage: boolean;
 }) {
@@ -176,8 +191,17 @@ export async function deleteEquipmentPermit(input: {
 
   // Сужение по тенанту в самом условии удаления, а не проверкой до него:
   // между проверкой и удалением строка успевает смениться.
-  const removed = await db.userEquipmentPermit.deleteMany({
-    where: { id: input.permitId, tenantId: input.tenantId },
+  await db.$transaction(async (tx) => {
+    const removed = await tx.userEquipmentPermit.deleteMany({
+      where: { id: input.permitId, tenantId: input.tenantId },
+    });
+    if (removed.count === 0) throw new ServiceError('Допуск не найден', 404);
+    await recordAuditEventInTx(tx, {
+      action: 'user.equipment_permit.deleted',
+      scope: 'users',
+      actorId: input.actorId,
+      targetId: input.permitId,
+      tenantId: input.tenantId,
+    });
   });
-  if (removed.count === 0) throw new ServiceError('Допуск не найден', 404);
 }

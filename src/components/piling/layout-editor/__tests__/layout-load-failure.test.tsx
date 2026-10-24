@@ -55,6 +55,34 @@ function Harness() {
 
 type FetchCall = { url: string; method: string };
 
+describe('layout revision conflict', () => {
+  it.each(['card', 'page'])('%s sends its read revision and keeps the draft on 409', async (kind) => {
+    vi.restoreAllMocks();
+    const value = kind === 'card' ? TILE_DEFAULT : DEFAULT_TEMPLATE;
+    const revision = '"synthetic-row:2026-01-01T00:00:00.000Z"';
+    const cleanup = vi.fn();
+    let sent: HeadersInit | undefined;
+    global.fetch = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      if (init?.method === 'PUT') {
+        sent = init.headers;
+        return new Response(JSON.stringify({error: 'Конфликт раскладки'}), {status: 409});
+      }
+      return new Response(JSON.stringify(value), {headers: {ETag: revision}});
+    });
+    const hook = kind === 'card'
+      ? () => useLayoutTemplate({surfaceId: 'tile-surface', defaultTemplate: TILE_DEFAULT, validate: createTemplateValidator([]), onBeforeSave: cleanup})
+      : () => usePageLayoutTemplate({surfaceId: 'page-surface', defaultTemplate: DEFAULT_TEMPLATE, validate: createPageLayoutValidator(CATALOG), catalogIds: CATALOG});
+    const {result} = renderHook<{ startEditing(): void; saveDraft(): Promise<void>; editing: boolean }, unknown>(hook);
+    await act(async () => {await Promise.resolve();});
+    act(() => result.current.startEditing());
+    await act(async () => {await result.current.saveDraft();});
+    expect(new Headers(sent).get('If-Match')).toBe(revision);
+    expect(toast.error).toHaveBeenCalledWith('Раскладка изменена в другой вкладке. Обновите страницу; ваш черновик не сохранён.');
+    expect(result.current.editing).toBe(true);
+    expect(cleanup).not.toHaveBeenCalled();
+  });
+});
+
 function stubFetch(respond: () => Response) {
   const calls: FetchCall[] = [];
   global.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {

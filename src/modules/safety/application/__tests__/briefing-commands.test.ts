@@ -8,10 +8,16 @@ import {beforeEach, describe, expect, it, vi} from 'vitest';
   свою отметку, инструктор — свою, остальные не подписывают ничего, и ничьё
   время первой отметки не переписывается.
 */
-const mocks = vi.hoisted(() => ({find: vi.fn(), update: vi.fn(), userFind: vi.fn(), create: vi.fn()}));
-vi.mock('@/lib/db', () => ({
-  db: {briefingRecord: {findFirst: mocks.find, update: mocks.update, create: mocks.create}, user: {findFirst: mocks.userFind}},
-}));
+const mocks = vi.hoisted(() => ({find: vi.fn(), update: vi.fn(), userFind: vi.fn(), create: vi.fn(), audit: vi.fn()}));
+vi.mock('@/modules/audit', () => ({recordAuditEventInTx: mocks.audit}));
+vi.mock('@/lib/db', () => {
+  const db = {
+    briefingRecord: {findFirst: mocks.find, update: mocks.update, create: mocks.create},
+    user: {findFirst: mocks.userFind},
+    $transaction: (run: (tx: unknown) => unknown) => run(db),
+  };
+  return {db};
+});
 
 import {conductBriefing, signBriefingRecord} from '../briefing-commands';
 
@@ -23,6 +29,8 @@ const sign = (actorId: string, tenantId = 'tenant-a') => signBriefingRecord({ten
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.audit.mockReset();
+  mocks.audit.mockResolvedValue(undefined);
   mocks.find.mockResolvedValue(record());
   mocks.update.mockResolvedValue({});
 });
@@ -59,6 +67,24 @@ describe('подпись под записью журнала', () => {
     expect(mocks.update).not.toHaveBeenCalled();
   });
 
+  it('подпись пишет след в той же транзакции; повторная подпись следа не пишет', async () => {
+    await sign('worker-1');
+    expect(mocks.audit).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      action: 'briefing.signed', actorId: 'worker-1', targetId: 'rec-1', tenantId: 'tenant-a',
+    }));
+
+    mocks.audit.mockClear();
+    mocks.find.mockResolvedValue(record({employeeSignedAt: new Date('2026-10-16T06:00:00Z')}));
+    await sign('worker-1');
+    expect(mocks.audit).not.toHaveBeenCalled();
+  });
+
+  it('сбой следа не глушится: подпись падает вместе со следом', async () => {
+    const failure = new Error('след не записан');
+    mocks.audit.mockRejectedValue(failure);
+    await expect(sign('worker-1')).rejects.toBe(failure);
+  });
+
   it('запись ищется только в своей организации; чужая выглядит как отсутствующая', async () => {
     mocks.find.mockResolvedValue(null);
     await expect(sign('worker-1', 'tenant-b')).rejects.toMatchObject({status: 404});
@@ -91,6 +117,18 @@ describe('проведение инструктажа', () => {
     expect(data).toMatchObject({tenantId: 'tenant-a', userId: 'worker-1', instructorId: 'safety-1', kind: 'INSTRUCTION'});
     expect(data.instructorSignedAt).toBeInstanceOf(Date);
     expect(data).not.toHaveProperty('employeeSignedAt');
+  });
+
+  it('проведение пишет след в той же транзакции, а сбой следа его отменяет', async () => {
+    await conduct();
+    expect(mocks.audit).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      action: 'briefing.conducted', actorId: 'safety-1', targetId: 'rec-9', tenantId: 'tenant-a',
+      metadata: {employeeId: 'worker-1', documentTitle: 'Свайные работы', type: 'REPEAT'},
+    }));
+
+    const failure = new Error('след не записан');
+    mocks.audit.mockRejectedValue(failure);
+    await expect(conduct()).rejects.toBe(failure);
   });
 
   it.each([

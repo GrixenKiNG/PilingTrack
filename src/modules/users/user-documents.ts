@@ -22,7 +22,7 @@ import { db } from '@/lib/db';
 import { ServiceError } from '@/lib/service-error';
 import { can } from '@/core/security/authorization';
 import { documentExpiry } from '@/lib/document-expiry';
-import { recordAuditEvent } from '@/modules/audit';
+import { recordAuditEventInTx, type AuditClient } from '@/modules/audit';
 import { evaluateOperatorClearance, type OperatorClearance } from './operator-clearance';
 import {
   assertCanRead,
@@ -198,20 +198,22 @@ export async function createUserDocument(
 
   if (input.mediaId) await requireAttachableMedia(input.mediaId, user.id, ctx);
 
-  const created = await db.userDocument.create({
-    data: {
-      tenantId: ctx.tenantId,
-      userId: user.id,
-      typeId: type.id,
-      number: input.number?.trim() ?? '',
-      issuedAt,
-      expiresAt,
-      notes: input.notes?.trim() ?? '',
-      mediaId: input.mediaId || null,
-    },
+  return db.$transaction(async (tx) => {
+    const created = await tx.userDocument.create({
+      data: {
+        tenantId: ctx.tenantId,
+        userId: user.id,
+        typeId: type.id,
+        number: input.number?.trim() ?? '',
+        issuedAt,
+        expiresAt,
+        notes: input.notes?.trim() ?? '',
+        mediaId: input.mediaId || null,
+      },
+    });
+    await auditDocumentChange(tx, 'created', ctx, created, user.id);
+    return created;
   });
-  await auditDocumentChange('created', ctx, created, user.id);
-  return created;
 }
 
 /**
@@ -224,13 +226,14 @@ export async function createUserDocument(
  * а вот дата окончания и вид документа определяют допуск к работе.
  */
 function auditDocumentChange(
+  tx: AuditClient,
   action: 'created' | 'updated' | 'deleted',
   ctx: UserDocumentContext,
   document: { id: string; typeId?: string; expiresAt?: Date | null },
   targetUserId: string,
   before?: { typeId?: string; expiresAt?: Date | null },
 ) {
-  return recordAuditEvent({
+  return recordAuditEventInTx(tx, {
     action: `user.document.${action}`,
     scope: 'users',
     actorId: ctx.actor.id,
@@ -320,17 +323,21 @@ export async function updateUserDocument(
     input.expiresAt !== undefined ? (data.expiresAt as Date | null) : existing.expiresAt,
   );
 
-  const updated = await db.userDocument.update({ where: { id: documentId }, data });
-  // Прошлую строку читали для проверки прав — берём её же как `before`,
-  // чтобы в следе был виден прежний срок, а не только новый.
-  await auditDocumentChange('updated', ctx, updated, userId, existing);
-  return updated;
+  return db.$transaction(async (tx) => {
+    const updated = await tx.userDocument.update({ where: { id: documentId }, data });
+    // Прошлую строку читали для проверки прав — берём её же как `before`,
+    // чтобы в следе был виден прежний срок, а не только новый.
+    await auditDocumentChange(tx, 'updated', ctx, updated, userId, existing);
+    return updated;
+  });
 }
 
 export async function deleteUserDocument(userId: string, documentId: string, ctx: UserDocumentContext) {
   assertCanWrite(userId, ctx);
   await requireTenantUser(userId, ctx.tenantId);
   const document = await requireOwnDocument(userId, documentId, ctx.tenantId);
-  await db.userDocument.delete({ where: { id: documentId } });
-  await auditDocumentChange('deleted', ctx, document, userId);
+  await db.$transaction(async (tx) => {
+    await tx.userDocument.delete({ where: { id: documentId } });
+    await auditDocumentChange(tx, 'deleted', ctx, document, userId);
+  });
 }

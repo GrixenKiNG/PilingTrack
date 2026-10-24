@@ -1,5 +1,5 @@
-export { createSite, updateSite, activateSite, deactivateSite } from './site-command.service';
-export type { CreateSiteCommand, UpdateSiteCommand } from './site.command';
+export { updateSite, activateSite, deactivateSite } from './site-command.service';
+export type { UpdateSiteCommand } from './site.command';
 export {
   createSiteWithPlans,
   updateSiteWithPlans,

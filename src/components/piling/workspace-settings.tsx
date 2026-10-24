@@ -294,7 +294,7 @@ export function WorkspaceSettings() {
                     <p className="text-sm font-medium text-foreground">{label}</p>
                     {/* Правило без отправителя: признак сохранится, но слать
                         его некому. Молчать об этом — обманывать администратора. */}
-                    {!implemented && <p className="text-xs text-muted-foreground">Отправитель не реализован</p>}
+                    {!implemented && <p className="text-xs text-muted-foreground max-sm:text-sm">Отправитель не реализован</p>}
                   </div>
                   <Toggle checked={settings.notifications[key] ?? false} label={label} disabled={!isAdmin || settingsState !== 'ready' || !implemented || saving} onClick={() => toggleNotification(key)} />
                 </div>
@@ -306,9 +306,9 @@ export function WorkspaceSettings() {
           <Card>
             <CardHeader><CardTitle className="flex items-center gap-2 text-base"><Database className="h-4 w-4 text-signal-strong" />Интеграции и резервное копирование</CardTitle><CardDescription>Подключения и защита данных.</CardDescription></CardHeader>
             <CardContent className="space-y-3">
-              <div className="flex items-center justify-between gap-3 text-sm"><span className="text-muted-foreground">Telegram-бот</span>{isAdmin ? <button type="button" onClick={() => setActiveTab('telegram')} className="inline-flex items-center gap-1.5 font-medium text-info-strong hover:underline"><Send className="h-3.5 w-3.5" />Настроить</button> : <span className="text-muted-foreground">только администратор</span>}</div>
-              {isAdmin && <div className="flex items-center justify-between gap-3 text-sm"><span className="text-muted-foreground">Очередь сообщений (DLQ)</span><button type="button" onClick={() => setActiveTab('dlq')} className="inline-flex items-center gap-1.5 font-medium text-info-strong hover:underline"><Database className="h-3.5 w-3.5" />Открыть</button></div>}
-              <p className="text-xs leading-5 text-muted-foreground">Резервное копирование выполняется на сервере по расписанию (off-site). Управление — на стороне инфраструктуры.</p>
+              <div className="flex items-center justify-between gap-3 text-sm"><span className="text-muted-foreground">Telegram-бот</span>{isAdmin ? <button type="button" onClick={() => setActiveTab('telegram')} className="inline-flex items-center gap-1.5 font-medium text-info-strong hover:underline max-sm:min-h-11 max-sm:min-w-11"><Send className="h-3.5 w-3.5" />Настроить</button> : <span className="text-muted-foreground">только администратор</span>}</div>
+              {isAdmin && <div className="flex items-center justify-between gap-3 text-sm"><span className="text-muted-foreground">Очередь сообщений (DLQ)</span><button type="button" onClick={() => setActiveTab('dlq')} className="inline-flex items-center gap-1.5 font-medium text-info-strong hover:underline max-sm:min-h-11 max-sm:min-w-11"><Database className="h-3.5 w-3.5" />Открыть</button></div>}
+              <p className="text-xs leading-5 text-muted-foreground max-sm:text-sm">Резервное копирование выполняется на сервере по расписанию (off-site). Управление — на стороне инфраструктуры.</p>
             </CardContent>
           </Card>
 
@@ -319,7 +319,7 @@ export function WorkspaceSettings() {
                 <CardTitle className="flex items-center gap-2 text-base"><LayoutGrid className="h-4 w-4 text-signal-strong" />Шаблоны плиток</CardTitle>
                 <CardDescription>Состав, порядок и размер плиток на дашбордах, мониторинге и в оборудовании.</CardDescription>
               </div>
-              <Button variant="outline" size="sm" onClick={() => setActiveTab('template')}><LayoutTemplate className="h-4 w-4" />Открыть редактор</Button>
+              <Button variant="outline" size="sm" className="max-sm:min-h-11" onClick={() => setActiveTab('template')}><LayoutTemplate className="h-4 w-4" />Открыть редактор</Button>
             </CardHeader>
           </Card>
         </div>
@@ -351,12 +351,12 @@ export function WorkspaceSettings() {
                   {/* Тот же признак, что и на вкладке «Рабочее пространство»:
                       список строится из общего каталога, и правило без
                       отправителя не должно выглядеть рабочим ни здесь, ни там. */}
-                  {!implemented && <p className="text-xs text-muted-foreground">Отправитель не реализован</p>}
+                  {!implemented && <p className="text-xs text-muted-foreground max-sm:text-sm">Отправитель не реализован</p>}
                 </div>
                 <Toggle checked={settings.notifications[key] ?? false} label={label} disabled={!isAdmin || settingsState !== 'ready' || !implemented || saving} onClick={() => toggleNotification(key)} />
               </div>
             ))}
-            {!isAdmin && <p className="text-xs text-muted-foreground">Только администратор может изменять правила уведомлений.</p>}
+            {!isAdmin && <p className="text-xs text-muted-foreground max-sm:text-sm">Только администратор может изменять правила уведомлений.</p>}
           </CardContent>
         </Card>
       )}

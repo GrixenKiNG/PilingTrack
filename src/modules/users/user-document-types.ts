@@ -1,6 +1,6 @@
 import { db } from '@/lib/db';
 import { ServiceError } from '@/lib/service-error';
-import { recordAuditEvent } from '@/modules/audit';
+import { recordAuditEventInTx } from '@/modules/audit';
 import {
   assertCanManageTypes,
   type UserDocumentContext,
@@ -68,24 +68,27 @@ export async function createUserDocumentType(input: UserDocumentTypeInput, ctx: 
       : 'Такой вид документа есть, но отключён — включите его вместо создания нового', 409);
   }
 
-  const created = await db.userDocumentType.create({
-    data: {
-      tenantId: ctx.tenantId,
-      name,
-      normalizedName,
-      requiresExpiry: input.requiresExpiry ?? true,
-      defaultValidMonths: input.defaultValidMonths ?? null,
-      leadTimeDays: input.leadTimeDays ?? 30,
-      requiredForOperator: input.requiredForOperator ?? false,
-      notes: input.notes?.trim() ?? '',
-    },
+  // Вид документа определяет допуск (`requiredForOperator`) — след в той же транзакции.
+  return db.$transaction(async (tx) => {
+    const created = await tx.userDocumentType.create({
+      data: {
+        tenantId: ctx.tenantId,
+        name,
+        normalizedName,
+        requiresExpiry: input.requiresExpiry ?? true,
+        defaultValidMonths: input.defaultValidMonths ?? null,
+        leadTimeDays: input.leadTimeDays ?? 30,
+        requiredForOperator: input.requiredForOperator ?? false,
+        notes: input.notes?.trim() ?? '',
+      },
+    });
+    await recordAuditEventInTx(tx, {
+      action: 'user.document_type.created', scope: 'users',
+      actorId: ctx.actor.id, targetId: created.id, tenantId: ctx.tenantId,
+      metadata: { name: created.name },
+    });
+    return created;
   });
-  await recordAuditEvent({
-    action: 'user.document_type.created', scope: 'users',
-    actorId: ctx.actor.id, targetId: created.id, tenantId: ctx.tenantId,
-    metadata: { name: created.name },
-  });
-  return created;
 }
 
 export async function updateUserDocumentType(
@@ -120,13 +123,15 @@ export async function updateUserDocumentType(
   if (input.isActive !== undefined) data.isActive = input.isActive;
   if (input.notes !== undefined) data.notes = input.notes.trim();
 
-  const updated = await db.userDocumentType.update({ where: { id: typeId }, data });
-  await recordAuditEvent({
-    action: 'user.document_type.updated', scope: 'users',
-    actorId: ctx.actor.id, targetId: typeId, tenantId: ctx.tenantId,
-    metadata: { name: updated.name, changed: Object.keys(data) },
+  return db.$transaction(async (tx) => {
+    const updated = await tx.userDocumentType.update({ where: { id: typeId }, data });
+    await recordAuditEventInTx(tx, {
+      action: 'user.document_type.updated', scope: 'users',
+      actorId: ctx.actor.id, targetId: typeId, tenantId: ctx.tenantId,
+      metadata: { name: updated.name, changed: Object.keys(data) },
+    });
+    return updated;
   });
-  return updated;
 }
 
 /**
@@ -147,10 +152,12 @@ export async function deleteUserDocumentType(typeId: string, ctx: UserDocumentCo
       409,
     );
   }
-  await db.userDocumentType.delete({ where: { id: typeId } });
-  await recordAuditEvent({
-    action: 'user.document_type.deleted', scope: 'users',
-    actorId: ctx.actor.id, targetId: typeId, tenantId: ctx.tenantId,
-    metadata: { name: existing.name },
+  await db.$transaction(async (tx) => {
+    await tx.userDocumentType.delete({ where: { id: typeId } });
+    await recordAuditEventInTx(tx, {
+      action: 'user.document_type.deleted', scope: 'users',
+      actorId: ctx.actor.id, targetId: typeId, tenantId: ctx.tenantId,
+      metadata: { name: existing.name },
+    });
   });
 }

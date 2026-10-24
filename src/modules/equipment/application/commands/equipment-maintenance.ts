@@ -7,6 +7,8 @@
 
 import { db } from '@/lib/db';
 import { ServiceError } from '@/lib/service-error';
+import { logger } from '@/lib/logger';
+import { recordAuditEvent } from '@/modules/audit';
 import { requestReadinessSnapshot } from '@/modules/readiness/server';
 import { OPEN_MAINTENANCE } from '@/modules/readiness/server';
 import { advanceMaintenanceRegulation } from './maintenance-regulation';
@@ -315,7 +317,7 @@ export async function acceptMaintenance(
   // этой проверки пустой наряд закрывался бы через приёмку в обход правила.
   assertWorkDescribed(existing.workDone);
 
-  return db.$transaction(async (tx) => {
+  const accepted = await db.$transaction(async (tx) => {
     const record = await tx.maintenanceRecord.update({
       // Повтор проверок в самой записи — см. updateMaintenance. Описание работ
       // входит в условие: assertWorkDescribed выше читает его до транзакции, и
@@ -344,6 +346,23 @@ export async function acceptMaintenance(
     await requestMaintenanceSnapshot(tx as typeof db, record, ctx.tenantId, 'accepted');
     return record;
   });
+
+  // След приёмки — «по возможности», ПОСЛЕ коммита (решение владельца 24.10.2026,
+  // F-R34-12): принятых нарядов, которые не удалось принять из-за сбоя ленты,
+  // быть не должно. Сбой записи следа только логируется и считается.
+  try {
+    await recordAuditEvent({
+      action: 'maintenance.accepted',
+      scope: 'equipment',
+      actorId: ctx.userId,
+      targetId: recordId,
+      tenantId: ctx.tenantId,
+      metadata: { name: accepted.title },
+    });
+  } catch (err) {
+    logger.error('Maintenance accept: audit write failed', err, { recordId });
+  }
+  return accepted;
 }
 
 export async function deleteMaintenance(

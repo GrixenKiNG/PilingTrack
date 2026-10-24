@@ -1,15 +1,16 @@
 import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
 
 vi.mock('@/lib/db', () => ({
-  db: { moduleLayoutTemplate: { findUnique: vi.fn(), upsert: vi.fn() } },
+  db: { moduleLayoutTemplate: { findUnique: vi.fn(), create: vi.fn() } },
 }));
 
 import { db } from '@/lib/db';
+import { getLayoutSnapshot } from '@/modules/layout';
 import { getTemplate, saveTemplate } from '@/modules/monitoring/application/template-service';
 import { DEFAULT_EQUIPMENT_TILE_TEMPLATE } from '@/components/piling/monitoring/equipment-tile-template';
 
 const findUniqueMock = db.moduleLayoutTemplate.findUnique as unknown as Mock;
-const upsertMock = db.moduleLayoutTemplate.upsert as unknown as Mock;
+const createMock = db.moduleLayoutTemplate.create as unknown as Mock;
 
 describe('monitoring template service', () => {
   beforeEach(() => vi.clearAllMocks());
@@ -25,12 +26,12 @@ describe('monitoring template service', () => {
     await expect(saveTemplate('orion', { nope: true }, 'user1')).rejects.toThrow();
   });
 
-  it('upserts a valid template under the monitoring surface', async () => {
-    upsertMock.mockImplementation(async ({ create }: { create: { template: unknown } }) => ({ template: create.template }));
-    const res = await saveTemplate('orion', DEFAULT_EQUIPMENT_TILE_TEMPLATE, 'user1');
+  it('creates a valid template under the monitoring surface', async () => {
+    createMock.mockImplementation(async ({ data }: { data: { template: unknown } }) => ({ id: 'row', updatedAt: new Date('2026-01-01'), template: data.template }));
+    const res = await saveTemplate('orion', DEFAULT_EQUIPMENT_TILE_TEMPLATE, 'user1', (await getLayoutSnapshot('orion', 'monitoring-equipment-tile')).revision);
     expect(res.version).toBe(1);
-    expect(upsertMock).toHaveBeenCalledOnce();
-    const call = upsertMock.mock.calls[0][0] as { create: { surfaceId: string } };
-    expect(call.create.surfaceId).toBe('monitoring-equipment-tile');
+    expect(createMock).toHaveBeenCalledOnce();
+    const call = createMock.mock.calls[0][0] as { data: { surfaceId: string } };
+    expect(call.data.surfaceId).toBe('monitoring-equipment-tile');
   });
 });

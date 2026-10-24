@@ -405,7 +405,7 @@ export function AdminReports() {
                   placeholder="Поиск по оператору, объекту, установке"
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
-                  className="h-9 min-w-[200px] flex-1 rounded-md border border-border bg-card px-2 text-xs text-foreground outline-none focus:border-slate-400"
+                  className="h-9 max-sm:min-h-11 min-w-[200px] flex-1 rounded-md border border-border bg-card px-2 text-xs max-sm:text-sm text-foreground outline-none focus:border-slate-400"
                 />
                 {QUICK_FILTERS.map((filter) => (
                   <button
@@ -413,7 +413,7 @@ export function AdminReports() {
                     type="button"
                     onClick={() => setQuickFilter(filter.key)}
                     className={cn(
-                      'min-h-9 rounded-md border px-3 py-1.5 text-xs font-medium transition-colors',
+                      'min-h-9 max-sm:min-h-11 rounded-md border px-3 py-1.5 text-xs max-sm:text-sm font-medium transition-colors',
                       quickFilter === filter.key
                         ? 'border-slate-900 bg-slate-900 text-white'
                         : 'border-border bg-muted text-muted-foreground hover:border-border hover:bg-card',
@@ -428,7 +428,7 @@ export function AdminReports() {
                     aria-label="Период с"
                     value={periodFrom}
                     onChange={(event) => setPeriodFrom(event.target.value)}
-                    className="h-9 rounded-md border border-border bg-card px-2 text-xs font-mono text-foreground outline-none focus:border-slate-400"
+                    className="h-9 max-sm:min-h-11 rounded-md border border-border bg-card px-2 text-xs max-sm:text-sm font-mono text-foreground outline-none focus:border-slate-400"
                   />
                   <span className="text-xs text-muted-foreground">-</span>
                   <input
@@ -436,13 +436,13 @@ export function AdminReports() {
                     aria-label="Период по"
                     value={periodTo}
                     onChange={(event) => setPeriodTo(event.target.value)}
-                    className="h-9 rounded-md border border-border bg-card px-2 text-xs font-mono text-foreground outline-none focus:border-slate-400"
+                    className="h-9 max-sm:min-h-11 rounded-md border border-border bg-card px-2 text-xs max-sm:text-sm font-mono text-foreground outline-none focus:border-slate-400"
                   />
                   <Button
                     type="button"
                     variant="outline"
                     onClick={periodActive ? handleResetPeriod : handleApplyPeriod}
-                    className="h-9 border-border bg-card px-3 text-xs text-muted-foreground hover:bg-muted"
+                    className="h-9 max-sm:min-h-11 border-border bg-card px-3 text-xs max-sm:text-sm text-muted-foreground hover:bg-muted"
                   >
                     {periodActive ? 'Сбросить' : 'Применить'}
                   </Button>

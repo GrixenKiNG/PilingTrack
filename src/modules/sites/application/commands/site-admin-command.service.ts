@@ -6,7 +6,7 @@
 import type { Prisma } from '@/generated/postgres-client/client';
 import { db } from '@/lib/db';
 import { ServiceError } from '@/lib/service-error';
-import { recordAuditEvent } from '@/modules/audit';
+import { recordAuditEventInTx } from '@/modules/audit';
 
 // ────────────────────────────────────────────
 // Plan normalization
@@ -121,15 +121,16 @@ export async function createSiteWithPlans(input: {
       });
     }
 
-    return created;
-  });
+    // Объект и его след — одна транзакция.
+    await recordAuditEventInTx(tx, {
+      action: 'site.created',
+      scope: 'sites',
+      actorId: ctx.actorId,
+      targetId: created.id,
+      metadata: { tenantId: ctx.tenantId, name: created.name, plannedPiles: created.plannedPiles, plannedDrilling: created.plannedDrilling },
+    });
 
-  await recordAuditEvent({
-    action: 'site.created',
-    scope: 'sites',
-    actorId: ctx.actorId,
-    targetId: site.id,
-    metadata: { tenantId: ctx.tenantId, name: site.name, plannedPiles: site.plannedPiles, plannedDrilling: site.plannedDrilling },
+    return created;
   });
 
   return site;
@@ -217,27 +218,31 @@ export async function updateSiteWithPlans(siteId: string, input: {
       });
     }
 
-    return tx.site.findUnique({
+    const result = await tx.site.findUnique({
       where: { id: siteId },
       include: {
         pilePlans: { include: { pileGrade: true } },
         drillingPlans: true,
       },
     });
-  });
 
-  await recordAuditEvent({
-    action: 'site.updated',
-    scope: 'sites',
-    actorId: ctx.actorId,
-    targetId: siteId,
-    metadata: {
-      tenantId: ctx.tenantId,
-      before: { name: existing.name, plannedPiles: existing.plannedPiles, plannedDrilling: existing.plannedDrilling },
-      after: updated
-        ? { name: updated.name, plannedPiles: updated.plannedPiles, plannedDrilling: updated.plannedDrilling }
-        : null,
-    },
+    // Планы объекта задают, что и в каком объёме считается «сделанным», —
+    // след правки в той же транзакции.
+    await recordAuditEventInTx(tx, {
+      action: 'site.updated',
+      scope: 'sites',
+      actorId: ctx.actorId,
+      targetId: siteId,
+      metadata: {
+        tenantId: ctx.tenantId,
+        before: { name: existing.name, plannedPiles: existing.plannedPiles, plannedDrilling: existing.plannedDrilling },
+        after: result
+          ? { name: result.name, plannedPiles: result.plannedPiles, plannedDrilling: result.plannedDrilling }
+          : null,
+      },
+    });
+
+    return result;
   });
 
   return updated;
@@ -266,14 +271,15 @@ export async function hardDeleteSite(siteId: string, ctx: SiteCommandContext) {
     );
   }
 
-  await db.site.delete({ where: { id: siteId } });
-
-  await recordAuditEvent({
-    action: 'site.deleted',
-    scope: 'sites',
-    actorId: ctx.actorId,
-    targetId: siteId,
-    metadata: { tenantId: ctx.tenantId, name: site.name },
+  await db.$transaction(async (tx) => {
+    await tx.site.delete({ where: { id: siteId } });
+    await recordAuditEventInTx(tx, {
+      action: 'site.deleted',
+      scope: 'sites',
+      actorId: ctx.actorId,
+      targetId: siteId,
+      metadata: { tenantId: ctx.tenantId, name: site.name },
+    });
   });
 
   return { success: true };
@@ -290,18 +296,20 @@ export async function hardDeleteSite(siteId: string, ctx: SiteCommandContext) {
 export async function setSiteCompleted(siteId: string, completed: boolean, ctx: SiteCommandContext) {
   const site = await requireTenantSite(siteId, ctx.tenantId);
 
-  const claimed = await db.site.updateMany({
-    where: { id: siteId, tenantId: ctx.tenantId, updatedAt: site.updatedAt },
-    data: { completionDate: completed ? new Date() : null },
-  });
-  if (claimed.count !== 1) throw new ServiceError('Объект изменён или удалён. Обновите список.', 409);
+  await db.$transaction(async (tx) => {
+    const claimed = await tx.site.updateMany({
+      where: { id: siteId, tenantId: ctx.tenantId, updatedAt: site.updatedAt },
+      data: { completionDate: completed ? new Date() : null },
+    });
+    if (claimed.count !== 1) throw new ServiceError('Объект изменён или удалён. Обновите список.', 409);
 
-  await recordAuditEvent({
-    action: completed ? 'site.completed' : 'site.completion_cleared',
-    scope: 'sites',
-    actorId: ctx.actorId,
-    targetId: siteId,
-    metadata: { tenantId: ctx.tenantId, name: site.name },
+    await recordAuditEventInTx(tx, {
+      action: completed ? 'site.completed' : 'site.completion_cleared',
+      scope: 'sites',
+      actorId: ctx.actorId,
+      targetId: siteId,
+      metadata: { tenantId: ctx.tenantId, name: site.name },
+    });
   });
 
   return { success: true };
@@ -319,14 +327,17 @@ export async function assignUserToSite(siteId: string, userId: string, ctx: Site
   await requireTenantSite(siteId, ctx.tenantId);
   const user = await db.user.findFirst({ where: { id: userId, tenantId: ctx.tenantId }, select: { id: true } });
   if (!user) throw new ServiceError('Пользователь не найден.', 404);
-  const result = await db.userSiteAssignment.upsert({
-    where: { userId_siteId: { userId, siteId } },
-    update: {},
-    create: { userId, siteId },
+  // Назначение определяет, какие объекты видит человек, — след в той же транзакции.
+  return db.$transaction(async (tx) => {
+    const result = await tx.userSiteAssignment.upsert({
+      where: { userId_siteId: { userId, siteId } },
+      update: {},
+      create: { userId, siteId },
+    });
+    await recordAuditEventInTx(tx, { action: 'site.user_assigned', scope: 'sites', actorId: ctx.actorId,
+      targetId: siteId, metadata: { tenantId: ctx.tenantId, userId } });
+    return result;
   });
-  await recordAuditEvent({ action: 'site.user_assigned', scope: 'sites', actorId: ctx.actorId,
-    targetId: siteId, metadata: { tenantId: ctx.tenantId, userId } });
-  return result;
 }
 
 export async function unassignUserFromSite(siteId: string, userId: string, ctx: SiteCommandContext) {
@@ -335,12 +346,13 @@ export async function unassignUserFromSite(siteId: string, userId: string, ctx: 
   }
 
   await requireTenantSite(siteId, ctx.tenantId);
-  await db.userSiteAssignment.deleteMany({
-    where: { userId, siteId },
+  await db.$transaction(async (tx) => {
+    await tx.userSiteAssignment.deleteMany({
+      where: { userId, siteId },
+    });
+    await recordAuditEventInTx(tx, { action: 'site.user_unassigned', scope: 'sites', actorId: ctx.actorId,
+      targetId: siteId, metadata: { tenantId: ctx.tenantId, userId } });
   });
-
-  await recordAuditEvent({ action: 'site.user_unassigned', scope: 'sites', actorId: ctx.actorId,
-    targetId: siteId, metadata: { tenantId: ctx.tenantId, userId } });
   return { success: true };
 }
 
@@ -408,33 +420,50 @@ export async function createSiteHierarchyItem(input: {
   if (input.type !== 'field' && !input.parentId) throw new ServiceError('Выберите родительский элемент.', 400);
 
   await requireTenantSite(input.siteId, ctx.tenantId);
-  if (input.type === 'field') {
-    return db.pileField.create({
-      data: { name: input.name.trim(), siteId: input.siteId },
-    });
-  }
+  const type = input.type as 'field' | 'cluster' | 'picket';
+  const name = input.name.trim();
 
-  if (input.type === 'cluster') {
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: guarded above (type !== 'field' requires parentId)
-    const parentId = input.parentId!;
-    const parent = await db.pileField.findFirst({ where: { id: parentId, siteId: input.siteId }, select: { id: true } });
-    if (!parent) throw new ServiceError('Родительский элемент не найден — обновите схему.', 404);
-    return db.cluster.create({
-      data: { name: input.name.trim(), fieldId: parentId },
+  // Узел схемы и его след (F-R34-15) — одна транзакция: пикет — ключ привязки
+  // выработки (PileWork.picketId), его появление должно быть видно в ленте.
+  return db.$transaction(async (tx) => {
+    let item: { id: string; name: string };
+    if (type === 'field') {
+      item = await tx.pileField.create({ data: { name, siteId: input.siteId } });
+    } else if (type === 'cluster') {
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: guarded above (type !== 'field' requires parentId)
+      const parentId = input.parentId!;
+      const parent = await tx.pileField.findFirst({ where: { id: parentId, siteId: input.siteId }, select: { id: true } });
+      if (!parent) throw new ServiceError('Родительский элемент не найден — обновите схему.', 404);
+      item = await tx.cluster.create({ data: { name, fieldId: parentId } });
+    } else {
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: guarded above (type !== 'field' requires parentId)
+      const parentId = input.parentId!;
+      const parent = await tx.cluster.findFirst({ where: { id: parentId, field: { siteId: input.siteId } }, select: { id: true } });
+      if (!parent) throw new ServiceError('Родительский элемент не найден — обновите схему.', 404);
+      item = await tx.picket.create({ data: { name, clusterId: parentId } });
+    }
+    await recordAuditEventInTx(tx, {
+      action: 'site.hierarchy.created', scope: 'sites', actorId: ctx.actorId,
+      targetId: input.siteId, tenantId: ctx.tenantId,
+      metadata: { type, name: item.name, itemId: item.id },
     });
-  }
+    return item;
+  });
+}
 
-  if (input.type === 'picket') {
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: guarded above (type !== 'field' requires parentId)
-    const parentId = input.parentId!;
-    const parent = await db.cluster.findFirst({ where: { id: parentId, field: { siteId: input.siteId } }, select: { id: true } });
-    if (!parent) throw new ServiceError('Родительский элемент не найден — обновите схему.', 404);
-    return db.picket.create({
-      data: { name: input.name.trim(), clusterId: parentId },
-    });
-  }
-
-  throw new ServiceError('Неизвестный тип элемента — обновите страницу.', 400);
+/** След удаления узла схемы (F-R34-15): имя берётся до удаления, внутри той же транзакции. */
+function auditHierarchyDeleted(
+  tx: Parameters<typeof recordAuditEventInTx>[0],
+  ctx: SiteCommandContext,
+  siteId: string,
+  type: 'field' | 'cluster' | 'picket',
+  item: { id: string; name: string },
+) {
+  return recordAuditEventInTx(tx, {
+    action: 'site.hierarchy.deleted', scope: 'sites', actorId: ctx.actorId,
+    targetId: siteId, tenantId: ctx.tenantId,
+    metadata: { type, name: item.name, itemId: item.id },
+  });
 }
 
 export async function deleteSiteHierarchyItem(siteId: string, type: string, itemId: string, ctx: SiteCommandContext) {
@@ -453,10 +482,11 @@ export async function deleteSiteHierarchyItem(siteId: string, type: string, item
       await tx.$queryRaw<Array<{ id: string }>>`SELECT id FROM "PileField" WHERE id = ${itemId} FOR UPDATE`;
       await tx.$queryRaw<Array<{ id: string }>>`SELECT id FROM "Cluster" WHERE "fieldId" = ${itemId} ORDER BY id FOR UPDATE`;
       await tx.$queryRaw<Array<{ id: string }>>`SELECT id FROM "Picket" WHERE "clusterId" IN (SELECT id FROM "Cluster" WHERE "fieldId" = ${itemId}) ORDER BY id FOR UPDATE`;
-      const item = await tx.pileField.findFirst({ where: { id: itemId, siteId }, select: { id: true } });
+      const item = await tx.pileField.findFirst({ where: { id: itemId, siteId }, select: { id: true, name: true } });
       if (!item) throw new ServiceError('Элемент схемы не найден — возможно, удалён.', 404);
       await assertNoSubtreeProduction(tx, 'field', itemId);
       await tx.pileField.delete({ where: { id: itemId } });
+      await auditHierarchyDeleted(tx, ctx, siteId, 'field', item);
       return { success: true };
     });
   }
@@ -466,10 +496,11 @@ export async function deleteSiteHierarchyItem(siteId: string, type: string, item
       // Куст → его пикеты (F-R39-RACE2).
       await tx.$queryRaw<Array<{ id: string }>>`SELECT id FROM "Cluster" WHERE id = ${itemId} FOR UPDATE`;
       await tx.$queryRaw<Array<{ id: string }>>`SELECT id FROM "Picket" WHERE "clusterId" = ${itemId} ORDER BY id FOR UPDATE`;
-      const item = await tx.cluster.findFirst({ where: { id: itemId, field: { siteId } }, select: { id: true } });
+      const item = await tx.cluster.findFirst({ where: { id: itemId, field: { siteId } }, select: { id: true, name: true } });
       if (!item) throw new ServiceError('Элемент схемы не найден — возможно, удалён.', 404);
       await assertNoSubtreeProduction(tx, 'cluster', itemId);
       await tx.cluster.delete({ where: { id: itemId } });
+      await auditHierarchyDeleted(tx, ctx, siteId, 'cluster', item);
       return { success: true };
     });
   }
@@ -477,10 +508,11 @@ export async function deleteSiteHierarchyItem(siteId: string, type: string, item
   if (type === 'picket') {
     return db.$transaction(async (tx) => {
       await tx.$queryRaw<Array<{ id: string }>>`SELECT id FROM "Picket" WHERE id = ${itemId} FOR UPDATE`;
-      const item = await tx.picket.findFirst({ where: { id: itemId, cluster: { field: { siteId } } }, select: { id: true } });
+      const item = await tx.picket.findFirst({ where: { id: itemId, cluster: { field: { siteId } } }, select: { id: true, name: true } });
       if (!item) throw new ServiceError('Элемент схемы не найден — возможно, удалён.', 404);
       await assertNoSubtreeProduction(tx, 'picket', itemId);
       await tx.picket.delete({ where: { id: itemId } });
+      await auditHierarchyDeleted(tx, ctx, siteId, 'picket', item);
       return { success: true };
     });
   }

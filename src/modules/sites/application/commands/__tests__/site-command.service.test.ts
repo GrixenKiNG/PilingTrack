@@ -9,9 +9,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { SiteAggregate, type SiteInfo } from '../../../domain';
 
+// След пишется в той же транзакции, что и сохранение агрегата: репозиторий
+// получает шаг «в той же транзакции» и вызывает его на своём клиенте.
 const recordAuditEvent = vi.fn();
 vi.mock('@/modules/audit', () => ({
-  recordAuditEvent: (...args: unknown[]) => recordAuditEvent(...args),
+  recordAuditEventInTx: (...args: unknown[]) => recordAuditEvent(...args),
 }));
 
 const reportCount = vi.fn();
@@ -20,9 +22,16 @@ vi.mock('@/lib/db', () => ({
 }));
 
 const save = vi.fn();
+const fakeTx = { tx: true };
 let stored: SiteAggregate | null = null;
 vi.mock('../../../infrastructure', () => ({
-  getSiteRepository: () => ({ findById: async () => stored, save: (...args: unknown[]) => save(...args) }),
+  getSiteRepository: () => ({
+    findById: async () => stored,
+    save: async (aggregate: unknown, inSameTransaction?: (tx: unknown) => Promise<void>) => {
+      save(aggregate);
+      if (inSameTransaction) await inSameTransaction(fakeTx);
+    },
+  }),
 }));
 
 import { activateSite, deactivateSite } from '../site-command.service';
@@ -59,7 +68,8 @@ describe('activateSite', () => {
     await activateSite('s1', ctx);
     expect(save).toHaveBeenCalledTimes(1);
     expect(recordAuditEvent).toHaveBeenCalledTimes(1);
-    expect(recordAuditEvent.mock.calls[0][0]).toMatchObject({ action: 'site.activated' });
+    expect(recordAuditEvent.mock.calls[0][0]).toBe(fakeTx);
+    expect(recordAuditEvent.mock.calls[0][1]).toMatchObject({ action: 'site.activated' });
   });
 });
 
@@ -78,7 +88,8 @@ describe('deactivateSite', () => {
     await deactivateSite('s1', ctx);
     expect(save).toHaveBeenCalledTimes(1);
     expect(recordAuditEvent).toHaveBeenCalledTimes(1);
-    expect(recordAuditEvent.mock.calls[0][0]).toMatchObject({ action: 'site.deactivated' });
+    expect(recordAuditEvent.mock.calls[0][0]).toBe(fakeTx);
+    expect(recordAuditEvent.mock.calls[0][1]).toMatchObject({ action: 'site.deactivated' });
   });
 
   it('throws 409 and records nothing when draft reports exist', async () => {
