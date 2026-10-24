@@ -463,17 +463,23 @@ BOM для Excel, разделитель `;`, шапка с часовым по�
 
 ## 8. Данные
 
-Модели Prisma, принадлежащие модулю:
+Функция «Техническая готовность» собрана из **трёх модулей кода**, а не из одного.
+Данные делятся между ними так (владелец записи — модуль, чья команда её создаёт):
 
-| Группа | Модели |
-|---|---|
-| Парк | `Equipment`, `EquipmentDocument`, `DeviceKey` |
-| Обслуживание | `MaintenanceRecord`, `MaintenancePlan`, `MeterReading` |
-| Осмотры | `ChecklistTemplate`, `ChecklistSection`, `ChecklistItem`, `Inspection`, `InspectionAnswer` |
-| Дефекты | `EquipmentDefect` |
-| Готовность | `ReadinessRuleSet`, `ReadinessScoreSnapshot`, `CurrentReadiness`, `ReadinessBackfillProgress` |
-| Работа | `Shift`, `ShiftHandover`, `WorkPermit`, `WorkPermitApproval` |
-| Инфраструктура | `OutboxEvent`, `IdempotencyKey`, `AuditLog` (+ хеш-поля) |
+| Модуль | Группа | Модели |
+|---|---|---|
+| `equipment` | Парк | `Equipment`, `EquipmentDocument`, `DeviceKey` |
+| `equipment` | Обслуживание | `MaintenanceRecord`, `MaintenancePlan`, `MeterReading`, `FuelLog` |
+| `inspections` | Осмотры | `ChecklistTemplate`, `ChecklistSection`, `ChecklistItem`, `Inspection`, `InspectionAnswer` |
+| `readiness` | Дефекты | `EquipmentDefect` |
+| `readiness` | Готовность | `ReadinessRuleSet`, `ReadinessScoreSnapshot`, `CurrentReadiness`, `ReadinessBackfillProgress` |
+| `readiness` | Работа | `Shift`, `ShiftHandover`, `WorkPermit`, `WorkPermitApproval` |
+| инфраструктура | Сквозное | `OutboxEvent`, `IdempotencyKey`, `AuditLog` (+ хеш-поля) |
+
+**Направление зависимостей — только вниз:** `readiness → inspections → equipment`
+(ADR-0053). Нижний модуль о верхних не знает; пересчёт готовности он заказывает
+событием `ReadinessSnapshotRequested` (запись в `core/outbox`), а запись дефекта
+получает от вызывающего как функцию. Правило проверяет `npm run check:layers`.
 
 **Сборка чек-листа.** Шаблон собирается из блоков: `BASE` по марке установки,
 `HAMMER` по типу молота (`HYDRAULIC` / `DIESEL` / `NONE`), `ROTARY` для
