@@ -29,6 +29,8 @@ const {
 
 vi.mock('@/lib/db', () => ({
   db: {
+    telemetryRecord: { findMany: vi.fn(async () => []) },
+    $queryRaw: vi.fn(async () => []),
     equipment: { findMany: findManyMock, findUnique: equipmentUniqueMock, count: equipmentCountMock },
     report: { findMany: reportFindManyMock },
     reportAnalytics: { findMany: analyticsFindManyMock },
@@ -428,5 +430,17 @@ describe('getFleetKpiData — переходящие ремонты', () => {
     expect(data.records.map((r) => r.equipmentId)).toEqual(['new']);
     expect(data.carriedOver.map((r) => r.equipmentId)).toEqual(['old']);
     expect(data.equipmentCount).toBe(1);
+  });
+});
+
+
+describe('getFuelSummary — качество расхода', () => {
+  it('не считает единственный ручной замер измеренным нулём', async () => {
+    equipmentUniqueMock.mockResolvedValue({ fuelTankLiters: 200 });
+    fuelLogFindManyMock.mockResolvedValue([{ equipmentId: 'eq-1', tankPercent: 80, litersAdded: null, recordedAt: new Date('2026-10-02'), createdAt: new Date('2026-10-02') }]);
+    fuelLogFirstMock.mockResolvedValue(null);
+    meterReadingFirstMock.mockResolvedValue(null);
+    const summary = await getFuelSummary('eq-1', 'orion', new Date('2026-10-01'), new Date('2026-10-07'));
+    expect(summary.consumedLiters).toBeNull();
   });
 });

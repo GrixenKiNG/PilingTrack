@@ -1,3 +1,4 @@
+import { readFuelConsumptions } from './fuel-consumption';
 import { SUBMITTED_REPORT_STATUS } from '@/lib/report-status';
 import { db } from '@/lib/db';
 import { ServiceError } from '@/lib/service-error';
@@ -261,8 +262,8 @@ async function engineHoursAt(equipmentId: string, tenantId: string, at: Date): P
  * Сводка по топливу за период: сколько долито, остаток на начало/конец, расход
  * и л/моточас. Наработка берётся из журнала показаний (MeterReading) —
  * источника истины, а не из кэша Equipment.engineHoursTotal. Если объёма бака
- * или замеров остатка нет, расход возвращается null: честный прочерк вместо
- * выдуманной цифры.
+ * или пары замеров остатка нет, ручной баланс неизвестен. Приоритет —
+ * достоверная телеметрия, затем ручной баланс, иначе null.
  */
 export async function getFuelSummary(
   equipmentId: string,
@@ -272,55 +273,28 @@ export async function getFuelSummary(
 ) {
   if (!tenantId) throw new ServiceError('Не определена организация пользователя', 400); // fail-closed (IDOR guard)
 
-  const { computeFuelConsumption } = await import('../commands/fuel-log');
-
   const equipment = await db.equipment.findUnique({
-    where: { id: equipmentId, tenantId },
-    select: { fuelTankLiters: true },
+    where: { id: equipmentId, tenantId }, select: { fuelTankLiters: true },
   });
   if (!equipment) throw new ServiceError('Установка не найдена', 404);
-
-  const entries = await db.fuelLog.findMany({
-    where: { equipmentId, tenantId, recordedAt: { gte: from, lte: to } },
-    orderBy: [{ recordedAt: 'asc' }, { createdAt: 'asc' }],
-  });
-
-  const litersAdded = entries.reduce((sum, e) => sum + (e.litersAdded ?? 0), 0);
-
-  // Остаток на конец — последний непустой замер в периоде.
-  const withPercent = entries.filter((e) => e.tankPercent != null);
-  const endPercent = withPercent.length ? withPercent[withPercent.length - 1].tankPercent : null;
-
-  // Остаток на начало — последний замер до периода; если его нет, берём первый
-  // замер внутри периода (тогда его же долив в расход не войдёт по смыслу, но
-  // это лучшее приближение при коротком журнале).
-  const before = await db.fuelLog.findFirst({
-    where: { equipmentId, tenantId, recordedAt: { lt: from }, tankPercent: { not: null } },
-    orderBy: [{ recordedAt: 'desc' }, { createdAt: 'desc' }],
-    select: { tankPercent: true },
-  });
-  const startPercent = before?.tankPercent ?? (withPercent.length ? withPercent[0].tankPercent : null);
-
+  // Публичный журнал исторически включает точный момент to; общий запрос использует [from, to).
+  const summaries = await readFuelConsumptions([{ equipmentId, fuelTankLiters: equipment.fuelTankLiters }], tenantId, from, new Date(to.getTime() + 1));
+  const summary = summaries.get(equipmentId);
+  if (!summary) throw new Error('Не найдена сводка топлива');
   const startHours = await engineHoursAt(equipmentId, tenantId, from);
   const endHours = await engineHoursAt(equipmentId, tenantId, to);
   const engineHoursDelta = startHours != null && endHours != null ? endHours - startHours : null;
-
-  const consumption = computeFuelConsumption({
-    tankLiters: equipment.fuelTankLiters,
-    startPercent,
-    endPercent,
-    litersAdded,
-    engineHoursDelta,
-  });
-
   return {
     tankLiters: equipment.fuelTankLiters,
-    litersAdded,
-    startPercent,
-    endPercent,
+    litersAdded: summary.litersAdded,
+    startPercent: summary.startPercent,
+    endPercent: summary.endPercent,
     engineHoursDelta,
-    ...consumption,
-    entryCount: entries.length,
+    consumption: summary.consumption,
+    consumedLiters: summary.consumption.liters,
+    perEngineHour: summary.consumption.liters != null && engineHoursDelta != null && engineHoursDelta > 0
+      ? Math.round(summary.consumption.liters / engineHoursDelta * 10) / 10 : null,
+    entryCount: summary.entryCount,
   };
 }
 

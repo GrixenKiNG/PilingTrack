@@ -3,11 +3,10 @@
 /**
  * FuelPanel — журнал топлива по установке: долив в бак и остаток по указателю.
  * Живёт рядом с журналом наработки на /admin/to. Источник истины по топливу —
- * этот журнал; расход и л/моточас считает бэкенд из долива, остатка и объёма
- * бака (наработка для л/моточас берётся из журнала моточасов).
+ * общий расчёт: достоверная телеметрия, затем ручной баланс топлива.
+ * Наработка для л/моточас берётся из журнала моточасов.
  *
- * Когда на бак поставят датчик, телеметрия начнёт писать сюда с source=TELEMETRY
- * и вытеснит ручной ввод — панель не меняется.
+ * Сырые записи журнала остаются видны независимо от выбранного источника расхода.
  */
 
 import { useCallback, useEffect, useState } from 'react';
@@ -16,6 +15,7 @@ import { toast } from 'sonner';
 import { authFetch } from '@/lib/api';
 import { getTodayInTimezone } from '@/lib/timezone';
 import { Button } from '@/components/ui/button';
+import type { ResolvedFuelConsumption as FuelConsumption } from '@/modules/equipment';
 import { Input } from '@/components/ui/input';
 import { LoadFailure, loadFailureText, catchText } from '@/components/piling/to/load-failure';
 
@@ -34,7 +34,7 @@ interface FuelSummary {
   startPercent: number | null;
   endPercent: number | null;
   engineHoursDelta: number | null;
-  consumedLiters: number | null;
+  consumption: FuelConsumption;
   perEngineHour: number | null;
   entryCount: number;
 }
@@ -155,16 +155,21 @@ export function FuelPanel({ equipmentId }: { equipmentId: string }) {
         <SummaryTile label="Долив, 30 дн." value={summary ? `${summary.litersAdded} л` : '—'} />
         <SummaryTile
           label="Расход, 30 дн."
-          value={summary?.consumedLiters != null ? `${summary.consumedLiters} л` : '—'}
+          value={summary?.consumption.liters != null ? `${summary.consumption.liters.toLocaleString('ru-RU', { maximumFractionDigits: 1 })} л` : '—'}
         />
         <SummaryTile
           label="л/моточас"
           value={summary?.perEngineHour != null ? `${summary.perEngineHour}` : '—'}
         />
       </div>
-      {summary && summary.consumedLiters == null && (
-        <p className="mb-3 text-2xs leading-snug text-muted-foreground">
-          Расход не считается: нужен объём бака в карточке техники и замеры остатка в % на начало и конец периода.
+      {summary && (
+        <p className="mb-3 text-sm text-muted-foreground sm:text-2xs">
+          Источник расхода: {{ telemetry: 'телеметрия', manual: 'ручной журнал', none: 'нет данных' }[summary.consumption.source]}.
+        </p>
+      )}
+      {summary && summary.consumption.quality === 'insufficient' && (
+        <p className="mb-3 text-sm leading-snug text-muted-foreground sm:text-2xs">
+          Недостаточно данных: нужны два последовательных показания телеметрии без сброса счётчика или объём бака и два замера остатка в ручном журнале.
         </p>
       )}
 

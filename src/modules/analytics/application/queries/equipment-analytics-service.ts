@@ -1,3 +1,4 @@
+import { readFuelConsumptions } from '@/modules/equipment';
 import { SUBMITTED_REPORT_STATUS } from '@/lib/report-status';
 import { db } from '@/lib/db';
 import { checkMaintenanceDue } from '@/lib/maintenance-due';
@@ -10,9 +11,8 @@ import { zonedDayStartUtc } from '@/lib/timezone';
  * and is bounded by [dateFrom, dateTo]. A CTE narrows the report set once so
  * the period/tenant/site filters are written a single time.
  *
- * Fuel is the only metric not derivable from reports — it comes from the
- * telematics `fuel_total` cumulative counter (period usage = max − min per
- * rig). Without at least two readings the consumption is unknown (null).
+ * Fuel uses the shared equipment contract: valid cumulative telemetry first,
+ * then the manual tank balance. A reset or insufficient readings never become zero.
  */
 
 interface EquipmentRow {
@@ -20,6 +20,7 @@ interface EquipmentRow {
   name: string;
   model: string | null;
   kind: string;
+  fuelTankLiters: number | null;
   reportCount: number;
   activeDays: number;
   piles: number;
@@ -83,6 +84,7 @@ export async function getEquipmentAnalytics(params: EquipmentAnalyticsParams) {
       e.name                                 AS "name",
       e.model                                AS "model",
       e.kind::text                           AS "kind",
+      e."fuelTankLiters"                      AS "fuelTankLiters",
       e."engineHoursTotal"                   AS "engineHoursTotal",
       e."nextMaintenanceAtHours"             AS "nextMaintenanceAtHours",
       e."nextMaintenanceDate"                AS "nextMaintenanceDate",
@@ -142,35 +144,16 @@ export async function getEquipmentAnalytics(params: EquipmentAnalyticsParams) {
     ORDER BY "hours" DESC
   `;
 
-  // Fuel from telematics cumulative counter (max − min per rig over the range).
+  // Один контракт и одна граница периода для телеметрии и резервного ручного журнала.
   const fromTs = zonedDayStartUtc(dateFrom, timezone);
   const nextDay = new Date(`${dateTo}T12:00:00Z`);
   nextDay.setUTCDate(nextDay.getUTCDate() + 1);
   const toTs = zonedDayStartUtc(nextDay.toISOString().slice(0, 10), timezone);
-  const fuelGrouped = await db.telemetryRecord.groupBy({
-    by: ['equipmentId'],
-    where: {
-      // Таблица тенантная: без фильтра агрегат читает счётчики всех
-      // организаций, и первое же совпадение по equipmentId вернуло бы чужой
-      // расход. siteId остаётся необязательным.
-      tenantId,
-      type: 'fuel_total',
-      timestamp: { gte: fromTs, lt: toTs },
-      ...(siteId ? { siteId } : {}),
-    },
-    _min: { value: true },
-    _max: { value: true },
-    _count: { _all: true },
-  });
-  const fuelByEquipment = new Map<string, number>();
-  for (const g of fuelGrouped) {
-    if (g._count._all < 2 || g._min.value == null || g._max.value == null) continue;
-    const used = g._max.value - g._min.value;
-    if (used >= 0) fuelByEquipment.set(g.equipmentId, used);
-  }
+  const fuelByEquipment = await readFuelConsumptions(rows, tenantId, fromTs, toTs, siteId);
 
   const equipment = rows.map((row) => {
-    const fuelLiters = fuelByEquipment.get(row.equipmentId);
+    const fuelConsumption = fuelByEquipment.get(row.equipmentId)?.consumption ?? { liters: null, source: 'none' as const, quality: 'insufficient' as const };
+    const fuelLiters = fuelConsumption.liters;
     const due = checkMaintenanceDue({
       nextMaintenanceDate: row.nextMaintenanceDate ? row.nextMaintenanceDate.toISOString() : null,
       nextMaintenanceAtHours: row.nextMaintenanceAtHours,
@@ -189,6 +172,7 @@ export async function getEquipmentAnalytics(params: EquipmentAnalyticsParams) {
       drillingMeters: round1(row.drillingMeters),
       downtimeHours: round1(row.downtimeHours),
       fuelLiters: fuelLiters == null ? null : round1(fuelLiters),
+      fuelConsumption,
       engineHoursTotal: row.engineHoursTotal,
       nextMaintenanceAtHours: row.nextMaintenanceAtHours,
       nextMaintenanceDate: row.nextMaintenanceDate ? row.nextMaintenanceDate.toISOString() : null,
@@ -209,9 +193,14 @@ export async function getEquipmentAnalytics(params: EquipmentAnalyticsParams) {
     drillingMeters: round1(rows.reduce((s, e) => s + e.drillingMeters, 0)),
     downtimeHours: round1(rows.reduce((s, e) => s + e.downtimeHours, 0)),
     // Частичная сумма не описывает расход всего парка.
-    fuelLiters: rows.length > 0 && rows.every((row) => fuelByEquipment.has(row.equipmentId))
-      ? round1(rows.reduce((sum, row) => sum + (fuelByEquipment.get(row.equipmentId) ?? 0), 0))
+    fuelLiters: rows.length > 0 && rows.every((row) => fuelByEquipment.get(row.equipmentId)?.consumption.liters != null)
+      ? round1(rows.reduce((sum, row) => sum + (fuelByEquipment.get(row.equipmentId)?.consumption.liters ?? 0), 0))
       : null,
+    fuelSources: {
+      telemetry: equipment.filter((row) => row.fuelConsumption.source === 'telemetry').length,
+      manual: equipment.filter((row) => row.fuelConsumption.source === 'manual').length,
+      none: equipment.filter((row) => row.fuelConsumption.source === 'none').length,
+    },
     maintenanceDueCount: equipment.filter((e) => e.maintenanceDue).length,
   };
 
@@ -223,7 +212,9 @@ export async function getEquipmentAnalytics(params: EquipmentAnalyticsParams) {
     pct: totalDowntime > 0 ? Math.round((r.hours / totalDowntime) * 100) : 0,
   }));
 
-  return { dateFrom, dateTo, periodDays, fleet, equipment, downtimePareto };
+  return { dateFrom, dateTo, periodDays, fleet, equipment, downtimePareto,
+    fuelScopeNote: siteId ? 'Ручной журнал не привязан к объекту: при фильтре объекта расход доступен только по телеметрии.' : null,
+  };
 }
 
 function round1(n: number): number {

@@ -8,31 +8,38 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { queryRaw, groupBy } = vi.hoisted(() => ({
+const { queryRaw, telemetryFindMany, manualFindMany } = vi.hoisted(() => ({
   queryRaw: vi.fn(),
-  groupBy: vi.fn(),
+  telemetryFindMany: vi.fn(),
+  manualFindMany: vi.fn(async () => []),
 }));
 
 vi.mock('@/lib/db', () => ({
   db: {
     $queryRaw: queryRaw,
-    telemetryRecord: { groupBy: groupBy },
+    telemetryRecord: { findMany: telemetryFindMany },
+    fuelLog: { findMany: manualFindMany },
   },
 }));
 
 import { getEquipmentAnalytics } from '../equipment-analytics-service';
 
+function counterSamples(equipmentId: string, values: number[]) {
+  return values.map((value, index) => ({ equipmentId, value, timestamp: new Date(Date.UTC(2026, 0, 1, index)) }));
+}
+
 describe('getEquipmentAnalytics — tenant isolation', () => {
   beforeEach(() => {
     queryRaw.mockReset();
-    groupBy.mockReset();
     queryRaw.mockResolvedValue([]);
-    groupBy.mockResolvedValue([]);
+    telemetryFindMany.mockReset();
+    queryRaw.mockResolvedValue([]);
+    telemetryFindMany.mockResolvedValue([]);
   });
 
   it('uses production-day boundaries for the fuel window, including the next midnight exclusively', async () => {
     await getEquipmentAnalytics({ dateFrom: '2026-09-20', dateTo: '2026-09-26', tenantId: 'orion' });
-    expect(groupBy.mock.calls[0][0].where.timestamp).toEqual({
+    expect(telemetryFindMany.mock.calls[0][0].where.timestamp).toEqual({
       gte: new Date('2026-09-19T21:00:00Z'),
       lt: new Date('2026-09-26T21:00:00Z'),
     });
@@ -42,7 +49,7 @@ describe('getEquipmentAnalytics — tenant isolation', () => {
     await getEquipmentAnalytics({
       dateFrom: '2026-09-20', dateTo: '2026-09-26', tenantId: 'orion', timezone: 'Asia/Tokyo',
     });
-    expect(groupBy.mock.calls[0][0].where.timestamp).toEqual({
+    expect(telemetryFindMany.mock.calls[0][0].where.timestamp).toEqual({
       gte: new Date('2026-09-19T15:00:00Z'),
       lt: new Date('2026-09-26T15:00:00Z'),
     });
@@ -81,16 +88,16 @@ describe('getEquipmentAnalytics — tenant isolation', () => {
   it('filters the telemetry fuel aggregate by tenant, keeping siteId optional', async () => {
     await getEquipmentAnalytics({ dateFrom: '2026-01-01', dateTo: '2026-12-31', siteId: 'site_A', tenantId: 'orion' });
 
-    expect(groupBy.mock.calls[0][0].where).toMatchObject({
+    expect(telemetryFindMany.mock.calls[0][0].where).toMatchObject({
       tenantId: 'orion',
       siteId: 'site_A',
       type: 'fuel_total',
     });
 
-    groupBy.mockClear();
+    telemetryFindMany.mockClear();
     await getEquipmentAnalytics({ dateFrom: '2026-01-01', dateTo: '2026-12-31', tenantId: 'orion' });
 
-    const where = groupBy.mock.calls[0][0].where;
+    const where = telemetryFindMany.mock.calls[0][0].where;
     expect(where).toMatchObject({ tenantId: 'orion' });
     expect(where).not.toHaveProperty('siteId');
   });
@@ -129,8 +136,9 @@ describe('getEquipmentAnalytics — maintenance flags delegate to checkMaintenan
 
   beforeEach(() => {
     queryRaw.mockReset();
-    groupBy.mockReset();
-    groupBy.mockResolvedValue([]);
+    queryRaw.mockResolvedValue([]);
+    telemetryFindMany.mockReset();
+    telemetryFindMany.mockResolvedValue([]);
   });
 
   it('marks a past service date as overdue, not soon', async () => {
@@ -152,9 +160,9 @@ describe('getEquipmentAnalytics — maintenance flags delegate to checkMaintenan
       equipmentId: `e${index}`, pileMeters: 12.05, drillingMeters: 12.05, downtimeHours: 0.05,
     }));
     queryRaw.mockResolvedValueOnce(rows).mockResolvedValueOnce([]);
-    groupBy.mockResolvedValue([
-      ...rows.map((row) => ({ equipmentId: row.equipmentId, _min: { value: 0 }, _max: { value: 0.05 }, _count: { _all: 2 } })),
-      { equipmentId: 'outside-fleet', _min: { value: 0 }, _max: { value: 100 }, _count: { _all: 2 } },
+    telemetryFindMany.mockResolvedValue([
+      ...rows.flatMap((row) => counterSamples(row.equipmentId, [0, 0.05])),
+      ...counterSamples('outside-fleet', [0, 100]),
     ]);
 
     const result = await getEquipmentAnalytics({ dateFrom: '2026-01-01', dateTo: '2026-12-31', tenantId: 'orion' });
@@ -165,9 +173,7 @@ describe('getEquipmentAnalytics — maintenance flags delegate to checkMaintenan
 
   it.each([0, 1, 2])('distinguishes unknown fuel from measured zero (%i samples)', async (count) => {
     queryRaw.mockResolvedValueOnce([equipmentRow()]).mockResolvedValueOnce([]);
-    groupBy.mockResolvedValue(count ? [
-      { equipmentId: 'e1', _min: { value: 100 }, _max: { value: 100 }, _count: { _all: count } },
-    ] : []);
+    telemetryFindMany.mockResolvedValue(counterSamples('e1', Array(count).fill(100)));
 
     const result = await getEquipmentAnalytics({ dateFrom: '2026-01-01', dateTo: '2026-01-31', tenantId: 'orion' });
 
@@ -177,9 +183,7 @@ describe('getEquipmentAnalytics — maintenance flags delegate to checkMaintenan
 
   it('does not present a partial fuel sum as the whole fleet consumption', async () => {
     queryRaw.mockResolvedValueOnce([equipmentRow(), equipmentRow({ equipmentId: 'e2' })]).mockResolvedValueOnce([]);
-    groupBy.mockResolvedValue([
-      { equipmentId: 'e1', _min: { value: 100 }, _max: { value: 125 }, _count: { _all: 2 } },
-    ]);
+    telemetryFindMany.mockResolvedValue(counterSamples('e1', [100, 125]));
 
     const result = await getEquipmentAnalytics({ dateFrom: '2026-01-01', dateTo: '2026-01-31', tenantId: 'orion' });
 
@@ -213,9 +217,10 @@ describe('getEquipmentAnalytics — maintenance flags delegate to checkMaintenan
 describe('getEquipmentAnalytics — pile meters source', () => {
   beforeEach(() => {
     queryRaw.mockReset();
-    groupBy.mockReset();
     queryRaw.mockResolvedValue([]);
-    groupBy.mockResolvedValue([]);
+    telemetryFindMany.mockReset();
+    queryRaw.mockResolvedValue([]);
+    telemetryFindMany.mockResolvedValue([]);
   });
 
   it('computes pile meters from PileGrade.lengthMm, not the site plan or the grade name', async () => {
@@ -239,9 +244,10 @@ describe('getEquipmentAnalytics — pile meters source', () => {
 describe('getEquipmentAnalytics — tenant isolation in every raw query (F-ANALYTICS-TENANT-SQL)', () => {
   beforeEach(() => {
     queryRaw.mockReset();
-    groupBy.mockReset();
     queryRaw.mockResolvedValue([]);
-    groupBy.mockResolvedValue([]);
+    telemetryFindMany.mockReset();
+    queryRaw.mockResolvedValue([]);
+    telemetryFindMany.mockResolvedValue([]);
   });
 
   it('scopes both raw queries by strict tenant equality, never `tenantId … IS NULL`', async () => {
@@ -278,6 +284,18 @@ describe('getEquipmentAnalytics — tenant isolation in every raw query (F-ANALY
     ).rejects.toThrow(/tenantId/i);
 
     expect(queryRaw).not.toHaveBeenCalled();
-    expect(groupBy).not.toHaveBeenCalled();
+    expect(telemetryFindMany).not.toHaveBeenCalled();
+  });
+});
+
+
+describe('топливо — сброс счётчика', () => {
+  it('1000→5 недостаточно для достоверного расхода', async () => {
+    queryRaw.mockReset();
+    queryRaw.mockResolvedValue([]);
+    queryRaw.mockResolvedValueOnce([{ equipmentId: 'e1', name: 'Rig', model: null, kind: 'PILING_RIG', reportCount: 0, activeDays: 0, piles: 0, pileMeters: 0, drillingCount: 0, drillingMeters: 0, downtimeHours: 0, engineHoursTotal: null, nextMaintenanceAtHours: null, nextMaintenanceDate: null }]).mockResolvedValueOnce([]);
+    telemetryFindMany.mockResolvedValue(counterSamples('e1', [1000, 5]));
+    const result = await getEquipmentAnalytics({ dateFrom: '2026-01-01', dateTo: '2026-01-31', tenantId: 'orion' });
+    expect(result.equipment[0].fuelLiters).toBeNull();
   });
 });
