@@ -93,10 +93,10 @@ describe('listAssignableUsers', () => {
     findManyUserMock.mockResolvedValue([]);
   });
 
-  it('scopes to active users of the tenant', async () => {
+  it('scopes to active mechanics and admins of the tenant', async () => {
     await listAssignableUsers('orion');
     const arg = findManyUserMock.mock.calls[0][0];
-    expect(arg.where).toEqual({ tenantId: 'orion', isActive: true });
+    expect(arg.where).toEqual({ tenantId: 'orion', isActive: true, role: { in: ['MECHANIC', 'ADMIN'] } });
     expect(arg.select).toEqual({ id: true, name: true, role: true });
   });
 

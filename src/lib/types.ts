@@ -10,6 +10,8 @@ export type UserRole =
   | 'MECHANIC'
   | 'FOREMAN'
   | 'SAFETY_ENGINEER';
+/** Кого можно назначить исполнителем наряда ТО (решение владельца 24.10.2026). */
+export const MAINTENANCE_ASSIGNEE_ROLES: UserRole[] = ['MECHANIC', 'ADMIN'];
 export type ReportStatus = 'draft' | 'submitted';
 
 export const ROLE_LABELS: Record<UserRole, string> = {

@@ -4,7 +4,7 @@ const {
   findUniqueEquipmentMock, createRecMock, findUniqueRecMock, updateRecMock,
   deleteRecMock, outboxCreateManyMock,
   findFirstEquipmentMock, updateEquipmentMock, findManyPlanMock, updatePlanMock,
-  findFirstReadingMock, createReadingMock, executeRawMock, auditInTxMock,
+  findFirstReadingMock, createReadingMock, executeRawMock, auditInTxMock, findFirstUserMock,
 } = vi.hoisted(() => ({
   findUniqueEquipmentMock: vi.fn(),
   createRecMock: vi.fn(),
@@ -28,6 +28,8 @@ const {
   outboxCreateManyMock: vi.fn(),
   // След приёмки пишется после коммита и приёмку не отменяет (решение владельца 24.10.2026).
   auditInTxMock: vi.fn(),
+  // Исполнитель наряда: проверка роли и организации.
+  findFirstUserMock: vi.fn(),
 }));
 
 vi.mock('@/modules/audit', () => ({ recordAuditEvent: auditInTxMock }));
@@ -49,6 +51,7 @@ vi.mock('@/lib/db', () => {
       delete: deleteRecMock,
     },
     outboxEvent: { createMany: outboxCreateManyMock },
+    user: { findFirst: findFirstUserMock },
     $executeRaw: executeRawMock,
     $transaction: (cb: (t: unknown) => unknown) => cb(client),
   };
@@ -61,6 +64,8 @@ import { projectNextMaintenance } from '../maintenance-regulation';
 // Безопасные значения по умолчанию: у техники без регламентов закрытие наряда
 // не должно ничего двигать, и остальные наборы тестов об этом не знают.
 beforeEach(() => {
+  findFirstUserMock.mockReset();
+  findFirstUserMock.mockResolvedValue({ id: 'usr_2' });
   auditInTxMock.mockReset();
   auditInTxMock.mockResolvedValue(undefined);
   findFirstEquipmentMock.mockReset();
@@ -119,6 +124,20 @@ describe('createMaintenance — work order fields', () => {
     expect(data.assigneeId).toBe('usr_2');
     expect(data.faultCause).toBe('кавитация');
     expect(data.partsUsedText).toBe('фильтр');
+  });
+
+  it('accepts only an active mechanic or admin of the same tenant as assignee', async () => {
+    await createMaintenance('eq_1', { type: 'REPAIR', title: 'x', assigneeId: 'usr_2' }, { tenantId: 'orion' });
+    expect(findFirstUserMock.mock.calls[0][0].where).toEqual({
+      id: 'usr_2', tenantId: 'orion', isActive: true, role: { in: ['MECHANIC', 'ADMIN'] },
+    });
+  });
+
+  it('rejects an assignee outside the allowed set with 400 and writes nothing', async () => {
+    findFirstUserMock.mockResolvedValue(null);
+    await expect(createMaintenance('eq_1', { type: 'REPAIR', title: 'x', assigneeId: 'usr_op' },
+      { tenantId: 'orion' })).rejects.toMatchObject({ status: 400 });
+    expect(createRecMock).not.toHaveBeenCalled();
   });
 
   it('throws 404 when equipment missing', async () => {
@@ -210,6 +229,13 @@ describe('updateMaintenance — lifecycle transitions', () => {
     expect(updatePlanMock).not.toHaveBeenCalled();
     expect(createReadingMock).not.toHaveBeenCalled();
     expect(outboxCreateManyMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects a changed assignee outside the allowed set on update', async () => {
+    findFirstUserMock.mockResolvedValue(null);
+    await expect(updateMaintenance('eq_1', 'rec_1', { assigneeId: 'usr_op' },
+      { tenantId: 'orion', userId: 'usr_9' })).rejects.toMatchObject({ status: 400 });
+    expect(updateRecMock).not.toHaveBeenCalled();
   });
 
   it('sets startedAt when status moves to IN_PROGRESS', async () => {

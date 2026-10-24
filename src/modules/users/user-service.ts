@@ -4,7 +4,7 @@ import { assertNotSelfAction } from '@/core/security/authorization';
 import { hashPassword } from '@/core/security/password';
 import { recordAuditEventInTx } from '@/modules/audit';
 import { type CursorPaginationResult } from '@/lib/pagination-cursor';
-import type { OperationalUserDTO, UserRole } from '@/lib/types';
+import { MAINTENANCE_ASSIGNEE_ROLES, type OperationalUserDTO, type UserRole } from '@/lib/types';
 import { requireTenantId } from '@/lib/tenant-scope';
 
 function isUniqueConstraintError(message: string) {
@@ -14,7 +14,7 @@ function isUniqueConstraintError(message: string) {
 export async function listAssignableUsers(tenantId: string) {
   if (!tenantId) throw new ServiceError('Не определена организация пользователя', 400);
   return db.user.findMany({
-    where: { tenantId, isActive: true },
+    where: { tenantId, isActive: true, role: { in: MAINTENANCE_ASSIGNEE_ROLES } },
     select: { id: true, name: true, role: true },
     orderBy: { name: 'asc' },
   });

@@ -8,6 +8,7 @@
 import { db } from '@/lib/db';
 import { ServiceError } from '@/lib/service-error';
 import { logger } from '@/lib/logger';
+import { MAINTENANCE_ASSIGNEE_ROLES } from '@/lib/types';
 import { recordAuditEvent } from '@/modules/audit';
 import { requestReadinessSnapshot } from '@/core/outbox/readiness-snapshot-request';
 import { OPEN_MAINTENANCE } from '../../domain/maintenance-status';
@@ -57,6 +58,16 @@ function rethrowConcurrentChange(error: unknown): never {
   throw error;
 }
 
+/** Исполнитель — действующий механик или админ той же организации. */
+async function assertAssignee(tenantId: string, assigneeId: string | null | undefined) {
+  if (!assigneeId) return;
+  const assignee = await db.user.findFirst({
+    where: { id: assigneeId, tenantId, isActive: true, role: { in: MAINTENANCE_ASSIGNEE_ROLES } },
+    select: { id: true },
+  });
+  if (!assignee) throw new ServiceError('Исполнитель не найден или не может вести наряды ТО', 400);
+}
+
 export async function createMaintenance(
   equipmentId: string,
   input: MaintenanceInput,
@@ -67,6 +78,7 @@ export async function createMaintenance(
     select: { id: true },
   });
   if (!equipment) throw new ServiceError('Установка не найдена', 404);
+  await assertAssignee(ctx.tenantId, input.assigneeId);
 
   const status = input.status ?? 'PLANNED';
   if (status === 'DONE') assertWorkDescribed(input.workDone);
@@ -221,6 +233,7 @@ export async function updateMaintenance(
       (existing.status === 'DONE' || existing.status === 'CANCELLED')) {
     throw new ServiceError('Статус закрытого наряда нельзя изменить', 409);
   }
+  await assertAssignee(ctx.tenantId, input.assigneeId);
 
   const data: Record<string, unknown> = {};
   if (input.type !== undefined) data.type = input.type;
