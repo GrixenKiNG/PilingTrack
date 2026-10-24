@@ -156,6 +156,9 @@ export async function deleteFuelEntry(
  * две записи: замер, а затем долив на миллисекунду позже. Долив тогда попадает в
  * баланс следующего периода, а не искажает текущий. Возвращает число записей.
  */
+/** Предел долива одной записи с экрана машиниста — тот же, что у поля «Долил за смену» в каталоге (защита от опечатки и подделки запроса). */
+const MAX_OPERATOR_TOP_UP_LITERS = 2000;
+
 export async function recordOperatorFuelInTx(
   tx: Pick<Prisma.TransactionClient, 'fuelLog'>,
   equipmentId: string,
@@ -170,6 +173,9 @@ export async function recordOperatorFuelInTx(
   }
   if (litersAdded != null && litersAdded < 0) {
     throw new ServiceError('Долив не может быть отрицательным', 400);
+  }
+  if (litersAdded != null && litersAdded > MAX_OPERATOR_TOP_UP_LITERS) {
+    throw new ServiceError(`Долив больше ${MAX_OPERATOR_TOP_UP_LITERS} л за одну запись — проверьте цифру`, 400);
   }
 
   const base = {

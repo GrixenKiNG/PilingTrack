@@ -142,6 +142,10 @@ describe('submitChecklist — пометка замены счётчика', () 
 });
 
 describe('submitChecklist — топливо из ЕО после работы', () => {
+  // Границы значения проверяются только у «своего» пункта каталога, поэтому и читать
+  // остаток и долив можно только с него (ответ с чужого пункта не проверен).
+  beforeEach(() => { selectChecklistItems.mockReturnValue([{id: 'fuel-level'}, {id: 'topup-diesel'}]); });
+
   const fuelAnswers = (measures: Record<string, number>[]): ChecklistAnswer[] => measures.map((m, i) => (
     {itemId: i === 0 ? 'fuel-level' : 'topup-diesel', answer: 'OK', measures: m}
   ));
@@ -152,6 +156,20 @@ describe('submitChecklist — топливо из ЕО после работы',
     expect(rows).toHaveLength(2);
     expect(rows[0]).toMatchObject({tenantId: 'tenant-a', equipmentId: 'eq-1', tankPercent: 62, litersAdded: null, recordedById: 'operator-a'});
     expect(rows[1]).toMatchObject({tankPercent: null, litersAdded: 120});
+  });
+
+  it('значения с чужого пункта (в обход границ каталога) игнорируются', async () => {
+    await submitChecklist({...input, answers: [
+      {itemId: 'cab-glass', answer: 'OK', measures: {dieselL: 999999, fuelPercent: 1290}},
+    ]});
+    expect(tx.fuelLog.create).not.toHaveBeenCalled();
+    expect(tx.operatorShiftEvidence.create).not.toHaveBeenCalled();
+  });
+
+  it('пункт, которого нет в выбранных для этой смены, не принимается', async () => {
+    selectChecklistItems.mockReturnValue([]);
+    await submitChecklist({...input, answers: fuelAnswers([{fuelPercent: 62}, {dieselL: 120}])});
+    expect(tx.fuelLog.create).not.toHaveBeenCalled();
   });
 
   it('без остатка и долива журнал топлива не трогается', async () => {

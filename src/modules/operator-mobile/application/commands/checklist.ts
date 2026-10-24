@@ -255,7 +255,10 @@ export async function submitChecklist(input: {
       });
     }
 
-    const fuel = findMeasure(input.answers, 'fuelPercent');
+    // Остаток и долив читаем только с «своих» пунктов каталога, выбранных для этой смены:
+    // границы значения (0–100 %, до 2000 л) проверены именно у них, а измерение с
+    // чужого пункта прошло бы мимо проверки.
+    const fuel = measureOfItem(items, input.answers, 'fuel-level', 'fuelPercent');
     if (fuel !== null) {
       await recordEvidence(tx, {
         tenantId: input.tenantId,
@@ -272,7 +275,7 @@ export async function submitChecklist(input: {
     // Остаток по указателю и долив дизеля — это ещё и журнал топлива установки, откуда
     // его читают карточка техники, сводка расхода и аналитика. Масло и антифриз туда
     // не идут: они остаются в свидетельствах смены и в истории осмотров.
-    const dieselTopUp = findMeasure(input.answers, 'dieselL');
+    const dieselTopUp = measureOfItem(items, input.answers, 'topup-diesel', 'dieselL');
     if (fuel !== null || (dieselTopUp !== null && dieselTopUp > 0)) {
       await recordOperatorFuelInTx(tx, input.equipmentId, {
         tankPercent: fuel === null ? null : Math.round(fuel),
@@ -281,7 +284,10 @@ export async function submitChecklist(input: {
       }, {tenantId: input.tenantId, recordedById: input.operatorId, note: definition.title});
     }
 
+    // Долив жидкостей — только с пунктов «Долил за смену» (`topup-*`), выбранных для смены.
+    const topUpItemIds = new Set(items.filter((item) => item.id.startsWith('topup-')).map((item) => item.id));
     const fluids = input.answers
+      .filter((answer) => topUpItemIds.has(answer.itemId))
       .filter((answer) => answer.measures && Object.keys(answer.measures).some((key) => key.endsWith('L')))
       .map((answer) => ({itemId: answer.itemId, ...answer.measures}));
     if (fluids.length > 0) {
@@ -322,6 +328,14 @@ export async function submitChecklist(input: {
       createdDefects: created,
     };
   });
+}
+
+function measureOfItem(
+  items: ReadonlyArray<{id: string}>, answers: ChecklistAnswer[], itemId: string, key: string,
+): number | null {
+  if (!items.some((item) => item.id === itemId)) return null;
+  const value = answers.find((answer) => answer.itemId === itemId)?.measures?.[key];
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
 }
 
 function findMeasure(answers: ChecklistAnswer[], key: string): number | null {

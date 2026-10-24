@@ -38,22 +38,27 @@ export interface EquipmentChecklistReadings {
 
 const TOP_UP_KEYS = ['coolantL', 'hydraulicOilL', 'engineOilL', 'dieselL'] as const;
 
-function readingsOf(values: unknown[]): EquipmentChecklistReadings | null {
+/**
+ * Показание берём только с «своего» пункта: моточасы — со снятия счётчика (`meter-*`),
+ * остаток — с `fuel-level`, литры — с `topup-*`. Границы проверены сервером именно у
+ * этих пунктов, значение с чужого пункта показывать нельзя.
+ */
+function readingsOf(rows: Array<{itemId: string; value: unknown}>): EquipmentChecklistReadings | null {
   const readings: EquipmentChecklistReadings = {
     engineHours: null, fuelPercent: null,
     topUps: {coolantL: null, hydraulicOilL: null, engineOilL: null, dieselL: null},
   };
   let any = false;
-  for (const value of values) {
+  for (const {itemId, value} of rows) {
     if (!value || typeof value !== 'object') continue;
     const record = value as Record<string, unknown>;
     const num = (key: string) => (typeof record[key] === 'number' && Number.isFinite(record[key]) ? (record[key] as number) : null);
-    const hours = num('engineHours');
+    const hours = itemId.startsWith('meter') ? num('engineHours') : null;
     if (hours !== null) { readings.engineHours = hours; any = true; }
-    const fuel = num('fuelPercent');
+    const fuel = itemId === 'fuel-level' ? num('fuelPercent') : null;
     if (fuel !== null) { readings.fuelPercent = fuel; any = true; }
     for (const key of TOP_UP_KEYS) {
-      const liters = num(key);
+      const liters = itemId.startsWith('topup-') ? num(key) : null;
       if (liters !== null) { readings.topUps[key] = liters; any = true; }
     }
   }
@@ -89,7 +94,7 @@ export async function listEquipmentChecklistHistory(input: {
     // Снятые значения лежат в value ответа: моточасы, остаток топлива, литры долива.
     db.operatorChecklistAnswerRecord.findMany({
       where: {tenantId: input.tenantId, executionId: {in: executions.map((item) => item.id)}, NOT: {value: {equals: Prisma.DbNull}}},
-      select: {executionId: true, value: true},
+      select: {executionId: true, itemId: true, value: true},
     }),
     db.user.findMany({
       where: {tenantId: input.tenantId, id: {in: [...new Set(executions.map((item) => item.startedById))]}},
@@ -115,6 +120,6 @@ export async function listEquipmentChecklistHistory(input: {
     completedAt: item.completedAt ? item.completedAt.toISOString() : null,
     performerName: names.get(item.startedById) ?? null,
     counts: countsOf(item.id),
-    readings: readingsOf(valueRows.filter((row) => row.executionId === item.id).map((row) => row.value)),
+    readings: readingsOf(valueRows.filter((row) => row.executionId === item.id)),
   }));
 }

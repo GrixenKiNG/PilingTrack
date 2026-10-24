@@ -149,6 +149,13 @@ describe('recordOperatorFuelInTx — топливо из ЕО машиниста
     expect(tx.fuelLog.create).not.toHaveBeenCalled();
   });
 
+  it('долив больше предела записи отклоняется целиком — ничего не пишется', async () => {
+    const tx = fakeTx();
+    await expect(recordOperatorFuelInTx(tx as never, 'eq-1', { tankPercent: 50, litersAdded: 2001, at }, ctx))
+      .rejects.toMatchObject({ status: 400 });
+    expect(tx.fuelLog.create).not.toHaveBeenCalled();
+  });
+
   it('остаток вне 0–100 % отклоняется, организация обязательна', async () => {
     const tx = fakeTx();
     await expect(recordOperatorFuelInTx(tx as never, 'eq-1', { tankPercent: 140, litersAdded: null, at }, ctx)).rejects.toMatchObject({ status: 400 });

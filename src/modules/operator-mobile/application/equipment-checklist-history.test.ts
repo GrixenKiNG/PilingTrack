@@ -70,13 +70,15 @@ describe('история чек-листов машиниста по устан�
     ]);
     database.operatorChecklistAnswerRecord.groupBy.mockResolvedValue([]);
     database.operatorChecklistAnswerRecord.findMany.mockResolvedValue([
-      {executionId: 'e1', value: {engineHours: 108}},
-      {executionId: 'e1', value: {fuelPercent: 62}},
-      {executionId: 'e1', value: {coolantL: 2}},
-      {executionId: 'e1', value: {hydraulicOilL: 5}},
-      {executionId: 'e1', value: {engineOilL: 3}},
-      {executionId: 'e1', value: {dieselL: 120}},
-      {executionId: 'e1', value: {unknownKey: 9}},
+      {executionId: 'e1', itemId: 'meter-after', value: {engineHours: 108}},
+      {executionId: 'e1', itemId: 'fuel-level', value: {fuelPercent: 62}},
+      {executionId: 'e1', itemId: 'topup-coolant', value: {coolantL: 2}},
+      {executionId: 'e1', itemId: 'topup-hydraulic', value: {hydraulicOilL: 5}},
+      {executionId: 'e1', itemId: 'topup-engine-oil', value: {engineOilL: 3}},
+      {executionId: 'e1', itemId: 'topup-diesel', value: {dieselL: 120}},
+      {executionId: 'e1', itemId: 'topup-diesel', value: {unknownKey: 9}},
+      // значения с чужих пунктов (мимо границ каталога) не показываются
+      {executionId: 'e2', itemId: 'cab-glass', value: {engineHours: 999999, fuelPercent: 1290, dieselL: 99999}},
     ]);
 
     const rows = await listEquipmentChecklistHistory({tenantId: 't', equipmentId: 'eq-1'});
