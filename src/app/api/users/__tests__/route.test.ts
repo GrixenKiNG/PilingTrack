@@ -65,6 +65,49 @@ describe('/api/users tenant boundary', () => {
     expect(listUsersMock).toHaveBeenCalledWith('tenant-a', null, expect.anything());
   });
 
+  const fullRow = {
+    id: 'u-1',
+    email: 'op@example.com',
+    name: 'Иванов',
+    phone: '+79990000000',
+    role: 'OPERATOR',
+    isActive: true,
+    lastReportAt: '2026-10-20T10:00:00.000Z',
+    lastLoginAt: '2026-10-21T10:00:00.000Z',
+    lastActivityAt: '2026-10-21T10:00:00.000Z',
+    lastActivitySource: 'login',
+  };
+
+  it('does not expose contacts and activity to a reader without users.manage', async () => {
+    requireAuthMock.mockResolvedValue({
+      user: { id: 'disp-a', role: 'DISPATCHER', tenantId: 'tenant-a' },
+      error: null,
+    });
+    listUsersMock.mockResolvedValue([fullRow]);
+
+    const response = await GET(req('GET'));
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.users[0]).toMatchObject({ id: 'u-1', name: 'Иванов', role: 'OPERATOR' });
+    expect(body.users[0]).toMatchObject({
+      email: '',
+      phone: '',
+      lastReportAt: null,
+      lastLoginAt: null,
+      lastActivityAt: null,
+      lastActivitySource: null,
+    });
+  });
+
+  it('returns the full catalog to an administrator', async () => {
+    listUsersMock.mockResolvedValue([fullRow]);
+
+    const body = await (await GET(req('GET'))).json();
+
+    expect(body.users[0]).toMatchObject({ email: 'op@example.com', phone: '+79990000000' });
+  });
+
   it.each([
     ['GET', () => GET(req('GET'))],
     ['POST', () => POST(req('POST', validCreateBody()))],

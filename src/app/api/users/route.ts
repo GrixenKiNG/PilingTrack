@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
-import { assertCan } from '@/services/auth/authorization-service';
+import { assertCan, can } from '@/services/auth/authorization-service';
 import { createUserSchema, deleteIdSchema, updateUserSchema } from '@/lib/validation-schemas';
 import { withApi, withMutation } from '@/core/api-wrapper';
 import { parseCursorPagination } from '@/lib/pagination-cursor';
@@ -30,7 +30,21 @@ export const GET = withApi(
     const role = request.nextUrl.searchParams.get('role');
     const pagination = parseCursorPagination(request, { defaultLimit: 50, maxLimit: 100 });
     const { listUsers } = await getUsersModule();
-    const users = await listUsers(tenantId, role, pagination);
+    const rows = await listUsers(tenantId, role, pagination);
+    // Контакты и время входа нужны только тому, кто управляет учётными записями.
+    // Остальным каталог нужен для выбора работника: имя, роль, объекты, бригада.
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
+    const users = can(user!, 'users.manage')
+      ? rows
+      : rows.map((row) => ({
+          ...row,
+          email: '',
+          phone: '',
+          lastReportAt: null,
+          lastLoginAt: null,
+          lastActivityAt: null,
+          lastActivitySource: null,
+        }));
     const nextCursor = pagination.getNextCursor(users);
     return NextResponse.json({ users, nextCursor });
   },
