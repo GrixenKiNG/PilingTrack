@@ -224,3 +224,8 @@ GitNexus: impact до правок — login HIGH16 тестовых потре�
 Первичные результаты: baseline-25-results.json,qa-final-195-results.json (снимок полного результата),qa-195-summary.json,e2e-results.json,integration-results.json,chain-results.json,mobile-probe.json и логи находятся в output/qa-stabilize-1023. Для атрибуции браузера используйте raw JSON и per-project trace.zip в artifacts: общий каталог shots/JSON перезаписывается между профилями. Конфигурация воспроизводимого QA и запуск описаны в e2e/README.md. Копии штатного test-day-stand использовались с переносом output, генерацией клиента и отдельным владельцем worker; scripts/test-db-up.sh/test-db-down.sh остались штатными. Учётные данные не выведены в отчёт.
 
 Физический телефон, внешняя резервная копия и production не проверялись по рамкам задания. Полные циклы всех операторских вариантов, отмеченные skips/fixme выше, остаются пробелами покрытия. После финальной сборки все три собственных стенда остановлены с exit0/CLEANUP done; проверка Docker по test-db/day-stand меткам не нашла оставшихся контейнеров, проверка собственных Node-процессов также пуста. Результат сохранён в cleanup.json. Автоматическая готовность к релизу или принятие владельцем не заявляются.
+
+
+## K: мобильные размеры, отдельная ветка codex/mobile-sizes-1023
+
+Подробности и реальные коды проверок: [docs/reports/mobile-sizes-1023/REPORT.md](docs/reports/mobile-sizes-1023/REPORT.md). Код: 5727704d, 35062f07. Unit5366 passed/265 skipped/0 failed; build/lint/tsc exit0. Общий F:3 passed/3 failed из-за frozen operator и повторного pageerror WebKit. K не принята полностью, требуется решение владельца.
