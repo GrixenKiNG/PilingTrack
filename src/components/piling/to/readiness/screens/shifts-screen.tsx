@@ -205,7 +205,7 @@ export function ShiftsScreen(props: ReferenceUiProps) {
     ведёт на форму, которая ответит 403. */}
 {props.bootstrap?.capabilities.entities.shift.manage
   ? <Button asChild className="min-h-11 bg-signal-strong hover:bg-signal-strong"><Link href={props.selectedId ? `/admin/to/shifts/new?equipmentId=${props.selectedId}` : '/admin/to/shifts/new'}>+ Создать смену</Link></Button>
-  : <Button disabled className="min-h-11 bg-signal-strong hover:bg-signal-strong">+ Создать смену</Button>}</div>}
+  : <Button disabled title="У вашей роли нет права создавать смену: её заводит машинист" className="min-h-11 bg-signal-strong hover:bg-signal-strong">+ Создать смену</Button>}</div>}
       />
       <div className="mb-2 flex flex-wrap gap-2 text-2xs text-muted-foreground"><span className="rounded border border-border bg-card px-2 py-1">Дневная 07:00–19:00</span><span className="rounded border border-border bg-card px-2 py-1">Ночная 19:00–07:00</span><span className="rounded border border-border bg-card px-2 py-1">Часовой пояс: {timezone}</span></div>
       {nextAction && (
