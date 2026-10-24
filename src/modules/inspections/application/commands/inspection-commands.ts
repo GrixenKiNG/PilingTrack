@@ -4,7 +4,9 @@ import { recordAuditEvent, recordAuditEventInTx } from '@/modules/audit';
 import type { Prisma } from '@/generated/postgres-client/client';
 import { ServiceError } from '@/lib/service-error';
 import { advanceMaintenanceRegulation, recordMeterReadingInTx } from '@/modules/equipment';
-import { createRepairOrderForDefect, OPEN_MAINTENANCE, requestReadinessSnapshot } from '@/modules/readiness/server';
+import { createRepairOrderForDefect } from '@/modules/readiness/server';
+import { requestReadinessSnapshot } from '@/core/outbox/readiness-snapshot-request';
+import { OPEN_MAINTENANCE } from '@/modules/equipment/client';
 import { computeHealthScore, findMissing, type SnapItem, type AnswerLike } from '../../domain/inspection-logic';
 import { inspectionDefectKey, planDefectsFromInspection, type DefectRuleItem } from '../../domain/defect-rules';
 import {

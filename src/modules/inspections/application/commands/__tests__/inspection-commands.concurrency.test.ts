@@ -58,7 +58,8 @@ vi.mock('@/modules/equipment', () => ({
 
 vi.mock('@/modules/readiness/server', () => ({
   createRepairOrderForDefect: vi.fn(),
-  OPEN_MAINTENANCE: ['IN_PROGRESS'],
+}));
+vi.mock('@/core/outbox/readiness-snapshot-request', () => ({
   requestReadinessSnapshot: vi.fn(),
 }));
 

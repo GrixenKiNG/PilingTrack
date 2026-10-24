@@ -38,7 +38,7 @@ vi.mock('@/lib/db', () => {
   };
 });
 
-vi.mock('@/modules/readiness/server', () => ({
+vi.mock('@/core/outbox/readiness-snapshot-request', () => ({
   requestReadinessSnapshot: readinessMock,
 }));
 

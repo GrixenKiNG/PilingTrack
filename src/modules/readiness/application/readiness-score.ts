@@ -8,13 +8,14 @@ import {buildEvidence} from '../domain/evaluation/evidence';
 import {immutablePublishedRules} from '../domain/evaluation/rules';
 import {usesWorkPermits} from '../domain/readiness-rules';
 import {isPermitInForce} from '../domain/permits/in-force';
+import {OPEN_MAINTENANCE} from '@/modules/equipment/client';
 
 /**
  * Статусы наряда ТО, которые авторитетный расчёт считает «работа не закрыта».
- * Экспортируется, чтобы модуль ТО заказывал пересчёт по тому же списку, а не
- * по своей копии: разъехавшись, они дали бы наряды, меняющие балл молча.
+ * Список принадлежит ТО (`@/modules/equipment/client`); здесь он только
+ * переэкспортируется для прежних импортёров модуля готовности.
  */
-export const OPEN_MAINTENANCE = ['PLANNED', 'ASSIGNED', 'IN_PROGRESS', 'ON_HOLD'] as const;
+export {OPEN_MAINTENANCE};
 
 export async function evaluateAuthoritativeReadiness(input: {
   tx: ReadinessTransaction;

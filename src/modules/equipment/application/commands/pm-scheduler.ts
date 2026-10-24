@@ -12,7 +12,7 @@ import { db } from '@/lib/db';
 import { recordAuditEvent } from '@/modules/audit';
 import { ServiceError } from '@/lib/service-error';
 import { evaluatePlanDue } from '@/lib/pm-due';
-import { requestReadinessSnapshot } from '@/modules/readiness/server';
+import { requestReadinessSnapshot } from '@/core/outbox/readiness-snapshot-request';
 import {
   runWithTenantContext,
   setRequestTenantId,

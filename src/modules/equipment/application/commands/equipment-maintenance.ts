@@ -9,8 +9,8 @@ import { db } from '@/lib/db';
 import { ServiceError } from '@/lib/service-error';
 import { logger } from '@/lib/logger';
 import { recordAuditEvent } from '@/modules/audit';
-import { requestReadinessSnapshot } from '@/modules/readiness/server';
-import { OPEN_MAINTENANCE } from '@/modules/readiness/server';
+import { requestReadinessSnapshot } from '@/core/outbox/readiness-snapshot-request';
+import { OPEN_MAINTENANCE } from '../../domain/maintenance-status';
 import { advanceMaintenanceRegulation } from './maintenance-regulation';
 import { recordMeterReadingInTx } from './meter-reading';
 
