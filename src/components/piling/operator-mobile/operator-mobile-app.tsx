@@ -1,5 +1,8 @@
 'use client';
 
+import {PHASE_STAGE, AUTH_REDIRECT_MS, AUTH_EXPIRED_NOTICE, STALE_SCREEN_NOTICE, STALE_AFTER_REJECT_NOTICE, QUIET_RELOAD_EVERY_MS, type WorkTab, type Detour} from "./operator-mobile-config";
+
+
 import {useCallback, useEffect, useRef, useState, type ReactNode} from 'react';
 import {Ellipsis, HardHat, ShieldCheck, Wrench} from 'lucide-react';
 import {logoutClient} from '@/lib/api';
@@ -33,77 +36,6 @@ import {SafetyTab} from './screens/safety-tab';
 import {admissionBlockers, admissionSteps} from './safety/admission-steps';
 import {knownAnswers} from './safety/known-answers';
 import './operator-type.css';
-
-/** Чек-лист, закрывающий фазу. Тот же порядок, что на сервере. */
-const PHASE_STAGE: Partial<Record<OperatorMobileState['phase'], ChecklistStage>> = {
-  PRESHIFT_INSPECTION: 'PRESHIFT_INSPECTION',
-  STARTUP: 'EO_BEFORE',
-  SITE_READY: 'SITE_READY',
-};
-
-/**
- * Истёкший вход на команде — уводим на вход, но не мгновенно.
- *
- * Задержка нужна, чтобы машинист успел прочитать, почему экран уходит: без неё
- * перезагрузка выглядит как сбой приложения. Тот же переход, что на загрузке
- * состояния (`reload`).
- */
-const AUTH_REDIRECT_MS = 2500;
-const AUTH_EXPIRED_NOTICE =
-  'Сессия истекла. Записи сохранены на телефоне и уйдут после входа.';
-
-/**
- * Текст о несвежем экране после принятой команды.
- *
- * Обещал «обновится автоматически при связи», но автоматического перечитывания
- * не было: экран оставался несвежим до следующего действия (аудит F-V1-QUIET-RELOAD-b).
- * Теперь обещание исполняется — ниже повторное перечитывание, — а к записи
- * приписано прямое «не вводите повторно».
- */
-const STALE_SCREEN_NOTICE =
-  'Записано. Экран не обновился — обновим, как появится связь. Не вводите запись повторно.';
-
-/**
- * Текст о несвежем экране после ОТКЛОНЁННОЙ команды (F-V1-409-NOTICE-TEXT).
- *
- * На 409 запись не принята — сервер уже в другом состоянии. Прежний
- * `STALE_SCREEN_NOTICE` утверждал «Записано … не вводите запись повторно»:
- * машинист прочитал бы это как «отказ принят» и не ввёл бы отклонённую запись
- * снова — молчаливая потеря. Поэтому здесь только про несвежесть экрана, без
- * «Записано» и без «не вводите повторно»; сам текст отказа 409 остаётся на
- * месте (`actionError`).
- */
-const STALE_AFTER_REJECT_NOTICE =
-  'Экран не обновился — обновим, как появится связь.';
-
-/**
- * Как часто повторять тихое перечитывание, пока экран остаётся несвежим.
- *
- * Пятнадцать секунд — не чаще: сбой перечитывания обычно значит недоступный
- * сервер, и долбить его каждую секунду незачем. События `online` и возврата на
- * вкладку пробуют раньше таймера.
- */
-const QUIET_RELOAD_EVERY_MS = 15_000;
-
-/**
- * Разделы, доступные после начала работы.
- *
- * До этого экран ведёт человека по порядку — допуск, приём, осмотр, пуск,
- * площадка, — и порядок здесь не удобство, а безопасность. Когда работа
- * началась, ведение заканчивается, и машинист сам решает, куда смотреть.
- */
-type WorkTab = 'SHIFT' | 'SAFETY' | 'EQUIPMENT' | 'MORE';
-
-/** Экраны, открываемые вне очереди фаз. */
-type Detour =
-  | {kind: 'PPE'}
-  | {kind: 'BRIEFING'}
-  | {kind: 'KNOWLEDGE'}
-  | {kind: 'CHECKLIST'; stage: ChecklistStage}
-  /** Просмотр пройденного этапа: только чтение, ничего не меняет. */
-  | {kind: 'REVIEW'; phase: OperatorPhase}
-  /** Дописать выработку или простой после «Завершить работу», до сдачи смены. */
-  | {kind: 'WORK_ENTRY'};
 
 /**
  * Мобильное рабочее место машиниста.
