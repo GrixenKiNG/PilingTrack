@@ -1,4 +1,4 @@
-import { STAGE_OWNER } from './readiness-centre';
+import { STAGE_OWNER } from './readiness-centre-metrics';
 
 
 import { ShieldCheck, User, Wrench } from '@/components/piling/icons/unified-icons';
