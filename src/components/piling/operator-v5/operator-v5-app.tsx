@@ -261,7 +261,7 @@ function AdmissionScreen({state, busy, onPpe, onBriefing, onKnowledge}: {
 }) {
   const {identity} = state;
   const bad = identity.documents.filter(
-    (doc) => doc.verdict === 'EXPIRED' || doc.verdict === 'MISSING',
+    (doc) => doc.required && (doc.verdict === 'EXPIRED' || doc.verdict === 'MISSING'),
   );
 
   return (

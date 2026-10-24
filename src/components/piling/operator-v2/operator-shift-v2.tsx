@@ -313,6 +313,8 @@ export function OperatorShiftV2() {
   const [mobile, setMobile] = useState<OperatorMobileState | null>(null);
   const [mobileError, setMobileError] = useState<string | null>(null);
   const [safetyStep, setSafetyStep] = useState<'PPE' | 'BRIEFING' | 'KNOWLEDGE' | null>(null);
+  type TbStage = 'TB_PILING' | 'TB_DRILLING';
+  const [tbStage, setTbStage] = useState<TbStage | null>(null);
   const screenRef = useRef<HTMLDivElement>(null);
   const [nextFocus, setNextFocus] = useState<{target: 'accept' | 'checklist' | 'close'; count: number} | null>(null);
   const [nextNotice, setNextNotice] = useState<string | null>(null);
@@ -881,7 +883,7 @@ export function OperatorShiftV2() {
     setNextNotice(null);
     setEditingProductionShiftId(null);
     setPileOpen(false); setPassportOpen(false); setDrillingOpen(false); setDowntimeOpen(false);
-    setSafetyStep(null); setTab('shift');
+    setSafetyStep(null); setTbStage(null); setTab('shift');
   };
   const next = flowMobile ? nextStep(flowMobile) : null;
   const focusNext = (target: 'accept' | 'checklist' | 'close') => {
@@ -956,6 +958,13 @@ export function OperatorShiftV2() {
     const documents = facts.clearance.documents;
     // Приёмка уже открытой смены (передача от прошлой) — кнопка внизу.
     const canAct = cleared && Boolean(facts.shift);
+    /*
+      Допуск сервер проверяет сам: пока не отмечены СИЗ, инструкция и проверка
+      знаний, «Принять установку» отвечает 409. Раньше кнопка была доступна и
+      отказ оставался всплывающей подсказкой — оператор не понимал, что делать.
+      Теперь шаг допуска назван на экране, а приёмка ждёт его.
+    */
+    const admissionPending = next?.action.kind === 'ADMISSION' || next?.action.kind === 'WAIT_ADMISSION';
     return (
       <StepShell bar={nextNoticeNode} screenRef={screenRef}
         title={tab === 'safety' ? 'Техника безопасности' : V2_STEP_TITLE.acceptance}
@@ -969,7 +978,7 @@ export function OperatorShiftV2() {
         footer={(
           <>
             {tab === 'shift' && canAct ? (
-              <StepButton label="Принять установку" onClick={() => void acceptEquipment()} busy={busy} />
+              <StepButton label="Принять установку" onClick={() => void acceptEquipment()} disabled={admissionPending} busy={busy} />
             ) : null}
             {/* До открытия смены машину сначала выбирают, а принимают кнопкой —
                 она погашена, пока строка не отмечена. */}
@@ -977,7 +986,7 @@ export function OperatorShiftV2() {
               <StepButton
                 label="Принять установку"
                 onClick={() => { if (acceptTargetId) void acceptOn(acceptTargetId); }}
-                disabled={!acceptTargetId}
+                disabled={!acceptTargetId || admissionPending}
                 busy={busy}
               />
             ) : null}
@@ -1016,6 +1025,15 @@ export function OperatorShiftV2() {
         />
 
         <Blockers items={state.blockers} />
+
+        {admissionPending && next ? (
+          <div className="space-y-2 rounded-xl border border-warning/40 bg-warning/10 px-3 py-3">
+            <p role="status" className="text-base text-warning-strong">
+              Сначала допуск: {next.title.toLowerCase()}. Без него установку принять нельзя.
+            </p>
+            <StepButton label={next.action.kind === 'ADMISSION' ? `Пройти: ${next.title}` : 'Обновить допуск'} onClick={goNext} busy={busy} />
+          </div>
+        ) : null}
 
         {facts.clearance.warnings.length > 0 && (
           <ul className="space-y-1 rounded-xl border border-warning/40 bg-warning/10 px-3 py-2">
@@ -1162,6 +1180,43 @@ export function OperatorShiftV2() {
     );
   }
 
+  /*
+    Чек-листы ТБ по видам работ (забивка, лидерное бурение).
+
+    Сервер не принимает выработку, пока срок такого чек-листа не пройден, и
+    отвечает «пройдите его». Прежде экран отправлял человека во вкладку «ТБ», где
+    были только шаги допуска, — выработку записать было нельзя. Чек-лист идёт теми
+    же экранами и командой, что осмотры до работы.
+  */
+  const tbList = tbStage && mobile ? mobile.checklists.find((item) => item.stage === tbStage) ?? null : null;
+  if (tbStage && mobile && tbList) {
+    return (
+      <StepShell bar={nextNoticeNode} screenRef={screenRef} title={tbList.title} subtitle="Техника безопасности">
+        <button type="button" onClick={() => setTbStage(null)}
+          className="min-h-12 w-full rounded-lg border border-border bg-card text-base font-semibold text-foreground">
+          Назад
+        </button>
+        <ChecklistScreen
+          draftUserId={user?.id}
+          draftShiftId={mobile.shift?.id ?? facts.shift?.id}
+          key={`${mobile.shift?.id}:${mobile.assignment?.equipmentId}:${tbList.stage}`}
+          checklist={tbList}
+          warnings={mobile.warnings}
+          busy={busy}
+          error={checklistError}
+          commandId={checklistCommandId}
+          lastMeter={mobile.assignment?.lastMeter ?? null}
+          known={knownAnswers(tbList.stage, mobile)}
+          onSubmit={async (answers, restoredCommandId) => {
+            const ok = await submitChecklist(tbList.stage, answers, restoredCommandId);
+            if (ok) setTbStage(null);
+            return ok;
+          }}
+        />
+      </StepShell>
+    );
+  }
+
   // ---------- 5. Работа ----------
   if (step === 'work' || editingProduction) {
     return (
@@ -1190,6 +1245,24 @@ export function OperatorShiftV2() {
               ? (
                 <>
                   <SafetyTab state={mobile} onOpen={setSafetyStep} />
+                  <section className="rounded-xl border border-border bg-card px-3 py-2">
+                    <h3 className="text-base font-semibold">Чек-листы ТБ по видам работ</h3>
+                    {mobile.checklists
+                      .filter((item) => item.stage === 'TB_PILING' || item.stage === 'TB_DRILLING')
+                      .map((item) => (
+                        <button key={item.stage} type="button" onClick={() => setTbStage(item.stage as TbStage)}
+                          className="flex min-h-12 w-full items-center gap-2 border-t py-2 text-left first:border-t-0">
+                          <span aria-hidden>{item.done ? '✓' : '—'}</span>
+                          <span className="min-w-0 flex-1">
+                            <span className="block text-base font-semibold">{item.title}</span>
+                            <span className="block text-sm text-muted-foreground">
+                              {item.done ? 'Пройден' : 'Срок подошёл — без него запись выработки не примут'}
+                            </span>
+                          </span>
+                          <span aria-hidden>›</span>
+                        </button>
+                      ))}
+                  </section>
                   {/* Происшествие — про смену, а не про машину: ушибся человек,
                       посторонний в опасной зоне, разлили масло. Дефект чинит
                       механик, происшествие разбирают, и место ему здесь. */}

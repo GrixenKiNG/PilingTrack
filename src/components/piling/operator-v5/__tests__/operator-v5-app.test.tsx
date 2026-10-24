@@ -125,6 +125,21 @@ describe('T12: следующий шаг v5 открывает действие 
     expect(api.sendCommand).not.toHaveBeenCalled();
   });
 
+  it('необязательный документ без записи не показывает «Работать нельзя», обязательный — показывает', async () => {
+    const identity = workStateFixture().identity;
+    const doc = (required: boolean) => ({
+      typeId: 'd1', name: 'Допуск на высоту', required, verdict: 'MISSING', number: '', expiresAt: null, daysLeft: null,
+    });
+    const ppe = {...identity.ppe, confirmed: false};
+    const view = open({phase: 'IDENTITY', identity: {...identity, ppe, documents: [doc(false)]} as OperatorMobileState['identity']});
+    await screen.findByRole('button', {name: 'Следующий шаг: СИЗ'});
+    expect(screen.queryByText('Работать нельзя')).not.toBeInTheDocument();
+    view.unmount();
+
+    open({phase: 'IDENTITY', identity: {...identity, ppe, documents: [doc(true)]} as OperatorMobileState['identity']});
+    expect(await screen.findByText('Работать нельзя')).toBeInTheDocument();
+  });
+
   it('выработка получает фокус без потери уже введённого количества', async () => {
     open({phase: 'WORK', entries: [], dictionaries: {
       pileGrades: [{id: 'grade-1', name: 'С 20-35', lengthMm: 6000}], drillingTypes: [], downtimeReasons: [],

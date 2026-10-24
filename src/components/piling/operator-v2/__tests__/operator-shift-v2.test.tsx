@@ -428,6 +428,52 @@ describe('V2: сбой загрузки и отказ записи', () => {
     expect(screen.queryByLabelText('Тип бурения')).not.toBeInTheDocument();
     expect(await screen.findByText('Техника безопасности')).toBeInTheDocument();
   });
+
+  it('вкладка ТБ даёт пройти чек-лист ТБ по бурению: ответ уходит той же командой', async () => {
+    authFetch.mockResolvedValue({ok: true, json: async () => ({...facts,
+      clearance: {...facts.clearance, warnings: []},
+    })});
+    api.fetchState.mockResolvedValue(workStateFixture({checklists: [{
+      stage: 'TB_DRILLING', title: 'ТБ: лидерное бурение', purpose: '', version: '1', done: false, period: null,
+      sections: [{id: 's', title: 'Люди и зона', items: [{id: 'i1', text: 'Зона огорожена', severity: 'NOTE'}]}],
+    }] as OperatorMobileState['checklists']}));
+    render(<OperatorShiftV2 />);
+
+    fireEvent.click(await screen.findByRole('button', {name: 'ТБ'}));
+    fireEvent.click(await screen.findByRole('button', {name: /ТБ: лидерное бурение/}));
+    fireEvent.click(await screen.findByRole('button', {name: 'Весь раздел «Люди и зона» в норме'}));
+    fireEvent.click(await screen.findByRole('button', {name: 'Завершить'}));
+
+    await waitFor(() => expect(api.sendCommand).toHaveBeenCalledWith(
+      expect.objectContaining({command: 'submit-checklist', stage: 'TB_DRILLING'}),
+    ));
+  });
+});
+
+describe('V2: допуск не пройден — приёмка ждёт', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    api.queued = [];
+    api.sendCommand.mockResolvedValue({ok: true});
+    authFetch.mockResolvedValue({ok: true, json: async () => ({...facts, shift: null,
+      clearance: {...facts.clearance, warnings: []},
+    })});
+  });
+
+  it('при неотмеченных СИЗ «Принять установку» не нажимается, а экран называет следующий шаг допуска', async () => {
+    const base = workStateFixture();
+    api.fetchState.mockResolvedValue(workStateFixture({phase: 'IDENTITY', shift: null, identity: {
+      ...base.identity, ppe: {...base.identity.ppe, confirmed: false},
+    }}));
+    render(<OperatorShiftV2 />);
+
+    expect(await screen.findByText(/Сначала допуск: сиз/i)).toBeInTheDocument();
+    const accept = screen.queryByRole('button', {name: 'Принять установку'});
+    if (accept) expect(accept).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', {name: /Пройти: /}));
+    expect(await screen.findByRole('button', {name: /Комплект в порядке/})).toBeInTheDocument();
+    expect(api.sendCommand).not.toHaveBeenCalled();
+  });
 });
 
 describe('D-20260930-001: несданная смена прошлых суток на приёме v2', () => {
