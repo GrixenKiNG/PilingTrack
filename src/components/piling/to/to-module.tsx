@@ -1,5 +1,9 @@
 'use client';
 
+import { TECH_READINESS_PRODUCTION_SHELL_ENABLED, type ModuleSurface, OUTCOME_STATUS, STAGE_EVIDENCE_KEY, STAGE_EVIDENCE_STATE, DEFECTS_UNAVAILABLE_MESSAGE, PERMITS_UNAVAILABLE_MESSAGE, SURFACE_TABS, SURFACE_ROUTE, SURFACE_LABEL, SURFACE_HOME, surfaceOfView, parseView, parseSettingsSection } from './to-module-config';
+export { TECH_READINESS_PRODUCTION_SHELL_ENABLED } from './to-module-config';
+export type { ModuleSurface } from './to-module-config';
+
 import { usePilingStore } from '@/lib/store';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
@@ -18,7 +22,6 @@ import type { CrewSummary, MaintenanceSummary } from './readiness-design-views';
 import type { ActingRole } from '@/lib/types';
 import { TechReadinessModule } from './readiness/tech-readiness-module';
 import { InspectionLayer } from './inspection-layer';
-import { MODULE_TABS, SAFETY_TABS, type ModuleTab } from './readiness/module-tab-list';
 import type { QueryState } from './readiness/boundaries/query-state';
 import {
   fetchCurrentReadiness,
@@ -50,12 +53,7 @@ import {
   type ReferenceView,
   type SettingsSection,
 } from './readiness-reference-ui';
-import {
-  deriveEquipmentReadiness,
-  type EquipmentReadiness,
-  type ReadinessEvidence,
-  type ReadinessStatus,
-} from './readiness-model';
+import { deriveEquipmentReadiness, type EquipmentReadiness, type ReadinessEvidence } from './readiness-model';
 import {
   buildAuthoritativeReadinessPresentation,
   buildUnavailableReadinessPresentation,
@@ -66,122 +64,6 @@ import type { JournalRecord } from './to-stats';
 // ни серверных зависимостей, — поэтому безопасен в клиентской сборке.
 import { can } from '@/services/auth/authorization-service';
 import { resolveEffectiveRole } from '@/lib/types';
-
-// Список обязан покрывать ОБА набора вкладок — MODULE_TABS и SAFETY_TABS: он
-// сторожит ?view= в адресе, и пропущенное здесь значение выглядит как «такой
-// вкладки нет» — переход по закладке молча возвращает на домашний раздел.
-const VIEW_IDS = new Set<ReferenceView>([
-  'my-clearance',
-  'readiness',
-  'fleet',
-  'shifts',
-  'permits',
-  'maintenance',
-  'safety',
-  'employees',
-  'instructions',
-  'knowledge',
-  'documents',
-  'briefings',
-  'incidents',
-  'reports',
-  'settings',
-]);
-
-/**
- * Исход авторитетного расчёта — в статус карточки парка.
- *
- * «Готова с замечанием» и «требует решения» сводятся к одному «внимание»:
- * у карточки парка нет отдельного цвета под каждое, а зелёным их красить
- * нельзя — замечание тогда некому заметить.
- */
-const OUTCOME_STATUS: Record<string, ReadinessStatus> = {
-  READY: 'READY',
-  READY_WITH_WARNING: 'ATTENTION',
-  ATTENTION: 'ATTENTION',
-  BLOCKED: 'BLOCKED',
-};
-
-const STAGE_EVIDENCE_KEY: Record<string, ReadinessEvidence['key']> = {
-  INSPECTION: 'inspection',
-  ENGINE_HOURS: 'meter',
-  PERMIT: 'permit',
-  MAINTENANCE: 'maintenance',
-  ACCEPTANCE: 'acceptance',
-};
-
-const STAGE_EVIDENCE_STATE: Record<string, ReadinessEvidence['state']> = {
-  pass: 'pass',
-  warning: 'warning',
-  fail: 'block',
-  unknown: 'missing',
-};
-
-const SETTINGS_IDS = new Set<SettingsSection>([
-  'rules',
-  'checklists',
-  'roles',
-  'dictionaries',
-  'notifications',
-  'integrations',
-  'audit',
-]);
-
-export const TECH_READINESS_PRODUCTION_SHELL_ENABLED =
-  process.env.NEXT_PUBLIC_TECH_READINESS_PRODUCTION_SHELL !== 'false';
-
-/**
- * Отказ чтения журнала дефектов. Отдельное состояние, а не только строка в
- * общем баннере: счётчик критических дефектов решает допуск установки, и ноль в
- * нём при отказе читался бы как «замечаний нет» (F-N1005-DEFECTS-UNKNOWN).
- */
-const DEFECTS_UNAVAILABLE_MESSAGE = 'Не удалось загрузить журнал дефектов.';
-const PERMITS_UNAVAILABLE_MESSAGE = 'Сервер не отдал список нарядов. Повторите загрузку.';
-
-/**
- * Какой модуль показывает оболочка. Данные и экраны у них общие, разные —
- * набор вкладок, адрес и то, куда попадаешь без `?view=`.
- */
-export type ModuleSurface = 'readiness' | 'safety';
-
-const SURFACE_TABS: Record<ModuleSurface, ReadonlyArray<ModuleTab>> = {
-  readiness: MODULE_TABS,
-  safety: SAFETY_TABS,
-};
-
-const SURFACE_ROUTE: Record<ModuleSurface, string> = {
-  readiness: '/admin/to',
-  safety: '/admin/safety',
-};
-
-const SURFACE_LABEL: Record<ModuleSurface, string> = {
-  readiness: 'Техническая готовность',
-  safety: 'ТБ и допуски',
-};
-
-/** Раздел, который открывается без `?view=` в адресе. */
-const SURFACE_HOME: Record<ModuleSurface, ReferenceView> = {
-  readiness: 'readiness',
-  // Домашний раздел «ТБ и допусков» — сводка инженера ОТ. Роли без его прав
-  // туда не попадут: подстановка первой разрешённой вкладки уведёт их на
-  // «Мой допуск», открытый каждому.
-  safety: 'safety',
-};
-
-/** Какому модулю принадлежит раздел. Раздел живёт ровно в одном. */
-function surfaceOfView(view: ReferenceView): ModuleSurface {
-  return SAFETY_TABS.some((tab) => tab.id === view) ? 'safety' : 'readiness';
-}
-
-const parseView = (value: string | null, surface: ModuleSurface): ReferenceView => {
-  if (value === 'journal' || value === 'meters' || value === 'plans') return 'maintenance';
-  return value && VIEW_IDS.has(value as ReferenceView)
-    ? value as ReferenceView
-    : SURFACE_HOME[surface];
-};
-
-const parseSettingsSection = (value: string | null): SettingsSection =>
-  value && SETTINGS_IDS.has(value as SettingsSection) ? value as SettingsSection : 'rules';
 
 interface WorkspaceIssue {
   source: string;
