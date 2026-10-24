@@ -60,11 +60,11 @@ function KpiTile({ id, label, value, hint, delta }: { id: string; label: string;
           <PilingIcon name={ANALYTICS_KPI_ICONS[id] ?? 'analytics'} fill decorative className="absolute inset-0" />
         </span>
         <div className="min-w-0">
-        <p className="text-xs text-muted-foreground">{label}</p>
+        <p className="text-xs text-muted-foreground max-sm:text-sm">{label}</p>
         <p className="mt-1 text-2xl font-bold text-foreground">{value}</p>
         {delta
-          ? <p className={`mt-1 text-xs font-medium ${delta.good ? 'text-success-strong' : 'text-destructive-strong'}`}>{delta.text}</p>
-          : <p className="mt-1 text-xs text-muted-foreground">{hint}</p>}
+          ? <p className={`mt-1 text-xs max-sm:text-sm font-medium ${delta.good ? 'text-success-strong' : 'text-destructive-strong'}`}>{delta.text}</p>
+          : <p className="mt-1 text-xs text-muted-foreground max-sm:text-sm">{hint}</p>}
         </div>
       </CardContent>
     </Card>

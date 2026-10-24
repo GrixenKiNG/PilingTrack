@@ -138,7 +138,7 @@ export function EquipmentAnalytics() {
 
   // Тач-таргеты ≥44px у кнопок периода на мобильном, компактно на десктопе.
   const chip = 'min-h-11 rounded-md border border-border px-3 py-2 text-sm text-muted-foreground hover:bg-muted sm:min-h-0 sm:py-1 sm:text-xs';
-  const dateInput = 'min-h-10 rounded-md border border-border bg-card px-2 py-2 text-sm sm:min-h-0 sm:py-1';
+  const dateInput = 'min-h-10 max-sm:min-h-11 rounded-md border border-border bg-card px-2 py-2 text-sm sm:min-h-0 sm:py-1';
 
   return (
     <div className="space-y-5 p-4 lg:p-6">
@@ -262,7 +262,7 @@ function FleetTable({
           <select
             value={sortKey}
             onChange={(e) => onSort(e.target.value as SortKey)}
-            className="min-h-10 flex-1 rounded-md border border-border bg-card px-2 py-2 text-sm text-foreground"
+            className="min-h-10 max-sm:min-h-11 flex-1 rounded-md border border-border bg-card px-2 py-2 text-sm text-foreground"
           >
             {FLEET_COLUMNS.map((c) => (
               <option key={c.k} value={c.k}>{c.label}{sortKey === c.k ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''}</option>

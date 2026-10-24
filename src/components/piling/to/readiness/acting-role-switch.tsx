@@ -44,7 +44,7 @@ export function ActingRoleSwitch({ actorRole, value, onChange, disabled = false 
           onChange(next === 'ADMIN' ? null : (next as ActingRole));
         }}
         className={cn(
-          'min-h-9 rounded-md border border-border bg-card px-2 text-xs font-medium text-foreground',
+          'min-h-9 max-sm:min-h-11 max-sm:text-sm rounded-md border border-border bg-card px-2 text-xs font-medium text-foreground',
           'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
           'disabled:cursor-not-allowed disabled:opacity-60',
           value && 'border-signal/40 text-signal-strong',

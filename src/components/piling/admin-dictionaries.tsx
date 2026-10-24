@@ -478,8 +478,8 @@ export function AdminDictionaries() {
             {dictionarySummary.map(({ kind, summaryTitle, pilingIcon, active, archived, objects }) => (
               <button key={kind} type="button" className="rounded-xl border border-border bg-card p-4 text-left transition hover:border-signal/30 hover:shadow-sm" onClick={() => { selectKind(kind); setSearch(''); }}>
                 {/* Иконка во всю высоту плитки + описание — как в дашборде. */}
-                <div className="flex items-stretch gap-4"><span className="relative w-20 shrink-0 self-stretch"><PilingIcon name={pilingIcon} fill decorative className="absolute inset-0" /></span><div><p className="text-sm font-semibold text-foreground">{summaryTitle}</p><div className="mt-2 flex items-end gap-4"><div><p className="text-2xl font-bold text-info-strong">{active}</p><p className="text-xs text-info-strong">активных</p></div><div className="border-l border-border pl-4"><p className="text-lg font-semibold text-muted-foreground">{archived}</p><p className="text-xs text-muted-foreground">архивных</p></div></div></div></div>
-                <p className="mt-3 border-t border-border pt-3 text-xs text-muted-foreground">Используются в {objects} объектах</p>
+                <div className="flex items-stretch gap-4"><span className="relative w-20 shrink-0 self-stretch"><PilingIcon name={pilingIcon} fill decorative className="absolute inset-0" /></span><div><p className="text-sm font-semibold text-foreground">{summaryTitle}</p><div className="mt-2 flex items-end gap-4"><div><p className="text-2xl font-bold text-info-strong">{active}</p><p className="text-xs text-info-strong max-sm:text-sm">активных</p></div><div className="border-l border-border pl-4"><p className="text-lg font-semibold text-muted-foreground">{archived}</p><p className="text-xs text-muted-foreground max-sm:text-sm">архивных</p></div></div></div></div>
+                <p className="mt-3 border-t border-border pt-3 text-xs text-muted-foreground max-sm:text-sm">Используются в {objects} объектах</p>
               </button>
             ))}
           </section>
@@ -569,9 +569,9 @@ export function AdminDictionaries() {
           </label>
           <label className="block"><span className="text-muted-foreground">Длина, м</span>
             <Input aria-label="Длина, м" value={panelDraft?.length ?? ''} inputMode="decimal" placeholder="35,00" onChange={(event) => setPanelDraft((draft) => draft && ({ ...draft, length: event.target.value }))} className="mt-1 h-11" />
-            <p className="mt-1 text-xs text-muted-foreground">Указываются по проектной длине.</p>
+            <p className="mt-1 text-xs text-muted-foreground max-sm:text-sm">Указываются по проектной длине.</p>
             {selectedUsed && (
-              <p className="mt-1.5 flex gap-1.5 rounded-md border border-warning/30 bg-warning/10 p-2 text-xs text-warning-strong">
+              <p className="mt-1.5 flex gap-1.5 rounded-md border border-warning/30 bg-warning/10 p-2 text-xs text-warning-strong max-sm:text-sm">
                 <AlertTriangle className="mt-px h-3.5 w-3.5 shrink-0" />
                 <span>Погонные метры считаются от этой длины. Если её изменить, цифры в уже сданных отчётах ({selectedItem.reportCount}) и в аналитике за прошлые периоды станут другими.</span>
               </p>
@@ -583,7 +583,7 @@ export function AdminDictionaries() {
           </> : (selectedItem.code ? <div><span className="text-muted-foreground">Код</span><div className="mt-1 rounded-md border border-border bg-muted p-2 font-medium text-foreground">{selectedItem.code}</div></div> : null)}
           </div>
           <div className="mt-5 rounded-lg border border-warning/30 bg-warning/10 p-3 text-sm text-warning-strong">{selectedItem.reportCount || selectedItem.planCount ? <><p className="flex items-center gap-2 font-medium"><AlertTriangle className="h-4 w-4" />Значение используется в отчётах и планах</p><p className="mt-2">Использование: отчётов — {selectedItem.reportCount}, планов — {selectedItem.planCount}.</p><p className="mt-2 font-medium">Можно только архивировать.</p></> : 'Значение не используется: его можно изменить или удалить.'}</div><section className="mt-5 space-y-2 text-sm"><h3 className="font-semibold text-foreground">Использование</h3><p className="flex justify-between border-b border-dashed pb-2 text-muted-foreground"><span>Объекты</span><b>{selectedItem.siteCount}</b></p><p className="flex justify-between border-b border-dashed pb-2 text-muted-foreground"><span>Отчёты</span><b>{selectedItem.reportCount}</b></p><p className="flex justify-between border-b border-dashed pb-2 text-muted-foreground"><span>Планы</span><b>{selectedItem.planCount}</b></p></section>
-          <div className="mt-auto border-t border-border pt-5"><div className="grid grid-cols-2 gap-2"><Button className="min-h-11 bg-signal text-white hover:bg-signal-strong" disabled={saving || !panelDirty} onClick={() => void savePanel()}><Save className="mr-1.5 h-4 w-4" />Сохранить</Button><Button variant="outline" className="min-h-11 border-signal/30 text-signal-strong hover:bg-signal/10" onClick={() => void setStatus(selectedKind, selectedItem, !selectedItem.isActive)}><Archive className="mr-1.5 h-4 w-4" />{selectedItem.isActive ? 'Архивировать' : 'Восстановить'}</Button></div><p className="mt-5 text-xs text-muted-foreground">Подсказка: используемые значения нельзя удалить. Архивированные записи скрываются из активных фильтров.</p></div></> : <div className="mt-4 text-sm text-muted-foreground">
+          <div className="mt-auto border-t border-border pt-5"><div className="grid grid-cols-2 gap-2"><Button className="min-h-11 bg-signal text-white hover:bg-signal-strong" disabled={saving || !panelDirty} onClick={() => void savePanel()}><Save className="mr-1.5 h-4 w-4" />Сохранить</Button><Button variant="outline" className="min-h-11 border-signal/30 text-signal-strong hover:bg-signal/10" onClick={() => void setStatus(selectedKind, selectedItem, !selectedItem.isActive)}><Archive className="mr-1.5 h-4 w-4" />{selectedItem.isActive ? 'Архивировать' : 'Восстановить'}</Button></div><p className="mt-5 text-xs text-muted-foreground max-sm:text-sm">Подсказка: используемые значения нельзя удалить. Архивированные записи скрываются из активных фильтров.</p></div></> : <div className="mt-4 text-sm text-muted-foreground">
             {historyFailed ? <div role="alert" className="space-y-2 rounded-lg border border-destructive/30 bg-destructive/5 p-3">
               <p className="font-medium text-destructive-strong">Журнал изменений не загрузился</p>
               <p className="text-muted-foreground">История этого значения не показана. Это не значит, что изменений не было.</p>
@@ -598,7 +598,7 @@ export function AdminDictionaries() {
                         <span className="font-medium text-foreground">{entry.title}</span>
                         <span className="shrink-0 text-xs text-muted-foreground">{entry.at}</span>
                       </div>
-                      {entry.meta && <p className="mt-0.5 text-xs text-muted-foreground">{entry.meta}</p>}
+                      {entry.meta && <p className="mt-0.5 text-xs text-muted-foreground max-sm:text-sm">{entry.meta}</p>}
                       {entry.changes && entry.changes.length > 0 && (
                         <ul className="mt-1.5 space-y-0.5 text-xs text-muted-foreground">
                           {entry.changes.map((change, index) => (
@@ -609,7 +609,7 @@ export function AdminDictionaries() {
                     </li>
                   ))}
                 </ul>}
-          </div>}</> : <><Search className="mx-auto mb-3 h-10 w-10 text-muted-foreground" /><p className="text-sm text-muted-foreground">Выберите запись</p><p className="mt-1 text-xs text-muted-foreground">Сведения откроются здесь, в этом же окне</p></>}
+          </div>}</> : <><Search className="mx-auto mb-3 h-10 w-10 text-muted-foreground" /><p className="text-sm text-muted-foreground">Выберите запись</p><p className="mt-1 text-xs text-muted-foreground max-sm:text-sm">Сведения откроются здесь, в этом же окне</p></>}
         </div>
         </div>
       </InspectorShell>

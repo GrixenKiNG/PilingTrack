@@ -171,7 +171,7 @@ export function HierarchyTree({ readOnly = false, siteId, tree, onAdd, onDelete 
       )}
       {!readOnly && <button
         onClick={() => onAdd('field', siteId, siteId)}
-        className="flex items-center gap-1.5 text-xs text-signal-strong hover:text-signal-strong font-medium py-1"
+        className="flex items-center gap-1.5 text-xs text-signal-strong hover:text-signal-strong font-medium py-1 max-sm:min-h-11 max-sm:text-sm"
       >
         <Plus className="w-3 h-3" />
         Добавить свайное поле

@@ -332,7 +332,7 @@ export function AdminAnalytics() {
                     <span className="w-9 text-right font-medium tabular-nums text-foreground">{e.usagePct}%</span>
                   </div>
                 ))}
-                <p className="pt-1 text-2xs text-muted-foreground">Доля дней периода, когда по установке был отчёт.</p>
+                <p className="pt-1 text-2xs max-sm:text-sm! text-muted-foreground">Доля дней периода, когда по установке был отчёт.</p>
               </CardContent>
             </Card>
           )}

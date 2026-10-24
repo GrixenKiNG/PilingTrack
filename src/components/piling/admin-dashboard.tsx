@@ -404,20 +404,20 @@ export function AdminDashboard() {
             <div className="flex items-center gap-1">
               <input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)}
                 aria-label="Начало периода"
-                className="rounded-md border border-border bg-card px-2 py-1 text-xs text-foreground" />
+                className="rounded-md border border-border bg-card px-2 py-1 text-xs text-foreground max-sm:min-h-11 max-sm:text-sm" />
               <span className="text-xs text-muted-foreground">—</span>
               <input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)}
                 aria-label="Конец периода"
-                className="rounded-md border border-border bg-card px-2 py-1 text-xs text-foreground" />
+                className="rounded-md border border-border bg-card px-2 py-1 text-xs text-foreground max-sm:min-h-11 max-sm:text-sm" />
             </div>
           )}
           <select value={siteFilter} onChange={(e) => setSiteFilter(e.target.value)} aria-label="Фильтр по объекту"
-            className="rounded-md border border-border bg-card px-2 py-1 text-xs text-foreground">
+            className="rounded-md border border-border bg-card px-2 py-1 text-xs text-foreground max-sm:min-h-11 max-sm:text-sm">
             <option value="all">Все объекты</option>
             {siteOptions.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
           <select value={rigFilter} onChange={(e) => setRigFilter(e.target.value)} aria-label="Фильтр по установке"
-            className="rounded-md border border-border bg-card px-2 py-1 text-xs text-foreground">
+            className="rounded-md border border-border bg-card px-2 py-1 text-xs text-foreground max-sm:min-h-11 max-sm:text-sm">
             <option value="all">Все установки</option>
             {(fleet?.equipment ?? []).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
@@ -425,7 +425,7 @@ export function AdminDashboard() {
             type="button"
             onClick={refreshAll}
             disabled={loading}
-            className="flex h-9 w-9 items-center justify-center rounded-md border border-border bg-card text-muted-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-info/30 disabled:cursor-not-allowed disabled:opacity-50"
+            className="flex h-9 w-9 max-sm:h-11 max-sm:w-11 items-center justify-center rounded-md border border-border bg-card text-muted-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-info/30 disabled:cursor-not-allowed disabled:opacity-50"
             aria-label="Обновить дашборд"
             title="Обновить дашборд"
           >
