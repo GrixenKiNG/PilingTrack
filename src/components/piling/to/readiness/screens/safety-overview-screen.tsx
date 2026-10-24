@@ -216,7 +216,7 @@ export function SafetyOverviewScreen(props: ReferenceUiProps) {
         )}
       />
 
-      <p className="mb-1 mt-1 inline-flex items-center gap-2 rounded-full border border-success/25 bg-success/10 px-3 py-1 text-2xs font-bold tracking-wide text-success-strong">
+      <p className="mb-1 mt-1 inline-flex items-center gap-2 rounded-full border border-success/25 bg-success/10 px-3 py-1 text-2xs max-sm:text-sm! font-bold tracking-wide text-success-strong">
         <PilingIcon name="accepted" size={12} tone="success" decorative />
         БЕЗОПАСНОСТЬ СЕГОДНЯ — СТАБИЛЬНАЯ РАБОТА ЗАВТРА
       </p>
@@ -383,7 +383,7 @@ export function SafetyOverviewScreen(props: ReferenceUiProps) {
                 </tbody>
               </table>
             </div>
-            <p className="mt-2 text-2xs text-muted-foreground">
+            <p className="mt-2 text-2xs max-sm:text-sm! text-muted-foreground">
               Показано {Math.min(PREVIEW_LIMIT, worstFirst.length)} из {worstFirst.length} сотрудников
             </p>
           </section>

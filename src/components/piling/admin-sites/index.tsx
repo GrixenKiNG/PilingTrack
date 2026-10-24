@@ -525,11 +525,11 @@ function SiteCrewBoard({ crews, error }: { crews?: SiteCrew[]; error?: boolean }
       </h3>
 
       {crews === undefined && error ? (
-        <p className="text-2xs text-destructive-strong">Состав бригад не загрузился — обновите страницу.</p>
+        <p className="text-2xs max-sm:text-sm! text-destructive-strong">Состав бригад не загрузился — обновите страницу.</p>
       ) : null}
-      {crews === undefined && !error ? <p className="text-2xs text-muted-foreground">Загрузка…</p> : null}
+      {crews === undefined && !error ? <p className="text-2xs max-sm:text-sm! text-muted-foreground">Загрузка…</p> : null}
       {crews?.length === 0 ? (
-        <p className="text-2xs text-muted-foreground">
+        <p className="text-2xs max-sm:text-sm! text-muted-foreground">
           За объектом не закреплено ни одной бригады. Закрепление — в модуле «Бригады».
         </p>
       ) : null}
@@ -554,7 +554,7 @@ function SiteCrewBoard({ crews, error }: { crews?: SiteCrew[]; error?: boolean }
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
-                  <p className="truncate text-xs font-semibold text-foreground">
+                  <p className="truncate text-xs font-semibold text-foreground max-sm:text-sm">
                     {crew.equipment?.name ?? 'Установка не закреплена'}
                   </p>
                   {state ? (
@@ -563,12 +563,12 @@ function SiteCrewBoard({ crews, error }: { crews?: SiteCrew[]; error?: boolean }
                     </span>
                   ) : null}
                 </div>
-                <p className="truncate text-2xs text-muted-foreground">
+                <p className="truncate text-2xs max-sm:text-sm! text-muted-foreground">
                   {crew.name || 'Бригада без названия'}
                   {crew.operator ? ` · ${crew.operator.name}` : ''}
                 </p>
                 {crew.assistants.length > 0 ? (
-                  <p className="truncate text-2xs text-muted-foreground">
+                  <p className="truncate text-2xs max-sm:text-sm! text-muted-foreground">
                     Помощники: {crew.assistants.map((assistant) => assistant.name).join(', ')}
                   </p>
                 ) : null}

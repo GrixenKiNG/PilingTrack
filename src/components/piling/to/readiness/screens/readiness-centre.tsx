@@ -857,7 +857,7 @@ export function ReadinessCentre(props: ReferenceUiProps) {
             рядом зелёная плашка и читалась как «всё сделано».
           */}
           {startAllowed && pendingStages.length > 0 && (
-            <p className="mt-2 rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-2xs leading-relaxed text-foreground">
+            <p className="mt-2 rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-2xs max-sm:text-sm! leading-relaxed text-foreground">
               <span className="font-semibold">Процедура не завершена:</span> {pendingSummary}.{' '}
               <span className="text-muted-foreground">Действующие правила пуск этим не ограничивают — вердикт выше относится к запрету, а не к полноте процедуры.</span>
             </p>
@@ -898,11 +898,11 @@ export function ReadinessCentre(props: ReferenceUiProps) {
                 </Button>
               )
             ) : nextStage ? (
-              <p className="mt-3 rounded-md bg-muted/60 px-3 py-2 text-xs text-muted-foreground">
+              <p className="mt-3 rounded-md bg-muted/60 px-3 py-2 text-xs text-muted-foreground max-sm:text-sm">
                 {nextStage.key === 'ENGINE_HOURS' ? ENGINE_HOURS_NOTE : presentation.nextAction}
               </p>
             ) : (
-              <p className="mt-3 rounded-md bg-success/10 px-3 py-2 text-xs font-semibold text-success-strong">
+              <p className="mt-3 rounded-md bg-success/10 px-3 py-2 text-xs font-semibold text-success-strong max-sm:text-sm">
                 Все шаги контура закрыты
               </p>
             )}
@@ -1031,8 +1031,8 @@ export function ReadinessCentre(props: ReferenceUiProps) {
             вердикт есть, а указания к действию нет.
           */}
           <div className="mt-4 border-t border-border pt-3">
-            <p className="text-xs font-semibold text-foreground">{recommendation}</p>
-            <p className="mt-1 text-2xs text-muted-foreground">
+            <p className="text-xs font-semibold text-foreground max-sm:text-sm">{recommendation}</p>
+            <p className="mt-1 text-2xs max-sm:text-sm! text-muted-foreground">
               {presentation.ruleSetVersion === 'unpublished'
                 ? 'Правила готовности ещё не опубликованы. '
                 : presentation.ruleSetVersion ? `Правила ${presentation.ruleSetVersion}. ` : ''}{presentation.title}. {presentation.calculatedAt ? `Авторитетный снимок от ${formatDateTimeInTimezone(presentation.calculatedAt, props.bootstrap?.tenant.timezone)}.` : presentation.description}
@@ -1179,7 +1179,7 @@ export function ReadinessCentre(props: ReferenceUiProps) {
                         <ArrowRight className="h-4 w-4" />Открыть
                       </Button>
                     ) : tile.note ? (
-                      <p className="mt-3 text-2xs leading-relaxed text-muted-foreground">{tile.note}</p>
+                      <p className="mt-3 text-2xs max-sm:text-sm! leading-relaxed text-muted-foreground">{tile.note}</p>
                     ) : null}
                   </div>
                 );
@@ -1210,7 +1210,7 @@ export function ReadinessCentre(props: ReferenceUiProps) {
                   </div>
                 ))}
                 {presentation.evidence.length === 0 && (
-                  <p className="text-2xs text-signal-strong">{presentation.title}</p>
+                  <p className="text-2xs max-sm:text-sm! text-signal-strong">{presentation.title}</p>
                 )}
               </div>
             </details>
@@ -1222,7 +1222,7 @@ export function ReadinessCentre(props: ReferenceUiProps) {
         <section className={cn(card, 'p-4')}>
           <div className="flex items-center justify-between"><h2 className="flex items-center gap-2 font-bold"><Send className="h-4 w-4 text-muted-foreground" />Передача и приёмка</h2><span className="text-2xs text-muted-foreground">неизменяемый журнал</span></div>
           {handoverJournal.length === 0 ? (
-            <p className="mt-3 rounded-lg border border-border p-3 text-2xs leading-relaxed text-muted-foreground">
+            <p className="mt-3 rounded-lg border border-border p-3 text-2xs max-sm:text-sm! leading-relaxed text-muted-foreground">
               По этой установке ещё не было передач смены. Записи появятся, когда оператор передаст смену диспетчеру.
             </p>
           ) : (
@@ -1272,7 +1272,7 @@ export function ReadinessCentre(props: ReferenceUiProps) {
           <div className="flex items-center justify-between"><h2 className="flex items-center gap-2 font-bold"><AlertCircle className="h-4 w-4 text-muted-foreground" />Входящие (диспетчер)</h2><span className="text-xs text-muted-foreground">{awaitingAcceptance.length}</span></div>
           <div className="mt-3 space-y-3">
             {awaitingAcceptance.length === 0 && (
-              <p className="text-xs text-muted-foreground">Ничего не ждёт приёмки.</p>
+              <p className="text-xs text-muted-foreground max-sm:text-sm">Ничего не ждёт приёмки.</p>
             )}
             {awaitingAcceptance.slice(0, 3).map((item) => {
               const itemSnapshot = props.currentReadiness.find((entry) => entry.equipmentId === item.id) ?? null;

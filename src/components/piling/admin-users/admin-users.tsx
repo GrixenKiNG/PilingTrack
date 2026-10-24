@@ -328,7 +328,7 @@ export function AdminUsers() {
                 onChange={(event) => setSearch(event.target.value)}
                 placeholder="ФИО, email или телефон"
                 aria-label="Поиск пользователей"
-                className="h-9 pl-9 text-xs"
+                className="h-9 max-sm:min-h-11 pl-9 text-xs max-sm:text-sm"
               />
             </label>
           )}

@@ -28,7 +28,7 @@ export function OpsDetailPanel({
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <h2 className="truncate text-base font-semibold text-foreground">{title}</h2>
-            {subtitle && <p className="mt-0.5 text-2xs text-muted-foreground">{subtitle}</p>}
+            {subtitle && <p className="mt-0.5 text-2xs max-sm:text-sm! text-muted-foreground">{subtitle}</p>}
             {status && <div className="mt-1">{status}</div>}
           </div>
           {onClose && (

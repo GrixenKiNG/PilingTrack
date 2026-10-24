@@ -104,7 +104,7 @@ export function AdminEquipment() {
             <PilingIcon name="equipment-rig" size={24} tone="primary" decorative />
             Установки
           </h1>
-          <p className="mt-0.5 text-xs text-muted-foreground">Центр управления парком техники · данные из отчётов</p>
+          <p className="mt-0.5 text-xs text-muted-foreground max-sm:text-sm">Центр управления парком техники · данные из отчётов</p>
         </div>
         {canManage && <div className="flex gap-2">
           <Button onClick={() => setShowCreate(true)} className="min-h-11 bg-signal text-white hover:bg-signal-strong sm:min-h-9">
@@ -220,7 +220,7 @@ export function AdminEquipment() {
               <div className="flex h-full min-h-[200px] flex-col items-center justify-center rounded-xl border border-dashed border-border bg-muted/50 p-8 text-center">
                 <PilingIcon name="equipment-rig" size={40} decorative className="mb-3 opacity-40" />
                 <p className="text-sm text-muted-foreground">Выберите установку</p>
-                <p className="mt-1 text-xs text-muted-foreground">Карточка откроется здесь, в этом же окне</p>
+                <p className="mt-1 text-xs text-muted-foreground max-sm:text-sm">Карточка откроется здесь, в этом же окне</p>
               </div>
             )}
           </div>
