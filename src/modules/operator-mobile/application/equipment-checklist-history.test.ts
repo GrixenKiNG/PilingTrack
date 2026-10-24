@@ -77,6 +77,8 @@ describe('история чек-листов машиниста по устан�
       {executionId: 'e1', itemId: 'topup-engine-oil', value: {engineOilL: 3}},
       {executionId: 'e1', itemId: 'topup-diesel', value: {dieselL: 120}},
       {executionId: 'e1', itemId: 'topup-diesel', value: {unknownKey: 9}},
+      // лишний ключ на «своём» пункте не показывается
+      {executionId: 'e1', itemId: 'topup-coolant', value: {dieselL: 99999}},
       // значения с чужих пунктов (мимо границ каталога) не показываются
       {executionId: 'e2', itemId: 'cab-glass', value: {engineHours: 999999, fuelPercent: 1290, dieselL: 99999}},
     ]);

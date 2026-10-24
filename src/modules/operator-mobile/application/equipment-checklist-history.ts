@@ -36,12 +36,19 @@ export interface EquipmentChecklistReadings {
   topUps: {coolantL: number | null; hydraulicOilL: number | null; engineOilL: number | null; dieselL: number | null};
 }
 
-const TOP_UP_KEYS = ['coolantL', 'hydraulicOilL', 'engineOilL', 'dieselL'] as const;
+/** Пункт каталога → его собственный ключ значения (по нему сервер проверяет границы). */
+const TOP_UP_ITEM_KEY = {
+  'topup-coolant': 'coolantL',
+  'topup-hydraulic': 'hydraulicOilL',
+  'topup-engine-oil': 'engineOilL',
+  'topup-diesel': 'dieselL',
+} as const;
 
 /**
- * Показание берём только с «своего» пункта: моточасы — со снятия счётчика (`meter-*`),
- * остаток — с `fuel-level`, литры — с `topup-*`. Границы проверены сервером именно у
- * этих пунктов, значение с чужого пункта показывать нельзя.
+ * Показание берём только с «своего» пункта и только по его собственному ключу:
+ * моточасы — со снятия счётчика (`meter-*`), остаток — с `fuel-level`, литры — с
+ * `topup-*`. Значение с чужого пункта или лишний ключ показывать нельзя: границы
+ * проверены сервером именно у этих.
  */
 function readingsOf(rows: Array<{itemId: string; value: unknown}>): EquipmentChecklistReadings | null {
   const readings: EquipmentChecklistReadings = {
@@ -53,12 +60,15 @@ function readingsOf(rows: Array<{itemId: string; value: unknown}>): EquipmentChe
     if (!value || typeof value !== 'object') continue;
     const record = value as Record<string, unknown>;
     const num = (key: string) => (typeof record[key] === 'number' && Number.isFinite(record[key]) ? (record[key] as number) : null);
-    const hours = itemId.startsWith('meter') ? num('engineHours') : null;
-    if (hours !== null) { readings.engineHours = hours; any = true; }
-    const fuel = itemId === 'fuel-level' ? num('fuelPercent') : null;
-    if (fuel !== null) { readings.fuelPercent = fuel; any = true; }
-    for (const key of TOP_UP_KEYS) {
-      const liters = itemId.startsWith('topup-') ? num(key) : null;
+    if (itemId.startsWith('meter')) {
+      const hours = num('engineHours');
+      if (hours !== null) { readings.engineHours = hours; any = true; }
+    } else if (itemId === 'fuel-level') {
+      const fuel = num('fuelPercent');
+      if (fuel !== null) { readings.fuelPercent = fuel; any = true; }
+    } else if (itemId in TOP_UP_ITEM_KEY) {
+      const key = TOP_UP_ITEM_KEY[itemId as keyof typeof TOP_UP_ITEM_KEY];
+      const liters = num(key);
       if (liters !== null) { readings.topUps[key] = liters; any = true; }
     }
   }

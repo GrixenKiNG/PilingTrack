@@ -284,12 +284,13 @@ export async function submitChecklist(input: {
       }, {tenantId: input.tenantId, recordedById: input.operatorId, note: definition.title});
     }
 
-    // Долив жидкостей — только с пунктов «Долил за смену» (`topup-*`), выбранных для смены.
-    const topUpItemIds = new Set(items.filter((item) => item.id.startsWith('topup-')).map((item) => item.id));
-    const fluids = input.answers
-      .filter((answer) => topUpItemIds.has(answer.itemId))
-      .filter((answer) => answer.measures && Object.keys(answer.measures).some((key) => key.endsWith('L')))
-      .map((answer) => ({itemId: answer.itemId, ...answer.measures}));
+    // Долив жидкостей — только с пунктов «Долил за смену» (`topup-*`), выбранных для смены,
+    // и только их собственный ключ: проверка границ идёт по нему, лишние ключи в ответе не проверены.
+    const fluids = items.flatMap((item) => {
+      if (!item.id.startsWith('topup-') || !item.measure) return [];
+      const value = input.answers.find((answer) => answer.itemId === item.id)?.measures?.[item.measure.key];
+      return typeof value === 'number' && Number.isFinite(value) ? [{itemId: item.id, [item.measure.key]: value}] : [];
+    });
     if (fluids.length > 0) {
       await recordEvidence(tx, {
         tenantId: input.tenantId,

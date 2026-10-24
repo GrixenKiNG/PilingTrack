@@ -23,6 +23,8 @@ const {withReadinessTenantTransaction, requestReadinessSnapshot, createRepairOrd
 vi.mock('@/modules/readiness/server', () => ({
   withReadinessTenantTransaction, requestReadinessSnapshot, createRepairOrderForDefect,
 }));
+// Моточасы пишет equipment и заказывает пересчёт через core/outbox, а не через readiness.
+vi.mock('@/core/outbox/readiness-snapshot-request', () => ({requestReadinessSnapshot}));
 
 const {enqueueCriticalDefects} = vi.hoisted(() => ({enqueueCriticalDefects: vi.fn()}));
 vi.mock('@/core/notifications/durable-alert', () => ({enqueueCriticalDefects}));
@@ -251,6 +253,18 @@ describe('submitChecklist — «долил за смену» (ЕО после р
     });
     expect(tx.equipmentDefect.create).not.toHaveBeenCalled();
     expect(tx.operatorChecklistAnswerRecord.create).toHaveBeenCalledTimes(2);
+  });
+
+  it('лишние ключи в ответе и значения без собственного ключа пункта в событие не попадают', async () => {
+    await submitChecklist({...input, stage: 'EO_AFTER', answers: [
+      {itemId: 'topup-coolant', answer: 'OK', measures: {coolantL: 2, dieselL: 999999}},
+      {itemId: 'topup-diesel', answer: 'OK', measures: {coolantL: 50}},
+    ]});
+    const fluids = tx.operatorShiftEvidence.create.mock.calls
+      .map(([call]) => call.data)
+      .find((data: {clientCommandId: string}) => data.clientCommandId === 'cmd-1:fluids');
+    expect(fluids.payload).toEqual({stage: 'EO_AFTER', fluids: [{itemId: 'topup-coolant', coolantL: 2}]});
+    expect(tx.fuelLog.create).not.toHaveBeenCalled();
   });
 
   it('без долива не пишет событие о жидкостях', async () => {

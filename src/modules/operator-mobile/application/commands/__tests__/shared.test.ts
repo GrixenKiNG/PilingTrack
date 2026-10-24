@@ -3,6 +3,8 @@ import {describe, expect, it, vi} from 'vitest';
 
 vi.mock('@/modules/readiness/server', () => ({
   withReadinessTenantTransaction: vi.fn(),
+}));
+vi.mock('@/core/outbox/readiness-snapshot-request', () => ({
   requestReadinessSnapshot: vi.fn().mockResolvedValue(undefined),
 }));
 
