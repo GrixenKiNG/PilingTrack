@@ -18,7 +18,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireTenantId } from '@/lib/tenant';
 import { requireAuth } from '@/lib/auth';
 import { withApi, withMutation } from '@/core/api-wrapper';
-import { getLayout, getLayoutSet, saveLayout, deleteLayout, BASE_ENTITY, UnknownSurfaceError } from '@/modules/layout';
+import { getLayoutSnapshot, getLayoutSet, saveLayoutSnapshot, LayoutConflictError, deleteLayout, BASE_ENTITY, UnknownSurfaceError } from '@/modules/layout';
 import { resolveEffectiveRole } from '@/lib/types';
 
 export const runtime = 'nodejs';
@@ -41,8 +41,10 @@ export const GET = withApi(async (request: NextRequest, ctx: Ctx) => {
       return NextResponse.json(await getLayoutSet(tenantId, surfaceId));
     }
     const entityId = searchParams.get('entityId') ?? BASE_ENTITY;
-    return NextResponse.json(await getLayout(tenantId, surfaceId, entityId));
+    const snapshot = await getLayoutSnapshot(tenantId, surfaceId, entityId);
+    return NextResponse.json(snapshot.template, { headers: { ETag: snapshot.revision } });
   } catch (err) {
+    if (err instanceof LayoutConflictError) return NextResponse.json({ error: err.message }, { status: 409 });
     if (err instanceof UnknownSurfaceError) return NextResponse.json({ error: 'Неизвестная поверхность' }, { status: 404 });
     throw err;
   }
@@ -65,9 +67,10 @@ export const PUT = withMutation(async (request: NextRequest, ctx: Ctx) => {
   }
   try {
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
-    const saved = await saveLayout(tenantId, surfaceId, body, user!.id, entityId);
-    return NextResponse.json(saved);
+    const saved = await saveLayoutSnapshot(tenantId, surfaceId, body, user!.id, entityId, request.headers.get('If-Match'));
+    return NextResponse.json(saved.template, { headers: { ETag: saved.revision } });
   } catch (err) {
+    if (err instanceof LayoutConflictError) return NextResponse.json({ error: err.message }, { status: 409 });
     if (err instanceof UnknownSurfaceError) return NextResponse.json({ error: 'Неизвестная поверхность' }, { status: 404 });
     if (err instanceof TypeError) return NextResponse.json({ error: 'Некорректные данные' }, { status: 400 });
     throw err;
@@ -84,9 +87,10 @@ export const DELETE = withMutation(async (request: NextRequest, ctx: Ctx) => {
   const tenantId = tenantOf(user!);
   const entityId = new URL(request.url).searchParams.get('entityId') ?? BASE_ENTITY;
   try {
-    await deleteLayout(tenantId, surfaceId, entityId);
+    await deleteLayout(tenantId, surfaceId, entityId, request.headers.get('If-Match'));
     return NextResponse.json({ ok: true });
   } catch (err) {
+    if (err instanceof LayoutConflictError) return NextResponse.json({ error: err.message }, { status: 409 });
     if (err instanceof UnknownSurfaceError) return NextResponse.json({ error: 'Неизвестная поверхность' }, { status: 404 });
     throw err;
   }

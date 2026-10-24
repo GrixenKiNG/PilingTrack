@@ -5,21 +5,21 @@ vi.mock('@/lib/db', () => ({
     moduleLayoutTemplate: {
       findUnique: vi.fn(),
       findMany: vi.fn(),
-      upsert: vi.fn(),
+      create: vi.fn(),
       deleteMany: vi.fn(),
     },
   },
 }));
 
 import { db } from '@/lib/db';
-import { getLayout, getLayoutSet, saveLayout, deleteLayout, UnknownSurfaceError } from '@/modules/layout';
+import { getLayout, getLayoutSnapshot, getLayoutSet, saveLayout, deleteLayout, UnknownSurfaceError } from '@/modules/layout';
 import { DEFAULT_EQUIPMENT_CARD_TEMPLATE } from '@/components/piling/admin-equipment/equipment-card-template';
 import { ANALYTICS_DASHBOARD_WIDGET_IDS } from '@/components/piling/analytics-dashboard/kpi-catalog';
 
 const anyDb = db.moduleLayoutTemplate as unknown as {
   findUnique: ReturnType<typeof vi.fn>;
   findMany: ReturnType<typeof vi.fn>;
-  upsert: ReturnType<typeof vi.fn>;
+  create: ReturnType<typeof vi.fn>;
   deleteMany: ReturnType<typeof vi.fn>;
 };
 
@@ -31,11 +31,11 @@ function customTemplate() {
 }
 
 describe('layout service', () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => { vi.clearAllMocks(); anyDb.findUnique.mockResolvedValue(null); });
 
   it('ships a valid equipment-card default template (saveable as-is)', async () => {
-    anyDb.upsert.mockImplementation(async ({ create }: { create: { template: unknown } }) => ({ template: create.template }));
-    await expect(saveLayout('orion', 'equipment-card', DEFAULT_EQUIPMENT_CARD_TEMPLATE, 'u1')).resolves.toBeTruthy();
+    anyDb.create.mockImplementation(async ({ data }: { data: { template: unknown } }) => ({ id: 'row', updatedAt: new Date('2026-01-01'), template: data.template }));
+    await expect(saveLayout('orion', 'equipment-card', DEFAULT_EQUIPMENT_CARD_TEMPLATE, 'u1', '', (await getLayoutSnapshot('orion', 'equipment-card')).revision)).resolves.toBeTruthy();
   });
 
   it('returns the surface default when nothing is saved', async () => {
@@ -46,8 +46,8 @@ describe('layout service', () => {
 
   it('a per-entity override wins over the base', async () => {
     anyDb.findUnique.mockImplementation(async ({ where }: { where: { tenantId_surfaceId_entityId: { entityId: string } } }) => {
-      if (where.tenantId_surfaceId_entityId.entityId === 'eq-1') return { entityId: 'eq-1', template: customTemplate() };
-      return { entityId: '', template: DEFAULT_EQUIPMENT_CARD_TEMPLATE };
+      if (where.tenantId_surfaceId_entityId.entityId === 'eq-1') return { id: 'row', updatedAt: new Date('2026-01-01'), entityId: 'eq-1', template: customTemplate() };
+      return { id: 'row', updatedAt: new Date('2026-01-01'), entityId: '', template: DEFAULT_EQUIPMENT_CARD_TEMPLATE };
     });
     const t = await getLayout('orion', 'equipment-card', 'eq-1');
     expect(t.card.minHeight).toBe(555);
@@ -55,7 +55,7 @@ describe('layout service', () => {
 
   it('a tile with no override falls back to the base', async () => {
     anyDb.findUnique.mockImplementation(async ({ where }: { where: { tenantId_surfaceId_entityId: { entityId: string } } }) => {
-      if (where.tenantId_surfaceId_entityId.entityId === '') return { entityId: '', template: customTemplate() };
+      if (where.tenantId_surfaceId_entityId.entityId === '') return { id: 'row', updatedAt: new Date('2026-01-01'), entityId: '', template: customTemplate() };
       return null; // no override for eq-2
     });
     const t = await getLayout('orion', 'equipment-card', 'eq-2');
@@ -73,22 +73,22 @@ describe('layout service', () => {
   });
 
   it('saves an override scoped to its entity', async () => {
-    anyDb.upsert.mockImplementation(async ({ create }: { create: { template: unknown } }) => ({ template: create.template }));
-    await saveLayout('orion', 'equipment-card', DEFAULT_EQUIPMENT_CARD_TEMPLATE, 'u1', 'eq-1');
-    const call = anyDb.upsert.mock.calls[0][0];
-    expect(call.where.tenantId_surfaceId_entityId).toEqual({ tenantId: 'orion', surfaceId: 'equipment-card', entityId: 'eq-1' });
-    expect(call.create.entityId).toBe('eq-1');
+    anyDb.create.mockImplementation(async ({ data }: { data: { template: unknown } }) => ({ id: 'row', updatedAt: new Date('2026-01-01'), template: data.template }));
+    await saveLayout('orion', 'equipment-card', DEFAULT_EQUIPMENT_CARD_TEMPLATE, 'u1', 'eq-1', (await getLayoutSnapshot('orion', 'equipment-card', 'eq-1')).revision);
+    const call = anyDb.create.mock.calls[0][0];
+    expect(call.data).toMatchObject({ tenantId: 'orion', surfaceId: 'equipment-card', entityId: 'eq-1' });
   });
 
   it('deleteLayout removes the row at that scope', async () => {
     anyDb.deleteMany.mockResolvedValue({ count: 1 });
-    await deleteLayout('orion', 'equipment-card', 'eq-1');
-    expect(anyDb.deleteMany.mock.calls[0][0].where).toEqual({ tenantId: 'orion', surfaceId: 'equipment-card', entityId: 'eq-1' });
+    anyDb.findUnique.mockResolvedValue({ id: 'row', updatedAt: new Date('2026-01-01'), template: DEFAULT_EQUIPMENT_CARD_TEMPLATE });
+    await deleteLayout('orion', 'equipment-card', 'eq-1', (await getLayoutSnapshot('orion', 'equipment-card', 'eq-1')).revision);
+    expect(anyDb.deleteMany.mock.calls[0][0].where).toEqual({ tenantId: 'orion', surfaceId: 'equipment-card', entityId: 'eq-1', id: 'row', updatedAt: new Date('2026-01-01') });
   });
 
   it('returns the analytics-dashboard page-layout default (widget list)', async () => {
     anyDb.findUnique.mockResolvedValue(null);
-    const t = await getLayout('orion', 'analytics-dashboard') as unknown as { widgets: { id: string }[] };
+    const t = await getLayout('orion', 'analytics-dashboard');
     expect(t.widgets.length).toBe(ANALYTICS_DASHBOARD_WIDGET_IDS.length);
     expect(t.widgets.map((w) => w.id)).toContain('kpi-drilling');
   });

@@ -9,10 +9,10 @@
  * catalog grows.
  */
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { authFetch } from '@/lib/api';
-import { LAYOUT_LOAD_FAILED_MESSAGE, LAYOUT_OFFLINE_MESSAGE, layoutForbiddenMessage } from './use-layout-template';
+import { LAYOUT_CONFLICT_MESSAGE, LAYOUT_LOAD_FAILED_MESSAGE, LAYOUT_OFFLINE_MESSAGE, layoutForbiddenMessage } from './use-layout-template';
 import {
   clonePageLayoutTemplate,
   type PageLayoutTemplate,
@@ -61,13 +61,16 @@ export function usePageLayoutTemplate(options: {
   const [draft, setDraft] = useState<PageLayoutTemplate>(() => mergeCatalog(defaultTemplate, catalogIds));
   const [editing, setEditing] = useState(false);
   const [loadFailed, setLoadFailed] = useState(false);
+  const revisionRef = useRef<string | null>(null);
 
-  const load = useCallback(async (): Promise<{ initial: PageLayoutTemplate; failed: boolean }> => {
+  const load = useCallback(async (): Promise<{ initial: PageLayoutTemplate; failed: boolean; revision: string | null }> => {
     let server = defaultTemplate;
     let failed = false;
+    let revision: string | null = null;
     try {
       const res = await authFetch(endpoint);
       if (res.ok) {
+        revision = res.headers.get('ETag');
         server = validate(await res.json()) ?? defaultTemplate;
       } else {
         // «Раскладки нет» сервер отдаёт как 200 со стандартным шаблоном
@@ -78,14 +81,15 @@ export function usePageLayoutTemplate(options: {
       // network failure — standard template is shown for rendering only, saving stays blocked
       failed = true;
     }
-    return { initial: mergeCatalog(server, catalogIds), failed };
+    return { initial: mergeCatalog(server, catalogIds), failed, revision };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- reload when the surface (endpoint) changes; catalog/default fixed per surface
   }, [endpoint]);
 
   useEffect(() => {
     let active = true;
-    void load().then(({ initial, failed }) => {
-      if (active) { setTemplate(initial); setDraft(initial); setLoadFailed(failed); }
+    void load().then(({ initial, failed, revision }) => {
+      if (active) {
+        revisionRef.current = revision; setTemplate(initial); setDraft(initial); setLoadFailed(failed); }
     });
     return () => { active = false; };
   }, [load]);
@@ -103,7 +107,7 @@ export function usePageLayoutTemplate(options: {
     try {
       res = await authFetch(endpoint, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(revisionRef.current ? { 'If-Match': revisionRef.current } : {}) },
         body: JSON.stringify(draft),
       });
     } catch {
@@ -112,9 +116,10 @@ export function usePageLayoutTemplate(options: {
       return;
     }
     if (!res.ok) {
-      toast.error(res.status === 403 ? await layoutForbiddenMessage(res) : 'Не удалось сохранить раскладку');
+      toast.error(res.status === 409 ? LAYOUT_CONFLICT_MESSAGE : res.status === 403 ? await layoutForbiddenMessage(res) : 'Не удалось сохранить раскладку');
       return;
     }
+    revisionRef.current = res.headers.get('ETag');
     setTemplate(clonePageLayoutTemplate(draft));
     setEditing(false);
   }, [draft, endpoint, loadFailed]);
@@ -122,17 +127,18 @@ export function usePageLayoutTemplate(options: {
   const reset = useCallback(async () => {
     let res: Response;
     try {
-      res = await authFetch(endpoint, { method: 'DELETE' });
+      res = await authFetch(endpoint, { method: 'DELETE', headers: revisionRef.current ? { 'If-Match': revisionRef.current } : {} });
     } catch {
       // Обрыв сети: ничего не удалено, можно повторить (F-R108-4).
       toast.error(LAYOUT_OFFLINE_MESSAGE);
       return;
     }
     if (!res.ok) {
-      toast.error(res.status === 403 ? await layoutForbiddenMessage(res) : 'Не удалось сбросить раскладку');
+      toast.error(res.status === 409 ? LAYOUT_CONFLICT_MESSAGE : res.status === 403 ? await layoutForbiddenMessage(res) : 'Не удалось сбросить раскладку');
       return;
     }
-    const { initial, failed } = await load();
+    const { initial, failed, revision } = await load();
+    revisionRef.current = revision;
     setTemplate(initial);
     setDraft(initial);
     setLoadFailed(failed);
