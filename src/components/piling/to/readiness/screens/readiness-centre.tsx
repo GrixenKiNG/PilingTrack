@@ -1,6 +1,9 @@
 'use client';
 
-import { STAGE_PILL, STAGE_OWNER, ENGINE_HOURS_NOTE, HANDOVER_ICON, HANDOVER_PREVIEW, HANDOVER_PILL, countBlockersByTone, BLOCKER_COUNT_LABEL, BLOCKER_COUNT_CLASS, buildReadinessMetricTiles, evidenceMetric } from './readiness-centre-metrics';
+import { HandoverEvent } from './readiness-centre-handover';
+
+
+import { STAGE_PILL, STAGE_OWNER, ENGINE_HOURS_NOTE, HANDOVER_PREVIEW, countBlockersByTone, BLOCKER_COUNT_LABEL, BLOCKER_COUNT_CLASS, buildReadinessMetricTiles, evidenceMetric } from './readiness-centre-metrics';
 
 
 import { RoleFlowFooter, StageLink } from './readiness-centre-role-panels';
@@ -18,59 +21,13 @@ import { Button } from '@/components/ui/button';
 import { formatDateTimeInTimezone } from '@/lib/timezone';
 import { cn } from '@/lib/utils';
 import { ResizableColumns } from './resizable-columns';
-import { buildHandoverJournal, handoverRoleLabel, type HandoverJournalEvent } from '../handover-journal';
+import { buildHandoverJournal } from '../handover-journal';
 import { isOpenRecord } from '../../to-stats';
 
 import { buildAuthoritativeReadinessPresentation, buildUnavailableReadinessPresentation, type PresentationStage } from '../authoritative-presentation';
 import { EquipmentPhoto, ReadinessRing, STAGE_CTA, muted, blockerTone, BLOCKER_TONE_CLASS, BLOCKER_TONE_LABEL } from './shared';
 import { blockerGuidance } from './blocker-guidance';
 import type { ReferenceUiProps, ReferenceView } from './types';
-
-/** Одно событие ленты передачи. Вынесено, чтобы список и раскрытие «полного
- *  журнала» рисовали строку одинаково, а не двумя копиями разметки. */
-function HandoverEvent({ event, latest, timezone }: {
-  event: HandoverJournalEvent;
-  latest: boolean;
-  timezone: string | undefined;
-}) {
-  const EventIcon = HANDOVER_ICON[event.kind];
-  const pill = HANDOVER_PILL[event.kind];
-  return (
-    <li className="relative">
-      {/* Кружок с иконкой вместо безымянной точки: тип события читается,
-          не доходя до подписи. */}
-      <span className={cn('absolute -left-[35px] top-0 grid h-[18px] w-[18px] place-items-center rounded-full border bg-card',
-        latest ? 'border-signal text-signal-strong' : event.kind === 'REWORKED' ? 'border-warning text-warning-strong' : 'border-border text-muted-foreground')}>
-        <EventIcon className="h-2.5 w-2.5" />
-      </span>
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0 text-xs font-semibold">{event.label}</div>
-        <div className="flex shrink-0 items-center gap-1">
-          {/* Самоприёмку показываем видимой меткой: разрешена, но «кто
-              проверил» — вопрос для разбора, и в аудите он лежал незаметно. */}
-          {event.selfAccepted && (
-            <span className="rounded border border-warning bg-warning/10 px-1.5 py-0.5 text-3xs font-semibold text-warning-strong">
-              Самоприёмка
-            </span>
-          )}
-          <span className={cn('rounded border px-1.5 py-0.5 text-3xs font-semibold', pill.cls)}>
-            {pill.label}
-          </span>
-        </div>
-      </div>
-      <div className="mt-1 text-2xs leading-relaxed text-muted-foreground">
-        {formatDateTimeInTimezone(event.occurredAt, timezone)}
-        {event.actorName ? ` · ${event.actorName}` : ''}
-        {handoverRoleLabel(event.actorRole) ? ` (${handoverRoleLabel(event.actorRole)})` : ''}
-        {event.selfAccepted ? ' · принято тем же, кто сдал' : ''}
-        {` · пакет v${event.packageVersion}`}
-      </div>
-      {event.comment && (
-        <p className="mt-1 rounded border border-border bg-muted/40 p-2 text-2xs leading-relaxed">{event.comment}</p>
-      )}
-    </li>
-  );
-}
 
 export function ReadinessCentre(props: ReferenceUiProps) {
   const selected = props.equipment.find((item) => item.id === props.selectedId) ?? props.equipment[0];
