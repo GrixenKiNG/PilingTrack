@@ -56,9 +56,6 @@ vi.mock('@/modules/equipment', () => ({
   recordMeterReadingInTx: vi.fn(),
 }));
 
-vi.mock('@/modules/readiness/server', () => ({
-  createRepairOrderForDefect: vi.fn(),
-}));
 vi.mock('@/core/outbox/readiness-snapshot-request', () => ({
   requestReadinessSnapshot: vi.fn(),
 }));

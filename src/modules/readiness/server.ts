@@ -9,6 +9,7 @@ export {
 export {ReadinessCommandError} from './application/command-pipeline/errors';
 export {OPEN_MAINTENANCE} from './application/readiness-score';
 export {createRepairOrderForDefect} from './infrastructure/defects/repair-order';
+export {recordDefectInTx, type RecordDefectInput} from './infrastructure/defects/record-defect';
 export {
   createDefectCommand,
   rejectDefectCommand,

@@ -7,7 +7,9 @@ const m = vi.hoisted(() => ({
   recCreate: vi.fn(), recUpdateMany: vi.fn(), outboxCreate: vi.fn(), outboxAlertCreate: vi.fn(),
   recFind: vi.fn(), advanceRegulation: vi.fn(),
   crewFindFirst: vi.fn(),
-  defectFindMany: vi.fn(), defectCreate: vi.fn(),
+  defectFindMany: vi.fn(),
+  // Дефекты пишет модуль готовности; осмотру его функцию передаёт вызывающий (маршрут).
+  recordDefect: vi.fn(),
   // Снимки к пунктам осмотра считаются по Media, а не по числу из запроса.
   mediaGroupBy: vi.fn(),
   // Замок дедупликации дефектов берётся через $executeRaw: pg_advisory_xact_lock
@@ -31,7 +33,7 @@ vi.mock('@/lib/db', () => {
     },
     inspectionAnswer: { deleteMany: m.ansDeleteMany, createMany: m.ansCreateMany },
     maintenanceRecord: { create: m.recCreate, updateMany: m.recUpdateMany, findUniqueOrThrow: m.recFind },
-    equipmentDefect: { findMany: m.defectFindMany, create: m.defectCreate },
+    equipmentDefect: { findMany: m.defectFindMany },
     crew: { findFirst: m.crewFindFirst },
     outboxEvent: { createMany: m.outboxCreate, create: m.outboxAlertCreate },
     media: { groupBy: m.mediaGroupBy },
@@ -60,6 +62,7 @@ beforeEach(() => {
   // Замок ничего не возвращает — $executeRaw отдаёт число затронутых строк.
   m.executeRaw.mockResolvedValue(1);
   m.defectFindMany.mockResolvedValue([]);
+  m.recordDefect.mockResolvedValue({ id: 'd1' });
   m.recFind.mockResolvedValue({type: 'TO1', engineHoursAtService: 1100, completedAt: new Date('2026-10-22T12:00:00Z')});
 });
 
@@ -326,19 +329,14 @@ describe('completeInspection', () => {
     };
     m.insFindUnique.mockResolvedValue(draft);
     m.insFindUniqueOrThrow.mockResolvedValue({ id: 'ins1', status: 'COMPLETED' });
-    m.defectCreate.mockResolvedValue({ id: 'd1' });
-    m.recCreate.mockResolvedValue({ id: 'rec-repair' });
-    await completeInspectionWithOutcome('ins1', { tenantId: 'orion', signedByName: 'Иванов' });
+    await completeInspectionWithOutcome('ins1', { tenantId: 'orion', signedByName: 'Иванов', recordDefect: m.recordDefect });
     expect(m.transaction).toHaveBeenCalledTimes(1);
-    // Дефект высокого и критического уровня сам заводит заявку ТО, обычный — нет (решение 18.10.2026).
-    if (severity === 'NORMAL') {
-      expect(m.recCreate).not.toHaveBeenCalled();
-      expect(m.defectCreate).toHaveBeenCalledWith({ data: expect.objectContaining({ maintenanceRecordId: null }), select: { id: true } });
-    } else {
-      expect(m.recCreate).toHaveBeenCalledWith({ data: expect.objectContaining({ type: 'REPAIR', status: 'PLANNED', priority: 'HIGH', createdById: 'u1' }), select: { id: true } });
-      expect(m.defectCreate).toHaveBeenCalledWith({ data: expect.objectContaining({ maintenanceRecordId: 'rec-repair' }), select: { id: true } });
-    }
-    m.recCreate.mockClear();
+    // Дефект и заявка ТО по нему (решение 18.10.2026) пишет команда готовности; её правила — в её тесте.
+    expect(m.recordDefect).toHaveBeenCalledTimes(1);
+    expect(m.recordDefect).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      tenantId: 'orion', equipmentId: 'eq1', severity: severity, title: 'Течь гидравлики', inspectionId: 'ins1',
+      reportedById: 'u1', sourceKey: inspectionDefectKey('eq1', 'i1'), requestSnapshot: true,
+    }));
     if (severity === 'NORMAL') {
       expect(m.outboxAlertCreate).not.toHaveBeenCalled();
     } else {
@@ -349,16 +347,16 @@ describe('completeInspection', () => {
       }) });
     }
     m.outboxAlertCreate.mockClear();
-    m.defectCreate.mockClear();
+    m.recordDefect.mockClear();
     m.defectFindMany.mockResolvedValue([{ sourceKey: inspectionDefectKey('eq1', 'i1') }]);
-    await completeInspectionWithOutcome('ins1', { tenantId: 'orion', signedByName: 'Иванов' });
-    expect(m.defectCreate).not.toHaveBeenCalled();
+    await completeInspectionWithOutcome('ins1', { tenantId: 'orion', signedByName: 'Иванов', recordDefect: m.recordDefect });
+    expect(m.recordDefect).not.toHaveBeenCalled();
     expect(m.outboxAlertCreate).not.toHaveBeenCalled();
     // Повтор: после неудачного захвата чтение уже видит завершённый осмотр.
     m.insFindUnique.mockResolvedValueOnce(draft).mockResolvedValueOnce({ ...draft, status: 'COMPLETED' });
     m.insUpdateMany.mockResolvedValue({ count: 0 });
-    await completeInspectionWithOutcome('ins1', { tenantId: 'orion', signedByName: 'Иванов' });
-    expect(m.defectCreate).not.toHaveBeenCalled();
+    await completeInspectionWithOutcome('ins1', { tenantId: 'orion', signedByName: 'Иванов', recordDefect: m.recordDefect });
+    expect(m.recordDefect).not.toHaveBeenCalled();
     expect(m.outboxAlertCreate).not.toHaveBeenCalled();
   });
   it('rejects when required items unanswered (no status change)', async () => {
@@ -462,9 +460,7 @@ describe('completeInspection', () => {
       answers: [{ itemId: 'i1', result: 'NO', photoCount: 0 }],
     });
     m.insFindUniqueOrThrow.mockResolvedValue({ id: 'ins1', status: 'COMPLETED', equipmentId: 'eq1' });
-    m.defectCreate.mockResolvedValue({ id: 'd1' });
-
-    await completeInspectionWithOutcome('ins1', { tenantId: 'orion', signedByName: 'Иванов' });
+    await completeInspectionWithOutcome('ins1', { tenantId: 'orion', signedByName: 'Иванов', recordDefect: m.recordDefect });
 
     // Замок — первый оператор транзакции: раньше чтения открытых дефектов.
     expect(m.executeRaw).toHaveBeenCalledTimes(1);
@@ -477,7 +473,18 @@ describe('completeInspection', () => {
       .toBeLessThan(m.defectFindMany.mock.invocationCallOrder[0]);
     // Чтение открытых и вставка — той же транзакцией, под тем же замком.
     expect(m.transaction).toHaveBeenCalledTimes(1);
-    expect(m.defectCreate).toHaveBeenCalledTimes(1);
+    expect(m.recordDefect).toHaveBeenCalledTimes(1);
+  });
+
+  it('нашёл дефекты, а функции записи нет — завершение отказывает, дефекты не теряются молча', async () => {
+    m.insFindUnique.mockResolvedValue({
+      id: 'ins1', tenantId: 'orion', status: 'DRAFT', equipmentId: 'eq1', performedById: 'u1',
+      templateSnapshot: [{ id: 'i1', text: 'Течь гидравлики', answerType: 'YES_NO', required: true, photoRequired: false, createsDefect: true }],
+      answers: [{ itemId: 'i1', result: 'NO', photoCount: 0 }],
+    });
+    m.insFindUniqueOrThrow.mockResolvedValue({ id: 'ins1', status: 'COMPLETED', equipmentId: 'eq1' });
+    await expect(completeInspectionWithOutcome('ins1', { tenantId: 'orion', signedByName: 'Иванов' }))
+      .rejects.toThrow('recordDefect не передан');
   });
 });
 

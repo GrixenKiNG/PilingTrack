@@ -11,14 +11,16 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
 import { ServiceError } from '@/services/service-error';
 
-const { requireAuthMock, completeInspectionMock } = vi.hoisted(() => ({
+const { requireAuthMock, completeInspectionMock, recordDefectMock } = vi.hoisted(() => ({
   requireAuthMock: vi.fn(),
   completeInspectionMock: vi.fn(),
+  recordDefectMock: vi.fn(),
 }));
 
 vi.mock('@/lib/auth', () => ({ requireAuth: requireAuthMock }));
 vi.mock('@/lib/csrf-protection', () => ({ withCsrf: () => null }));
 vi.mock('@/modules/inspections', () => ({ completeInspectionWithOutcome: completeInspectionMock }));
+vi.mock('@/modules/readiness/server', () => ({ recordDefectInTx: recordDefectMock }));
 
 import { POST } from '../route';
 
@@ -51,8 +53,10 @@ describe('POST /api/inspections/[id]/complete', () => {
 
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ inspection: INSPECTION });
+    // Дефекты осмотра записывает модуль готовности — маршрут передаёт его функцию.
     expect(completeInspectionMock).toHaveBeenCalledWith('insp-1', {
       tenantId: 'tenant-a', signedByName: 'Петров И.И.', performerId: null, actorId: 'admin-1',
+      recordDefect: recordDefectMock,
     });
   });
 

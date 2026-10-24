@@ -4,7 +4,6 @@ import { recordAuditEvent, recordAuditEventInTx } from '@/modules/audit';
 import type { Prisma } from '@/generated/postgres-client/client';
 import { ServiceError } from '@/lib/service-error';
 import { advanceMaintenanceRegulation, recordMeterReadingInTx } from '@/modules/equipment';
-import { createRepairOrderForDefect } from '@/modules/readiness/server';
 import { requestReadinessSnapshot } from '@/core/outbox/readiness-snapshot-request';
 import { OPEN_MAINTENANCE } from '@/modules/equipment/client';
 import { computeHealthScore, findMissing, type SnapItem, type AnswerLike } from '../../domain/inspection-logic';
@@ -13,6 +12,28 @@ import {
   composeChecklist, selectBlocks, requiredBlockTypes, type CandidateBlock,
 } from '../../domain/block-composition';
 import { itemsForPhase, type ShiftInspectionPhase } from '../../domain/phase-split';
+
+/**
+ * Запись дефекта, найденного осмотром. Дефекты принадлежат модулю готовности, а он
+ * стоит выше осмотров по цепочке зависимостей (readiness → inspections → equipment),
+ * поэтому осмотр не импортирует его, а получает функцию записи от вызывающего:
+ * маршрут завершения передаёт `recordDefectInTx` из @/modules/readiness/server.
+ * Запись идёт в транзакции завершения осмотра.
+ */
+export interface InspectionDefectInput {
+  tenantId: string;
+  equipmentId: string;
+  severity: 'LOW' | 'NORMAL' | 'HIGH' | 'CRITICAL';
+  title: string;
+  description: string;
+  node: string | null;
+  inspectionId: string;
+  reportedById: string;
+  sourceKey: string;
+  /** Заказать пересчёт готовности по этому дефекту. */
+  requestSnapshot: true;
+}
+export type InspectionDefectRecorder = (tx: Prisma.TransactionClient, input: InspectionDefectInput) => Promise<unknown>;
 
 const toDate = (v: string | Date) => (v instanceof Date ? v : new Date(v));
 
@@ -353,7 +374,11 @@ export async function saveAnswers(
  */
 export async function completeInspectionWithOutcome(
   id: string,
-  ctx: { tenantId: string; signedByName: string; performerId?: string | null; actorId?: string | null },
+  ctx: {
+    tenantId: string; signedByName: string; performerId?: string | null; actorId?: string | null;
+    /** Обязательна, когда осмотр находит дефекты: без неё завершение с дефектами отказывает, а не теряет их. */
+    recordDefect?: InspectionDefectRecorder;
+  },
 ) {
   if (!ctx.tenantId) throw new ServiceError('tenantId is required', 400);
   const ins = await db.inspection.findUnique({ where: { id }, include: { answers: true } });
@@ -517,38 +542,15 @@ export async function completeInspectionWithOutcome(
       const toCreate = plannedDefects.filter((item) =>
         !alreadyOpen.has(inspectionDefectKey(ins.equipmentId, item.itemId)));
       createdDefects = toCreate.length;
+      if (toCreate.length > 0 && !ctx.recordDefect) {
+        throw new Error('completeInspectionWithOutcome: осмотр нашёл дефекты, но recordDefect не передан');
+      }
       for (const planned of toCreate) {
-        // Дефект высокого и критического уровня сам заводит заявку ТО (решение 18.10.2026).
-        const repairOrderId = await createRepairOrderForDefect(tx, {
-          tenantId: ctx.tenantId, equipmentId: ins.equipmentId, defectTitle: planned.title,
-          severity: planned.severity, actorId: ins.performedById,
-        });
-        const defect = await tx.equipmentDefect.create({
-          data: {
-            tenantId: ctx.tenantId,
-            equipmentId: ins.equipmentId,
-            severity: planned.severity,
-            title: planned.title,
-            description: planned.description,
-            node: planned.node,
-            inspectionId: id,
-            reportedById: ins.performedById,
-            sourceKey: inspectionDefectKey(ins.equipmentId, planned.itemId),
-            maintenanceRecordId: repairOrderId,
-          },
-          select: { id: true },
-        });
-        await tx.outboxEvent.createMany({
-          skipDuplicates: true,
-          data: [{
-            type: 'ReadinessSnapshotRequested', aggregateId: defect.id, aggregateType: 'EquipmentDefect',
-            tenantId: ctx.tenantId,
-            dedupeKey: `readiness.snapshot:${ctx.tenantId}:${ins.equipmentId}:DEFECT_CHANGED:${defect.id}:created`,
-            payload: {
-              triggerType: 'DEFECT_CHANGED', triggerId: `${defect.id}:created`,
-              equipmentId: ins.equipmentId, triggerOccurredAt: now.toISOString(),
-            } as Prisma.InputJsonValue,
-          }],
+        await ctx.recordDefect?.(tx, {
+          tenantId: ctx.tenantId, equipmentId: ins.equipmentId, severity: planned.severity,
+          title: planned.title, description: planned.description, node: planned.node ?? null,
+          inspectionId: id, reportedById: ins.performedById,
+          sourceKey: inspectionDefectKey(ins.equipmentId, planned.itemId), requestSnapshot: true,
         });
       }
       await enqueueCriticalDefects(tx, {

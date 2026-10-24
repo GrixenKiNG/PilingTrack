@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { requireAuth } from '@/lib/auth';
 import { assertCan } from '@/services/auth/authorization-service';
 import { completeInspectionWithOutcome } from '@/modules/inspections';
+import { recordDefectInTx } from '@/modules/readiness/server';
 import { withMutation, readJsonBody } from '@/core/api-wrapper';
 import { ServiceError } from '@/services/service-error';
 
@@ -32,6 +33,8 @@ export const POST = withMutation(
         signedByName: parsed.data.signedByName,
         performerId: actor.role === 'OPERATOR' ? actor.id : null,
         actorId: actor.id,
+        // Дефекты осмотра и заявки ТО по ним записывает модуль готовности — их владелец.
+        recordDefect: recordDefectInTx,
       });
       return NextResponse.json({ inspection });
     } catch (err) {

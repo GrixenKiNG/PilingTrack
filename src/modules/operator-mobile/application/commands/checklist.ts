@@ -7,7 +7,7 @@
  */
 import {enqueueCriticalDefects} from '@/core/notifications/durable-alert';
 import type {Prisma} from '@/generated/postgres-client/client';
-import {createRepairOrderForDefect, withReadinessTenantTransaction} from '@/modules/readiness/server';
+import {recordDefectInTx, withReadinessTenantTransaction} from '@/modules/readiness/server';
 import {requestReadinessSnapshot} from '@/modules/readiness/server';
 import {getChecklist} from '../../domain/checklist-catalog';
 import type {ChecklistStage, ShiftCondition} from '../../domain/checklist-types';
@@ -213,26 +213,12 @@ export async function submitChecklist(input: {
       });
       if (open) continue;
       created.push({severity: draft.severity, title: draft.title});
-      // Дефект высокого и критического уровня сам заводит заявку ТО (решение 18.10.2026).
-      const repairOrderId = await createRepairOrderForDefect(tx, {
-        tenantId: input.tenantId, equipmentId: input.equipmentId, defectTitle: draft.title,
-        severity: draft.severity, actorId: input.operatorId,
-      });
-      await tx.equipmentDefect.create({
-        data: {
-          tenantId: input.tenantId,
-          equipmentId: input.equipmentId,
-          severity: draft.severity,
-          status: 'OPEN',
-          title: draft.title,
-          description: draft.description,
-          reportedById: input.operatorId,
-          reportedAt: now,
-          shiftId: input.shiftId,
-          sourceKey: draft.sourceKey,
-          maintenanceRecordId: repairOrderId,
-          evidenceMediaIds: draft.mediaIds as Prisma.InputJsonValue,
-        },
+      // Дефект и заявка ТО (для высокого и критического уровня) — одна команда готовности.
+      await recordDefectInTx(tx, {
+        tenantId: input.tenantId, equipmentId: input.equipmentId, severity: draft.severity,
+        title: draft.title, description: draft.description, reportedById: input.operatorId,
+        reportedAt: now, shiftId: input.shiftId, sourceKey: draft.sourceKey,
+        evidenceMediaIds: draft.mediaIds as Prisma.InputJsonValue,
       });
     }
 

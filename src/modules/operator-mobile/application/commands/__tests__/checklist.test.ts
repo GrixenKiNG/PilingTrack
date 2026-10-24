@@ -15,13 +15,13 @@ import {beforeEach, describe, expect, it, vi} from 'vitest';
   команде. `collectDefectDrafts` возвращает заведомо неотсортированный набор с
   повтором, `selectChecklistItems`/`validateChecklistRun` — тривиальные.
 */
-const {withReadinessTenantTransaction, requestReadinessSnapshot, createRepairOrderForDefect} = vi.hoisted(() => ({
+const {withReadinessTenantTransaction, requestReadinessSnapshot, recordDefectInTx} = vi.hoisted(() => ({
   withReadinessTenantTransaction: vi.fn(),
   requestReadinessSnapshot: vi.fn(),
-  createRepairOrderForDefect: vi.fn(),
+  recordDefectInTx: vi.fn(),
 }));
 vi.mock('@/modules/readiness/server', () => ({
-  withReadinessTenantTransaction, requestReadinessSnapshot, createRepairOrderForDefect,
+  withReadinessTenantTransaction, requestReadinessSnapshot, recordDefectInTx,
 }));
 // Моточасы пишет equipment и заказывает пересчёт через core/outbox, а не через readiness.
 vi.mock('@/core/outbox/readiness-snapshot-request', () => ({requestReadinessSnapshot}));
@@ -68,7 +68,7 @@ const tx = {
   operatorChecklistTemplate: {findUnique: vi.fn(), create: vi.fn()},
   operatorChecklistAnswerRecord: {create: vi.fn()},
   operatorShiftEvidence: {findFirst: vi.fn(), findUnique: vi.fn(), create: vi.fn()},
-  equipmentDefect: {findFirst: vi.fn(), create: vi.fn()},
+  equipmentDefect: {findFirst: vi.fn()},
   meterReading: {findFirst: vi.fn(), create: vi.fn()},
   fuelLog: {create: vi.fn()},
   equipment: {findFirst: vi.fn(), update: vi.fn()},
@@ -112,7 +112,8 @@ beforeEach(() => {
     {sourceKey: 'eq-1:PRESHIFT_INSPECTION:leaks-ground', title: 'Течь', description: '', severity: 'HIGH', mediaIds: []},
   ]);
   tx.equipmentDefect.findFirst.mockResolvedValue(null);
-  tx.equipmentDefect.create.mockResolvedValue({id: 'defect-1'});
+  // Дефект и заявка ТО пишутся одной командой готовности; её правила проверяет её собственный тест.
+  recordDefectInTx.mockResolvedValue({id: 'defect-1', maintenanceRecordId: null});
   tx.meterReading.findFirst.mockResolvedValue({engineHours: 3000});
   tx.meterReading.create.mockResolvedValue({id: 'meter-1'});
   tx.equipment.findFirst.mockResolvedValue({engineHoursTotal: 3000});
@@ -186,17 +187,15 @@ describe('submitChecklist — топливо из ЕО после работы',
 });
 
 describe('submitChecklist — заявка ТО по дефекту', () => {
-  it('дефект высокого уровня получает заявку ТО и привязку, обычный — нет (решение 18.10.2026)', async () => {
-    createRepairOrderForDefect.mockResolvedValue('rec-repair');
-
+  it('каждый новый дефект записывается командой готовности вместе с заявкой ТО (решение 18.10.2026)', async () => {
     await submitChecklist(input);
 
-    expect(createRepairOrderForDefect).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
-      severity: 'HIGH', defectTitle: 'Течь', actorId: input.operatorId,
+    expect(recordDefectInTx).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      tenantId: 'tenant-a', equipmentId: 'eq-1', severity: 'HIGH', title: 'Течь', reportedById: input.operatorId,
+      shiftId: input.shiftId, sourceKey: 'eq-1:PRESHIFT_INSPECTION:leaks-ground', reportedAt: input.now,
     }));
-    expect(tx.equipmentDefect.create).toHaveBeenCalledWith({data: expect.objectContaining({
-      severity: 'HIGH', maintenanceRecordId: 'rec-repair',
-    })});
+    // Пересчёт готовности заказывается один раз на весь осмотр, а не на каждый дефект.
+    expect(recordDefectInTx.mock.calls.every(([, arg]) => !arg.requestSnapshot)).toBe(true);
   });
 });
 
@@ -251,7 +250,7 @@ describe('submitChecklist — «долил за смену» (ЕО после р
         {itemId: 'topup-diesel', dieselL: 120},
       ],
     });
-    expect(tx.equipmentDefect.create).not.toHaveBeenCalled();
+    expect(recordDefectInTx).not.toHaveBeenCalled();
     expect(tx.operatorChecklistAnswerRecord.create).toHaveBeenCalledTimes(2);
   });
 
