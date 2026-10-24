@@ -1,4 +1,4 @@
-import { Prisma } from '@/generated/postgres-client';
+import { Prisma } from '@/generated/postgres-client/client';
 import { EquipmentAggregate, EquipmentInfo, EquipmentDomainEvent } from '../domain';
 
 export function toPrismaData(agg: EquipmentAggregate) {

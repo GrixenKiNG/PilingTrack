@@ -22,7 +22,7 @@ vi.mock('@/lib/db', () => ({
   },
 }));
 
-vi.mock('@/generated/postgres-client', () => ({
+vi.mock('@/generated/postgres-client/client', () => ({
   Prisma: {
     sql: (strings: TemplateStringsArray, ...values: unknown[]) => ({ strings, values }),
   },

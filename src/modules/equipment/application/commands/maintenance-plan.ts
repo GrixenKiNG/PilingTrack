@@ -9,7 +9,7 @@
 import { db } from '@/lib/db';
 import { ServiceError } from '@/lib/service-error';
 import type { PmTriggerType } from './pm-scheduler';
-import type { MaintenanceType } from '@/generated/postgres-client';
+import type { MaintenanceType } from '@/generated/postgres-client/client';
 
 export interface MaintenancePlanInput {
   equipmentId: string;
