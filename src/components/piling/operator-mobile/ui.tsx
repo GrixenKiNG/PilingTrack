@@ -284,7 +284,9 @@ export function PhaseBar({progress, onOpen}: {
               aria-label={`${step.label} — ${step.done ? 'выполнено' : step.current ? 'текущий этап' : 'впереди'}`}
               className={cn(
                 'relative flex min-w-0 flex-col items-center',
-                index > 0 && 'before:absolute before:right-1/2 before:top-3 before:h-0.5 before:w-full before:bg-border',
+                // Соединитель только рисунок: без pointer-events-none он лежит поверх правой
+                // половины кнопки предыдущего этапа и съедает касание на уровне её центра.
+                index > 0 && 'before:pointer-events-none before:absolute before:right-1/2 before:top-3 before:h-0.5 before:w-full before:bg-border',
                 index > 0 && (step.done || step.current) && 'before:bg-success/80',
               )}
             >

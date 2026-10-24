@@ -19,6 +19,14 @@ describe('рабочая оболочка машиниста', () => {
     expect(screen.getByRole('listitem', {name: 'Допуск — выполнено'})).toBeInTheDocument();
   });
 
+  it('линия-соединитель не перехватывает касания кнопок соседних этапов', () => {
+    render(<PhaseBar progress={[{...progress[0]}, {...progress[1], done: true, current: false}, {...progress[2], current: true}]} onOpen={() => undefined} />);
+
+    const items = screen.getAllByRole('listitem');
+    // Соединитель каждого этапа, кроме первого, рисуется поверх правой половины кнопки предыдущего.
+    for (const item of items.slice(1)) expect(item.className).toContain('before:pointer-events-none');
+  });
+
   it('показывает завершённую смену как семь из семи, а не как первый шаг', () => {
     const completed = Array.from({length: 7}, (_, index) => ({
       phase: `PHASE_${index}`,
