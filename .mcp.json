@@ -1,0 +1,19 @@
+{
+  "mcpServers": {
+    "sequential-thinking": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-sequential-thinking@2025.12.18"]
+    },
+    "postgres-local-ro": {
+      "command": "docker",
+      "args": [
+        "run", "-i", "--rm", "-e", "DATABASE_URI",
+        "crystaldba/postgres-mcp@sha256:dbbd346860d29f1543e991f30f3284bf4ab5f096d049ecc3426528f20b1b6e6b",
+        "--access-mode=restricted"
+      ],
+      "env": {
+        "DATABASE_URI": "${PILINGTRACK_RO_DATABASE_URL_DOCKER}"
+      }
+    }
+  }
+}
