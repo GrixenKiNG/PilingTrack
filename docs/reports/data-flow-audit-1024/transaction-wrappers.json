@@ -1,0 +1,312 @@
+[
+  {
+    "file": "src/modules/readiness/infrastructure/tenant-transaction.ts",
+    "line": 43,
+    "call": "runReadinessTenantTransaction"
+  },
+  {
+    "file": "src/modules/readiness/infrastructure/tenant-transaction.ts",
+    "line": 116,
+    "call": "runReadinessSerializableTransaction"
+  },
+  {
+    "file": "src/modules/readiness/infrastructure/readiness-worker-entry.ts",
+    "line": 29,
+    "call": "withReadinessWorkerTransaction"
+  },
+  {
+    "file": "src/modules/operator-mobile/application/commands/admission.ts",
+    "line": 228,
+    "call": "withReadinessTenantTransaction"
+  },
+  {
+    "file": "src/modules/operator-mobile/application/commands/admission.ts",
+    "line": 264,
+    "call": "withReadinessTenantTransaction"
+  },
+  {
+    "file": "src/modules/operator-mobile/application/commands/admission.ts",
+    "line": 334,
+    "call": "withReadinessTenantTransaction"
+  },
+  {
+    "file": "src/modules/operator-mobile/application/commands/shift-close.ts",
+    "line": 23,
+    "call": "withReadinessTenantTransaction"
+  },
+  {
+    "file": "src/modules/operator-mobile/application/commands/shift-close.ts",
+    "line": 57,
+    "call": "withReadinessTenantTransaction"
+  },
+  {
+    "file": "src/modules/operator-mobile/application/commands/shift-close.ts",
+    "line": 245,
+    "call": "withReadinessTenantTransaction"
+  },
+  {
+    "file": "src/modules/operator-mobile/application/commands/production.ts",
+    "line": 109,
+    "call": "withReadinessTenantTransaction(input.tenantId, async (tx) => {\r\n    // Повтор уже принятой команды отсекаем ДО всех остальных правил.\r\n    //\r\n    // Ниже стоит перехват P2002 — он спасает мгновенный повтор при обрыве. Но\r\n    // между первой отправкой и повтором проходит время, а правила ниже от\r\n    // времени зависят: смена успевает закрыться. Тогда\r\n    // повтор отвергается ещё до `create`, и машинист получает отказ по записи,\r\n    // которая давно принята. Для отложенной отправки с телефона это обычный\r\n    // случай, а не редкость.\r\n    //\r\n    // Запись уже есть — значит команда выполнена, и время её больше не судит.\r\n    const duplicate = await findByCommand(\r\n      tx, input.tenantId, input.entry.kind, input.clientCommandId,\r\n    );\r\n    if (duplicate) return {reportId: ''};\r\n\r\n    const shift = await requireOpenShift(tx, input.tenantId, input.shiftId, input.operatorId);\r\n    const crew = await requireCrew(tx, input.tenantId, input.operatorId, shift.equipmentId, input.actingAs);\r\n\r\n    // ВЫРАБОТКУ МОЖНО ВНЕСТИ И ПОСЛЕ «ЗАВЕРШИТЬ РАБОТУ» — ДО СДАЧИ СМЕНЫ\r\n    // (решение владельца 07.10.2026: «оператор может после работы занести\r\n    // выполненные работы и простой»).\r\n    //\r\n    // Раньше запись выработки в `HANDOVER_PENDING` отвергалась: пропущенную\r\n    // запись обязан был вносить мастер в журнале забивки. Машинист, который не\r\n    // трогает телефон за работой, а вносит всё по окончании, упирался в этот\r\n    // отказ. Теперь выработка и простой принимаются, пока смена не сдана;\r\n    // запрещены только смена, которой ещё нет (не принята установка), и\r\n    // закрытая — её отсекает `requireOpenShift` выше.\r\n    //\r\n    // Остальные запреты выработки (критический дефект, документы, СИЗ,\r\n    // происшествие) работают по-прежнему: они про машину, а не про время.\r\n    // Отложенная отправка не страдает: очередь офлайна идёт по порядку, а\r\n    // повтор уже принятой команды отсекается выше по clientCommandId.\r\n    if (shift.state !== 'STARTED' && shift.state !== 'HANDOVER_PENDING' && input.entry.kind !== 'DOWNTIME') {\r\n      /*\r\n        Два разных состояния — два разных сообщения.\r\n\r\n        Раньше здесь на оба случая стоял один ответ «работа завершена». Для\r\n        смены, которая ещё НЕ начата, он говорил ровно противоположное правде:\r\n        машинист читал, что работа кончилась, хотя не принял установку\r\n        (поймано на бою 12.09.2026 — см. `admissionAccepted` в\r\n        mobile-shift-query). Экран эту дорогу больше не открывает, но\r\n        сообщение остаётся последней защитой: оно обязано называть\r\n        действие, а не вводить в заблуждение.\r\n      */\r\n      const notStarted = shift.state === 'PLANNED' || shift.state === 'PENDING_ACCEPTANCE';\r\n      throw new OperatorCommandError(\r\n        409,\r\n        notStarted\r\n          ? 'Смена ещё не начата: примите установку на экране приёма, и запись выработки откроется.'\r\n          : 'Смена закрыта — выработку больше не записать. '\r\n            + 'Если запись пропущена, её вносит мастер в журнале забивки.',\r\n      );\r\n    }\r\n\r\n    // Погода не блокирует запись на сервере. На установках нет телеметрии и\r\n    // удалённого управления, а внешний метеосервис может быть устаревшим или\r\n    // измерять не в точке работ. Критический порог остаётся красным\r\n    // предупреждением в состоянии смены; решение об остановке принимает\r\n    // ответственный на площадке. readWeather сохранён во входном контракте\r\n    // на время совместимого обновления API-клиентов.\r\n\r\n    // Чек-лист ТБ — пропуск к работе этого вида, а не бумажка «на потом».\r\n    // Забивка и бурение опасны по-разному, и общий инструктаж эти различия\r\n    // стирает, поэтому пропуска два.\r\n    //\r\n    // СРОК, А НЕ СМЕНА (решение владельца 18.09.2026). Раньше пропуск истекал\r\n    // в полночь и список правил проходили заново каждое утро — сорок раз в\r\n    // месяц. Норматив требует повторять инструктаж по графику, и срок берётся\r\n    // у той же инструкции, которой управляет инженер по охране труда.\r\n    const requiredSafety = input.entry.kind === 'PILES' || input.entry.kind === 'PILE_PASSPORT'\r\n      ? 'TB_PILING'\r\n      : input.entry.kind === 'DRILLING' ? 'TB_DRILLING' : null;\r\n    if (requiredSafety) {\r\n      // Срок принадлежит человеку и ходит с ним между машинами и объектами,\r\n      // поэтому ищем по работнику, а не по смене или установке.\r\n      const passed = await tx.operatorChecklistExecution.findFirst({\r\n        where: {\r\n          tenantId: input.tenantId,\r\n          startedById: input.operatorId,\r\n          status: 'COMPLETED',\r\n          template: {templateKey: requiredSafety},\r\n        },\r\n        select: {startedAt: true},\r\n        orderBy: {startedAt: 'desc'},\r\n      });\r\n      const period = safetyChecklistPeriod(requiredSafety, passed?.startedAt ?? null, input.now);\r\n      if (period.due) {\r\n        throw new OperatorCommandError(\r\n          409,\r\n          requiredSafety === 'TB_PILING'\r\n            ? 'Подошёл срок чек-листа ТБ по забивке свай — пройдите его'\r\n            : 'Подошёл срок чек-листа ТБ по лидерному бурению — пройдите его',\r\n        );\r\n      }\r\n    }\r\n\r\n    const reportId = await ensureReport(tx, {\r\n      tenantId: input.tenantId,\r\n      shiftId: input.shiftId,\r\n      operatorId: input.operatorId,\r\n      siteId: crew.siteId,\r\n      equipmentId: shift.equipmentId,\r\n      crewId: crew.id,\r\n      productionDate: shift.productionDate.toISOString().slice(0, 10),\r\n      shiftType: shift.type,\r\n    });\r\n\r\n    // Сданный отчёт — закрытый документ. В контуре готовности смена после\r\n    // сдачи живёт до передачи машины, и записи продолжали ложиться в уже\r\n    // сданный отчёт: событие «сдан» ушло с одними итогами, а в отчёте — другие.\r\n    // Простой тоже: сданный отчёт уже сказал, сколько машина стояла.\r\n    const report = await tx.report.findUnique({where: {id: reportId}, select: {status: true, shiftStart: true, shiftEnd: true}});\r\n    if (report?.status === 'submitted') {\r\n      throw new OperatorCommandError(\r\n        409,\r\n        'Отчёт по смене уже сдан — новые записи в него не попадут. '\r\n          + 'Если запись пропущена, её вносит мастер в журнале забивки.',\r\n      );\r\n    }\r\n\r\n    const {entry} = input;\r\n    const checkDowntimeTotal = async (hours: number) => {\r\n      const recorded = await tx.reportDowntime.findMany({\r\n        where: {tenantId: input.tenantId, reportId}, select: {duration: true},\r\n      });\r\n      // До закрытия мобильной смены фактические часы отчёта ещё не заполнены.\r\n      // Используем расписание организации, а не время, проведённое в приложении.\r\n      const window = SHIFT_WINDOW[shift.type];\r\n      const clock = (hour: number) => `${String(hour % 24).padStart(2, '0')}:00`;\r\n      validateDowntimeWithinShift(\r\n        report?.shiftStart ?? clock(window.startHour),\r\n        report?.shiftEnd ?? clock(window.endHour),\r\n        [...recorded, {duration: hours}],\r\n      );\r\n    };\r\n\r\n    /*\r\n      ЗАПРЕТ ПРОВЕРЯЕТСЯ ЗДЕСЬ И ТОЛЬКО ДЛЯ ВЫРАБОТКИ.\r\n\r\n      Сваи, паспорт и бурение — это продолжение операции: их запрещает\r\n      неустранённый критический дефект, просроченный обязательный документ,\r\n      нехватка СИЗ, выведенная из эксплуатации машина и неразобранное\r\n      происшествие с требованием остановки.\r\n\r\n      Простой намеренно проходит без проверки. Он и есть честная запись о том,\r\n      что машина стоит, — в том числе стоит из-за этого самого запрета. Закрыв\r\n      простой вместе с выработкой, мы получили бы смену, где работа запрещена,\r\n      а сказать об этом нечем: четыре часа ожидания механика просто исчезли бы\r\n      из отчёта.\r\n    */\r\n    if (entry.kind !== 'DOWNTIME') {\r\n      await requireProductionPermit(tx, {\r\n        tenantId: input.tenantId,\r\n        operatorId: input.operatorId,\r\n        equipmentId: shift.equipmentId,\r\n        shiftId: input.shiftId,\r\n        productionDate: shift.productionDate,\r\n        now,\r\n      });\r\n    }\r\n\r\n    // Краткий по-русски след записи — что именно дописали в отчёт (F-R34-2).\r\n    let auditDiff: Record<string, unknown>;\r\n\r\n    if (entry.kind === 'PILES') {\r\n      if (entry.count <= 0) throw new OperatorCommandError(400, 'Количество свай должно быть больше нуля');\r\n      // Марка — только своей организации (см. requirePileGrade): чужая\r\n      // записывалась молча и портила расчёт погонных метров.\r\n      const grade = await requirePileGrade(tx, input.tenantId, entry.pileGradeId, shift.startedAt ?? shift.createdAt);\r\n      await tx.pileWork.create({\r\n        data: {\r\n          reportId,\r\n          tenantId: input.tenantId,\r\n          shiftId: input.shiftId,\r\n          clientCommandId: input.clientCommandId,\r\n          pileGradeId: entry.pileGradeId,\r\n          count: entry.count,\r\n          comment: entry.comment ?? null,\r\n          occurredAt: now,\r\n        },\r\n      });\r\n      auditDiff = {'Выработка': {old: null, new: `сваи: +${entry.count} шт (${grade.name})`}};\r\n    } else if (entry.kind === 'PILE_PASSPORT') {\r\n      // Длину сваи берём из её марки — единственного источника длины в\r\n      // продукте (см. lib/pile-length). Она нужна правилу глубины: свая не\r\n      // уходит глубже собственной длины, кроме погружения добойником.\r\n      const grade = await requirePileGrade(tx, input.tenantId, entry.pileGradeId, shift.startedAt ?? shift.createdAt);\r\n\r\n      const problems = validatePassport({\r\n        pileNumber: entry.passport.pileNumber,\r\n        refusalSetPenetrationMm: entry.passport.refusalSetPenetrationMm ?? null,\r\n        refusalSetBlows: entry.passport.refusalSetBlows ?? null,\r\n        drivenDepthM: entry.passport.drivenDepthM ?? null,\r\n        pileLengthM: grade?.lengthMm != null ? grade.lengthMm / 1000 : null,\r\n        followerUsed: entry.passport.followerUsed ?? false,\r\n      });\r\n      if (problems.length > 0) {\r\n        throw new OperatorCommandError(400, 'Паспорт заполнен не полностью', problems);\r\n      }\r\n\r\n      // Залог без ударов или с отрицательным погружением — не замер, а мусор,\r\n      // из которого потом посчитается отказ и уедет решение по свае. Ноль\r\n      // погружения законен: свая встала.\r\n      const sets = entry.passport.sets ?? [];\r\n      for (const [index, set] of sets.entries()) {\r\n        const bad = !Number.isFinite(set.blows) || set.blows <= 0\r\n          || !Number.isFinite(set.penetrationMm) || set.penetrationMm < 0;\r\n        if (bad) {\r\n          throw new OperatorCommandError(400, `Залог № ${index + 1} заполнен неверно`, [\r\n            {field: 'sets', message: 'В залоге нужны число ударов больше нуля и погружение от нуля'},\r\n          ]);\r\n        }\r\n      }\r\n\r\n      // Пикет — только с объекта смены. Форма отчёта проверяет то же самое\r\n      // (validatePicketsBelongToSite): иначе свая чужого объекта попадает в\r\n      // журнал забивки и в выработку по пикетам этого.\r\n      if (entry.passport.picketId) {\r\n        const picket = await tx.picket.findFirst({\r\n          where: {id: entry.passport.picketId, cluster: {field: {siteId: crew.siteId}}},\r\n          select: {id: true},\r\n        });\r\n        if (!picket) throw new OperatorCommandError(400, 'Пикет не относится к объекту смены — выберите пикет этого объекта');\r\n      }\r\n\r\n      // Молот снимаем с карточки установки: позднейшая замена молота не должна\r\n      // переписывать журнал уже забитых свай.\r\n      const equipment = await tx.equipment.findFirst({\r\n        where: {tenantId: input.tenantId, id: shift.equipmentId},\r\n        select: {hammerType: true, hammerEnergyKj: true},\r\n      });\r\n\r\n      const work = await tx.pileWork.create({\r\n        data: {\r\n          reportId,\r\n          tenantId: input.tenantId,\r\n          shiftId: input.shiftId,\r\n          clientCommandId: input.clientCommandId,\r\n          pileGradeId: entry.pileGradeId,\r\n          // Одна свая — одна запись. Учёт, планы и погонные метры считают по\r\n          // этой строке ровно как по пачке и о паспорте ничего не знают.\r\n          count: 1,\r\n          picketId: entry.passport.picketId ?? null,\r\n          depth: entry.passport.drivenDepthM ?? null,\r\n          occurredAt: now,\r\n        },\r\n        select: {id: true},\r\n      });\r\n\r\n      await tx.pilePassport.create({\r\n        data: {\r\n          tenantId: input.tenantId,\r\n          pileWorkId: work.id,\r\n          clientCommandId: input.clientCommandId,\r\n          pileNumber: entry.passport.pileNumber.trim(),\r\n          designHeadLevelM: entry.passport.designHeadLevelM ?? null,\r\n          actualHeadLevelM: entry.passport.actualHeadLevelM ?? null,\r\n          drivenDepthM: entry.passport.drivenDepthM ?? null,\r\n          refusalSetPenetrationMm: entry.passport.refusalSetPenetrationMm ?? null,\r\n          refusalSetBlows: entry.passport.refusalSetBlows ?? null,\r\n          designRefusalMm: entry.passport.designRefusalMm ?? null,\r\n          totalBlows: entry.passport.totalBlows ?? null,\r\n          blowsLastMeter: entry.passport.blowsLastMeter ?? null,\r\n          redriven: entry.passport.redriven ?? false,\r\n          followerUsed: entry.passport.followerUsed ?? false,\r\n          headCutOff: entry.passport.headCutOff ?? false,\r\n          planDeviationMm: entry.passport.planDeviationMm ?? null,\r\n          tiltPercent: entry.passport.tiltPercent ?? null,\r\n          hammerType: equipment?.hammerType ?? null,\r\n          hammerEnergyKj: equipment?.hammerEnergyKj ?? null,\r\n          dropHeightM: entry.passport.dropHeightM ?? null,\r\n          mediaIds: (entry.passport.mediaIds ?? []) as Prisma.InputJsonValue,\r\n          note: entry.passport.note?.trim() || null,\r\n          drivenAt: now,\r\n          recordedById: input.operatorId,\r\n          // Залоги пишутся одной вставкой вместе с паспортом: журнал без хода\r\n          // забивки и ход забивки без журнала одинаково бесполезны, и\r\n          // разорванная запись оставила бы одно без другого при сбое.\r\n          sets: sets.length > 0\r\n            ? {\r\n              create: sets.map((set, index) => ({\r\n                tenantId: input.tenantId,\r\n                ordinal: index + 1,\r\n                blows: set.blows,\r\n                penetrationMm: set.penetrationMm,\r\n                dropHeightM: set.dropHeightM ?? null,\r\n              })),\r\n            }\r\n            : undefined,\r\n        },\r\n      });\r\n      auditDiff = {'Выработка': {\r\n        old: null,\r\n        new: `паспорт сваи №${entry.passport.pileNumber.trim()}`,\r\n      }};\r\n    } else if (entry.kind === 'DRILLING') {\r\n      if (entry.count <= 0) throw new OperatorCommandError(400, 'Количество скважин должно быть больше нуля');\r\n      if (entry.metersPerUnit <= 0) throw new OperatorCommandError(400, 'Глубина скважины должна быть больше нуля');\r\n      await requireDrillingType(tx, input.tenantId, entry.typeId);\r\n      await tx.leaderDrilling.create({\r\n        data: {\r\n          reportId,\r\n          tenantId: input.tenantId,\r\n          shiftId: input.shiftId,\r\n          clientCommandId: input.clientCommandId,\r\n          typeId: entry.typeId,\r\n          count: entry.count,\r\n          metersPerUnit: entry.metersPerUnit,\r\n          meters: entry.count * entry.metersPerUnit,\r\n          occurredAt: now,\r\n        },\r\n      });\r\n      auditDiff = {'Выработка': {old: null, new: `бурение: +${entry.count * entry.metersPerUnit} м.п.`}};\r\n    } else if (typeof entry.hours === 'number') {\r\n      // ПРОСТОЙ В ЧАСАХ (решение владельца 07.10.2026). Никакой привязки ко\r\n      // времени: ни «не позже сейчас», ни «не раньше начала смены», ни\r\n      // пересечения с другими простоями — машинист называет, сколько часов\r\n      // машина стояла, и сервер это фиксирует в отчёте. Длительность — ровно то\r\n      // число, которое он ввёл: ни округления, ни пересчёта.\r\n      const hours = entry.hours;\r\n      if (!Number.isFinite(hours) || hours < DOWNTIME_STEP_HOURS) {\r\n        throw new OperatorCommandError(400, `Простой записывается в часах: от ${String(DOWNTIME_STEP_HOURS).replace('.', ',')} ч.`);\r\n      }\r\n      if (hours > DOWNTIME_MAX_HOURS) {\r\n        throw new OperatorCommandError(400, `Простой длиннее суток (${Math.round(hours)} ч). Проверьте часы.`);\r\n      }\r\n      if (!isWholeDowntimeStep(hours)) {\r\n        throw new OperatorCommandError(400, 'Укажите часы с шагом в четверть часа: 0,25 / 0,5 / 1 / 1,5 …');\r\n      }\r\n\r\n      const reason = await requireDowntimeReason(tx, input.tenantId, entry.reasonId);\r\n      await checkDowntimeTotal(hours);\r\n      await tx.reportDowntime.create({\r\n        data: {\r\n          reportId,\r\n          tenantId: input.tenantId,\r\n          shiftId: input.shiftId,\r\n          clientCommandId: input.clientCommandId,\r\n          reasonId: entry.reasonId,\r\n          duration: hours,\r\n          durationSeconds: Math.round(hours * 3600),\r\n          kind: 'DOWNTIME',\r\n          status: 'CLOSED',\r\n          comment: entry.comment ?? null,\r\n          occurredAt: now,\r\n        },\r\n      });\r\n      auditDiff = {'Выработка': {old: null, new: `простой: ${hours} ч (${reason.name})`}};\r\n    } else {\r\n      if (!entry.startedAt || !entry.endedAt) {\r\n        throw new OperatorCommandError(400, 'Укажите, сколько часов стояла машина');\r\n      }\r\n      const startedAt = new Date(entry.startedAt);\r\n      const endedAt = new Date(entry.endedAt);\r\n      if (Number.isNaN(startedAt.getTime()) || Number.isNaN(endedAt.getTime())) {\r\n        throw new OperatorCommandError(400, 'Не разобрать время простоя');\r\n      }\r\n\r\n      // Длительность считает сервер по интервалу — округления нет вовсе\r\n      // (см. lib/downtime-hours). Переход через полночь разобран там же.\r\n      const hours = downtimeHoursBetween(startedAt, endedAt);\r\n      if (hours <= 0) {\r\n        throw new OperatorCommandError(400, 'Конец простоя совпадает с началом. Укажите, когда машина снова пошла.');\r\n      }\r\n      if (hours > DOWNTIME_MAX_HOURS) {\r\n        throw new OperatorCommandError(400, `Простой длиннее суток (${Math.round(hours)} ч). Проверьте время.`);\r\n      }\r\n\r\n      /*\r\n        БУДУЩЕЕ ВРЕМЯ ОТВЕРГАЕМ, ПРОШЛОЕ — НЕТ.\r\n\r\n        Часы на телефоне идут своим ходом, и небольшое расхождение с сервером\r\n        нормально; допуск в пять минут закрывает его, не мешая записать простой\r\n        сразу, как машина пошла. А вот простой, «закончившийся» через два часа\r\n        после сейчас, — это опечатка в поле времени, и принять её значит\r\n        получить смену, где машина стояла в своё будущее.\r\n\r\n        Начало в прошлом не ограничиваем: вспомнить утренний простой после\r\n        обеда — нормальный ход смены, ради которого журнал и ведётся.\r\n      */\r\n      if (endedAt.getTime() > now.getTime() + 5 * 60_000) {\r\n        throw new OperatorCommandError(400, 'Простой не может заканчиваться в будущем');\r\n      }\r\n\r\n      // Простой принадлежит смене: не раньше её начала и не поверх уже\r\n      // записанного (см. domain/downtime-interval).\r\n      const [shiftClock, recorded] = await Promise.all([\r\n        tx.shift.findFirst({\r\n          where: {tenantId: input.tenantId, id: input.shiftId},\r\n          select: {startedAt: true, timezone: true},\r\n        }),\r\n        tx.reportDowntime.findMany({\r\n          where: {\r\n            tenantId: input.tenantId, shiftId: input.shiftId,\r\n            startedAt: {not: null}, endedAt: {not: null},\r\n          },\r\n          select: {startedAt: true, endedAt: true},\r\n        }),\r\n      ]);\r\n      const conflict = findDowntimeConflict(\r\n        {startedAt, endedAt},\r\n        shiftClock?.startedAt ?? null,\r\n        recorded as {startedAt: Date; endedAt: Date}[],\r\n      );\r\n      if (conflict) {\r\n        const clock = (at: Date) => new Intl.DateTimeFormat('ru-RU', {\r\n          timeZone: shiftClock?.timezone ?? 'Europe/Moscow', hour: '2-digit', minute: '2-digit', hour12: false,\r\n        }).format(at);\r\n        throw new OperatorCommandError(400, conflict.kind === 'BEFORE_SHIFT'\r\n          ? `Простой не может начаться раньше смены — смена начата в ${clock(conflict.shiftStartedAt)}.`\r\n          : `Простой пересекается с уже записанным (${clock(conflict.other.startedAt)}–${clock(conflict.other.endedAt)}). `\r\n            + 'Если записанный неверен — поправьте его, а не добавляйте второй.');\r\n      }\r\n\r\n      const reason = await requireDowntimeReason(tx, input.tenantId, entry.reasonId);\r\n      await checkDowntimeTotal(hours);\r\n      await tx.reportDowntime.create({\r\n        data: {\r\n          reportId,\r\n          tenantId: input.tenantId,\r\n          shiftId: input.shiftId,\r\n          clientCommandId: input.clientCommandId,\r\n          reasonId: entry.reasonId,\r\n          // `duration` — часы дробным числом: единица хранения одна на всё\r\n          // приложение. Рядом лежит сам интервал, ради которого всё и затеяно:\r\n          // из числа часов нельзя узнать, КОГДА машина стояла.\r\n          duration: hours,\r\n          startedAt,\r\n          endedAt,\r\n          durationSeconds: Math.round(hours * 3600),\r\n          kind: 'DOWNTIME',\r\n          status: 'CLOSED',\r\n          comment: entry.comment ?? null,\r\n          occurredAt: startedAt,\r\n        },\r\n      });\r\n      auditDiff = {'Выработка': {old: null, new: `простой: ${hours} ч (${reason.name})`}};\r\n    }\r\n\r\n    /*\r\n      СЛЕД ЗАПИСИ ВЫРАБОТКИ В ИСТОРИИ ОТЧЁТА.\r\n\r\n      `ReportAudit` писали только создание и правка отчёта\r\n      (`report-command.service.ts`), а выработка мобильного контура — сваи,\r\n      паспорт сваи, бурение и простой — ложилась без единой строки: в истории\r\n      отчёта не было видно, что и когда в него дописали (F-R34-2).\r\n\r\n      Пишем в ТОЙ ЖЕ транзакции, что и саму запись: иначе выработка сохранится,\r\n      а следа о ней не останется. Действие — `updated` («Изменён»):\r\n      существующий отчёт дополняется, отдельного шага «создан» у выработки нет.\r\n      Номер в следе — деловой (`RM-…`), а не первичный ключ: история отчёта\r\n      ищет строки по нему (`report-history-service.ts`). Повтор уже принятой\r\n      команды отсекается выше по `clientCommandId` и сюда не доходит.\r\n    */\r\n    await bumpReportVersion(tx, reportId);\r\n    await writeReportAuditRow({\r\n      reportId: await businessReportId(tx, reportId),\r\n      action: 'updated',\r\n      userId: input.operatorId,\r\n      diff: auditDiff,\r\n      ...await reportAuditActor(tx, input.tenantId, input.operatorId),\r\n    }, tx as unknown as Parameters<typeof writeReportAuditRow>[1]);\r\n\r\n    return {reportId};\r\n  }).catch"
+  },
+  {
+    "file": "src/modules/operator-mobile/application/commands/production.ts",
+    "line": 109,
+    "call": "withReadinessTenantTransaction"
+  },
+  {
+    "file": "src/modules/operator-mobile/application/commands/production.ts",
+    "line": 591,
+    "call": "withReadinessTenantTransaction"
+  },
+  {
+    "file": "src/modules/operator-mobile/application/commands/production-corrections.ts",
+    "line": 77,
+    "call": "withReadinessTenantTransaction"
+  },
+  {
+    "file": "src/modules/operator-mobile/application/commands/incidents.ts",
+    "line": 60,
+    "call": "withReadinessTenantTransaction"
+  },
+  {
+    "file": "src/modules/operator-mobile/application/commands/equipment.ts",
+    "line": 34,
+    "call": "withReadinessTenantTransaction"
+  },
+  {
+    "file": "src/modules/operator-mobile/application/commands/checklist.ts",
+    "line": 83,
+    "call": "withReadinessTenantTransaction"
+  },
+  {
+    "file": "src/modules/readiness/application/defects/commands.ts",
+    "line": 106,
+    "call": "executeIdempotentCommand"
+  },
+  {
+    "file": "src/modules/readiness/application/shifts/commands.ts",
+    "line": 60,
+    "call": "executeIdempotentCommand"
+  },
+  {
+    "file": "src/modules/readiness/application/scheduler.ts",
+    "line": 125,
+    "call": "withReadinessTenantTransaction"
+  },
+  {
+    "file": "src/modules/readiness/application/projection/project-event.ts",
+    "line": 44,
+    "call": "withReadinessWorkerTransaction"
+  },
+  {
+    "file": "src/modules/readiness/application/permits/commands.ts",
+    "line": 109,
+    "call": "executeIdempotentCommand"
+  },
+  {
+    "file": "src/modules/readiness/application/backfill/backfill-service.ts",
+    "line": 34,
+    "call": "withReadinessWorkerTransaction"
+  },
+  {
+    "file": "src/modules/readiness/application/backfill/backfill-service.ts",
+    "line": 48,
+    "call": "withReadinessWorkerTransaction"
+  },
+  {
+    "file": "src/modules/readiness/application/backfill/backfill-service.ts",
+    "line": 87,
+    "call": "withReadinessWorkerTransaction"
+  },
+  {
+    "file": "src/modules/readiness/application/backfill/backfill-service.ts",
+    "line": 90,
+    "call": "withReadinessWorkerTransaction"
+  },
+  {
+    "file": "src/modules/readiness/application/backfill/backfill-service.ts",
+    "line": 95,
+    "call": "withReadinessWorkerTransaction"
+  },
+  {
+    "file": "src/app/api/readiness/current/route.ts",
+    "line": 20,
+    "call": "withReadinessRequestTransaction"
+  },
+  {
+    "file": "src/app/api/readiness/audit/route.ts",
+    "line": 28,
+    "call": "withReadinessRequestTransaction"
+  },
+  {
+    "file": "src/app/api/readiness/defects/[id]/triage/route.ts",
+    "line": 17,
+    "call": "withReadinessSerializableTransaction"
+  },
+  {
+    "file": "src/app/api/readiness/defects/route.ts",
+    "line": 40,
+    "call": "withReadinessRequestTransaction"
+  },
+  {
+    "file": "src/app/api/readiness/defects/route.ts",
+    "line": 76,
+    "call": "withReadinessSerializableTransaction"
+  },
+  {
+    "file": "src/app/api/readiness/defects/[id]/reject/route.ts",
+    "line": 17,
+    "call": "withReadinessSerializableTransaction"
+  },
+  {
+    "file": "src/app/api/readiness/defects/[id]/resolve/route.ts",
+    "line": 17,
+    "call": "withReadinessSerializableTransaction"
+  },
+  {
+    "file": "src/app/api/readiness/bootstrap/route.ts",
+    "line": 39,
+    "call": "withReadinessRequestTransaction"
+  },
+  {
+    "file": "src/app/api/readiness/permit-form-options/route.ts",
+    "line": 33,
+    "call": "withReadinessRequestTransaction"
+  },
+  {
+    "file": "src/app/api/readiness/place-presets/route.ts",
+    "line": 41,
+    "call": "withReadinessRequestTransaction"
+  },
+  {
+    "file": "src/app/api/readiness/place-presets/route.ts",
+    "line": 74,
+    "call": "withReadinessRequestTransaction"
+  },
+  {
+    "file": "src/app/api/readiness/work-permits/route.ts",
+    "line": 37,
+    "call": "withReadinessRequestTransaction"
+  },
+  {
+    "file": "src/app/api/readiness/work-permits/route.ts",
+    "line": 67,
+    "call": "withReadinessSerializableTransaction"
+  },
+  {
+    "file": "src/app/api/readiness/history/route.ts",
+    "line": 26,
+    "call": "withReadinessRequestTransaction"
+  },
+  {
+    "file": "src/app/api/readiness/work-permits/[id]/submit/route.ts",
+    "line": 17,
+    "call": "withReadinessSerializableTransaction"
+  },
+  {
+    "file": "src/app/api/readiness/handovers/[id]/route.ts",
+    "line": 14,
+    "call": "withReadinessRequestTransaction"
+  },
+  {
+    "file": "src/app/api/readiness/work-permits/[id]/route.ts",
+    "line": 23,
+    "call": "withReadinessRequestTransaction"
+  },
+  {
+    "file": "src/app/api/readiness/work-permits/[id]/route.ts",
+    "line": 40,
+    "call": "withReadinessSerializableTransaction"
+  },
+  {
+    "file": "src/app/api/readiness/handovers/[id]/rework/route.ts",
+    "line": 11,
+    "call": "withReadinessSerializableTransaction"
+  },
+  {
+    "file": "src/app/api/readiness/work-permits/[id]/revoke/route.ts",
+    "line": 17,
+    "call": "withReadinessSerializableTransaction"
+  },
+  {
+    "file": "src/app/api/readiness/work-permits/[id]/reject/route.ts",
+    "line": 17,
+    "call": "withReadinessSerializableTransaction"
+  },
+  {
+    "file": "src/app/api/readiness/handovers/[id]/accept/route.ts",
+    "line": 12,
+    "call": "withReadinessSerializableTransaction"
+  },
+  {
+    "file": "src/app/api/readiness/handovers/[id]/accept/route.ts",
+    "line": 15,
+    "call": "withReadinessTenantTransaction"
+  },
+  {
+    "file": "src/app/api/readiness/shifts/[id]/waiver/route.ts",
+    "line": 22,
+    "call": "withReadinessSerializableTransaction"
+  },
+  {
+    "file": "src/app/api/readiness/work-permits/[id]/close/route.ts",
+    "line": 17,
+    "call": "withReadinessSerializableTransaction"
+  },
+  {
+    "file": "src/app/api/readiness/export/route.ts",
+    "line": 33,
+    "call": "withReadinessSerializableTransaction"
+  },
+  {
+    "file": "src/app/api/readiness/shifts/[id]/cancel/route.ts",
+    "line": 13,
+    "call": "withReadinessSerializableTransaction"
+  },
+  {
+    "file": "src/app/api/readiness/shifts/[id]/handover/route.ts",
+    "line": 13,
+    "call": "withReadinessSerializableTransaction"
+  },
+  {
+    "file": "src/app/api/readiness/shifts/route.ts",
+    "line": 28,
+    "call": "withReadinessRequestTransaction"
+  },
+  {
+    "file": "src/app/api/readiness/shifts/route.ts",
+    "line": 57,
+    "call": "withReadinessSerializableTransaction"
+  },
+  {
+    "file": "src/app/api/readiness/shifts/[id]/route.ts",
+    "line": 20,
+    "call": "withReadinessRequestTransaction"
+  },
+  {
+    "file": "src/app/api/readiness/shifts/[id]/route.ts",
+    "line": 29,
+    "call": "withReadinessSerializableTransaction"
+  },
+  {
+    "file": "src/app/api/readiness/shifts/[id]/start/route.ts",
+    "line": 15,
+    "call": "withReadinessSerializableTransaction"
+  },
+  {
+    "file": "src/app/api/readiness/work-permits/[id]/approve/route.ts",
+    "line": 17,
+    "call": "withReadinessSerializableTransaction"
+  },
+  {
+    "file": "src/app/api/readiness/shifts/[id]/decline/route.ts",
+    "line": 16,
+    "call": "withReadinessSerializableTransaction"
+  },
+  {
+    "file": "src/app/api/readiness/shifts/[id]/request-acceptance/route.ts",
+    "line": 14,
+    "call": "withReadinessSerializableTransaction"
+  }
+]

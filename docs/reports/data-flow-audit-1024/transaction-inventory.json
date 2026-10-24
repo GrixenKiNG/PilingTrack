@@ -1,0 +1,788 @@
+[
+  {
+    "file": "src/core/security/tenant-rls.ts",
+    "line": 104,
+    "call": "client.$transaction",
+    "characters": 151,
+    "operations": [],
+    "audit": false,
+    "outbox": false,
+    "catches": false
+  },
+  {
+    "file": "src/core/security/tenant-rls.ts",
+    "line": 206,
+    "call": "client\n    .$transaction",
+    "characters": 159,
+    "operations": [],
+    "audit": false,
+    "outbox": false,
+    "catches": false
+  },
+  {
+    "file": "src/core/security/tenant-enforcement.ts",
+    "line": 42,
+    "call": "db.$transaction",
+    "characters": 225,
+    "operations": [],
+    "audit": false,
+    "outbox": false,
+    "catches": false
+  },
+  {
+    "file": "src/core/security/identity-role.ts",
+    "line": 61,
+    "call": "db.$transaction",
+    "characters": 333,
+    "operations": [],
+    "audit": false,
+    "outbox": false,
+    "catches": false
+  },
+  {
+    "file": "src/core/outbox/dead-letter-queue.ts",
+    "line": 141,
+    "call": "db.$transaction",
+    "characters": 1581,
+    "operations": [
+      "deadLetterQueue.updateMany",
+      "deadLetterQueue.findUnique",
+      "outboxEvent.create"
+    ],
+    "audit": false,
+    "outbox": true,
+    "catches": false
+  },
+  {
+    "file": "src/modules/equipment/infrastructure/equipment.repository.ts",
+    "line": 23,
+    "call": "db.$transaction",
+    "characters": 415,
+    "operations": [
+      "equipment.upsert",
+      "outboxEvent.create"
+    ],
+    "audit": false,
+    "outbox": true,
+    "catches": false
+  },
+  {
+    "file": "src/services/telemetry/telemetry-buffer.ts",
+    "line": 145,
+    "call": "db.$transaction",
+    "characters": 508,
+    "operations": [
+      "telemetryRecord.create"
+    ],
+    "audit": false,
+    "outbox": false,
+    "catches": false
+  },
+  {
+    "file": "src/modules/users/user-service.ts",
+    "line": 163,
+    "call": "db.$transaction",
+    "characters": 1018,
+    "operations": [
+      "user.create"
+    ],
+    "audit": true,
+    "outbox": false,
+    "catches": false
+  },
+  {
+    "file": "src/modules/users/user-service.ts",
+    "line": 319,
+    "call": "db.$transaction",
+    "characters": 43,
+    "operations": [],
+    "audit": false,
+    "outbox": false,
+    "catches": false
+  },
+  {
+    "file": "src/modules/users/user-service.ts",
+    "line": 361,
+    "call": "db.$transaction",
+    "characters": 379,
+    "operations": [
+      "user.delete"
+    ],
+    "audit": true,
+    "outbox": false,
+    "catches": false
+  },
+  {
+    "file": "src/modules/users/user-documents.ts",
+    "line": 201,
+    "call": "db.$transaction",
+    "characters": 452,
+    "operations": [
+      "userDocument.create"
+    ],
+    "audit": false,
+    "outbox": false,
+    "catches": false
+  },
+  {
+    "file": "src/modules/users/user-documents.ts",
+    "line": 326,
+    "call": "db.$transaction",
+    "characters": 360,
+    "operations": [
+      "userDocument.update"
+    ],
+    "audit": false,
+    "outbox": false,
+    "catches": false
+  },
+  {
+    "file": "src/modules/users/user-documents.ts",
+    "line": 339,
+    "call": "db.$transaction",
+    "characters": 170,
+    "operations": [
+      "userDocument.delete"
+    ],
+    "audit": false,
+    "outbox": false,
+    "catches": false
+  },
+  {
+    "file": "src/modules/users/user-document-types.ts",
+    "line": 72,
+    "call": "db.$transaction",
+    "characters": 703,
+    "operations": [
+      "userDocumentType.create"
+    ],
+    "audit": true,
+    "outbox": false,
+    "catches": false
+  },
+  {
+    "file": "src/modules/users/user-document-types.ts",
+    "line": 126,
+    "call": "db.$transaction",
+    "characters": 387,
+    "operations": [
+      "userDocumentType.update"
+    ],
+    "audit": true,
+    "outbox": false,
+    "catches": false
+  },
+  {
+    "file": "src/modules/users/user-document-types.ts",
+    "line": 155,
+    "call": "db.$transaction",
+    "characters": 318,
+    "operations": [
+      "userDocumentType.delete"
+    ],
+    "audit": true,
+    "outbox": false,
+    "catches": false
+  },
+  {
+    "file": "src/lib/db.ts",
+    "line": 208,
+    "call": "db.$transaction",
+    "characters": 39,
+    "operations": [],
+    "audit": false,
+    "outbox": false,
+    "catches": false
+  },
+  {
+    "file": "src/modules/readiness/infrastructure/tenant-transaction.ts",
+    "line": 27,
+    "call": "client.$transaction",
+    "characters": 461,
+    "operations": [],
+    "audit": false,
+    "outbox": false,
+    "catches": false
+  },
+  {
+    "file": "src/modules/readiness/infrastructure/tenant-transaction.ts",
+    "line": 79,
+    "call": "client.$transaction",
+    "characters": 534,
+    "operations": [],
+    "audit": false,
+    "outbox": false,
+    "catches": false
+  },
+  {
+    "file": "src/modules/crews/infrastructure/crew.repository.ts",
+    "line": 39,
+    "call": "db.$transaction",
+    "characters": 2357,
+    "operations": [
+      "crew.updateMany",
+      "crew.create",
+      "site.findUnique",
+      "outboxEvent.createMany"
+    ],
+    "audit": false,
+    "outbox": true,
+    "catches": false
+  },
+  {
+    "file": "src/modules/equipment/application/commands/pm-scheduler.ts",
+    "line": 105,
+    "call": "db.$transaction",
+    "characters": 1530,
+    "operations": [
+      "maintenanceRecord.findFirst",
+      "maintenanceRecord.create"
+    ],
+    "audit": false,
+    "outbox": false,
+    "catches": false
+  },
+  {
+    "file": "src/modules/equipment/application/commands/meter-reading.ts",
+    "line": 276,
+    "call": "db.$transaction",
+    "characters": 89,
+    "operations": [],
+    "audit": false,
+    "outbox": false,
+    "catches": false
+  },
+  {
+    "file": "src/modules/equipment/application/commands/meter-reading.ts",
+    "line": 293,
+    "call": "db.$transaction",
+    "characters": 693,
+    "operations": [
+      "meterReading.delete"
+    ],
+    "audit": false,
+    "outbox": false,
+    "catches": false
+  },
+  {
+    "file": "src/modules/equipment/application/commands/equipment-metadata.ts",
+    "line": 121,
+    "call": "db.$transaction",
+    "characters": 96,
+    "operations": [],
+    "audit": false,
+    "outbox": false,
+    "catches": false
+  },
+  {
+    "file": "src/modules/equipment/application/commands/equipment-maintenance.ts",
+    "line": 77,
+    "call": "db.$transaction",
+    "characters": 1326,
+    "operations": [
+      "maintenanceRecord.create"
+    ],
+    "audit": false,
+    "outbox": false,
+    "catches": false
+  },
+  {
+    "file": "src/modules/equipment/application/commands/equipment-maintenance.ts",
+    "line": 261,
+    "call": "db.$transaction",
+    "characters": 1791,
+    "operations": [
+      "maintenanceRecord.update"
+    ],
+    "audit": false,
+    "outbox": false,
+    "catches": true
+  },
+  {
+    "file": "src/modules/equipment/application/commands/equipment-maintenance.ts",
+    "line": 320,
+    "call": "db.$transaction",
+    "characters": 1487,
+    "operations": [
+      "maintenanceRecord.update"
+    ],
+    "audit": false,
+    "outbox": false,
+    "catches": true
+  },
+  {
+    "file": "src/modules/equipment/application/commands/equipment-maintenance.ts",
+    "line": 386,
+    "call": "db.$transaction",
+    "characters": 912,
+    "operations": [
+      "maintenanceRecord.delete"
+    ],
+    "audit": false,
+    "outbox": false,
+    "catches": true
+  },
+  {
+    "file": "src/modules/equipment/application/commands/equipment-command.service.ts",
+    "line": 23,
+    "call": "db.$transaction",
+    "characters": 1677,
+    "operations": [
+      "equipment.findUnique",
+      "equipment.update",
+      "outboxEvent.create"
+    ],
+    "audit": false,
+    "outbox": true,
+    "catches": false
+  },
+  {
+    "file": "src/modules/equipment/application/commands/equipment-command.service.ts",
+    "line": 60,
+    "call": "db.$transaction",
+    "characters": 3402,
+    "operations": [
+      "equipment.findUnique",
+      "equipment.delete"
+    ],
+    "audit": false,
+    "outbox": false,
+    "catches": true
+  },
+  {
+    "file": "src/modules/sites/infrastructure/site.repository.ts",
+    "line": 33,
+    "call": "db.$transaction",
+    "characters": 1404,
+    "operations": [
+      "site.updateMany",
+      "site.create",
+      "outboxEvent.createMany"
+    ],
+    "audit": false,
+    "outbox": true,
+    "catches": false
+  },
+  {
+    "file": "src/modules/notifications/application/durable-alert-delivery.ts",
+    "line": 75,
+    "call": "db.$transaction",
+    "characters": 2672,
+    "operations": [
+      "outboxEvent.findFirst",
+      "outboxEvent.update"
+    ],
+    "audit": false,
+    "outbox": true,
+    "catches": true
+  },
+  {
+    "file": "src/modules/reports/infrastructure/report.repository.ts",
+    "line": 274,
+    "call": "db.$transaction",
+    "characters": 42,
+    "operations": [],
+    "audit": false,
+    "outbox": false,
+    "catches": false
+  },
+  {
+    "file": "src/modules/sites/application/commands/site-admin-command.service.ts",
+    "line": 92,
+    "call": "db.$transaction",
+    "characters": 1329,
+    "operations": [
+      "site.create",
+      "sitePilePlan.createMany",
+      "siteDrillingPlan.createMany"
+    ],
+    "audit": true,
+    "outbox": false,
+    "catches": false
+  },
+  {
+    "file": "src/modules/sites/application/commands/site-admin-command.service.ts",
+    "line": 177,
+    "call": "db.$transaction",
+    "characters": 2606,
+    "operations": [
+      "site.updateMany",
+      "sitePilePlan.deleteMany",
+      "siteDrillingPlan.deleteMany",
+      "sitePilePlan.createMany",
+      "siteDrillingPlan.createMany",
+      "site.findUnique"
+    ],
+    "audit": true,
+    "outbox": false,
+    "catches": false
+  },
+  {
+    "file": "src/modules/sites/application/commands/site-admin-command.service.ts",
+    "line": 274,
+    "call": "db.$transaction",
+    "characters": 299,
+    "operations": [
+      "site.delete"
+    ],
+    "audit": true,
+    "outbox": false,
+    "catches": false
+  },
+  {
+    "file": "src/modules/sites/application/commands/site-admin-command.service.ts",
+    "line": 299,
+    "call": "db.$transaction",
+    "characters": 592,
+    "operations": [
+      "site.updateMany"
+    ],
+    "audit": true,
+    "outbox": false,
+    "catches": false
+  },
+  {
+    "file": "src/modules/sites/application/commands/site-admin-command.service.ts",
+    "line": 331,
+    "call": "db.$transaction",
+    "characters": 401,
+    "operations": [
+      "userSiteAssignment.upsert"
+    ],
+    "audit": true,
+    "outbox": false,
+    "catches": false
+  },
+  {
+    "file": "src/modules/sites/application/commands/site-admin-command.service.ts",
+    "line": 349,
+    "call": "db.$transaction",
+    "characters": 302,
+    "operations": [
+      "userSiteAssignment.deleteMany"
+    ],
+    "audit": true,
+    "outbox": false,
+    "catches": false
+  },
+  {
+    "file": "src/modules/sites/application/commands/site-admin-command.service.ts",
+    "line": 428,
+    "call": "db.$transaction",
+    "characters": 1470,
+    "operations": [
+      "pileField.create",
+      "pileField.findFirst",
+      "cluster.create",
+      "cluster.findFirst",
+      "picket.create"
+    ],
+    "audit": true,
+    "outbox": false,
+    "catches": false
+  },
+  {
+    "file": "src/modules/sites/application/commands/site-admin-command.service.ts",
+    "line": 477,
+    "call": "db.$transaction",
+    "characters": 1192,
+    "operations": [
+      "pileField.findFirst",
+      "pileField.delete"
+    ],
+    "audit": false,
+    "outbox": false,
+    "catches": false
+  },
+  {
+    "file": "src/modules/sites/application/commands/site-admin-command.service.ts",
+    "line": 495,
+    "call": "db.$transaction",
+    "characters": 755,
+    "operations": [
+      "cluster.findFirst",
+      "cluster.delete"
+    ],
+    "audit": false,
+    "outbox": false,
+    "catches": false
+  },
+  {
+    "file": "src/modules/sites/application/commands/site-admin-command.service.ts",
+    "line": 509,
+    "call": "db.$transaction",
+    "characters": 594,
+    "operations": [
+      "picket.findFirst",
+      "picket.delete"
+    ],
+    "audit": false,
+    "outbox": false,
+    "catches": false
+  },
+  {
+    "file": "src/modules/safety/application/equipment-permits.ts",
+    "line": 139,
+    "call": "db.$transaction",
+    "characters": 1031,
+    "operations": [
+      "userEquipmentPermit.upsert"
+    ],
+    "audit": true,
+    "outbox": false,
+    "catches": false
+  },
+  {
+    "file": "src/modules/safety/application/equipment-permits.ts",
+    "line": 194,
+    "call": "db.$transaction",
+    "characters": 455,
+    "operations": [
+      "userEquipmentPermit.deleteMany"
+    ],
+    "audit": true,
+    "outbox": false,
+    "catches": false
+  },
+  {
+    "file": "src/modules/safety/application/briefing-commands.ts",
+    "line": 93,
+    "call": "db.$transaction",
+    "characters": 949,
+    "operations": [
+      "briefingRecord.create"
+    ],
+    "audit": true,
+    "outbox": false,
+    "catches": false
+  },
+  {
+    "file": "src/modules/safety/application/briefing-commands.ts",
+    "line": 157,
+    "call": "db.$transaction",
+    "characters": 402,
+    "operations": [
+      "briefingRecord.update"
+    ],
+    "audit": true,
+    "outbox": false,
+    "catches": false
+  },
+  {
+    "file": "src/modules/reports/application/event-handlers.ts",
+    "line": 615,
+    "call": "db.$transaction",
+    "characters": 838,
+    "operations": [
+      "outboxEvent.findUnique",
+      "outboxEvent.update"
+    ],
+    "audit": false,
+    "outbox": true,
+    "catches": false
+  },
+  {
+    "file": "src/modules/settings/application/settings-service.ts",
+    "line": 98,
+    "call": "db.$transaction",
+    "characters": 499,
+    "operations": [
+      "tenantSettings.upsert"
+    ],
+    "audit": false,
+    "outbox": false,
+    "catches": false
+  },
+  {
+    "file": "src/modules/reports/application/queries/pile-passport.service.ts",
+    "line": 65,
+    "call": "db.$transaction",
+    "characters": 1743,
+    "operations": [
+      "pilePassport.findFirst",
+      "pilePassport.updateMany"
+    ],
+    "audit": true,
+    "outbox": false,
+    "catches": false
+  },
+  {
+    "file": "src/modules/reports/application/commands/report-command.service.ts",
+    "line": 116,
+    "call": "db.$transaction",
+    "characters": 9977,
+    "operations": [
+      "report.findUnique",
+      "shift.findFirst",
+      "crew.findMany"
+    ],
+    "audit": false,
+    "outbox": true,
+    "catches": false
+  },
+  {
+    "file": "src/modules/reports/application/projections/projection-handlers.ts",
+    "line": 91,
+    "call": "db.$transaction",
+    "characters": 2455,
+    "operations": [
+      "siteDailySummary.findMany",
+      "siteWeeklyTrend.upsert"
+    ],
+    "audit": false,
+    "outbox": false,
+    "catches": false
+  },
+  {
+    "file": "src/modules/reports/application/projections/rebuild.ts",
+    "line": 80,
+    "call": "db.$transaction",
+    "characters": 189,
+    "operations": [
+      "siteDailySummary.deleteMany",
+      "siteDailySummary.createMany"
+    ],
+    "audit": false,
+    "outbox": false,
+    "catches": false
+  },
+  {
+    "file": "src/modules/reports/application/projections/rebuild.ts",
+    "line": 164,
+    "call": "db.$transaction",
+    "characters": 159,
+    "operations": [
+      "siteWeeklyTrend.deleteMany",
+      "siteWeeklyTrend.createMany"
+    ],
+    "audit": false,
+    "outbox": false,
+    "catches": false
+  },
+  {
+    "file": "src/modules/inspections/application/commands/template-commands.ts",
+    "line": 72,
+    "call": "db.$transaction",
+    "characters": 141,
+    "operations": [],
+    "audit": false,
+    "outbox": false,
+    "catches": false
+  },
+  {
+    "file": "src/modules/inspections/application/commands/inspection-commands.ts",
+    "line": 170,
+    "call": "db.$transaction",
+    "characters": 1369,
+    "operations": [
+      "maintenanceRecord.create",
+      "inspection.create"
+    ],
+    "audit": false,
+    "outbox": false,
+    "catches": false
+  },
+  {
+    "file": "src/modules/inspections/application/commands/inspection-commands.ts",
+    "line": 316,
+    "call": "db.$transaction",
+    "characters": 2449,
+    "operations": [
+      "inspection.updateMany",
+      "inspection.findUnique",
+      "inspectionAnswer.deleteMany",
+      "inspectionAnswer.createMany"
+    ],
+    "audit": false,
+    "outbox": false,
+    "catches": false
+  },
+  {
+    "file": "src/modules/inspections/application/commands/inspection-commands.ts",
+    "line": 432,
+    "call": "db.$transaction",
+    "characters": 9001,
+    "operations": [
+      "inspection.updateMany",
+      "inspection.findUnique",
+      "inspection.findUniqueOrThrow",
+      "maintenanceRecord.updateMany",
+      "maintenanceRecord.findUniqueOrThrow",
+      "equipmentDefect.findMany",
+      "outboxEvent.createMany"
+    ],
+    "audit": true,
+    "outbox": true,
+    "catches": false
+  },
+  {
+    "file": "src/modules/readiness/application/readiness-rules-service.ts",
+    "line": 100,
+    "call": "db.$transaction",
+    "characters": 1890,
+    "operations": [
+      "readinessRuleSet.findFirst",
+      "readinessRuleSet.update",
+      "readinessRuleSet.create"
+    ],
+    "audit": false,
+    "outbox": false,
+    "catches": false
+  },
+  {
+    "file": "src/modules/readiness/application/readiness-rules-service.ts",
+    "line": 219,
+    "call": "db.$transaction",
+    "characters": 2228,
+    "operations": [
+      "readinessRuleSet.findFirst",
+      "readinessRuleSet.updateMany",
+      "readinessRuleSet.update"
+    ],
+    "audit": false,
+    "outbox": false,
+    "catches": false
+  },
+  {
+    "file": "src/modules/readiness/application/access-matrix-service.ts",
+    "line": 164,
+    "call": "db.$transaction",
+    "characters": 2042,
+    "operations": [
+      "readinessAccessMatrix.findFirst",
+      "readinessAccessMatrix.update",
+      "readinessAccessMatrix.create"
+    ],
+    "audit": false,
+    "outbox": false,
+    "catches": false
+  },
+  {
+    "file": "src/modules/readiness/application/access-matrix-service.ts",
+    "line": 214,
+    "call": "db.$transaction",
+    "characters": 1976,
+    "operations": [
+      "readinessAccessMatrix.findFirst",
+      "readinessAccessMatrix.create",
+      "readinessAccessMatrix.updateMany",
+      "readinessAccessMatrix.update"
+    ],
+    "audit": false,
+    "outbox": false,
+    "catches": false
+  },
+  {
+    "file": "src/app/api/reports/delete/route.ts",
+    "line": 73,
+    "call": "db.$transaction",
+    "characters": 2586,
+    "operations": [
+      "report.findFirst",
+      "report.delete"
+    ],
+    "audit": false,
+    "outbox": true,
+    "catches": false
+  }
+]
