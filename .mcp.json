@@ -4,6 +4,13 @@
       "command": "npx",
       "args": ["-y", "@modelcontextprotocol/server-sequential-thinking@2025.12.18"]
     },
+    "context7": {
+      "type": "http",
+      "url": "https://mcp.context7.com/mcp",
+      "headers": {
+        "Authorization": "Bearer ${CONTEXT7_API_KEY}"
+      }
+    },
     "postgres-local-ro": {
       "command": "docker",
       "args": [
