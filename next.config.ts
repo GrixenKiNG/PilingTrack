@@ -4,6 +4,9 @@ import path from "node:path";
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  // BullMQ uses ioredis here; its optional GLIDE adapter is not configured.
+  // Keep native Node loading so webpack does not resolve the unused adapter.
+  serverExternalPackages: ["bullmq"],
   reactStrictMode: true,
   // Bake a version into the bundle at build time. Next's `env` config
   // replaces every `process.env.APP_VERSION` reference in compiled code
