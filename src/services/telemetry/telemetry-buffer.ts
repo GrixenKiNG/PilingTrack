@@ -13,7 +13,7 @@
  */
 
 import { CircuitBreaker } from '@/core/infrastructure/circuit-breakers';
-import type { Prisma } from '@/generated/postgres-client';
+import type { Prisma } from '@/generated/postgres-client/client';
 import type { TelemetryRecord } from '@/services/telemetry/telemetry-ingestion-service';
 import { logger } from '@/lib/logger';
 import { runWithTenantContext, setRequestTenantId } from '@/core/security/tenant-context';

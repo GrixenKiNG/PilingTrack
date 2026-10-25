@@ -1,6 +1,6 @@
 import { db } from '@/lib/db';
 import { ServiceError } from '@/lib/service-error';
-import type { ChecklistLevel } from '@/generated/postgres-client';
+import type { ChecklistLevel } from '@/generated/postgres-client/client';
 
 export async function listTemplates(
   tenantId: string,

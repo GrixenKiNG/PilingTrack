@@ -54,7 +54,7 @@ const FIELD_LABELS: Record<string, string> = {
   plannedPiles: 'План свай',
   plannedDrilling: 'План бурения',
   role: 'Роль',
-  email: 'Email',
+  email: 'Электронная почта',
   lengthMm: 'Длина, мм',
   sectionOrDiameter: 'Сечение',
   // Поля событий по документам работника и допускам к технике.

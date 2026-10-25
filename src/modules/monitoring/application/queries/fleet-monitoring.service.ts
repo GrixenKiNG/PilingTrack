@@ -22,7 +22,7 @@ import { SUBMITTED_REPORT_STATUS } from '@/lib/report-status';
 import { db } from '@/lib/db';
 import { pileLengthMeters } from '@/lib/pile-length';
 import { resolveEquipmentOperationalStates } from '@/modules/equipment';
-import type { EquipmentKind } from '@/generated/postgres-client';
+import type { EquipmentKind } from '@/generated/postgres-client/client';
 
 const RECENT_WINDOW_DAYS = 7;
 const EXPECTED_WINDOW_DAYS = 2;
