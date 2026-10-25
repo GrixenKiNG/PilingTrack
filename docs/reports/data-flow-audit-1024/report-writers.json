@@ -1,0 +1,177 @@
+[
+  {
+    "file": "src/core/outbox/dead-letter-queue.ts",
+    "line": 159,
+    "call": "tx.outboxEvent.create"
+  },
+  {
+    "file": "src/core/outbox/readiness-snapshot-request.ts",
+    "line": 46,
+    "call": "tx.outboxEvent.createMany"
+  },
+  {
+    "file": "src/core/notifications/durable-alert.ts",
+    "line": 17,
+    "call": "tx.outboxEvent.create"
+  },
+  {
+    "file": "src/modules/equipment/infrastructure/equipment.repository.ts",
+    "line": 30,
+    "call": "tx.outboxEvent.create"
+  },
+  {
+    "file": "src/modules/readiness/infrastructure/snapshots/outbox-repository.ts",
+    "line": 11,
+    "call": "this.tx.outboxEvent.updateMany"
+  },
+  {
+    "file": "src/modules/crews/infrastructure/crew.repository.ts",
+    "line": 80,
+    "call": "tx.outboxEvent.createMany"
+  },
+  {
+    "file": "src/modules/equipment/application/commands/equipment-command.service.ts",
+    "line": 41,
+    "call": "tx.outboxEvent.create"
+  },
+  {
+    "file": "src/modules/operator-mobile/application/commands/shift-close.ts",
+    "line": 175,
+    "call": "tx.report.updateMany"
+  },
+  {
+    "file": "src/modules/operator-mobile/application/commands/shift-close.ts",
+    "line": 330,
+    "call": "tx.outboxEvent.create"
+  },
+  {
+    "file": "src/modules/operator-mobile/application/commands/shared.ts",
+    "line": 382,
+    "call": "tx.report.upsert"
+  },
+  {
+    "file": "src/modules/operator-mobile/application/commands/shared.ts",
+    "line": 412,
+    "call": "tx.report.update"
+  },
+  {
+    "file": "src/modules/sites/infrastructure/site.repository.ts",
+    "line": 55,
+    "call": "tx.outboxEvent.createMany"
+  },
+  {
+    "file": "src/modules/notifications/application/durable-alert-delivery.ts",
+    "line": 94,
+    "call": "tx.outboxEvent.update"
+  },
+  {
+    "file": "src/modules/notifications/application/durable-alert-delivery.ts",
+    "line": 116,
+    "call": "tx.outboxEvent.update"
+  },
+  {
+    "file": "src/modules/notifications/application/durable-alert-delivery.ts",
+    "line": 119,
+    "call": "tx.outboxEvent.update"
+  },
+  {
+    "file": "src/modules/reports/infrastructure/report.repository.ts",
+    "line": 138,
+    "call": "tx.report.updateMany"
+  },
+  {
+    "file": "src/modules/reports/infrastructure/report.repository.ts",
+    "line": 181,
+    "call": "tx.report.create"
+  },
+  {
+    "file": "src/modules/reports/infrastructure/report.repository.ts",
+    "line": 238,
+    "call": "tx.outboxEvent.createMany"
+  },
+  {
+    "file": "src/modules/reports/infrastructure/report.repository.ts",
+    "line": 334,
+    "call": "db.report.updateMany"
+  },
+  {
+    "file": "src/modules/reports/application/event-handlers.ts",
+    "line": 525,
+    "call": "db.outboxEvent.create"
+  },
+  {
+    "file": "src/modules/reports/application/event-handlers.ts",
+    "line": 620,
+    "call": "tx.outboxEvent.update"
+  },
+  {
+    "file": "src/modules/reports/application/event-handlers.ts",
+    "line": 625,
+    "call": "tx.outboxEvent.update"
+  },
+  {
+    "file": "src/modules/reports/application/outbox-publisher.ts",
+    "line": 74,
+    "call": "tx.outboxEvent.create"
+  },
+  {
+    "file": "src/modules/reports/application/outbox-publisher.ts",
+    "line": 170,
+    "call": "db.outboxEvent.updateMany"
+  },
+  {
+    "file": "src/modules/reports/application/outbox-publisher.ts",
+    "line": 227,
+    "call": "db.outboxEvent.update"
+  },
+  {
+    "file": "src/modules/reports/application/outbox-publisher.ts",
+    "line": 241,
+    "call": "db.outboxEvent.update"
+  },
+  {
+    "file": "src/modules/inspections/application/commands/inspection-commands.ts",
+    "line": 567,
+    "call": "tx.outboxEvent.createMany"
+  },
+  {
+    "file": "src/modules/readiness/application/defects/commands.ts",
+    "line": 84,
+    "call": "input.tx.outboxEvent.create"
+  },
+  {
+    "file": "src/modules/readiness/application/shifts/commands.ts",
+    "line": 88,
+    "call": "input.tx.outboxEvent.createMany"
+  },
+  {
+    "file": "src/modules/readiness/application/scheduler.ts",
+    "line": 225,
+    "call": "tx.report.updateMany"
+  },
+  {
+    "file": "src/modules/readiness/application/scheduler.ts",
+    "line": 231,
+    "call": "tx.outboxEvent.create"
+  },
+  {
+    "file": "src/modules/readiness/application/permits/commands.ts",
+    "line": 90,
+    "call": "input.tx.outboxEvent.create"
+  },
+  {
+    "file": "src/app/api/alerts/webhook/route.ts",
+    "line": 153,
+    "call": "db.outboxEvent.upsert"
+  },
+  {
+    "file": "src/app/api/alerts/webhook/route.ts",
+    "line": 162,
+    "call": "db.outboxEvent.create"
+  },
+  {
+    "file": "src/app/api/reports/delete/route.ts",
+    "line": 109,
+    "call": "tx.report.delete"
+  }
+]
