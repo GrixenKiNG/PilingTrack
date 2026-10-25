@@ -11,7 +11,7 @@
  * norm it is included; where it does not, the norm is left blank to fill in.
  */
 import 'dotenv/config';
-import { PrismaClient } from '../src/generated/postgres-client';
+import { PrismaClient } from '../src/generated/postgres-client/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 
 const connectionString = process.env.DATABASE_URL_POSTGRES || process.env.DATABASE_URL;

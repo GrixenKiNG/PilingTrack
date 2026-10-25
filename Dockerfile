@@ -65,7 +65,7 @@ RUN rm -f ./prisma/seed.ts ./prisma/seed-test-data.ts
 # prisma.config.ts holds the datasource.url (env-based) + seed command — Prisma 7
 # requires it for `migrate deploy`/`status`; the schema has no inline url.
 COPY package.json tsconfig.json prisma.config.ts ./
-# Generate the client (seed.ts imports it from ../src/generated/postgres-client)
+# Generate the client (seed.ts imports it from ../src/generated/postgres-client/client)
 # and prime the engine binaries used by `migrate deploy`.
 RUN npx prisma generate --schema prisma/schema.prisma
 
@@ -101,11 +101,7 @@ COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
 # Сиды с демо-учётками и фиксированными паролями в боевый образ не попадают.
 RUN rm -f ./prisma/seed.ts ./prisma/seed-test-data.ts
 
-# Next.js standalone не трассирует кастомный Prisma client из src/generated/postgres-client.
-# Явно копируем @prisma и .prisma — иначе runtime падает с
-# "Cannot find module '@prisma/client-runtime-utils'".
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@prisma ./node_modules/@prisma
-COPY --from=builder --chown=nextjs:nodejs /app/src/generated ./src/generated
+# Generated TypeScript client is bundled into standalone by Next.js.
 
 # Install wget for health checks
 RUN apk add --no-cache wget

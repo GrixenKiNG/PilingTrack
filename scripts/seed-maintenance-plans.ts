@@ -28,7 +28,7 @@
  */
 import 'dotenv/config';
 import { PrismaPg } from '@prisma/adapter-pg';
-import { PrismaClient } from '../src/generated/postgres-client';
+import { PrismaClient } from '../src/generated/postgres-client/client';
 
 const REGULATIONS = [
   { type: 'TO1' as const, intervalHours: 250, title: 'ТО-1 (каждые 250 м/ч)' },

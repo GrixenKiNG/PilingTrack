@@ -25,7 +25,7 @@
  */
 import 'dotenv/config';
 import { PrismaPg } from '@prisma/adapter-pg';
-import { PrismaClient } from '../src/generated/postgres-client';
+import { PrismaClient } from '../src/generated/postgres-client/client';
 import { projectNextMaintenance } from '../src/modules/equipment/application/commands/maintenance-regulation';
 
 /** Наряды, которые считаются фактически выполненными. */

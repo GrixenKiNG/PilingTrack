@@ -11,7 +11,7 @@
  *
  * Запуск: npx tsx scripts/reset-one-password.ts <email> <password>
  */
-import { PrismaClient } from '../src/generated/postgres-client';
+import { PrismaClient } from '../src/generated/postgres-client/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { hashSync } from 'bcryptjs';
 

@@ -34,7 +34,6 @@ export DEFAULT_TENANT_ID="notify-b-disposable"
 export PRISMA_CONNECTION_LIMIT=8
 export LOG_LEVEL=error
 npx --no-install prisma generate --config prisma.integration.config.ts >output/notify-tx-1023/generate.log 2>&1
-node scripts/patch-postgres-client.js >>output/notify-tx-1023/generate.log 2>&1
 node --test tests/integration/notifications/measurements.test.mjs >output/notify-tx-1023/measurement-after.tap 2>&1
 printf '0\n' >output/notify-tx-1023/measurement-after.exit
 set +e
