@@ -238,6 +238,23 @@ describe('updateMaintenance — lifecycle transitions', () => {
     expect(updateRecMock).not.toHaveBeenCalled();
   });
 
+  it('does not re-check an unchanged assignee, so an old work order with a non-mechanic can still be closed', async () => {
+    findUniqueRecMock.mockResolvedValue({ id: 'rec_1', equipmentId: 'eq_1', completedAt: null, startedAt: null,
+      tenantId: 'orion', status: 'IN_PROGRESS', workDone: 'заменили фильтр', assigneeId: 'usr_op' });
+    findFirstUserMock.mockResolvedValue(null);
+    await updateMaintenance('eq_1', 'rec_1', { assigneeId: 'usr_op', status: 'DONE' }, { tenantId: 'orion', userId: 'usr_9' });
+    expect(findFirstUserMock).not.toHaveBeenCalled();
+    expect(updateRecMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('lets the assignee be cleared without a lookup', async () => {
+    findUniqueRecMock.mockResolvedValue({ id: 'rec_1', equipmentId: 'eq_1', completedAt: null, startedAt: null,
+      tenantId: 'orion', status: 'PLANNED', workDone: '', assigneeId: 'usr_op' });
+    await updateMaintenance('eq_1', 'rec_1', { assigneeId: null }, { tenantId: 'orion', userId: 'usr_9' });
+    expect(findFirstUserMock).not.toHaveBeenCalled();
+    expect(updateRecMock.mock.calls[0][0].data.assigneeId).toBeNull();
+  });
+
   it('sets startedAt when status moves to IN_PROGRESS', async () => {
     await updateMaintenance('eq_1', 'rec_1', { status: 'IN_PROGRESS' }, { tenantId: 'orion', userId: 'usr_9' });
     const data = updateRecMock.mock.calls[0][0].data;

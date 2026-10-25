@@ -219,7 +219,7 @@ export async function updateMaintenance(
 ) {
   const existing = await db.maintenanceRecord.findUnique({
     where: { id: recordId },
-    select: { id: true, equipmentId: true, completedAt: true, startedAt: true, tenantId: true, acceptedById: true, status: true, workDone: true, cancelReason: true },
+    select: { id: true, equipmentId: true, completedAt: true, startedAt: true, tenantId: true, acceptedById: true, status: true, workDone: true, cancelReason: true, assigneeId: true },
   });
   if (!existing || existing.equipmentId !== equipmentId || existing.tenantId !== ctx.tenantId) {
     throw new ServiceError('Запись ТО не найдена', 404);
@@ -233,7 +233,12 @@ export async function updateMaintenance(
       (existing.status === 'DONE' || existing.status === 'CANCELLED')) {
     throw new ServiceError('Статус закрытого наряда нельзя изменить', 409);
   }
-  await assertAssignee(ctx.tenantId, input.assigneeId);
+  // Формы наряда всегда присылают текущего исполнителя. Проверяем только смену:
+  // иначе наряд, назначенный до введения правила (оператор, диспетчер, уволенный
+  // механик), нельзя ни сохранить, ни закрыть.
+  if (input.assigneeId !== undefined && input.assigneeId !== existing.assigneeId) {
+    await assertAssignee(ctx.tenantId, input.assigneeId);
+  }
 
   const data: Record<string, unknown> = {};
   if (input.type !== undefined) data.type = input.type;
