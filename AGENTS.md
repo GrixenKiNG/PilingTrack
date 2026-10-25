@@ -28,7 +28,7 @@ Instructions for coding agents other than Claude (Codex and similar). Claude rea
 ## 3. Project architecture (short)
 
 - `src/modules/` — domain logic (commands, queries, entities). `reports/` is the fully migrated reference layout.
-- `src/services/` — legacy/shared services. `users`, `analytics`, `telemetry`, `system` still live here behind `modules/<x>/index.ts` facades. **Don't start a services→modules migration.** Import through `@/modules/<x>`.
+- `src/services/` — legacy/shared services. What remains: `auth`, `tenancy`, `telemetry` (`modules/telemetry/index.ts` is only a facade), `dictionaries`, `telegram`, `weather`, `feedback`. `users`, `analytics`, `system`, `audit`, `reports`, `notifications` are already fully in `modules/`. **Don't start further services→modules migration.** Import through `@/modules/<x>`.
 - `src/core/` — infrastructure only. `src/app/api/` — route handlers.
 - API routes: wrap GET with `withApi`, POST/PUT/DELETE with `withMutation` (it provides CSRF + rate limit — never duplicate them inline). Validate with `schema.safeParse(body)`; on failure return 400; use only `validated.data`.
 - **Tenancy fails closed:** a missing `tenantId` throws; use strict equality. Never write `tenantId IS NULL OR ...` — it returns every tenant's rows.
@@ -74,7 +74,7 @@ npm run build                   # needs env; if it fails on env/DB, say so — d
 
 `tsc` alone is not enough — Next route types are only checked by `npm run build`.
 
-Environment notes: Windows + Git Bash. Python is not installed — use `node` for scripts. A fresh worktree has no `src/generated`; run `npm run db:generate` first.
+Environment notes: Windows + Git Bash. Python works, but for editing files use `node`. A fresh worktree has no `src/generated`; run `npm run db:generate` first.
 
 ## 7. Final report (in Russian)
 
@@ -83,6 +83,8 @@ Environment notes: Windows + Git Bash. Python is not installed — use `node` fo
 3. What you deliberately left alone and why.
 4. Each check from §6: command, exit code, key numbers (tests passed/skipped, Playwright count).
 5. Open questions and risks you're not sure about.
+
+**Project amendment to the GitNexus block below:** `impact` is mandatory before renaming, moving or deleting a symbol and before refactoring shared functions; for a point fix inside one function a text search is enough. `UNKNOWN` is not "safe" — confirm with text search.
 
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence

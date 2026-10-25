@@ -80,9 +80,9 @@ domain write (command)                         # e.g. report upsert
 outbox worker (src/workers/outbox-worker.ts)
   └─ polls OutboxEvent, validates payload against the schema registry
      (src/core/event-bus/schema-registry), emits via the legacy domain-event bus
-     (src/services/reports/domain-events.ts)
+     (src/modules/reports/application/domain-events.ts)
 projection worker (src/workers/projection-worker.ts)
-  └─ registerAllEventHandlers() from src/services/reports/event-handlers
+  └─ registerAllEventHandlers() from src/modules/reports/application/event-handlers
   └─ startProjectionWorker() from src/modules/reports/application/projections/
 read models (prisma/schema.prisma):
   ReportAnalytics, SiteDailySummary, SiteWeeklyTrend, OperatorPerformance
@@ -99,7 +99,7 @@ read models (prisma/schema.prisma):
 
 **The single event bus (ADR-0006, reversed 2026-05-21):** a "modern" bus in
 `core/event-bus/event-bus.ts` (Kafka/NATS adapters, ~947 lines) had **zero production
-callers** and was deleted. The legacy bus in `src/services/reports/domain-events.ts` IS
+callers** and was deleted. The legacy bus in `src/modules/reports/application/domain-events.ts` IS
 the production bus. `core/event-bus/` keeps only the schema registry. Do not resurrect
 the deleted bus from git history; a future Kafka/NATS need means building a new
 `event-bus-v3` with a demonstrated caller first.
