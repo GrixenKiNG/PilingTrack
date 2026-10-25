@@ -70,7 +70,7 @@ async function waitForServer() {
 }
 
 function getPrismaClient() {
-  const { PrismaClient } = require(path.join(projectRoot, 'src', 'generated', 'postgres-client'));
+  const { PrismaClient } = require('tsx/cjs/api').require('./src/generated/postgres-client/client.ts', path.join(projectRoot, 'package.json'));
   const { PrismaPg } = require('@prisma/adapter-pg');
   return new PrismaClient({ adapter: new PrismaPg({ connectionString }), log: ['error'] });
 }

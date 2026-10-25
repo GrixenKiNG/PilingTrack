@@ -24,7 +24,7 @@
  */
 import 'dotenv/config';
 import { PrismaPg } from '@prisma/adapter-pg';
-import { PrismaClient } from '../src/generated/postgres-client';
+import { PrismaClient } from '../src/generated/postgres-client/client';
 
 interface DocumentTypeSeed {
   name: string;

@@ -25,7 +25,7 @@ function getPrismaClient() {
     // (see prisma/seed.ts) — a bare `new PrismaClient()` throws otherwise.
     let PostgresClient: any;
     try {
-      ({ PrismaClient: PostgresClient } = require('../src/generated/postgres-client'));
+      ({ PrismaClient: PostgresClient } = require('../src/generated/postgres-client/client'));
     } catch {
       throw new Error('PostgreSQL Prisma client not generated. Run: npm run db:generate');
     }

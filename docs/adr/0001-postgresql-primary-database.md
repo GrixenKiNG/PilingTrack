@@ -75,4 +75,4 @@ PilingTrack изначально разрабатывался с поддерж�
 
 - [prisma/schema.postgres.prisma](../../prisma/schema.postgres.prisma)
 - [src/lib/db.ts](../../src/lib/db.ts)
-- [scripts/patch-postgres-client.js](../../scripts/patch-postgres-client.js)
+- `scripts/patch-postgres-client.js` — удалён 25.10.2026: на Prisma 7 патч ничего не менял, генератор переведён на `prisma-client`

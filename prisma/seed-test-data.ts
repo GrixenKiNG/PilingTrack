@@ -3,7 +3,7 @@
  * Run: npx tsx prisma/seed-test-data.ts
  */
 
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from '../src/generated/postgres-client/client';
 
 const prisma = new PrismaClient();
 

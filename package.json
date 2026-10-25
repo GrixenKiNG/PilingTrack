@@ -53,7 +53,7 @@
     "postinstall": "npm run db:generate",
     "db:push": "prisma db push",
     "prod:smoke": "node scripts/prod-smoke.mjs",
-    "db:generate": "prisma generate && node scripts/patch-postgres-client.js",
+    "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:migrate:deploy": "prisma migrate deploy",
     "db:reset": "prisma migrate reset",

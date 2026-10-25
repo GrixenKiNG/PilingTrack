@@ -1,4 +1,5 @@
-import { PrismaClient } from '../../src/generated/postgres-client/client.js';
+import { require as tsxRequire } from 'tsx/cjs/api';
+const { PrismaClient } = tsxRequire('./src/generated/postgres-client/client.ts', process.cwd() + '/package.json');
 import { PrismaPg } from '@prisma/adapter-pg';
 import bcrypt from 'bcryptjs';
 import { randomBytes } from 'node:crypto';

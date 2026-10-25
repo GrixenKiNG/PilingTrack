@@ -15,7 +15,7 @@
  *     run: npm run db:explain-analyze
  */
 
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from '../src/generated/postgres-client/client';
 
 interface QueryCheck {
   name: string;
@@ -176,7 +176,7 @@ async function main() {
 
   let prisma: PrismaClient;
   try {
-    const { PrismaClient: PostgresClient } = require('../src/generated/postgres-client');
+    const { PrismaClient: PostgresClient } = require('../src/generated/postgres-client/client');
     prisma = new PostgresClient();
   } catch {
     console.error('❌ PostgreSQL Prisma client not generated.');

@@ -4,22 +4,16 @@
  * Per ADR-0001: PostgreSQL is the only supported database.
  * SQLite support has been removed.
  *
- * This module intentionally avoids a static runtime import of the generated
- * Prisma client so app routes can import `@/lib/db` without immediately
- * pulling Prisma runtime into the server trace graph.
+ * The generated TypeScript client is bundled by Next.js and loaded by tsx in
+ * workers. The lazy facade still defers client creation until the first call.
  */
 
-import type { Prisma as PostgresPrisma, PrismaClient as PostgresPrismaClient } from '../generated/postgres-client/client';
+import { PrismaClient, type Prisma as PostgresPrisma, type PrismaClient as PostgresPrismaClient } from '../generated/postgres-client/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { applyTenantGuc, isRawMethod, wrapRawQuery, wrapTransaction } from '@/core/security/tenant-rls';
 
-type PrismaRuntimeModule = {
-  PrismaClient: new (options?: ConstructorParameters<typeof import('../generated/postgres-client/client').PrismaClient>[0]) => PostgresPrismaClient;
-};
-
 const globalForPrisma = globalThis as unknown as {
   prisma: PostgresPrismaClient | undefined;
-  prismaRuntimeModule: PrismaRuntimeModule | undefined;
 };
 
 /**
@@ -46,22 +40,6 @@ export const DEFAULT_TX_OPTIONS = {
   isolationLevel: 'ReadCommitted' as PostgresPrisma.TransactionIsolationLevel,
 };
 
-function loadPrismaRuntimeModule(): PrismaRuntimeModule {
-  if (!globalForPrisma.prismaRuntimeModule) {
-    // Keep Node-only runtime loading inside the function so Turbopack dev/HMR
-    // can parse this module without eagerly touching CommonJS helpers.
-    const runtimeRequire = eval('require') as NodeRequire;
-    const generatedClientRuntimePath =
-      `${process.cwd().replace(/\\/g, '/')}/src/generated/postgres-client/client.js`;
-
-    globalForPrisma.prismaRuntimeModule = runtimeRequire(
-      generatedClientRuntimePath
-    ) as PrismaRuntimeModule;
-  }
-
-  return globalForPrisma.prismaRuntimeModule;
-}
-
 function createPrismaClient(): PostgresPrismaClient {
   // Runtime queries prefer DATABASE_URL — in docker-compose that's PgBouncer
   // (transaction pooling); local dev points it straight at postgres, which is
@@ -83,7 +61,6 @@ function createPrismaClient(): PostgresPrismaClient {
   const poolTimeout = parseInt(process.env.PRISMA_POOL_TIMEOUT || '10', 10);
   const connectionLimit = parseInt(process.env.PRISMA_CONNECTION_LIMIT || '20', 10);
 
-  const { PrismaClient } = loadPrismaRuntimeModule();
   const adapter = new PrismaPg({
     connectionString: url,
     connectionTimeoutMillis: poolTimeout * 1000,

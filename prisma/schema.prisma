@@ -1,5 +1,7 @@
 generator client {
-  provider = "prisma-client-js"
+  provider = "prisma-client"
+  moduleFormat = "cjs"
+  importFileExtension = "ts"
   output   = "../src/generated/postgres-client"
 }
 

@@ -86,9 +86,9 @@ Also verify `ENCRYPTION_KEY` is **identical** in `.env` and `.env.docker` (`grep
 
 1. **Node version.** No `engines` field in `package.json` and no root `.nvmrc` — nothing enforces a version. `setup.bat` recommends Node 22 LTS; this machine runs v25.6.1 (2026-07-07) and works. Anything ≥22 is a safe bet.
 
-2. **Install:** `npm ci` (or `npm install`). `postinstall` runs `npm run db:generate` = `prisma generate && node scripts/patch-postgres-client.js`.
+2. **Install:** `npm ci` (or `npm install`). `postinstall` runs `npm run db:generate` = `prisma generate`.
    - Prisma client is generated into `src/generated/postgres-client/` (checked path, not the default `node_modules` location).
-   - **Why the patch exists:** `scripts/patch-postgres-client.js` rewrites the generated client for the Next.js **standalone** build — it marks the client as bundled, removes `process.cwd()`-relative lookups of `query_engine-windows.dll.node` / `schema.prisma` (which break when the app runs from `.next/standalone/`), nulls `relativeEnvPaths`, strips the `warnEnvConflicts` call, and tags `process.cwd()` in `runtime/library.js` with `/*turbopackIgnore*/`. If the client behaves oddly after a manual `npx prisma generate`, you skipped the patch — always regenerate via `npm run db:generate`, never bare `prisma generate`.
+   - Generator is `prisma-client` (TypeScript sources, `moduleFormat=cjs`, `importFileExtension=ts`); import from `@/generated/postgres-client/client`. The old `scripts/patch-postgres-client.js` standalone patch was removed on 25.10.2026 (it had nothing left to patch on Prisma 7). Regenerate with `npm run db:generate`.
 
 3. **Env bootstrapping.** Need both `.env` (local dev) and `.env.docker` (compose). Fresh machine: let `scripts/generate-env-docker.ps1` create both (`powershell -NoProfile -ExecutionPolicy Bypass -File scripts\generate-env-docker.ps1`), or `cp .env.example .env` and fill in.
    - `scripts/validate-env.ts` runs **before** `dev`, `build`, and `start` and **fails fast**. Hard requirements: `DATABASE_PROVIDER` (`sqlite`|`postgres`), `SESSION_SECRET` (≥32 chars, not a placeholder), and `DATABASE_URL_POSTGRES` when provider is `postgres`. `REDIS_URL` missing = warning only (rate limiting falls back to in-memory). Manual check: `npm run validate:env`.
@@ -210,7 +210,7 @@ Direct psql into local DB: `docker exec -it pilingtrack-postgres psql -U postgre
 ## Known build traps
 
 - **Standalone output.** `npm run build` = validate-env → `db:generate` → `next build` → `node scripts/copy-standalone-assets.js`. The copy step exists because Next standalone tracing misses things: it copies `.next/static` and `public/` into `.next/standalone/`, plus `src/generated/postgres-client/` (the Prisma client is imported by a concrete relative path Next can't trace), and drops `scripts/release-start.bat` in as `start.bat`. **Never run `next build` bare** — `.next/standalone/server.js` will start but serve without static assets or crash on Prisma. Same rule for `npm run start`: it runs `node .next/standalone/server.js`, which only works after the full `npm run build`.
-- **`prisma generate` after every schema change** — and always via `npm run db:generate` so the standalone patch (checklist step 2) is re-applied. Symptoms of a stale client: TS errors on model fields that exist in `schema.prisma`, or runtime `Unknown field` errors.
+- **`prisma generate` after every schema change** — and via `npm run db:generate`. Symptoms of a stale client: TS errors on model fields that exist in `schema.prisma`, or runtime `Unknown field` errors.
 - **Port-3000 zombies** — handled by the `predev`/`prestart` kill-port hook; the one case it can't fix is the Docker `app` container (stop it manually).
 - **Full local prod-mode check** before a deploy: `start.bat prod` (build ~1 min+, workers run embedded in-process).
 
@@ -226,7 +226,7 @@ Re-verify before trusting, one-liners:
 |---|---|
 | npm scripts unchanged | `Get-Content package.json \| Select-String '"(dev\|build\|verify\|typecheck\|db:generate\|postinstall)"'` |
 | Compose ports/services | `Select-String -Path docker-compose.yml -Pattern '"\d+:\d+"\|container_name'` |
-| Helper scripts still exist | `ls scripts\kill-port.js, scripts\validate-env.ts, scripts\switch-db.js, scripts\backup-local-db.ps1, scripts\refresh-prod-snapshot.sh, scripts\patch-postgres-client.js` |
+| Helper scripts still exist | `ls scripts\kill-port.js, scripts\validate-env.ts, scripts\switch-db.js, scripts\backup-local-db.ps1, scripts\refresh-prod-snapshot.sh (patch-postgres-client.js removed 25.10.2026)` |
 | Node version guidance appeared? | `Select-String -Path package.json -Pattern '"engines"'; Test-Path .nvmrc` |
 | Python interpreter | `Test-Path C:\Python314\python.exe` |
 | Which local DB is active | `npm run db:status` |

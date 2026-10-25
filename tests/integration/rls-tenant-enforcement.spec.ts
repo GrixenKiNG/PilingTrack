@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { PrismaPg } from '@prisma/adapter-pg';
-import * as path from 'node:path';
+import { PrismaClient } from '../../src/generated/postgres-client/client';
 import { applyTenantGuc } from '@/core/security/tenant-rls';
 import { runWithTenantContext, setRequestTenantId } from '@/core/security/tenant-context';
 
@@ -47,9 +47,6 @@ describe.skipIf(!APP_ROLE_URL)('RLS отделяет тенантов по-на�
 
   beforeAll(async () => {
     if (!APP_ROLE_URL) throw new Error("DATABASE_URL_APP_ROLE is required");
-    const clientPath = path.join(process.cwd(), 'src', 'generated', 'postgres-client', 'client.js');
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { PrismaClient } = require(clientPath);
     const raw = new PrismaClient({ adapter: new PrismaPg({ connectionString: APP_ROLE_URL }) });
     db = applyTenantGuc(raw);
     await raw.$queryRaw`SELECT 1`;
