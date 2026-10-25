@@ -60,7 +60,7 @@ const eslintConfig = [...nextCoreWebVitals, ...nextTypescript, {
     // Existing 56 occurrences are tracked in audit; new ones surface here.
     "no-restricted-syntax": ["warn", {
       selector: "Literal[value=/text-\\[\\d+px\\]/]",
-      message: "Avoid ad-hoc text-[Npx]; use a Tailwind size token (text-xs, text-sm, …) or extend tailwind.config theme.fontSize.",
+      message: "Avoid ad-hoc text-[Npx]; use a Tailwind size token (text-xs, text-sm, …) or add a --text-* token to @theme in src/app/globals.css.",
     }],
   },
 }, {
