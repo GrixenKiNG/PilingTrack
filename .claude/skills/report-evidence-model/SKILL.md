@@ -49,7 +49,7 @@ History pipeline: `ReportAudit` + `ReportVersion` → `getReportHistory()` →
    `rg "reportPhoto\.(create|findMany|count|update)" src --glob '!**/generated/**'`.
 
 2. **The integrity hash is not a signature.** `hashState` in
-   `src/services/reports/audit-service.ts` is a non-crypto 32-bit rolling hash.
+   `src/modules/reports/application/audit-service.ts` is a non-crypto 32-bit rolling hash.
    It catches accidental drift, not tampering. Never describe it as tamper-proof
    or a signature. Real tamper-evidence = a new design (HMAC/hash chain), not a tweak.
 
@@ -86,9 +86,9 @@ missing tenantId. (IDOR policy in CLAUDE.md / resource-access-service.ts.)
 
 ## Key files
 - `prisma/schema.prisma` — models `Report`, `ReportVersion`, `ReportAudit`, `Media`, `ReportPhoto`
-- `src/services/reports/report-history.ts` — pure helpers (`humanizeDiff`, `NOISE`)
-- `src/services/reports/report-history-service.ts` — `getReportHistory`
-- `src/services/reports/audit-service.ts` — `writeReportAuditRow`, `computeDiff`, `hashState`
+- `src/modules/reports/application/report-history.ts` — pure helpers (`humanizeDiff`, `NOISE`)
+- `src/modules/reports/application/report-history-service.ts` — `getReportHistory`
+- `src/modules/reports/application/audit-service.ts` — `writeReportAuditRow`, `computeDiff`, `hashState`
 - `src/core/media/media-auth.ts` — media authorization
 - `src/app/api/reports/[id]/history/route.ts` — history endpoint
 - `src/components/piling/admin-reports/report-thumbnail.tsx` — evidence thumbnail UI

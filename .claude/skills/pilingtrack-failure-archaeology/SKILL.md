@@ -835,7 +835,7 @@ tried), with a stated reason.
   `docs/adr/`; per `pilingtrack-architecture-contract` §"ADRs":
   "the modern bus had zero callers and was deleted; the legacy bus is the
   single source of truth." The legacy bus in
-  `src/services/reports/domain-events.ts` remains the production event
+  `src/modules/reports/application/domain-events.ts` remains the production event
   bus; `core/event-bus/` retains only the schema registry.
 - **Status:** Settled 2026-05-21 (ADR superseded same week it was tested
   against a real incident). Rule-of-record:

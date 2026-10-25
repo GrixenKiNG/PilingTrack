@@ -12,10 +12,8 @@ Instructions for coding agents other than Claude (Codex and similar). Claude rea
 - **No secrets.** Don't read, create or edit `.env*` files; don't invent env values to make a build pass. If a check fails for lack of env/DB, report that.
 - **Security-critical files are off-limits:** `src/services/auth/**`, `src/core/security/**`, `src/lib/rate-limiter.ts`, `src/services/auth/authorization-service.ts`, anything RLS/tenancy-related, `docker-compose*`, `Dockerfile*`, `scripts/deploy-*`.
 - **No new dependencies** and no version bumps unless that is the task.
-- **Frozen areas — don't edit, refactor or delete, even if they look duplicated or dead.** The owner is still choosing between these variants and will clean them up personally:
-  - all operator screen variants: `src/app/operator/**`, `src/app/(app)/operator/**`, `src/components/piling/operator*/**`, `src/modules/operator-mobile/**`;
-  - the ORION public site and its concepts: `src/app/orion/**`, `src/app/api/orion/**`, `src/components/orion/**`, `public/orion*`.
-  If a task seems to require touching them, stop and say so in the report.
+- **Operator screens — allowed for Codex (owner decision 2026-10-03, reconfirmed 2026-10-25), with conditions:** you may edit `src/app/operator/**`, `src/app/(app)/operator/**`, `src/components/piling/operator*/**`, `src/modules/operator-mobile/**` only when the task text names them, with tests, and without changing visible text (except connection-error messages). **Never delete or merge screen versions** — operator, v2, v3, v5, v7, v10 all stay (owner, 2026-10-23). Hermes and other agents: these areas stay frozen.
+- **Frozen areas — don't edit, refactor or delete, even if they look duplicated or dead:** the ORION public site and its concepts: `src/app/orion/**`, `src/app/api/orion/**`, `src/components/orion/**`, `public/orion*`. If a task seems to require touching them, stop and say so in the report.
 
 ## 2. How to change code
 
@@ -24,11 +22,12 @@ Instructions for coding agents other than Claude (Codex and similar). Claude rea
 - **Clean up only your own mess:** remove imports/variables your change made unused; leave pre-existing dead code alone unless the task is removing it.
 - **Unclear? Stop and say so** in the report instead of guessing. List assumptions explicitly.
 - Files over ~500 lines: split by concern only if the task asks.
+- When `CLAUDE.md` changes, this file must be re-checked against it (and the other way round).
 
 ## 3. Project architecture (short)
 
 - `src/modules/` — domain logic (commands, queries, entities). `reports/` is the fully migrated reference layout.
-- `src/services/` — legacy/shared services. `users`, `analytics`, `telemetry`, `system` still live here behind `modules/<x>/index.ts` facades. **Don't start a services→modules migration.** Import through `@/modules/<x>`.
+- `src/services/` — legacy/shared services. What remains: `auth`, `tenancy`, `telemetry` (`modules/telemetry/index.ts` is only a facade), `dictionaries`, `telegram`, `weather`, `feedback`. `users`, `analytics`, `system`, `audit`, `reports`, `notifications` are already fully in `modules/`. **Don't start further services→modules migration.** Import through `@/modules/<x>`.
 - `src/core/` — infrastructure only. `src/app/api/` — route handlers.
 - API routes: wrap GET with `withApi`, POST/PUT/DELETE with `withMutation` (it provides CSRF + rate limit — never duplicate them inline). Validate with `schema.safeParse(body)`; on failure return 400; use only `validated.data`.
 - **Tenancy fails closed:** a missing `tenantId` throws; use strict equality. Never write `tenantId IS NULL OR ...` — it returns every tenant's rows.
@@ -74,7 +73,7 @@ npm run build                   # needs env; if it fails on env/DB, say so — d
 
 `tsc` alone is not enough — Next route types are only checked by `npm run build`.
 
-Environment notes: Windows + Git Bash. Python is not installed — use `node` for scripts. A fresh worktree has no `src/generated`; run `npm run db:generate` first.
+Environment notes: Windows + Git Bash. Python works, but for editing files use `node`. A fresh worktree has no `src/generated`; run `npm run db:generate` first.
 
 ## 7. Final report (in Russian)
 
@@ -83,6 +82,8 @@ Environment notes: Windows + Git Bash. Python is not installed — use `node` fo
 3. What you deliberately left alone and why.
 4. Each check from §6: command, exit code, key numbers (tests passed/skipped, Playwright count).
 5. Open questions and risks you're not sure about.
+
+**Project amendment to the GitNexus block below:** `impact` is mandatory before renaming, moving or deleting a symbol and before refactoring shared functions; for a point fix inside one function a text search is enough. `UNKNOWN` is not "safe" — confirm with text search.
 
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence

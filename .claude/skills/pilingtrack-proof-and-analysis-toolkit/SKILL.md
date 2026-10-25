@@ -262,7 +262,7 @@ became `updateMany({ where: { id: existingToken.id, revoked: false }, ... })`;
 when `claim.count === 0`, the loser now revokes the entire token family and
 throws "refresh token was reused. All sessions revoked." — the exact same
 claim-and-check-count shape already used for concurrent outbox consumers at
-`src/services/reports/outbox-publisher.ts:131` (`const claim = await
+`src/modules/reports/application/outbox-publisher.ts:170` (`const claim = await
 db.outboxEvent.updateMany({ where: { published: false, ... } })`). The fix
 was test-first per `CLAUDE.md`'s security-critical-code rule: a failing
 test reproduced the double-mint before the fix landed.
@@ -475,7 +475,7 @@ git log --oneline -- 'prisma/migrations/20260528000000*'
 git log --oneline | grep -E "^(145129d|ce2b88d|aee7a2b|eb6e28b|159ac4f|ecfa59e)"
 
 # Claim-and-check-count pattern still exists in outbox publisher (Recipe 4):
-grep -n "updateMany" src/services/reports/outbox-publisher.ts
+grep -n "updateMany" src/modules/reports/application/outbox-publisher.ts
 
 # Explain-analyze script still wired (Recipe 5):
 grep -n "postgres:explain-analyze" package.json

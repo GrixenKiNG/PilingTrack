@@ -47,13 +47,13 @@ The **primary provenance source**. One row per change (`created`/`updated`/`subm
 
 ⚠️ **`hashState` is NOT cryptographic** — it is a 32-bit polynomial rolling hash (`((hash<<5)-hash+char)|0`) over sorted-key JSON. It detects accidental drift, not malicious tampering. Do not present it as a signature or tamper-proof seal. If real tamper-evidence is required, that is a new design (HMAC/chain hash), not a tweak.
 
-Writing audit rows — two paths in `src/services/reports/audit-service.ts`:
+Writing audit rows — two paths in `src/modules/reports/application/audit-service.ts`:
 - `writeReportAuditRow(record, tx)` — pass `tx` to make the audit row atomic with the report save. **Prefer this.**
 - `recordAudit(record)` — non-transactional fallback; also fires the general `AuditLog` event. Use only when you can't hook the save transaction.
 - Defensive guard: both skip silently if `client.reportAudit` is missing from the generated Prisma client. Don't remove without checking all deploy targets have the model.
 
 ## AuditLog (general)
-Written via `recordAuditEvent` from `@/services/audit/audit-service` (note: different file from the reports audit-service). Scope `reports`, action `report.<action>`. Carries `oldData`/`newData`/`diff` in `metadata`. This is the cross-cutting trail; `ReportAudit` is the report-specific one. Both get written by `recordAudit`.
+Written via `recordAuditEvent` from `@/modules/audit` (note: different file from the reports audit-service). Scope `reports`, action `report.<action>`. Carries `oldData`/`newData`/`diff` in `metadata`. This is the cross-cutting trail; `ReportAudit` is the report-specific one. Both get written by `recordAudit`.
 
 ## Media (LIVE photo evidence)
 `prisma/schema.prisma` model `Media`. **This is where report photos actually live.** Generic S3-backed store:
@@ -79,7 +79,7 @@ rg "reportPhoto\.(create|findMany|count|update)" src --glob '!**/generated/**'
 If that returns nothing, it is still dead. Building on it means wiring a new path end-to-end, not extending a live one. Default to `Media` unless you specifically need GPS/photoType columns and are prepared to activate `ReportPhoto` fully.
 
 ## Provenance assembly
-`getReportHistory(reportId)` in `src/services/reports/report-history-service.ts`:
+`getReportHistory(reportId)` in `src/modules/reports/application/report-history-service.ts`:
 1. Loads `ReportAudit` (desc by `createdAt`) + `ReportVersion` (desc by `version`).
 2. Loads name lookups (pileGrade, drillingType, downtimeReason, site, user, equipment).
 3. Maps each audit row to a `ReportHistoryEvent`, running `diff` through `humanizeDiff`.
@@ -87,7 +87,7 @@ If that returns nothing, it is still dead. Building on it means wiring a new pat
 Returns `{ events, versions }`. Exposed at `GET /api/reports/[id]/history`, consumed by `useReportHistory` hook.
 
 ## Client/server split (important)
-`src/services/reports/report-history.ts` holds **pure, DB-free** helpers (`humanizeDiff`, `actionLabel`, `statusLabel`, all types). `report-history-service.ts` holds the DB-bound `getReportHistory` and re-exports the pure helpers.
+`src/modules/reports/application/report-history.ts` holds **pure, DB-free** helpers (`humanizeDiff`, `actionLabel`, `statusLabel`, all types). `report-history-service.ts` holds the DB-bound `getReportHistory` and re-exports the pure helpers.
 
 **Client/browser code must import from `report-history.ts`** — importing from `report-history-service.ts` drags Prisma + `pg` into the browser bundle. Keep new pure helpers in `report-history.ts`.
 

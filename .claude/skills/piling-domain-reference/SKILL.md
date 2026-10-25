@@ -122,7 +122,7 @@ the transactional outbox (`OutboxEvent`). Canonical types in
 `ReportUpdated`, `ReportSubmitted`, `ReportDeleted`, `ReportVersionCreated`
 (+ item-level aliases like `downtime.added`). Consumers:
 
-- `src/services/reports/event-handlers.ts` — maintains `ReportAnalytics` and
+- `src/modules/reports/application/event-handlers.ts` — maintains `ReportAnalytics` and
   recomputes `SiteDailySummary`; the downtime **Telegram alert** (thresholds
   in hours: >2 warn, >4 high — set by commit `e79c5da`); the audit handler.
 - `src/modules/reports/application/projections/projection-worker.ts` —
