@@ -83,6 +83,10 @@ Environment notes: Windows + Git Bash. Python works, but for editing files use `
 4. Each check from §6: command, exit code, key numbers (tests passed/skipped, Playwright count).
 5. Open questions and risks you're not sure about.
 
+## 3a. Next.js 16 — документация
+
+Установлена версия Next 16.4.x, её API отличаются от того, что вы знаете по обучению. Перед правками роутинга, конфига или серверных компонентов читайте актуальную документацию в `node_modules/next/dist/docs/` (путь относительно корня проекта). Не полагайтесь на память о старых версиях.
+
 **Project amendment to the GitNexus block below:** `impact` is mandatory before renaming, moving or deleting a symbol and before refactoring shared functions; for a point fix inside one function a text search is enough. `UNKNOWN` is not "safe" — confirm with text search.
 
 <!-- gitnexus:start -->
