@@ -1,12 +1,14 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { push, authFetch, fetchWorkPermits, fetchReadinessShifts, fetchCurrentReadiness, fetchReadinessDefects } = vi.hoisted(() => ({
+const { push, authFetch, fetchWorkPermits, fetchReadinessShifts, fetchCurrentReadiness, fetchReadinessDefects, useAbility } = vi.hoisted(() => ({
   push: vi.fn(), authFetch: vi.fn(),
   fetchWorkPermits: vi.fn(), fetchReadinessShifts: vi.fn(), fetchCurrentReadiness: vi.fn(), fetchReadinessDefects: vi.fn(),
+  useAbility: vi.fn(),
 }));
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push }) }));
 vi.mock('@/lib/api', () => ({ authFetch }));
+vi.mock('@/lib/use-ability', () => ({ useAbility }));
 vi.mock('../to/readiness/api/client', () => ({ fetchWorkPermits, fetchReadinessShifts, fetchCurrentReadiness, fetchReadinessDefects }));
 
 import { DashboardAttention } from '../dashboard-attention';
@@ -21,10 +23,19 @@ beforeEach(() => {
   fetchCurrentReadiness.mockResolvedValue([]);
   fetchReadinessDefects.mockResolvedValue([]);
   authFetch.mockResolvedValue(noDocs);
+  useAbility.mockReturnValue(true);
 });
 afterEach(cleanup);
 
 describe('DashboardAttention — «Требует решения сейчас»', () => {
+  it('не запрашивает контроль документов у роли без users.documents.read_all', async () => {
+    useAbility.mockReturnValue(false);
+    render(<DashboardAttention equipmentName={names} refreshKey={0} />);
+    await screen.findByText('Срочных решений нет');
+    expect(authFetch).not.toHaveBeenCalled();
+    expect(fetchWorkPermits).toHaveBeenCalled();
+  });
+
   it('показывает строки с ролью и действием; нажатие ведёт на нужную вкладку', async () => {
     fetchReadinessDefects.mockResolvedValue([{ id: 'd1', equipmentId: 'eq-9', severity: 'CRITICAL', status: 'OPEN' }]);
     render(<DashboardAttention equipmentName={names} refreshKey={0} />);
