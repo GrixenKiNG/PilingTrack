@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { beforeEach, describe, it, expect, vi } from 'vitest';
 
 // computeFuelConsumption — чистая функция, базу не трогает, но про import
 // fuel-log.ts подтягивается и `@/lib/db` на верхнем уровне модуля, поэтому
@@ -15,7 +15,8 @@ vi.mock('@/lib/db', () => {
   return { db: client };
 });
 
-import { computeFuelConsumption, recordOperatorFuelInTx } from '../fuel-log';
+import { db } from '@/lib/db';
+import { addFuelEntry, computeFuelConsumption, deleteFuelEntry, recordOperatorFuelInTx } from '../fuel-log';
 
 // Правило расхода: «сожгли = долили + (было в баке − осталось)». «Было −
 // осталось» выводится из процентов указателя и объёма бака. Без объёма бака
@@ -161,5 +162,89 @@ describe('recordOperatorFuelInTx — топливо из ЕО машиниста
     await expect(recordOperatorFuelInTx(tx as never, 'eq-1', { tankPercent: 140, litersAdded: null, at }, ctx)).rejects.toMatchObject({ status: 400 });
     await expect(recordOperatorFuelInTx(tx as never, 'eq-1', { tankPercent: 50, litersAdded: null, at }, { ...ctx, tenantId: '' })).rejects.toMatchObject({ status: 400 });
     expect(tx.fuelLog.create).not.toHaveBeenCalled();
+  });
+});
+
+describe('addFuelEntry — ручная запись топлива', () => {
+  const ctx = { tenantId: 'tenant-a', recordedById: 'user-1' };
+  const findEquipment = vi.mocked(db.equipment.findUnique);
+  const createLog = vi.mocked(db.fuelLog.create);
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    findEquipment.mockResolvedValue({ id: 'eq-1' } as never);
+    createLog.mockResolvedValue({ id: 'f-1', recordedAt: new Date('2026-10-26T09:00:00Z') } as never);
+  });
+
+  it('без организации — отказ до обращения к базе', async () => {
+    await expect(addFuelEntry('eq-1', { litersAdded: 10 }, { tenantId: '' })).rejects.toMatchObject({ status: 400 });
+    expect(findEquipment).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['пустая запись', {}, 'Укажите долив'],
+    ['отрицательный долив', { litersAdded: -1 }, 'отрицательным'],
+    ['остаток выше 100 %', { tankPercent: 101 }, 'от 0 до 100'],
+    ['остаток ниже 0 %', { tankPercent: -1 }, 'от 0 до 100'],
+  ])('%s отклоняется и ничего не пишет', async (_name, input, text) => {
+    await expect(addFuelEntry('eq-1', input, ctx)).rejects.toMatchObject({ status: 400, message: expect.stringContaining(text) });
+    expect(createLog).not.toHaveBeenCalled();
+  });
+
+  it('установка чужой организации не находится: запись не создаётся', async () => {
+    findEquipment.mockResolvedValue(null);
+
+    await expect(addFuelEntry('eq-other', { litersAdded: 10 }, ctx)).rejects.toMatchObject({ status: 404 });
+    expect(findEquipment.mock.calls[0][0].where).toEqual({ id: 'eq-other', tenantId: 'tenant-a' });
+    expect(createLog).not.toHaveBeenCalled();
+  });
+
+  it('пишет целые литры и проценты, источник — вручную, заметка без пробелов', async () => {
+    await addFuelEntry('eq-1', { litersAdded: 120.9, tankPercent: 55.4, note: '  бочка  ' }, ctx);
+
+    expect(createLog.mock.calls[0][0].data).toMatchObject({
+      tenantId: 'tenant-a', equipmentId: 'eq-1', litersAdded: 120, tankPercent: 55,
+      source: 'MANUAL', recordedById: 'user-1', note: 'бочка',
+    });
+  });
+
+  it('неразборчивая дата заменяется текущим временем, разборчивая сохраняется', async () => {
+    await addFuelEntry('eq-1', { litersAdded: 10, recordedAt: 'не дата' }, ctx);
+    expect(createLog.mock.calls[0][0].data.recordedAt).toBeInstanceOf(Date);
+    expect(Number.isNaN((createLog.mock.calls[0][0].data.recordedAt as Date).getTime())).toBe(false);
+
+    await addFuelEntry('eq-1', { litersAdded: 10, recordedAt: '2026-10-20T06:00:00Z' }, ctx);
+    expect(createLog.mock.calls[1][0].data.recordedAt).toEqual(new Date('2026-10-20T06:00:00Z'));
+  });
+});
+
+describe('deleteFuelEntry — удаление записи топлива', () => {
+  const findLog = vi.mocked(db.fuelLog.findUnique);
+  const deleteLog = vi.mocked(db.fuelLog.delete);
+
+  beforeEach(() => vi.clearAllMocks());
+
+  it('удаляет запись своей организации у своей установки', async () => {
+    findLog.mockResolvedValue({ id: 'f-1', equipmentId: 'eq-1', tenantId: 'tenant-a' } as never);
+
+    await deleteFuelEntry('eq-1', 'f-1', { tenantId: 'tenant-a' });
+
+    expect(deleteLog).toHaveBeenCalledWith({ where: { id: 'f-1' } });
+  });
+
+  it.each([
+    ['записи нет', null],
+    ['запись чужой организации', { id: 'f-1', equipmentId: 'eq-1', tenantId: 'tenant-b' }],
+    ['запись другой установки', { id: 'f-1', equipmentId: 'eq-2', tenantId: 'tenant-a' }],
+  ])('%s: 404 и без удаления', async (_name, row) => {
+    findLog.mockResolvedValue(row as never);
+
+    await expect(deleteFuelEntry('eq-1', 'f-1', { tenantId: 'tenant-a' })).rejects.toMatchObject({ status: 404 });
+    expect(deleteLog).not.toHaveBeenCalled();
+  });
+
+  it('без организации — отказ до обращения к базе', async () => {
+    await expect(deleteFuelEntry('eq-1', 'f-1', { tenantId: '' })).rejects.toMatchObject({ status: 400 });
+    expect(findLog).not.toHaveBeenCalled();
   });
 });
