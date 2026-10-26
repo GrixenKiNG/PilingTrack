@@ -40,9 +40,14 @@ describe.skipIf(!process.env.INTEGRATION_DATABASE_URL_OWNER)('outbox failures on
     expect(role.rows).toEqual([{ name: 'pilingtrack_app', rolsuper: false, rolbypassrls: false }]);
     tenant = fixture.tenants[0];
     raw = new PrismaClient({ adapter: new PrismaPg({ connectionString: values.INTEGRATION_DATABASE_URL_APP, max: 2 }) });
-    const scoped = applyTenantGuc(raw);
+    // Same Prisma/RLS adapter boundary as lib/db; the wrapper preserves its API.
+    const scoped = applyTenantGuc(raw as unknown as Parameters<typeof applyTenantGuc>[0]) as unknown as PrismaClient;
     state.db = new Proxy(scoped, { get(client, key) {
-      if (key === '$transaction') return (...args: unknown[]) => wrapTransaction(client, client.$transaction as never, args);
+      if (key === '$transaction') return (...args: unknown[]) => wrapTransaction(
+        client as unknown as Parameters<typeof wrapTransaction>[0],
+        client.$transaction as unknown as (...callArgs: unknown[]) => Promise<unknown>,
+        args,
+      );
       return Reflect.get(client, key);
     } });
     ({ publishOutboxEvents: publish, projectOutboxEvents: project } = await import('../outbox-publisher'));
