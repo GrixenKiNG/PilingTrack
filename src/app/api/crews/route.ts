@@ -52,6 +52,8 @@ export const POST = withMutation(
 
     const { createCrew } = await getCrewsModule();
     const crew = await createCrew({
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
+      tenantId: requireTenantId(user!),
       name: validation.data.name?.trim() || 'Unnamed Crew',
       operatorId: validation.data.operatorId,
       equipmentId: validation.data.equipmentId,

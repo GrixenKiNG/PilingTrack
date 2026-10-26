@@ -15,7 +15,12 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { CrewAggregate } from '../domain';
 import type { CrewRepository } from '../infrastructure';
-import { createCrew, updateCrew, deleteCrew } from '../application/commands/crew-command.service';
+import { createCrew as createCrewInTenant, updateCrew, deleteCrew } from '../application/commands/crew-command.service';
+import type { CreateCrewCommand } from '../application/commands/crew.command';
+
+// Бригады здесь заводятся в организации tenant-1.
+const createCrew = (command: Omit<CreateCrewCommand, 'tenantId'>) =>
+  createCrewInTenant({ tenantId: 'tenant-1', ...command });
 
 // ============================================================
 // Mocks

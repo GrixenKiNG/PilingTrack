@@ -126,6 +126,7 @@ const crewWriteResponseInclude = {
 } as const;
 
 export async function createCrew(command: CreateCrewCommand) {
+  if (!command.tenantId) throw new ServiceError('Не определена организация пользователя', 400); // fail-closed (IDOR guard)
   // Validate required fields before creating aggregate
   if (!command.operatorId || !command.equipmentId || !command.siteId) {
     throw new ServiceError('Укажите машиниста, установку и объект', 400);
@@ -148,6 +149,9 @@ export async function createCrew(command: CreateCrewCommand) {
 
   if (!equipment) throw new ServiceError('Установка не найдена', 404);
   if (!site) throw new ServiceError('Объект не найден', 404);
+  // Объект — якорь организации бригады. Без сверки с вызывающим бригаду можно было
+  // собрать из чужих частей: assertSameTenant ниже сравнивает их только между собой.
+  if (site.tenantId !== command.tenantId) throw new ServiceError('Объект не найден', 404);
 
   // Tenant integrity + one-rig-one-crew, before we create anything.
   assertSameTenant({

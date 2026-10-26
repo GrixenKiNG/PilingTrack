@@ -1,4 +1,6 @@
 export interface CreateCrewCommand {
+  /** Организация вызывающего: бригада собирается только из частей этой организации. */
+  tenantId: string;
   name: string;
   operatorId: string;
   equipmentId: string;

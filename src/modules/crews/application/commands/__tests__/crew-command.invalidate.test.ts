@@ -111,6 +111,7 @@ describe('XP40: инвалидация после сохранения', () => {
   function run(kind: 'create' | 'update') {
     if (kind === 'create') {
       return createCrew({
+        tenantId: 'tenant-1',
         name: 'Бригада',
         operatorId: 'operator-1',
         equipmentId: 'equipment-1',
