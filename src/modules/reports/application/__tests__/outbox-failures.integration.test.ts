@@ -36,6 +36,8 @@ describe.skipIf(!process.env.INTEGRATION_DATABASE_URL_OWNER)('outbox failures on
     vi.stubEnv('DATABASE_URL', values.INTEGRATION_DATABASE_URL_APP);
     vi.stubEnv('DATABASE_URL_POSTGRES', values.INTEGRATION_DATABASE_URL_APP);
     fixture = await createFixture();
+    const role = await fixture.app.query('SELECT current_user AS name, rolsuper, rolbypassrls FROM pg_roles WHERE rolname=current_user');
+    expect(role.rows).toEqual([{ name: 'pilingtrack_app', rolsuper: false, rolbypassrls: false }]);
     tenant = fixture.tenants[0];
     raw = new PrismaClient({ adapter: new PrismaPg({ connectionString: values.INTEGRATION_DATABASE_URL_APP, max: 2 }) });
     const scoped = applyTenantGuc(raw);
@@ -122,5 +124,9 @@ describe.skipIf(!process.env.INTEGRATION_DATABASE_URL_OWNER)('outbox failures on
     await publish(async () => { calls++; });
     expect(calls).toBe(0);
     expect((await row(id)).published).toBe(false);
+    await expireBackoff(id);
+    await project(async () => { calls++; });
+    expect(calls).toBe(0);
+    expect((await row(id)).projected).toBe(false);
   });
 });
