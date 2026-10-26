@@ -38,7 +38,7 @@
 |---|---|---|
 | `EquipmentPlaceholder` (телеметрия, ошибки ECU) | ✅ честный плейсхолдер | «ждёт датчик» / «нет данных» — `// Never shows a fabricated number` |
 | `equipment-monitoring.tsx` пустой период | ✅ честное пустое состояние | «Телеметрия за этот период не поступала» |
-| Email-транспорт уведомлений | ⚠️ отсутствует | своего email-канала в коде нет; алерты доставляет только Telegram — `src/services/notifications/durable-alert-delivery.ts` → `src/core/notifications/telegram.ts` |
+| Email-транспорт уведомлений | ⚠️ отсутствует | своего email-канала в коде нет; алерты доставляет только Telegram — `src/modules/notifications/application/durable-alert-delivery.ts` → `src/core/notifications/telegram.ts` |
 | `PARAM_SPECS` пороги телеметрии | ✅ референсные константы | помечены «ориентировочные, калибруются по установке» |
 | `Math.random` (9 мест) | ✅ всё легитимно | сэмплинг, джиттер ретраев, RUM-id, ширина скелетона |
 | Таблицы `TelematicsDevice`/`TelemetryRecord`/`DeviceKey` | ✅ дремлют по дизайну | заполнятся при подключении бокса; синтетических генераторов нет (симулятор удалён) |
