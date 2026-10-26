@@ -18,11 +18,11 @@ const createSchema = z.object({
   title: z.string().trim().min(1).max(200),
   type: z.enum(['EO', 'TO1', 'TO2', 'TO3', 'SEASONAL']).optional(),
   triggerType: z.enum(['HOURS', 'CALENDAR']),
-  intervalHours: z.preprocess(emptyToUndef, z.coerce.number().int().positive()).optional().nullable(),
-  intervalDays: z.preprocess(emptyToUndef, z.coerce.number().int().positive()).optional().nullable(),
-  leadTimeDays: z.preprocess(emptyToUndef, z.coerce.number().int().min(0)).optional().nullable(),
-  lastDoneHours: z.preprocess(emptyToUndef, z.coerce.number().int().min(0)).optional().nullable(),
-  lastDoneAt: z.preprocess(emptyToUndef, z.coerce.date()).optional().nullable(),
+  intervalHours: z.preprocess(emptyToUndef, z.coerce.number().int().positive().optional()).optional().nullable(),
+  intervalDays: z.preprocess(emptyToUndef, z.coerce.number().int().positive().optional()).optional().nullable(),
+  leadTimeDays: z.preprocess(emptyToUndef, z.coerce.number().int().min(0).optional()).optional().nullable(),
+  lastDoneHours: z.preprocess(emptyToUndef, z.coerce.number().int().min(0).optional()).optional().nullable(),
+  lastDoneAt: z.preprocess(emptyToUndef, z.coerce.date().optional()).optional().nullable(),
 });
 
 export const GET = withApi(

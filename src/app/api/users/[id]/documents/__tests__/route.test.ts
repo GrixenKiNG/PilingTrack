@@ -96,6 +96,14 @@ describe('POST /api/users/[id]/documents', () => {
     expect(ctx).toEqual({tenantId: 'tenant-a', actor: {id: 'admin-1', role: 'ADMIN'}});
   });
 
+  it('пустая строка вместо даты — «не указано» (внешний клиент без null), мусор вместо даты — по-прежнему 400', async () => {
+    const ok = await post({typeId: 'type-1', issuedAt: '', expiresAt: ''});
+
+    expect(ok.status).toBe(201);
+    expect(h.createUserDocument.mock.calls[0][1].expiresAt).toBeUndefined();
+    expect((await post({typeId: 'type-1', expiresAt: 'вчера'})).status).toBe(400);
+  });
+
   it('организацию из тела запроса игнорирует', async () => {
     await post({typeId: 'type-1', tenantId: 'tenant-evil'});
 
