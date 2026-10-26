@@ -146,8 +146,9 @@ export async function listFiles(prefix: string): Promise<string[]> {
  * Pattern: {tenantId}/{siteId}/{year}/{month}/{reportId}.pdf
  */
 export function reportPdfKey(reportId: string, siteId: string, tenantId: string | null, date: string): string {
+  if (!tenantId) throw new Error('tenantId is required');
   const [year, month] = date.split('-');
-  const prefix = tenantId || 'default';
+  const prefix = tenantId;
   return `${prefix}/${siteId}/${year}/${month}/${reportId}.pdf`;
 }
 
@@ -155,7 +156,8 @@ export function reportPdfKey(reportId: string, siteId: string, tenantId: string 
  * Generate S3 key for a CSV export.
  */
 export function exportCsvKey(siteId: string, tenantId: string | null, dateRange: string): string {
-  const prefix = tenantId || 'default';
+  if (!tenantId) throw new Error('tenantId is required');
+  const prefix = tenantId;
   const now = new Date().toISOString().split('T')[0];
   return `${prefix}/${siteId}/exports/${now}_${dateRange}.csv`;
 }
