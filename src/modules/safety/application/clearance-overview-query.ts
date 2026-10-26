@@ -149,7 +149,7 @@ export async function querySafetyClearanceOverview(input: {
   const [requiredTypes, users] = await Promise.all([
     db.userDocumentType.findMany({
       where: { tenantId, isActive: true, requiredForOperator: true },
-      select: { id: true, name: true, leadTimeDays: true },
+      select: { id: true, name: true, leadTimeDays: true, requiresExpiry: true },
     }),
     db.user.findMany({
       where: { tenantId, isActive: true, role: { in: FIELD_ROLES } },

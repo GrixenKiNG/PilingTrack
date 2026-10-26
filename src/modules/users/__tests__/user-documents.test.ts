@@ -268,6 +268,20 @@ describe('evaluateOperatorClearance', () => {
     expect(result.warnings).toHaveLength(0);
   });
 
+  it('срок необязателен: просроченная дата только предупреждает', () => {
+    const optional = { ...type, requiresExpiry: false };
+    const result = evaluateOperatorClearance([optional], [{ typeId: 'type-1', expiresAt: day(-1) }], now);
+    expect(result.cleared).toBe(true);
+    expect(result.blockers).toHaveLength(0);
+    expect(result.warnings[0].reason).toBe('expired');
+  });
+
+  it('срок обязателен: просроченная дата по-прежнему снимает допуск', () => {
+    const required = { ...type, requiresExpiry: true };
+    const result = evaluateOperatorClearance([required], [{ typeId: 'type-1', expiresAt: day(-1) }], now);
+    expect(result.cleared).toBe(false);
+  });
+
   it('чужие виды документов допуск не закрывают', () => {
     const result = evaluateOperatorClearance([type], [{ typeId: 'type-2', expiresAt: day(400) }], now);
     expect(result.cleared).toBe(false);

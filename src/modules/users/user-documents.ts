@@ -165,7 +165,7 @@ export async function getOperatorClearance(
 
   const required = await client.userDocumentType.findMany({
     where: { tenantId, isActive: true, requiredForOperator: true },
-    select: { id: true, name: true, leadTimeDays: true },
+    select: { id: true, name: true, leadTimeDays: true, requiresExpiry: true },
   });
   if (required.length === 0) return { cleared: true, blockers: [], warnings: [], documents: [] };
 

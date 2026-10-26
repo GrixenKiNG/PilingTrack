@@ -22,6 +22,12 @@ export interface RequiredDocumentType {
   name: string;
   /** Окно предупреждения вида документа: у каждого своё. */
   leadTimeDays: number;
+  /**
+   * false — срок необязателен, дата только напоминание: просрочка допуска не
+   * снимает. Решение владельца 26.10.2026; так же считает `operator-mobile`.
+   * Не указано — срок обязателен.
+   */
+  requiresExpiry?: boolean;
 }
 
 export interface HeldDocument {
@@ -139,7 +145,7 @@ export function evaluateOperatorClearance(
     });
     if (expiry.status === 'expired') {
       const days = Math.abs(expiry.daysLeft ?? 0);
-      blockers.push({
+      (type.requiresExpiry === false ? warnings : blockers).push({
         typeId: type.id, typeName: type.name, reason: 'expired', daysLeft: expiry.daysLeft,
         label: `Просрочен: ${type.name} — ${days} ${dayWord(days)}`,
       });
