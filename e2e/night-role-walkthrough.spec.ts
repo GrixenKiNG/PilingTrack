@@ -56,10 +56,16 @@ for (const role of roles) {
     page.on('requestfailed', finished);
     const settled = async () => {
       try {
+        await expect(page.getByText('QA ' + role, { exact: true }).first()).toBeVisible();
+        const pathname = new URL(page.url()).pathname;
+        if ((pathname === '/admin/to' || pathname === '/admin/safety') && role !== 'ASSISTANT') {
+          await expect(page.getByTestId('tech-readiness-module')).toBeVisible();
+        }
         await expect.poll(() => page.evaluate(() => {
           const state = (window as Window & { __nightFetch?: { pending: number; lastAt: number } }).__nightFetch;
           return state !== undefined && state.pending === 0 && Date.now() - state.lastAt >= 250;
         }), { timeout: 15_000 }).toBe(true);
+        await expect(page.locator('[data-query-state="loading"]')).toHaveCount(0);
       } catch (error) {
         await info.attach('pending-API', { body: JSON.stringify([...pending.values()]), contentType: 'application/json' });
         await info.attach('network-events', { body: JSON.stringify(network), contentType: 'application/json' });

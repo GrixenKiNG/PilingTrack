@@ -1,8 +1,8 @@
 import { defineConfig } from '@playwright/test';
 import base from './playwright.config';
 
-// Own disposable fixtures only. The legacy qa/ suites load external credentials
-// and are deliberately not collected by this configuration.
+// Own disposable fixtures only. The qa/ suites need their separate disposable
+// matrix wrapper and are deliberately not collected by this configuration.
 const specs = [
   'admin-dictionaries.spec.ts', 'admin-users.spec.ts', 'app.spec.ts',
   'inspection-to-flow.spec.ts', 'monitoring-tile-editor.spec.ts',
