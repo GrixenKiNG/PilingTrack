@@ -7,6 +7,7 @@ import { can } from '@/services/auth/authorization-service';
 import { queryReadinessBootstrap } from '@/modules/readiness/server';
 import { withReadinessRequestTransaction } from '@/modules/readiness/server';
 import {withApi} from '@/core/api-wrapper';
+import { logger } from '@/lib/logger';
 
 export const runtime = 'nodejs';
 
@@ -54,6 +55,7 @@ async function handleGet(request: NextRequest) {
     if (caught instanceof ServiceError) {
       return response({ error: caught.message }, caught.status, requestId);
     }
+    logger.error('Стартовые данные готовности не собраны', caught, { requestId });
     return response({ error: 'Внутренняя ошибка сервера' }, 500, requestId);
   }
 }

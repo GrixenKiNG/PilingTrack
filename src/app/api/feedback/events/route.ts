@@ -12,6 +12,7 @@ import { resolveEffectiveRole } from '@/lib/types';
 import { z } from 'zod';
 import { getSessionCacheScope, withApi, withMutation } from '@/core/api-wrapper';
 import { getResponseCache } from '@/core/cache';
+import { logger } from '@/lib/logger';
 
 const ALLOWED_LEVELS: FeedbackEventLevel[] = ['info', 'success', 'warn', 'error', 'audit'];
 const ALLOWED_PRIORITIES: FeedbackEventPriority[] = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
@@ -191,7 +192,8 @@ export const POST = withMutation(async (request: NextRequest) => {
       { status: 201 },
       requestId
     );
-  } catch {
+  } catch (error) {
+    logger.error('Запись события ленты не выполнена', error, { requestId });
     return createJsonResponse({ error: 'Внутренняя ошибка сервера', requestId }, { status: 500 }, requestId);
   }
 }, { domain: 'feedback' });

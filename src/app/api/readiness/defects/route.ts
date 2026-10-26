@@ -11,6 +11,7 @@ import {resolveReadinessRequestContext} from '../_shared/request-context';
 import {readinessErrorResponse, readinessResponse} from '../_shared/response';
 import {withReadinessCommand} from '../_shared/route-adapter';
 import {withApi} from '@/core/api-wrapper';
+import { logger } from '@/lib/logger';
 
 export const runtime = 'nodejs';
 
@@ -54,6 +55,7 @@ async function handleGet(request: NextRequest) {
       status: 200, correlationId: context.correlationId, requestId: context.requestId,
     });
   } catch (error) {
+    if (!(error instanceof ReadinessCommandError)) logger.error('Список дефектов не прочитан', error, { requestId: context.requestId });
     return readinessErrorResponse(
       error instanceof ReadinessCommandError
         ? error

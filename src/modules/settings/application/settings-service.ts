@@ -79,7 +79,10 @@ export async function isNotificationEnabled(
       return getSettings(tenantId);
     });
     return settings.notifications[key] ?? DEFAULT_NOTIFICATIONS[key] ?? false;
-  } catch {
+  } catch (error) {
+    logger.warn('isNotificationEnabled: настройки не прочитаны, уведомление включено', {
+      key, message: error instanceof Error ? error.message : String(error),
+    });
     return true;
   }
 }

@@ -143,7 +143,11 @@ async function getDlqPendingCount(): Promise<number> {
     const { getDlqStats } = await import('@/core/outbox/dead-letter-queue');
     const stats = await getDlqStats();
     return stats.pending;
-  } catch {
+  } catch (error) {
+    // Ноль здесь выглядит как «очередь пуста», хотя очередь не прочитана.
+    logger.warn('Lag monitor: счётчик DLQ не прочитан, принят 0', {
+      message: error instanceof Error ? error.message : String(error),
+    });
     return 0;
   }
 }
