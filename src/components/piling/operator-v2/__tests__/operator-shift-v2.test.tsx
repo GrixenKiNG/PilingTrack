@@ -214,18 +214,17 @@ describe('T12: следующий шаг v2 выполняет общий пер
     expect(api.sendCommand).toHaveBeenCalledTimes(1);
   });
 
-  it('на приёмке ведёт к выбору установки и затем к приёмке без открытия смены', async () => {
+  it('на приёмке единственная установка отмечена сама, «Следующий шаг» ведёт к кнопке приёмки без открытия смены', async () => {
     api.fetchState.mockResolvedValue(workStateFixture({phase: 'ADMISSION', shift: null}));
     authFetch.mockResolvedValue({ok: true, json: async () => ({...facts, shift: null,
       clearance: {...facts.clearance, warnings: []}, assignments: [{equipmentId: 'eq-1', equipmentName: 'LRH 100', siteId: 'site-1'}],
     })});
     render(<OperatorShiftV2 />);
     fireEvent.click(await screen.findByRole('button', {name: 'Следующий шаг: Принять установку'}));
-    const choice = screen.getByRole('button', {name: /LRH 100/, pressed: false});
-    await waitFor(() => expect(choice).toHaveFocus());
-    fireEvent.click(choice);
-    fireEvent.click(screen.getByRole('button', {name: 'Следующий шаг: Принять установку'}));
+    // Установка одна — она отмечена сама, кнопка приёмки не серая.
+    expect(screen.getByRole('button', {name: /LRH 100/, pressed: true})).toBeInTheDocument();
     await waitFor(() => expect(screen.getByRole('button', {name: 'Принять установку'})).toHaveFocus());
+    expect(screen.getByRole('button', {name: 'Принять установку'})).toBeEnabled();
     expect(api.sendCommand).not.toHaveBeenCalled();
   });
 

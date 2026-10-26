@@ -114,6 +114,12 @@ export function OperatorShiftV2() {
     машине (находка F-R40-19).
   */
   const [acceptTargetId, setAcceptTargetId] = useState<string | null>(null);
+  // Одна закреплённая установка — выбирать не из чего: отмечаем её сами, иначе
+  // кнопка «Принять установку» стоит серой без видимой причины.
+  const soleAssignmentId = facts && !facts.shift && facts.assignments.length === 1
+    ? facts.assignments[0].equipmentId
+    : null;
+  const targetId = acceptTargetId ?? soleAssignmentId;
   /*
     Снимок рабочего места (`/api/operator/mobile/state`) — второй источник
     экрана, и он же единственный источник выработки.
@@ -805,8 +811,8 @@ export function OperatorShiftV2() {
             {tab === 'shift' && !facts.shift && facts.assignments.length > 0 ? (
               <StepButton
                 label="Принять установку"
-                onClick={() => { if (acceptTargetId) void acceptOn(acceptTargetId); }}
-                disabled={!acceptTargetId || admissionPending}
+                onClick={() => { if (targetId) void acceptOn(targetId); }}
+                disabled={!targetId || admissionPending}
                 busy={busy}
               />
             ) : null}
@@ -927,7 +933,7 @@ export function OperatorShiftV2() {
                   <CheckRow
                     label={assignment.equipmentName}
                     hint={`${assignment.model} · ${assignment.siteName}`}
-                    checked={acceptTargetId === assignment.equipmentId}
+                    checked={targetId === assignment.equipmentId}
                     onToggle={() => setAcceptTargetId(assignment.equipmentId)}
                   />
                 </li>
