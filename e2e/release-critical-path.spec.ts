@@ -201,8 +201,14 @@ for (const multiple of [false, true]) test('v3: real legacy report reaches dispa
     await page.getByRole('option', { name: equipmentName, exact: true }).click();
     await page.getByRole('combobox', { name: 'Марка сваи', exact: true }).click();
     await page.getByRole('option', { name: /QA C120.30/ }).click();
-    await page.getByRole('spinbutton', { name: 'Количество свай, шт.', exact: true }).fill('2');
+    await expect(page.getByRole('combobox', { name: 'Марка сваи', exact: true })).toBeFocused();
+    const count = page.getByRole('spinbutton', { name: 'Количество свай, шт.', exact: true });
+    await count.fill('2');
+    await expect(count).toHaveValue('2');
+    observed.inputBeforeAdd = await count.inputValue();
     await page.getByRole('button', { name: 'Добавить сваи в отчёт', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Удалить сваи QA C120.30 из отчёта', exact: true })).toHaveCount(1);
+    await expect(page.getByRole('button', { name: 'Отправить отчёт', exact: true })).toBeEnabled();
     const [saved] = await Promise.all([page.waitForResponse(r => r.url().includes('/api/reports/upsert') && r.request().method() === 'POST'), page.getByRole('button', { name: 'Отправить отчёт', exact: true }).click()]);
     expect(saved.status(), await saved.text()).toBe(200);
     const report = (await db.query('SELECT id,"reportId",status,"shiftId" FROM "Report" WHERE "tenantId"=$1 AND "userId"=$2 AND "equipmentId"=$3', [fixture.tenantId, fixture.users.OPERATOR.id, fixture.equipmentId])).rows;
