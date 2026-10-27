@@ -28,6 +28,10 @@
   -webkit-tap-highlight-color: transparent;
 }
 
+.v5 .oc-machine strong {
+  overflow-wrap: anywhere;
+}
+
 /* Содержимое тянется, вкладки прижаты к низу — как на телефоне. */
 .v5 .app .scr {
   flex: 1 1 auto;
