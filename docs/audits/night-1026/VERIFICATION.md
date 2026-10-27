@@ -110,3 +110,13 @@ Docker main: app build exit0 360с, workers build exit0 43с; workers smoke exit
 ## Проверка сохранения v7 после добавления v10
 
 Сценарий f154f8b4: Chromium, одна/две установки —2passed/0failed/0skipped,exit0/59с. Полный v7 across3browsers6/0/0 остаётся отдельным предыдущим прогоном того же приложения1b0a2663. Rawv7-after-v10-regression/. Это повтор после изменения общего E2E-body, не замена исходного полного6.
+
+## После добавления основного /operator
+
+E2E сохранён в58a2b64f; приложение по-прежнему1b0a2663. Основной /operator:6passed/0failed/0skipped,exit0/279с (Chromium,MobileSafari,MobileChrome;single/multiple). После изменения E2E: npx tsc --noEmit exit0/17с; npm run lint exit0/75с,zero warnings,text integrity passed. Сбор default-config Playwright через собственную одноразовую QA-фикстуру:366тестов/30файлов,exit0;тот же BASE318/28,exit0;wrapper38с,cleanup=true. Сырые operator-six-cycles/,operator-collection/,tsc-operator.*,lint-operator.*. Новых unit/app изменений нет: последний полный unit остаётся5775/1/0,exit1 по исходной гонке,не заменён выборочными зелёными.
+
+GitNexus scopeall перед58a2b64f:3changed/0affected,4файла,LOW,безpartial/truncated (detect-operator-precommit.json). Нулевой affected для анонимного E2E callback не является доказательством отсутствия его вызовов; общие бизнес-assertions и реальный стенд проверены непосредственно.
+
+## Очистка после сохранения доказательств
+
+Сначала штатный stop branch24304 завершил app21208/worker792, затем stop parent31316 удалил свой MinIO/дваRedis, затем stop outer35488 удалил codex-pg-cc9926812e04 и codex-night-redis-cc9926812e04. Все пять PID отсутствуют, docker ps --filter name=codex- пуст; cleanup.json:cleaned=true. Порты своих app/PG/Redis не слушают;3100 по-прежнему слушает рабочий процесс9852. Рабочие контейнеры/данные не затрагивались. Повтор требует нового одноразового supervisor, живых проверок больше нет.
