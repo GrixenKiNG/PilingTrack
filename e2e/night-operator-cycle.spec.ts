@@ -48,13 +48,14 @@ async function checklist(page: Page) {
   await page.getByRole('button', { name: 'Завершить', exact: true }).click();
 }
 
-for (const multiple of [false, true]) test('v7: real admission, inspections, offline replay, production and closed report (' + (multiple ? 'multiple rigs' : 'single rig') + ')', async ({ page, context }, info) => {
+for (const version of ['v7', 'v10'] as const) for (const multiple of [false, true]) test(version + ': real admission, inspections, offline replay, production and closed report (' + (multiple ? 'multiple rigs' : 'single rig') + ')', async ({ page, context }, info) => {
   test.setTimeout(600_000);
   await page.setViewportSize({ width: 375, height: 812 });
   const fixture = await createRoleAuditFixture();
   const db = new Client({ connectionString: process.env.INTEGRATION_DATABASE_URL_OWNER });
   await db.connect();
-  const equipmentName = 'Ночной цикл v7 ' + fixture.equipmentId;
+  const equipmentName = 'Ночной цикл ' + version + ' ' + fixture.equipmentId;
+  const amountLabel = version === 'v10' ? 'Количество, шт' : 'Количество, шт.';
   const observed: Array<Record<string, unknown>> = [];
   const commands: Array<Record<string, unknown>> = [];
   page.on('request', request => {
@@ -81,7 +82,7 @@ for (const multiple of [false, true]) test('v7: real admission, inspections, off
       await db.query('INSERT INTO "Crew" (id,name,"operatorId","equipmentId","siteId","updatedAt") VALUES ($1,$2,$3,$4,$5,now())', [randomUUID(), 'Вторая учебная бригада', fixture.users.OPERATOR.id, extraId, fixture.siteId]);
     }
     await login(page, fixture.users.OPERATOR.email, fixture.password);
-    await page.goto('/operator/v7');
+    await page.goto('/operator/' + version);
     await expect(page.getByRole('button', { name: /^Следующий шаг:/ })).toBeVisible();
     observed.push({ step: 'initial', state: await state(page) });
     await next(page);
@@ -104,7 +105,12 @@ for (const multiple of [false, true]) test('v7: real admission, inspections, off
     await expect.poll(async () => (await state(page)).phase).toBe('ADMISSION');
     await next(page);
     expect((await state(page)).options).toHaveLength(multiple ? 2 : 1);
-    await page.getByRole('button').filter({ hasText: equipmentName }).click();
+    if (version === 'v7') await page.getByRole('button').filter({ hasText: equipmentName }).click();
+    else {
+      await expect(page.getByText(equipmentName, { exact: false }).first()).toBeVisible();
+      expect((await state(page)).assignment?.equipmentId).toBe(fixture.equipmentId);
+      observed.push({ step: 'v10 accepts displayed default assignment; no alternative rig selector', options: (await state(page)).options });
+    }
     await page.getByRole('button', { name: 'Принять установку', exact: true }).click();
     await expect.poll(async () => (await state(page)).phase).toBe('PRESHIFT_INSPECTION');
     for (const phase of ['PRESHIFT_INSPECTION', 'SITE_READY', 'STARTUP'] as const) {
@@ -116,6 +122,7 @@ for (const multiple of [false, true]) test('v7: real admission, inspections, off
     }
     expect((await state(page)).phase).toBe('WORK');
     await page.getByRole("button", { name: "ТБ", exact: true }).click();
+    if (version === 'v10') await page.getByRole('button', { name: /^Чек-листы ТБ по видам работ/ }).click();
     const piling = (await state(page)).checklists.find(item => item.stage === "TB_PILING");
     if (!piling) throw new Error('TB_PILING checklist is required for this cycle');
     await page.getByRole("button").filter({ hasText: piling.title }).click();
@@ -128,11 +135,15 @@ for (const multiple of [false, true]) test('v7: real admission, inspections, off
     await expect.poll(async () => (await state(page)).checklists.find(item => item.stage === "TB_DRILLING")?.done).toBe(true);
     await page.getByRole("button", { name: "Смена", exact: true }).click();
     await next(page);
-    await page.getByRole('button', { name: 'QA C120.30', exact: true }).click();
-    await page.getByLabel('Количество, шт.', { exact: true }).fill('2');
+    if (version === 'v10') {
+      await page.getByRole('button', { name: 'Добавить сваю', exact: true }).click();
+      await page.getByRole('combobox', { name: 'Марка сваи', exact: true }).selectOption({ label: 'QA C120.30' });
+    }
+    else await page.getByRole('button', { name: 'QA C120.30', exact: true }).click();
+    await page.getByLabel(amountLabel, { exact: true }).fill('2');
     await context.setOffline(true);
     await page.getByRole('button', { name: 'Записать', exact: true }).click();
-    await expect(page.getByText(/Сохранено на устройстве|В очереди: 1/).first()).toBeVisible();
+    await expect(page.getByText(/Сохранено на устройстве|В очереди: 1|запись сохранена/i).first()).toBeVisible();
     await context.setOffline(false);
     await expect.poll(async () => (await state(page)).production.piles.count, { timeout: 45_000 }).toBe(2);
     const pileCommand = commands.find(command => command.command === 'log-production');
@@ -143,21 +154,27 @@ for (const multiple of [false, true]) test('v7: real admission, inspections, off
     expect(replay.status()).toBe(200);
     expect((await state(page)).production.piles.count).toBe(2);
     observed.push({ step: 'offline replay', state: await state(page), commandId: pileCommand?.clientCommandId });
-    await page.getByRole("button", { name: "Добавить бурение", exact: true }).click();
-    await page.getByRole("button", { name: "QA бурение", exact: true }).click();
-    await page.getByLabel("Количество, шт.", { exact: true }).fill("1");
+    await page.getByRole("button", { name: "Добавить бурение", exact: true }).first().click();
+    if (version === 'v10') await page.getByRole('combobox', { name: 'Тип бурения', exact: true }).selectOption({ label: 'QA бурение' });
+    else await page.getByRole("button", { name: "QA бурение", exact: true }).click();
+    await page.getByLabel(amountLabel, { exact: true }).fill("1");
     await page.getByLabel("Метров на скважину", { exact: true }).fill("3");
     await page.getByRole("button", { name: "Записать", exact: true }).click();
     await expect.poll(async () => (await state(page)).production.drilling.meters).toBe(3);
-    await page.getByRole("button", { name: "Простой", exact: true }).click();
-    await page.getByRole("button", { name: "QA ожидание", exact: true }).click();
+    await page.getByRole("button", { name: version === 'v10' ? "Записать простой" : "Простой", exact: true }).first().click();
+    if (version === 'v10') await page.getByRole('combobox', { name: 'Причина простоя', exact: true }).selectOption({ label: 'QA ожидание' });
+    else await page.getByRole("button", { name: "QA ожидание", exact: true }).click();
     await page.getByLabel("Простой, часов", { exact: true }).fill("0.25");
     await page.getByRole("button", { name: "Записать", exact: true }).click();
     await expect.poll(async () => (await state(page)).production.downtimeHours).toBe(0.25);
+    if (version === 'v10') await page.getByRole('button', { name: '← К смене', exact: true }).click();
     await page.getByRole("button", { name: "Инцидент", exact: true }).click();
-    await page.getByRole("button", { name: /^Другое/ }).click();
+    if (version === 'v10') {
+      await page.getByRole('button', { name: 'Записать происшествие', exact: true }).click();
+      await page.getByRole('combobox', { name: 'Событие', exact: true }).selectOption('OTHER');
+    } else await page.getByRole("button", { name: /^Другое/ }).click();
     await page.getByRole("button", { name: "Другой наблюдаемый признак", exact: true }).click();
-    await page.getByLabel("Опишите своими словами", { exact: true }).fill("Синтетическое учебное происшествие ночной проверки, без реального оборудования и пострадавших.");
+    await page.getByLabel(version === 'v10' ? "Как было дело" : "Опишите своими словами", { exact: true }).fill("Синтетическое учебное происшествие ночной проверки, без реального оборудования и пострадавших.");
     await page.getByRole("button", { name: "Записать происшествие", exact: true }).click();
     await expect.poll(async () => (await state(page)).incidents.length).toBe(1);
     observed.push({ step: "drilling, downtime and incident", state: await state(page) });
@@ -169,7 +186,7 @@ for (const multiple of [false, true]) test('v7: real admission, inspections, off
     await checklist(page);
     await expect.poll(async () => (await state(page)).checklists.find(item => item.stage === 'EO_AFTER')?.done).toBe(true);
     await next(page);
-    await page.getByRole('button', { name: 'Закрыть смену', exact: true }).click();
+    await page.getByRole('button', { name: version === 'v10' ? 'Закрыть смену и отправить отчёт' : 'Закрыть смену', exact: true }).click();
     await expect.poll(async () => (await state(page)).phase).toBe('CLOSED');
     const closed = await state(page);
     expect(closed.receipt?.reportId).toBeTruthy();
@@ -186,7 +203,7 @@ for (const multiple of [false, true]) test('v7: real admission, inspections, off
     await expect.poll(async () => Number((await db.query('SELECT count(*) AS count FROM "FeedbackEvent" WHERE "targetId"=$1 AND action=$2', [closed.receipt?.reportId, 'ReportSubmitted'])).rows[0].count), { timeout: 20_000 }).toBe(1);
     observed.push({ step: 'audit and general feed are separate', audit: audit.rows, feed: feed.rows });
     observed.push({ step: 'closed', state: closed });
-    await page.screenshot({ path: info.outputPath('v7-closed.png'), fullPage: true });
+    await page.screenshot({ path: info.outputPath(version + '-closed.png'), fullPage: true });
     await page.request.post('/api/auth/logout', { headers: { Origin: new URL(page.url()).origin } });
     await login(page, fixture.users.DISPATCHER.email, fixture.password);
     await page.goto('/admin/reports');
@@ -195,7 +212,7 @@ for (const multiple of [false, true]) test('v7: real admission, inspections, off
     await expect(reportButton).toHaveCount(1);
     await reportButton.click();
     await expect(page.getByRole('heading', { name: `Отчёт #${closed.receipt?.reportId}`, exact: true })).toBeVisible();
-    await page.screenshot({ path: info.outputPath('v7-dispatcher-report.png'), fullPage: true });
+    await page.screenshot({ path: info.outputPath(version + '-dispatcher-report.png'), fullPage: true });
     observed.push({ step: 'dispatcher sees the actual submitted report', reportId: closed.receipt?.reportId });
   } finally {
     await context.setOffline(false);
