@@ -8,7 +8,7 @@ const specs = [
   'inspection-to-flow.spec.ts', 'monitoring-tile-editor.spec.ts',
   'operator-report-smoke.spec.ts', 'rate-limit-e2e.spec.ts',
   'release-critical-path.spec.ts', 'report-creation-flow.spec.ts',
-  'smoke-e2e.spec.ts', 'role-audit.spec.js', 'night-role-walkthrough.spec.ts',
+  'smoke-e2e.spec.ts', 'role-audit.spec.js', 'night-role-walkthrough.spec.ts', 'night-operator-cycle.spec.ts',
 ];
 
 export default defineConfig({

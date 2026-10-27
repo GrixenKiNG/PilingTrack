@@ -22,8 +22,9 @@ for (const role of roles) {
       const original = window.fetch;
       window.fetch = async (...args) => {
         const target = args[0] instanceof Request ? args[0].url : String(args[0]);
-        const pathname = new URL(target, location.href).pathname;
-        if (!pathname.startsWith('/api/') || pathname === '/api/feedback/stream') return original(...args);
+        const url = new URL(target, location.href);
+        const pathname = url.pathname;
+        if ((!pathname.startsWith('/api/') && !url.searchParams.has('_rsc')) || pathname === '/api/feedback/stream') return original(...args);
         state.pending++;
         state.lastAt = Date.now();
         const finished = () => { state.pending--; state.lastAt = Date.now(); };
@@ -36,6 +37,7 @@ for (const role of roles) {
     });
     const rows: Array<Record<string, unknown>> = [];
     const errors: string[] = [];
+    let observeConsole = false;
     const pending = new Map<object, string>();
     const network: Array<Record<string, unknown>> = [];
     const requestIds = new WeakMap<object, number>();
@@ -48,23 +50,31 @@ for (const role of roles) {
         pending.set(request, pathname);
       }
     });
-    const finished = (request: { url(): string }) => {
+    const finished = (request: { url(): string; failure(): { errorText: string } | null }) => {
+      if (new URL(request.url()).searchParams.has('_rsc') && request.failure()) {
+        network.push({ event: 'RSC failed', path: request.url(), error: request.failure()?.errorText, at: Date.now() });
+      }
       if (requestIds.has(request)) network.push({ event: 'finished', id: requestIds.get(request), path: new URL(request.url()).pathname, at: Date.now() });
       pending.delete(request);
     };
     page.on('requestfinished', finished);
     page.on('requestfailed', finished);
+    const networkQuiet = async () => {
+      await expect.poll(() => page.evaluate(() => {
+        const state = (window as Window & { __nightFetch?: { pending: number; lastAt: number } }).__nightFetch;
+        return state !== undefined && state.pending === 0 && Date.now() - state.lastAt >= 250;
+      }), { timeout: 15_000 }).toBe(true);
+    };
     const settled = async () => {
       try {
-        await expect(page.getByText('QA ' + role, { exact: true }).first()).toBeVisible();
+        // Names are deliberately hidden by the responsive shell on phones.
+        // Their presence still confirms the authenticated client store loaded.
+        await expect(page.getByText('QA ' + role, { exact: true }).first()).toBeAttached();
         const pathname = new URL(page.url()).pathname;
         if ((pathname === '/admin/to' || pathname === '/admin/safety') && role !== 'ASSISTANT') {
           await expect(page.getByTestId('tech-readiness-module')).toBeVisible();
         }
-        await expect.poll(() => page.evaluate(() => {
-          const state = (window as Window & { __nightFetch?: { pending: number; lastAt: number } }).__nightFetch;
-          return state !== undefined && state.pending === 0 && Date.now() - state.lastAt >= 250;
-        }), { timeout: 15_000 }).toBe(true);
+        await networkQuiet();
         await expect(page.locator('[data-query-state="loading"]')).toHaveCount(0);
       } catch (error) {
         await info.attach('pending-API', { body: JSON.stringify([...pending.values()]), contentType: 'application/json' });
@@ -74,6 +84,9 @@ for (const role of roles) {
     };
     const apiErrors: Array<{ path: string; status: number }> = [];
     page.on('pageerror', error => errors.push(error.message));
+    page.on('console', message => {
+      if (observeConsole && message.type() === 'error') errors.push('console: ' + message.text());
+    });
     page.on('response', response => {
       const url = new URL(response.url());
       if (url.pathname.startsWith('/api/') && response.status() >= 400) {
@@ -82,10 +95,11 @@ for (const role of roles) {
       if (requestIds.has(response.request())) network.push({ event: 'response', id: requestIds.get(response.request()), path: url.pathname, status: response.status(), at: Date.now() });
     });
     await login(page, fixture.users[role].email, fixture.password);
-    await expect(page.getByText('QA ' + role, { exact: true }).first()).toBeVisible();
+    await expect(page.getByText('QA ' + role, { exact: true }).first()).toBeAttached();
     // Do not cancel the first dashboard fetches with a forced navigation:
     // Chromium can leave those old Request objects without a finish event.
     await settled();
+    observeConsole = true;
     rows.push({ step: 'login', role, path: new URL(page.url()).pathname });
     const expected = ROLE_NAVIGATION[role];
     // The current operator/assistant home deliberately owns its own navigation.
@@ -94,20 +108,38 @@ for (const role of roles) {
       await page.goto('/history');
       await settled();
     }
+    const mobileMenu = page.getByRole('button', { name: 'Открыть меню навигации', exact: true });
+    const opensMenu = await mobileMenu.isVisible();
+    if (opensMenu) await mobileMenu.click();
     for (const item of expected) {
-      await expect.soft(page.locator(`a[href="${item.href}"]`).first(), `menu: ${role} ${item.href}`).toBeAttached();
+      await expect.soft(page.locator(`a[href="${item.href}"]:visible`).first(), `menu: ${role} ${item.href}`).toBeVisible();
     }
+    if (opensMenu) {
+      await page.keyboard.press('Escape');
+      await expect(mobileMenu).toBeVisible();
+    }
+    const visit = async (href: string) => {
+      if (role === 'OPERATOR' || role === 'ASSISTANT') {
+        await page.goto(href);
+      } else {
+        const menu = page.getByRole('button', { name: 'Открыть меню навигации', exact: true });
+        if (await menu.isVisible()) await menu.click();
+        await page.locator(`a[href="${href}"]:visible`).first().click();
+        await expect(page).toHaveURL(url => url.pathname === href);
+      }
+      await settled();
+    };
     for (const item of expected) {
       apiErrors.length = 0;
-      await page.goto(item.href);
-      await settled();
+      await visit(item.href);
       await expect(page.locator('body')).not.toContainText('Application error:');
       expect.soft(new URL(page.url()).pathname, `${role} opens ${item.href}`).toBe(item.href);
       const tabs = (await page.getByRole('tab').allTextContents()).map(label => label.trim());
       for (const label of tabs) {
-        // The list can include nested tabs of the initially selected panel.
-        // Restore that panel before trying another initial tab.
-        await page.goto(item.href);
+        // Restore the initial parent panel through its own control. A hard
+        // navigation here aborts Link prefetches and does not model a user tab click.
+        const initialTab = page.getByRole('tab', { name: tabs[0], exact: true }).first();
+        if (await initialTab.isEnabled()) await initialTab.click();
         await settled();
         const tab = page.getByRole('tab', { name: label, exact: true }).first();
         await expect.soft(tab).toBeVisible();
@@ -126,9 +158,11 @@ for (const role of roles) {
       rows.push({ role, path: item.href, step: 'page opened', apiErrors: [...apiErrors], actions: await page.getByRole('button').allTextContents() });
       expect.soft(apiErrors, `normal navigation API errors: ${role} ${item.href}`).toEqual([]);
     }
+    observeConsole = false; // Deliberate permission denials below can log browser resource errors.
     // A direct URL is tested separately from menu visibility.
     await page.goto('/admin/users');
     await expect.soft(page).toHaveURL(role === 'ADMIN' ? /\/admin\/users$/ : /\/no-access$/);
+    await networkQuiet();
     const users = await page.request.get('/api/users');
     expect.soft(users.status(), 'users.read is different from users.manage').toBe(can({ role }, 'users.read') ? 200 : 403);
     rows.push({ role, step: 'direct users API', expected: can({ role }, 'users.read') ? 200 : 403, actual: users.status() });
@@ -137,8 +171,19 @@ for (const role of roles) {
       expect.soft(mutation.status(), 'forbidden create user fails before validation').toBe(403);
       rows.push({ role, step: 'forbidden create user', actual: mutation.status() });
     }
-    const logout = await page.request.post('/api/auth/logout', { headers: { Origin: new URL(page.url()).origin } });
+    // Return to a fully loaded shell and use its real logout action. API-only
+    // logout leaves that shell alive while its session probe is still running.
+    await page.goto(role === 'OPERATOR' || role === 'ASSISTANT' ? '/history' : expected[0].href);
+    await settled();
+    const logoutMenu = page.getByRole('button', { name: 'Открыть меню навигации', exact: true });
+    if (await logoutMenu.isVisible()) await logoutMenu.click();
+    await networkQuiet();
+    const logoutResponse = page.waitForResponse(response => new URL(response.url()).pathname === '/api/auth/logout' && response.request().method() === 'POST');
+    await page.getByRole('button', { name: 'Выйти', exact: true }).first().click();
+    const logout = await logoutResponse;
     expect.soft(logout.status()).toBe(200);
+    await expect(page).toHaveURL(/\/login(?:\?|$)/);
+    await networkQuiet();
     const afterLogout = await page.request.get('/api/auth/me');
     expect.soft(afterLogout.status()).toBe(401);
     rows.push({ role, step: 'logout', actual: logout.status(), afterLogout: afterLogout.status() });
@@ -146,8 +191,11 @@ for (const role of roles) {
     await login(page, fixture.users[nextRole].email, fixture.password);
     const changed = await page.request.get('/api/auth/me');
     expect.soft((await changed.json()).user.role).toBe(nextRole);
+    await expect(page.getByText('QA ' + nextRole, { exact: true }).first()).toBeAttached();
+    await networkQuiet();
     rows.push({ role, step: 'session replacement', nextRole });
     expect.soft(errors, 'uncaught browser errors').toEqual([]);
     await info.attach('role-observations', { body: JSON.stringify({ rows, errors }, null, 2), contentType: 'application/json' });
+    await info.attach('network-events', { body: JSON.stringify(network), contentType: 'application/json' });
   });
 }
