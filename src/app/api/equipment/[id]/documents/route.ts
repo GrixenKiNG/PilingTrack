@@ -19,8 +19,8 @@ const emptyToUndef = (v: unknown) => (v === '' || v === null ? undefined : v);
 const createSchema = z.object({
   type: documentTypeEnum,
   title: z.string().trim().min(1).max(200),
-  issuedAt:  z.preprocess(emptyToUndef, z.coerce.date()).optional(),
-  expiresAt: z.preprocess(emptyToUndef, z.coerce.date()).optional(),
+  issuedAt:  z.preprocess(emptyToUndef, z.coerce.date().optional()).optional(),
+  expiresAt: z.preprocess(emptyToUndef, z.coerce.date().optional()).optional(),
   notes: z.string().max(2000).optional(),
   mediaId: z.string().optional().nullable(),
 });

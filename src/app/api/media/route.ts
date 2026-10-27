@@ -32,7 +32,8 @@ export const POST = withMutation(async (request: NextRequest) => {
     entityId?: string;
   }>(request);
 
-  if (!body.fileName || !body.contentType) {
+  // Тело `null` — валидный JSON: без `?.` оно роняло маршрут в 500 вместо 400.
+  if (!body?.fileName || !body.contentType) {
     return NextResponse.json({ error: 'Требуются fileName и contentType' }, { status: 400 });
   }
 

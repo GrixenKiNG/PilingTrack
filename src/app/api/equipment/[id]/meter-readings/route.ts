@@ -34,7 +34,7 @@ const emptyToUndef = (v: unknown) => (v === '' || v === null ? undefined : v);
 
 const createSchema = z.object({
   engineHours: z.coerce.number().int().min(0),
-  recordedAt: z.preprocess(emptyToUndef, z.coerce.date()).optional().nullable(),
+  recordedAt: z.preprocess(emptyToUndef, z.coerce.date().optional()).optional().nullable(),
   source: z.enum(['MANUAL', 'TELEMETRY']).optional(),
   note: z.string().max(500).optional().nullable(),
 });

@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { findFirstMock, createMock, updateMock, deleteMock, recordAuditMock } = vi.hoisted(() => ({
+const { findFirstMock, findManyMock, createMock, updateMock, deleteMock, recordAuditMock } = vi.hoisted(() => ({
   findFirstMock: vi.fn(),
+  findManyMock: vi.fn(),
   createMock: vi.fn(),
   updateMock: vi.fn(),
   deleteMock: vi.fn(),
@@ -16,6 +17,7 @@ vi.mock('@/lib/db', () => {
   const db = {
     userDocumentType: {
       findFirst: findFirstMock,
+      findMany: findManyMock,
       create: createMock,
       update: updateMock,
       delete: deleteMock,
@@ -27,6 +29,8 @@ vi.mock('@/lib/db', () => {
 
 // Права НЕ подменяем: проверяем подключение к настоящей матрице ролей.
 import {
+  listUserDocumentTypes,
+  listUserDocumentTypesForAdmin,
   createUserDocumentType,
   updateUserDocumentType,
   deleteUserDocumentType,
@@ -38,7 +42,7 @@ const ctx = (actor: { id: string; role: string }) => ({ tenantId: 'orion', actor
 
 describe('справочник видов документов работника', () => {
   beforeEach(() => {
-    for (const m of [findFirstMock, createMock, updateMock, deleteMock, recordAuditMock]) m.mockReset();
+    for (const m of [findFirstMock, findManyMock, createMock, updateMock, deleteMock, recordAuditMock]) m.mockReset();
   });
 
   it('оператор не может менять справочник и до базы дело не доходит', async () => {
@@ -92,5 +96,73 @@ describe('справочник видов документов работник�
     expect(recordAuditMock).toHaveBeenCalledWith(expect.objectContaining({
       action: 'user.document_type.deleted', actorId: 'usr_admin', targetId: 't2', tenantId: 'orion',
     }));
+  });
+
+  it('новый вид: срок обязателен по умолчанию, оператору не обязателен, название без лишних пробелов, след записан', async () => {
+    findFirstMock.mockResolvedValueOnce(null);
+    createMock.mockImplementation(async ({ data }: { data: { name: string } }) => ({ id: 't9', ...data }));
+
+    await createUserDocumentType({ name: '  Допуск к работам на высоте ' }, ctx(ADMIN));
+
+    expect(createMock.mock.calls[0][0].data).toMatchObject({
+      tenantId: 'orion', name: 'Допуск к работам на высоте', normalizedName: 'допуск к работам на высоте',
+      requiresExpiry: true, leadTimeDays: 30, requiredForOperator: false, defaultValidMonths: null,
+    });
+    expect(recordAuditMock).toHaveBeenCalledWith(expect.objectContaining({ action: 'user.document_type.created', targetId: 't9' }));
+  });
+
+  it('пустое название вида отклоняется до обращения к базе', async () => {
+    await expect(createUserDocumentType({ name: '   ' }, ctx(ADMIN))).rejects.toMatchObject({ status: 400 });
+    findFirstMock.mockResolvedValueOnce({ id: 't1', name: 'Медосмотр' });
+    await expect(updateUserDocumentType('t1', { name: '  ' }, ctx(ADMIN))).rejects.toMatchObject({ status: 400 });
+    expect(createMock).not.toHaveBeenCalled();
+    expect(updateMock).not.toHaveBeenCalled();
+  });
+
+  it('правка меняет только присланные поля и называет их в следе', async () => {
+    findFirstMock.mockResolvedValueOnce({ id: 't1', name: 'Медосмотр' });
+    updateMock.mockResolvedValueOnce({ id: 't1', name: 'Медосмотр' });
+
+    await updateUserDocumentType('t1', { requiredForOperator: true, leadTimeDays: 14, notes: ' раз в год ' }, ctx(ADMIN));
+
+    expect(updateMock.mock.calls[0][0].data).toEqual({ requiredForOperator: true, leadTimeDays: 14, notes: 'раз в год' });
+    expect([...recordAuditMock.mock.calls[0][0].metadata.changed].sort()).toEqual(['leadTimeDays', 'notes', 'requiredForOperator']);
+  });
+
+  it('переименование в уже занятое имя другим видом — 409, запись не идёт', async () => {
+    findFirstMock
+      .mockResolvedValueOnce({ id: 't1', name: 'Медосмотр' })
+      .mockResolvedValueOnce({ id: 't2' });
+
+    await expect(updateUserDocumentType('t1', { name: 'Удостоверение' }, ctx(ADMIN))).rejects.toMatchObject({ status: 409 });
+    expect(findFirstMock.mock.calls[1][0].where).toMatchObject({ normalizedName: 'удостоверение', id: { not: 't1' } });
+    expect(updateMock).not.toHaveBeenCalled();
+  });
+
+  it('отключение вида идёт через правку isActive', async () => {
+    findFirstMock.mockResolvedValueOnce({ id: 't1', name: 'Медосмотр' });
+    updateMock.mockResolvedValueOnce({ id: 't1', name: 'Медосмотр' });
+
+    await updateUserDocumentType('t1', { isActive: false }, ctx(ADMIN));
+
+    expect(updateMock.mock.calls[0][0].data).toEqual({ isActive: false });
+  });
+
+  it('форма получает только включённые виды своей организации', async () => {
+    findManyMock.mockResolvedValueOnce([]);
+
+    await listUserDocumentTypes('orion');
+
+    expect(findManyMock.mock.calls[0][0].where).toEqual({ tenantId: 'orion', isActive: true });
+  });
+
+  it('экран управления видит и отключённые виды со счётчиком документов, оператор — нет', async () => {
+    findManyMock.mockResolvedValueOnce([{ id: 't1', name: 'Медосмотр', isActive: false, _count: { documents: 3 } }]);
+
+    const types = await listUserDocumentTypesForAdmin(ctx(ADMIN));
+
+    expect(types).toEqual([{ id: 't1', name: 'Медосмотр', isActive: false, documentCount: 3 }]);
+    expect(findManyMock.mock.calls[0][0].where).toEqual({ tenantId: 'orion' });
+    await expect(listUserDocumentTypesForAdmin(ctx(OPERATOR))).rejects.toMatchObject({ status: 403 });
   });
 });

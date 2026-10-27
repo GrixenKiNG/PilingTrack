@@ -13,8 +13,8 @@ const emptyToUndef = (v: unknown) => (v === '' || v === null ? undefined : v);
 const updateSchema = z.object({
   typeId: z.string().trim().min(1).optional(),
   number: z.string().trim().max(100).optional(),
-  issuedAt: z.preprocess(emptyToUndef, z.coerce.date()).optional().nullable(),
-  expiresAt: z.preprocess(emptyToUndef, z.coerce.date()).optional().nullable(),
+  issuedAt: z.preprocess(emptyToUndef, z.coerce.date().optional()).optional().nullable(),
+  expiresAt: z.preprocess(emptyToUndef, z.coerce.date().optional()).optional().nullable(),
   notes: z.string().max(2000).optional(),
   mediaId: z.string().optional().nullable(),
 });

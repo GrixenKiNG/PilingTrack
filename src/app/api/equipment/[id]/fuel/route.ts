@@ -31,9 +31,9 @@ const emptyToUndef = (v: unknown) => (v === '' || v === null ? undefined : v);
 
 const createSchema = z
   .object({
-    litersAdded: z.preprocess(emptyToUndef, z.coerce.number().int().min(0)).optional().nullable(),
-    tankPercent: z.preprocess(emptyToUndef, z.coerce.number().int().min(0).max(100)).optional().nullable(),
-    recordedAt: z.preprocess(emptyToUndef, z.coerce.date()).optional().nullable(),
+    litersAdded: z.preprocess(emptyToUndef, z.coerce.number().int().min(0).optional()).optional().nullable(),
+    tankPercent: z.preprocess(emptyToUndef, z.coerce.number().int().min(0).max(100).optional()).optional().nullable(),
+    recordedAt: z.preprocess(emptyToUndef, z.coerce.date().optional()).optional().nullable(),
     source: z.enum(['MANUAL', 'TELEMETRY']).optional(),
     note: z.string().max(500).optional().nullable(),
   })
