@@ -300,3 +300,18 @@ describe('v10: ЕО после работы', () => {
     expect(screen.getByText(/Прошлое показание: 1234 м\/ч/)).toBeInTheDocument();
   });
 });
+
+describe('v10: итог смены на закрытии', () => {
+  it('показывает объём за смену: сваи и бурение в штуках и м.п., простой', async () => {
+    const closing = makeState('CLOSING', [...STAGES]);
+    closing.production = {piles: {count: 12, meters: 96}, drilling: {count: 3, meters: 24.5}, downtimeHours: 1.5};
+    api.fetchState.mockResolvedValue(closing);
+    render(<OperatorV10App />);
+
+    fireEvent.click(await screen.findByRole('button', {name: 'Дальше: ЕО после работы и закрытие смены'}));
+    expect(screen.getByText('Итог смены')).toBeInTheDocument();
+    expect(screen.getByText('12 шт · 96 м.п.')).toBeInTheDocument();
+    expect(screen.getByText('3 скв · 24,5 м')).toBeInTheDocument();
+    expect(screen.getByText('1,5 ч')).toBeInTheDocument();
+  });
+});

@@ -176,6 +176,16 @@ export function ScreenClosing({state, busy, onFinish, onClose, go, unsent, onFlu
           note={String(state.defects.length)} />
         <Row icon="list" title="Записи выработки" note={String(state.entries.length)} />
       </Card>
+      {/* Итог смены — тот же состав, что в /operator/v2 и основном приложении:
+          сваи и бурение в штуках и м.п., простой. Закрытие показывает объём,
+          который уйдёт диспетчеру, до нажатия «Закрыть смену». */}
+      <Card title="Итог смены">
+        <Pair label="Сваи выполнено"
+          value={`${state.production.piles.count} шт · ${formatNumber(state.production.piles.meters)} м.п.`} />
+        <Pair label="Бурение"
+          value={`${state.production.drilling.count} скв · ${formatNumber(state.production.drilling.meters)} м`} />
+        <Pair label="Простой" value={formatDowntimeHoursOnly(state.production.downtimeHours)} />
+      </Card>
       {/* Номер отчёта — здесь, а не только на экране «Отчёт и синхронизация».
           Человек закрывает смену на этом экране и уходит; номер, которым смену
           опознают в разговоре с диспетчером, не должен лежать через два
