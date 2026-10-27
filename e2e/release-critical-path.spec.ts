@@ -1,6 +1,7 @@
 import { test, expect } from './fixtures/disposable.fixture';
 import { TEST_USERS } from './fixtures/auth.fixture';
 import { login } from './page-objects/login.page';
+import { createRoleAuditFixture } from './fixtures/role-audit.mjs';
 import { Client } from 'pg';
 import { randomUUID } from 'node:crypto';
 import { getTodayInTimezone } from '@/lib/timezone';
@@ -169,4 +170,57 @@ test('F7 briefing print opens with no opener and no false blocked toast', async 
     await db.query('DELETE FROM "BriefingRecord" WHERE id=$1 AND "tenantId"=$2', [id, 'codex-e1-a']);
     await db.end();
   }
+});
+
+for (const multiple of [false, true]) test('v3: real legacy report reaches dispatcher (' + (multiple ? 'multiple rigs' : 'single rig') + ')', async ({ page }, info) => {
+  test.setTimeout(120000);
+  await page.setViewportSize({ width: 375, height: 812 });
+  const fixture = await createRoleAuditFixture();
+  const db = await owner();
+  const equipmentName = 'V3 QA ' + fixture.equipmentId;
+  const observed: Record<string, unknown> = {};
+  try {
+    await db.query('UPDATE "Equipment" SET name=$3 WHERE id=$1 AND "tenantId"=$2', [fixture.equipmentId, fixture.tenantId, equipmentName]);
+    if (multiple) {
+      const id = randomUUID();
+      await db.query('INSERT INTO "Equipment" (id,"tenantId",name,model,kind,"updatedAt") VALUES ($1,$2,$3,$4,$5,now())', [id, fixture.tenantId, 'V3 вторая установка', 'QA', 'PILE_DRIVER']);
+      await db.query('INSERT INTO "Crew" (id,name,"operatorId","equipmentId","siteId","updatedAt") VALUES ($1,$2,$3,$4,$5,now())', [randomUUID(), 'V3 вторая бригада', fixture.users.OPERATOR.id, id, fixture.siteId]);
+    }
+    await login(page, fixture.users.OPERATOR.email, fixture.password);
+    const mobile = async () => { const r = await page.request.get('/api/operator/mobile/state'); expect(r.status()).toBe(200); return (await r.json()).data; };
+    observed.before = await mobile();
+    await page.goto('/operator/v3');
+    await expect(page.getByRole('button', { name: /^Начало смены/ })).toBeEnabled();
+    observed.dashboardButtons = await page.getByRole('button').allTextContents();
+    observed.canonicalNextControls = await page.getByRole('button', { name: /^Следующий шаг:/ }).count();
+    await page.getByRole('button', { name: /^Начало смены/ }).click();
+    await expect(page).toHaveURL(/\/operator\/v3\/report$/);
+    await page.getByRole('combobox', { name: 'Объект', exact: true }).click();
+    await page.getByRole('option', { name: 'QA полигон', exact: true }).click();
+    await page.getByRole('combobox', { name: 'Установка', exact: true }).click();
+    await page.getByRole('option', { name: equipmentName, exact: true }).click();
+    await page.getByRole('combobox', { name: 'Марка сваи', exact: true }).click();
+    await page.getByRole('option', { name: /QA C120.30/ }).click();
+    await page.getByRole('spinbutton', { name: 'Количество свай, шт.', exact: true }).fill('2');
+    await page.getByRole('button', { name: 'Добавить сваи в отчёт', exact: true }).click();
+    const [saved] = await Promise.all([page.waitForResponse(r => r.url().includes('/api/reports/upsert') && r.request().method() === 'POST'), page.getByRole('button', { name: 'Отправить отчёт', exact: true }).click()]);
+    expect(saved.status(), await saved.text()).toBe(200);
+    const report = (await db.query('SELECT id,"reportId",status,"shiftId" FROM "Report" WHERE "tenantId"=$1 AND "userId"=$2 AND "equipmentId"=$3', [fixture.tenantId, fixture.users.OPERATOR.id, fixture.equipmentId])).rows;
+    expect(report).toHaveLength(1);
+    expect(report[0].status).toBe('submitted');
+    expect(Number((await db.query('SELECT sum(count) AS count FROM "PileWork" WHERE "tenantId"=$1 AND "reportId"=$2', [fixture.tenantId, report[0].id])).rows[0].count)).toBe(2);
+    await expect.poll(async () => (await db.query('SELECT published,projected FROM "OutboxEvent" WHERE "tenantId"=$1 AND "aggregateId"=$2 AND type=$3', [fixture.tenantId, report[0].reportId, 'ReportSubmitted'])).rows, { timeout: 30000 }).toEqual([{ published: true, projected: true }]);
+    await expect.poll(async () => (await db.query('SELECT "totalPiles" FROM "ReportAnalytics" WHERE "tenantId"=$1 AND "reportId"=$2', [fixture.tenantId, report[0].reportId])).rows[0]?.totalPiles, { timeout: 30000 }).toBe(2);
+    expect((await db.query('SELECT action,"actorId" FROM "ReportAudit" WHERE "reportId"=$1 AND action=$2', [report[0].reportId, 'created'])).rows).toEqual([{action:'created',actorId:fixture.users.OPERATOR.id}]);
+    observed.report = report[0]; observed.after = await mobile();
+    await page.screenshot({ path: info.outputPath('v3-submitted.png'), fullPage: true });
+    await page.request.post('/api/auth/logout', { headers: { Origin: new URL(page.url()).origin } });
+    await login(page, fixture.users.DISPATCHER.email, fixture.password);
+    await page.goto('/admin/reports');
+    await page.getByPlaceholder('Поиск по оператору, объекту, установке').fill(equipmentName);
+    const reportButton = page.getByRole('button', { name: 'Показать в правой панели', exact: true });
+    await expect(reportButton).toHaveCount(1); await reportButton.click();
+    await expect(page.getByRole('heading', { name: 'Отчёт #' + report[0].reportId, exact: true })).toBeVisible();
+    await page.screenshot({ path: info.outputPath('v3-dispatcher.png'), fullPage: true });
+  } finally { await db.end(); await info.attach('v3-legacy-evidence', { body: JSON.stringify(observed), contentType: 'application/json' }); }
 });
