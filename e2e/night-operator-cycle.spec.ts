@@ -28,17 +28,20 @@ async function checklist(page: Page) {
       const count = text.match(/(\d+)\s*\/\s*(\d+)/);
       if (count && Number(count[1]) < Number(count[2])) { incomplete = i; break; }
     }
-    if (incomplete < 0) break;
-    const section = sections.nth(incomplete);
-    if (await section.getAttribute('aria-expanded') !== 'true') await section.click();
+    const flat = await sections.count() === 0;
+    if (flat ? guard > 0 : incomplete < 0) break;
+    if (!flat) {
+      const section = sections.nth(incomplete);
+      if (await section.getAttribute('aria-expanded') !== 'true') await section.click();
+    }
     const normal = page.getByRole('button', { name: 'Норма', exact: true });
     for (let i = 0; i < await normal.count(); i++) await normal.nth(i).click();
     const measures = page.locator('input[type="number"], input[inputmode="decimal"], input[inputmode="numeric"]');
     for (let i = 0; i < await measures.count(); i++) {
       const input = measures.nth(i);
       if (await input.inputValue()) continue;
-      const label = await input.evaluate(el => el.closest('label')?.innerText || '');
-      const previous = label.match(/Прошлое показание:\s*(\d+(?:[.,]\d+)?)\s*м\/ч/i);
+      const label = await input.evaluate(el => el.closest('label')?.innerText || el.parentElement?.innerText || '');
+      const previous = label.match(/(?:Прошлое показание:|было)\s*(\d+(?:[.,]\d+)?)\s*м\/ч/i);
       if (/моточас|м\/ч/i.test(label)) {
         if (!previous) throw new Error('Known synthetic meter reading is required');
         await input.fill(String(Number(previous[1].replace(',', '.')) + 1));
@@ -48,7 +51,7 @@ async function checklist(page: Page) {
   await page.getByRole('button', { name: 'Завершить', exact: true }).click();
 }
 
-for (const version of ['v7', 'v10', 'operator'] as const) for (const multiple of [false, true]) test(version + ': real admission, inspections, offline replay, production and closed report (' + (multiple ? 'multiple rigs' : 'single rig') + ')', async ({ page, context }, info) => {
+for (const version of ['v7', 'v10', 'operator', 'v5'] as const) for (const multiple of [false, true]) test(version + ': real admission, inspections, offline replay, production and closed report (' + (multiple ? 'multiple rigs' : 'single rig') + ')', async ({ page, context }, info) => {
   test.setTimeout(600_000);
   await page.setViewportSize({ width: 375, height: 812 });
   const fixture = await createRoleAuditFixture();
@@ -56,6 +59,7 @@ for (const version of ['v7', 'v10', 'operator'] as const) for (const multiple of
   await db.connect();
   const equipmentName = 'Ночной цикл ' + version + ' ' + fixture.equipmentId;
   const mainScreen = version === 'operator';
+  const v5Screen = version === 'v5';
   const amountLabel = mainScreen ? 'Свай, шт' : version === 'v10' ? 'Количество, шт' : 'Количество, шт.';
   const observed: Array<Record<string, unknown>> = [];
   const commands: Array<Record<string, unknown>> = [];
@@ -93,7 +97,7 @@ for (const version of ['v7', 'v10', 'operator'] as const) for (const multiple of
     if (mainScreen) await page.getByRole('button', { name: 'Прочитал и ознакомлен', exact: true }).click();
     else {
       await page.getByRole('button', { name: /^Я ознакомился с инструкцией/ }).click();
-      await page.getByRole('button', { name: 'Ознакомлен', exact: true }).click();
+      await page.getByRole('button', { name: v5Screen ? 'Подтвердить ознакомление' : 'Ознакомлен', exact: true }).click();
     }
     await expect.poll(async () => (await state(page)).identity.briefing.ok).toBe(true);
     const attempt = page.waitForResponse(response => new URL(response.url()).pathname === '/api/operator/knowledge-attempt');
@@ -102,7 +106,7 @@ for (const version of ['v7', 'v10', 'operator'] as const) for (const multiple of
     for (const question of questions) {
       await expect(page.getByText(question.text, { exact: true })).toBeVisible();
       await page.getByRole('button', { name: question.options[question.correct], exact: true }).click();
-      if (mainScreen) await page.getByRole('button', { name: 'Верно, дальше', exact: true }).click();
+      if (mainScreen || v5Screen) await page.getByRole('button', { name: 'Верно, дальше', exact: true }).click();
       else {
         await page.getByRole('button', { name: 'Ответить', exact: true }).click();
         await page.getByRole('button', { name: 'Далее', exact: true }).click();
@@ -118,7 +122,8 @@ for (const version of ['v7', 'v10', 'operator'] as const) for (const multiple of
       expect((await state(page)).assignment?.equipmentId).toBe(fixture.equipmentId);
       observed.push({ step: 'v10 accepts displayed default assignment; no alternative rig selector', options: (await state(page)).options });
     }
-    await page.getByRole('button', { name: mainScreen ? 'Принять и открыть смену' : 'Принять установку', exact: true }).click();
+    if (v5Screen) await page.locator('.card').filter({ hasText: equipmentName }).getByRole('button', { name: 'Принять машину', exact: true }).click();
+    else await page.getByRole('button', { name: mainScreen ? 'Принять и открыть смену' : 'Принять установку', exact: true }).click();
     await expect.poll(async () => (await state(page)).phase).toBe('PRESHIFT_INSPECTION');
     for (const phase of ['PRESHIFT_INSPECTION', 'SITE_READY', 'STARTUP'] as const) {
       expect((await state(page)).phase).toBe(phase);
@@ -128,7 +133,18 @@ for (const version of ['v7', 'v10', 'operator'] as const) for (const multiple of
       observed.push({ step: phase, state: await state(page) });
     }
     expect((await state(page)).phase).toBe('WORK');
-    if (mainScreen) {
+    if (v5Screen) await expect.poll(async () => page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(375);
+    if (v5Screen) {
+      await next(page);
+      for (const stage of ['TB_PILING', 'TB_DRILLING'] as const) {
+        const list = (await state(page)).checklists.find(item => item.stage === stage);
+        if (!list) throw new Error(stage + ' checklist is required');
+        await page.getByRole('button').filter({ hasText: list.title }).click();
+        await checklist(page);
+        await expect.poll(async () => (await state(page)).checklists.find(item => item.stage === stage)?.done).toBe(true);
+      }
+      await next(page);
+    } else if (mainScreen) {
       await next(page);
       await page.getByRole('button', { name: 'Пройти чек-лист', exact: true }).click();
       await checklist(page);
@@ -159,12 +175,17 @@ for (const version of ['v7', 'v10', 'operator'] as const) for (const multiple of
       await page.getByRole('button', { name: 'Добавить сваю', exact: true }).click();
       await page.getByRole('combobox', { name: 'Марка сваи', exact: true }).selectOption({ label: 'QA C120.30' });
     }
+    else if (v5Screen) {
+      await page.getByRole('button', { name: 'Добавить сваю', exact: true }).click();
+      await page.getByRole('combobox').selectOption({ label: 'QA C120.30' });
+    }
     else if (mainScreen) {
       await page.getByRole('button', { name: 'Пачкой', exact: true }).click();
       await page.getByRole('combobox', { name: 'Марка сваи', exact: true }).selectOption({ label: 'QA C120.30' });
     }
     else await page.getByRole('button', { name: 'QA C120.30', exact: true }).click();
-    await page.getByLabel(amountLabel, { exact: true }).fill('2');
+    if (v5Screen) await page.getByRole('textbox').first().fill('2');
+    else await page.getByLabel(amountLabel, { exact: true }).fill('2');
     await context.setOffline(true);
     await page.getByRole('button', { name: 'Записать', exact: true }).click();
     await expect(page.getByText(/Сохранено на устройстве|В очереди: 1|запись сохранена/i).first()).toBeVisible();
@@ -178,31 +199,44 @@ for (const version of ['v7', 'v10', 'operator'] as const) for (const multiple of
     expect(replay.status()).toBe(200);
     expect((await state(page)).production.piles.count).toBe(2);
     observed.push({ step: 'offline replay', state: await state(page), commandId: pileCommand?.clientCommandId });
-    await page.getByRole("button", { name: mainScreen ? "Бурение" : "Добавить бурение", exact: true }).first().click();
+    await page.getByRole("button", { name: mainScreen || v5Screen ? "Бурение" : "Добавить бурение", exact: true }).first().click();
     if (version === 'v10' || mainScreen) await page.getByRole('combobox', { name: 'Тип бурения', exact: true }).selectOption({ label: 'QA бурение' });
+    else if (v5Screen) await page.getByRole("combobox").selectOption({ label: "QA бурение" });
     else await page.getByRole("button", { name: "QA бурение", exact: true }).click();
-    await page.getByLabel(mainScreen ? "Скважин, шт" : amountLabel, { exact: true }).fill("1");
-    await page.getByLabel(mainScreen ? "Метров на одну скважину" : "Метров на скважину", { exact: true }).fill("3");
+    if (v5Screen) {
+      await page.getByRole("textbox").nth(0).fill("1");
+      await page.getByRole("textbox").nth(1).fill("3");
+    } else {
+      await page.getByLabel(mainScreen ? "Скважин, шт" : amountLabel, { exact: true }).fill("1");
+      await page.getByLabel(mainScreen ? "Метров на одну скважину" : "Метров на скважину", { exact: true }).fill("3");
+    }
     await page.getByRole("button", { name: "Записать", exact: true }).click();
     await expect.poll(async () => (await state(page)).production.drilling.meters).toBe(3);
     await page.getByRole("button", { name: version === 'v10' ? "Записать простой" : "Простой", exact: true }).first().click();
     if (version === 'v10' || mainScreen) await page.getByRole('combobox', { name: 'Причина простоя', exact: true }).selectOption({ label: 'QA ожидание' });
+    else if (v5Screen) await page.getByRole("combobox").selectOption({ label: "QA ожидание" });
     else await page.getByRole("button", { name: "QA ожидание", exact: true }).click();
-    await page.getByLabel("Простой, часов", { exact: true }).fill("0.25");
+    if (v5Screen) await page.getByRole("spinbutton").fill("0.25");
+    else await page.getByLabel("Простой, часов", { exact: true }).fill("0.25");
     await page.getByRole("button", { name: "Записать", exact: true }).click();
     await expect.poll(async () => (await state(page)).production.downtimeHours).toBe(0.25);
-    if (version === 'v10') await page.getByRole('button', { name: '← К смене', exact: true }).click();
+    if (version === 'v10' || v5Screen) await page.getByRole('button', { name: '← К смене', exact: true }).click();
     if (mainScreen) await page.getByRole("button", { name: "Ещё", exact: true }).click();
     else await page.getByRole("button", { name: "Инцидент", exact: true }).click();
     if (version === 'v10') {
       await page.getByRole('button', { name: 'Записать происшествие', exact: true }).click();
       await page.getByRole('combobox', { name: 'Событие', exact: true }).selectOption('OTHER');
+    } else if (v5Screen) {
+      await page.getByRole("button", { name: "Записать происшествие", exact: true }).click();
+      await page.getByRole("combobox").selectOption("OTHER");
     } else {
       if (mainScreen) await page.getByRole('button', { name: 'Записать происшествие', exact: true }).click();
       await page.getByRole("button", { name: /^Другое/ }).click();
     }
     await page.getByRole("button", { name: "Другой наблюдаемый признак", exact: true }).click();
-    await page.getByLabel(version === 'v10' || mainScreen ? "Как было дело" : "Опишите своими словами", { exact: true }).fill("Синтетическое учебное происшествие ночной проверки, без реального оборудования и пострадавших.");
+    const description = "Синтетическое учебное происшествие ночной проверки, без реального оборудования и пострадавших.";
+    if (v5Screen) await page.getByRole("textbox").fill(description);
+    else await page.getByLabel(version === 'v10' || mainScreen ? "Как было дело" : "Опишите своими словами", { exact: true }).fill(description);
     await page.getByRole("button", { name: "Записать происшествие", exact: true }).click();
     await expect.poll(async () => (await state(page)).incidents.length).toBe(1);
     observed.push({ step: "drilling, downtime and incident", state: await state(page) });
