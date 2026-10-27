@@ -1,63 +1,57 @@
-# Доказательная ночь 26–27 октября 2026
+# Доказательная ночь 26–28 октября 2026
 
-Обновлено27октября18:35МСК. Ветка codex/night-evidence-1026,база origin/main `efd95008eac3bc846c89003c4b7766f2eb5c1c9b`. Последняя правка приложения **f51b0f30**:разрешённая одна SQL-строка. Push,merge и выкладки не было.
+Ветка codex/night-evidence-1026, база origin/main **efd95008eac3bc846c89003c4b7766f2eb5c1c9b**. Прикладная сборка **44126b98**, последующие изменения — E2E и отчёты. Ничего не отправлялось и не вливалось.
 
-| Задача | Статус | Результат и границы |
+| Задача | Статус | Что доказано |
 |---|---|---|
-|1. Повтор241пропуска|Готово|Все241 найдены и прошли в полном свежем прогоне5776/0/0 наf51|
-|2. Отказы outbox|Готово|Пять PG-сценариев,авария отдельного процесса,разрешённый tenant guard;существующие тесты прошли и в полномf51|
-|3. Матрица допуска|Готово|10случаев×5путей,решения совпали;предупреждения не унифицировались|
-|4. Образы и smoke|Готово|Точный main efd95008:app0/360с,workers0/43с,workers smoke0/9с;совместный запуск и prod:smoke13/13 exit0,cleanup=true. Это образыmain,не ночной ветки|
-|5. Длинные файлы|Готово|15текстовых файлов:7прикладных,8тестовых;только чтение|
-|6. Роли и все экраны оператора|**Частично**|На1b0:роли21/0/0,полные /operator/v7/v10 по6/0/0. На новыйf51 это доказательство не перенесено. Продолжаются оставшиеся UI-сценарии;v2/v3/v5 и всеCRUD/цепочки пока не закрыты|
-|7. Документы против кода|Готово в указанном объёме|42утверждения обязательных категорий,8вопросов;только очевидные пути/команды исправлены,архивы целиком не объявляются проверенными|
+|1. Повтор241пропуска|Готово|Все241 прошли в полном5776/0/0,512файлов|
+|2. Отказы outbox|Готово|Пять PG-сценариев, crash/replay, точечный canonical tenant guard; retry/DLQ сохранены|
+|3. Матрица допуска|Готово|10случаев×5путей, решения совпали; разные предупреждения оставлены|
+|4. Образы и smoke|Готово|Точный main efd95008:app0/360с,workers0/43с,workerssmoke0/9с,prod:smoke13/13exit0. Это образы main, не ночной ветки|
+|5. Длинные файлы|Готово|15файлов:7прикладных/8тестовых; только чтение|
+|6. Роли и сквозные цепочки|**Частично**|Пять версий оператора:30полных циклов;V3:9legacy/selector. Цепочки диспетчера, ОТ и ремонта подтверждены. КаждыйCRUD и каждый чужойURL ещё не исчерпаны|
+|7. Документы против кода|Готово в заявленном объёме|42утверждения обязательных категорий,9вопросов владельцу. Архивы целиком не объявлены проверенными|
 
 ## ДЕФЕКТЫ
 
-| Приоритет | Подтверждённый дефект | Исправление |
+| Приоритет | Дефект | Исправление |
 |---|---|---|
-|P2|ASSISTANT получал403 общего bootstrap в «ТБ и допуски»|0e3e2c9a:существующий личный экран,без расширения прав;RED9b9cce5f|
-|P2|Outbox без канонического tenantId доходил до handler|48aa4689 по разрешению;retry/DLQ сохранены,backfill не выполнялся|
-|P2|20конкурентных approval иногда получали23505 по legacy UNIQUE(scope,key)|**f51b0f30** по точечному разрешению:только ON CONFLICT DO NOTHING.37существующих проверок,10повторов гонки и полный5776/0/0 прошли;тесты не менялись|
-|P3|FOREMAN-dashboard запрашивал закрытый список документов пользователей|befa99f9 через существующее право users.documents.read_all|
-|P3|Два S3-key helper без tenantId возвращали default-prefix|7ad5d3bd по разрешению,включены2существующих теста;вызовы в приложении не найдены,реальная утечка не заявляется|
-|P3|V3 desktop:нижняя навигация перекрывала выбор объекта|1b0a2663,одна CSS-добавка;RED2mobile/1desktop→GREEN3. Это достижимость selector,не полный циклV3|
+|P2|ASSISTANT403 в «ТБ и допуски»|0e3e2c9a: личный экран без расширения прав|
+|P2|Outbox без tenantId доходил доhandler|48aa4689: разрешённый guard;старые записи требуют разбора|
+|P2|Гонка20approval:23505legacy UNIQUE(scope,key),воспроизведена наmain|f51b0f30:ровно разрешённое ON CONFLICT DO NOTHING.37проверок+10гонок+полный5776/0/0|
+|P3|FOREMAN делал закрытый запрос документов|befa99f9:существующее право чтения|
+|P3|Два S3helpers с пустымtenant возвращалиdefaultprefix|7ad5d3bd:2функции+2существующихтеста;живых callers нет,утечка не заявлена|
+|P3|V5 длинное имя расширялоviewport и мешало нажатиям|46315b0f:локальныйoverflow-wrap,RED→GREEN|
+|P3|V2 нижняя панель перекрывала завершение осмотра;имя расширялоviewport|21dc26ce+7a9dc8a7+95f7c6b8:локальныеCSSклассы;6полныхциклов зелёные|
+|P3|V3 нижняя навигация перекрывала selector объекта|1b0a2663:CSS,3selector зелёные;версия сохранена|
 
-## Последние проверки на f51b0f30
+## Проверки
 
-| Команда / проверка | Exit | Результат |
-|---|---:|---|
-|npm run build|0|HTTP health подтвердил точныйSHAf51;время команды отдельно не измерялось|
-|npx tsc --noEmit|0|31с|
-|npm run lint|0|75с,zero warnings,text integrity passed|
-|Полный npm run test:unit на свежем PG/Redis/HTTP|0|**5776 passed /0 failed /0 skipped**,512файлов;856,05с Vitest/901с wrapper|
-|Полный Playwright --list через собственные одноразовые QA-фикстуры|0|366тестов/30файлов;BASE той же процедурой318/28 exit0;37с wrapper,cleanup=true|
-|9существующих связанных файлов|0|37passed/0failed/0skipped,25с|
-|10отдельных20-way approval race|Все0|Каждый1passed/0failed;по3прочих сценария отфильтрованы,не названы исполненными|
+Build44126:exit0/143с;tsc0/19с;lint0/65с/zero warnings. Свежий полный unit: **5776passed/0failed/0skipped**,512файлов,831,50с Vitest/873с wrapper. Все241 исторических найдены и прошли. Playwright collection:384/30 против BASE318/28,обаexit0. Последующие E2E-only проверки и новые сквозные цепочки — CROSS-ROLE.md;точные команды,exits,время и последняя коллекция — VERIFICATION.md.
 
-Все241исторических сопоставлены и passed в том же полном JSON. ИсходныйRED5775/1/0,его воспроизводимость наmain и все другие красные запуски сохранены в VERIFICATION.md;ни один не стёрт новым GREEN. Ни schema,ни индексы,ни tenant namespace/фильтры/транзакции не менялись.
+Пять канонических версий /operator,v2,v5,v7,v10 × три браузера × одна/две установки: **30passed/0failed/0skipped**,30CLOSED/30уникальных отчётов. Проверены СИЗ/инструктаж/знания,осмотры/ТБ,offline/replay,сваи/бурение/простой,инцидент/ЕО,закрытие,SQL/audit/outbox/analytics и UI диспетчера. V10 при двух назначениях принимает показанное по умолчанию; другой chooser не выдуман.
 
-## Границы UI и доставки
+V3: **9passed/0failed/0skipped** (6legacy+3selector). Отчёт сохраняется, но shiftId=null и mobilephaseIDENTITY до/после. Это отдельная legacy-модель; канонический цикл V3 отсутствует. Вопрос№9 — решение владельца, процесс самовольно не переписан. Начальный SafariRED оказался гонкой фокуса нового теста после RadixSelect;86358ae3 ждёт реальный возврат фокуса, не ослабляя assertions.
 
-Прежние результаты относятся к приложению1b0a2663:семь ролей×три браузера21/0/0;полные /operator,v7,v10 по6/0/0;V3selector3/0/0;C3fresh1/0/0. Полный цикл включал допуск,осмотры,ТБ,офлайн2сваи и replay без дубля,бурение3м,простой0,25ч,инцидент,ЕО,закрытие,SQLanalytics/audit/outbox и открытие отчёта диспетчером. Наf51 эти UI-прогоны пока не повторены.
+Существующие critical paths на совершенно свежем стенде: **6passed/0failed/0skipped**,exit0/58с:report→dailyprojection→analytics→реальныеPDFbytes, ADMIN наряд/приёмка, подтверждённое удаление куста,503recovery,UI второго канала(ответmock),printpopup. ПрочиеCRUD этим не объявляются проверенными.
 
-Дляv10 при двух вариантах проверено только принятие показанного назначения по умолчанию:другого chooser в форме нет. Паспорт сваи,полныеv2/v3/v5,каждыйCRUD,все чужиеURL и цепочки дефект→ремонт→готовность / инцидент→инженерОТ ещё не доказаны. Наличие команд в коде не подменяет полный браузерный цикл.
+Свежий C1–C3: **3passed/0failed/0skipped**,exit0/67с,cleanup=true. Это действия со справочником,объектом и отчётом диспетчера;подробности QA-RUN.md. Новые сквозные цепочки:Chromium2/0/0;ремонт3/0/0;обход семи ролей21/0/0. Последние tsc0/19с,lint0/124с;Playwright387/30 против BASE318/28,обаexit0.
 
-Первый свежий Chromium QA68 остаётся53passed/14skipped/1failed exit1. Устаревший email-контрактC3 исправлен поfixture-ID с проверкой скрытия контактов,focused повтор прошёл;весь68 после этого не повторялся. Причины14пропусков —QA-RUN.md.
+## Что осталось
 
-На прежнем смешанном стенде перед очисткой сохранены40pendingDLQ:29NotificationDeliveryRequested,5синтетических ReportSubmitted без исходных данных,6ReadinessSnapshotRequested без equipment. Telegram не настроен,внешняя доставка не считается успешной. Отдельные6положительных delivery-сценариев прошли на свежихPG/Redis и своём HTTP-получателе. Политика ненастроенного канала —вопрос№8;подробностиOUTBOX.md. Железо,MQTT/датчики,реальныйTelegram не проверялись.
+КаждыйCRUD, каждый чужойURL, паспорт сваи и вся матрица ресурсов не исчерпаны. Первоначальный QA68 остаётся53passed/14skipped/1failed,exit1;устаревший email-контракт C3 исправлен и focused зелёный,весь68 не повторялся. Причины14skip — QA-RUN.md. Исторические REDunit/UI не удалены и не заменены выборочными GREEN.
 
-## Состояние работы
+Очередь уведомлений и6delivery-сценариев на своём HTTP подтверждены; реальный Telegram, датчики, MQTT и железо не проверены. Ненастроенный Telegram даёт retry/DLQ: политика — вопрос№8. Закрытие ремонта не переписывает старый осмотр и само по себе не обещает полностью READY.
 
-Одноразовая автоматизация18-30 запустила продолжение и удалена. Текущий собственный стенд наf51 оставлен для задачи6;временные unit/list-контейнеры очищены. Рабочий3100 и данные не затрагивались. .env не читались/не создавались;schema,migrations,dependencies,auth/security,ORION и версии оператора сохранены.
+Рабочие3100/данные/production не трогались. .env/schema/migrations/dependencies/auth/security/ORION не менялись. Узкие исключения S3/outbox/однаSQLстрока не расширены. Один независимый review выполнен ранее; новый не дублировался, поздние фиксы ему не приписаны. Автоматизации03-15/08-20/13-25/18-30 удалены.
 
-Прикладная дельта до1b0 прошла один независимый review;Important переносимости PG-теста исправлен. Новый fresh-review не дублировался. Дляf51 проверены ровно разрешённая строка и существующие тесты. Impact UNKNOWN из-заDI подтверждён текстом длякомандdefects/permits/shifts;полный detect перед коммитом безpartial/truncated. Глобальный бюджетflows и анонимныеE2E ограничивают полноту графа,ноль callers не принимается за безопасность.
+## Файлы и повтор
 
-Отчёты —docs/audits/night-1026/. Команды и история —VERIFICATION.md,однострочный фикс —PERMIT-IDEMPOTENCY-RACE.md,файлы и строки —CHANGED-FILES.md. Сырые JSON/логи/скриншоты и актуальная точка —D:/PillingR/night-logs/night-evidence-1026/. Полная очередь ещё не объявляется законченной;это не разрешение на выкладку.
+Подробности: VERIFICATION.md, ROLES-WALKTHROUGH.md, CROSS-ROLE.md, OPERATOR-CYCLE.md, V2-FOOTER.md, V5-VIEWPORT.md, V3-LEGACY.md. Файлы и строки — CHANGED-FILES.md. Сырые логи/JSON/screenshots и RESUME — D:/PillingR/night-logs/night-evidence-1026/. Команды в *-result.json; пароли fixtures не писать в.env/отчёт. Полные detectall/compare перед финальным коммитом приложены отдельно; ограничения графа не трактуются как безопасность.
 
 ## Коммиты ветки
 
-До текущего документального снимка;актуальный полный список вместе с ним:git log --reverse --format="%H %s" efd95008..HEAD.
+До документального снимка; включая его: git log --reverse --format="%H %s" efd95008..HEAD.
 
 - 17fd1277d3ee97b49b1f4736fd77aa8318a5097a test(storage): expose tenantless S3 key regression
 - 7ad5d3bd7192b8976ce11113b68b54c93dbfe655 fix(storage): reject tenantless report and CSV keys
@@ -83,3 +77,13 @@
 - 58a2b64f7a9437e6badbc1474bfb279ee95c5a18 test: exercise full primary operator shift and offline replay
 - a61aa205bd55817ca342f98b0310889f6f5aaff9 docs: record primary operator evidence and final isolated cleanup
 - f51b0f30465c0273905853d0e1e8bc333a9ee0e5 fix(readiness): handle both idempotency unique constraints
+- a17c07e7132b772118d9b3b780a1c9f3c5781c03 docs: record verified idempotency fix and full green baseline
+- e4b438783fef8e4c36fa685b8e553cf8e7022315 test: reproduce v5 long equipment name overflow
+- 46315b0fa1233b27075c4edb79d604c6c451026c fix(operator-v5): wrap long equipment names within viewport
+- 1d0ff6e99da391207450ffc546f6051875883cda test: reproduce blocked completion in v2 inspection
+- 21dc26ce6046a139e54d0ce8fc19c55e94682b65 fix(operator-v2): keep nested screen footer clear of step dock
+- 7a9dc8a7d7e8064d3af48549592315468e045cf2 fix(operator-v2): reserve space for fixed step navigation
+- 95f7c6b85de1baff9cf2188ce7fc6b449714622b fix(operator-v2): wrap long rig names within the viewport
+- 44126b987c9dd02b0bbefe28e8094f282b94aaf0 test(operator-v3): prove legacy report persistence and dispatcher visibility
+- 86358ae362686ec2655bf525267059a41908a57b test(operator-v3): await select focus restoration before numeric input
+- fa2de8ec394b86dba29eb2861d0252a1416c647c test(e2e): prove dispatcher safety repair and readiness chains

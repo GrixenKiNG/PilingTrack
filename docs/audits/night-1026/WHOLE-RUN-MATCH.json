@@ -1,30 +1,46 @@
 {
-  "wholeRun": "full-unit-claim-fix",
-  "sourceSha": "f51b0f30465c0273905853d0e1e8bc333a9ee0e5",
+  "wholeRun": "full-unit-night-ui-final",
+  "sourceSha": "44126b987c9dd02b0bbefe28e8094f282b94aaf0",
+  "unitExit": 0,
+  "gatesComplete": true,
   "passed": 5776,
   "failed": 0,
   "skipped": 0,
   "files": 512,
+  "historicalTotal": 241,
   "historicalMatched": 241,
   "historicalPassed": 241,
   "historicalNotPassed": [],
+  "failedTests": [],
+  "unitWorktreeSha": "86358ae362686ec2655bf525267059a41908a57b",
   "previousRun": {
-    "wholeRun": "full-unit-v3-final",
-    "sourceSha": "1b0a2663d19c5d9f77e22f64882ba59c306bbf8c",
-    "passed": 5775,
-    "failed": 1,
+    "wholeRun": "full-unit-claim-fix",
+    "sourceSha": "f51b0f30465c0273905853d0e1e8bc333a9ee0e5",
+    "passed": 5776,
+    "failed": 0,
     "skipped": 0,
     "files": 512,
     "historicalMatched": 241,
     "historicalPassed": 241,
     "historicalNotPassed": [],
-    "previousSuccessful": {
-      "wholeRun": "full-unit-after-portability",
-      "passed": 5776,
-      "failed": 0,
+    "previousRun": {
+      "wholeRun": "full-unit-v3-final",
+      "sourceSha": "1b0a2663d19c5d9f77e22f64882ba59c306bbf8c",
+      "passed": 5775,
+      "failed": 1,
       "skipped": 0,
       "files": 512,
-      "historicalPassed": 241
+      "historicalMatched": 241,
+      "historicalPassed": 241,
+      "historicalNotPassed": [],
+      "previousSuccessful": {
+        "wholeRun": "full-unit-after-portability",
+        "passed": 5776,
+        "failed": 0,
+        "skipped": 0,
+        "files": 512,
+        "historicalPassed": 241
+      }
     }
   }
 }

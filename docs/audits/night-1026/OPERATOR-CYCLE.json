@@ -4233,6 +4233,2198 @@
           ]
         }
       ]
+    },
+    {
+      "run": "v5-six-after-wrap",
+      "exit": 0,
+      "passed": 6,
+      "failed": 0,
+      "skipped": 0,
+      "seconds": 253,
+      "appBuild": "46315b0fa1233b27075c4edb79d604c6c451026c",
+      "cases": [
+        {
+          "title": "v5: real admission, inspections, offline replay, production and closed report (single rig)",
+          "project": "chromium",
+          "status": "passed",
+          "duration": 48927,
+          "observedSteps": [
+            {
+              "step": "initial",
+              "phase": "IDENTITY",
+              "assignment": "cmvqvsfae0009bsw5bxa0cyb5",
+              "options": 1,
+              "production": {
+                "piles": {
+                  "count": 0,
+                  "meters": 0
+                },
+                "drilling": {
+                  "count": 0,
+                  "meters": 0
+                },
+                "downtimeHours": 0
+              },
+              "receipt": null
+            },
+            {
+              "step": "PRESHIFT_INSPECTION",
+              "phase": "SITE_READY",
+              "assignment": "cmvqvsfae0009bsw5bxa0cyb5",
+              "options": 1,
+              "production": {
+                "piles": {
+                  "count": 0,
+                  "meters": 0
+                },
+                "drilling": {
+                  "count": 0,
+                  "meters": 0
+                },
+                "downtimeHours": 0
+              },
+              "receipt": null
+            },
+            {
+              "step": "SITE_READY",
+              "phase": "STARTUP",
+              "assignment": "cmvqvsfae0009bsw5bxa0cyb5",
+              "options": 1,
+              "production": {
+                "piles": {
+                  "count": 0,
+                  "meters": 0
+                },
+                "drilling": {
+                  "count": 0,
+                  "meters": 0
+                },
+                "downtimeHours": 0
+              },
+              "receipt": null
+            },
+            {
+              "step": "STARTUP",
+              "phase": "WORK",
+              "assignment": "cmvqvsfae0009bsw5bxa0cyb5",
+              "options": 1,
+              "production": {
+                "piles": {
+                  "count": 0,
+                  "meters": 0
+                },
+                "drilling": {
+                  "count": 0,
+                  "meters": 0
+                },
+                "downtimeHours": 0
+              },
+              "receipt": null
+            },
+            {
+              "step": "offline replay",
+              "phase": "WORK",
+              "assignment": "cmvqvsfae0009bsw5bxa0cyb5",
+              "options": 1,
+              "production": {
+                "piles": {
+                  "count": 2,
+                  "meters": 24
+                },
+                "drilling": {
+                  "count": 0,
+                  "meters": 0
+                },
+                "downtimeHours": 0
+              },
+              "receipt": null
+            },
+            {
+              "step": "drilling, downtime and incident",
+              "phase": "WORK",
+              "assignment": "cmvqvsfae0009bsw5bxa0cyb5",
+              "options": 1,
+              "production": {
+                "piles": {
+                  "count": 2,
+                  "meters": 24
+                },
+                "drilling": {
+                  "count": 1,
+                  "meters": 3
+                },
+                "downtimeHours": 0.25
+              },
+              "receipt": null
+            },
+            {
+              "step": "audit and general feed are separate"
+            },
+            {
+              "step": "closed",
+              "phase": "CLOSED",
+              "assignment": "cmvqvsfae0009bsw5bxa0cyb5",
+              "options": 1,
+              "production": {
+                "piles": {
+                  "count": 2,
+                  "meters": 24
+                },
+                "drilling": {
+                  "count": 1,
+                  "meters": 3
+                },
+                "downtimeHours": 0.25
+              },
+              "receipt": {
+                "reportId": "RM-6bfd285c-2026-10-27",
+                "submittedAt": "2026-10-27T16:09:52.398Z",
+                "closedAt": "2026-10-27T16:09:52.398Z",
+                "timezone": "Europe/Moscow"
+              }
+            },
+            {
+              "step": "dispatcher sees the actual submitted report"
+            }
+          ],
+          "commands": [
+            {
+              "command": "confirm-ppe"
+            },
+            {
+              "command": "acknowledge-briefing"
+            },
+            {
+              "command": "submit-knowledge"
+            },
+            {
+              "command": "accept-equipment",
+              "clientCommandId": "65980ccb-d493-4aca-b341-0d1546daa313"
+            },
+            {
+              "command": "submit-checklist",
+              "clientCommandId": "d7ee6d22-8a4b-4bc7-b8f9-f62345d9bdf5"
+            },
+            {
+              "command": "submit-checklist",
+              "clientCommandId": "81cc4723-6f66-4e8f-a6b4-9ac109d8a614"
+            },
+            {
+              "command": "submit-checklist",
+              "clientCommandId": "23dc2f80-30b2-44c4-a040-6c9b301d4ac5"
+            },
+            {
+              "command": "submit-checklist",
+              "clientCommandId": "05a5379b-d7c7-41da-9821-19a1a760ebf8"
+            },
+            {
+              "command": "submit-checklist",
+              "clientCommandId": "e14442a6-bb94-484b-bfb6-ea5415c7e001"
+            },
+            {
+              "command": "log-production",
+              "clientCommandId": "0a11de37-5c46-4139-bb5b-b909acd94b61"
+            },
+            {
+              "command": "log-production",
+              "clientCommandId": "0a11de37-5c46-4139-bb5b-b909acd94b61"
+            },
+            {
+              "command": "log-production",
+              "clientCommandId": "8c680396-59c1-4a9c-8326-71763d0cf1d4"
+            },
+            {
+              "command": "log-production",
+              "clientCommandId": "b17b8afd-a097-4d7b-8f98-7df19e499380"
+            },
+            {
+              "command": "report-incident",
+              "clientCommandId": "d30704bd-11d7-4ad5-8473-51c9a4e4b773"
+            },
+            {
+              "command": "finish-work"
+            },
+            {
+              "command": "submit-checklist",
+              "clientCommandId": "0897c60d-0960-4dd7-bdbe-91ebeafa212e"
+            },
+            {
+              "command": "close-shift"
+            }
+          ],
+          "responses": [
+            {
+              "status": 200
+            },
+            {
+              "status": 200
+            },
+            {
+              "status": 200
+            },
+            {
+              "status": 200
+            },
+            {
+              "status": 200
+            },
+            {
+              "status": 200
+            },
+            {
+              "status": 200
+            },
+            {
+              "status": 200
+            },
+            {
+              "status": 200
+            },
+            {
+              "status": 200
+            },
+            {
+              "status": 200
+            },
+            {
+              "status": 200
+            },
+            {
+              "status": 200
+            },
+            {
+              "status": 200
+            },
+            {
+              "status": 200
+            },
+            {
+              "status": 200
+            }
+          ]
+        },
+        {
+          "title": "v5: real admission, inspections, offline replay, production and closed report (multiple rigs)",
+          "project": "chromium",
+          "status": "passed",
+          "duration": 20447,
+          "observedSteps": [
+            {
+              "step": "initial",
+              "phase": "IDENTITY",
+              "assignment": "cmvqvtgx9000wbsw5zkj81wlo",
+              "options": 2,
+              "production": {
+                "piles": {
+                  "count": 0,
+                  "meters": 0
+                },
+                "drilling": {
+                  "count": 0,
+                  "meters": 0
+                },
+                "downtimeHours": 0
+              },
+              "receipt": null
+            },
+            {
+              "step": "PRESHIFT_INSPECTION",
+              "phase": "SITE_READY",
+              "assignment": "cmvqvtgx9000wbsw5zkj81wlo",
+              "options": 2,
+              "production": {
+                "piles": {
+                  "count": 0,
+                  "meters": 0
+                },
+                "drilling": {
+                  "count": 0,
+                  "meters": 0
+                },
+                "downtimeHours": 0
+              },
+              "receipt": null
+            },
+            {
+              "step": "SITE_READY",
+              "phase": "STARTUP",
+              "assignment": "cmvqvtgx9000wbsw5zkj81wlo",
+              "options": 2,
+              "production": {
+                "piles": {
+                  "count": 0,
+                  "meters": 0
+                },
+                "drilling": {
+                  "count": 0,
+                  "meters": 0
+                },
+                "downtimeHours": 0
+              },
+              "receipt": null
+            },
+            {
+              "step": "STARTUP",
+              "phase": "WORK",
+              "assignment": "cmvqvtgx9000wbsw5zkj81wlo",
+              "options": 2,
+              "production": {
+                "piles": {
+                  "count": 0,
+                  "meters": 0
+                },
+                "drilling": {
+                  "count": 0,
+                  "meters": 0
+                },
+                "downtimeHours": 0
+              },
+              "receipt": null
+            },
+            {
+              "step": "offline replay",
+              "phase": "WORK",
+              "assignment": "cmvqvtgx9000wbsw5zkj81wlo",
+              "options": 2,
+              "production": {
+                "piles": {
+                  "count": 2,
+                  "meters": 24
+                },
+                "drilling": {
+                  "count": 0,
+                  "meters": 0
+                },
+                "downtimeHours": 0
+              },
+              "receipt": null
+            },
+            {
+              "step": "drilling, downtime and incident",
+              "phase": "WORK",
+              "assignment": "cmvqvtgx9000wbsw5zkj81wlo",
+              "options": 2,
+              "production": {
+                "piles": {
+                  "count": 2,
+                  "meters": 24
+                },
+                "drilling": {
+                  "count": 1,
+                  "meters": 3
+                },
+                "downtimeHours": 0.25
+              },
+              "receipt": null
+            },
+            {
+              "step": "audit and general feed are separate"
+            },
+            {
+              "step": "closed",
+              "phase": "CLOSED",
+              "assignment": "cmvqvtgx9000wbsw5zkj81wlo",
+              "options": 2,
+              "production": {
+                "piles": {
+                  "count": 2,
+                  "meters": 24
+                },
+                "drilling": {
+                  "count": 1,
+                  "meters": 3
+                },
+                "downtimeHours": 0.25
+              },
+              "receipt": {
+                "reportId": "RM-4e233284-2026-10-27",
+                "submittedAt": "2026-10-27T16:10:40.471Z",
+                "closedAt": "2026-10-27T16:10:40.471Z",
+                "timezone": "Europe/Moscow"
+              }
+            },
+            {
+              "step": "dispatcher sees the actual submitted report"
+            }
+          ],
+          "commands": [
+            {
+              "command": "confirm-ppe"
+            },
+            {
+              "command": "acknowledge-briefing"
+            },
+            {
+              "command": "submit-knowledge"
+            },
+            {
+              "command": "accept-equipment",
+              "clientCommandId": "2384b3f1-c5e6-4a18-998f-59f1d3f80d54"
+            },
+            {
+              "command": "submit-checklist",
+              "clientCommandId": "4a7b49ec-241a-4f07-a4e7-cec786df7b0b"
+            },
+            {
+              "command": "submit-checklist",
+              "clientCommandId": "b47a3f6b-c4b1-482b-ac2d-557f785d63a7"
+            },
+            {
+              "command": "submit-checklist",
+              "clientCommandId": "750ee7a2-2d62-4a2b-b4d2-9a1a4fb49ac3"
+            },
+            {
+              "command": "submit-checklist",
+              "clientCommandId": "92efdf23-cdc8-4471-836a-a77f08d7aa9c"
+            },
+            {
+              "command": "submit-checklist",
+              "clientCommandId": "f7663d7d-75c5-41b9-aa90-75d8be749c14"
+            },
+            {
+              "command": "log-production",
+              "clientCommandId": "8208de09-a75a-4429-9e64-9ef3cdb34868"
+            },
+            {
+              "command": "log-production",
+              "clientCommandId": "8208de09-a75a-4429-9e64-9ef3cdb34868"
+            },
+            {
+              "command": "log-production",
+              "clientCommandId": "064afd1f-189d-4fdd-93eb-4f34a618edee"
+            },
+            {
+              "command": "log-production",
+              "clientCommandId": "2a0d3033-d156-495b-8ace-fc1c77e9e9d5"
+            },
+            {
+              "command": "report-incident",
+              "clientCommandId": "5cbe76d0-4be1-4fa5-9ef8-495a312dd7f1"
+            },
+            {
+              "command": "finish-work"
+            },
+            {
+              "command": "submit-checklist",
+              "clientCommandId": "7cb3fab4-8225-4ad4-8f68-97617d6242b4"
+            },
+            {
+              "command": "close-shift"
+            }
+          ],
+          "responses": [
+            {
+              "status": 200
+            },
+            {
+              "status": 200
+            },
+            {
+              "status": 200
+            },
+            {
+              "status": 200
+            },
+            {
+              "status": 200
+            },
+            {
+              "status": 200
+            },
+            {
+              "status": 200
+            },
+            {
+              "status": 200
+            },
+            {
+              "status": 200
+            },
+            {
+              "status": 200
+            },
+            {
+              "status": 200
+            },
+            {
+              "status": 200
+            },
+            {
+              "status": 200
+            },
+            {
+              "status": 200
+            },
+            {
+              "status": 200
+            },
+            {
+              "status": 200
+            }
+          ]
+        },
+        {
+          "title": "v5: real admission, inspections, offline replay, production and closed report (single rig)",
+          "project": "Mobile Safari",
+          "status": "passed",
+          "duration": 62328,
+          "observedSteps": [
+            {
+              "step": "initial",
+              "phase": "IDENTITY",
+              "assignment": "cmvqvtxzo0009tgw5me0i7fwt",
+              "options": 1,
+              "production": {
+                "piles": {
+                  "count": 0,
+                  "meters": 0
+                },
+                "drilling": {
+                  "count": 0,
+                  "meters": 0
+                },
+                "downtimeHours": 0
+              },
+              "receipt": null
+            },
+            {
+              "step": "PRESHIFT_INSPECTION",
+              "phase": "SITE_READY",
+              "assignment": "cmvqvtxzo0009tgw5me0i7fwt",
+              "options": 1,
+              "production": {
+                "piles": {
+                  "count": 0,
+                  "meters": 0
+                },
+                "drilling": {
+                  "count": 0,
+                  "meters": 0
+                },
+                "downtimeHours": 0
+              },
+              "receipt": null
+            },
+            {
+              "step": "SITE_READY",
+              "phase": "STARTUP",
+              "assignment": "cmvqvtxzo0009tgw5me0i7fwt",
+              "options": 1,
+              "production": {
+                "piles": {
+                  "count": 0,
+                  "meters": 0
+                },
+                "drilling": {
+                  "count": 0,
+                  "meters": 0
+                },
+                "downtimeHours": 0
+              },
+              "receipt": null
+            },
+            {
+              "step": "STARTUP",
+              "phase": "WORK",
+              "assignment": "cmvqvtxzo0009tgw5me0i7fwt",
+              "options": 1,
+              "production": {
+                "piles": {
+                  "count": 0,
+                  "meters": 0
+                },
+                "drilling": {
+                  "count": 0,
+                  "meters": 0
+                },
+                "downtimeHours": 0
+              },
+              "receipt": null
+            },
+            {
+              "step": "offline replay",
+              "phase": "WORK",
+              "assignment": "cmvqvtxzo0009tgw5me0i7fwt",
+              "options": 1,
+              "production": {
+                "piles": {
+                  "count": 2,
+                  "meters": 24
+                },
+                "drilling": {
+                  "count": 0,
+                  "meters": 0
+                },
+                "downtimeHours": 0
+              },
+              "receipt": null
+            },
+            {
+              "step": "drilling, downtime and incident",
+              "phase": "WORK",
+              "assignment": "cmvqvtxzo0009tgw5me0i7fwt",
+              "options": 1,
+              "production": {
+                "piles": {
+                  "count": 2,
+                  "meters": 24
+                },
+                "drilling": {
+                  "count": 1,
+                  "meters": 3
+                },
+                "downtimeHours": 0.25
+              },
+              "receipt": null
+            },
+            {
+              "step": "audit and general feed are separate"
+            },
+            {
+              "step": "closed",
+              "phase": "CLOSED",
+              "assignment": "cmvqvtxzo0009tgw5me0i7fwt",
+              "options": 1,
+              "production": {
+                "piles": {
+                  "count": 2,
+                  "meters": 24
+                },
+                "drilling": {
+                  "count": 1,
+                  "meters": 3
+                },
+                "downtimeHours": 0.25
+              },
+              "receipt": {
+                "reportId": "RM-bcbe4b9a-2026-10-27",
+                "submittedAt": "2026-10-27T16:11:19.609Z",
+                "closedAt": "2026-10-27T16:11:19.609Z",
+                "timezone": "Europe/Moscow"
+              }
+            },
+            {
+              "step": "dispatcher sees the actual submitted report"
+            }
+          ],
+          "commands": [
+            {
+              "command": "confirm-ppe"
+            },
+            {
+              "command": "acknowledge-briefing"
+            },
+            {
+              "command": "submit-knowledge"
+            },
+            {
+              "command": "accept-equipment",
+              "clientCommandId": "32964e42-fcee-426a-bb86-3fdffce0c9f0"
+            },
+            {
+              "command": "submit-checklist",
+              "clientCommandId": "41319cee-e3fa-4b9e-bec4-9ae73a321477"
+            },
+            {
+              "command": "submit-checklist",
+              "clientCommandId": "804774bd-baa3-42f4-866e-b64f252098cd"
+            },
+            {
+              "command": "submit-checklist",
+              "clientCommandId": "f537b8c9-de3e-468b-bbcf-ff2fe7c0d45a"
+            },
+            {
+              "command": "submit-checklist",
+              "clientCommandId": "d3033079-20b8-4175-ad57-0d882244779f"
+            },
+            {
+              "command": "submit-checklist",
+              "clientCommandId": "110fefce-5915-4002-a0db-f191cd438ea5"
+            },
+            {
+              "command": "log-production",
+              "clientCommandId": "f93b8393-6340-4be7-8f13-4525323e87ed"
+            },
+            {
+              "command": "log-production",
+              "clientCommandId": "f93b8393-6340-4be7-8f13-4525323e87ed"
+            },
+            {
+              "command": "log-production",
+              "clientCommandId": "980a79d0-9af7-4774-9bd1-3f09c46a0a1e"
+            },
+            {
+              "command": "log-production",
+              "clientCommandId": "c628d202-dbdb-4cac-9271-c94f6c4ee394"
+            },
+            {
+              "command": "report-incident",
+              "clientCommandId": "9419b6ad-1415-454e-84b4-9ab25f9d45ab"
+            },
+            {
+              "command": "finish-work"
+            },
+            {
+              "command": "submit-checklist",
+              "clientCommandId": "f4c6f720-c1fd-41c9-b56f-10e1c118727c"
+            },
+            {
+              "command": "close-shift"
+            }
+          ],
+          "responses": [
+            {
+              "status": 200
+            },
+            {
+              "status": 200
+            },
+            {
+              "status": 200
+            },
+            {
+              "status": 200
+            },
+            {
+              "status": 200
+            },
+            {
+              "status": 200
+            },
+            {
+              "status": 200
+            },
+            {
+              "status": 200
+            },
+            {
+              "status": 200
+            },
+            {
+              "status": 200
+            },
+            {
+              "status": 200
+            },
+            {
+              "status": 200
+            },
+            {
+              "status": 200
+            },
+            {
+              "status": 200
+            },
+            {
+              "status": 200
+            },
+            {
+              "status": 200
+            }
+          ]
+        },
+        {
+          "title": "v5: real admission, inspections, offline replay, production and closed report (multiple rigs)",
+          "project": "Mobile Safari",
+          "status": "passed",
+          "duration": 70199,
+          "observedSteps": [
+            {
+              "step": "initial",
+              "phase": "IDENTITY",
+              "assignment": "cmvqvv9xz000wtgw5xagydzme",
+              "options": 2,
+              "production": {
+                "piles": {
+                  "count": 0,
+                  "meters": 0
+                },
+                "drilling": {
+                  "count": 0,
+                  "meters": 0
+                },
+                "downtimeHours": 0
+              },
+              "receipt": null
+            },
+            {
+              "step": "PRESHIFT_INSPECTION",
+              "phase": "SITE_READY",
+              "assignment": "cmvqvv9xz000wtgw5xagydzme",
+              "options": 2,
+              "production": {
+                "piles": {
+                  "count": 0,
+                  "meters": 0
+                },
+                "drilling": {
+                  "count": 0,
+                  "meters": 0
+                },
+                "downtimeHours": 0
+              },
+              "receipt": null
+            },
+            {
+              "step": "SITE_READY",
+              "phase": "STARTUP",
+              "assignment": "cmvqvv9xz000wtgw5xagydzme",
+              "options": 2,
+              "production": {
+                "piles": {
+                  "count": 0,
+                  "meters": 0
+                },
+                "drilling": {
+                  "count": 0,
+                  "meters": 0
+                },
+                "downtimeHours": 0
+              },
+              "receipt": null
+            },
+            {
+              "step": "STARTUP",
+              "phase": "WORK",
+              "assignment": "cmvqvv9xz000wtgw5xagydzme",
+              "options": 2,
+              "production": {
+                "piles": {
+                  "count": 0,
+                  "meters": 0
+                },
+                "drilling": {
+                  "count": 0,
+                  "meters": 0
+                },
+                "downtimeHours": 0
+              },
+              "receipt": null
+            },
+            {
+              "step": "offline replay",
+              "phase": "WORK",
+              "assignment": "cmvqvv9xz000wtgw5xagydzme",
+              "options": 2,
+              "production": {
+                "piles": {
+                  "count": 2,
+                  "meters": 24
+                },
+                "drilling": {
+                  "count": 0,
+                  "meters": 0
+                },
+                "downtimeHours": 0
+              },
+              "receipt": null
+            },
+            {
+              "step": "drilling, downtime and incident",
+              "phase": "WORK",
+              "assignment": "cmvqvv9xz000wtgw5xagydzme",
+              "options": 2,
+              "production": {
+                "piles": {
+                  "count": 2,
+                  "meters": 24
+                },
+                "drilling": {
+                  "count": 1,
+                  "meters": 3
+                },
+                "downtimeHours": 0.25
+              },
+              "receipt": null
+            },
+            {
+              "step": "audit and general feed are separate"
+            },
+            {
+              "step": "closed",
+              "phase": "CLOSED",
+              "assignment": "cmvqvv9xz000wtgw5xagydzme",
+              "options": 2,
+              "production": {
+                "piles": {
+                  "count": 2,
+                  "meters": 24
+                },
+                "drilling": {
+                  "count": 1,
+                  "meters": 3
+                },
+                "downtimeHours": 0.25
+              },
+              "receipt": {
+                "reportId": "RM-b61bb4b3-2026-10-27",
+                "submittedAt": "2026-10-27T16:12:22.735Z",
+                "closedAt": "2026-10-27T16:12:22.735Z",
+                "timezone": "Europe/Moscow"
+              }
+            },
+            {
+              "step": "dispatcher sees the actual submitted report"
+            }
+          ],
+          "commands": [
+            {
+              "command": "confirm-ppe"
+            },
+            {
+              "command": "acknowledge-briefing"
+            },
+            {
+              "command": "submit-knowledge"
+            },
+            {
+              "command": "accept-equipment",
+              "clientCommandId": "50ef30e4-970e-4cb1-85bd-fda15012dcb9"
+            },
+            {
+              "command": "submit-checklist",
+              "clientCommandId": "21acada5-420a-4924-9f85-95c395bc5e2f"
+            },
+            {
+              "command": "submit-checklist",
+              "clientCommandId": "2c5bff0e-ff24-4470-b24a-3ec7ee7c3226"
+            },
+            {
+              "command": "submit-checklist",
+              "clientCommandId": "201d4f6d-2105-4e7d-a0d8-d25f6bbf8d03"
+            },
+            {
+              "command": "submit-checklist",
+              "clientCommandId": "277a25ad-8e68-48f1-8f2b-8d75c6877606"
+            },
+            {
+              "command": "submit-checklist",
+              "clientCommandId": "c103a911-6fbd-44f5-a7e5-039aa7fdc650"
+            },
+            {
+              "command": "log-production",
+              "clientCommandId": "e3b6ef30-0774-4276-8e56-500fbb6d96e3"
+            },
+            {
+              "command": "log-production",
+              "clientCommandId": "e3b6ef30-0774-4276-8e56-500fbb6d96e3"
+            },
+            {
+              "command": "log-production",
+              "clientCommandId": "70fc8a6e-a3f7-4ef3-9a87-63df7d361f6a"
+            },
+            {
+              "command": "log-production",
+              "clientCommandId": "a1abeb4c-39d3-48a0-bec6-29eaa99dbced"
+            },
+            {
+              "command": "report-incident",
+              "clientCommandId": "42b29b2a-28ac-4bed-9928-d56517d39159"
+            },
+            {
+              "command": "finish-work"
+            },
+            {
+              "command": "submit-checklist",
+              "clientCommandId": "cfbe14c0-2b69-4068-ba63-e7e00498e6ff"
+            },
+            {
+              "command": "close-shift"
+            }
+          ],
+          "responses": [
+            {
+              "status": 200
+            },
+            {
+              "status": 200
+            },
+            {
+              "status": 200
+            },
+            {
+              "status": 200
+            },
+            {
+              "status": 200
+            },
+            {
+              "status": 200
+            },
+            {
+              "status": 200
+            },
+            {
+              "status": 200
+            },
+            {
+              "status": 200
+            },
+            {
+              "status": 200
+            },
+            {
+              "status": 200
+            },
+            {
+              "status": 200
+            },
+            {
+              "status": 200
+            },
+            {
+              "status": 200
+            },
+            {
+              "status": 200
+            },
+            {
+              "status": 200
+            }
+          ]
+        },
+        {
+          "title": "v5: real admission, inspections, offline replay, production and closed report (single rig)",
+          "project": "Mobile Chrome",
+          "status": "passed",
+          "duration": 24727,
+          "observedSteps": [
+            {
+              "step": "initial",
+              "phase": "IDENTITY",
+              "assignment": "cmvqvwt7y0009kww5j9m7cfx6",
+              "options": 1,
+              "production": {
+                "piles": {
+                  "count": 0,
+                  "meters": 0
+                },
+                "drilling": {
+                  "count": 0,
+                  "meters": 0
+                },
+                "downtimeHours": 0
+              },
+              "receipt": null
+            },
+            {
+              "step": "PRESHIFT_INSPECTION",
+              "phase": "SITE_READY",
+              "assignment": "cmvqvwt7y0009kww5j9m7cfx6",
+              "options": 1,
+              "production": {
+                "piles": {
+                  "count": 0,
+                  "meters": 0
+                },
+                "drilling": {
+                  "count": 0,
+                  "meters": 0
+                },
+                "downtimeHours": 0
+              },
+              "receipt": null
+            },
+            {
+              "step": "SITE_READY",
+              "phase": "STARTUP",
+              "assignment": "cmvqvwt7y0009kww5j9m7cfx6",
+              "options": 1,
+              "production": {
+                "piles": {
+                  "count": 0,
+                  "meters": 0
+                },
+                "drilling": {
+                  "count": 0,
+                  "meters": 0
+                },
+                "downtimeHours": 0
+              },
+              "receipt": null
+            },
+            {
+              "step": "STARTUP",
+              "phase": "WORK",
+              "assignment": "cmvqvwt7y0009kww5j9m7cfx6",
+              "options": 1,
+              "production": {
+                "piles": {
+                  "count": 0,
+                  "meters": 0
+                },
+                "drilling": {
+                  "count": 0,
+                  "meters": 0
+                },
+                "downtimeHours": 0
+              },
+              "receipt": null
+            },
+            {
+              "step": "offline replay",
+              "phase": "WORK",
+              "assignment": "cmvqvwt7y0009kww5j9m7cfx6",
+              "options": 1,
+              "production": {
+                "piles": {
+                  "count": 2,
+                  "meters": 24
+                },
+                "drilling": {
+                  "count": 0,
+                  "meters": 0
+                },
+                "downtimeHours": 0
+              },
+              "receipt": null
+            },
+            {
+              "step": "drilling, downtime and incident",
+              "phase": "WORK",
+              "assignment": "cmvqvwt7y0009kww5j9m7cfx6",
+              "options": 1,
+              "production": {
+                "piles": {
+                  "count": 2,
+                  "meters": 24
+                },
+                "drilling": {
+                  "count": 1,
+                  "meters": 3
+                },
+                "downtimeHours": 0.25
+              },
+              "receipt": null
+            },
+            {
+              "step": "audit and general feed are separate"
+            },
+            {
+              "step": "closed",
+              "phase": "CLOSED",
+              "assignment": "cmvqvwt7y0009kww5j9m7cfx6",
+              "options": 1,
+              "production": {
+                "piles": {
+                  "count": 2,
+                  "meters": 24
+                },
+                "drilling": {
+                  "count": 1,
+                  "meters": 3
+                },
+                "downtimeHours": 0.25
+              },
+              "receipt": {
+                "reportId": "RM-31d1c5cd-2026-10-27",
+                "submittedAt": "2026-10-27T16:13:16.682Z",
+                "closedAt": "2026-10-27T16:13:16.682Z",
+                "timezone": "Europe/Moscow"
+              }
+            },
+            {
+              "step": "dispatcher sees the actual submitted report"
+            }
+          ],
+          "commands": [
+            {
+              "command": "confirm-ppe"
+            },
+            {
+              "command": "acknowledge-briefing"
+            },
+            {
+              "command": "submit-knowledge"
+            },
+            {
+              "command": "accept-equipment",
+              "clientCommandId": "5de8e789-9a12-426f-bbb3-c1102afb01e7"
+            },
+            {
+              "command": "submit-checklist",
+              "clientCommandId": "877e158e-4a9a-449d-95e4-51308e5a680f"
+            },
+            {
+              "command": "submit-checklist",
+              "clientCommandId": "46632e41-24f0-4c12-b9ee-8bab5496e406"
+            },
+            {
+              "command": "submit-checklist",
+              "clientCommandId": "da0ab7ad-c7f2-436d-be0e-7ae65bab88b2"
+            },
+            {
+              "command": "submit-checklist",
+              "clientCommandId": "e3ab54fe-e3cf-4ff7-b0e5-3781b1492c00"
+            },
+            {
+              "command": "submit-checklist",
+              "clientCommandId": "d4d2aeda-8c33-4ce7-a0e9-624cd7f31d66"
+            },
+            {
+              "command": "log-production",
+              "clientCommandId": "6a0a376e-ff5a-4297-abfd-f564cad8cafa"
+            },
+            {
+              "command": "log-production",
+              "clientCommandId": "6a0a376e-ff5a-4297-abfd-f564cad8cafa"
+            },
+            {
+              "command": "log-production",
+              "clientCommandId": "3f45cb32-5789-4dd6-8a3b-e408d5cd1aa3"
+            },
+            {
+              "command": "log-production",
+              "clientCommandId": "587e4941-8427-40c2-a174-74c9f3281b1f"
+            },
+            {
+              "command": "report-incident",
+              "clientCommandId": "04f173ad-ba99-4a97-aac2-f07708607790"
+            },
+            {
+              "command": "finish-work"
+            },
+            {
+              "command": "submit-checklist",
+              "clientCommandId": "46b874eb-b055-41d2-b720-d193436182ed"
+            },
+            {
+              "command": "close-shift"
+            }
+          ],
+          "responses": [
+            {
+              "status": 200
+            },
+            {
+              "status": 200
+            },
+            {
+              "status": 200
+            },
+            {
+              "status": 200
+            },
+            {
+              "status": 200
+            },
+            {
+              "status": 200
+            },
+            {
+              "status": 200
+            },
+            {
+              "status": 200
+            },
+            {
+              "status": 200
+            },
+            {
+              "status": 200
+            },
+            {
+              "status": 200
+            },
+            {
+              "status": 200
+            },
+            {
+              "status": 200
+            },
+            {
+              "status": 200
+            },
+            {
+              "status": 200
+            },
+            {
+              "status": 200
+            }
+          ]
+        },
+        {
+          "title": "v5: real admission, inspections, offline replay, production and closed report (multiple rigs)",
+          "project": "Mobile Chrome",
+          "status": "passed",
+          "duration": 20703,
+          "observedSteps": [
+            {
+              "step": "initial",
+              "phase": "IDENTITY",
+              "assignment": "cmvqvxc65000wkww5g29njd3h",
+              "options": 2,
+              "production": {
+                "piles": {
+                  "count": 0,
+                  "meters": 0
+                },
+                "drilling": {
+                  "count": 0,
+                  "meters": 0
+                },
+                "downtimeHours": 0
+              },
+              "receipt": null
+            },
+            {
+              "step": "PRESHIFT_INSPECTION",
+              "phase": "SITE_READY",
+              "assignment": "cmvqvxc65000wkww5g29njd3h",
+              "options": 2,
+              "production": {
+                "piles": {
+                  "count": 0,
+                  "meters": 0
+                },
+                "drilling": {
+                  "count": 0,
+                  "meters": 0
+                },
+                "downtimeHours": 0
+              },
+              "receipt": null
+            },
+            {
+              "step": "SITE_READY",
+              "phase": "STARTUP",
+              "assignment": "cmvqvxc65000wkww5g29njd3h",
+              "options": 2,
+              "production": {
+                "piles": {
+                  "count": 0,
+                  "meters": 0
+                },
+                "drilling": {
+                  "count": 0,
+                  "meters": 0
+                },
+                "downtimeHours": 0
+              },
+              "receipt": null
+            },
+            {
+              "step": "STARTUP",
+              "phase": "WORK",
+              "assignment": "cmvqvxc65000wkww5g29njd3h",
+              "options": 2,
+              "production": {
+                "piles": {
+                  "count": 0,
+                  "meters": 0
+                },
+                "drilling": {
+                  "count": 0,
+                  "meters": 0
+                },
+                "downtimeHours": 0
+              },
+              "receipt": null
+            },
+            {
+              "step": "offline replay",
+              "phase": "WORK",
+              "assignment": "cmvqvxc65000wkww5g29njd3h",
+              "options": 2,
+              "production": {
+                "piles": {
+                  "count": 2,
+                  "meters": 24
+                },
+                "drilling": {
+                  "count": 0,
+                  "meters": 0
+                },
+                "downtimeHours": 0
+              },
+              "receipt": null
+            },
+            {
+              "step": "drilling, downtime and incident",
+              "phase": "WORK",
+              "assignment": "cmvqvxc65000wkww5g29njd3h",
+              "options": 2,
+              "production": {
+                "piles": {
+                  "count": 2,
+                  "meters": 24
+                },
+                "drilling": {
+                  "count": 1,
+                  "meters": 3
+                },
+                "downtimeHours": 0.25
+              },
+              "receipt": null
+            },
+            {
+              "step": "audit and general feed are separate"
+            },
+            {
+              "step": "closed",
+              "phase": "CLOSED",
+              "assignment": "cmvqvxc65000wkww5g29njd3h",
+              "options": 2,
+              "production": {
+                "piles": {
+                  "count": 2,
+                  "meters": 24
+                },
+                "drilling": {
+                  "count": 1,
+                  "meters": 3
+                },
+                "downtimeHours": 0.25
+              },
+              "receipt": {
+                "reportId": "RM-7770aa93-2026-10-27",
+                "submittedAt": "2026-10-27T16:13:40.598Z",
+                "closedAt": "2026-10-27T16:13:40.598Z",
+                "timezone": "Europe/Moscow"
+              }
+            },
+            {
+              "step": "dispatcher sees the actual submitted report"
+            }
+          ],
+          "commands": [
+            {
+              "command": "confirm-ppe"
+            },
+            {
+              "command": "acknowledge-briefing"
+            },
+            {
+              "command": "submit-knowledge"
+            },
+            {
+              "command": "accept-equipment",
+              "clientCommandId": "7d5837ac-95d2-4094-9d27-9f93741ce7ba"
+            },
+            {
+              "command": "submit-checklist",
+              "clientCommandId": "7ea7aa67-abd8-4eb2-ab47-826781e87f91"
+            },
+            {
+              "command": "submit-checklist",
+              "clientCommandId": "b113704b-b7bc-4b84-857e-1305c1942da5"
+            },
+            {
+              "command": "submit-checklist",
+              "clientCommandId": "c301a4da-681e-478c-9e6d-12d74c54c9c2"
+            },
+            {
+              "command": "submit-checklist",
+              "clientCommandId": "ce988af5-19ea-4931-970d-fc75998aae45"
+            },
+            {
+              "command": "submit-checklist",
+              "clientCommandId": "a62c1baa-1649-4807-8edb-7633ab68e38a"
+            },
+            {
+              "command": "log-production",
+              "clientCommandId": "f67bf854-a109-435b-a886-cd001633023e"
+            },
+            {
+              "command": "log-production",
+              "clientCommandId": "f67bf854-a109-435b-a886-cd001633023e"
+            },
+            {
+              "command": "log-production",
+              "clientCommandId": "847b4274-06d5-4ded-831b-e788df950ea1"
+            },
+            {
+              "command": "log-production",
+              "clientCommandId": "d64fa30b-934b-4ad2-a4ff-811de41a1188"
+            },
+            {
+              "command": "report-incident",
+              "clientCommandId": "73a6baae-c530-4885-8210-41173f3466c9"
+            },
+            {
+              "command": "finish-work"
+            },
+            {
+              "command": "submit-checklist",
+              "clientCommandId": "56004ce5-ea2c-456e-a453-56447e88e2d0"
+            },
+            {
+              "command": "close-shift"
+            }
+          ],
+          "responses": [
+            {
+              "status": 200
+            },
+            {
+              "status": 200
+            },
+            {
+              "status": 200
+            },
+            {
+              "status": 200
+            },
+            {
+              "status": 200
+            },
+            {
+              "status": 200
+            },
+            {
+              "status": 200
+            },
+            {
+              "status": 200
+            },
+            {
+              "status": 200
+            },
+            {
+              "status": 200
+            },
+            {
+              "status": 200
+            },
+            {
+              "status": 200
+            },
+            {
+              "status": 200
+            },
+            {
+              "status": 200
+            },
+            {
+              "status": 200
+            },
+            {
+              "status": 200
+            }
+          ]
+        }
+      ]
     }
-  ]
+  ],
+  "finalRun": {
+    "run": "canonical-thirty-final",
+    "appBuild": "44126b987c9dd02b0bbefe28e8094f282b94aaf0",
+    "exit": 0,
+    "seconds": 1178,
+    "scenarioHash": "26942793535e3eba276fdf02c97ebbea6eb25e350145475f9a6a477284909b83",
+    "scenarioUnchanged": true,
+    "passed": 30,
+    "failed": 0,
+    "skipped": 0,
+    "flaky": 0,
+    "raw": "D:/PillingR/night-logs/night-evidence-1026/canonical-thirty-final-raw/playwright.json",
+    "cases": [
+      {
+        "title": "v7: real admission, inspections, offline replay, production and closed report (single rig)",
+        "project": "chromium",
+        "status": "passed",
+        "durationMs": 44664,
+        "reportId": "RM-019f9dd1-2026-10-27",
+        "shiftId": "019f9dd1-a06f-4791-88f2-6f977aa137af",
+        "closedPhase": "CLOSED",
+        "observedSteps": [
+          "initial",
+          "PRESHIFT_INSPECTION",
+          "SITE_READY",
+          "STARTUP",
+          "offline replay",
+          "drilling, downtime and incident",
+          "audit and general feed are separate",
+          "closed",
+          "dispatcher sees the actual submitted report"
+        ]
+      },
+      {
+        "title": "v7: real admission, inspections, offline replay, production and closed report (multiple rigs)",
+        "project": "chromium",
+        "status": "passed",
+        "durationMs": 47949,
+        "reportId": "RM-b2b21c8d-2026-10-27",
+        "shiftId": "b2b21c8d-0958-4e58-ba9d-46287781d109",
+        "closedPhase": "CLOSED",
+        "observedSteps": [
+          "initial",
+          "PRESHIFT_INSPECTION",
+          "SITE_READY",
+          "STARTUP",
+          "offline replay",
+          "drilling, downtime and incident",
+          "audit and general feed are separate",
+          "closed",
+          "dispatcher sees the actual submitted report"
+        ]
+      },
+      {
+        "title": "v10: real admission, inspections, offline replay, production and closed report (single rig)",
+        "project": "chromium",
+        "status": "passed",
+        "durationMs": 29866,
+        "reportId": "RM-dd854e2d-2026-10-27",
+        "shiftId": "dd854e2d-e18a-4ae1-a134-080e5b1a4ec1",
+        "closedPhase": "CLOSED",
+        "observedSteps": [
+          "initial",
+          "v10 accepts displayed default assignment; no alternative rig selector",
+          "PRESHIFT_INSPECTION",
+          "SITE_READY",
+          "STARTUP",
+          "offline replay",
+          "drilling, downtime and incident",
+          "audit and general feed are separate",
+          "closed",
+          "dispatcher sees the actual submitted report"
+        ]
+      },
+      {
+        "title": "v10: real admission, inspections, offline replay, production and closed report (multiple rigs)",
+        "project": "chromium",
+        "status": "passed",
+        "durationMs": 29736,
+        "reportId": "RM-d5b5dc07-2026-10-27",
+        "shiftId": "d5b5dc07-94f1-401a-9553-bc60d3c7b7d2",
+        "closedPhase": "CLOSED",
+        "observedSteps": [
+          "initial",
+          "v10 accepts displayed default assignment; no alternative rig selector",
+          "PRESHIFT_INSPECTION",
+          "SITE_READY",
+          "STARTUP",
+          "offline replay",
+          "drilling, downtime and incident",
+          "audit and general feed are separate",
+          "closed",
+          "dispatcher sees the actual submitted report"
+        ]
+      },
+      {
+        "title": "operator: real admission, inspections, offline replay, production and closed report (single rig)",
+        "project": "chromium",
+        "status": "passed",
+        "durationMs": 20523,
+        "reportId": "RM-a22d9993-2026-10-27",
+        "shiftId": "a22d9993-b473-406b-8531-32c46a4913ca",
+        "closedPhase": "CLOSED",
+        "observedSteps": [
+          "initial",
+          "PRESHIFT_INSPECTION",
+          "SITE_READY",
+          "STARTUP",
+          "offline replay",
+          "drilling, downtime and incident",
+          "audit and general feed are separate",
+          "closed",
+          "dispatcher sees the actual submitted report"
+        ]
+      },
+      {
+        "title": "operator: real admission, inspections, offline replay, production and closed report (multiple rigs)",
+        "project": "chromium",
+        "status": "passed",
+        "durationMs": 19718,
+        "reportId": "RM-2a15bc88-2026-10-27",
+        "shiftId": "2a15bc88-0651-44cc-8bd5-63c5012d8c26",
+        "closedPhase": "CLOSED",
+        "observedSteps": [
+          "initial",
+          "PRESHIFT_INSPECTION",
+          "SITE_READY",
+          "STARTUP",
+          "offline replay",
+          "drilling, downtime and incident",
+          "audit and general feed are separate",
+          "closed",
+          "dispatcher sees the actual submitted report"
+        ]
+      },
+      {
+        "title": "v5: real admission, inspections, offline replay, production and closed report (single rig)",
+        "project": "chromium",
+        "status": "passed",
+        "durationMs": 20689,
+        "reportId": "RM-63c3728c-2026-10-27",
+        "shiftId": "63c3728c-4433-4446-9e94-cea6e3bd803c",
+        "closedPhase": "CLOSED",
+        "observedSteps": [
+          "initial",
+          "PRESHIFT_INSPECTION",
+          "SITE_READY",
+          "STARTUP",
+          "offline replay",
+          "drilling, downtime and incident",
+          "audit and general feed are separate",
+          "closed",
+          "dispatcher sees the actual submitted report"
+        ]
+      },
+      {
+        "title": "v5: real admission, inspections, offline replay, production and closed report (multiple rigs)",
+        "project": "chromium",
+        "status": "passed",
+        "durationMs": 19201,
+        "reportId": "RM-9b86d1d6-2026-10-27",
+        "shiftId": "9b86d1d6-d7c8-4c43-85a2-1f5ad71e1b80",
+        "closedPhase": "CLOSED",
+        "observedSteps": [
+          "initial",
+          "PRESHIFT_INSPECTION",
+          "SITE_READY",
+          "STARTUP",
+          "offline replay",
+          "drilling, downtime and incident",
+          "audit and general feed are separate",
+          "closed",
+          "dispatcher sees the actual submitted report"
+        ]
+      },
+      {
+        "title": "v2: real admission, inspections, offline replay, production and closed report (single rig)",
+        "project": "chromium",
+        "status": "passed",
+        "durationMs": 30504,
+        "reportId": "RM-15aa972d-2026-10-27",
+        "shiftId": "15aa972d-096a-48ff-b1e2-a84e3c123be2",
+        "closedPhase": "CLOSED",
+        "observedSteps": [
+          "initial",
+          "PRESHIFT_INSPECTION",
+          "SITE_READY",
+          "STARTUP",
+          "offline replay",
+          "drilling, downtime and incident",
+          "audit and general feed are separate",
+          "closed",
+          "dispatcher sees the actual submitted report"
+        ]
+      },
+      {
+        "title": "v2: real admission, inspections, offline replay, production and closed report (multiple rigs)",
+        "project": "chromium",
+        "status": "passed",
+        "durationMs": 30206,
+        "reportId": "RM-b831bd09-2026-10-27",
+        "shiftId": "b831bd09-a86d-4cfe-a240-f202134217f8",
+        "closedPhase": "CLOSED",
+        "observedSteps": [
+          "initial",
+          "PRESHIFT_INSPECTION",
+          "SITE_READY",
+          "STARTUP",
+          "offline replay",
+          "drilling, downtime and incident",
+          "audit and general feed are separate",
+          "closed",
+          "dispatcher sees the actual submitted report"
+        ]
+      },
+      {
+        "title": "v7: real admission, inspections, offline replay, production and closed report (single rig)",
+        "project": "Mobile Safari",
+        "status": "passed",
+        "durationMs": 73292,
+        "reportId": "RM-17c5a6b2-2026-10-27",
+        "shiftId": "17c5a6b2-0aaf-4aa9-be3b-f186795df959",
+        "closedPhase": "CLOSED",
+        "observedSteps": [
+          "initial",
+          "PRESHIFT_INSPECTION",
+          "SITE_READY",
+          "STARTUP",
+          "offline replay",
+          "drilling, downtime and incident",
+          "audit and general feed are separate",
+          "closed",
+          "dispatcher sees the actual submitted report"
+        ]
+      },
+      {
+        "title": "v7: real admission, inspections, offline replay, production and closed report (multiple rigs)",
+        "project": "Mobile Safari",
+        "status": "passed",
+        "durationMs": 48960,
+        "reportId": "RM-98f3a695-2026-10-27",
+        "shiftId": "98f3a695-29f7-4f4e-a6ee-c448ee0a9330",
+        "closedPhase": "CLOSED",
+        "observedSteps": [
+          "initial",
+          "PRESHIFT_INSPECTION",
+          "SITE_READY",
+          "STARTUP",
+          "offline replay",
+          "drilling, downtime and incident",
+          "audit and general feed are separate",
+          "closed",
+          "dispatcher sees the actual submitted report"
+        ]
+      },
+      {
+        "title": "v10: real admission, inspections, offline replay, production and closed report (single rig)",
+        "project": "Mobile Safari",
+        "status": "passed",
+        "durationMs": 49995,
+        "reportId": "RM-60384282-2026-10-27",
+        "shiftId": "60384282-3089-47fd-8c12-7f04904fe64c",
+        "closedPhase": "CLOSED",
+        "observedSteps": [
+          "initial",
+          "v10 accepts displayed default assignment; no alternative rig selector",
+          "PRESHIFT_INSPECTION",
+          "SITE_READY",
+          "STARTUP",
+          "offline replay",
+          "drilling, downtime and incident",
+          "audit and general feed are separate",
+          "closed",
+          "dispatcher sees the actual submitted report"
+        ]
+      },
+      {
+        "title": "v10: real admission, inspections, offline replay, production and closed report (multiple rigs)",
+        "project": "Mobile Safari",
+        "status": "passed",
+        "durationMs": 49872,
+        "reportId": "RM-a25397f3-2026-10-27",
+        "shiftId": "a25397f3-e5b1-4c67-95cc-f47f9d792465",
+        "closedPhase": "CLOSED",
+        "observedSteps": [
+          "initial",
+          "v10 accepts displayed default assignment; no alternative rig selector",
+          "PRESHIFT_INSPECTION",
+          "SITE_READY",
+          "STARTUP",
+          "offline replay",
+          "drilling, downtime and incident",
+          "audit and general feed are separate",
+          "closed",
+          "dispatcher sees the actual submitted report"
+        ]
+      },
+      {
+        "title": "operator: real admission, inspections, offline replay, production and closed report (single rig)",
+        "project": "Mobile Safari",
+        "status": "passed",
+        "durationMs": 70836,
+        "reportId": "RM-99a12d30-2026-10-27",
+        "shiftId": "99a12d30-5fd7-4311-b84a-65698a5b533f",
+        "closedPhase": "CLOSED",
+        "observedSteps": [
+          "initial",
+          "PRESHIFT_INSPECTION",
+          "SITE_READY",
+          "STARTUP",
+          "offline replay",
+          "drilling, downtime and incident",
+          "audit and general feed are separate",
+          "closed",
+          "dispatcher sees the actual submitted report"
+        ]
+      },
+      {
+        "title": "operator: real admission, inspections, offline replay, production and closed report (multiple rigs)",
+        "project": "Mobile Safari",
+        "status": "passed",
+        "durationMs": 49236,
+        "reportId": "RM-1fd1f7c1-2026-10-27",
+        "shiftId": "1fd1f7c1-3476-4190-a01b-a4aa85a16b64",
+        "closedPhase": "CLOSED",
+        "observedSteps": [
+          "initial",
+          "PRESHIFT_INSPECTION",
+          "SITE_READY",
+          "STARTUP",
+          "offline replay",
+          "drilling, downtime and incident",
+          "audit and general feed are separate",
+          "closed",
+          "dispatcher sees the actual submitted report"
+        ]
+      },
+      {
+        "title": "v5: real admission, inspections, offline replay, production and closed report (single rig)",
+        "project": "Mobile Safari",
+        "status": "passed",
+        "durationMs": 40171,
+        "reportId": "RM-132777c0-2026-10-27",
+        "shiftId": "132777c0-2997-4d53-935e-7e73eba8c8c4",
+        "closedPhase": "CLOSED",
+        "observedSteps": [
+          "initial",
+          "PRESHIFT_INSPECTION",
+          "SITE_READY",
+          "STARTUP",
+          "offline replay",
+          "drilling, downtime and incident",
+          "audit and general feed are separate",
+          "closed",
+          "dispatcher sees the actual submitted report"
+        ]
+      },
+      {
+        "title": "v5: real admission, inspections, offline replay, production and closed report (multiple rigs)",
+        "project": "Mobile Safari",
+        "status": "passed",
+        "durationMs": 39629,
+        "reportId": "RM-363b9705-2026-10-27",
+        "shiftId": "363b9705-12a6-44ed-982a-006950e25330",
+        "closedPhase": "CLOSED",
+        "observedSteps": [
+          "initial",
+          "PRESHIFT_INSPECTION",
+          "SITE_READY",
+          "STARTUP",
+          "offline replay",
+          "drilling, downtime and incident",
+          "audit and general feed are separate",
+          "closed",
+          "dispatcher sees the actual submitted report"
+        ]
+      },
+      {
+        "title": "v2: real admission, inspections, offline replay, production and closed report (single rig)",
+        "project": "Mobile Safari",
+        "status": "passed",
+        "durationMs": 70724,
+        "reportId": "RM-23dc1cbc-2026-10-27",
+        "shiftId": "23dc1cbc-39ce-4d4a-930b-2bb6d98ab0b2",
+        "closedPhase": "CLOSED",
+        "observedSteps": [
+          "initial",
+          "PRESHIFT_INSPECTION",
+          "SITE_READY",
+          "STARTUP",
+          "offline replay",
+          "drilling, downtime and incident",
+          "audit and general feed are separate",
+          "closed",
+          "dispatcher sees the actual submitted report"
+        ]
+      },
+      {
+        "title": "v2: real admission, inspections, offline replay, production and closed report (multiple rigs)",
+        "project": "Mobile Safari",
+        "status": "passed",
+        "durationMs": 50381,
+        "reportId": "RM-4d27d342-2026-10-27",
+        "shiftId": "4d27d342-8d80-42e6-bb6d-515f2d21d2be",
+        "closedPhase": "CLOSED",
+        "observedSteps": [
+          "initial",
+          "PRESHIFT_INSPECTION",
+          "SITE_READY",
+          "STARTUP",
+          "offline replay",
+          "drilling, downtime and incident",
+          "audit and general feed are separate",
+          "closed",
+          "dispatcher sees the actual submitted report"
+        ]
+      },
+      {
+        "title": "v7: real admission, inspections, offline replay, production and closed report (single rig)",
+        "project": "Mobile Chrome",
+        "status": "passed",
+        "durationMs": 45709,
+        "reportId": "RM-f7943084-2026-10-27",
+        "shiftId": "f7943084-d8e8-47f4-8c7e-f16f9d63f177",
+        "closedPhase": "CLOSED",
+        "observedSteps": [
+          "initial",
+          "PRESHIFT_INSPECTION",
+          "SITE_READY",
+          "STARTUP",
+          "offline replay",
+          "drilling, downtime and incident",
+          "audit and general feed are separate",
+          "closed",
+          "dispatcher sees the actual submitted report"
+        ]
+      },
+      {
+        "title": "v7: real admission, inspections, offline replay, production and closed report (multiple rigs)",
+        "project": "Mobile Chrome",
+        "status": "passed",
+        "durationMs": 29437,
+        "reportId": "RM-3785881a-2026-10-27",
+        "shiftId": "3785881a-101d-4bfa-b22f-cc41862a0a4a",
+        "closedPhase": "CLOSED",
+        "observedSteps": [
+          "initial",
+          "PRESHIFT_INSPECTION",
+          "SITE_READY",
+          "STARTUP",
+          "offline replay",
+          "drilling, downtime and incident",
+          "audit and general feed are separate",
+          "closed",
+          "dispatcher sees the actual submitted report"
+        ]
+      },
+      {
+        "title": "v10: real admission, inspections, offline replay, production and closed report (single rig)",
+        "project": "Mobile Chrome",
+        "status": "passed",
+        "durationMs": 29307,
+        "reportId": "RM-04e2f708-2026-10-27",
+        "shiftId": "04e2f708-f03e-4e6e-b412-1bfc928faa17",
+        "closedPhase": "CLOSED",
+        "observedSteps": [
+          "initial",
+          "v10 accepts displayed default assignment; no alternative rig selector",
+          "PRESHIFT_INSPECTION",
+          "SITE_READY",
+          "STARTUP",
+          "offline replay",
+          "drilling, downtime and incident",
+          "audit and general feed are separate",
+          "closed",
+          "dispatcher sees the actual submitted report"
+        ]
+      },
+      {
+        "title": "v10: real admission, inspections, offline replay, production and closed report (multiple rigs)",
+        "project": "Mobile Chrome",
+        "status": "passed",
+        "durationMs": 50949,
+        "reportId": "RM-9fdef3e9-2026-10-27",
+        "shiftId": "9fdef3e9-810e-415f-acef-72ee665d497c",
+        "closedPhase": "CLOSED",
+        "observedSteps": [
+          "initial",
+          "v10 accepts displayed default assignment; no alternative rig selector",
+          "PRESHIFT_INSPECTION",
+          "SITE_READY",
+          "STARTUP",
+          "offline replay",
+          "drilling, downtime and incident",
+          "audit and general feed are separate",
+          "closed",
+          "dispatcher sees the actual submitted report"
+        ]
+      },
+      {
+        "title": "operator: real admission, inspections, offline replay, production and closed report (single rig)",
+        "project": "Mobile Chrome",
+        "status": "passed",
+        "durationMs": 29277,
+        "reportId": "RM-707b9457-2026-10-27",
+        "shiftId": "707b9457-af6a-4493-88de-adda0beb5ab1",
+        "closedPhase": "CLOSED",
+        "observedSteps": [
+          "initial",
+          "PRESHIFT_INSPECTION",
+          "SITE_READY",
+          "STARTUP",
+          "offline replay",
+          "drilling, downtime and incident",
+          "audit and general feed are separate",
+          "closed",
+          "dispatcher sees the actual submitted report"
+        ]
+      },
+      {
+        "title": "operator: real admission, inspections, offline replay, production and closed report (multiple rigs)",
+        "project": "Mobile Chrome",
+        "status": "passed",
+        "durationMs": 29985,
+        "reportId": "RM-5b31c351-2026-10-27",
+        "shiftId": "5b31c351-a284-4e0c-8934-b53ebbaad2b1",
+        "closedPhase": "CLOSED",
+        "observedSteps": [
+          "initial",
+          "PRESHIFT_INSPECTION",
+          "SITE_READY",
+          "STARTUP",
+          "offline replay",
+          "drilling, downtime and incident",
+          "audit and general feed are separate",
+          "closed",
+          "dispatcher sees the actual submitted report"
+        ]
+      },
+      {
+        "title": "v5: real admission, inspections, offline replay, production and closed report (single rig)",
+        "project": "Mobile Chrome",
+        "status": "passed",
+        "durationMs": 20478,
+        "reportId": "RM-f3230b99-2026-10-27",
+        "shiftId": "f3230b99-d205-41e3-83ee-360a05cbabc1",
+        "closedPhase": "CLOSED",
+        "observedSteps": [
+          "initial",
+          "PRESHIFT_INSPECTION",
+          "SITE_READY",
+          "STARTUP",
+          "offline replay",
+          "drilling, downtime and incident",
+          "audit and general feed are separate",
+          "closed",
+          "dispatcher sees the actual submitted report"
+        ]
+      },
+      {
+        "title": "v5: real admission, inspections, offline replay, production and closed report (multiple rigs)",
+        "project": "Mobile Chrome",
+        "status": "passed",
+        "durationMs": 20073,
+        "reportId": "RM-9f159ff4-2026-10-27",
+        "shiftId": "9f159ff4-d586-43be-a0a2-a552fa692e43",
+        "closedPhase": "CLOSED",
+        "observedSteps": [
+          "initial",
+          "PRESHIFT_INSPECTION",
+          "SITE_READY",
+          "STARTUP",
+          "offline replay",
+          "drilling, downtime and incident",
+          "audit and general feed are separate",
+          "closed",
+          "dispatcher sees the actual submitted report"
+        ]
+      },
+      {
+        "title": "v2: real admission, inspections, offline replay, production and closed report (single rig)",
+        "project": "Mobile Chrome",
+        "status": "passed",
+        "durationMs": 29669,
+        "reportId": "RM-a7aeb284-2026-10-27",
+        "shiftId": "a7aeb284-f1f7-445e-a641-719b62f15d06",
+        "closedPhase": "CLOSED",
+        "observedSteps": [
+          "initial",
+          "PRESHIFT_INSPECTION",
+          "SITE_READY",
+          "STARTUP",
+          "offline replay",
+          "drilling, downtime and incident",
+          "audit and general feed are separate",
+          "closed",
+          "dispatcher sees the actual submitted report"
+        ]
+      },
+      {
+        "title": "v2: real admission, inspections, offline replay, production and closed report (multiple rigs)",
+        "project": "Mobile Chrome",
+        "status": "passed",
+        "durationMs": 50120,
+        "reportId": "RM-0168ccb1-2026-10-27",
+        "shiftId": "0168ccb1-feb9-45d4-954b-05fb5cb346f4",
+        "closedPhase": "CLOSED",
+        "observedSteps": [
+          "initial",
+          "PRESHIFT_INSPECTION",
+          "SITE_READY",
+          "STARTUP",
+          "offline replay",
+          "drilling, downtime and incident",
+          "audit and general feed are separate",
+          "closed",
+          "dispatcher sees the actual submitted report"
+        ]
+      }
+    ]
+  }
 }

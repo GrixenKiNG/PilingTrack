@@ -1,6 +1,33 @@
+# Текущие проверки UI и сквозных цепочек, 28 октября 2026
+
+Прикладная сборка: **44126b987c9dd02b0bbefe28e8094f282b94aaf0**. Unit/type/lint выполнялись в worktree86358ae3; последующие изменения — только E2E и отчёты. Пустой git diff прикладных src/prisma/package*/next.config.ts подтверждён перед повторным использованием сборки. Это не новая сборка позднего тестового SHA.
+
+| Команда / сценарий | Exit | Passed / failed / skipped | Время |
+|---|---:|---|---|
+| npm run build |0|Production-сборка44126, HTTP health подтвердил SHA|143 с|
+| npx tsc --noEmit |0|.next/dev/types проверен/удалён перед запуском|19 с|
+| npm run lint |0|Zero warnings, text integrity passed|65 с|
+| npm run test:unit -- --maxWorkers=1 --no-file-parallelism --reporter=default --reporter=json --outputFile=…/full-unit-fresh.json |0|**5776 / 0 / 0**, 512 файлов|831,50 с Vitest / 873 с wrapper|
+| npx playwright test --list через disposable-qa |0|384 теста / 30 файлов; BASE318 / 28, тоже exit0|38 с wrapper|
+| Пять канонических версий × три браузера × одна/две установки |0|**30 / 0 / 0**, flaky0, 30CLOSED/30уникальных отчётов|1178 с|
+| V3: шесть legacy-отчётов + три selector |0|**9 / 0 / 0**, flaky0|168 с|
+| Существующие critical paths на совершенно свежем стенде |0|**6 / 0 / 0**, flaky0, cleanup=true|58 с|
+
+Все241 ранее пропущенных теста найдены по пути и полному имени и прошли в том же полном JSON. Новый повтор всех unit из-за E2E-only не нужен. После E2E выполнены отдельные tsc/lint/list — результаты ниже.
+
+Сырые данные: night-ui-final-gates-results.json, night-ui-final-validated-summary.json, full-unit-night-ui-final.json/log, unit-night-ui-final-result/public.json, night-ui-final-playwright-*-list.*, canonical-thirty-final-raw/, v3-nine-final-2-raw/, critical-fresh-final-raw/. Freshness-validator: exit0. Временные unit/list/critical PG, Redis и HTTP-процессы очищены; рабочий3100 не использован.
+
+## Новые сквозные цепочки
+
+Результаты и команды — CROSS-ROLE.md/json. Это разные синтетические аккаунты OPERATOR, DISPATCHER, MECHANIC, ADMIN и SAFETY_ENGINEER, без режима «Действую как». Первые красные попытки нового harness сохранены: отсутствовало ожидание окончания транзакции чек-листа; ожидался другой URL PUT; exact-label не учитывал подсказку; формат чисел не совпал с существующим formatCountMeters. Ожидания SQL, авторов, статусов и чисел не ослаблялись. Новых дефектов приложения в этих попытках не доказано.
+
+Ниже сохранена история предыдущих полных RED/GREEN. Слова «последний/ожидается» внутри истории относятся к тому снимку, а не текущему состоянию.
+
+---
+
 # Проверки ветки и причины красных запусков
 
-## Актуальный результат 27 октября, код 1b0a2663
+## Исторический результат 27 октября, код 1b0a2663
 
 Проверки выполнены последовательно на собственной одноразовой инфраструктуре. Ниже — последний полный запуск, а не сумма выборочных зелёных повторов.
 
@@ -140,3 +167,34 @@ GitNexus scopeall перед58a2b64f:3changed/0affected,4файла,LOW,безpa
 Сырые:full-unit-claim-fix.json,full-unit-claim-fix.log,unit-claim-fix-result.json,unit-claim-fix-public.json,claim-fix-gates-results.json,claim-fix-validated-summary.json,claim-fix-build-health.json,claim-fix-playwright-default-list.log,claim-fix-playwright-base-list.log. Старый RED5775/1/0 сохранён отдельно как full-unit-v3-final.json,baselineRED как permit-race-base-2.json.
 
 Старые21ролевой и18полных операторских сценариев относятся к приложению1b0a2663. Их не выдаём за повтор наf51. Новый fresh-review не дублировался.
+
+
+## Последние E2E-only проверки
+
+| Проверка | Passed / failed / skipped | Exit | Время wrapper |
+|---|---|---:|---|
+|Chromium: полный v2 + диспетчер/ОТ; отдельная цепочка ремонта|2 / 0 / 0|0|86 с|
+|Ремонтная цепочка во всех трёх браузерах|3 / 0 / 0|0|172 с|
+|Все семь ролей × три браузера на текущем приложении|21 / 0 / 0|0|749 с|
+|npx tsc --noEmit после изменений E2E|—|0|19 с|
+|npm run lint после изменений E2E|Zero warnings|0|124 с|
+|npx playwright test --list, одинаковая disposable-процедура|387 тестов / 30 файлов против BASE318 / 28|0 / 0|40 с|
+
+Retries=0; flaky=0. Полный unit ранее прошёл на той же прикладной сборке:5776/0/0. После него менялись только E2E и отчёты, поэтому unit/build повторно ради E2E не запускались.
+
+
+Подробности и ограничения — CROSS-ROLE.md/json.
+
+
+## Текущий C1–C3 на сборке44126b98, 28 октября
+
+Chromium, совершенно свежие собственные PG18/два Redis/HTTP, другой набор fixtures. Все три существующих сценария прошли: **3 passed / 0 failed / 0 skipped**, exit0;32,2с Playwright/67с с подготовкой и очисткой. cleanup=true,cleanupErrors=[]. C1:создание справочника,архивация/отмена и массовая архивация. C2:создание объекта,статус «Выполнен»/отмена,деактивация с подтверждением и удаление. C3:диспетчер создаёт,правит и удаляет свой отчёт. Доказательство ограничено assertions существующих сценариев, не каждымCRUD приложения.
+
+Сырьё crud-current-raw/qa-195-results.json,artifacts/ и run/;команда и exit — crud-current-result.json и crud-current-tests.log. Состояния авторизации не копировались в доказательный архив. Исходный полный QA68 остаётся53/14/1;этот focused3 не считается повтором68.
+
+
+## Граф перед документальным снимком
+
+Индекс обновлён перед fa2:33 508 узлов,72 752 ребра,566кластеров,1 225потоков. Финальные detect(scope=all) и compare(BASEefd95008) завершились exit0,partial=false,truncated=false;сырые полные ответы detect-final-docs.json/compare-final-branch.json. В документальном снимке 31 изменённая секция в 18 файлах,compare78символов/54файла;оба LOW/0affected. Ноль affected не означает отсутствие влияния: анонимные E2E и часть нового Markdown не разрешены индексом.
+
+Перед fa2 privatechecklist имелUNKNOWN;текст подтвердил только локальные вызовы в одном тесте,после добавления8мест. После обновления точный helper не разрешился;это остаётсяUNKNOWN. Один поисковый запрос вернул повреждённые отображаемые filePath у части определений;по ним выводы о приложении не делались. Зависимости цепочек сверены исходниками и реальным SQL/HTTP,не нулём графа. Полный ответ detect сохранён без усечения;усечение вывода терминала не применялось как доказательство. Нового прикладного изменения вfa2 нет.

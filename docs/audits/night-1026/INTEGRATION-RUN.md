@@ -307,3 +307,8 @@ reportPdfKey/exportCsvKey при null или пустом tenantId возвра�
 ## После разрешённой однострочной SQL-правки
 
 Наf51b0f30 полный свежий unit:5776passed/0failed/0skipped,512файлов,exit0;856,05с Vitest/901с wrapper. Все241 из этого реестра снова matched по file+fullName и passed,нет отсутствующих. Бывшая20-way approval race прошла в полном запуске,в группе37существующих тестов и10отдельных повторов. Тесты не менялись. Старый5775/1/0 и его воспроизводимость наmain сохранены. Сырые full-unit-claim-fix.json иclaim-fix-validated-summary.json;актуальные команды VERIFICATION.md.
+
+
+## Финальный полный повтор после UI-правок
+
+Сборка44126b98, unit-worktree86358ae3:5776passed/0failed/0skipped,512файлов,exit0;831,50с Vitest/873с wrapper. Все241 сопоставлены и прошли в этом же JSON. Сырые full-unit-night-ui-final.json,night-ui-final-validated-summary.json;SKIP-REGISTRY/WHOLE-RUN-MATCH обновлены. Старые RED и исходные причины пропусков сохранены.
