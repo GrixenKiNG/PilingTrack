@@ -303,3 +303,7 @@ reportPdfKey/exportCsvKey при null или пустом tenantId возвра�
 ## Повтор на 1b0a2663, 27 октября
 
 Последний полный свежий unit: exit1,5775passed/1failed/0skipped,512файлов,981с wrapper,cleanup=true. Все241исторических по file+fullName снова matched и passed. Единственный failed вне этого реестра: tests/integration/tech-readiness-work-permits.spec.ts,20-way approval race,raw23505legacy IdempotencyKey_scope_key_key. Неизменённый тест на BASEefd воспроизвёл ту же ошибку вторым запуском (первый1passed,второй1failed,по3filtered). Это существующая гонка; исходники не правились, требуется разрешение на одну SQL-строку tenant-scoped repository. Подробности PERMIT-IDEMPOTENCY-RACE.md, актуальные проверки VERIFICATION.md; старые5776green выше являются историей.
+
+## После разрешённой однострочной SQL-правки
+
+Наf51b0f30 полный свежий unit:5776passed/0failed/0skipped,512файлов,exit0;856,05с Vitest/901с wrapper. Все241 из этого реестра снова matched по file+fullName и passed,нет отсутствующих. Бывшая20-way approval race прошла в полном запуске,в группе37существующих тестов и10отдельных повторов. Тесты не менялись. Старый5775/1/0 и его воспроизводимость наmain сохранены. Сырые full-unit-claim-fix.json иclaim-fix-validated-summary.json;актуальные команды VERIFICATION.md.

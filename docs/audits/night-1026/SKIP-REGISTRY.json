@@ -5,10 +5,10 @@
     "reason": "Нет INTEGRATION_DATABASE_URL_OWNER/APP",
     "result": "passed",
     "run": "integration-db-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-analytics-performance.spec.ts",
@@ -16,10 +16,10 @@
     "reason": "Нет INTEGRATION_DATABASE_URL_OWNER/APP",
     "result": "passed",
     "run": "integration-db-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-equipment-race.spec.ts",
@@ -27,10 +27,10 @@
     "reason": "Нет INTEGRATION_DATABASE_URL_OWNER/APP",
     "result": "passed",
     "run": "integration-db-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-equipment-race.spec.ts",
@@ -38,10 +38,10 @@
     "reason": "Нет INTEGRATION_DATABASE_URL_OWNER/APP",
     "result": "passed",
     "run": "integration-db-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-equipment-race.spec.ts",
@@ -49,10 +49,10 @@
     "reason": "Нет INTEGRATION_DATABASE_URL_OWNER/APP",
     "result": "passed",
     "run": "integration-db-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-feedback-rls.spec.ts",
@@ -60,10 +60,10 @@
     "reason": "Нет INTEGRATION_DATABASE_URL_OWNER/APP",
     "result": "passed",
     "run": "integration-db-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-feedback-rls.spec.ts",
@@ -71,10 +71,10 @@
     "reason": "Нет INTEGRATION_DATABASE_URL_OWNER/APP",
     "result": "passed",
     "run": "integration-db-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-feedback-rls.spec.ts",
@@ -82,10 +82,10 @@
     "reason": "Нет INTEGRATION_DATABASE_URL_OWNER/APP",
     "result": "passed",
     "run": "integration-db-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-feedback-rls.spec.ts",
@@ -93,10 +93,10 @@
     "reason": "Нет INTEGRATION_DATABASE_URL_OWNER/APP",
     "result": "passed",
     "run": "integration-db-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-feedback-rls.spec.ts",
@@ -104,10 +104,10 @@
     "reason": "Нет INTEGRATION_DATABASE_URL_OWNER/APP",
     "result": "passed",
     "run": "integration-db-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-feedback-rls.spec.ts",
@@ -115,10 +115,10 @@
     "reason": "Нет INTEGRATION_DATABASE_URL_OWNER/APP",
     "result": "passed",
     "run": "integration-db-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-feedback-rls.spec.ts",
@@ -126,10 +126,10 @@
     "reason": "Нет INTEGRATION_DATABASE_URL_OWNER/APP",
     "result": "passed",
     "run": "integration-db-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -137,10 +137,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -148,10 +148,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -159,10 +159,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -170,10 +170,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -181,10 +181,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -192,10 +192,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -203,10 +203,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -214,10 +214,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -225,10 +225,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -236,10 +236,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -247,10 +247,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -258,10 +258,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -269,10 +269,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -280,10 +280,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -291,10 +291,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -302,10 +302,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -313,10 +313,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -324,10 +324,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -335,10 +335,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -346,10 +346,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -357,10 +357,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -368,10 +368,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -379,10 +379,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -390,10 +390,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -401,10 +401,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -412,10 +412,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -423,10 +423,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -434,10 +434,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -445,10 +445,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -456,10 +456,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -467,10 +467,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -478,10 +478,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -489,10 +489,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -500,10 +500,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -511,10 +511,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -522,10 +522,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -533,10 +533,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -544,10 +544,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -555,10 +555,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -566,10 +566,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -577,10 +577,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -588,10 +588,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -599,10 +599,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -610,10 +610,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -621,10 +621,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -632,10 +632,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -643,10 +643,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -654,10 +654,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -665,10 +665,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -676,10 +676,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -687,10 +687,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -698,10 +698,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -709,10 +709,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -720,10 +720,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -731,10 +731,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -742,10 +742,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -753,10 +753,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -764,10 +764,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -775,10 +775,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -786,10 +786,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -797,10 +797,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -808,10 +808,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -819,10 +819,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -830,10 +830,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -841,10 +841,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -852,10 +852,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -863,10 +863,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -874,10 +874,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -885,10 +885,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -896,10 +896,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -907,10 +907,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -918,10 +918,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -929,10 +929,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -940,10 +940,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -951,10 +951,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -962,10 +962,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -973,10 +973,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -984,10 +984,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -995,10 +995,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -1006,10 +1006,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -1017,10 +1017,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -1028,10 +1028,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -1039,10 +1039,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -1050,10 +1050,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -1061,10 +1061,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -1072,10 +1072,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -1083,10 +1083,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -1094,10 +1094,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -1105,10 +1105,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -1116,10 +1116,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -1127,10 +1127,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -1138,10 +1138,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -1149,10 +1149,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -1160,10 +1160,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -1171,10 +1171,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -1182,10 +1182,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -1193,10 +1193,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -1204,10 +1204,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -1215,10 +1215,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -1226,10 +1226,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -1237,10 +1237,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -1248,10 +1248,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -1259,10 +1259,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -1270,10 +1270,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -1281,10 +1281,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -1292,10 +1292,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -1303,10 +1303,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -1314,10 +1314,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -1325,10 +1325,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -1336,10 +1336,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -1347,10 +1347,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -1358,10 +1358,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -1369,10 +1369,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -1380,10 +1380,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -1391,10 +1391,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -1402,10 +1402,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -1413,10 +1413,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -1424,10 +1424,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -1435,10 +1435,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -1446,10 +1446,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -1457,10 +1457,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -1468,10 +1468,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -1479,10 +1479,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -1490,10 +1490,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -1501,10 +1501,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -1512,10 +1512,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -1523,10 +1523,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -1534,10 +1534,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -1545,10 +1545,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -1556,10 +1556,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -1567,10 +1567,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -1578,10 +1578,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -1589,10 +1589,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -1600,10 +1600,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -1611,10 +1611,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -1622,10 +1622,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -1633,10 +1633,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -1644,10 +1644,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -1655,10 +1655,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -1666,10 +1666,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -1677,10 +1677,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -1688,10 +1688,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -1699,10 +1699,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -1710,10 +1710,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -1721,10 +1721,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -1732,10 +1732,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -1743,10 +1743,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -1754,10 +1754,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -1765,10 +1765,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -1776,10 +1776,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -1787,10 +1787,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -1798,10 +1798,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -1809,10 +1809,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -1820,10 +1820,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -1831,10 +1831,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -1842,10 +1842,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -1853,10 +1853,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -1864,10 +1864,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-idor.spec.ts",
@@ -1875,10 +1875,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-m6-m8.spec.ts",
@@ -1886,10 +1886,10 @@
     "reason": "Нет INTEGRATION_DATABASE_URL_OWNER/APP",
     "result": "passed",
     "run": "integration-db-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-m6-m8.spec.ts",
@@ -1897,10 +1897,10 @@
     "reason": "Нет INTEGRATION_DATABASE_URL_OWNER/APP",
     "result": "passed",
     "run": "integration-db-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-m6-m8.spec.ts",
@@ -1908,10 +1908,10 @@
     "reason": "Нет INTEGRATION_DATABASE_URL_OWNER/APP",
     "result": "passed",
     "run": "integration-db-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-m6-m8.spec.ts",
@@ -1919,10 +1919,10 @@
     "reason": "Нет INTEGRATION_DATABASE_URL_OWNER/APP",
     "result": "passed",
     "run": "integration-db-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-m6-m8.spec.ts",
@@ -1930,10 +1930,10 @@
     "reason": "Нет INTEGRATION_DATABASE_URL_OWNER/APP",
     "result": "passed",
     "run": "integration-db-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-m6-m8.spec.ts",
@@ -1941,10 +1941,10 @@
     "reason": "Нет INTEGRATION_DATABASE_URL_OWNER/APP",
     "result": "passed",
     "run": "integration-db-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-m6-m8.spec.ts",
@@ -1952,10 +1952,10 @@
     "reason": "Нет INTEGRATION_DATABASE_URL_OWNER/APP",
     "result": "passed",
     "run": "integration-db-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-report-race.spec.ts",
@@ -1963,10 +1963,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-report-race.spec.ts",
@@ -1974,10 +1974,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-report-race.spec.ts",
@@ -1985,10 +1985,10 @@
     "reason": "Нет CODEX_STAND_URL + изолированной БД",
     "result": "passed",
     "run": "integration-http-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-restore.spec.ts",
@@ -1996,10 +1996,10 @@
     "reason": "Нет INTEGRATION_DATABASE_URL_* / owned container",
     "result": "passed",
     "run": "integration-db-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-rls.spec.ts",
@@ -2007,10 +2007,10 @@
     "reason": "Нет INTEGRATION_DATABASE_URL_OWNER/APP",
     "result": "passed",
     "run": "integration-db-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-rls.spec.ts",
@@ -2018,10 +2018,10 @@
     "reason": "Нет INTEGRATION_DATABASE_URL_OWNER/APP",
     "result": "passed",
     "run": "integration-db-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-rls.spec.ts",
@@ -2029,10 +2029,10 @@
     "reason": "Нет INTEGRATION_DATABASE_URL_OWNER/APP",
     "result": "passed",
     "run": "integration-db-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-rls.spec.ts",
@@ -2040,10 +2040,10 @@
     "reason": "Нет INTEGRATION_DATABASE_URL_OWNER/APP",
     "result": "passed",
     "run": "integration-db-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-rls.spec.ts",
@@ -2051,10 +2051,10 @@
     "reason": "Нет INTEGRATION_DATABASE_URL_OWNER/APP",
     "result": "passed",
     "run": "integration-db-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-rls.spec.ts",
@@ -2062,10 +2062,10 @@
     "reason": "Нет INTEGRATION_DATABASE_URL_OWNER/APP",
     "result": "passed",
     "run": "integration-db-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-rls.spec.ts",
@@ -2073,10 +2073,10 @@
     "reason": "Нет INTEGRATION_DATABASE_URL_OWNER/APP",
     "result": "passed",
     "run": "integration-db-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-rls.spec.ts",
@@ -2084,10 +2084,10 @@
     "reason": "Нет INTEGRATION_DATABASE_URL_OWNER/APP",
     "result": "passed",
     "run": "integration-db-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-rls.spec.ts",
@@ -2095,10 +2095,10 @@
     "reason": "Нет INTEGRATION_DATABASE_URL_OWNER/APP",
     "result": "passed",
     "run": "integration-db-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-rls.spec.ts",
@@ -2106,10 +2106,10 @@
     "reason": "Нет INTEGRATION_DATABASE_URL_OWNER/APP",
     "result": "passed",
     "run": "integration-db-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-rls.spec.ts",
@@ -2117,10 +2117,10 @@
     "reason": "Нет INTEGRATION_DATABASE_URL_OWNER/APP",
     "result": "passed",
     "run": "integration-db-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-rls.spec.ts",
@@ -2128,10 +2128,10 @@
     "reason": "Нет INTEGRATION_DATABASE_URL_OWNER/APP",
     "result": "passed",
     "run": "integration-db-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-rls.spec.ts",
@@ -2139,10 +2139,10 @@
     "reason": "Нет INTEGRATION_DATABASE_URL_OWNER/APP",
     "result": "passed",
     "run": "integration-db-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-rls.spec.ts",
@@ -2150,10 +2150,10 @@
     "reason": "Нет INTEGRATION_DATABASE_URL_OWNER/APP",
     "result": "passed",
     "run": "integration-db-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-rls.spec.ts",
@@ -2161,10 +2161,10 @@
     "reason": "Нет INTEGRATION_DATABASE_URL_OWNER/APP",
     "result": "passed",
     "run": "integration-db-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-rls.spec.ts",
@@ -2172,10 +2172,10 @@
     "reason": "Нет INTEGRATION_DATABASE_URL_OWNER/APP",
     "result": "passed",
     "run": "integration-db-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-rls.spec.ts",
@@ -2183,10 +2183,10 @@
     "reason": "Нет INTEGRATION_DATABASE_URL_OWNER/APP",
     "result": "passed",
     "run": "integration-db-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-rls.spec.ts",
@@ -2194,10 +2194,10 @@
     "reason": "Нет INTEGRATION_DATABASE_URL_OWNER/APP",
     "result": "passed",
     "run": "integration-db-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-rls.spec.ts",
@@ -2205,10 +2205,10 @@
     "reason": "Нет INTEGRATION_DATABASE_URL_OWNER/APP",
     "result": "passed",
     "run": "integration-db-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-rls.spec.ts",
@@ -2216,10 +2216,10 @@
     "reason": "Нет INTEGRATION_DATABASE_URL_OWNER/APP",
     "result": "passed",
     "run": "integration-db-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-rls.spec.ts",
@@ -2227,10 +2227,10 @@
     "reason": "Нет INTEGRATION_DATABASE_URL_OWNER/APP",
     "result": "passed",
     "run": "integration-db-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-rls.spec.ts",
@@ -2238,10 +2238,10 @@
     "reason": "Нет INTEGRATION_DATABASE_URL_OWNER/APP",
     "result": "passed",
     "run": "integration-db-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-rls.spec.ts",
@@ -2249,10 +2249,10 @@
     "reason": "Нет INTEGRATION_DATABASE_URL_OWNER/APP",
     "result": "passed",
     "run": "integration-db-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-rls.spec.ts",
@@ -2260,10 +2260,10 @@
     "reason": "Нет INTEGRATION_DATABASE_URL_OWNER/APP",
     "result": "passed",
     "run": "integration-db-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-rls.spec.ts",
@@ -2271,10 +2271,10 @@
     "reason": "Нет INTEGRATION_DATABASE_URL_OWNER/APP",
     "result": "passed",
     "run": "integration-db-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-rls.spec.ts",
@@ -2282,10 +2282,10 @@
     "reason": "Нет INTEGRATION_DATABASE_URL_OWNER/APP",
     "result": "passed",
     "run": "integration-db-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-rls.spec.ts",
@@ -2293,10 +2293,10 @@
     "reason": "Нет INTEGRATION_DATABASE_URL_OWNER/APP",
     "result": "passed",
     "run": "integration-db-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-rls.spec.ts",
@@ -2304,10 +2304,10 @@
     "reason": "Нет INTEGRATION_DATABASE_URL_OWNER/APP",
     "result": "passed",
     "run": "integration-db-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-rls.spec.ts",
@@ -2315,10 +2315,10 @@
     "reason": "Нет INTEGRATION_DATABASE_URL_OWNER/APP",
     "result": "passed",
     "run": "integration-db-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-rls.spec.ts",
@@ -2326,10 +2326,10 @@
     "reason": "Нет INTEGRATION_DATABASE_URL_OWNER/APP",
     "result": "passed",
     "run": "integration-db-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-rls.spec.ts",
@@ -2337,10 +2337,10 @@
     "reason": "Нет INTEGRATION_DATABASE_URL_OWNER/APP",
     "result": "passed",
     "run": "integration-db-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-rls.spec.ts",
@@ -2348,10 +2348,10 @@
     "reason": "Нет INTEGRATION_DATABASE_URL_OWNER/APP",
     "result": "passed",
     "run": "integration-db-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-rls.spec.ts",
@@ -2359,10 +2359,10 @@
     "reason": "Нет INTEGRATION_DATABASE_URL_OWNER/APP",
     "result": "passed",
     "run": "integration-db-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-rls.spec.ts",
@@ -2370,10 +2370,10 @@
     "reason": "Нет INTEGRATION_DATABASE_URL_OWNER/APP",
     "result": "passed",
     "run": "integration-db-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-rls.spec.ts",
@@ -2381,10 +2381,10 @@
     "reason": "Нет INTEGRATION_DATABASE_URL_OWNER/APP",
     "result": "passed",
     "run": "integration-db-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-rls.spec.ts",
@@ -2392,10 +2392,10 @@
     "reason": "Нет INTEGRATION_DATABASE_URL_OWNER/APP",
     "result": "passed",
     "run": "integration-db-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-rls.spec.ts",
@@ -2403,10 +2403,10 @@
     "reason": "Нет INTEGRATION_DATABASE_URL_OWNER/APP",
     "result": "passed",
     "run": "integration-db-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-rls.spec.ts",
@@ -2414,10 +2414,10 @@
     "reason": "Нет INTEGRATION_DATABASE_URL_OWNER/APP",
     "result": "passed",
     "run": "integration-db-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-rls.spec.ts",
@@ -2425,10 +2425,10 @@
     "reason": "Нет INTEGRATION_DATABASE_URL_OWNER/APP",
     "result": "passed",
     "run": "integration-db-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-rls.spec.ts",
@@ -2436,10 +2436,10 @@
     "reason": "Нет INTEGRATION_DATABASE_URL_OWNER/APP",
     "result": "passed",
     "run": "integration-db-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-rls.spec.ts",
@@ -2447,10 +2447,10 @@
     "reason": "Нет INTEGRATION_DATABASE_URL_OWNER/APP",
     "result": "passed",
     "run": "integration-db-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-rls.spec.ts",
@@ -2458,10 +2458,10 @@
     "reason": "Нет INTEGRATION_DATABASE_URL_OWNER/APP",
     "result": "passed",
     "run": "integration-db-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-rls.spec.ts",
@@ -2469,10 +2469,10 @@
     "reason": "Нет INTEGRATION_DATABASE_URL_OWNER/APP",
     "result": "passed",
     "run": "integration-db-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-rls.spec.ts",
@@ -2480,10 +2480,10 @@
     "reason": "Нет INTEGRATION_DATABASE_URL_OWNER/APP",
     "result": "passed",
     "run": "integration-db-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-rls.spec.ts",
@@ -2491,10 +2491,10 @@
     "reason": "Нет INTEGRATION_DATABASE_URL_OWNER/APP",
     "result": "passed",
     "run": "integration-db-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-scripts.spec.ts",
@@ -2502,10 +2502,10 @@
     "reason": "Нет INTEGRATION_DATABASE_URL_* / owned container",
     "result": "passed",
     "run": "integration-db-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-scripts.spec.ts",
@@ -2513,10 +2513,10 @@
     "reason": "Нет INTEGRATION_DATABASE_URL_* / owned container",
     "result": "passed",
     "run": "integration-db-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-scripts.spec.ts",
@@ -2524,10 +2524,10 @@
     "reason": "Нет INTEGRATION_DATABASE_URL_* / owned container",
     "result": "passed",
     "run": "integration-db-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-scripts.spec.ts",
@@ -2535,10 +2535,10 @@
     "reason": "Нет INTEGRATION_DATABASE_URL_* / owned container",
     "result": "passed",
     "run": "integration-db-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-scripts.spec.ts",
@@ -2546,10 +2546,10 @@
     "reason": "Нет INTEGRATION_DATABASE_URL_* / owned container",
     "result": "passed",
     "run": "integration-db-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/disposable-scripts.spec.ts",
@@ -2557,10 +2557,10 @@
     "reason": "Нет INTEGRATION_DATABASE_URL_* / owned container",
     "result": "passed",
     "run": "integration-db-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/tech-readiness-write-pipeline.spec.ts",
@@ -2568,10 +2568,10 @@
     "reason": "Нет INTEGRATION_DATABASE_URL_OWNER/APP",
     "result": "passed",
     "run": "integration-db-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/tech-readiness-write-pipeline.spec.ts",
@@ -2579,10 +2579,10 @@
     "reason": "Нет INTEGRATION_DATABASE_URL_OWNER/APP",
     "result": "passed",
     "run": "integration-db-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/tech-readiness-write-pipeline.spec.ts",
@@ -2590,10 +2590,10 @@
     "reason": "Нет INTEGRATION_DATABASE_URL_OWNER/APP",
     "result": "passed",
     "run": "integration-db-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/tech-readiness-write-pipeline.spec.ts",
@@ -2601,10 +2601,10 @@
     "reason": "Нет INTEGRATION_DATABASE_URL_OWNER/APP",
     "result": "passed",
     "run": "integration-db-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/tech-readiness-write-pipeline.spec.ts",
@@ -2612,10 +2612,10 @@
     "reason": "Нет INTEGRATION_DATABASE_URL_OWNER/APP",
     "result": "passed",
     "run": "integration-db-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "tests/integration/tech-readiness-write-pipeline.spec.ts",
@@ -2623,10 +2623,10 @@
     "reason": "Нет INTEGRATION_DATABASE_URL_OWNER/APP",
     "result": "passed",
     "run": "integration-db-base",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "src/core/storage/__tests__/s3-service.test.ts",
@@ -2636,10 +2636,10 @@
     "run": "s3-green",
     "initialResult": "failed",
     "initialRun": "s3-red",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   },
   {
     "file": "src/core/storage/__tests__/s3-service.test.ts",
@@ -2649,9 +2649,9 @@
     "run": "s3-green",
     "initialResult": "failed",
     "initialRun": "s3-red",
-    "wholeRun": "full-unit-v3-final",
+    "wholeRun": "full-unit-claim-fix",
     "wholeRunResult": "passed",
     "wholeRunBeforeReview": "full-unit-fresh",
-    "lastSuccessfulWholeRun": "full-unit-after-portability"
+    "lastSuccessfulWholeRun": "full-unit-claim-fix"
   }
 ]

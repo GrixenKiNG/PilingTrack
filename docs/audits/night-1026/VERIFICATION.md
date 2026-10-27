@@ -120,3 +120,23 @@ GitNexus scopeall перед58a2b64f:3changed/0affected,4файла,LOW,безpa
 ## Очистка после сохранения доказательств
 
 Сначала штатный stop branch24304 завершил app21208/worker792, затем stop parent31316 удалил свой MinIO/дваRedis, затем stop outer35488 удалил codex-pg-cc9926812e04 и codex-night-redis-cc9926812e04. Все пять PID отсутствуют, docker ps --filter name=codex- пуст; cleanup.json:cleaned=true. Порты своих app/PG/Redis не слушают;3100 по-прежнему слушает рабочий процесс9852. Рабочие контейнеры/данные не затрагивались. Повтор требует нового одноразового supervisor, живых проверок больше нет.
+
+## Полная проверка исправления f51b0f30
+
+Все команды выполнены отдельно и последовательно на собственной инфраструктуре. **Ни один тест не переписан ради этой правки.**
+
+| Команда / проверка | Exit | Результат |
+|---|---:|---|
+| npm run build |0|Стенд вывел BUILD exit0; HTTP /api/health вернул200 и version=f51b0f30465c0273905853d0e1e8bc333a9ee0e5. Отдельное время команды не измерялось|
+| npx tsc --noEmit |0|31с; перед ним проверен и очищен только путь .next/dev/types этой рабочей папки|
+| npm run lint |0|75с, zero warnings, text integrity passed|
+| npm run test:unit -- --maxWorkers=1 --no-file-parallelism --reporter=default --reporter=json --outputFile=…/full-unit-fresh.json |0|**5776 passed /0 failed /0 skipped**,512файлов;856,05с Vitest,901с с подготовкой/очисткой стенда|
+| Полный default-config Playwright --list через собственный disposable-qa wrapper |0|366тестов/30файлов;BASE318/28,exit0;37с wrapper,cleanup=true|
+
+**241/241 исторических случая найдены по относительному пути и полному имени и passed в том же полном запуске.** Это не сумма focused-прогонов. JSON признан свежим только после проверки sourceBuildSha=f51 и времени записи после создания нового HTTP-стенда. Отдельный валидатор exit0.
+
+Временные PG/Redis/HTTP для fullunit и collection очищены:cleanup=true,cleanupErrors=[]. Основной собственный supervisor остаётся жив для продолжения задачи6; рабочий3100 не затронут.
+
+Сырые:full-unit-claim-fix.json,full-unit-claim-fix.log,unit-claim-fix-result.json,unit-claim-fix-public.json,claim-fix-gates-results.json,claim-fix-validated-summary.json,claim-fix-build-health.json,claim-fix-playwright-default-list.log,claim-fix-playwright-base-list.log. Старый RED5775/1/0 сохранён отдельно как full-unit-v3-final.json,baselineRED как permit-race-base-2.json.
+
+Старые21ролевой и18полных операторских сценариев относятся к приложению1b0a2663. Их не выдаём за повтор наf51. Новый fresh-review не дублировался.
