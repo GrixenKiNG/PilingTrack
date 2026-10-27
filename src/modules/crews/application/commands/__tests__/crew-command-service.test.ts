@@ -15,7 +15,12 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { CrewAggregate } from '../../../domain';
 import type { CrewRepository } from '../../../infrastructure';
-import { createCrew, updateCrew, deleteCrew } from '../crew-command.service';
+import { createCrew as createCrewInTenant, updateCrew, deleteCrew } from '../crew-command.service';
+import type { CreateCrewCommand } from '../crew.command';
+
+// Почти все сценарии идут в организации tenant-1; чужую организацию задают явно.
+const createCrew = (command: Omit<CreateCrewCommand, 'tenantId'> & { tenantId?: string }) =>
+  createCrewInTenant({ tenantId: 'tenant-1', ...command });
 
 // ============================================================
 // Mocks
@@ -111,10 +116,10 @@ describe('Crew Command Service', () => {
     mockDb.crew.findFirst.mockResolvedValue(null);
     mockDb.crewAssistant.findMany.mockResolvedValue([]);
     mockDb.crewAssistant.createMany.mockResolvedValue({ count: 0 });
-    mockDb.user.findUnique.mockResolvedValue({ id: 'operator-1', role: 'OPERATOR' });
+    mockDb.user.findUnique.mockResolvedValue({ id: 'operator-1', role: 'OPERATOR', tenantId: 'tenant-1' });
     mockDb.user.findMany.mockResolvedValue([]);
-    mockDb.equipment.findUnique.mockResolvedValue({ id: 'equip-1' });
-    mockDb.site.findUnique.mockResolvedValue({ id: 'site-1' });
+    mockDb.equipment.findUnique.mockResolvedValue({ id: 'equip-1', tenantId: 'tenant-1' });
+    mockDb.site.findUnique.mockResolvedValue({ id: 'site-1', tenantId: 'tenant-1' });
   });
 
   // --------------------------------------------------------
@@ -211,7 +216,7 @@ describe('Crew Command Service', () => {
     });
 
     it('should reject crew if user is not OPERATOR', async () => {
-      mockDb.user.findUnique.mockResolvedValue({ id: 'operator-1', role: 'DISPATCHER' });
+      mockDb.user.findUnique.mockResolvedValue({ id: 'operator-1', role: 'DISPATCHER', tenantId: 'tenant-1' });
 
       await expect(createCrew({
         name: 'Alpha',
@@ -270,10 +275,9 @@ describe('Crew Command Service', () => {
     });
 
     it('links assistants by userId and snapshots their names', async () => {
-      // tenantId omitted (undefined) to match the default site mock's tenant.
       mockDb.user.findMany.mockResolvedValue([
-        { id: 'asst-1', name: 'Иван' },
-        { id: 'asst-2', name: 'Пётр' },
+        { id: 'asst-1', name: 'Иван', tenantId: 'tenant-1' },
+        { id: 'asst-2', name: 'Пётр', tenantId: 'tenant-1' },
       ]);
 
       await createCrew({
@@ -293,6 +297,31 @@ describe('Crew Command Service', () => {
           expect.objectContaining({ userId: 'asst-2', name: 'Пётр' }),
         ],
       });
+    });
+
+    it('не собирает бригаду из частей чужой организации (IDOR)', async () => {
+      mockDb.user.findUnique.mockResolvedValue({ id: 'operator-1', role: 'OPERATOR', tenantId: 'tenant-2' });
+      mockDb.equipment.findUnique.mockResolvedValue({ id: 'equip-1', tenantId: 'tenant-2' });
+      mockDb.site.findUnique.mockResolvedValue({ id: 'site-1', tenantId: 'tenant-2' });
+
+      await expect(createCrew({
+        name: 'Alpha',
+        operatorId: 'operator-1',
+        equipmentId: 'equip-1',
+        siteId: 'site-1',
+      })).rejects.toThrow('Объект не найден');
+      expect(mockRepoSave).not.toHaveBeenCalled();
+    });
+
+    it('отказывает без организации вызывающего (fail closed)', async () => {
+      await expect(createCrew({
+        tenantId: '',
+        name: 'Alpha',
+        operatorId: 'operator-1',
+        equipmentId: 'equip-1',
+        siteId: 'site-1',
+      })).rejects.toThrow('Не определена организация');
+      expect(mockRepoSave).not.toHaveBeenCalled();
     });
 
     it('rejects assistantUserIds that are missing or not ASSISTANT users', async () => {
