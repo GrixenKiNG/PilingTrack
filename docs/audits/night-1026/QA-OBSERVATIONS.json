@@ -1,0 +1,1562 @@
+{
+  "scope": "Chromium only, own fresh PG18 + two Redis; existing bounded QA harness",
+  "stats": {
+    "startTime": "2026-10-27T05:32:56.899Z",
+    "duration": 1781353.099,
+    "expected": 53,
+    "skipped": 14,
+    "unexpected": 1,
+    "flaky": 0
+  },
+  "cases": [
+    {
+      "title": "operator (КБУРГ-16.02 №1): оператор",
+      "file": "qa/operator-versions.spec.ts",
+      "line": 13,
+      "project": "chromium",
+      "status": "expected",
+      "result": "passed",
+      "annotations": []
+    },
+    {
+      "title": "operator (КБУРГ-16.02 №1): помощник",
+      "file": "qa/operator-versions.spec.ts",
+      "line": 13,
+      "project": "chromium",
+      "status": "expected",
+      "result": "passed",
+      "annotations": []
+    },
+    {
+      "title": "operator (Bauer RTG RM20): оператор",
+      "file": "qa/operator-versions.spec.ts",
+      "line": 13,
+      "project": "chromium",
+      "status": "expected",
+      "result": "passed",
+      "annotations": []
+    },
+    {
+      "title": "operator (Bauer RTG RM20): помощник",
+      "file": "qa/operator-versions.spec.ts",
+      "line": 13,
+      "project": "chromium",
+      "status": "expected",
+      "result": "passed",
+      "annotations": []
+    },
+    {
+      "title": "v2 (Liebherr LRH 100 №2): оператор",
+      "file": "qa/operator-versions.spec.ts",
+      "line": 13,
+      "project": "chromium",
+      "status": "expected",
+      "result": "passed",
+      "annotations": []
+    },
+    {
+      "title": "v2 (Liebherr LRH 100 №2): помощник",
+      "file": "qa/operator-versions.spec.ts",
+      "line": 13,
+      "project": "chromium",
+      "status": "expected",
+      "result": "passed",
+      "annotations": []
+    },
+    {
+      "title": "v2 (КБУРГ-16.02 №2): оператор",
+      "file": "qa/operator-versions.spec.ts",
+      "line": 13,
+      "project": "chromium",
+      "status": "expected",
+      "result": "passed",
+      "annotations": []
+    },
+    {
+      "title": "v2 (КБУРГ-16.02 №2): помощник",
+      "file": "qa/operator-versions.spec.ts",
+      "line": 13,
+      "project": "chromium",
+      "status": "expected",
+      "result": "passed",
+      "annotations": []
+    },
+    {
+      "title": "v5 (Kopernik Jint-SD20A): оператор",
+      "file": "qa/operator-versions.spec.ts",
+      "line": 13,
+      "project": "chromium",
+      "status": "expected",
+      "result": "passed",
+      "annotations": []
+    },
+    {
+      "title": "v5 (Kopernik Jint-SD20A): помощник",
+      "file": "qa/operator-versions.spec.ts",
+      "line": 13,
+      "project": "chromium",
+      "status": "expected",
+      "result": "passed",
+      "annotations": []
+    },
+    {
+      "title": "v7 (Banut 655): оператор",
+      "file": "qa/operator-versions.spec.ts",
+      "line": 13,
+      "project": "chromium",
+      "status": "expected",
+      "result": "passed",
+      "annotations": []
+    },
+    {
+      "title": "v7 (Banut 655): помощник",
+      "file": "qa/operator-versions.spec.ts",
+      "line": 13,
+      "project": "chromium",
+      "status": "expected",
+      "result": "passed",
+      "annotations": []
+    },
+    {
+      "title": "v10 (Woltman-PVE 50PR): оператор",
+      "file": "qa/operator-versions.spec.ts",
+      "line": 13,
+      "project": "chromium",
+      "status": "expected",
+      "result": "passed",
+      "annotations": []
+    },
+    {
+      "title": "v10 (Woltman-PVE 50PR): помощник",
+      "file": "qa/operator-versions.spec.ts",
+      "line": 13,
+      "project": "chromium",
+      "status": "expected",
+      "result": "passed",
+      "annotations": []
+    },
+    {
+      "title": "v3 (Synthetic retained v3 rig): оператор",
+      "file": "qa/operator-versions.spec.ts",
+      "line": 13,
+      "project": "chromium",
+      "status": "expected",
+      "result": "passed",
+      "annotations": []
+    },
+    {
+      "title": "v3 (Synthetic retained v3 rig): помощник",
+      "file": "qa/operator-versions.spec.ts",
+      "line": 13,
+      "project": "chromium",
+      "status": "expected",
+      "result": "passed",
+      "annotations": []
+    },
+    {
+      "title": "сверка: сваи отчёта ↔ аналитика ↔ дневная сводка",
+      "file": "qa/reconcile.spec.ts",
+      "line": 23,
+      "project": "chromium",
+      "status": "expected",
+      "result": "passed",
+      "annotations": []
+    },
+    {
+      "title": "роль ADMIN: навигация и кнопки",
+      "file": "qa/roles-clickthrough.spec.ts",
+      "line": 16,
+      "project": "chromium",
+      "status": "expected",
+      "result": "passed",
+      "annotations": []
+    },
+    {
+      "title": "роль DISPATCHER: навигация и кнопки",
+      "file": "qa/roles-clickthrough.spec.ts",
+      "line": 16,
+      "project": "chromium",
+      "status": "expected",
+      "result": "passed",
+      "annotations": []
+    },
+    {
+      "title": "роль MECHANIC: навигация и кнопки",
+      "file": "qa/roles-clickthrough.spec.ts",
+      "line": 16,
+      "project": "chromium",
+      "status": "expected",
+      "result": "passed",
+      "annotations": []
+    },
+    {
+      "title": "роль FOREMAN: навигация и кнопки",
+      "file": "qa/roles-clickthrough.spec.ts",
+      "line": 16,
+      "project": "chromium",
+      "status": "expected",
+      "result": "passed",
+      "annotations": []
+    },
+    {
+      "title": "роль SAFETY_ENGINEER: навигация и кнопки",
+      "file": "qa/roles-clickthrough.spec.ts",
+      "line": 16,
+      "project": "chromium",
+      "status": "expected",
+      "result": "passed",
+      "annotations": []
+    },
+    {
+      "title": "роль ASSISTANT: навигация и кнопки",
+      "file": "qa/roles-clickthrough.spec.ts",
+      "line": 16,
+      "project": "chromium",
+      "status": "expected",
+      "result": "passed",
+      "annotations": []
+    },
+    {
+      "title": "AU39-04: администратор сохраняет отчёт оператора, назначенного только бригадой",
+      "file": "qa-ac/audit-fixes-1016.spec.ts",
+      "line": 44,
+      "project": "chromium",
+      "status": "skipped",
+      "result": "skipped",
+      "annotations": [
+        {
+          "type": "serial",
+          "location": {
+            "file": "D:\\PillingR\\wt-night-evidence-1026\\e2e\\qa-ac\\audit-fixes-1016.spec.ts",
+            "line": 0,
+            "column": 0
+          }
+        },
+        {
+          "type": "skip",
+          "description": "в QA-базе нет сданного отчёта оператора, назначенного на объект только бригадой",
+          "location": {
+            "file": "D:\\PillingR\\wt-night-evidence-1026\\e2e\\qa-ac\\audit-fixes-1016.spec.ts",
+            "line": 53,
+            "column": 8
+          }
+        }
+      ]
+    },
+    {
+      "title": "AU195-14: поиск номера в журнале свай — итоги не нули и совпадают со строками",
+      "file": "qa-ac/audit-fixes-1016.spec.ts",
+      "line": 79,
+      "project": "chromium",
+      "status": "expected",
+      "result": "passed",
+      "annotations": [
+        {
+          "type": "serial",
+          "location": {
+            "file": "D:\\PillingR\\wt-night-evidence-1026\\e2e\\qa-ac\\audit-fixes-1016.spec.ts",
+            "line": 0,
+            "column": 0
+          }
+        }
+      ]
+    },
+    {
+      "title": "R78-41 (1/2): инженер проводит инструктаж, у работника он ждёт его отметки",
+      "file": "qa-ac/audit-fixes-1016.spec.ts",
+      "line": 101,
+      "project": "chromium",
+      "status": "skipped",
+      "result": "skipped",
+      "annotations": [
+        {
+          "type": "serial",
+          "location": {
+            "file": "D:\\PillingR\\wt-night-evidence-1026\\e2e\\qa-ac\\audit-fixes-1016.spec.ts",
+            "line": 0,
+            "column": 0
+          }
+        },
+        {
+          "type": "skip",
+          "description": "в QA-базе нет ни одной записи инструктажа, взять название инструкции неоткуда",
+          "location": {
+            "file": "D:\\PillingR\\wt-night-evidence-1026\\e2e\\qa-ac\\audit-fixes-1016.spec.ts",
+            "line": 107,
+            "column": 8
+          }
+        }
+      ]
+    },
+    {
+      "title": "R78-41 (2/2): работник подтверждает ту же запись в «Мой допуск»",
+      "file": "qa-ac/audit-fixes-1016.spec.ts",
+      "line": 121,
+      "project": "chromium",
+      "status": "skipped",
+      "result": "skipped",
+      "annotations": [
+        {
+          "type": "serial",
+          "location": {
+            "file": "D:\\PillingR\\wt-night-evidence-1026\\e2e\\qa-ac\\audit-fixes-1016.spec.ts",
+            "line": 0,
+            "column": 0
+          }
+        },
+        {
+          "type": "skip",
+          "description": "запись инструктажа не создана предыдущим шагом",
+          "location": {
+            "file": "D:\\PillingR\\wt-night-evidence-1026\\e2e\\qa-ac\\audit-fixes-1016.spec.ts",
+            "line": 123,
+            "column": 8
+          }
+        }
+      ]
+    },
+    {
+      "title": "D-20261016-001: сводка допуска помощника v7 учитывает обязательные документы",
+      "file": "qa-ac/audit-fixes-1016.spec.ts",
+      "line": 150,
+      "project": "chromium",
+      "status": "skipped",
+      "result": "skipped",
+      "annotations": [
+        {
+          "type": "serial",
+          "location": {
+            "file": "D:\\PillingR\\wt-night-evidence-1026\\e2e\\qa-ac\\audit-fixes-1016.spec.ts",
+            "line": 0,
+            "column": 0
+          }
+        },
+        {
+          "type": "skip",
+          "description": "у QA-помощника не пройдены инструктаж или знания — сводка по документам не проверяется",
+          "location": {
+            "file": "D:\\PillingR\\wt-night-evidence-1026\\e2e\\qa-ac\\audit-fixes-1016.spec.ts",
+            "line": 158,
+            "column": 8
+          }
+        }
+      ]
+    },
+    {
+      "title": "D-20261010-001: неотправленная форма осмотра переживает перезагрузку (v1)",
+      "file": "qa-ac/audit-fixes-1016.spec.ts",
+      "line": 172,
+      "project": "chromium",
+      "status": "skipped",
+      "result": "skipped",
+      "annotations": [
+        {
+          "type": "serial",
+          "location": {
+            "file": "D:\\PillingR\\wt-night-evidence-1026\\e2e\\qa-ac\\audit-fixes-1016.spec.ts",
+            "line": 0,
+            "column": 0
+          }
+        },
+        {
+          "type": "skip",
+          "description": "сегодня у QA-машиниста нет открытого осмотра: смена уже принята или закрыта",
+          "location": {
+            "file": "D:\\PillingR\\wt-night-evidence-1026\\e2e\\qa-ac\\audit-fixes-1016.spec.ts",
+            "line": 191,
+            "column": 8
+          }
+        }
+      ]
+    },
+    {
+      "title": "D-20261010-001 (форма сваи): введённые марка и количество переживают перезагрузку",
+      "file": "qa-ac/audit-fixes-1016.spec.ts",
+      "line": 246,
+      "project": "chromium",
+      "status": "skipped",
+      "result": "skipped",
+      "annotations": [
+        {
+          "type": "serial",
+          "location": {
+            "file": "D:\\PillingR\\wt-night-evidence-1026\\e2e\\qa-ac\\audit-fixes-1016.spec.ts",
+            "line": 0,
+            "column": 0
+          }
+        },
+        {
+          "type": "skip",
+          "description": "форма выработки недоступна: смена QA-машиниста ещё не дошла до работы (нужен приём и три осмотра)",
+          "location": {
+            "file": "D:\\PillingR\\wt-night-evidence-1026\\e2e\\qa-ac\\audit-fixes-1016.spec.ts",
+            "line": 261,
+            "column": 8
+          }
+        }
+      ]
+    },
+    {
+      "title": "D-20261010-001 (v2): марка и количество в форме сваи переживают перезагрузку",
+      "file": "qa-ac/audit-fixes-1016.spec.ts",
+      "line": 280,
+      "project": "chromium",
+      "status": "skipped",
+      "result": "skipped",
+      "annotations": [
+        {
+          "type": "serial",
+          "location": {
+            "file": "D:\\PillingR\\wt-night-evidence-1026\\e2e\\qa-ac\\audit-fixes-1016.spec.ts",
+            "line": 0,
+            "column": 0
+          }
+        },
+        {
+          "type": "skip",
+          "description": "v2: форма выработки недоступна — смена QA-машиниста не дошла до работы",
+          "location": {
+            "file": "D:\\PillingR\\wt-night-evidence-1026\\e2e\\qa-ac\\audit-fixes-1016.spec.ts",
+            "line": 288,
+            "column": 8
+          }
+        }
+      ]
+    },
+    {
+      "title": "D: выгрузки CSV/XLSX/PDF — файлы, запятые, итоги, формулы",
+      "file": "qa-ac/exports.spec.ts",
+      "line": 23,
+      "project": "chromium",
+      "status": "expected",
+      "result": "passed",
+      "annotations": []
+    },
+    {
+      "title": "H: заголовки безопасности — /, /login, /admin, /api/health",
+      "file": "qa-ac/headers.spec.ts",
+      "line": 21,
+      "project": "chromium",
+      "status": "expected",
+      "result": "passed",
+      "annotations": []
+    },
+    {
+      "title": "G: клавиатура — дашборд, отчёты, объекты",
+      "file": "qa-ac/keyboard.spec.ts",
+      "line": 44,
+      "project": "chromium",
+      "status": "expected",
+      "result": "passed",
+      "annotations": []
+    },
+    {
+      "title": "E: «Сваи» и «Бурение» совпадают на дашборде, в объектах и отчётах",
+      "file": "qa-ac/kpi-consistency.spec.ts",
+      "line": 26,
+      "project": "chromium",
+      "status": "expected",
+      "result": "passed",
+      "annotations": []
+    },
+    {
+      "title": "F metric: actual 44px hit area, padding and clipping",
+      "file": "qa-ac/mobile.spec.ts",
+      "line": 109,
+      "project": "chromium",
+      "status": "expected",
+      "result": "passed",
+      "annotations": []
+    },
+    {
+      "title": "F: мобильная вёрстка 375×812 — админка и оператор",
+      "file": "qa-ac/mobile.spec.ts",
+      "line": 137,
+      "project": "chromium",
+      "status": "expected",
+      "result": "passed",
+      "annotations": []
+    },
+    {
+      "title": "N1: диспетчер без права на раздел видит «Нет доступа»",
+      "file": "qa-ac/no-access.spec.ts",
+      "line": 36,
+      "project": "chromium",
+      "status": "expected",
+      "result": "passed",
+      "annotations": []
+    },
+    {
+      "title": "N2: помощник на /admin/reports видит «Нет доступа»",
+      "file": "qa-ac/no-access.spec.ts",
+      "line": 46,
+      "project": "chromium",
+      "status": "expected",
+      "result": "passed",
+      "annotations": []
+    },
+    {
+      "title": "N2b: помощник на /admin/to видит «Нет доступа»",
+      "file": "qa-ac/no-access.spec.ts",
+      "line": 55,
+      "project": "chromium",
+      "status": "expected",
+      "result": "passed",
+      "annotations": []
+    },
+    {
+      "title": "N3: администратор на /admin/reports — отказа нет",
+      "file": "qa-ac/no-access.spec.ts",
+      "line": 65,
+      "project": "chromium",
+      "status": "expected",
+      "result": "passed",
+      "annotations": []
+    },
+    {
+      "title": "N4: параметр ?from= показан текстом, ссылки по нему нет",
+      "file": "qa-ac/no-access.spec.ts",
+      "line": 73,
+      "project": "chromium",
+      "status": "expected",
+      "result": "passed",
+      "annotations": []
+    },
+    {
+      "title": "админка: три сегодняшних отчёта — список, карточка, PDF",
+      "file": "qa-ac/operator-everywhere.spec.ts",
+      "line": 6,
+      "project": "chromium",
+      "status": "expected",
+      "result": "passed",
+      "annotations": []
+    },
+    {
+      "title": "журнал забивки: NEW-5 — синтетические паспорта и записи без паспорта",
+      "file": "qa-ac/operator-everywhere.spec.ts",
+      "line": 27,
+      "project": "chromium",
+      "status": "expected",
+      "result": "passed",
+      "annotations": []
+    },
+    {
+      "title": "карточка Banut 655: NEW-6 — сваи синтетической смены в таблице",
+      "file": "qa-ac/operator-everywhere.spec.ts",
+      "line": 36,
+      "project": "chromium",
+      "status": "expected",
+      "result": "passed",
+      "annotations": []
+    },
+    {
+      "title": "главная панель и аналитика: числа дня и отчёты операторов",
+      "file": "qa-ac/operator-everywhere.spec.ts",
+      "line": 52,
+      "project": "chromium",
+      "status": "expected",
+      "result": "passed",
+      "annotations": []
+    },
+    {
+      "title": "v7 (Banut 655, r0mix0n): полная смена — допуск, осмотры, 2 сваи, бурение, простой, отчёт",
+      "file": "qa-ac/operator-walk.spec.ts",
+      "line": 126,
+      "project": "chromium",
+      "status": "skipped",
+      "result": "skipped",
+      "annotations": [
+        {
+          "type": "fixme",
+          "description": "шаги и даты зашиты под 06.10.2026 и под допуск без «Проверки знаний по ТБ»; сегодняшний цикл v7 покрывает ежедневный прогон Hermes",
+          "location": {
+            "file": "D:\\PillingR\\wt-night-evidence-1026\\e2e\\qa-ac\\operator-walk.spec.ts",
+            "line": 128,
+            "column": 8
+          }
+        }
+      ]
+    },
+    {
+      "title": "v1 (КБУРГ-16.02 №1, ka@): завершение и сдача смены — NEW-9 не воспроизводится",
+      "file": "qa-ac/operator-walk.spec.ts",
+      "line": 261,
+      "project": "chromium",
+      "status": "skipped",
+      "result": "skipped",
+      "annotations": [
+        {
+          "type": "fixme",
+          "description": "нужна открытая смена бригады ka@ на сегодня, её нет; NEW-9 подтверждён полными циклами v1 07.10, 08.10 и 16.10",
+          "location": {
+            "file": "D:\\PillingR\\wt-night-evidence-1026\\e2e\\qa-ac\\operator-walk.spec.ts",
+            "line": 263,
+            "column": 8
+          }
+        }
+      ]
+    },
+    {
+      "title": "D-20260930-001: v2 (apj@piling.ru) — после HANDOVER_PENDING открывается новый цикл",
+      "file": "qa-ac/operator-walk.spec.ts",
+      "line": 336,
+      "project": "chromium",
+      "status": "skipped",
+      "result": "skipped",
+      "annotations": [
+        {
+          "type": "skip",
+          "description": "у apj нет смены в HANDOVER_PENDING (27.09 закрыта 09.10): сценарий дефекта не воспроизводится",
+          "location": {
+            "file": "D:\\PillingR\\wt-night-evidence-1026\\e2e\\qa-ac\\operator-walk.spec.ts",
+            "line": 337,
+            "column": 8
+          }
+        }
+      ]
+    },
+    {
+      "title": "D-20261001-001: v5 (mag@piling.ru) — баннер о незакрытой смене 30.09 и новая смена",
+      "file": "qa-ac/operator-walk.spec.ts",
+      "line": 352,
+      "project": "chromium",
+      "status": "skipped",
+      "result": "skipped",
+      "annotations": [
+        {
+          "type": "skip",
+          "description": "у mag нет смены в HANDOVER_PENDING: баннера о незакрытой смене не будет",
+          "location": {
+            "file": "D:\\PillingR\\wt-night-evidence-1026\\e2e\\qa-ac\\operator-walk.spec.ts",
+            "line": 354,
+            "column": 8
+          }
+        }
+      ]
+    },
+    {
+      "title": "v1 (Bauer RTG RM20, operator@): полная смена от допуска до отчёта",
+      "file": "qa-ac/operator-walk.spec.ts",
+      "line": 378,
+      "project": "chromium",
+      "status": "skipped",
+      "result": "skipped",
+      "annotations": [
+        {
+          "type": "fixme",
+          "description": "шаги и даты зашиты под 06.10.2026 и под допуск без «Проверки знаний по ТБ»",
+          "location": {
+            "file": "D:\\PillingR\\wt-night-evidence-1026\\e2e\\qa-ac\\operator-walk.spec.ts",
+            "line": 380,
+            "column": 8
+          }
+        }
+      ]
+    },
+    {
+      "title": "v10 (Woltman-PVE 50PR, ivv@): продолжает смену 04.10 под видом 06.10 (D-20261001-001)",
+      "file": "qa-ac/operator-walk.spec.ts",
+      "line": 492,
+      "project": "chromium",
+      "status": "skipped",
+      "result": "skipped",
+      "annotations": [
+        {
+          "type": "fixme",
+          "description": "сценарий воспроизводил смену 04.10 в данных, которых больше нет; дефект D-20261001-001 уже VERIFIED",
+          "location": {
+            "file": "D:\\PillingR\\wt-night-evidence-1026\\e2e\\qa-ac\\operator-walk.spec.ts",
+            "line": 494,
+            "column": 8
+          }
+        }
+      ]
+    },
+    {
+      "title": "D-20260930-001: v2 (gea@piling.ru) — вторая бригада того же дефекта",
+      "file": "qa-ac/operator-walk.spec.ts",
+      "line": 536,
+      "project": "chromium",
+      "status": "skipped",
+      "result": "skipped",
+      "annotations": [
+        {
+          "type": "skip",
+          "description": "у gea нет смены в HANDOVER_PENDING: сценарий дефекта не воспроизводится",
+          "location": {
+            "file": "D:\\PillingR\\wt-night-evidence-1026\\e2e\\qa-ac\\operator-walk.spec.ts",
+            "line": 537,
+            "column": 8
+          }
+        }
+      ]
+    },
+    {
+      "title": "D-20260930-003: помощник v5 (kn@) — «экран доступен только машинисту» (не воспроизводится)",
+      "file": "qa-ac/operator-walk.spec.ts",
+      "line": 552,
+      "project": "chromium",
+      "status": "expected",
+      "result": "passed",
+      "annotations": []
+    },
+    {
+      "title": "D-20260930-003: помощник v7 (qa-hermes-assistant-2) — объяснение про машиниста (не воспроизводится)",
+      "file": "qa-ac/operator-walk.spec.ts",
+      "line": 562,
+      "project": "chromium",
+      "status": "expected",
+      "result": "passed",
+      "annotations": []
+    },
+    {
+      "title": "помощники прочих версий: что видно на экране бригады (сбор доказательств)",
+      "file": "qa-ac/operator-walk.spec.ts",
+      "line": 572,
+      "project": "chromium",
+      "status": "expected",
+      "result": "passed",
+      "annotations": []
+    },
+    {
+      "title": "S1: диспетчер — журнал забивки: «Свай (всего)», строка без паспорта, выгрузка .xlsx",
+      "file": "qa-ac/post-merge-smoke.spec.ts",
+      "line": 35,
+      "project": "chromium",
+      "status": "expected",
+      "result": "passed",
+      "annotations": []
+    },
+    {
+      "title": "S2: журнал забивки — фильтр «Все» выбран по умолчанию",
+      "file": "qa-ac/post-merge-smoke.spec.ts",
+      "line": 87,
+      "project": "chromium",
+      "status": "expected",
+      "result": "passed",
+      "annotations": []
+    },
+    {
+      "title": "S3: мастер — на /monitoring виден блок аналитики",
+      "file": "qa-ac/post-merge-smoke.spec.ts",
+      "line": 102,
+      "project": "chromium",
+      "status": "expected",
+      "result": "passed",
+      "annotations": []
+    },
+    {
+      "title": "S4: инженер ОТ — после входа попадает в «ТБ и допуски»",
+      "file": "qa-ac/post-merge-smoke.spec.ts",
+      "line": 112,
+      "project": "chromium",
+      "status": "expected",
+      "result": "passed",
+      "annotations": []
+    },
+    {
+      "title": "S5: помощник на /admin/reports видит «Нет доступа к разделу»",
+      "file": "qa-ac/post-merge-smoke.spec.ts",
+      "line": 122,
+      "project": "chromium",
+      "status": "expected",
+      "result": "passed",
+      "annotations": []
+    },
+    {
+      "title": "S6: администратор — /api/metrics отдаёт метрики согласованности аналитики",
+      "file": "qa-ac/post-merge-smoke.spec.ts",
+      "line": 131,
+      "project": "chromium",
+      "status": "expected",
+      "result": "passed",
+      "annotations": []
+    },
+    {
+      "title": "B1: негативные права ролей и IDOR операторов",
+      "file": "qa-ac/rbac-negative.spec.ts",
+      "line": 46,
+      "project": "chromium",
+      "status": "expected",
+      "result": "passed",
+      "annotations": []
+    },
+    {
+      "title": "B2: кэш «Действую как» не отдаёт ответ чужой роли (P-02)",
+      "file": "qa-ac/rbac-negative.spec.ts",
+      "line": 158,
+      "project": "chromium",
+      "status": "expected",
+      "result": "passed",
+      "annotations": []
+    },
+    {
+      "title": "A: карта ролей — меню и главные кнопки",
+      "file": "qa-ac/roles-map.spec.ts",
+      "line": 55,
+      "project": "chromium",
+      "status": "expected",
+      "result": "passed",
+      "annotations": []
+    },
+    {
+      "title": "C1: справочники — добавить, архивировать с «Отменить», массовая архивация",
+      "file": "qa-ac/write-flows.spec.ts",
+      "line": 17,
+      "project": "chromium",
+      "status": "expected",
+      "result": "passed",
+      "annotations": []
+    },
+    {
+      "title": "C2: объект — «Выполнен» с «Отменить», деактивация с окном, удаление",
+      "file": "qa-ac/write-flows.spec.ts",
+      "line": 73,
+      "project": "chromium",
+      "status": "expected",
+      "result": "passed",
+      "annotations": []
+    },
+    {
+      "title": "C3: отчёт — диспетчер создаёт на AC-QA объекте, правит, удаляет",
+      "file": "qa-ac/write-flows.spec.ts",
+      "line": 126,
+      "project": "chromium",
+      "status": "unexpected",
+      "result": "failed",
+      "annotations": [],
+      "error": "Error: оператор ka найден"
+    }
+  ],
+  "coverage": {
+    "rows": 1052,
+    "counts": {
+      "OK": 962,
+      "NOT CHECKED": 86,
+      "BLOCKED": 4
+    },
+    "nonOk": [
+      {
+        "module": "оператор",
+        "screen": "/operator",
+        "element": "Выйти",
+        "role": "OPERATOR",
+        "version": "operator",
+        "status": "NOT CHECKED"
+      },
+      {
+        "module": "оператор",
+        "screen": "/operator",
+        "element": "Следующий шаг: Смена закрыта",
+        "role": "OPERATOR",
+        "version": "operator",
+        "status": "BLOCKED"
+      },
+      {
+        "module": "оператор",
+        "screen": "/operator",
+        "element": "Выйти",
+        "role": "ASSISTANT",
+        "version": "operator",
+        "status": "NOT CHECKED"
+      },
+      {
+        "module": "оператор",
+        "screen": "/operator",
+        "element": "Выйти",
+        "role": "OPERATOR",
+        "version": "operator",
+        "status": "NOT CHECKED"
+      },
+      {
+        "module": "оператор",
+        "screen": "/operator",
+        "element": "Следующий шаг: Смена закрыта",
+        "role": "OPERATOR",
+        "version": "operator",
+        "status": "BLOCKED"
+      },
+      {
+        "module": "оператор",
+        "screen": "/operator",
+        "element": "Выйти",
+        "role": "ASSISTANT",
+        "version": "operator",
+        "status": "NOT CHECKED"
+      },
+      {
+        "module": "оператор",
+        "screen": "/operator/v2",
+        "element": "Выйти",
+        "role": "OPERATOR",
+        "version": "v2",
+        "status": "NOT CHECKED"
+      },
+      {
+        "module": "оператор",
+        "screen": "/operator/v2",
+        "element": "Выйти",
+        "role": "ASSISTANT",
+        "version": "v2",
+        "status": "NOT CHECKED"
+      },
+      {
+        "module": "оператор",
+        "screen": "/operator/v2",
+        "element": "Выйти",
+        "role": "OPERATOR",
+        "version": "v2",
+        "status": "NOT CHECKED"
+      },
+      {
+        "module": "оператор",
+        "screen": "/operator/v2",
+        "element": "Выйти",
+        "role": "ASSISTANT",
+        "version": "v2",
+        "status": "NOT CHECKED"
+      },
+      {
+        "module": "оператор",
+        "screen": "/operator/v3",
+        "element": "Выйти",
+        "role": "OPERATOR",
+        "version": "v3",
+        "status": "NOT CHECKED"
+      },
+      {
+        "module": "оператор",
+        "screen": "/operator/v3",
+        "element": "Отправить",
+        "role": "OPERATOR",
+        "version": "v3",
+        "status": "NOT CHECKED"
+      },
+      {
+        "module": "оператор",
+        "screen": "/operator/v3",
+        "element": "Synthetic QA site 7",
+        "role": "OPERATOR",
+        "version": "v3",
+        "status": "BLOCKED"
+      },
+      {
+        "module": "оператор",
+        "screen": "/operator/v3",
+        "element": "Выйти",
+        "role": "ASSISTANT",
+        "version": "v3",
+        "status": "NOT CHECKED"
+      },
+      {
+        "module": "оператор",
+        "screen": "/operator/v3",
+        "element": "Отправить",
+        "role": "ASSISTANT",
+        "version": "v3",
+        "status": "NOT CHECKED"
+      },
+      {
+        "module": "оператор",
+        "screen": "/operator/v3",
+        "element": "Synthetic QA site 7",
+        "role": "ASSISTANT",
+        "version": "v3",
+        "status": "BLOCKED"
+      },
+      {
+        "module": "/admin",
+        "screen": "/admin",
+        "element": "Выйти",
+        "role": "ADMIN",
+        "version": "-",
+        "status": "NOT CHECKED"
+      },
+      {
+        "module": "/admin",
+        "screen": "/admin",
+        "element": "Выйти",
+        "role": "ADMIN",
+        "version": "-",
+        "status": "NOT CHECKED"
+      },
+      {
+        "module": "/monitoring",
+        "screen": "/monitoring",
+        "element": "Выйти",
+        "role": "ADMIN",
+        "version": "-",
+        "status": "NOT CHECKED"
+      },
+      {
+        "module": "/admin/sites",
+        "screen": "/admin/sites",
+        "element": "Выйти",
+        "role": "ADMIN",
+        "version": "-",
+        "status": "NOT CHECKED"
+      },
+      {
+        "module": "/admin/sites",
+        "screen": "/admin/sites",
+        "element": "Деактивировать",
+        "role": "ADMIN",
+        "version": "-",
+        "status": "NOT CHECKED"
+      },
+      {
+        "module": "/admin/sites",
+        "screen": "/admin/sites",
+        "element": "Удалить навсегда",
+        "role": "ADMIN",
+        "version": "-",
+        "status": "NOT CHECKED"
+      },
+      {
+        "module": "/admin/sites",
+        "screen": "/admin/sites",
+        "element": "Удалить поле",
+        "role": "ADMIN",
+        "version": "-",
+        "status": "NOT CHECKED"
+      },
+      {
+        "module": "/admin/sites",
+        "screen": "/admin/sites",
+        "element": "Удалить куст",
+        "role": "ADMIN",
+        "version": "-",
+        "status": "NOT CHECKED"
+      },
+      {
+        "module": "/admin/sites",
+        "screen": "/admin/sites",
+        "element": "Удалить пикет",
+        "role": "ADMIN",
+        "version": "-",
+        "status": "NOT CHECKED"
+      },
+      {
+        "module": "/admin/reports",
+        "screen": "/admin/reports",
+        "element": "Выйти",
+        "role": "ADMIN",
+        "version": "-",
+        "status": "NOT CHECKED"
+      },
+      {
+        "module": "/admin/reports",
+        "screen": "/admin/reports",
+        "element": "Удалить",
+        "role": "ADMIN",
+        "version": "-",
+        "status": "NOT CHECKED"
+      },
+      {
+        "module": "/admin/reports",
+        "screen": "/admin/reports",
+        "element": "Удалить",
+        "role": "ADMIN",
+        "version": "-",
+        "status": "NOT CHECKED"
+      },
+      {
+        "module": "/admin/reports",
+        "screen": "/admin/reports",
+        "element": "ещё 7 кнопок",
+        "role": "ADMIN",
+        "version": "-",
+        "status": "NOT CHECKED"
+      },
+      {
+        "module": "/admin/equipment",
+        "screen": "/admin/equipment",
+        "element": "Выйти",
+        "role": "ADMIN",
+        "version": "-",
+        "status": "NOT CHECKED"
+      },
+      {
+        "module": "/admin/to",
+        "screen": "/admin/to",
+        "element": "Выйти",
+        "role": "ADMIN",
+        "version": "-",
+        "status": "NOT CHECKED"
+      },
+      {
+        "module": "/admin/crews",
+        "screen": "/admin/crews",
+        "element": "Выйти",
+        "role": "ADMIN",
+        "version": "-",
+        "status": "NOT CHECKED"
+      },
+      {
+        "module": "/admin/crews",
+        "screen": "/admin/crews",
+        "element": "Деактивировать",
+        "role": "ADMIN",
+        "version": "-",
+        "status": "NOT CHECKED"
+      },
+      {
+        "module": "/admin/safety",
+        "screen": "/admin/safety",
+        "element": "Выйти",
+        "role": "ADMIN",
+        "version": "-",
+        "status": "NOT CHECKED"
+      },
+      {
+        "module": "/admin/analytics",
+        "screen": "/admin/analytics",
+        "element": "Выйти",
+        "role": "ADMIN",
+        "version": "-",
+        "status": "NOT CHECKED"
+      },
+      {
+        "module": "/admin/dictionaries",
+        "screen": "/admin/dictionaries",
+        "element": "Выйти",
+        "role": "ADMIN",
+        "version": "-",
+        "status": "NOT CHECKED"
+      },
+      {
+        "module": "/admin/dictionaries",
+        "screen": "/admin/dictionaries",
+        "element": "Сортаменты свай 2 активных 0 архивных Используются в 3 объектах",
+        "role": "ADMIN",
+        "version": "-",
+        "status": "NOT CHECKED"
+      },
+      {
+        "module": "/admin/dictionaries",
+        "screen": "/admin/dictionaries",
+        "element": "Типы бурения 1 активных 0 архивных Используются в 3 объектах",
+        "role": "ADMIN",
+        "version": "-",
+        "status": "NOT CHECKED"
+      },
+      {
+        "module": "/admin/dictionaries",
+        "screen": "/admin/dictionaries",
+        "element": "Причины простоев 1 активных 0 архивных Используются в 3 объектах",
+        "role": "ADMIN",
+        "version": "-",
+        "status": "NOT CHECKED"
+      },
+      {
+        "module": "/admin/dictionaries",
+        "screen": "/admin/dictionaries",
+        "element": "Архивировать Synthetic C140",
+        "role": "ADMIN",
+        "version": "-",
+        "status": "NOT CHECKED"
+      },
+      {
+        "module": "/admin/dictionaries",
+        "screen": "/admin/dictionaries",
+        "element": "Архивировать Synthetic C60",
+        "role": "ADMIN",
+        "version": "-",
+        "status": "NOT CHECKED"
+      },
+      {
+        "module": "/admin/dictionaries",
+        "screen": "/admin/dictionaries",
+        "element": "Удалить Synthetic C60",
+        "role": "ADMIN",
+        "version": "-",
+        "status": "NOT CHECKED"
+      },
+      {
+        "module": "/admin/users",
+        "screen": "/admin/users",
+        "element": "Выйти",
+        "role": "ADMIN",
+        "version": "-",
+        "status": "NOT CHECKED"
+      },
+      {
+        "module": "/admin/users",
+        "screen": "/admin/users",
+        "element": "Заблокированные",
+        "role": "ADMIN",
+        "version": "-",
+        "status": "NOT CHECKED"
+      },
+      {
+        "module": "/admin/settings",
+        "screen": "/admin/settings",
+        "element": "Выйти",
+        "role": "ADMIN",
+        "version": "-",
+        "status": "NOT CHECKED"
+      },
+      {
+        "module": "/admin",
+        "screen": "/admin",
+        "element": "Выйти",
+        "role": "DISPATCHER",
+        "version": "-",
+        "status": "NOT CHECKED"
+      },
+      {
+        "module": "/admin",
+        "screen": "/admin",
+        "element": "Выйти",
+        "role": "DISPATCHER",
+        "version": "-",
+        "status": "NOT CHECKED"
+      },
+      {
+        "module": "/monitoring",
+        "screen": "/monitoring",
+        "element": "Выйти",
+        "role": "DISPATCHER",
+        "version": "-",
+        "status": "NOT CHECKED"
+      },
+      {
+        "module": "/admin/sites",
+        "screen": "/admin/sites",
+        "element": "Выйти",
+        "role": "DISPATCHER",
+        "version": "-",
+        "status": "NOT CHECKED"
+      },
+      {
+        "module": "/admin/sites",
+        "screen": "/admin/sites",
+        "element": "Деактивировать",
+        "role": "DISPATCHER",
+        "version": "-",
+        "status": "NOT CHECKED"
+      },
+      {
+        "module": "/admin/sites",
+        "screen": "/admin/sites",
+        "element": "Удалить навсегда",
+        "role": "DISPATCHER",
+        "version": "-",
+        "status": "NOT CHECKED"
+      },
+      {
+        "module": "/admin/sites",
+        "screen": "/admin/sites",
+        "element": "Удалить поле",
+        "role": "DISPATCHER",
+        "version": "-",
+        "status": "NOT CHECKED"
+      },
+      {
+        "module": "/admin/sites",
+        "screen": "/admin/sites",
+        "element": "Удалить куст",
+        "role": "DISPATCHER",
+        "version": "-",
+        "status": "NOT CHECKED"
+      },
+      {
+        "module": "/admin/sites",
+        "screen": "/admin/sites",
+        "element": "Удалить пикет",
+        "role": "DISPATCHER",
+        "version": "-",
+        "status": "NOT CHECKED"
+      },
+      {
+        "module": "/admin/reports",
+        "screen": "/admin/reports",
+        "element": "Выйти",
+        "role": "DISPATCHER",
+        "version": "-",
+        "status": "NOT CHECKED"
+      },
+      {
+        "module": "/admin/reports",
+        "screen": "/admin/reports",
+        "element": "Удалить",
+        "role": "DISPATCHER",
+        "version": "-",
+        "status": "NOT CHECKED"
+      },
+      {
+        "module": "/admin/reports",
+        "screen": "/admin/reports",
+        "element": "Удалить",
+        "role": "DISPATCHER",
+        "version": "-",
+        "status": "NOT CHECKED"
+      },
+      {
+        "module": "/admin/reports",
+        "screen": "/admin/reports",
+        "element": "Удалить",
+        "role": "DISPATCHER",
+        "version": "-",
+        "status": "NOT CHECKED"
+      },
+      {
+        "module": "/admin/reports",
+        "screen": "/admin/reports",
+        "element": "ещё 5 кнопок",
+        "role": "DISPATCHER",
+        "version": "-",
+        "status": "NOT CHECKED"
+      },
+      {
+        "module": "/admin/equipment",
+        "screen": "/admin/equipment",
+        "element": "Выйти",
+        "role": "DISPATCHER",
+        "version": "-",
+        "status": "NOT CHECKED"
+      },
+      {
+        "module": "/admin/to",
+        "screen": "/admin/to",
+        "element": "Выйти",
+        "role": "DISPATCHER",
+        "version": "-",
+        "status": "NOT CHECKED"
+      },
+      {
+        "module": "/admin/crews",
+        "screen": "/admin/crews",
+        "element": "Выйти",
+        "role": "DISPATCHER",
+        "version": "-",
+        "status": "NOT CHECKED"
+      },
+      {
+        "module": "/admin/crews",
+        "screen": "/admin/crews",
+        "element": "Деактивировать",
+        "role": "DISPATCHER",
+        "version": "-",
+        "status": "NOT CHECKED"
+      },
+      {
+        "module": "/admin/safety",
+        "screen": "/admin/safety",
+        "element": "Выйти",
+        "role": "DISPATCHER",
+        "version": "-",
+        "status": "NOT CHECKED"
+      },
+      {
+        "module": "/admin/analytics",
+        "screen": "/admin/analytics",
+        "element": "Выйти",
+        "role": "DISPATCHER",
+        "version": "-",
+        "status": "NOT CHECKED"
+      },
+      {
+        "module": "/admin/settings",
+        "screen": "/admin/settings",
+        "element": "Выйти",
+        "role": "DISPATCHER",
+        "version": "-",
+        "status": "NOT CHECKED"
+      },
+      {
+        "module": "/admin/to",
+        "screen": "/admin/to",
+        "element": "Выйти",
+        "role": "MECHANIC",
+        "version": "-",
+        "status": "NOT CHECKED"
+      },
+      {
+        "module": "/admin/to",
+        "screen": "/admin/to",
+        "element": "Выйти",
+        "role": "MECHANIC",
+        "version": "-",
+        "status": "NOT CHECKED"
+      },
+      {
+        "module": "/admin/equipment",
+        "screen": "/admin/equipment",
+        "element": "Выйти",
+        "role": "MECHANIC",
+        "version": "-",
+        "status": "NOT CHECKED"
+      },
+      {
+        "module": "/admin/maintenance",
+        "screen": "/admin/maintenance",
+        "element": "Выйти",
+        "role": "MECHANIC",
+        "version": "-",
+        "status": "NOT CHECKED"
+      },
+      {
+        "module": "/admin/crews",
+        "screen": "/admin/crews",
+        "element": "Выйти",
+        "role": "MECHANIC",
+        "version": "-",
+        "status": "NOT CHECKED"
+      },
+      {
+        "module": "/admin/safety",
+        "screen": "/admin/safety",
+        "element": "Выйти",
+        "role": "MECHANIC",
+        "version": "-",
+        "status": "NOT CHECKED"
+      },
+      {
+        "module": "/admin/equipment/qa-v5-equipment",
+        "screen": "/admin/equipment/qa-v5-equipment",
+        "element": "Выйти",
+        "role": "MECHANIC",
+        "version": "-",
+        "status": "NOT CHECKED"
+      },
+      {
+        "module": "/admin/sites",
+        "screen": "/no-access",
+        "element": "Выйти",
+        "role": "MECHANIC",
+        "version": "-",
+        "status": "NOT CHECKED"
+      },
+      {
+        "module": "/inspections",
+        "screen": "/inspections",
+        "element": "Выйти",
+        "role": "MECHANIC",
+        "version": "-",
+        "status": "NOT CHECKED"
+      },
+      {
+        "module": "/admin",
+        "screen": "/admin",
+        "element": "Выйти",
+        "role": "FOREMAN",
+        "version": "-",
+        "status": "NOT CHECKED"
+      },
+      {
+        "module": "/admin",
+        "screen": "/admin",
+        "element": "Выйти",
+        "role": "FOREMAN",
+        "version": "-",
+        "status": "NOT CHECKED"
+      },
+      {
+        "module": "/monitoring",
+        "screen": "/monitoring",
+        "element": "Выйти",
+        "role": "FOREMAN",
+        "version": "-",
+        "status": "NOT CHECKED"
+      },
+      {
+        "module": "/admin/sites",
+        "screen": "/admin/sites",
+        "element": "Выйти",
+        "role": "FOREMAN",
+        "version": "-",
+        "status": "NOT CHECKED"
+      },
+      {
+        "module": "/admin/to",
+        "screen": "/admin/to",
+        "element": "Выйти",
+        "role": "FOREMAN",
+        "version": "-",
+        "status": "NOT CHECKED"
+      },
+      {
+        "module": "/admin/crews",
+        "screen": "/admin/crews",
+        "element": "Выйти",
+        "role": "FOREMAN",
+        "version": "-",
+        "status": "NOT CHECKED"
+      },
+      {
+        "module": "/admin/safety",
+        "screen": "/admin/safety",
+        "element": "Выйти",
+        "role": "FOREMAN",
+        "version": "-",
+        "status": "NOT CHECKED"
+      },
+      {
+        "module": "/admin/reports",
+        "screen": "/admin/reports",
+        "element": "Выйти",
+        "role": "FOREMAN",
+        "version": "-",
+        "status": "NOT CHECKED"
+      },
+      {
+        "module": "/admin/analytics",
+        "screen": "/admin/analytics",
+        "element": "Выйти",
+        "role": "FOREMAN",
+        "version": "-",
+        "status": "NOT CHECKED"
+      },
+      {
+        "module": "/admin/safety",
+        "screen": "/admin/safety",
+        "element": "Выйти",
+        "role": "SAFETY_ENGINEER",
+        "version": "-",
+        "status": "NOT CHECKED"
+      },
+      {
+        "module": "/admin/safety",
+        "screen": "/admin/safety",
+        "element": "Выйти",
+        "role": "SAFETY_ENGINEER",
+        "version": "-",
+        "status": "NOT CHECKED"
+      },
+      {
+        "module": "/admin/to",
+        "screen": "/admin/to",
+        "element": "Выйти",
+        "role": "SAFETY_ENGINEER",
+        "version": "-",
+        "status": "NOT CHECKED"
+      },
+      {
+        "module": "/admin/sites",
+        "screen": "/admin/sites",
+        "element": "Выйти",
+        "role": "SAFETY_ENGINEER",
+        "version": "-",
+        "status": "NOT CHECKED"
+      },
+      {
+        "module": "/admin/reports",
+        "screen": "/admin/reports",
+        "element": "Выйти",
+        "role": "SAFETY_ENGINEER",
+        "version": "-",
+        "status": "NOT CHECKED"
+      },
+      {
+        "module": "/assistant",
+        "screen": "/assistant",
+        "element": "Выйти",
+        "role": "ASSISTANT",
+        "version": "-",
+        "status": "NOT CHECKED"
+      }
+    ]
+  },
+  "warning": "A framework passed case can contain BLOCKED or NOT CHECKED rows; destructive actions are deliberately not clicked. CSV labels are candidates, not confirmed defects."
+}

@@ -43,6 +43,13 @@ reportPdfKey/exportCsvKey при null или пустом tenantId возвра�
 
 Не использовать prod:smoke без явного --url localhost: его default — production.
 
+
+## Полный повтор после исправлений
+
+На отдельной свежей PostgreSQL 18 + Redis и настоящем HTTP-приложении выполнен весь npm run test:unit: **5776 passed / 0 skipped / 0 failed**, 512 файлов, exit 0. CLI: 815,41 с; весь wrapper с подготовкой/очисткой: 857 с. Все 241 исторических пропуска сопоставлены по пути и полному имени с этим же полным прогоном: 241 passed. Поля wholeRun/wholeRunResult в SKIP-REGISTRY.json и WHOLE-RUN-MATCH.json фиксируют соответствие. Эти числа не надо суммировать с отдельными прогонами выше.
+
+Команда: npm run test:unit -- --maxWorkers=1 --no-file-parallelism --reporter=default --reporter=json --outputFile=D:/PillingR/night-logs/night-evidence-1026/full-unit-fresh.json. Настоящий HTTP-сервер сохранил runtime-настройки; unit-процесс получил действующие адреса собственных БД/Redis/HTTP без runtime S3/secret/proxy/identity-role настроек приложения. Все DB/HTTP-gates включены. Подробности красных прогонов и причин — VERIFICATION.md. Wrapper unit-fresh-stand.cjs удалил только свои новый PostgreSQL, Redis и HTTP-процесс; cleanup=true.
+
 ## Построчный реестр241
 
 | № | Файл / сценарий | Причина | Реальный результат | Лог |
@@ -288,3 +295,11 @@ reportPdfKey/exportCsvKey при null или пустом tenantId возвра�
 |239|tests/integration/tech-readiness-write-pipeline.spec.ts: Tech Readiness real source → outbox → snapshot → read model projects the real event once and persists the immutable snapshot and current model|Нет INTEGRATION_DATABASE_URL_OWNER/APP|passed|integration-db-base.json|
 |240|src/core/storage/__tests__/s3-service.test.ts: S3-сервис: построение ключей объектов reportPdfKey: пустая организация отказывает (fail closed), а не использует "default"|Явный it.skip, известный fail-closed дефект helpers|failed → passed после исправления|s3-red.json → s3-green.json|
 |241|src/core/storage/__tests__/s3-service.test.ts: S3-сервис: построение ключей объектов exportCsvKey: пустая организация отказывает (fail closed), а не использует "default"|Явный it.skip, известный fail-closed дефект helpers|failed → passed после исправления|s3-red.json → s3-green.json|
+
+## Заключительный повтор после ревью
+
+После platform-selector в новом PG-тесте полный свежий последовательный npm run test:unit повторён: 5776 passed/0failed/0skipped,512files,exit0; 908с Vitest,978с outerwrapper,cleanup=true. Все241 снова сопоставлены по file+fullName и passed. Источник: full-unit-after-portability.json; прежний5776green сохранён в pre-portability/. Это не сумма отдельных запусков.
+
+## Повтор на 1b0a2663, 27 октября
+
+Последний полный свежий unit: exit1,5775passed/1failed/0skipped,512файлов,981с wrapper,cleanup=true. Все241исторических по file+fullName снова matched и passed. Единственный failed вне этого реестра: tests/integration/tech-readiness-work-permits.spec.ts,20-way approval race,raw23505legacy IdempotencyKey_scope_key_key. Неизменённый тест на BASEefd воспроизвёл ту же ошибку вторым запуском (первый1passed,второй1failed,по3filtered). Это существующая гонка; исходники не правились, требуется разрешение на одну SQL-строку tenant-scoped repository. Подробности PERMIT-IDEMPOTENCY-RACE.md, актуальные проверки VERIFICATION.md; старые5776green выше являются историей.
