@@ -3,6 +3,7 @@ import { test, expect } from './fixtures/disposable.fixture';
 import { login } from './page-objects/login.page';
 import { randomUUID } from 'node:crypto';
 import { Client } from 'pg';
+import { createRoleAuditFixture } from './fixtures/role-audit.mjs';
 
 test('J9 inactive equipment preserves history without a current ready verdict', async ({ page }) => {
   test.skip(!process.env.INTEGRATION_DATABASE_URL_OWNER, 'Requires owned disposable PostgreSQL');
@@ -154,4 +155,152 @@ test.describe('Inspection (ТО) flow', () => {
     await expect(body).toContainText('Молот');
     await expect(body).not.toContainText('нет шаблона');
   });
+});
+
+
+test('mechanic: complete a composed inspection with a photo, audit, meters and readiness', async ({ page }, info) => {
+  test.setTimeout(180_000);
+  const fixture = await createRoleAuditFixture();
+  const db = new Client({ connectionString: process.env.INTEGRATION_DATABASE_URL_OWNER });
+  const observed: Array<Record<string, unknown>> = [];
+  const errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  await db.connect();
+  try {
+    // Two synthetic blocks exercise all four supported answer types.
+    const baseId = randomUUID(), hammerId = randomUUID();
+    const sections = [randomUUID(), randomUUID(), randomUUID()];
+    const items = [randomUUID(), randomUUID(), randomUUID(), randomUUID(), randomUUID()];
+    for (const [id, block, model, hammer] of [[baseId, 'BASE', 'КБУРГ', null], [hammerId, 'HAMMER', null, 'HYDRAULIC']]) {
+      await db.query('INSERT INTO "ChecklistTemplate" (id,"tenantId",name,level,"blockType","appliesToModel","appliesToHammerKind","createdById","updatedAt") VALUES ($1,$2,$3,$4,$5,$6,$7,$8,now())',
+        [id, fixture.tenantId, 'QA mechanic ' + block, 'EO', block, model, hammer, fixture.users.ADMIN.id]);
+    }
+    for (const [i, title] of ['QA hydraulic checks', 'QA measurements', 'QA hammer checks'].entries()) {
+      await db.query('INSERT INTO "ChecklistSection" (id,"tenantId","templateId",title,"order") VALUES ($1,$2,$3,$4,$5)',
+        [sections[i], fixture.tenantId, i === 2 ? hammerId : baseId, title, i]);
+    }
+    const texts = ['QA photo of hydraulic unit', 'QA hydraulic condition', 'QA lubrication done', 'QA pressure measurement', 'QA hammer secured'];
+    const kinds = ['YES_NO', 'STATUS4', 'DONE', 'MEASURE', 'YES_NO'];
+    for (const [i, text] of texts.entries()) {
+      await db.query('INSERT INTO "ChecklistItem" (id,"tenantId","sectionId",text,"answerType","photoRequired","order") VALUES ($1,$2,$3,$4,$5,$6,$7)',
+        [items[i], fixture.tenantId, sections[i < 2 ? 0 : i < 4 ? 1 : 2], text, kinds[i], i === 0, i]);
+    }
+    await login(page, fixture.users.MECHANIC.email, fixture.password);
+    await page.goto('/inspections/new?equipmentId=' + fixture.equipmentId);
+    await expect(page.locator('#si-equipment')).toContainText('QA КБУРГ');
+    await expect(page.locator('body')).toContainText('База · КБУРГ');
+    await expect(page.locator('body')).toContainText('Молот · гидравлический');
+    await expect(page.getByText('✓ шаблон есть', { exact: true })).toHaveCount(2);
+    await expect(page.locator('body')).not.toContainText('нет шаблона');
+    await page.locator('#si-hours').fill('101');
+    const started = page.waitForResponse(r => new URL(r.url()).pathname === '/api/inspections' && r.request().method() === 'POST');
+    await page.getByRole('button', { name: 'Начать осмотр', exact: true }).click();
+    expect((await started).status()).toBe(201);
+    await expect(page).toHaveURL(/\/inspections\/[^/?]+$/);
+    const id = new URL(page.url()).pathname.slice('/inspections/'.length);
+    expect(id).not.toBe('');
+    const initial = (await db.query('SELECT i.status,i."performedById",i."maintenanceRecordId",m.status AS "maintenanceStatus",m."createdById" FROM "Inspection" i JOIN "MaintenanceRecord" m ON m.id=i."maintenanceRecordId" WHERE i.id=$1 AND i."tenantId"=$2', [id, fixture.tenantId])).rows[0];
+    expect(initial).toMatchObject({ status: 'DRAFT', performedById: fixture.users.MECHANIC.id, maintenanceStatus: 'IN_PROGRESS', createdById: fixture.users.MECHANIC.id });
+    const item = (text: string) => page.locator('div.rounded-lg.border.bg-card.px-3.py-3').filter({ hasText: text });
+    const photo = item(texts[0]);
+    await photo.getByRole('button', { name: 'Да', exact: true }).click();
+    const note = 'Синтетический осмотр: гидравлика проверена на тестовых данных.';
+    await photo.getByPlaceholder('Примечание…', { exact: true }).fill(note);
+    await item(texts[1]).getByRole('button', { name: 'Исправно', exact: true }).click();
+    const save = page.waitForResponse(r => new URL(r.url()).pathname === '/api/inspections/' + id && r.request().method() === 'PUT');
+    await page.getByRole('button', { name: 'Сохранить черновик', exact: true }).click();
+    expect((await save).status()).toBe(200);
+    expect((await db.query('SELECT result,note FROM "InspectionAnswer" WHERE "inspectionId"=$1 AND "itemId"=$2', [id, items[0]])).rows).toEqual([{ result: 'YES', note }]);
+    await page.reload();
+    await expect(item(texts[0]).getByPlaceholder('Примечание…', { exact: true })).toHaveValue(note);
+    const image = await item(texts[0]).screenshot();
+    const confirm = page.waitForResponse(r => /\/api\/media\/[^/]+\/confirm$/.test(new URL(r.url()).pathname) && r.request().method() === 'POST');
+    await item(texts[0]).locator('input[type="file"]').setInputFiles({ name: 'night-inspection.png', mimeType: 'image/png', buffer: image });
+    expect((await confirm).status()).toBe(200);
+    await expect(item(texts[0]).getByRole('button', { name: 'Открыть фото', exact: true })).toBeVisible();
+    const media = (await db.query('SELECT id,"uploadStatus","userId","fileSize" FROM "Media" WHERE "tenantId"=$1 AND "entityId"=$2 AND "isDeleted"=false', [fixture.tenantId, id + '__' + items[0]])).rows;
+    expect(media).toHaveLength(1);
+    expect(media[0]).toMatchObject({ uploadStatus: 'completed', userId: fixture.users.MECHANIC.id, fileSize: image.length });
+    const download = await page.request.get('/api/media/' + media[0].id + '/download');
+    expect(download.status()).toBe(200);
+    const bytes = await page.request.get((await download.json()).url);
+    expect(bytes.status()).toBe(200);
+    expect(await bytes.body()).toEqual(image);
+    let next = page.waitForResponse(r => new URL(r.url()).pathname === '/api/inspections/' + id && r.request().method() === 'PUT');
+    await page.getByRole('button', { name: /^Далее:/ }).click();
+    expect((await next).status()).toBe(200);
+    await item(texts[2]).getByRole('checkbox').check();
+    await item(texts[3]).getByPlaceholder('Значение', { exact: true }).fill('12');
+    next = page.waitForResponse(r => new URL(r.url()).pathname === '/api/inspections/' + id && r.request().method() === 'PUT');
+    await page.getByRole('button', { name: /^Далее:/ }).click();
+    expect((await next).status()).toBe(200);
+    await item(texts[4]).getByRole('button', { name: 'Да', exact: true }).click();
+    await page.getByRole('button', { name: 'Завершить осмотр', exact: true }).click();
+    await page.getByLabel('Подписал', { exact: true }).fill('QA MECHANIC');
+    const completed = page.waitForResponse(r => new URL(r.url()).pathname === '/api/inspections/' + id + '/complete' && r.request().method() === 'POST');
+    await page.getByRole('button', { name: 'Подтвердить', exact: true }).click();
+    expect((await completed).status()).toBe(200);
+    await expect(page).toHaveURL(/\/inspections$/);
+    const result = (await db.query('SELECT i.status,i."performedById",i."signedByName",i."signedAt",i."healthScore",m.status AS "maintenanceStatus",e."engineHoursTotal" FROM "Inspection" i JOIN "MaintenanceRecord" m ON m.id=i."maintenanceRecordId" JOIN "Equipment" e ON e.id=i."equipmentId" WHERE i.id=$1 AND i."tenantId"=$2', [id, fixture.tenantId])).rows[0];
+    expect(result).toMatchObject({ status: 'COMPLETED', performedById: fixture.users.MECHANIC.id, signedByName: 'QA MECHANIC', healthScore: 100, maintenanceStatus: 'DONE', engineHoursTotal: 101 });
+    expect(result.signedAt).toBeInstanceOf(Date);
+    const readings = (await db.query('SELECT id,"engineHours",source,"recordedById",note FROM "MeterReading" WHERE "tenantId"=$1 AND "equipmentId"=$2 ORDER BY id', [fixture.tenantId, fixture.equipmentId])).rows;
+    expect(readings).toHaveLength(1);
+    expect(readings[0]).toMatchObject({ engineHours: 101, source: 'MANUAL', recordedById: fixture.users.MECHANIC.id, note: 'Снято при осмотре EO' });
+    const answers = (await db.query('SELECT "itemId",result,value,note,"photoCount" FROM "InspectionAnswer" WHERE "inspectionId"=$1 ORDER BY "itemId"', [id])).rows;
+    expect(answers).toHaveLength(5);
+    for (const [i, answer] of ['YES', 'OK', 'DONE', 'OK', 'YES'].entries()) expect(answers).toContainEqual(expect.objectContaining({ itemId: items[i], result: answer }));
+    expect(answers).toContainEqual(expect.objectContaining({ itemId: items[0], note, photoCount: 1 }));
+    expect(answers).toContainEqual(expect.objectContaining({ itemId: items[3], value: '12' }));
+    const audit = (await db.query('SELECT action,"actorId" FROM "FeedbackEvent" WHERE "targetId"=$1 AND action IN ($2,$3)', [id, 'inspection.started', 'inspection.completed'])).rows;
+    expect(audit).toEqual(expect.arrayContaining([{ action: 'inspection.started', actorId: fixture.users.MECHANIC.id }, { action: 'inspection.completed', actorId: fixture.users.MECHANIC.id }]));
+    expect(audit).toHaveLength(2);
+    await expect.poll(async () => Number((await db.query('SELECT count(*) FROM "ReadinessScoreSnapshot" WHERE "tenantId"=$1 AND "equipmentId"=$2 AND "triggerType"=$3 AND "triggerId"=$4', [fixture.tenantId, fixture.equipmentId, 'INSPECTION_COMPLETED', id + ':completed'])).rows[0].count), { timeout: 30_000 }).toBe(1);
+    const snapshot = (await db.query('SELECT id,facts,evidence FROM "ReadinessScoreSnapshot" WHERE "tenantId"=$1 AND "equipmentId"=$2 AND "triggerType"=$3 AND "triggerId"=$4', [fixture.tenantId, fixture.equipmentId, 'INSPECTION_COMPLETED', id + ':completed'])).rows[0];
+    expect(snapshot.facts).toMatchObject({ inspectionCompleted: true, healthScore: 100, meterKnown: true });
+    expect(snapshot.evidence.inspectionId).toBe(id);
+    expect(snapshot.evidence.maintenanceRecordIds).not.toContain(initial.maintenanceRecordId);
+    await page.goto('/inspections/' + id);
+    await expect(page.getByRole('button', { name: 'Сохранить черновик', exact: true })).toHaveCount(0);
+    await expect(item(texts[0]).getByRole('button', { name: 'Да', exact: true })).toBeDisabled();
+    await page.screenshot({ path: info.outputPath('mechanic-completed-inspection.png'), fullPage: true });
+    const replay = await page.request.post('/api/inspections/' + id + '/complete', { headers: { Origin: new URL(page.url()).origin }, data: { signedByName: 'replay must preserve original signature' } });
+    expect(replay.status()).toBe(200);
+    expect((await replay.json()).inspection.signedByName).toBe('QA MECHANIC');
+    expect((await db.query('SELECT id,"engineHours",source,"recordedById",note FROM "MeterReading" WHERE "tenantId"=$1 AND "equipmentId"=$2 ORDER BY id', [fixture.tenantId, fixture.equipmentId])).rows).toEqual(readings);
+    expect((await db.query('SELECT "signedAt" FROM "Inspection" WHERE id=$1', [id])).rows).toEqual([{ signedAt: result.signedAt }]);
+    expect(Number((await db.query('SELECT count(*) FROM "FeedbackEvent" WHERE "targetId"=$1 AND action=$2', [id, 'inspection.completed'])).rows[0].count)).toBe(1);
+    for (const role of ['DISPATCHER', 'OPERATOR', 'ASSISTANT'] as const) {
+      const context = page.context();
+      const logout = await page.request.post('/api/auth/logout', { headers: { Origin: new URL(page.url()).origin } });
+      expect(logout.status()).toBe(200);
+      // Close the old authenticated shell before logging in again: its session
+      // probe can redirect to /login concurrently with the shared login helper.
+      await page.close();
+      page = await context.newPage();
+      page.on('pageerror', error => errors.push(error.message));
+      await login(page, fixture.users[role].email, fixture.password);
+      const read = await page.request.get('/api/inspections/' + id);
+      expect(read.status(), role + ' inspection access').toBe(role === 'DISPATCHER' ? 200 : role === 'OPERATOR' ? 404 : 403);
+      if (role === 'DISPATCHER') {
+        expect((await read.json()).inspection).toMatchObject({ id, status: 'COMPLETED', performedById: fixture.users.MECHANIC.id });
+        await page.goto('/inspections/' + id);
+        await expect(page.getByText('Завершён', { exact: true })).toBeVisible();
+        await expect(item(texts[0]).getByPlaceholder('Примечание…', { exact: true })).toHaveValue(note);
+        await page.screenshot({ path: info.outputPath('dispatcher-mechanic-inspection.png'), fullPage: true });
+      }
+      if (role === 'OPERATOR' || role === 'ASSISTANT') {
+        await page.goto('/inspections/' + id);
+        await expect(page.locator('body')).toContainText(role === 'OPERATOR' ? 'Осмотр не найден или принадлежит другому оператору.' : /Нет прав на просмотр осмотра|Нет доступа/);
+        await expect(page.locator('body')).not.toContainText(note);
+        await page.screenshot({ path: info.outputPath(role + '-inspection-denied.png'), fullPage: true });
+      }
+      observed.push({ step: 'cross-role read', role, status: read.status() });
+    }
+    expect(errors).toEqual([]);
+    observed.push({ step: 'mechanic inspection completed', inspectionId: id, equipmentId: fixture.equipmentId, maintenanceRecordId: initial.maintenanceRecordId, snapshotId: snapshot.id, mediaId: media[0].id, readings, answers, audit });
+  } finally {
+    await db.end();
+    await info.attach('mechanic-inspection', { body: JSON.stringify({ observed, errors }), contentType: 'application/json' });
+  }
 });

@@ -37,6 +37,8 @@ V3: **9passed/0failed/0skipped** (6legacy+3selector). Отчёт сохраня�
 
 Свежий C1–C3: **3passed/0failed/0skipped**,exit0/67с,cleanup=true. Это действия со справочником,объектом и отчётом диспетчера;подробности QA-RUN.md. Новые сквозные цепочки:Chromium2/0/0;ремонт3/0/0;обход семи ролей21/0/0. Последние tsc0/19с,lint0/124с;Playwright387/30 против BASE318/28,обаexit0.
 
+Полный EO механика и прежние регрессии осмотров: **12/0/0**,exit0/246с,три браузера. Подтверждены реальная фотография MinIO,подпись,моточасы/история,аудит и readiness snapshot;replay без повторного показания. Последние tsc0/15с,lint0/62с без предупреждений,list390/30 против BASE318/28,обаexit0/37с. MECHANIC-INSPECTION.md/json.
+
 ## Что осталось
 
 КаждыйCRUD, каждый чужойURL, паспорт сваи и вся матрица ресурсов не исчерпаны. Первоначальный QA68 остаётся53passed/14skipped/1failed,exit1;устаревший email-контракт C3 исправлен и focused зелёный,весь68 не повторялся. Причины14skip — QA-RUN.md. Исторические REDunit/UI не удалены и не заменены выборочными GREEN.
@@ -51,7 +53,7 @@ V3: **9passed/0failed/0skipped** (6legacy+3selector). Отчёт сохраня�
 
 ## Коммиты ветки
 
-До документального снимка; включая его: git log --reverse --format="%H %s" efd95008..HEAD.
+До текущего тестового снимка;его хеш приведён в итоговом сообщении и внешнем RESUME. Полный список включая него:git log --reverse --format="%H %s" efd95008..HEAD.
 
 - 17fd1277d3ee97b49b1f4736fd77aa8318a5097a test(storage): expose tenantless S3 key regression
 - 7ad5d3bd7192b8976ce11113b68b54c93dbfe655 fix(storage): reject tenantless report and CSV keys
@@ -87,3 +89,4 @@ V3: **9passed/0failed/0skipped** (6legacy+3selector). Отчёт сохраня�
 - 44126b987c9dd02b0bbefe28e8094f282b94aaf0 test(operator-v3): prove legacy report persistence and dispatcher visibility
 - 86358ae362686ec2655bf525267059a41908a57b test(operator-v3): await select focus restoration before numeric input
 - fa2de8ec394b86dba29eb2861d0252a1416c647c test(e2e): prove dispatcher safety repair and readiness chains
+- fcc5b0d6cda4b55490076016708edfb338fc1187 docs: record final operator and cross-role evidence with coverage limits

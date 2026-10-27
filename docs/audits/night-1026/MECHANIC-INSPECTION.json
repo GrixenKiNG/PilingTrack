@@ -1,0 +1,382 @@
+{
+  "sourceBuildSha": "44126b987c9dd02b0bbefe28e8094f282b94aaf0",
+  "testScenarioSha256": "003f74a2804d3a5e862e771db4291a6f624779294aa1cb85f1ccbd740f038827",
+  "verificationWorktreeSha": "fcc5b0d6cda4b55490076016708edfb338fc1187",
+  "pipeline": {
+    "sourceBuildSha": "44126b987c9dd02b0bbefe28e8094f282b94aaf0",
+    "worktreeSha": "fcc5b0d6cda4b55490076016708edfb338fc1187",
+    "scenarioHash": "003f74a2804d3a5e862e771db4291a6f624779294aa1cb85f1ccbd740f038827",
+    "scenarioUnchanged": true,
+    "complete": true,
+    "results": [
+      {
+        "id": "inspection-confirmed-fresh",
+        "exe": "C:\\Program Files\\nodejs\\node.exe",
+        "args": [
+          "D:\\PillingR\\night-logs\\night-evidence-1026/inspection-confirmed-fresh-stand.cjs"
+        ],
+        "exit": 0,
+        "seconds": 246
+      },
+      {
+        "id": "inspection-confirmed-tsc",
+        "exe": "C:/Program Files/Git/bin/bash.exe",
+        "args": [
+          "-c",
+          "npx tsc --noEmit"
+        ],
+        "exit": 0,
+        "seconds": 15
+      },
+      {
+        "id": "inspection-confirmed-lint",
+        "exe": "C:/Program Files/Git/bin/bash.exe",
+        "args": [
+          "-c",
+          "npm run lint"
+        ],
+        "exit": 0,
+        "seconds": 62
+      },
+      {
+        "id": "inspection-confirmed-list",
+        "exe": "C:\\Program Files\\nodejs\\node.exe",
+        "args": [
+          "D:\\PillingR\\night-logs\\night-evidence-1026/qa-fresh-stand.cjs",
+          "--list-default"
+        ],
+        "exit": 0,
+        "seconds": 37
+      }
+    ]
+  },
+  "cleanup": {
+    "exit": 0,
+    "seconds": 246,
+    "cleanup": true,
+    "cleanupErrors": []
+  },
+  "stats": {
+    "startTime": "2026-10-27T21:57:12.435Z",
+    "duration": 214293.838,
+    "expected": 12,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  },
+  "originalTestBodiesUnchanged": true,
+  "cases": [
+    {
+      "title": "J9 inactive equipment preserves history without a current ready verdict",
+      "project": "chromium",
+      "status": "passed"
+    },
+    {
+      "title": "mechanic: complete a composed inspection with a photo, audit, meters and readiness",
+      "project": "chromium",
+      "status": "passed",
+      "observed": {
+        "observed": [
+          {
+            "step": "cross-role read",
+            "role": "DISPATCHER",
+            "status": 200
+          },
+          {
+            "step": "cross-role read",
+            "role": "OPERATOR",
+            "status": 404
+          },
+          {
+            "step": "cross-role read",
+            "role": "ASSISTANT",
+            "status": 403
+          },
+          {
+            "step": "mechanic inspection completed",
+            "inspectionId": "cmvr87vpu000cr8w5hw0g1pxj",
+            "equipmentId": "cmvr87u1900093ow51k8rahd4",
+            "maintenanceRecordId": "cmvr87vpn000br8w5xyeztpim",
+            "snapshotId": "b8510401-fb42-4923-a2e8-bea0fe4dda2a",
+            "mediaId": "f962124f-0a71-48b9-ad47-ce42237c9db2",
+            "readings": [
+              {
+                "id": "cmvr87xi70013r8w5hm0jhdi2",
+                "engineHours": 101,
+                "source": "MANUAL",
+                "recordedById": "cmvr87tw800063ow5vu2u7x9b",
+                "note": "Снято при осмотре EO"
+              }
+            ],
+            "answers": [
+              {
+                "itemId": "3bc32c8a-d1d7-4961-801c-ec2bbd1ddbfb",
+                "result": "YES",
+                "value": null,
+                "note": "Синтетический осмотр: гидравлика проверена на тестовых данных.",
+                "photoCount": 1
+              },
+              {
+                "itemId": "7172c16c-698f-4a27-ae2d-5694da6cdae5",
+                "result": "YES",
+                "value": null,
+                "note": null,
+                "photoCount": 0
+              },
+              {
+                "itemId": "cce33af6-53f2-4bdb-b7fc-8264fa24b984",
+                "result": "DONE",
+                "value": null,
+                "note": null,
+                "photoCount": 0
+              },
+              {
+                "itemId": "d020a13d-022f-4373-8725-6a2d9d29af2a",
+                "result": "OK",
+                "value": null,
+                "note": null,
+                "photoCount": 0
+              },
+              {
+                "itemId": "da38f6fd-ac7e-4bad-8371-40705ddf1fb5",
+                "result": "OK",
+                "value": "12",
+                "note": null,
+                "photoCount": 0
+              }
+            ],
+            "audit": [
+              {
+                "action": "inspection.started",
+                "actorId": "cmvr87tw800063ow5vu2u7x9b"
+              },
+              {
+                "action": "inspection.completed",
+                "actorId": "cmvr87tw800063ow5vu2u7x9b"
+              }
+            ]
+          }
+        ],
+        "errors": []
+      }
+    },
+    {
+      "title": "J9 inactive equipment preserves history without a current ready verdict",
+      "project": "Mobile Safari",
+      "status": "passed"
+    },
+    {
+      "title": "mechanic: complete a composed inspection with a photo, audit, meters and readiness",
+      "project": "Mobile Safari",
+      "status": "passed",
+      "observed": {
+        "observed": [
+          {
+            "step": "cross-role read",
+            "role": "DISPATCHER",
+            "status": 200
+          },
+          {
+            "step": "cross-role read",
+            "role": "OPERATOR",
+            "status": 404
+          },
+          {
+            "step": "cross-role read",
+            "role": "ASSISTANT",
+            "status": 403
+          },
+          {
+            "step": "mechanic inspection completed",
+            "inspectionId": "cmvr89dei001pr8w58bu78pqd",
+            "equipmentId": "cmvr899hs0009ngw5q67obo2y",
+            "maintenanceRecordId": "cmvr89deb001or8w517su112z",
+            "snapshotId": "5aeb2f6a-0e33-4bc8-9da0-365cc74f7d6d",
+            "mediaId": "6d1b48a8-7fe8-4ba1-b91a-e5362a183c04",
+            "readings": [
+              {
+                "id": "cmvr89hha002gr8w5gwkubdx2",
+                "engineHours": 101,
+                "source": "MANUAL",
+                "recordedById": "cmvr899cz0006ngw539sa8l0d",
+                "note": "Снято при осмотре EO"
+              }
+            ],
+            "answers": [
+              {
+                "itemId": "403a6dfb-d6c0-49bb-a258-95308bffdb67",
+                "result": "YES",
+                "value": null,
+                "note": "Синтетический осмотр: гидравлика проверена на тестовых данных.",
+                "photoCount": 1
+              },
+              {
+                "itemId": "68fb4516-7892-4f6e-967e-c08d24e8d12c",
+                "result": "DONE",
+                "value": null,
+                "note": null,
+                "photoCount": 0
+              },
+              {
+                "itemId": "96076668-b5dd-4967-bca8-fea68ad86822",
+                "result": "OK",
+                "value": null,
+                "note": null,
+                "photoCount": 0
+              },
+              {
+                "itemId": "b2929d39-da29-4417-96fb-638d6235811c",
+                "result": "YES",
+                "value": null,
+                "note": null,
+                "photoCount": 0
+              },
+              {
+                "itemId": "b350020b-540b-4288-8e86-04f00d2c536f",
+                "result": "OK",
+                "value": "12",
+                "note": null,
+                "photoCount": 0
+              }
+            ],
+            "audit": [
+              {
+                "action": "inspection.started",
+                "actorId": "cmvr899cz0006ngw539sa8l0d"
+              },
+              {
+                "action": "inspection.completed",
+                "actorId": "cmvr899cz0006ngw539sa8l0d"
+              }
+            ]
+          }
+        ],
+        "errors": []
+      }
+    },
+    {
+      "title": "J9 inactive equipment preserves history without a current ready verdict",
+      "project": "Mobile Chrome",
+      "status": "passed"
+    },
+    {
+      "title": "mechanic: complete a composed inspection with a photo, audit, meters and readiness",
+      "project": "Mobile Chrome",
+      "status": "passed",
+      "observed": {
+        "observed": [
+          {
+            "step": "cross-role read",
+            "role": "DISPATCHER",
+            "status": 200
+          },
+          {
+            "step": "cross-role read",
+            "role": "OPERATOR",
+            "status": 404
+          },
+          {
+            "step": "cross-role read",
+            "role": "ASSISTANT",
+            "status": 403
+          },
+          {
+            "step": "mechanic inspection completed",
+            "inspectionId": "cmvr8b96g0032r8w5kk1kd6hc",
+            "equipmentId": "cmvr8b7l10009ocw5fwzvmzs1",
+            "maintenanceRecordId": "cmvr8b96c0031r8w5hatnrf5q",
+            "snapshotId": "c4616502-9059-47dd-955d-c7b0297affb2",
+            "mediaId": "c5cbd88a-2572-4c87-9537-9168be025d16",
+            "readings": [
+              {
+                "id": "cmvr8bb1a003tr8w58ybk1wy6",
+                "engineHours": 101,
+                "source": "MANUAL",
+                "recordedById": "cmvr8b7ga0006ocw5apynzy2s",
+                "note": "Снято при осмотре EO"
+              }
+            ],
+            "answers": [
+              {
+                "itemId": "1de9ac68-6749-4b63-ae44-62126d4b6ac8",
+                "result": "OK",
+                "value": "12",
+                "note": null,
+                "photoCount": 0
+              },
+              {
+                "itemId": "3c13d05c-2bc7-4412-8e5f-8d35aef2aef6",
+                "result": "YES",
+                "value": null,
+                "note": "Синтетический осмотр: гидравлика проверена на тестовых данных.",
+                "photoCount": 1
+              },
+              {
+                "itemId": "470ba42b-64e5-4a91-9a72-eb1d37db34c4",
+                "result": "OK",
+                "value": null,
+                "note": null,
+                "photoCount": 0
+              },
+              {
+                "itemId": "828f13d4-1377-45aa-b9dc-e1d8ace3f8ad",
+                "result": "DONE",
+                "value": null,
+                "note": null,
+                "photoCount": 0
+              },
+              {
+                "itemId": "977765f6-18a3-452c-93e8-8c0b64e238d7",
+                "result": "YES",
+                "value": null,
+                "note": null,
+                "photoCount": 0
+              }
+            ],
+            "audit": [
+              {
+                "action": "inspection.completed",
+                "actorId": "cmvr8b7ga0006ocw5apynzy2s"
+              },
+              {
+                "action": "inspection.started",
+                "actorId": "cmvr8b7ga0006ocw5apynzy2s"
+              }
+            ]
+          }
+        ],
+        "errors": []
+      }
+    },
+    {
+      "title": "admin starts ТО-1, answers an item and saves a draft",
+      "project": "chromium",
+      "status": "passed"
+    },
+    {
+      "title": "hammer block resolves to a template on ТО levels",
+      "project": "chromium",
+      "status": "passed"
+    },
+    {
+      "title": "admin starts ТО-1, answers an item and saves a draft",
+      "project": "Mobile Safari",
+      "status": "passed"
+    },
+    {
+      "title": "hammer block resolves to a template on ТО levels",
+      "project": "Mobile Safari",
+      "status": "passed"
+    },
+    {
+      "title": "admin starts ТО-1, answers an item and saves a draft",
+      "project": "Mobile Chrome",
+      "status": "passed"
+    },
+    {
+      "title": "hammer block resolves to a template on ТО levels",
+      "project": "Mobile Chrome",
+      "status": "passed"
+    }
+  ]
+}
