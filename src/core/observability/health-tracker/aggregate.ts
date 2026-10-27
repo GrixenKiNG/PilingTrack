@@ -48,7 +48,7 @@ function computeOverallStatus(components: SystemComponents): OverallStatus {
 
 async function collectMetrics(): Promise<SystemMetrics> {
   let outboxPending = 0;
-  let dlqPending = 0;
+  let dlqPending: number | null = null;
 
   try {
     const lagMetrics = getLagMetrics();
@@ -67,6 +67,7 @@ async function collectMetrics(): Promise<SystemMetrics> {
       if (dlqStats.status === 'fulfilled') {
         dlqPending = dlqStats.value.pending;
       }
+      // Иначе dlqPending остаётся null: неизвестно, а не ноль.
     }
   } catch {
     // best effort
@@ -129,7 +130,7 @@ export async function checkSystemStatus(): Promise<SystemStatus> {
                 ? process.memoryUsage()
                 : ({} as NodeJS.MemoryUsage),
             outboxPending: 0,
-            dlqPending: 0,
+            dlqPending: null,
           },
   };
 }

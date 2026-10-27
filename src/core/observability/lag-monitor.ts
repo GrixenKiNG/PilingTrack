@@ -51,7 +51,8 @@ export interface LagMetrics {
   projectionLeaderNodeId: string | null;
   isOutboxLeader: boolean;
   isProjectionLeader: boolean;
-  dlqPendingCount: number;
+  /** null — счётчик DLQ не прочитан: 0 здесь означал бы «очередь пуста». */
+  dlqPendingCount: number | null;
   reportAnalyticsStatusMismatchCount: number;
   reportAnalyticsMissingCount: number;
   timestamp: string;
@@ -138,17 +139,17 @@ async function getPendingCount(db: Awaited<ReturnType<typeof getDbClient>>): Pro
 /**
  * Get DLQ pending count.
  */
-async function getDlqPendingCount(): Promise<number> {
+async function getDlqPendingCount(): Promise<number | null> {
   try {
     const { getDlqStats } = await import('@/core/outbox/dead-letter-queue');
     const stats = await getDlqStats();
     return stats.pending;
   } catch (error) {
-    // Ноль здесь выглядит как «очередь пуста», хотя очередь не прочитана.
-    logger.warn('Lag monitor: счётчик DLQ не прочитан, принят 0', {
+    // Ноль здесь выглядит как «очередь пуста», хотя очередь не прочитана: отдаём null.
+    logger.warn('Lag monitor: счётчик DLQ не прочитан, значение неизвестно', {
       message: error instanceof Error ? error.message : String(error),
     });
-    return 0;
+    return null;
   }
 }
 
@@ -275,7 +276,7 @@ function evaluateAlerts(metrics: LagMetrics): LagAlert[] {
     });
   }
 
-  if (metrics.dlqPendingCount > 0) {
+  if (metrics.dlqPendingCount !== null && metrics.dlqPendingCount > 0) {
     alerts.push({
       level: 'warn',
       metric: 'dlq_pending_count',
@@ -367,7 +368,8 @@ export function exportPrometheusMetrics(metrics: LagMetrics | null): string {
     '',
     '# HELP dlq_pending_count Number of events in Dead Letter Queue',
     '# TYPE dlq_pending_count gauge',
-    `dlq_pending_count ${metrics.dlqPendingCount}`,
+    // Без значения строка не выводится: для Prometheus это «нет данных», а не ноль.
+    ...(metrics.dlqPendingCount === null ? [] : [`dlq_pending_count ${metrics.dlqPendingCount}`]),
     '',
     '# HELP report_analytics_status_mismatch_total Reports whose status differs from their ReportAnalytics row',
     '# TYPE report_analytics_status_mismatch_total gauge',

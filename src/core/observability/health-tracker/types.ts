@@ -60,7 +60,8 @@ export interface SystemMetrics {
   uptime: number;
   memoryUsage: NodeJS.MemoryUsage;
   outboxPending: number;
-  dlqPending: number;
+  /** null — значение неизвестно (очередь не прочитана). */
+  dlqPending: number | null;
 }
 
 export interface SystemStatus {

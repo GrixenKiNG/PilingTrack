@@ -326,36 +326,6 @@ export class MediaService {
   }
 
   /**
-   * Get download URL for a media file (presigned, time-limited).
-   */
-  async getDownloadUrl(mediaId: string, expiresIn?: number): Promise<{ url: string; media: MediaRecord }> {
-    const db = await getDbClient();
-    const media = await db.media.findUnique({
-      where: { id: mediaId },
-    });
-
-    if (!media || media.uploadStatus !== 'completed') {
-      throw new ServiceError('Файл не найден или недоступен', 404);
-    }
-
-    // Check tenant access
-    if (media.tenantId) {
-      // In production: verify request tenant matches media tenant
-    }
-
-    const command = new GetObjectCommand({
-      Bucket: this.config.bucket,
-      Key: media.key,
-    });
-
-    const url = await s3CircuitBreaker.execute(() =>
-      getSignedUrl(this.s3Client, command, { expiresIn: expiresIn ?? this.config.urlExpiresIn })
-    );
-
-    return { url, media: this.toMediaRecord(media) };
-  }
-
-  /**
    * Soft delete a media file.
    * Actual S3 deletion happens after retention period.
    *

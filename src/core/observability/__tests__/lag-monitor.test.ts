@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
   findFirst: vi.fn(),
   count: vi.fn(),
   queryRaw: vi.fn(),
+  dlqStats: vi.fn(),
   leader: { getLeader: vi.fn(async () => 'worker-1'), isLeader: vi.fn(() => true) },
 }));
 
@@ -28,7 +29,7 @@ vi.mock('@/core/infrastructure/leader-election', () => ({
   getOutboxLeaderElection: () => mocks.leader,
   getProjectionLeaderElection: () => mocks.leader,
 }));
-vi.mock('@/core/outbox/dead-letter-queue', () => ({ getDlqStats: async () => ({ pending: 0 }) }));
+vi.mock('@/core/outbox/dead-letter-queue', () => ({ getDlqStats: mocks.dlqStats }));
 vi.mock('@/lib/logger', () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }));
 
 import { getFreshLagMetrics, getLagMetrics, exportPrometheusMetrics, countReportAnalyticsStatusMismatch } from '../lag-monitor';
@@ -65,6 +66,7 @@ beforeEach(() => {
     mocks.rows.filter(row => row.published === where.published &&
       (!where.publishedAt || (row.publishedAt !== null && row.publishedAt >= where.publishedAt.gte))).length);
   mocks.queryRaw.mockReset().mockResolvedValue([{ statusMismatch: 0, missingAnalytics: 0 }]);
+  mocks.dlqStats.mockReset().mockResolvedValue({ pending: 0 });
 });
 
 afterEach(() => vi.useRealTimers());
@@ -193,4 +195,34 @@ it('F6 review7: a second module instance reads the producer lag snapshot', async
   vi.resetModules();
   const consumer = await import('../lag-monitor');
   expect(consumer.getLagMetrics()).toEqual(produced);
+});
+
+describe('DLQ backlog when the queue cannot be read', () => {
+  it('reports unknown (null), not zero, and raises no DLQ alert', async () => {
+    mocks.dlqStats.mockRejectedValue(new Error('db down'));
+
+    const metrics = await getFreshLagMetrics();
+
+    expect(metrics.dlqPendingCount).toBeNull();
+    expect(metrics.dlqPendingCount).not.toBe(0);
+  });
+
+  it('omits the dlq_pending_count sample from the scrape instead of exporting 0', async () => {
+    mocks.dlqStats.mockRejectedValue(new Error('db down'));
+    const metrics = await getFreshLagMetrics();
+
+    const text = exportPrometheusMetrics(metrics);
+
+    expect(text).toContain('# TYPE dlq_pending_count gauge');
+    expect(text).not.toMatch(/^dlq_pending_count d/m);
+  });
+
+  it('a readable queue still exports its real count and alerts when it is positive', async () => {
+    mocks.dlqStats.mockResolvedValue({ pending: 3 });
+
+    const metrics = await getFreshLagMetrics();
+
+    expect(metrics.dlqPendingCount).toBe(3);
+    expect(exportPrometheusMetrics(metrics)).toMatch(/^dlq_pending_count 3$/m);
+  });
 });
