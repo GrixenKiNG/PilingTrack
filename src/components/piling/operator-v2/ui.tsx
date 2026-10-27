@@ -48,7 +48,7 @@ export function StepShell({
     // край, и нажать её было нельзя. Здесь высота по содержимому, а кнопка
     // прилипает к нижней границе окна — она достижима и на длинном списке
     // осмотра, и на коротком экране пуска.
-    <div ref={screenRef} className="mx-auto w-full max-w-[560px] bg-background [&_.operator-screen-footer]:static [&_button:focus]:outline-2 [&_button:focus]:outline-offset-2 [&_button:focus]:outline-signal">
+    <div ref={screenRef} className="mx-auto w-full max-w-[560px] bg-background max-lg:pb-24 [&_.operator-screen-footer]:static [&_button:focus]:outline-2 [&_button:focus]:outline-offset-2 [&_button:focus]:outline-signal">
       <header className={cn('flex items-center gap-2 border-b-2 bg-card px-3 py-3 text-foreground', TONE_BAR[tone])}>
         {onBack ? (
           <button type="button" onClick={onBack} aria-label="Назад"
