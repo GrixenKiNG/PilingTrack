@@ -7,6 +7,8 @@ import { PrismaClient } from '@/generated/postgres-client/client';
 import { applyTenantGuc, wrapTransaction } from '@/core/security/tenant-rls';
 import { createFixture } from '../../../../../tests/integration/helpers/disposable-db';
 
+const bash = process.platform === 'win32' ? 'C:/Program Files/Git/bin/bash.exe' : 'bash';
+
 const state = vi.hoisted(() => ({ db: undefined as PrismaClient | undefined }));
 vi.mock('@/lib/db', () => ({ get db() { return state.db; } }));
 
@@ -24,7 +26,7 @@ describe.skipIf(!process.env.INTEGRATION_DATABASE_URL_OWNER)('outbox failures on
   beforeAll(async () => {
     // Never use the caller's DB: the normal application/worker may be live.
     // Existing helper owns its container and keeps credentials in stdout/RAM.
-    const output = execFileSync('C:/Program Files/Git/bin/bash.exe', ['scripts/test-db-up.sh'], { encoding: 'utf8', windowsHide: true, timeout: 120_000, stdio: ['ignore', 'pipe', 'pipe'] });
+    const output = execFileSync(bash, ['scripts/test-db-up.sh'], { encoding: 'utf8', windowsHide: true, timeout: 120_000, stdio: ['ignore', 'pipe', 'pipe'] });
     const values = Object.fromEntries(output.trim().split(/\r?\n/).map(line => {
       const match = /^export ([A-Z_]+)=(.*)$/.exec(line);
       if (!match) throw new Error('Unexpected disposable helper output');
@@ -61,7 +63,7 @@ describe.skipIf(!process.env.INTEGRATION_DATABASE_URL_OWNER)('outbox failures on
   afterAll(async () => {
     if (raw) await raw.$disconnect();
     if (fixture) await fixture.close();
-    if (container) execFileSync('C:/Program Files/Git/bin/bash.exe', ['scripts/test-db-down.sh', container], { windowsHide: true, stdio: 'pipe' });
+    if (container) execFileSync(bash, ['scripts/test-db-down.sh', container], { windowsHide: true, stdio: 'pipe' });
     vi.unstubAllEnvs();
   });
   const seed = async (tenantId: string | null = tenant) => {
