@@ -48,14 +48,15 @@ async function checklist(page: Page) {
   await page.getByRole('button', { name: 'Завершить', exact: true }).click();
 }
 
-for (const version of ['v7', 'v10'] as const) for (const multiple of [false, true]) test(version + ': real admission, inspections, offline replay, production and closed report (' + (multiple ? 'multiple rigs' : 'single rig') + ')', async ({ page, context }, info) => {
+for (const version of ['v7', 'v10', 'operator'] as const) for (const multiple of [false, true]) test(version + ': real admission, inspections, offline replay, production and closed report (' + (multiple ? 'multiple rigs' : 'single rig') + ')', async ({ page, context }, info) => {
   test.setTimeout(600_000);
   await page.setViewportSize({ width: 375, height: 812 });
   const fixture = await createRoleAuditFixture();
   const db = new Client({ connectionString: process.env.INTEGRATION_DATABASE_URL_OWNER });
   await db.connect();
   const equipmentName = 'Ночной цикл ' + version + ' ' + fixture.equipmentId;
-  const amountLabel = version === 'v10' ? 'Количество, шт' : 'Количество, шт.';
+  const mainScreen = version === 'operator';
+  const amountLabel = mainScreen ? 'Свай, шт' : version === 'v10' ? 'Количество, шт' : 'Количество, шт.';
   const observed: Array<Record<string, unknown>> = [];
   const commands: Array<Record<string, unknown>> = [];
   page.on('request', request => {
@@ -82,15 +83,18 @@ for (const version of ['v7', 'v10'] as const) for (const multiple of [false, tru
       await db.query('INSERT INTO "Crew" (id,name,"operatorId","equipmentId","siteId","updatedAt") VALUES ($1,$2,$3,$4,$5,now())', [randomUUID(), 'Вторая учебная бригада', fixture.users.OPERATOR.id, extraId, fixture.siteId]);
     }
     await login(page, fixture.users.OPERATOR.email, fixture.password);
-    await page.goto('/operator/' + version);
+    await page.goto(mainScreen ? '/operator' : '/operator/' + version);
     await expect(page.getByRole('button', { name: /^Следующий шаг:/ })).toBeVisible();
     observed.push({ step: 'initial', state: await state(page) });
     await next(page);
     await page.getByRole('button', { name: 'Комплект в порядке', exact: true }).click();
     await expect.poll(async () => (await state(page)).identity.ppe.confirmed).toBe(true);
     await next(page);
-    await page.getByRole('button', { name: /^Я ознакомился с инструкцией/ }).click();
-    await page.getByRole('button', { name: 'Ознакомлен', exact: true }).click();
+    if (mainScreen) await page.getByRole('button', { name: 'Прочитал и ознакомлен', exact: true }).click();
+    else {
+      await page.getByRole('button', { name: /^Я ознакомился с инструкцией/ }).click();
+      await page.getByRole('button', { name: 'Ознакомлен', exact: true }).click();
+    }
     await expect.poll(async () => (await state(page)).identity.briefing.ok).toBe(true);
     const attempt = page.waitForResponse(response => new URL(response.url()).pathname === '/api/operator/knowledge-attempt');
     await next(page);
@@ -98,20 +102,23 @@ for (const version of ['v7', 'v10'] as const) for (const multiple of [false, tru
     for (const question of questions) {
       await expect(page.getByText(question.text, { exact: true })).toBeVisible();
       await page.getByRole('button', { name: question.options[question.correct], exact: true }).click();
-      await page.getByRole('button', { name: 'Ответить', exact: true }).click();
-      await page.getByRole('button', { name: 'Далее', exact: true }).click();
+      if (mainScreen) await page.getByRole('button', { name: 'Верно, дальше', exact: true }).click();
+      else {
+        await page.getByRole('button', { name: 'Ответить', exact: true }).click();
+        await page.getByRole('button', { name: 'Далее', exact: true }).click();
+      }
     }
     await page.getByRole('button', { name: 'Записать результат', exact: true }).click();
     await expect.poll(async () => (await state(page)).phase).toBe('ADMISSION');
     await next(page);
     expect((await state(page)).options).toHaveLength(multiple ? 2 : 1);
-    if (version === 'v7') await page.getByRole('button').filter({ hasText: equipmentName }).click();
-    else {
+    if (version === 'v7' || (mainScreen && multiple)) await page.getByRole('button').filter({ hasText: equipmentName }).click();
+    else if (version === 'v10') {
       await expect(page.getByText(equipmentName, { exact: false }).first()).toBeVisible();
       expect((await state(page)).assignment?.equipmentId).toBe(fixture.equipmentId);
       observed.push({ step: 'v10 accepts displayed default assignment; no alternative rig selector', options: (await state(page)).options });
     }
-    await page.getByRole('button', { name: 'Принять установку', exact: true }).click();
+    await page.getByRole('button', { name: mainScreen ? 'Принять и открыть смену' : 'Принять установку', exact: true }).click();
     await expect.poll(async () => (await state(page)).phase).toBe('PRESHIFT_INSPECTION');
     for (const phase of ['PRESHIFT_INSPECTION', 'SITE_READY', 'STARTUP'] as const) {
       expect((await state(page)).phase).toBe(phase);
@@ -121,6 +128,18 @@ for (const version of ['v7', 'v10'] as const) for (const multiple of [false, tru
       observed.push({ step: phase, state: await state(page) });
     }
     expect((await state(page)).phase).toBe('WORK');
+    if (mainScreen) {
+      await next(page);
+      await page.getByRole('button', { name: 'Пройти чек-лист', exact: true }).click();
+      await checklist(page);
+      await expect.poll(async () => (await state(page)).checklists.find(item => item.stage === 'TB_PILING')?.done).toBe(true);
+      await next(page);
+      await page.getByRole('button', { name: 'Бурение', exact: true }).click();
+      await page.getByRole('button', { name: 'Пройти чек-лист', exact: true }).click();
+      await checklist(page);
+      await expect.poll(async () => (await state(page)).checklists.find(item => item.stage === 'TB_DRILLING')?.done).toBe(true);
+      await next(page);
+    } else {
     await page.getByRole("button", { name: "ТБ", exact: true }).click();
     if (version === 'v10') await page.getByRole('button', { name: /^Чек-листы ТБ по видам работ/ }).click();
     const piling = (await state(page)).checklists.find(item => item.stage === "TB_PILING");
@@ -135,8 +154,13 @@ for (const version of ['v7', 'v10'] as const) for (const multiple of [false, tru
     await expect.poll(async () => (await state(page)).checklists.find(item => item.stage === "TB_DRILLING")?.done).toBe(true);
     await page.getByRole("button", { name: "Смена", exact: true }).click();
     await next(page);
+    }
     if (version === 'v10') {
       await page.getByRole('button', { name: 'Добавить сваю', exact: true }).click();
+      await page.getByRole('combobox', { name: 'Марка сваи', exact: true }).selectOption({ label: 'QA C120.30' });
+    }
+    else if (mainScreen) {
+      await page.getByRole('button', { name: 'Пачкой', exact: true }).click();
       await page.getByRole('combobox', { name: 'Марка сваи', exact: true }).selectOption({ label: 'QA C120.30' });
     }
     else await page.getByRole('button', { name: 'QA C120.30', exact: true }).click();
@@ -154,27 +178,31 @@ for (const version of ['v7', 'v10'] as const) for (const multiple of [false, tru
     expect(replay.status()).toBe(200);
     expect((await state(page)).production.piles.count).toBe(2);
     observed.push({ step: 'offline replay', state: await state(page), commandId: pileCommand?.clientCommandId });
-    await page.getByRole("button", { name: "Добавить бурение", exact: true }).first().click();
-    if (version === 'v10') await page.getByRole('combobox', { name: 'Тип бурения', exact: true }).selectOption({ label: 'QA бурение' });
+    await page.getByRole("button", { name: mainScreen ? "Бурение" : "Добавить бурение", exact: true }).first().click();
+    if (version === 'v10' || mainScreen) await page.getByRole('combobox', { name: 'Тип бурения', exact: true }).selectOption({ label: 'QA бурение' });
     else await page.getByRole("button", { name: "QA бурение", exact: true }).click();
-    await page.getByLabel(amountLabel, { exact: true }).fill("1");
-    await page.getByLabel("Метров на скважину", { exact: true }).fill("3");
+    await page.getByLabel(mainScreen ? "Скважин, шт" : amountLabel, { exact: true }).fill("1");
+    await page.getByLabel(mainScreen ? "Метров на одну скважину" : "Метров на скважину", { exact: true }).fill("3");
     await page.getByRole("button", { name: "Записать", exact: true }).click();
     await expect.poll(async () => (await state(page)).production.drilling.meters).toBe(3);
     await page.getByRole("button", { name: version === 'v10' ? "Записать простой" : "Простой", exact: true }).first().click();
-    if (version === 'v10') await page.getByRole('combobox', { name: 'Причина простоя', exact: true }).selectOption({ label: 'QA ожидание' });
+    if (version === 'v10' || mainScreen) await page.getByRole('combobox', { name: 'Причина простоя', exact: true }).selectOption({ label: 'QA ожидание' });
     else await page.getByRole("button", { name: "QA ожидание", exact: true }).click();
     await page.getByLabel("Простой, часов", { exact: true }).fill("0.25");
     await page.getByRole("button", { name: "Записать", exact: true }).click();
     await expect.poll(async () => (await state(page)).production.downtimeHours).toBe(0.25);
     if (version === 'v10') await page.getByRole('button', { name: '← К смене', exact: true }).click();
-    await page.getByRole("button", { name: "Инцидент", exact: true }).click();
+    if (mainScreen) await page.getByRole("button", { name: "Ещё", exact: true }).click();
+    else await page.getByRole("button", { name: "Инцидент", exact: true }).click();
     if (version === 'v10') {
       await page.getByRole('button', { name: 'Записать происшествие', exact: true }).click();
       await page.getByRole('combobox', { name: 'Событие', exact: true }).selectOption('OTHER');
-    } else await page.getByRole("button", { name: /^Другое/ }).click();
+    } else {
+      if (mainScreen) await page.getByRole('button', { name: 'Записать происшествие', exact: true }).click();
+      await page.getByRole("button", { name: /^Другое/ }).click();
+    }
     await page.getByRole("button", { name: "Другой наблюдаемый признак", exact: true }).click();
-    await page.getByLabel(version === 'v10' ? "Как было дело" : "Опишите своими словами", { exact: true }).fill("Синтетическое учебное происшествие ночной проверки, без реального оборудования и пострадавших.");
+    await page.getByLabel(version === 'v10' || mainScreen ? "Как было дело" : "Опишите своими словами", { exact: true }).fill("Синтетическое учебное происшествие ночной проверки, без реального оборудования и пострадавших.");
     await page.getByRole("button", { name: "Записать происшествие", exact: true }).click();
     await expect.poll(async () => (await state(page)).incidents.length).toBe(1);
     observed.push({ step: "drilling, downtime and incident", state: await state(page) });
@@ -186,7 +214,7 @@ for (const version of ['v7', 'v10'] as const) for (const multiple of [false, tru
     await checklist(page);
     await expect.poll(async () => (await state(page)).checklists.find(item => item.stage === 'EO_AFTER')?.done).toBe(true);
     await next(page);
-    await page.getByRole('button', { name: version === 'v10' ? 'Закрыть смену и отправить отчёт' : 'Закрыть смену', exact: true }).click();
+    await page.getByRole('button', { name: version === 'v10' || mainScreen ? 'Закрыть смену и отправить отчёт' : 'Закрыть смену', exact: true }).click();
     await expect.poll(async () => (await state(page)).phase).toBe('CLOSED');
     const closed = await state(page);
     expect(closed.receipt?.reportId).toBeTruthy();
