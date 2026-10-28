@@ -271,3 +271,17 @@ Chromium, совершенно свежие собственные PG18/два R
 До staging новых отчётов: all {"changed_count":12,"affected_count":0,"changed_files":6,"risk_level":"low"}; сравнение с BASE {"changed_count":218,"affected_count":7,"changed_files":65,"risk_level":"high"}. Все команды exit 0, partial/truncated не возвращены. HIGH заранее сообщён пользователю; семь имён потоков V3 совпали с предыдущим снимком. Они перечислены в compare-users-final.json; девять старых V3-сценариев относятся к44126, а не к00ac. Ограничения общего бюджета execution flows остаются и не доказывают отсутствие других связей.
 
 После окончательного редактирования и staging выполняется ещё один полный all/compare. Его реальные финальные ответы сохраняются в detect-users-staged.json и compare-users-staged.json; это последний анализ перед коммитом. Индекс, контекст и полные логи сохранены во внешней evidence-папке. Новый whole-branch review не повторялся.
+
+
+## Новый RED: прямой id неназначенной установки
+
+EQUIPMENT-ACCESS-RED.md/json: реальный OPERATOR, один tenant, обычный GET списка не содержит чужую установку, details403, GET поid200 с точным синтетическим VIN. Целевой Playwright0/1/0/0flaky,exit1/39с; SQL назначения проверен, cleanup=true.
+
+Перед фиксацией RED: tsc exit0/15с; lint exit0/63с без предупреждений; Playwright collection 402/30 против BASE 318/28, оба exit0/40с. Свежий полный unit5776/0/0 и build0/168с относятся к неизменившемуся прикладному SHA00ac; новый E2E намеренно красный, он не скрыт общим зелёным итогом. Владелец разрешил только предложенный GET и существующие тесты; разрешение записано в PERMIT-EQUIPMENT-ACCESS.md. Приложение до этого RED-коммита не меняется.
+
+
+## GitNexus перед RED-коммитом
+
+Полная переиндексация exit0/139с; контроль requirePageAbility — правильный UID/путь и15callers. All:14changed/0affected/8files,LOW; compare(BASE):231changed/7affected/70files,HIGH. Флаги partial/truncated не возвращены. HIGH заранее сообщён владельцу; имена семи V3-потоков совпадают с предыдущим снимком. После последней правки отчётов выполняется повтор all/compare с полными ответами detect-equipment-red-staged.json/compare-equipment-red-staged.json. Глобальный бюджет execution flows ограничен; нулевой impact не доказывает отсутствие HTTP-потребителей.
+
+Физический сценарий имеет SHA2566ee344b6330f28841f5a37ceeb32a8af1ca6de99139c6a35b436ea4e0c38c275; Git нормализует прежние CRLF в LF (canonicalSHA256db730fa52f2802863f8238c892e65879166dde16cf9b4171558778ba9e9c8e4d). equipment-red-line-ending-proof.json подтвердил: только окончания строк, старый префикс побайтно сохранён, assertions не менялись.

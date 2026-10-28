@@ -1,0 +1,104 @@
+{
+  "sourceBuildSha": "00ac751ffa4c22cb2117a189474ce7bcc73410cc",
+  "scenario": {
+    "sourceBuildSha": "00ac751ffa4c22cb2117a189474ce7bcc73410cc",
+    "worktreeSha": "81de80872bb503bd86e20027b0cd12c0d082d09f",
+    "prefixByteExact": true,
+    "prefixBytes": 30402,
+    "scenarioSha256": "6ee344b6330f28841f5a37ceeb32a8af1ca6de99139c6a35b436ea4e0c38c275"
+  },
+  "stats": {
+    "startTime": "2026-10-28T19:22:24.890Z",
+    "duration": 5629.673,
+    "expected": 0,
+    "skipped": 0,
+    "unexpected": 1,
+    "flaky": 0
+  },
+  "result": {
+    "exit": 1,
+    "seconds": 39,
+    "cleanup": true,
+    "cleanupErrors": []
+  },
+  "observation": {
+    "observations": [
+      {
+        "operatorId": "cmvsi49qx00042ww5mp0dt7qa",
+        "tenantId": "cmvsi49h900002ww5c6vneawi",
+        "assignedEquipmentId": "cmvsi4a0w00092ww50385awe6",
+        "unassignedEquipmentId": "01dcc790-f8c5-4469-b6e4-c6e6b7f99f9a",
+        "unassignedMarker": "QA-private-47b2ed71-46dc-47fa-92ee-a5db3c8522cd",
+        "listedEquipmentIds": [
+          "cmvsi4a0w00092ww50385awe6"
+        ],
+        "ownStatus": 200,
+        "compositeDetailsStatus": 403,
+        "directStatus": 200,
+        "directIncludesUnassignedMarker": true,
+        "directResponse": "{\"equipment\":{\"id\":\"01dcc790-f8c5-4469-b6e4-c6e6b7f99f9a\",\"name\":\"QA-private-47b2ed71-46dc-47fa-92ee-a5db3c8522cd\",\"model\":\"QA unassigned\",\"qty\":1,\"isActive\":true,\"tenantId\":\"cmvsi49h900002ww5c6vneawi\",\"description\":\"\",\"inventoryNumber\":null,\"registrationNumber\":null,\"kind\":\"OTHER\",\"baseVehicle\":null,\"serialNumber\":null,\"manufactureYear\":null,\"vin\":\"QA-private-47b2ed71-46dc-47fa-92ee-a5db3c8522cd\",\"weightTons\":null,\"weightWithEquipmentTons\":null,\"heightMm\":null,\"lengthMm\":null,\"widthMm\":null,\"engineBrand\":null,\"engineSerialNumber\":null,\"enginePower\":null,\"maxPileLength\":null,\"maxDrillingDepth\":null,\"hammerType\":null,\"hammerSerialNumber\":null,\"hammerEnergyKj\":null,\"hammerKind\":\"NONE\",\"isCombined\":false,\"heightMeters\":null,\"maxPileDiameter\":null,\"purchaseDate\":null,\"purchasePrice\":null,\"engineHoursTotal\":null,\"fuelTankLiters\":null,\"nextMaintenanceAtHours\":null,\"nextMaintenanceDate\":null,\"homeBaseLocation\":null,\"createdAt\":\"2026-10-28T19:22:28.295Z\",\"updatedAt\":\"2026-10-28T19:22:28.295Z\",\"crews\":[]}}"
+      }
+    ]
+  },
+  "baselineSource": {
+    "base": "efd95008eac3bc846c89003c4b7766f2eb5c1c9b",
+    "sourceBuildSha": "00ac751ffa4c22cb2117a189474ce7bcc73410cc",
+    "files": [
+      {
+        "file": "src/app/api/equipment/[id]/route.ts",
+        "baseBlob": "f47126dc645b218ee94cf38790b3410442a4569b",
+        "currentBlob": "f47126dc645b218ee94cf38790b3410442a4569b"
+      },
+      {
+        "file": "src/app/api/equipment/route.ts",
+        "baseBlob": "bb0c88501aa0115cdc4ab2598d94e2bd702e3640",
+        "currentBlob": "bb0c88501aa0115cdc4ab2598d94e2bd702e3640"
+      },
+      {
+        "file": "src/app/api/equipment/[id]/details/route.ts",
+        "baseBlob": "896b36f25a9bb4c86dea14684c60edcae4ffe087",
+        "currentBlob": "896b36f25a9bb4c86dea14684c60edcae4ffe087"
+      },
+      {
+        "file": "src/modules/equipment/application/queries/equipment-query.service.ts",
+        "baseBlob": "03379d9b284d6a540c2d420999f26e79cffb10ee",
+        "currentBlob": "03379d9b284d6a540c2d420999f26e79cffb10ee"
+      },
+      {
+        "file": "src/core/security/authorization.ts",
+        "baseBlob": "611b1b213b8a90170132c54c73d0f111d06a8c18",
+        "currentBlob": "611b1b213b8a90170132c54c73d0f111d06a8c18"
+      }
+    ],
+    "httpBaselineRun": false
+  },
+  "applicationFixApplied": false,
+  "gates": {
+    "sourceBuildSha": "00ac751ffa4c22cb2117a189474ce7bcc73410cc",
+    "complete": true,
+    "results": [
+      {
+        "id": "equipment-red-tsc",
+        "exit": 0,
+        "seconds": 15
+      },
+      {
+        "id": "equipment-red-lint",
+        "exit": 0,
+        "seconds": 63
+      },
+      {
+        "id": "equipment-red-list",
+        "exit": 0,
+        "seconds": 40
+      }
+    ]
+  },
+  "collection": {
+    "tests": 402,
+    "files": 30,
+    "baseTests": 318,
+    "baseFiles": 28
+  },
+  "ownerPermission": "Разрешаю этот GET и тесты"
+}

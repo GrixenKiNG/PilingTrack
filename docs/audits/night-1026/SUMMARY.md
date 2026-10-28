@@ -16,6 +16,7 @@
 
 | Приоритет | Дефект | Исправление |
 |---|---|---|
+|P2|OPERATOR получает паспорт неназначенной установки по прямому id, хотя список её скрывает, а details запрещён|Новый RED:0/1/0,exit1/39с. EQUIPMENT-ACCESS-RED.md. Разрешён точечный GET-guard, ещё не применён|
 |P2|ASSISTANT403 в «ТБ и допуски»|0e3e2c9a: личный экран без расширения прав|
 |P2|Outbox без tenantId доходил доhandler|48aa4689: разрешённый guard;старые записи требуют разбора|
 |P2|Гонка20approval:23505legacy UNIQUE(scope,key),воспроизведена наmain|f51b0f30:ровно разрешённое ON CONFLICT DO NOTHING.37проверок+10гонок+полный5776/0/0|
@@ -47,6 +48,8 @@ V3: **9passed/0failed/0skipped** (6legacy+3selector). Отчёт сохраня�
 
 
 На сборке 00ac751f пользователи и документы: 6 passed / 0 failed / 0 skipped / 0 flaky, exit 0, 279 с; Chromium, Mobile Safari и Mobile Chrome. Создание и правка пользователя, сроки и удаление удостоверения, чтение инженером ОТ, отказы другому оператору, блокировка с отзывом сессии, разблокировка и удаление подтверждены UI/SQL и 24 точными событиями аудита. Build: exit 0, 168 с. Свежий полный unit: 5776 / 0 / 0; все 241 исторических случая повторены. Коллекция 399/30 против BASE 318/28, оба exit 0. Подробности: USERS-LIFECYCLE.md/json. Предыдущие RED сохранены.
+
+Новый E2E отказа по чужой установке: **0 passed / 1 failed / 0 skipped**, exit1; это подтверждённый дефект доступа в текущем00ac, не сбой окружения. Перед фиксацией RED: tsc exit0/15с; lint exit0/63с без предупреждений; Playwright collection 402/30 против BASE 318/28, оба exit0/40с. Свежий полный unit5776/0/0 и build0/168с относятся к неизменившемуся прикладному SHA00ac; новый E2E намеренно красный, он не скрыт общим зелёным итогом. Владелец разрешил только предложенный GET и существующие тесты; разрешение записано в PERMIT-EQUIPMENT-ACCESS.md. Приложение до этого RED-коммита не меняется.
 
 ## Что осталось
 
@@ -104,3 +107,4 @@ V3: **9passed/0failed/0skipped** (6legacy+3selector). Отчёт сохраня�
 - b0001fdb42ea795febc4e5590f2793ec52f413ed test(crews): prove UI lifecycle assignments and actor audit
 - 30634acf6c611574434dcd7a3ab784e67000d809 test(users): reproduce stale cached list after committed creation
 - 00ac751ffa4c22cb2117a189474ce7bcc73410cc fix(users): invalidate catalogue responses after successful writes
+- 81de80872bb503bd86e20027b0cd12c0d082d09f test(users): verify lifecycle after catalogue cache invalidation
