@@ -331,3 +331,10 @@ Sourceguardgitdiffsrc/prisma/package/next.configот451пуст;триscenarioha
 ## GitNexus перед новым RED-коммитом multiple
 
 Полная переиндексация exit0/114с; контроль requirePageAbility: правильныйUID/путь, входящие вызовы подтверждены. До staging all11changed/0affected/6trackedfiles LOW;compare250changed/7affected/74trackedfiles HIGH. Семь потоков — прежние V3(FetchWithTimeout,Cleanup,GetCurrentResetTimeout,FormatEntry,ShouldLog,IsSensitiveKey,GetMinLevel); пользователь предупреждён. Новые отчёты ещё не входили в trackedfiles этого снимка; после staging выполнен повтор. Полные окончательные ответы: detect-equipment-multiple-red-staged.json / compare-equipment-multiple-red-staged.json; partial/truncated/error должны отсутствовать. Общий индекс имеет ограниченный бюджет flows; отсутствие связи не доказывает отсутствие потребителя, динамический crews/my подтверждён текстом. Нового whole-branch reviewer нет. Код приложения для нового дефекта не изменён.
+
+
+## Проверки перед RED-коммитом кеша
+
+Команды отдельно и последовательно: npx tsc --noEmit exit0/14с (предварительно удалён только.next/dev/types,еслибыл); npm run lint exit0/62с без предупреждений; npx playwright test --list черезfreshwrapper exit0/34с,408тестов/30файлов противBASE318/28,обаexit0. Новый UIcase0passed/1failed/0skipped/0flaky exit1/40с. Source451 неизменён; полный unit5783/0/0 иbuild0/151с не повторялись для E2E-only RED,не объявляют новый UI зелёным.
+
+Перед коммитом полнаяforceпереиндексация,контрольUID/callers requirePageAbility,all+compare на точномWT. Полные артефакты equipment-cache-red-graph-results.json / detect-equipment-cache-red.json / compare-equipment-cache-red.json,безpartial/truncated/error. Общий compareHIGHсемиV3 заранее сообщён;это не объявление всего приложения безопасным. Новый reviewer не запускался.

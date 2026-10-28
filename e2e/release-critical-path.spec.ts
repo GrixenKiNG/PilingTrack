@@ -478,3 +478,148 @@ test('equipment multiple: operator can read and record fuel and meters for both 
     await db.end();
   }
 });
+
+test('equipment lifecycle: UI passport, meter history, retirement and role denials', async ({ page }, info) => {
+  test.setTimeout(300_000);
+  const fixture = await createRoleAuditFixture();
+  const db = await owner();
+  const token = randomUUID();
+  const name = 'Установка QA ' + token;
+  const inventory = 'QA-' + token;
+  const vin = 'QA' + token.replaceAll('-', '').slice(0, 15);
+  const observations: Array<Record<string, unknown>> = [];
+  const errors: string[] = [];
+  const observe = () => page.on('pageerror', error => errors.push(error.message));
+  observe();
+  const switchRole = async (role: 'ADMIN' | 'MECHANIC') => {
+    const context = page.context();
+    expect((await page.request.post('/api/auth/logout', { headers: { Origin: new URL(page.url()).origin } })).status()).toBe(200);
+    await page.close();
+    page = await context.newPage();
+    observe();
+    await login(page, fixture.users[role].email, fixture.password);
+    const me = await page.request.get('/api/auth/me');
+    expect(me.status()).toBe(200);
+    expect((await me.json()).user.role).toBe(role);
+  };
+  try {
+    await login(page, fixture.users.ADMIN.email, fixture.password);
+    await page.goto('/admin/equipment');
+    await page.getByRole('button', { name: 'Добавить установку', exact: true }).click();
+    let dialog = page.getByRole('dialog', { name: 'Новая установка', exact: true });
+    await dialog.getByLabel('Название *', { exact: true }).fill(name);
+    await dialog.getByLabel('Модель', { exact: true }).fill('QA model');
+    await dialog.getByLabel('Инвентарный номер', { exact: true }).fill(inventory);
+    await dialog.getByLabel('Серийный номер', { exact: true }).fill(token);
+    await dialog.getByLabel('VIN', { exact: true }).fill(vin);
+    await dialog.getByLabel('Год выпуска', { exact: true }).fill('2020');
+    await dialog.getByRole('tab', { name: 'Тех. характеристики', exact: true }).click();
+    await dialog.getByLabel('Вес (т)', { exact: true }).fill('31.5');
+    await dialog.getByLabel('Марка двигателя', { exact: true }).fill('QA engine');
+    await dialog.getByLabel('Макс. длина сваи (м)', { exact: true }).fill('12');
+    await dialog.getByRole('tab', { name: 'Эксплуатация', exact: true }).click();
+    await dialog.getByLabel('Наработка моточасов', { exact: true }).fill('100');
+    await dialog.getByLabel('Объём бака (л)', { exact: true }).fill('400');
+    await dialog.getByLabel('След. ТО по моточасам', { exact: true }).fill('150');
+    await dialog.getByLabel('Место базирования', { exact: true }).fill('QA полигон');
+    const creating = page.waitForResponse(r => new URL(r.url()).pathname === '/api/equipment' && r.request().method() === 'POST');
+    await dialog.getByRole('button', { name: 'Создать', exact: true }).click();
+    const created = await creating;
+    expect(created.status(), await created.text()).toBe(201);
+    const equipmentId = (await created.json()).equipment.id as string;
+    const path = '/api/equipment/' + equipmentId;
+    await expect(dialog).toHaveCount(0);
+    const equipment = async () => (await db.query('SELECT id,"tenantId",name,model,"inventoryNumber",vin,"serialNumber","weightTons","maxPileLength","engineHoursTotal","fuelTankLiters","nextMaintenanceAtHours","isActive" FROM "Equipment" WHERE id=$1 AND "tenantId"=$2', [equipmentId, fixture.tenantId])).rows[0];
+    const readings = async () => (await db.query('SELECT id,"engineHours",source,"recordedById",note FROM "MeterReading" WHERE "equipmentId"=$1 AND "tenantId"=$2 ORDER BY "createdAt",id', [equipmentId, fixture.tenantId])).rows;
+    const audit = async () => (await db.query('SELECT action,"actorId",metadata FROM "FeedbackEvent" WHERE scope=$1 AND "targetId"=$2 ORDER BY "createdAt",id', ['equipment', equipmentId])).rows;
+    expect(await equipment()).toEqual(expect.objectContaining({ id: equipmentId, tenantId: fixture.tenantId, name, model: 'QA model', inventoryNumber: inventory, vin, serialNumber: token, weightTons: 31.5, maxPileLength: 12, engineHoursTotal: 100, fuelTankLiters: 400, nextMaintenanceAtHours: 150, isActive: true }));
+    expect(await readings()).toEqual([expect.objectContaining({ engineHours: 100, source: 'MANUAL', recordedById: fixture.users.ADMIN.id })]);
+    const normalFleet = await page.request.get('/api/monitoring/fleet');
+    const freshFleet = await page.request.get('/api/monitoring/fleet?_ts=' + Date.now());
+    const normalSnapshot = await normalFleet.json();
+    const freshSnapshot = await freshFleet.json();
+    observations.push({ step: 'create visibility diagnostic', equipmentId, equipment: await equipment(), readings: await readings(), audit: await audit(), normalStatus: normalFleet.status(), freshStatus: freshFleet.status(), normalIds: normalSnapshot.equipment?.map((row: { id: string }) => row.id), freshIds: freshSnapshot.equipment?.map((row: { id: string }) => row.id) });
+    await page.getByPlaceholder('Поиск по названию, модели, инв. номеру').fill(inventory);
+    await expect(page.getByText(name, { exact: true })).toBeVisible();
+    await page.goto('/admin/equipment/' + equipmentId);
+    await expect(page.getByRole('heading', { name, exact: true })).toBeVisible();
+    await expect(page.getByText(vin, { exact: true })).toBeVisible();
+    await expect(page.getByText(token, { exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Редактировать', exact: true }).click();
+    dialog = page.getByRole('dialog', { name: 'Редактировать установку', exact: true });
+    await expect(dialog.getByLabel('Название *', { exact: true })).toHaveValue(name);
+    await expect(dialog.getByLabel('VIN', { exact: true })).toHaveValue(vin);
+    await dialog.getByLabel('Название *', { exact: true }).fill(name + ' изменена');
+    await dialog.getByRole('tab', { name: 'Эксплуатация', exact: true }).click();
+    await expect(dialog.getByLabel('Наработка моточасов', { exact: true })).toHaveValue('100');
+    await dialog.getByLabel('Наработка моточасов', { exact: true }).fill('110');
+    const saving = page.waitForResponse(r => new URL(r.url()).pathname === path && r.request().method() === 'PUT');
+    await dialog.getByRole('button', { name: 'Сохранить', exact: true }).click();
+    const saved = await saving;
+    expect(saved.status(), await saved.text()).toBe(200);
+    await expect(dialog).toHaveCount(0);
+    expect((await equipment()).name).toBe(name + ' изменена');
+    expect((await equipment()).engineHoursTotal).toBe(110);
+    expect((await readings()).map(row => row.engineHours)).toEqual([100, 110]);
+    expect((await readings()).every(row => row.recordedById === fixture.users.ADMIN.id)).toBe(true);
+    await page.reload();
+    await expect(page.getByRole('heading', { name: name + ' изменена', exact: true })).toBeVisible();
+    observations.push({ step: 'create and edit through UI; passport reload; exact meter history', equipment: await equipment(), readings: await readings(), audit: await audit() });
+    await switchRole('MECHANIC');
+    await page.goto('/admin/equipment/' + equipmentId);
+    await expect(page.getByRole('heading', { name: name + ' изменена', exact: true })).toBeVisible();
+    await expect(page.getByText(vin, { exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Редактировать', exact: true })).toHaveCount(0);
+    const before = await equipment();
+    const beforeReadings = await readings();
+    const beforeAudit = await audit();
+    for (const method of ['PUT', 'DELETE']) {
+      const response = await page.request.fetch(path, { method, headers: { Origin: new URL(page.url()).origin }, ...(method === 'PUT' ? { data: { name: 'FORBIDDEN' } } : {}) });
+      expect(response.status()).toBe(403);
+      expect(await equipment()).toEqual(before);
+      expect(await readings()).toEqual(beforeReadings);
+      expect(await audit()).toEqual(beforeAudit);
+    }
+    observations.push({ step: 'mechanic reads same passport; writes denied without changes', equipment: await equipment() });
+    await switchRole('ADMIN');
+    await page.goto('/admin/equipment/' + equipmentId);
+    for (const isActive of [false, true]) {
+      await page.getByRole('button', { name: 'Редактировать', exact: true }).click();
+      dialog = page.getByRole('dialog', { name: 'Редактировать установку', exact: true });
+      // ActiveToggle currently has a visual label without a bound control.
+      await dialog.locator('label').filter({ hasText: /^Активна$/ }).locator('..').getByRole('button').click();
+      const toggling = page.waitForResponse(r => new URL(r.url()).pathname === path && r.request().method() === 'PUT');
+      await dialog.getByRole('button', { name: 'Сохранить', exact: true }).click();
+      const toggled = await toggling;
+      expect(toggled.status(), await toggled.text()).toBe(200);
+      await expect(dialog).toHaveCount(0);
+      expect((await equipment()).isActive).toBe(isActive);
+      expect(await readings()).toEqual(beforeReadings);
+      await page.reload();
+      if (!isActive) await expect(page.getByText('Списана', { exact: true })).toBeVisible();
+      else await expect(page.getByText('Списана', { exact: true })).toHaveCount(0);
+    }
+    const finalAudit = await audit();
+    expect(finalAudit.map(row => row.action)).toEqual(['equipment.created', 'equipment.updated', 'equipment.retired', 'equipment.updated']);
+    expect(finalAudit.every(row => row.actorId === fixture.users.ADMIN.id)).toBe(true);
+    expect(finalAudit[1].metadata.before.name).toBe(name);
+    expect(finalAudit[1].metadata.after.name).toBe(name + ' изменена');
+    expect(finalAudit[2].metadata.before.isActive).toBe(true);
+    expect(finalAudit[2].metadata.after.isActive).toBe(false);
+    // The current fleet UI does not mount DeleteEquipmentDialog. This is an
+    // explicit API-only history guard check, not a claimed UI deletion.
+    const guardedDelete = await page.request.delete(path, { headers: { Origin: new URL(page.url()).origin } });
+    expect(guardedDelete.status()).toBe(409);
+    expect(await equipment()).toEqual(before);
+    expect(await readings()).toEqual(beforeReadings);
+    expect(await audit()).toEqual(finalAudit);
+    const requests = (await db.query('SELECT id,type,payload FROM "OutboxEvent" WHERE "tenantId"=$1 AND type=$2 AND payload->>\'equipmentId\'=$3', [fixture.tenantId, 'ReadinessSnapshotRequested', equipmentId])).rows;
+    for (const row of beforeReadings) expect(requests.some(event => event.payload.triggerId === row.id)).toBe(true);
+    observations.push({ step: 'retire and reactivate through UI; unchanged readings; guarded API deletion and persisted readiness requests', equipment: await equipment(), readings: await readings(), audit: finalAudit, readinessRequests: requests });
+    expect(errors).toEqual([]);
+    await page.screenshot({ path: info.outputPath('equipment-retained.png'), fullPage: true });
+  } finally {
+    await info.attach('equipment-lifecycle', { body: JSON.stringify({ observations, errors }, null, 2), contentType: 'application/json' });
+    await db.end();
+  }
+});

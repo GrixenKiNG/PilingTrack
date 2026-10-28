@@ -31,3 +31,6 @@ C1–C3 повторены на свежем стенде:3/0/0,exit0;точны
 
 
 29.10, новый открытый P3: OPERATOR × две активные назначенные установки × fuel/meter-readings GET/POST. Первая200/201,вторая403,неназначенная403; реальный HTTP/SQL, EQUIPMENT-MULTIPLE-RED.md. Новый case намеренно RED0/1/0. Прежний зелёный30cycle не доказывает эти отдельные ресурсы; task6 остаётся частичной. Правка query не выполнена без точечного исключения AGENTS.md.
+
+
+29.10: Equipment UI lifecycle покаREDнаcreate:201+SQL/audit есть,списокстарый. Edit/retire/reactivate/mechanic/historyguard в этом сценарии покаНЕПРОВЕРЕНЫ. EQUIPMENT-CACHE-RED.md. Не подменять фактическое прохождение подготовленным кодом.
