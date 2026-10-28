@@ -1,11 +1,11 @@
 # Изменённые файлы ветки
 
-База efd95008eac3bc846c89003c4b7766f2eb5c1c9b. Код/тесты по 451acce2b30e5130a9055e9d966edcf4a413ff67; текущие отчёты включены. Сам перечень исключён. Конечный пустой элемент не считается строкой. Удалений нет. Все удаления строк внутри файлов — diff, а не удаление файлов; новые helpers/exports ради чистки не удалялись.
+База efd95008eac3bc846c89003c4b7766f2eb5c1c9b. Код/тесты по 816e388acf80b725ef7512ccfd9566ab8e83ecdb; текущие отчёты включены. Сам перечень исключён. Конечный пустой элемент не считается строкой. Удалений нет. Все удаления строк внутри файлов — diff, а не удаление файлов; новые helpers/exports ради чистки не удалялись.
 
 | Файл | Было | Стало |
 |---|---:|---:|
 |docs/DATA-SOURCES.md|51|51|
-|docs/audits/night-1026/ACTION-COVERAGE.md|—|30|
+|docs/audits/night-1026/ACTION-COVERAGE.md|—|33|
 |docs/audits/night-1026/CLEARANCE-MATRIX.json|—|166|
 |docs/audits/night-1026/CLEARANCE-MATRIX.md|—|30|
 |docs/audits/night-1026/CREW-LIFECYCLE.json|—|581|
@@ -19,6 +19,8 @@
 |docs/audits/night-1026/EQUIPMENT-ACCESS-FIX.md|—|57|
 |docs/audits/night-1026/EQUIPMENT-ACCESS-RED.json|—|104|
 |docs/audits/night-1026/EQUIPMENT-ACCESS-RED.md|—|38|
+|docs/audits/night-1026/EQUIPMENT-MULTIPLE-RED.json|—|211|
+|docs/audits/night-1026/EQUIPMENT-MULTIPLE-RED.md|—|45|
 |docs/audits/night-1026/IMAGES.md|—|36|
 |docs/audits/night-1026/INTEGRATION-RUN.md|—|314|
 |docs/audits/night-1026/LONG-FILES.json|—|197|
@@ -30,14 +32,15 @@
 |docs/audits/night-1026/OUTBOX.md|—|51|
 |docs/audits/night-1026/PERMISSIONS-CODE.json|—|484|
 |docs/audits/night-1026/PERMIT-EQUIPMENT-ACCESS.md|—|38|
+|docs/audits/night-1026/PERMIT-EQUIPMENT-MULTIPLE.md|—|34|
 |docs/audits/night-1026/PERMIT-IDEMPOTENCY-RACE.md|—|45|
 |docs/audits/night-1026/QA-OBSERVATIONS.json|—|1562|
 |docs/audits/night-1026/QA-RUN.md|—|53|
 |docs/audits/night-1026/REVIEW.md|—|32|
 |docs/audits/night-1026/ROLES-OBSERVATIONS.json|—|4452|
-|docs/audits/night-1026/ROLES-WALKTHROUGH.md|—|205|
+|docs/audits/night-1026/ROLES-WALKTHROUGH.md|—|210|
 |docs/audits/night-1026/SKIP-REGISTRY.json|—|3139|
-|docs/audits/night-1026/SUMMARY.md|—|116|
+|docs/audits/night-1026/SUMMARY.md|—|117|
 |docs/audits/night-1026/USERS-CACHE-RED.json|—|71|
 |docs/audits/night-1026/USERS-CACHE-RED.md|—|21|
 |docs/audits/night-1026/USERS-LIFECYCLE.json|—|671|
@@ -47,7 +50,7 @@
 |docs/audits/night-1026/V3-LEGACY.md|—|45|
 |docs/audits/night-1026/V3-SELECTOR.md|—|25|
 |docs/audits/night-1026/V5-VIEWPORT.md|—|17|
-|docs/audits/night-1026/VERIFICATION.md|—|313|
+|docs/audits/night-1026/VERIFICATION.md|—|333|
 |docs/audits/night-1026/WHOLE-RUN-MATCH.json|—|46|
 |e2e/README.md|122|122|
 |e2e/admin-users.spec.ts|56|295|
@@ -56,7 +59,7 @@
 |e2e/night-operator-cycle.spec.ts|—|476|
 |e2e/night-role-walkthrough.spec.ts|—|334|
 |e2e/qa-ac/write-flows.spec.ts|212|216|
-|e2e/release-critical-path.spec.ts|172|432|
+|e2e/release-critical-path.spec.ts|172|480|
 |playwright.night.config.ts|—|26|
 |src/app/(app)/(safety)/admin/safety/__tests__/page.test.tsx|—|26|
 |src/app/(app)/(safety)/admin/safety/page.tsx|14|20|

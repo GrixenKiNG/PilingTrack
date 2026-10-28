@@ -311,3 +311,23 @@ Sourceguardgitdiffsrc/prisma/package/next.configот451пуст;триscenarioha
 ## GitNexus перед фиксацией отчёта
 
 Полное перестроение --index-only --force:exit0/211с;requirePageAbility имеет правильные UID/путь и15реальных callers. All:30changed/0affected/12files,LOW;compare(BASE):246changed/7affected/74files,HIGH. Все ответы полные,partial/truncated не возвращены. Имена семи потоков V3 совпали с предыдущим снимком;пользователь предупреждён. Девять V3-сценариев теперь повторены и на451,но все отказные ветви этими девятью случаями не объявляются проверенными. Глобальный бюджет execution flows ограничен и не доказывает отсутствие остальных связей. После окончательной правки и staging повторяютсяall/compare,финальные ответы —detect-equipment-docs-staged.json иcompare-equipment-docs-staged.json. Новый whole-branch review не запускался.
+
+
+## Новый RED: две назначенные установки, журналы топлива и моточасов
+
+Подтверждено на451acce2: первая назначенная установка GET200/POST201 для обоих ресурсов; вторая GET/POST403; неназначенная4x403. Реальный Chromium и собственный PG18, SQL1MeterReading/1FuelLog и2audit сactorOP; чужих записей нет. Целевой сценарий0passed/1failed/0skipped/0flaky,exit1/34с; это новый открытый P3, не общий зелёный итог. Raw equipment-multiple-confirmed-red-raw; EQUIPMENT-MULTIPLE-RED.md/json. Общий query и два вызова не изменены, точечное разрешение запрошено в PERMIT-EQUIPMENT-MULTIPLE.md.
+
+Перед RED-коммитом команды отдельно и последовательно:
+
+|Команда|Exit|Секунды|
+|---|---:|---:|
+|npx tsc --noEmit|0|17|
+|npm run lint|0|106|
+|npx playwright test --list + BASE collection, собственная fresh wrapper|0|37|
+
+Перед tsc удалён только .next/dev/types, если существовал. Lint без предупреждений. Коллекция 405/30 противBASE318/28; обаexit0. Полные unit/build не повторялись для одного E2E-only дополнения; полный5783/0/0 иbuild0/151с проверены на том же прикладном451, но не объявляют новый случай зелёным. Все прежние test bodies сохранены после нормализации прежних CRLF/LF.
+
+
+## GitNexus перед новым RED-коммитом multiple
+
+Полная переиндексация exit0/114с; контроль requirePageAbility: правильныйUID/путь, входящие вызовы подтверждены. До staging all11changed/0affected/6trackedfiles LOW;compare250changed/7affected/74trackedfiles HIGH. Семь потоков — прежние V3(FetchWithTimeout,Cleanup,GetCurrentResetTimeout,FormatEntry,ShouldLog,IsSensitiveKey,GetMinLevel); пользователь предупреждён. Новые отчёты ещё не входили в trackedfiles этого снимка; после staging выполнен повтор. Полные окончательные ответы: detect-equipment-multiple-red-staged.json / compare-equipment-multiple-red-staged.json; partial/truncated/error должны отсутствовать. Общий индекс имеет ограниченный бюджет flows; отсутствие связи не доказывает отсутствие потребителя, динамический crews/my подтверждён текстом. Нового whole-branch reviewer нет. Код приложения для нового дефекта не изменён.

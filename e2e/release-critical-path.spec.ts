@@ -430,3 +430,51 @@ test('equipment access: operator cannot read an unassigned rig by direct id', as
     await db.end();
   }
 });
+
+test('equipment multiple: operator can read and record fuel and meters for both assigned rigs', async ({ page }, info) => {
+  const fixture = await createRoleAuditFixture();
+  const db = await owner();
+  const secondId = randomUUID();
+  const unassignedId = randomUUID();
+  const observations: Array<Record<string, unknown>> = [];
+  try {
+    for (const id of [secondId, unassignedId]) await db.query('INSERT INTO "Equipment" (id,name,"tenantId","engineHoursTotal","fuelTankLiters","updatedAt") VALUES ($1,$2,$3,100,400,now())', [id, 'QA multiple resource rig', fixture.tenantId]);
+    await db.query('INSERT INTO "Crew" (id,name,"operatorId","equipmentId","siteId","updatedAt") VALUES ($1,$2,$3,$4,$5,now())', [randomUUID(), 'QA second meter crew', fixture.users.OPERATOR.id, secondId, fixture.siteId]);
+    const assigned = (await db.query('SELECT c.id,c."equipmentId" FROM "Crew" c JOIN "Equipment" e ON e.id=c."equipmentId" WHERE c."operatorId"=$1 AND c."isActive"=true AND e."tenantId"=$2 ORDER BY c.id', [fixture.users.OPERATOR.id, fixture.tenantId])).rows;
+    expect(assigned.map(row => row.equipmentId).sort()).toEqual([fixture.equipmentId, secondId].sort());
+    await login(page, fixture.users.OPERATOR.email, fixture.password);
+    const me = await page.request.get('/api/auth/me');
+    expect(me.status()).toBe(200);
+    expect((await me.json()).user.id).toBe(fixture.users.OPERATOR.id);
+    const outcomes: Array<{ equipmentId: string; resource: string; method: string; status: number; body: string }> = [];
+    const foreign: typeof outcomes = [];
+    const origin = new URL(page.url()).origin;
+    for (const equipmentId of [fixture.equipmentId, secondId, unassignedId]) {
+      const card = await page.request.get('/api/equipment/' + equipmentId);
+      expect(card.status()).toBe(equipmentId === unassignedId ? 404 : 200);
+      for (const resource of ['meter-readings', 'fuel']) {
+        for (const method of ['GET', 'POST']) {
+          const data = resource === 'meter-readings' ? { engineHours: 101, source: 'MANUAL', note: 'QA multiple rigs' } : { litersAdded: 10, tankPercent: 80, source: 'MANUAL', note: 'QA multiple rigs' };
+          const response = await page.request.fetch('/api/equipment/' + equipmentId + '/' + resource, { method, headers: { Origin: origin }, ...(method === 'POST' ? { data } : {}) });
+          (equipmentId === unassignedId ? foreign : outcomes).push({ equipmentId, resource, method, status: response.status(), body: await response.text() });
+        }
+      }
+    }
+    const ids = [fixture.equipmentId, secondId, unassignedId];
+    const meterRows = (await db.query('SELECT id,"equipmentId","recordedById","engineHours" FROM "MeterReading" WHERE "tenantId"=$1 AND "equipmentId"=ANY($2::text[]) ORDER BY id', [fixture.tenantId, ids])).rows;
+    const fuelRows = (await db.query('SELECT id,"equipmentId","recordedById","litersAdded","tankPercent" FROM "FuelLog" WHERE "tenantId"=$1 AND "equipmentId"=ANY($2::text[]) ORDER BY id', [fixture.tenantId, ids])).rows;
+    const auditRows = (await db.query('SELECT action,"actorId","targetId" FROM "FeedbackEvent" WHERE scope=$1 AND "targetId"=ANY($2::text[]) ORDER BY "createdAt",id', ['equipment', [...meterRows, ...fuelRows].map(row => row.id)])).rows;
+    observations.push({ operatorId: fixture.users.OPERATOR.id, tenantId: fixture.tenantId, assigned, outcomes, foreign, unassignedId, meterRows, fuelRows, auditRows });
+    for (const outcome of foreign) expect([403, 404]).toContain(outcome.status);
+    expect([...meterRows, ...fuelRows].some(row => row.equipmentId === unassignedId)).toBe(false);
+    for (const outcome of outcomes) expect(outcome.status, 'assigned rig ' + outcome.equipmentId + ', resource ' + outcome.resource + ', method ' + outcome.method).toBe(outcome.method === 'POST' ? 201 : 200);
+    expect(meterRows).toHaveLength(2);
+    expect(fuelRows).toHaveLength(2);
+    expect([...meterRows, ...fuelRows].every(row => row.recordedById === fixture.users.OPERATOR.id)).toBe(true);
+    expect(auditRows.map(row => row.action).sort()).toEqual(['equipment.fuel.created', 'equipment.fuel.created', 'meter.reading.added', 'meter.reading.added'].sort());
+    expect(auditRows.every(row => row.actorId === fixture.users.OPERATOR.id)).toBe(true);
+  } finally {
+    await info.attach('equipment-multiple-resource-access', { body: JSON.stringify({ observations }, null, 2), contentType: 'application/json' });
+    await db.end();
+  }
+});

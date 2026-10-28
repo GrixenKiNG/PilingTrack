@@ -1,0 +1,211 @@
+{
+  "status": "CONFIRMED RED / correction pending owner permission",
+  "sourceBuildSha": "451acce2b30e5130a9055e9d966edcf4a413ff67",
+  "worktreeSha": "816e388acf80b725ef7512ccfd9566ab8e83ecdb",
+  "baseSha": "efd95008eac3bc846c89003c4b7766f2eb5c1c9b",
+  "baselineHttpRun": false,
+  "stats": {
+    "startTime": "2026-10-28T23:31:17.802Z",
+    "duration": 6076.969,
+    "expected": 0,
+    "skipped": 0,
+    "unexpected": 1,
+    "flaky": 0
+  },
+  "result": {
+    "exit": 1,
+    "seconds": 34,
+    "cleanup": true,
+    "cleanupErrors": []
+  },
+  "scenarioSha256": "c5226aae6d29fbde1c22fc81ed1bc619d0b7e113686b08a28da4aa43602a35b0",
+  "oldTestPrefixUnchangedAfterCRLFNormalization": true,
+  "sourceProofs": [
+    {
+      "path": "src/modules/crews/application/queries/crew-query.service.ts",
+      "currentBlob": "8b1d69b9685dba5010e64e57f3d3376a9ab98ade",
+      "baseBlob": "8b1d69b9685dba5010e64e57f3d3376a9ab98ade"
+    },
+    {
+      "path": "src/app/api/equipment/[id]/fuel/route.ts",
+      "currentBlob": "ebf1ed7a45beb4c10dc7fbb2f60e2abdb2fe30e6",
+      "baseBlob": "ebf1ed7a45beb4c10dc7fbb2f60e2abdb2fe30e6"
+    },
+    {
+      "path": "src/app/api/equipment/[id]/meter-readings/route.ts",
+      "currentBlob": "92ba46a4e79acc5448a5c4149fe66c7c00432672",
+      "baseBlob": "92ba46a4e79acc5448a5c4149fe66c7c00432672"
+    }
+  ],
+  "observation": {
+    "operatorId": "cmvsr0bsm0004aww511wvpfau",
+    "tenantId": "cmvsr0bk50000aww54v7ta3y2",
+    "assigned": [
+      {
+        "id": "cmvsr0c34000baww5toydqzlv",
+        "equipmentId": "cmvsr0c1s0009aww5oy2yx31b"
+      },
+      {
+        "id": "fa230893-8a30-485a-a6a7-720b81276bbe",
+        "equipmentId": "16e99373-6462-4a50-aa35-abc21f2c5482"
+      }
+    ],
+    "outcomes": [
+      {
+        "equipmentId": "cmvsr0c1s0009aww5oy2yx31b",
+        "resource": "meter-readings",
+        "method": "GET",
+        "status": 200,
+        "body": "{\"readings\":[]}"
+      },
+      {
+        "equipmentId": "cmvsr0c1s0009aww5oy2yx31b",
+        "resource": "meter-readings",
+        "method": "POST",
+        "status": 201,
+        "body": "{\"reading\":{\"id\":\"cmvsr0dn90001e0w51ikz9rpu\",\"engineHours\":101,\"recordedAt\":\"2026-10-28T23:31:22.760Z\"},\"warning\":null}"
+      },
+      {
+        "equipmentId": "cmvsr0c1s0009aww5oy2yx31b",
+        "resource": "fuel",
+        "method": "GET",
+        "status": 200,
+        "body": "{\"entries\":[],\"summary\":{\"tankLiters\":400,\"litersAdded\":0,\"startPercent\":null,\"endPercent\":null,\"engineHoursDelta\":null,\"consumption\":{\"liters\":null,\"source\":\"none\",\"quality\":\"insufficient\"},\"consumedLiters\":null,\"perEngineHour\":null,\"entryCount\":0}}"
+      },
+      {
+        "equipmentId": "cmvsr0c1s0009aww5oy2yx31b",
+        "resource": "fuel",
+        "method": "POST",
+        "status": 201,
+        "body": "{\"id\":\"cmvsr0dym0004e0w5cy2nwhmd\",\"recordedAt\":\"2026-10-28T23:31:23.177Z\"}"
+      },
+      {
+        "equipmentId": "16e99373-6462-4a50-aa35-abc21f2c5482",
+        "resource": "meter-readings",
+        "method": "GET",
+        "status": 403,
+        "body": "{\"error\":\"Установка не закреплена за вашим экипажем\"}"
+      },
+      {
+        "equipmentId": "16e99373-6462-4a50-aa35-abc21f2c5482",
+        "resource": "meter-readings",
+        "method": "POST",
+        "status": 403,
+        "body": "{\"error\":\"Установка не закреплена за вашим экипажем\"}"
+      },
+      {
+        "equipmentId": "16e99373-6462-4a50-aa35-abc21f2c5482",
+        "resource": "fuel",
+        "method": "GET",
+        "status": 403,
+        "body": "{\"error\":\"Установка не закреплена за вашим экипажем\"}"
+      },
+      {
+        "equipmentId": "16e99373-6462-4a50-aa35-abc21f2c5482",
+        "resource": "fuel",
+        "method": "POST",
+        "status": 403,
+        "body": "{\"error\":\"Установка не закреплена за вашим экипажем\"}"
+      }
+    ],
+    "foreign": [
+      {
+        "equipmentId": "8b4501f6-d3d6-494f-a763-7b0033880a3c",
+        "resource": "meter-readings",
+        "method": "GET",
+        "status": 403,
+        "body": "{\"error\":\"Установка не закреплена за вашим экипажем\"}"
+      },
+      {
+        "equipmentId": "8b4501f6-d3d6-494f-a763-7b0033880a3c",
+        "resource": "meter-readings",
+        "method": "POST",
+        "status": 403,
+        "body": "{\"error\":\"Установка не закреплена за вашим экипажем\"}"
+      },
+      {
+        "equipmentId": "8b4501f6-d3d6-494f-a763-7b0033880a3c",
+        "resource": "fuel",
+        "method": "GET",
+        "status": 403,
+        "body": "{\"error\":\"Установка не закреплена за вашим экипажем\"}"
+      },
+      {
+        "equipmentId": "8b4501f6-d3d6-494f-a763-7b0033880a3c",
+        "resource": "fuel",
+        "method": "POST",
+        "status": 403,
+        "body": "{\"error\":\"Установка не закреплена за вашим экипажем\"}"
+      }
+    ],
+    "unassignedId": "8b4501f6-d3d6-494f-a763-7b0033880a3c",
+    "meterRows": [
+      {
+        "id": "cmvsr0dn90001e0w51ikz9rpu",
+        "equipmentId": "cmvsr0c1s0009aww5oy2yx31b",
+        "recordedById": "cmvsr0bsm0004aww511wvpfau",
+        "engineHours": 101
+      }
+    ],
+    "fuelRows": [
+      {
+        "id": "cmvsr0dym0004e0w5cy2nwhmd",
+        "equipmentId": "cmvsr0c1s0009aww5oy2yx31b",
+        "recordedById": "cmvsr0bsm0004aww511wvpfau",
+        "litersAdded": 10,
+        "tankPercent": 80
+      }
+    ],
+    "auditRows": [
+      {
+        "action": "meter.reading.added",
+        "actorId": "cmvsr0bsm0004aww511wvpfau",
+        "targetId": "cmvsr0dn90001e0w51ikz9rpu"
+      },
+      {
+        "action": "equipment.fuel.created",
+        "actorId": "cmvsr0bsm0004aww511wvpfau",
+        "targetId": "cmvsr0dym0004e0w5cy2nwhmd"
+      }
+    ]
+  },
+  "archive": "D:\\PillingR\\night-logs\\night-evidence-1026/equipment-multiple-confirmed-red-raw",
+  "redCommitGates": {
+    "sourceBuildSha": "451acce2b30e5130a9055e9d966edcf4a413ff67",
+    "complete": true,
+    "results": [
+      {
+        "id": "equipment-multiple-red-tsc",
+        "exit": 0,
+        "seconds": 17
+      },
+      {
+        "id": "equipment-multiple-red-lint",
+        "exit": 0,
+        "seconds": 106
+      },
+      {
+        "id": "equipment-multiple-red-list",
+        "exit": 0,
+        "seconds": 37
+      }
+    ],
+    "currentCollection": {
+      "tests": 405,
+      "files": 30
+    },
+    "baseCollection": {
+      "tests": 318,
+      "files": 28
+    },
+    "buildAndUnit": "Not rerun for new E2E-only change; existing source451 full unit5783/0/0, build0/151s remain historical verified evidence",
+    "focused": {
+      "exit": 1,
+      "passed": 0,
+      "failed": 1,
+      "skipped": 0,
+      "flaky": 0,
+      "seconds": 34
+    }
+  }
+}
