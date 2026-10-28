@@ -42,6 +42,9 @@ V3: **9passed/0failed/0skipped** (6legacy+3selector). Отчёт сохраня�
 Прямые15разделов×7ролей×3браузера:3passed/0failed/0skipped,315наблюдений с точным конечнымURL и родительскимadmin guard. DIRECT-URL-MATRIX.md/json. Последние tsc0/18с,lint0/81с без предупреждений;list393/30 против BASE318/28,обаexit0. Все detailURLs/CRUD этим не покрыты.
 
 
+Бригада через формы во всех3браузерах:3passed/0failed/0skipped. Создание, смена установки/объекта/названия, снятие помощника, отмена/подтверждение softdelete и активация; SQL/аудит/сохранность draftReport, чтение MECHANIC и403 на изменение, options OPERATOR. CREW-LIFECYCLE.md/json. Последние tsc0/17с,lint0/70с без предупреждений;коллекция396/30 против BASE318/28,обаexit0.
+
+
 ## Что осталось
 
 КаждыйCRUD, каждый чужойURL, паспорт сваи и вся матрица ресурсов не исчерпаны. Первоначальный QA68 остаётся53passed/14skipped/1failed,exit1;устаревший email-контракт C3 исправлен и focused зелёный,весь68 не повторялся. Причины14skip — QA-RUN.md. Исторические REDunit/UI не удалены и не заменены выборочными GREEN.
@@ -94,3 +97,4 @@ V3: **9passed/0failed/0skipped** (6legacy+3selector). Отчёт сохраня�
 - fa2de8ec394b86dba29eb2861d0252a1416c647c test(e2e): prove dispatcher safety repair and readiness chains
 - fcc5b0d6cda4b55490076016708edfb338fc1187 docs: record final operator and cross-role evidence with coverage limits
 - 34227a48b77e79a262d1b4d5e480c6249e2ba351 test(inspections): prove complete mechanic workflow across browsers
+- f938298c9fcdab0611ff0c1361176be01e1756b8 test(e2e): verify inherited page guards across seven real roles
