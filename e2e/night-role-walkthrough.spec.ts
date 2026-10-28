@@ -2,8 +2,11 @@ import { test, expect } from './fixtures/disposable.fixture';
 import { createRoleAuditFixture } from './fixtures/role-audit.mjs';
 import { login } from './page-objects/login.page';
 import { ROLE_NAVIGATION } from '../src/components/piling/icons/role-navigation';
-import { can, type Role } from '../src/core/security/authorization';
+import { can, type Ability, type Role } from '../src/core/security/authorization';
 import { operatorRouteOwnsNavigation } from '../src/app/(app)/operator-layout-policy';
+import { readdirSync, readFileSync } from 'node:fs';
+import { join, relative } from 'node:path';
+import { parseView, SURFACE_ROUTE, surfaceOfView } from '../src/components/piling/to/to-module-config';
 
 const roles: Role[] = ['ADMIN', 'DISPATCHER', 'OPERATOR', 'ASSISTANT', 'MECHANIC', 'FOREMAN', 'SAFETY_ENGINEER'];
 
@@ -199,3 +202,133 @@ for (const role of roles) {
     await info.attach('network-events', { body: JSON.stringify(network), contentType: 'application/json' });
   });
 }
+
+
+test('role guard matrix: all source-declared section guards and seven real sessions', async ({ page }, info) => {
+  test.setTimeout(600_000);
+  const fixture = await createRoleAuditFixture();
+  const appRoot = join(process.cwd(), 'src/app');
+  const guards: Array<{ file: string; line: number; href: string; ability: Ability }> = [];
+  const collect = (directory: string) => {
+    for (const entry of readdirSync(directory, { withFileTypes: true })) {
+      const file = join(directory, entry.name);
+      if (entry.isDirectory()) { collect(file); continue; }
+      if (!['layout.tsx', 'page.tsx'].includes(entry.name)) continue;
+      const source = readFileSync(file, 'utf8');
+      for (const match of source.matchAll(/\brequirePageAbility\(\s*'([^']+)'\s*\)/g)) {
+        const segments = relative(appRoot, file).replaceAll('\\', '/').split('/');
+        segments.pop();
+        const href = '/' + segments.filter(segment => !segment.startsWith('(')).join('/');
+        if (href.includes('[')) throw Error('A dynamic guard needs an explicit owned resource fixture: ' + file);
+        guards.push({ file: relative(process.cwd(), file).replaceAll('\\', '/'), line: source.slice(0, match.index).split('\n').length, href, ability: match[1] as Ability });
+      }
+    }
+  };
+  collect(appRoot);
+  const parentGuardSource = readFileSync(join(appRoot, '(app)/admin/layout.tsx'), 'utf8');
+  const parentRoleList = parentGuardSource.match(/if\s*\(!(?<roles>\[[^\]]+\])\.includes\(user\.role\)\)/)?.groups?.roles;
+  expect(parentRoleList, 'the inherited admin role guard must remain explicit').toBeTruthy();
+  const parentRoles = [...(parentRoleList || '').matchAll(/'([^']+)'/g)].map(match => match[1]);
+  expect(parentRoles).toEqual(['ADMIN', 'DISPATCHER', 'FOREMAN', 'MECHANIC', 'SAFETY_ENGINEER']);
+  // This is the reviewed set in page-ability-layouts.test.ts. New guards must
+  // extend the matrix, rather than silently shrinking its expected coverage.
+  expect(guards).toHaveLength(15);
+  expect(new Set(guards.map(row => row.href)).size).toBe(15);
+  guards.sort((a, b) => a.href.localeCompare(b.href));
+  const rows: Array<Record<string, unknown>> = [];
+  const errors: string[] = [];
+  let apiErrors: Array<{ path: string; status: number }> = [];
+  const observe = async () => {
+    await page.addInitScript(() => {
+      const state = { pending: 0, lastAt: Date.now() };
+      Object.defineProperty(window, '__nightFetch', { value: state });
+      const original = window.fetch;
+      window.fetch = async (...args) => {
+        const target = args[0] instanceof Request ? args[0].url : String(args[0]);
+        const url = new URL(target, location.href);
+        const pathname = url.pathname;
+        if ((!pathname.startsWith('/api/') && !url.searchParams.has('_rsc')) || pathname === '/api/feedback/stream') return original(...args);
+        state.pending++;
+        state.lastAt = Date.now();
+        const finished = () => { state.pending--; state.lastAt = Date.now(); };
+        try {
+          const response = await original(...args);
+          void response.clone().arrayBuffer().catch(() => {}).finally(finished);
+          return response;
+        } catch (error) { finished(); throw error; }
+      };
+    });
+
+    page.on('pageerror', error => errors.push(error.message));
+    page.on('response', response => {
+      const path = new URL(response.url()).pathname;
+      if (path.startsWith('/api/') && response.status() >= 400) apiErrors.push({ path, status: response.status() });
+    });
+  };
+  await observe();
+  const networkQuiet = async () => {
+    await expect.poll(async () => {
+      try { return await page.evaluate(() => {
+      const state = (window as Window & { __nightFetch?: { pending: number; lastAt: number } }).__nightFetch;
+      return state !== undefined && state.pending === 0 && Date.now() - state.lastAt >= 500;
+      }); } catch (error) {
+        if (error instanceof Error && error.message.includes('Execution context was destroyed')) return false;
+        throw error;
+      }
+    }, { timeout: 15_000 }).toBe(true);
+  };
+  try {
+    for (const [index, role] of roles.entries()) {
+      if (index > 0) {
+        const context = page.context();
+        const logout = await page.request.post('/api/auth/logout', { headers: { Origin: new URL(page.url()).origin } });
+        expect(logout.status()).toBe(200);
+        await page.close();
+        page = await context.newPage();
+        await observe();
+      }
+      await login(page, fixture.users[role].email, fixture.password);
+      await expect(page.getByText('QA ' + role, { exact: true }).first()).toBeAttached();
+      const me = await page.request.get('/api/auth/me');
+      expect(me.status()).toBe(200);
+      expect((await me.json()).user.role).toBe(role);
+      await networkQuiet();
+      for (const guard of guards) {
+        apiErrors = [];
+        const sectionAllowed = can({ role }, guard.ability);
+        const parentAllowed = parentRoles.includes(role);
+        const allowed = parentAllowed && sectionAllowed;
+        const pageSource = readFileSync(join(appRoot, '(app)', guard.href.slice(1), 'page.tsx'), 'utf8');
+        let destination = pageSource.match(/\bredirect\('([^']+)'\)/)?.[1] || guard.href;
+        const redirectChain = [destination];
+        // The server alias can be followed by ToModule's surface redirect.
+        // Incidents moved into readiness by the owner's 10.10 decision.
+        if (destination.startsWith('/admin/safety?')) {
+          const params = new URL(destination, page.url()).searchParams;
+          const view = parseView(params.get('view') ?? params.get('tab'), 'safety');
+          if (surfaceOfView(view) !== 'safety') destination = SURFACE_ROUTE[surfaceOfView(view)] + '?view=' + view;
+          redirectChain.push(destination);
+        }
+        const expectedUrl = new URL(allowed ? destination : '/no-access', page.url());
+        await page.goto(guard.href);
+        if (allowed) {
+          // Wait for server redirects to finish before starting another URL.
+          await expect(page).toHaveURL(url => url.pathname === expectedUrl.pathname && url.search === expectedUrl.search);
+          await expect(page.getByText('QA ' + role, { exact: true }).first()).toBeAttached();
+          await expect(page.locator('body')).not.toContainText('Application error:');
+        } else {
+          await expect(page).toHaveURL(url => url.pathname === '/no-access');
+          await expect(page.locator('body')).toContainText('Нет доступа');
+        }
+        await networkQuiet();
+        await expect(page).toHaveURL(url => url.pathname === expectedUrl.pathname && url.search === expectedUrl.search);
+        rows.push({ role, ...guard, parentAllowed, sectionAllowed, destination, redirectChain, expected: allowed ? 'allowed' : 'denied', actualPath: new URL(page.url()).pathname, apiErrors: [...apiErrors], scope: 'page guard only; CRUD and loaded data are separate checks' });
+      }
+      await page.screenshot({ path: info.outputPath(role + '-direct-guard.png'), fullPage: true });
+    }
+    expect(rows).toHaveLength(105);
+    expect(errors).toEqual([]);
+  } finally {
+    await info.attach('direct-url-matrix', { body: JSON.stringify({ guards, rows, errors }, null, 2), contentType: 'application/json' });
+  }
+});

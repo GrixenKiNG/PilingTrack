@@ -1,0 +1,5787 @@
+{
+  "sourceBuildSha": "44126b987c9dd02b0bbefe28e8094f282b94aaf0",
+  "scenarioHash": "94f2d56f3ccf1a98d55471a80836207a0df7d29427959b0696a8d18956827c40",
+  "verificationWorktreeSha": "34227a48b77e79a262d1b4d5e480c6249e2ba351",
+  "original21TestBodiesUnchanged": true,
+  "pipeline": {
+    "sourceBuildSha": "44126b987c9dd02b0bbefe28e8094f282b94aaf0",
+    "worktreeSha": "34227a48b77e79a262d1b4d5e480c6249e2ba351",
+    "scenarioHash": "94f2d56f3ccf1a98d55471a80836207a0df7d29427959b0696a8d18956827c40",
+    "scenarioUnchanged": true,
+    "complete": true,
+    "results": [
+      {
+        "id": "direct-guards-settled-fresh",
+        "exe": "C:\\Program Files\\nodejs\\node.exe",
+        "args": [
+          "D:\\PillingR\\night-logs\\night-evidence-1026/direct-guards-settled-fresh-stand.cjs"
+        ],
+        "exit": 0,
+        "seconds": 891
+      },
+      {
+        "id": "direct-guards-settled-tsc",
+        "exe": "C:/Program Files/Git/bin/bash.exe",
+        "args": [
+          "-c",
+          "npx tsc --noEmit"
+        ],
+        "exit": 0,
+        "seconds": 18
+      },
+      {
+        "id": "direct-guards-settled-lint",
+        "exe": "C:/Program Files/Git/bin/bash.exe",
+        "args": [
+          "-c",
+          "npm run lint"
+        ],
+        "exit": 0,
+        "seconds": 81
+      },
+      {
+        "id": "direct-guards-settled-list",
+        "exe": "C:\\Program Files\\nodejs\\node.exe",
+        "args": [
+          "D:\\PillingR\\night-logs\\night-evidence-1026/qa-fresh-stand.cjs",
+          "--list-default"
+        ],
+        "exit": 0,
+        "seconds": 41
+      }
+    ]
+  },
+  "stats": {
+    "startTime": "2026-10-28T04:47:57.536Z",
+    "duration": 858335.9609999999,
+    "expected": 3,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  },
+  "summary": [
+    {
+      "project": "chromium",
+      "observations": 105,
+      "allowed": 44,
+      "denied": 61,
+      "apiErrors": [],
+      "errors": []
+    },
+    {
+      "project": "Mobile Safari",
+      "observations": 105,
+      "allowed": 44,
+      "denied": 61,
+      "apiErrors": [],
+      "errors": []
+    },
+    {
+      "project": "Mobile Chrome",
+      "observations": 105,
+      "allowed": 44,
+      "denied": 61,
+      "apiErrors": [],
+      "errors": []
+    }
+  ],
+  "cases": [
+    {
+      "project": "chromium",
+      "status": "passed",
+      "guards": [
+        {
+          "file": "src/app/(app)/admin/page.tsx",
+          "line": 7,
+          "href": "/admin",
+          "ability": "analytics.read"
+        },
+        {
+          "file": "src/app/(app)/admin/analytics/layout.tsx",
+          "line": 4,
+          "href": "/admin/analytics",
+          "ability": "analytics.read"
+        },
+        {
+          "file": "src/app/(app)/admin/checklists/layout.tsx",
+          "line": 4,
+          "href": "/admin/checklists",
+          "ability": "inspection.perform"
+        },
+        {
+          "file": "src/app/(app)/admin/crews/layout.tsx",
+          "line": 4,
+          "href": "/admin/crews",
+          "ability": "crews.read"
+        },
+        {
+          "file": "src/app/(app)/admin/dictionaries/layout.tsx",
+          "line": 4,
+          "href": "/admin/dictionaries",
+          "ability": "dictionary.manage"
+        },
+        {
+          "file": "src/app/(app)/admin/dlq/layout.tsx",
+          "line": 4,
+          "href": "/admin/dlq",
+          "ability": "dlq.manage"
+        },
+        {
+          "file": "src/app/(app)/admin/equipment/layout.tsx",
+          "line": 4,
+          "href": "/admin/equipment",
+          "ability": "equipment.read"
+        },
+        {
+          "file": "src/app/(app)/admin/incidents/layout.tsx",
+          "line": 4,
+          "href": "/admin/incidents",
+          "ability": "incidents.read"
+        },
+        {
+          "file": "src/app/(app)/admin/maintenance/layout.tsx",
+          "line": 4,
+          "href": "/admin/maintenance",
+          "ability": "maintenance.manage"
+        },
+        {
+          "file": "src/app/(app)/admin/piles/layout.tsx",
+          "line": 4,
+          "href": "/admin/piles",
+          "ability": "piles.manage"
+        },
+        {
+          "file": "src/app/(app)/admin/reports/layout.tsx",
+          "line": 4,
+          "href": "/admin/reports",
+          "ability": "reports.read_all"
+        },
+        {
+          "file": "src/app/(app)/admin/settings/layout.tsx",
+          "line": 4,
+          "href": "/admin/settings",
+          "ability": "system.read"
+        },
+        {
+          "file": "src/app/(app)/admin/sites/layout.tsx",
+          "line": 4,
+          "href": "/admin/sites",
+          "ability": "sites.read_all"
+        },
+        {
+          "file": "src/app/(app)/admin/telegram/layout.tsx",
+          "line": 4,
+          "href": "/admin/telegram",
+          "ability": "telegram.manage"
+        },
+        {
+          "file": "src/app/(app)/admin/users/layout.tsx",
+          "line": 4,
+          "href": "/admin/users",
+          "ability": "users.manage"
+        }
+      ],
+      "rows": [
+        {
+          "role": "ADMIN",
+          "file": "src/app/(app)/admin/page.tsx",
+          "line": 7,
+          "href": "/admin",
+          "ability": "analytics.read",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin",
+          "redirectChain": [
+            "/admin"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "ADMIN",
+          "file": "src/app/(app)/admin/analytics/layout.tsx",
+          "line": 4,
+          "href": "/admin/analytics",
+          "ability": "analytics.read",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/analytics",
+          "redirectChain": [
+            "/admin/analytics"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/analytics",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "ADMIN",
+          "file": "src/app/(app)/admin/checklists/layout.tsx",
+          "line": 4,
+          "href": "/admin/checklists",
+          "ability": "inspection.perform",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/checklists",
+          "redirectChain": [
+            "/admin/checklists"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/checklists",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "ADMIN",
+          "file": "src/app/(app)/admin/crews/layout.tsx",
+          "line": 4,
+          "href": "/admin/crews",
+          "ability": "crews.read",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/crews",
+          "redirectChain": [
+            "/admin/crews"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/crews",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "ADMIN",
+          "file": "src/app/(app)/admin/dictionaries/layout.tsx",
+          "line": 4,
+          "href": "/admin/dictionaries",
+          "ability": "dictionary.manage",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/dictionaries",
+          "redirectChain": [
+            "/admin/dictionaries"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/dictionaries",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "ADMIN",
+          "file": "src/app/(app)/admin/dlq/layout.tsx",
+          "line": 4,
+          "href": "/admin/dlq",
+          "ability": "dlq.manage",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/dlq",
+          "redirectChain": [
+            "/admin/dlq"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/dlq",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "ADMIN",
+          "file": "src/app/(app)/admin/equipment/layout.tsx",
+          "line": 4,
+          "href": "/admin/equipment",
+          "ability": "equipment.read",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/equipment",
+          "redirectChain": [
+            "/admin/equipment"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/equipment",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "ADMIN",
+          "file": "src/app/(app)/admin/incidents/layout.tsx",
+          "line": 4,
+          "href": "/admin/incidents",
+          "ability": "incidents.read",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/to?view=incidents",
+          "redirectChain": [
+            "/admin/safety?view=incidents",
+            "/admin/to?view=incidents"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/to",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "ADMIN",
+          "file": "src/app/(app)/admin/maintenance/layout.tsx",
+          "line": 4,
+          "href": "/admin/maintenance",
+          "ability": "maintenance.manage",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/maintenance",
+          "redirectChain": [
+            "/admin/maintenance"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/maintenance",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "ADMIN",
+          "file": "src/app/(app)/admin/piles/layout.tsx",
+          "line": 4,
+          "href": "/admin/piles",
+          "ability": "piles.manage",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/reports?view=piles",
+          "redirectChain": [
+            "/admin/reports?view=piles"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/reports",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "ADMIN",
+          "file": "src/app/(app)/admin/reports/layout.tsx",
+          "line": 4,
+          "href": "/admin/reports",
+          "ability": "reports.read_all",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/reports",
+          "redirectChain": [
+            "/admin/reports"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/reports",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "ADMIN",
+          "file": "src/app/(app)/admin/settings/layout.tsx",
+          "line": 4,
+          "href": "/admin/settings",
+          "ability": "system.read",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/settings",
+          "redirectChain": [
+            "/admin/settings"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/settings",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "ADMIN",
+          "file": "src/app/(app)/admin/sites/layout.tsx",
+          "line": 4,
+          "href": "/admin/sites",
+          "ability": "sites.read_all",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/sites",
+          "redirectChain": [
+            "/admin/sites"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/sites",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "ADMIN",
+          "file": "src/app/(app)/admin/telegram/layout.tsx",
+          "line": 4,
+          "href": "/admin/telegram",
+          "ability": "telegram.manage",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/telegram",
+          "redirectChain": [
+            "/admin/telegram"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/telegram",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "ADMIN",
+          "file": "src/app/(app)/admin/users/layout.tsx",
+          "line": 4,
+          "href": "/admin/users",
+          "ability": "users.manage",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/users",
+          "redirectChain": [
+            "/admin/users"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/users",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "DISPATCHER",
+          "file": "src/app/(app)/admin/page.tsx",
+          "line": 7,
+          "href": "/admin",
+          "ability": "analytics.read",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin",
+          "redirectChain": [
+            "/admin"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "DISPATCHER",
+          "file": "src/app/(app)/admin/analytics/layout.tsx",
+          "line": 4,
+          "href": "/admin/analytics",
+          "ability": "analytics.read",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/analytics",
+          "redirectChain": [
+            "/admin/analytics"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/analytics",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "DISPATCHER",
+          "file": "src/app/(app)/admin/checklists/layout.tsx",
+          "line": 4,
+          "href": "/admin/checklists",
+          "ability": "inspection.perform",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/checklists",
+          "redirectChain": [
+            "/admin/checklists"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/checklists",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "DISPATCHER",
+          "file": "src/app/(app)/admin/crews/layout.tsx",
+          "line": 4,
+          "href": "/admin/crews",
+          "ability": "crews.read",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/crews",
+          "redirectChain": [
+            "/admin/crews"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/crews",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "DISPATCHER",
+          "file": "src/app/(app)/admin/dictionaries/layout.tsx",
+          "line": 4,
+          "href": "/admin/dictionaries",
+          "ability": "dictionary.manage",
+          "parentAllowed": true,
+          "sectionAllowed": false,
+          "destination": "/admin/dictionaries",
+          "redirectChain": [
+            "/admin/dictionaries"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "DISPATCHER",
+          "file": "src/app/(app)/admin/dlq/layout.tsx",
+          "line": 4,
+          "href": "/admin/dlq",
+          "ability": "dlq.manage",
+          "parentAllowed": true,
+          "sectionAllowed": false,
+          "destination": "/admin/dlq",
+          "redirectChain": [
+            "/admin/dlq"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "DISPATCHER",
+          "file": "src/app/(app)/admin/equipment/layout.tsx",
+          "line": 4,
+          "href": "/admin/equipment",
+          "ability": "equipment.read",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/equipment",
+          "redirectChain": [
+            "/admin/equipment"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/equipment",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "DISPATCHER",
+          "file": "src/app/(app)/admin/incidents/layout.tsx",
+          "line": 4,
+          "href": "/admin/incidents",
+          "ability": "incidents.read",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/to?view=incidents",
+          "redirectChain": [
+            "/admin/safety?view=incidents",
+            "/admin/to?view=incidents"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/to",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "DISPATCHER",
+          "file": "src/app/(app)/admin/maintenance/layout.tsx",
+          "line": 4,
+          "href": "/admin/maintenance",
+          "ability": "maintenance.manage",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/maintenance",
+          "redirectChain": [
+            "/admin/maintenance"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/maintenance",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "DISPATCHER",
+          "file": "src/app/(app)/admin/piles/layout.tsx",
+          "line": 4,
+          "href": "/admin/piles",
+          "ability": "piles.manage",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/reports?view=piles",
+          "redirectChain": [
+            "/admin/reports?view=piles"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/reports",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "DISPATCHER",
+          "file": "src/app/(app)/admin/reports/layout.tsx",
+          "line": 4,
+          "href": "/admin/reports",
+          "ability": "reports.read_all",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/reports",
+          "redirectChain": [
+            "/admin/reports"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/reports",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "DISPATCHER",
+          "file": "src/app/(app)/admin/settings/layout.tsx",
+          "line": 4,
+          "href": "/admin/settings",
+          "ability": "system.read",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/settings",
+          "redirectChain": [
+            "/admin/settings"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/settings",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "DISPATCHER",
+          "file": "src/app/(app)/admin/sites/layout.tsx",
+          "line": 4,
+          "href": "/admin/sites",
+          "ability": "sites.read_all",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/sites",
+          "redirectChain": [
+            "/admin/sites"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/sites",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "DISPATCHER",
+          "file": "src/app/(app)/admin/telegram/layout.tsx",
+          "line": 4,
+          "href": "/admin/telegram",
+          "ability": "telegram.manage",
+          "parentAllowed": true,
+          "sectionAllowed": false,
+          "destination": "/admin/telegram",
+          "redirectChain": [
+            "/admin/telegram"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "DISPATCHER",
+          "file": "src/app/(app)/admin/users/layout.tsx",
+          "line": 4,
+          "href": "/admin/users",
+          "ability": "users.manage",
+          "parentAllowed": true,
+          "sectionAllowed": false,
+          "destination": "/admin/users",
+          "redirectChain": [
+            "/admin/users"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "OPERATOR",
+          "file": "src/app/(app)/admin/page.tsx",
+          "line": 7,
+          "href": "/admin",
+          "ability": "analytics.read",
+          "parentAllowed": false,
+          "sectionAllowed": false,
+          "destination": "/admin",
+          "redirectChain": [
+            "/admin"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "OPERATOR",
+          "file": "src/app/(app)/admin/analytics/layout.tsx",
+          "line": 4,
+          "href": "/admin/analytics",
+          "ability": "analytics.read",
+          "parentAllowed": false,
+          "sectionAllowed": false,
+          "destination": "/admin/analytics",
+          "redirectChain": [
+            "/admin/analytics"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "OPERATOR",
+          "file": "src/app/(app)/admin/checklists/layout.tsx",
+          "line": 4,
+          "href": "/admin/checklists",
+          "ability": "inspection.perform",
+          "parentAllowed": false,
+          "sectionAllowed": true,
+          "destination": "/admin/checklists",
+          "redirectChain": [
+            "/admin/checklists"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "OPERATOR",
+          "file": "src/app/(app)/admin/crews/layout.tsx",
+          "line": 4,
+          "href": "/admin/crews",
+          "ability": "crews.read",
+          "parentAllowed": false,
+          "sectionAllowed": false,
+          "destination": "/admin/crews",
+          "redirectChain": [
+            "/admin/crews"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "OPERATOR",
+          "file": "src/app/(app)/admin/dictionaries/layout.tsx",
+          "line": 4,
+          "href": "/admin/dictionaries",
+          "ability": "dictionary.manage",
+          "parentAllowed": false,
+          "sectionAllowed": false,
+          "destination": "/admin/dictionaries",
+          "redirectChain": [
+            "/admin/dictionaries"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "OPERATOR",
+          "file": "src/app/(app)/admin/dlq/layout.tsx",
+          "line": 4,
+          "href": "/admin/dlq",
+          "ability": "dlq.manage",
+          "parentAllowed": false,
+          "sectionAllowed": false,
+          "destination": "/admin/dlq",
+          "redirectChain": [
+            "/admin/dlq"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "OPERATOR",
+          "file": "src/app/(app)/admin/equipment/layout.tsx",
+          "line": 4,
+          "href": "/admin/equipment",
+          "ability": "equipment.read",
+          "parentAllowed": false,
+          "sectionAllowed": false,
+          "destination": "/admin/equipment",
+          "redirectChain": [
+            "/admin/equipment"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "OPERATOR",
+          "file": "src/app/(app)/admin/incidents/layout.tsx",
+          "line": 4,
+          "href": "/admin/incidents",
+          "ability": "incidents.read",
+          "parentAllowed": false,
+          "sectionAllowed": false,
+          "destination": "/admin/to?view=incidents",
+          "redirectChain": [
+            "/admin/safety?view=incidents",
+            "/admin/to?view=incidents"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "OPERATOR",
+          "file": "src/app/(app)/admin/maintenance/layout.tsx",
+          "line": 4,
+          "href": "/admin/maintenance",
+          "ability": "maintenance.manage",
+          "parentAllowed": false,
+          "sectionAllowed": false,
+          "destination": "/admin/maintenance",
+          "redirectChain": [
+            "/admin/maintenance"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "OPERATOR",
+          "file": "src/app/(app)/admin/piles/layout.tsx",
+          "line": 4,
+          "href": "/admin/piles",
+          "ability": "piles.manage",
+          "parentAllowed": false,
+          "sectionAllowed": false,
+          "destination": "/admin/reports?view=piles",
+          "redirectChain": [
+            "/admin/reports?view=piles"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "OPERATOR",
+          "file": "src/app/(app)/admin/reports/layout.tsx",
+          "line": 4,
+          "href": "/admin/reports",
+          "ability": "reports.read_all",
+          "parentAllowed": false,
+          "sectionAllowed": false,
+          "destination": "/admin/reports",
+          "redirectChain": [
+            "/admin/reports"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "OPERATOR",
+          "file": "src/app/(app)/admin/settings/layout.tsx",
+          "line": 4,
+          "href": "/admin/settings",
+          "ability": "system.read",
+          "parentAllowed": false,
+          "sectionAllowed": false,
+          "destination": "/admin/settings",
+          "redirectChain": [
+            "/admin/settings"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "OPERATOR",
+          "file": "src/app/(app)/admin/sites/layout.tsx",
+          "line": 4,
+          "href": "/admin/sites",
+          "ability": "sites.read_all",
+          "parentAllowed": false,
+          "sectionAllowed": false,
+          "destination": "/admin/sites",
+          "redirectChain": [
+            "/admin/sites"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "OPERATOR",
+          "file": "src/app/(app)/admin/telegram/layout.tsx",
+          "line": 4,
+          "href": "/admin/telegram",
+          "ability": "telegram.manage",
+          "parentAllowed": false,
+          "sectionAllowed": false,
+          "destination": "/admin/telegram",
+          "redirectChain": [
+            "/admin/telegram"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "OPERATOR",
+          "file": "src/app/(app)/admin/users/layout.tsx",
+          "line": 4,
+          "href": "/admin/users",
+          "ability": "users.manage",
+          "parentAllowed": false,
+          "sectionAllowed": false,
+          "destination": "/admin/users",
+          "redirectChain": [
+            "/admin/users"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "ASSISTANT",
+          "file": "src/app/(app)/admin/page.tsx",
+          "line": 7,
+          "href": "/admin",
+          "ability": "analytics.read",
+          "parentAllowed": false,
+          "sectionAllowed": false,
+          "destination": "/admin",
+          "redirectChain": [
+            "/admin"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "ASSISTANT",
+          "file": "src/app/(app)/admin/analytics/layout.tsx",
+          "line": 4,
+          "href": "/admin/analytics",
+          "ability": "analytics.read",
+          "parentAllowed": false,
+          "sectionAllowed": false,
+          "destination": "/admin/analytics",
+          "redirectChain": [
+            "/admin/analytics"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "ASSISTANT",
+          "file": "src/app/(app)/admin/checklists/layout.tsx",
+          "line": 4,
+          "href": "/admin/checklists",
+          "ability": "inspection.perform",
+          "parentAllowed": false,
+          "sectionAllowed": false,
+          "destination": "/admin/checklists",
+          "redirectChain": [
+            "/admin/checklists"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "ASSISTANT",
+          "file": "src/app/(app)/admin/crews/layout.tsx",
+          "line": 4,
+          "href": "/admin/crews",
+          "ability": "crews.read",
+          "parentAllowed": false,
+          "sectionAllowed": false,
+          "destination": "/admin/crews",
+          "redirectChain": [
+            "/admin/crews"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "ASSISTANT",
+          "file": "src/app/(app)/admin/dictionaries/layout.tsx",
+          "line": 4,
+          "href": "/admin/dictionaries",
+          "ability": "dictionary.manage",
+          "parentAllowed": false,
+          "sectionAllowed": false,
+          "destination": "/admin/dictionaries",
+          "redirectChain": [
+            "/admin/dictionaries"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "ASSISTANT",
+          "file": "src/app/(app)/admin/dlq/layout.tsx",
+          "line": 4,
+          "href": "/admin/dlq",
+          "ability": "dlq.manage",
+          "parentAllowed": false,
+          "sectionAllowed": false,
+          "destination": "/admin/dlq",
+          "redirectChain": [
+            "/admin/dlq"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "ASSISTANT",
+          "file": "src/app/(app)/admin/equipment/layout.tsx",
+          "line": 4,
+          "href": "/admin/equipment",
+          "ability": "equipment.read",
+          "parentAllowed": false,
+          "sectionAllowed": false,
+          "destination": "/admin/equipment",
+          "redirectChain": [
+            "/admin/equipment"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "ASSISTANT",
+          "file": "src/app/(app)/admin/incidents/layout.tsx",
+          "line": 4,
+          "href": "/admin/incidents",
+          "ability": "incidents.read",
+          "parentAllowed": false,
+          "sectionAllowed": false,
+          "destination": "/admin/to?view=incidents",
+          "redirectChain": [
+            "/admin/safety?view=incidents",
+            "/admin/to?view=incidents"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "ASSISTANT",
+          "file": "src/app/(app)/admin/maintenance/layout.tsx",
+          "line": 4,
+          "href": "/admin/maintenance",
+          "ability": "maintenance.manage",
+          "parentAllowed": false,
+          "sectionAllowed": false,
+          "destination": "/admin/maintenance",
+          "redirectChain": [
+            "/admin/maintenance"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "ASSISTANT",
+          "file": "src/app/(app)/admin/piles/layout.tsx",
+          "line": 4,
+          "href": "/admin/piles",
+          "ability": "piles.manage",
+          "parentAllowed": false,
+          "sectionAllowed": false,
+          "destination": "/admin/reports?view=piles",
+          "redirectChain": [
+            "/admin/reports?view=piles"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "ASSISTANT",
+          "file": "src/app/(app)/admin/reports/layout.tsx",
+          "line": 4,
+          "href": "/admin/reports",
+          "ability": "reports.read_all",
+          "parentAllowed": false,
+          "sectionAllowed": false,
+          "destination": "/admin/reports",
+          "redirectChain": [
+            "/admin/reports"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "ASSISTANT",
+          "file": "src/app/(app)/admin/settings/layout.tsx",
+          "line": 4,
+          "href": "/admin/settings",
+          "ability": "system.read",
+          "parentAllowed": false,
+          "sectionAllowed": false,
+          "destination": "/admin/settings",
+          "redirectChain": [
+            "/admin/settings"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "ASSISTANT",
+          "file": "src/app/(app)/admin/sites/layout.tsx",
+          "line": 4,
+          "href": "/admin/sites",
+          "ability": "sites.read_all",
+          "parentAllowed": false,
+          "sectionAllowed": false,
+          "destination": "/admin/sites",
+          "redirectChain": [
+            "/admin/sites"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "ASSISTANT",
+          "file": "src/app/(app)/admin/telegram/layout.tsx",
+          "line": 4,
+          "href": "/admin/telegram",
+          "ability": "telegram.manage",
+          "parentAllowed": false,
+          "sectionAllowed": false,
+          "destination": "/admin/telegram",
+          "redirectChain": [
+            "/admin/telegram"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "ASSISTANT",
+          "file": "src/app/(app)/admin/users/layout.tsx",
+          "line": 4,
+          "href": "/admin/users",
+          "ability": "users.manage",
+          "parentAllowed": false,
+          "sectionAllowed": false,
+          "destination": "/admin/users",
+          "redirectChain": [
+            "/admin/users"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "MECHANIC",
+          "file": "src/app/(app)/admin/page.tsx",
+          "line": 7,
+          "href": "/admin",
+          "ability": "analytics.read",
+          "parentAllowed": true,
+          "sectionAllowed": false,
+          "destination": "/admin",
+          "redirectChain": [
+            "/admin"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "MECHANIC",
+          "file": "src/app/(app)/admin/analytics/layout.tsx",
+          "line": 4,
+          "href": "/admin/analytics",
+          "ability": "analytics.read",
+          "parentAllowed": true,
+          "sectionAllowed": false,
+          "destination": "/admin/analytics",
+          "redirectChain": [
+            "/admin/analytics"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "MECHANIC",
+          "file": "src/app/(app)/admin/checklists/layout.tsx",
+          "line": 4,
+          "href": "/admin/checklists",
+          "ability": "inspection.perform",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/checklists",
+          "redirectChain": [
+            "/admin/checklists"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/checklists",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "MECHANIC",
+          "file": "src/app/(app)/admin/crews/layout.tsx",
+          "line": 4,
+          "href": "/admin/crews",
+          "ability": "crews.read",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/crews",
+          "redirectChain": [
+            "/admin/crews"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/crews",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "MECHANIC",
+          "file": "src/app/(app)/admin/dictionaries/layout.tsx",
+          "line": 4,
+          "href": "/admin/dictionaries",
+          "ability": "dictionary.manage",
+          "parentAllowed": true,
+          "sectionAllowed": false,
+          "destination": "/admin/dictionaries",
+          "redirectChain": [
+            "/admin/dictionaries"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "MECHANIC",
+          "file": "src/app/(app)/admin/dlq/layout.tsx",
+          "line": 4,
+          "href": "/admin/dlq",
+          "ability": "dlq.manage",
+          "parentAllowed": true,
+          "sectionAllowed": false,
+          "destination": "/admin/dlq",
+          "redirectChain": [
+            "/admin/dlq"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "MECHANIC",
+          "file": "src/app/(app)/admin/equipment/layout.tsx",
+          "line": 4,
+          "href": "/admin/equipment",
+          "ability": "equipment.read",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/equipment",
+          "redirectChain": [
+            "/admin/equipment"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/equipment",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "MECHANIC",
+          "file": "src/app/(app)/admin/incidents/layout.tsx",
+          "line": 4,
+          "href": "/admin/incidents",
+          "ability": "incidents.read",
+          "parentAllowed": true,
+          "sectionAllowed": false,
+          "destination": "/admin/to?view=incidents",
+          "redirectChain": [
+            "/admin/safety?view=incidents",
+            "/admin/to?view=incidents"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "MECHANIC",
+          "file": "src/app/(app)/admin/maintenance/layout.tsx",
+          "line": 4,
+          "href": "/admin/maintenance",
+          "ability": "maintenance.manage",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/maintenance",
+          "redirectChain": [
+            "/admin/maintenance"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/maintenance",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "MECHANIC",
+          "file": "src/app/(app)/admin/piles/layout.tsx",
+          "line": 4,
+          "href": "/admin/piles",
+          "ability": "piles.manage",
+          "parentAllowed": true,
+          "sectionAllowed": false,
+          "destination": "/admin/reports?view=piles",
+          "redirectChain": [
+            "/admin/reports?view=piles"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "MECHANIC",
+          "file": "src/app/(app)/admin/reports/layout.tsx",
+          "line": 4,
+          "href": "/admin/reports",
+          "ability": "reports.read_all",
+          "parentAllowed": true,
+          "sectionAllowed": false,
+          "destination": "/admin/reports",
+          "redirectChain": [
+            "/admin/reports"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "MECHANIC",
+          "file": "src/app/(app)/admin/settings/layout.tsx",
+          "line": 4,
+          "href": "/admin/settings",
+          "ability": "system.read",
+          "parentAllowed": true,
+          "sectionAllowed": false,
+          "destination": "/admin/settings",
+          "redirectChain": [
+            "/admin/settings"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "MECHANIC",
+          "file": "src/app/(app)/admin/sites/layout.tsx",
+          "line": 4,
+          "href": "/admin/sites",
+          "ability": "sites.read_all",
+          "parentAllowed": true,
+          "sectionAllowed": false,
+          "destination": "/admin/sites",
+          "redirectChain": [
+            "/admin/sites"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "MECHANIC",
+          "file": "src/app/(app)/admin/telegram/layout.tsx",
+          "line": 4,
+          "href": "/admin/telegram",
+          "ability": "telegram.manage",
+          "parentAllowed": true,
+          "sectionAllowed": false,
+          "destination": "/admin/telegram",
+          "redirectChain": [
+            "/admin/telegram"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "MECHANIC",
+          "file": "src/app/(app)/admin/users/layout.tsx",
+          "line": 4,
+          "href": "/admin/users",
+          "ability": "users.manage",
+          "parentAllowed": true,
+          "sectionAllowed": false,
+          "destination": "/admin/users",
+          "redirectChain": [
+            "/admin/users"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "FOREMAN",
+          "file": "src/app/(app)/admin/page.tsx",
+          "line": 7,
+          "href": "/admin",
+          "ability": "analytics.read",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin",
+          "redirectChain": [
+            "/admin"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "FOREMAN",
+          "file": "src/app/(app)/admin/analytics/layout.tsx",
+          "line": 4,
+          "href": "/admin/analytics",
+          "ability": "analytics.read",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/analytics",
+          "redirectChain": [
+            "/admin/analytics"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/analytics",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "FOREMAN",
+          "file": "src/app/(app)/admin/checklists/layout.tsx",
+          "line": 4,
+          "href": "/admin/checklists",
+          "ability": "inspection.perform",
+          "parentAllowed": true,
+          "sectionAllowed": false,
+          "destination": "/admin/checklists",
+          "redirectChain": [
+            "/admin/checklists"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "FOREMAN",
+          "file": "src/app/(app)/admin/crews/layout.tsx",
+          "line": 4,
+          "href": "/admin/crews",
+          "ability": "crews.read",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/crews",
+          "redirectChain": [
+            "/admin/crews"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/crews",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "FOREMAN",
+          "file": "src/app/(app)/admin/dictionaries/layout.tsx",
+          "line": 4,
+          "href": "/admin/dictionaries",
+          "ability": "dictionary.manage",
+          "parentAllowed": true,
+          "sectionAllowed": false,
+          "destination": "/admin/dictionaries",
+          "redirectChain": [
+            "/admin/dictionaries"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "FOREMAN",
+          "file": "src/app/(app)/admin/dlq/layout.tsx",
+          "line": 4,
+          "href": "/admin/dlq",
+          "ability": "dlq.manage",
+          "parentAllowed": true,
+          "sectionAllowed": false,
+          "destination": "/admin/dlq",
+          "redirectChain": [
+            "/admin/dlq"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "FOREMAN",
+          "file": "src/app/(app)/admin/equipment/layout.tsx",
+          "line": 4,
+          "href": "/admin/equipment",
+          "ability": "equipment.read",
+          "parentAllowed": true,
+          "sectionAllowed": false,
+          "destination": "/admin/equipment",
+          "redirectChain": [
+            "/admin/equipment"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "FOREMAN",
+          "file": "src/app/(app)/admin/incidents/layout.tsx",
+          "line": 4,
+          "href": "/admin/incidents",
+          "ability": "incidents.read",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/to?view=incidents",
+          "redirectChain": [
+            "/admin/safety?view=incidents",
+            "/admin/to?view=incidents"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/to",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "FOREMAN",
+          "file": "src/app/(app)/admin/maintenance/layout.tsx",
+          "line": 4,
+          "href": "/admin/maintenance",
+          "ability": "maintenance.manage",
+          "parentAllowed": true,
+          "sectionAllowed": false,
+          "destination": "/admin/maintenance",
+          "redirectChain": [
+            "/admin/maintenance"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "FOREMAN",
+          "file": "src/app/(app)/admin/piles/layout.tsx",
+          "line": 4,
+          "href": "/admin/piles",
+          "ability": "piles.manage",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/reports?view=piles",
+          "redirectChain": [
+            "/admin/reports?view=piles"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/reports",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "FOREMAN",
+          "file": "src/app/(app)/admin/reports/layout.tsx",
+          "line": 4,
+          "href": "/admin/reports",
+          "ability": "reports.read_all",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/reports",
+          "redirectChain": [
+            "/admin/reports"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/reports",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "FOREMAN",
+          "file": "src/app/(app)/admin/settings/layout.tsx",
+          "line": 4,
+          "href": "/admin/settings",
+          "ability": "system.read",
+          "parentAllowed": true,
+          "sectionAllowed": false,
+          "destination": "/admin/settings",
+          "redirectChain": [
+            "/admin/settings"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "FOREMAN",
+          "file": "src/app/(app)/admin/sites/layout.tsx",
+          "line": 4,
+          "href": "/admin/sites",
+          "ability": "sites.read_all",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/sites",
+          "redirectChain": [
+            "/admin/sites"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/sites",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "FOREMAN",
+          "file": "src/app/(app)/admin/telegram/layout.tsx",
+          "line": 4,
+          "href": "/admin/telegram",
+          "ability": "telegram.manage",
+          "parentAllowed": true,
+          "sectionAllowed": false,
+          "destination": "/admin/telegram",
+          "redirectChain": [
+            "/admin/telegram"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "FOREMAN",
+          "file": "src/app/(app)/admin/users/layout.tsx",
+          "line": 4,
+          "href": "/admin/users",
+          "ability": "users.manage",
+          "parentAllowed": true,
+          "sectionAllowed": false,
+          "destination": "/admin/users",
+          "redirectChain": [
+            "/admin/users"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "file": "src/app/(app)/admin/page.tsx",
+          "line": 7,
+          "href": "/admin",
+          "ability": "analytics.read",
+          "parentAllowed": true,
+          "sectionAllowed": false,
+          "destination": "/admin",
+          "redirectChain": [
+            "/admin"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "file": "src/app/(app)/admin/analytics/layout.tsx",
+          "line": 4,
+          "href": "/admin/analytics",
+          "ability": "analytics.read",
+          "parentAllowed": true,
+          "sectionAllowed": false,
+          "destination": "/admin/analytics",
+          "redirectChain": [
+            "/admin/analytics"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "file": "src/app/(app)/admin/checklists/layout.tsx",
+          "line": 4,
+          "href": "/admin/checklists",
+          "ability": "inspection.perform",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/checklists",
+          "redirectChain": [
+            "/admin/checklists"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/checklists",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "file": "src/app/(app)/admin/crews/layout.tsx",
+          "line": 4,
+          "href": "/admin/crews",
+          "ability": "crews.read",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/crews",
+          "redirectChain": [
+            "/admin/crews"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/crews",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "file": "src/app/(app)/admin/dictionaries/layout.tsx",
+          "line": 4,
+          "href": "/admin/dictionaries",
+          "ability": "dictionary.manage",
+          "parentAllowed": true,
+          "sectionAllowed": false,
+          "destination": "/admin/dictionaries",
+          "redirectChain": [
+            "/admin/dictionaries"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "file": "src/app/(app)/admin/dlq/layout.tsx",
+          "line": 4,
+          "href": "/admin/dlq",
+          "ability": "dlq.manage",
+          "parentAllowed": true,
+          "sectionAllowed": false,
+          "destination": "/admin/dlq",
+          "redirectChain": [
+            "/admin/dlq"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "file": "src/app/(app)/admin/equipment/layout.tsx",
+          "line": 4,
+          "href": "/admin/equipment",
+          "ability": "equipment.read",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/equipment",
+          "redirectChain": [
+            "/admin/equipment"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/equipment",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "file": "src/app/(app)/admin/incidents/layout.tsx",
+          "line": 4,
+          "href": "/admin/incidents",
+          "ability": "incidents.read",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/to?view=incidents",
+          "redirectChain": [
+            "/admin/safety?view=incidents",
+            "/admin/to?view=incidents"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/to",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "file": "src/app/(app)/admin/maintenance/layout.tsx",
+          "line": 4,
+          "href": "/admin/maintenance",
+          "ability": "maintenance.manage",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/maintenance",
+          "redirectChain": [
+            "/admin/maintenance"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/maintenance",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "file": "src/app/(app)/admin/piles/layout.tsx",
+          "line": 4,
+          "href": "/admin/piles",
+          "ability": "piles.manage",
+          "parentAllowed": true,
+          "sectionAllowed": false,
+          "destination": "/admin/reports?view=piles",
+          "redirectChain": [
+            "/admin/reports?view=piles"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "file": "src/app/(app)/admin/reports/layout.tsx",
+          "line": 4,
+          "href": "/admin/reports",
+          "ability": "reports.read_all",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/reports",
+          "redirectChain": [
+            "/admin/reports"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/reports",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "file": "src/app/(app)/admin/settings/layout.tsx",
+          "line": 4,
+          "href": "/admin/settings",
+          "ability": "system.read",
+          "parentAllowed": true,
+          "sectionAllowed": false,
+          "destination": "/admin/settings",
+          "redirectChain": [
+            "/admin/settings"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "file": "src/app/(app)/admin/sites/layout.tsx",
+          "line": 4,
+          "href": "/admin/sites",
+          "ability": "sites.read_all",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/sites",
+          "redirectChain": [
+            "/admin/sites"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/sites",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "file": "src/app/(app)/admin/telegram/layout.tsx",
+          "line": 4,
+          "href": "/admin/telegram",
+          "ability": "telegram.manage",
+          "parentAllowed": true,
+          "sectionAllowed": false,
+          "destination": "/admin/telegram",
+          "redirectChain": [
+            "/admin/telegram"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "file": "src/app/(app)/admin/users/layout.tsx",
+          "line": 4,
+          "href": "/admin/users",
+          "ability": "users.manage",
+          "parentAllowed": true,
+          "sectionAllowed": false,
+          "destination": "/admin/users",
+          "redirectChain": [
+            "/admin/users"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "Mobile Safari",
+      "status": "passed",
+      "guards": [
+        {
+          "file": "src/app/(app)/admin/page.tsx",
+          "line": 7,
+          "href": "/admin",
+          "ability": "analytics.read"
+        },
+        {
+          "file": "src/app/(app)/admin/analytics/layout.tsx",
+          "line": 4,
+          "href": "/admin/analytics",
+          "ability": "analytics.read"
+        },
+        {
+          "file": "src/app/(app)/admin/checklists/layout.tsx",
+          "line": 4,
+          "href": "/admin/checklists",
+          "ability": "inspection.perform"
+        },
+        {
+          "file": "src/app/(app)/admin/crews/layout.tsx",
+          "line": 4,
+          "href": "/admin/crews",
+          "ability": "crews.read"
+        },
+        {
+          "file": "src/app/(app)/admin/dictionaries/layout.tsx",
+          "line": 4,
+          "href": "/admin/dictionaries",
+          "ability": "dictionary.manage"
+        },
+        {
+          "file": "src/app/(app)/admin/dlq/layout.tsx",
+          "line": 4,
+          "href": "/admin/dlq",
+          "ability": "dlq.manage"
+        },
+        {
+          "file": "src/app/(app)/admin/equipment/layout.tsx",
+          "line": 4,
+          "href": "/admin/equipment",
+          "ability": "equipment.read"
+        },
+        {
+          "file": "src/app/(app)/admin/incidents/layout.tsx",
+          "line": 4,
+          "href": "/admin/incidents",
+          "ability": "incidents.read"
+        },
+        {
+          "file": "src/app/(app)/admin/maintenance/layout.tsx",
+          "line": 4,
+          "href": "/admin/maintenance",
+          "ability": "maintenance.manage"
+        },
+        {
+          "file": "src/app/(app)/admin/piles/layout.tsx",
+          "line": 4,
+          "href": "/admin/piles",
+          "ability": "piles.manage"
+        },
+        {
+          "file": "src/app/(app)/admin/reports/layout.tsx",
+          "line": 4,
+          "href": "/admin/reports",
+          "ability": "reports.read_all"
+        },
+        {
+          "file": "src/app/(app)/admin/settings/layout.tsx",
+          "line": 4,
+          "href": "/admin/settings",
+          "ability": "system.read"
+        },
+        {
+          "file": "src/app/(app)/admin/sites/layout.tsx",
+          "line": 4,
+          "href": "/admin/sites",
+          "ability": "sites.read_all"
+        },
+        {
+          "file": "src/app/(app)/admin/telegram/layout.tsx",
+          "line": 4,
+          "href": "/admin/telegram",
+          "ability": "telegram.manage"
+        },
+        {
+          "file": "src/app/(app)/admin/users/layout.tsx",
+          "line": 4,
+          "href": "/admin/users",
+          "ability": "users.manage"
+        }
+      ],
+      "rows": [
+        {
+          "role": "ADMIN",
+          "file": "src/app/(app)/admin/page.tsx",
+          "line": 7,
+          "href": "/admin",
+          "ability": "analytics.read",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin",
+          "redirectChain": [
+            "/admin"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "ADMIN",
+          "file": "src/app/(app)/admin/analytics/layout.tsx",
+          "line": 4,
+          "href": "/admin/analytics",
+          "ability": "analytics.read",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/analytics",
+          "redirectChain": [
+            "/admin/analytics"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/analytics",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "ADMIN",
+          "file": "src/app/(app)/admin/checklists/layout.tsx",
+          "line": 4,
+          "href": "/admin/checklists",
+          "ability": "inspection.perform",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/checklists",
+          "redirectChain": [
+            "/admin/checklists"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/checklists",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "ADMIN",
+          "file": "src/app/(app)/admin/crews/layout.tsx",
+          "line": 4,
+          "href": "/admin/crews",
+          "ability": "crews.read",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/crews",
+          "redirectChain": [
+            "/admin/crews"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/crews",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "ADMIN",
+          "file": "src/app/(app)/admin/dictionaries/layout.tsx",
+          "line": 4,
+          "href": "/admin/dictionaries",
+          "ability": "dictionary.manage",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/dictionaries",
+          "redirectChain": [
+            "/admin/dictionaries"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/dictionaries",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "ADMIN",
+          "file": "src/app/(app)/admin/dlq/layout.tsx",
+          "line": 4,
+          "href": "/admin/dlq",
+          "ability": "dlq.manage",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/dlq",
+          "redirectChain": [
+            "/admin/dlq"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/dlq",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "ADMIN",
+          "file": "src/app/(app)/admin/equipment/layout.tsx",
+          "line": 4,
+          "href": "/admin/equipment",
+          "ability": "equipment.read",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/equipment",
+          "redirectChain": [
+            "/admin/equipment"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/equipment",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "ADMIN",
+          "file": "src/app/(app)/admin/incidents/layout.tsx",
+          "line": 4,
+          "href": "/admin/incidents",
+          "ability": "incidents.read",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/to?view=incidents",
+          "redirectChain": [
+            "/admin/safety?view=incidents",
+            "/admin/to?view=incidents"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/to",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "ADMIN",
+          "file": "src/app/(app)/admin/maintenance/layout.tsx",
+          "line": 4,
+          "href": "/admin/maintenance",
+          "ability": "maintenance.manage",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/maintenance",
+          "redirectChain": [
+            "/admin/maintenance"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/maintenance",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "ADMIN",
+          "file": "src/app/(app)/admin/piles/layout.tsx",
+          "line": 4,
+          "href": "/admin/piles",
+          "ability": "piles.manage",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/reports?view=piles",
+          "redirectChain": [
+            "/admin/reports?view=piles"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/reports",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "ADMIN",
+          "file": "src/app/(app)/admin/reports/layout.tsx",
+          "line": 4,
+          "href": "/admin/reports",
+          "ability": "reports.read_all",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/reports",
+          "redirectChain": [
+            "/admin/reports"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/reports",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "ADMIN",
+          "file": "src/app/(app)/admin/settings/layout.tsx",
+          "line": 4,
+          "href": "/admin/settings",
+          "ability": "system.read",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/settings",
+          "redirectChain": [
+            "/admin/settings"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/settings",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "ADMIN",
+          "file": "src/app/(app)/admin/sites/layout.tsx",
+          "line": 4,
+          "href": "/admin/sites",
+          "ability": "sites.read_all",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/sites",
+          "redirectChain": [
+            "/admin/sites"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/sites",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "ADMIN",
+          "file": "src/app/(app)/admin/telegram/layout.tsx",
+          "line": 4,
+          "href": "/admin/telegram",
+          "ability": "telegram.manage",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/telegram",
+          "redirectChain": [
+            "/admin/telegram"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/telegram",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "ADMIN",
+          "file": "src/app/(app)/admin/users/layout.tsx",
+          "line": 4,
+          "href": "/admin/users",
+          "ability": "users.manage",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/users",
+          "redirectChain": [
+            "/admin/users"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/users",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "DISPATCHER",
+          "file": "src/app/(app)/admin/page.tsx",
+          "line": 7,
+          "href": "/admin",
+          "ability": "analytics.read",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin",
+          "redirectChain": [
+            "/admin"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "DISPATCHER",
+          "file": "src/app/(app)/admin/analytics/layout.tsx",
+          "line": 4,
+          "href": "/admin/analytics",
+          "ability": "analytics.read",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/analytics",
+          "redirectChain": [
+            "/admin/analytics"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/analytics",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "DISPATCHER",
+          "file": "src/app/(app)/admin/checklists/layout.tsx",
+          "line": 4,
+          "href": "/admin/checklists",
+          "ability": "inspection.perform",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/checklists",
+          "redirectChain": [
+            "/admin/checklists"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/checklists",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "DISPATCHER",
+          "file": "src/app/(app)/admin/crews/layout.tsx",
+          "line": 4,
+          "href": "/admin/crews",
+          "ability": "crews.read",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/crews",
+          "redirectChain": [
+            "/admin/crews"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/crews",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "DISPATCHER",
+          "file": "src/app/(app)/admin/dictionaries/layout.tsx",
+          "line": 4,
+          "href": "/admin/dictionaries",
+          "ability": "dictionary.manage",
+          "parentAllowed": true,
+          "sectionAllowed": false,
+          "destination": "/admin/dictionaries",
+          "redirectChain": [
+            "/admin/dictionaries"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "DISPATCHER",
+          "file": "src/app/(app)/admin/dlq/layout.tsx",
+          "line": 4,
+          "href": "/admin/dlq",
+          "ability": "dlq.manage",
+          "parentAllowed": true,
+          "sectionAllowed": false,
+          "destination": "/admin/dlq",
+          "redirectChain": [
+            "/admin/dlq"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "DISPATCHER",
+          "file": "src/app/(app)/admin/equipment/layout.tsx",
+          "line": 4,
+          "href": "/admin/equipment",
+          "ability": "equipment.read",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/equipment",
+          "redirectChain": [
+            "/admin/equipment"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/equipment",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "DISPATCHER",
+          "file": "src/app/(app)/admin/incidents/layout.tsx",
+          "line": 4,
+          "href": "/admin/incidents",
+          "ability": "incidents.read",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/to?view=incidents",
+          "redirectChain": [
+            "/admin/safety?view=incidents",
+            "/admin/to?view=incidents"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/to",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "DISPATCHER",
+          "file": "src/app/(app)/admin/maintenance/layout.tsx",
+          "line": 4,
+          "href": "/admin/maintenance",
+          "ability": "maintenance.manage",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/maintenance",
+          "redirectChain": [
+            "/admin/maintenance"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/maintenance",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "DISPATCHER",
+          "file": "src/app/(app)/admin/piles/layout.tsx",
+          "line": 4,
+          "href": "/admin/piles",
+          "ability": "piles.manage",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/reports?view=piles",
+          "redirectChain": [
+            "/admin/reports?view=piles"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/reports",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "DISPATCHER",
+          "file": "src/app/(app)/admin/reports/layout.tsx",
+          "line": 4,
+          "href": "/admin/reports",
+          "ability": "reports.read_all",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/reports",
+          "redirectChain": [
+            "/admin/reports"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/reports",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "DISPATCHER",
+          "file": "src/app/(app)/admin/settings/layout.tsx",
+          "line": 4,
+          "href": "/admin/settings",
+          "ability": "system.read",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/settings",
+          "redirectChain": [
+            "/admin/settings"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/settings",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "DISPATCHER",
+          "file": "src/app/(app)/admin/sites/layout.tsx",
+          "line": 4,
+          "href": "/admin/sites",
+          "ability": "sites.read_all",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/sites",
+          "redirectChain": [
+            "/admin/sites"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/sites",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "DISPATCHER",
+          "file": "src/app/(app)/admin/telegram/layout.tsx",
+          "line": 4,
+          "href": "/admin/telegram",
+          "ability": "telegram.manage",
+          "parentAllowed": true,
+          "sectionAllowed": false,
+          "destination": "/admin/telegram",
+          "redirectChain": [
+            "/admin/telegram"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "DISPATCHER",
+          "file": "src/app/(app)/admin/users/layout.tsx",
+          "line": 4,
+          "href": "/admin/users",
+          "ability": "users.manage",
+          "parentAllowed": true,
+          "sectionAllowed": false,
+          "destination": "/admin/users",
+          "redirectChain": [
+            "/admin/users"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "OPERATOR",
+          "file": "src/app/(app)/admin/page.tsx",
+          "line": 7,
+          "href": "/admin",
+          "ability": "analytics.read",
+          "parentAllowed": false,
+          "sectionAllowed": false,
+          "destination": "/admin",
+          "redirectChain": [
+            "/admin"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "OPERATOR",
+          "file": "src/app/(app)/admin/analytics/layout.tsx",
+          "line": 4,
+          "href": "/admin/analytics",
+          "ability": "analytics.read",
+          "parentAllowed": false,
+          "sectionAllowed": false,
+          "destination": "/admin/analytics",
+          "redirectChain": [
+            "/admin/analytics"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "OPERATOR",
+          "file": "src/app/(app)/admin/checklists/layout.tsx",
+          "line": 4,
+          "href": "/admin/checklists",
+          "ability": "inspection.perform",
+          "parentAllowed": false,
+          "sectionAllowed": true,
+          "destination": "/admin/checklists",
+          "redirectChain": [
+            "/admin/checklists"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "OPERATOR",
+          "file": "src/app/(app)/admin/crews/layout.tsx",
+          "line": 4,
+          "href": "/admin/crews",
+          "ability": "crews.read",
+          "parentAllowed": false,
+          "sectionAllowed": false,
+          "destination": "/admin/crews",
+          "redirectChain": [
+            "/admin/crews"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "OPERATOR",
+          "file": "src/app/(app)/admin/dictionaries/layout.tsx",
+          "line": 4,
+          "href": "/admin/dictionaries",
+          "ability": "dictionary.manage",
+          "parentAllowed": false,
+          "sectionAllowed": false,
+          "destination": "/admin/dictionaries",
+          "redirectChain": [
+            "/admin/dictionaries"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "OPERATOR",
+          "file": "src/app/(app)/admin/dlq/layout.tsx",
+          "line": 4,
+          "href": "/admin/dlq",
+          "ability": "dlq.manage",
+          "parentAllowed": false,
+          "sectionAllowed": false,
+          "destination": "/admin/dlq",
+          "redirectChain": [
+            "/admin/dlq"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "OPERATOR",
+          "file": "src/app/(app)/admin/equipment/layout.tsx",
+          "line": 4,
+          "href": "/admin/equipment",
+          "ability": "equipment.read",
+          "parentAllowed": false,
+          "sectionAllowed": false,
+          "destination": "/admin/equipment",
+          "redirectChain": [
+            "/admin/equipment"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "OPERATOR",
+          "file": "src/app/(app)/admin/incidents/layout.tsx",
+          "line": 4,
+          "href": "/admin/incidents",
+          "ability": "incidents.read",
+          "parentAllowed": false,
+          "sectionAllowed": false,
+          "destination": "/admin/to?view=incidents",
+          "redirectChain": [
+            "/admin/safety?view=incidents",
+            "/admin/to?view=incidents"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "OPERATOR",
+          "file": "src/app/(app)/admin/maintenance/layout.tsx",
+          "line": 4,
+          "href": "/admin/maintenance",
+          "ability": "maintenance.manage",
+          "parentAllowed": false,
+          "sectionAllowed": false,
+          "destination": "/admin/maintenance",
+          "redirectChain": [
+            "/admin/maintenance"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "OPERATOR",
+          "file": "src/app/(app)/admin/piles/layout.tsx",
+          "line": 4,
+          "href": "/admin/piles",
+          "ability": "piles.manage",
+          "parentAllowed": false,
+          "sectionAllowed": false,
+          "destination": "/admin/reports?view=piles",
+          "redirectChain": [
+            "/admin/reports?view=piles"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "OPERATOR",
+          "file": "src/app/(app)/admin/reports/layout.tsx",
+          "line": 4,
+          "href": "/admin/reports",
+          "ability": "reports.read_all",
+          "parentAllowed": false,
+          "sectionAllowed": false,
+          "destination": "/admin/reports",
+          "redirectChain": [
+            "/admin/reports"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "OPERATOR",
+          "file": "src/app/(app)/admin/settings/layout.tsx",
+          "line": 4,
+          "href": "/admin/settings",
+          "ability": "system.read",
+          "parentAllowed": false,
+          "sectionAllowed": false,
+          "destination": "/admin/settings",
+          "redirectChain": [
+            "/admin/settings"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "OPERATOR",
+          "file": "src/app/(app)/admin/sites/layout.tsx",
+          "line": 4,
+          "href": "/admin/sites",
+          "ability": "sites.read_all",
+          "parentAllowed": false,
+          "sectionAllowed": false,
+          "destination": "/admin/sites",
+          "redirectChain": [
+            "/admin/sites"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "OPERATOR",
+          "file": "src/app/(app)/admin/telegram/layout.tsx",
+          "line": 4,
+          "href": "/admin/telegram",
+          "ability": "telegram.manage",
+          "parentAllowed": false,
+          "sectionAllowed": false,
+          "destination": "/admin/telegram",
+          "redirectChain": [
+            "/admin/telegram"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "OPERATOR",
+          "file": "src/app/(app)/admin/users/layout.tsx",
+          "line": 4,
+          "href": "/admin/users",
+          "ability": "users.manage",
+          "parentAllowed": false,
+          "sectionAllowed": false,
+          "destination": "/admin/users",
+          "redirectChain": [
+            "/admin/users"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "ASSISTANT",
+          "file": "src/app/(app)/admin/page.tsx",
+          "line": 7,
+          "href": "/admin",
+          "ability": "analytics.read",
+          "parentAllowed": false,
+          "sectionAllowed": false,
+          "destination": "/admin",
+          "redirectChain": [
+            "/admin"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "ASSISTANT",
+          "file": "src/app/(app)/admin/analytics/layout.tsx",
+          "line": 4,
+          "href": "/admin/analytics",
+          "ability": "analytics.read",
+          "parentAllowed": false,
+          "sectionAllowed": false,
+          "destination": "/admin/analytics",
+          "redirectChain": [
+            "/admin/analytics"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "ASSISTANT",
+          "file": "src/app/(app)/admin/checklists/layout.tsx",
+          "line": 4,
+          "href": "/admin/checklists",
+          "ability": "inspection.perform",
+          "parentAllowed": false,
+          "sectionAllowed": false,
+          "destination": "/admin/checklists",
+          "redirectChain": [
+            "/admin/checklists"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "ASSISTANT",
+          "file": "src/app/(app)/admin/crews/layout.tsx",
+          "line": 4,
+          "href": "/admin/crews",
+          "ability": "crews.read",
+          "parentAllowed": false,
+          "sectionAllowed": false,
+          "destination": "/admin/crews",
+          "redirectChain": [
+            "/admin/crews"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "ASSISTANT",
+          "file": "src/app/(app)/admin/dictionaries/layout.tsx",
+          "line": 4,
+          "href": "/admin/dictionaries",
+          "ability": "dictionary.manage",
+          "parentAllowed": false,
+          "sectionAllowed": false,
+          "destination": "/admin/dictionaries",
+          "redirectChain": [
+            "/admin/dictionaries"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "ASSISTANT",
+          "file": "src/app/(app)/admin/dlq/layout.tsx",
+          "line": 4,
+          "href": "/admin/dlq",
+          "ability": "dlq.manage",
+          "parentAllowed": false,
+          "sectionAllowed": false,
+          "destination": "/admin/dlq",
+          "redirectChain": [
+            "/admin/dlq"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "ASSISTANT",
+          "file": "src/app/(app)/admin/equipment/layout.tsx",
+          "line": 4,
+          "href": "/admin/equipment",
+          "ability": "equipment.read",
+          "parentAllowed": false,
+          "sectionAllowed": false,
+          "destination": "/admin/equipment",
+          "redirectChain": [
+            "/admin/equipment"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "ASSISTANT",
+          "file": "src/app/(app)/admin/incidents/layout.tsx",
+          "line": 4,
+          "href": "/admin/incidents",
+          "ability": "incidents.read",
+          "parentAllowed": false,
+          "sectionAllowed": false,
+          "destination": "/admin/to?view=incidents",
+          "redirectChain": [
+            "/admin/safety?view=incidents",
+            "/admin/to?view=incidents"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "ASSISTANT",
+          "file": "src/app/(app)/admin/maintenance/layout.tsx",
+          "line": 4,
+          "href": "/admin/maintenance",
+          "ability": "maintenance.manage",
+          "parentAllowed": false,
+          "sectionAllowed": false,
+          "destination": "/admin/maintenance",
+          "redirectChain": [
+            "/admin/maintenance"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "ASSISTANT",
+          "file": "src/app/(app)/admin/piles/layout.tsx",
+          "line": 4,
+          "href": "/admin/piles",
+          "ability": "piles.manage",
+          "parentAllowed": false,
+          "sectionAllowed": false,
+          "destination": "/admin/reports?view=piles",
+          "redirectChain": [
+            "/admin/reports?view=piles"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "ASSISTANT",
+          "file": "src/app/(app)/admin/reports/layout.tsx",
+          "line": 4,
+          "href": "/admin/reports",
+          "ability": "reports.read_all",
+          "parentAllowed": false,
+          "sectionAllowed": false,
+          "destination": "/admin/reports",
+          "redirectChain": [
+            "/admin/reports"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "ASSISTANT",
+          "file": "src/app/(app)/admin/settings/layout.tsx",
+          "line": 4,
+          "href": "/admin/settings",
+          "ability": "system.read",
+          "parentAllowed": false,
+          "sectionAllowed": false,
+          "destination": "/admin/settings",
+          "redirectChain": [
+            "/admin/settings"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "ASSISTANT",
+          "file": "src/app/(app)/admin/sites/layout.tsx",
+          "line": 4,
+          "href": "/admin/sites",
+          "ability": "sites.read_all",
+          "parentAllowed": false,
+          "sectionAllowed": false,
+          "destination": "/admin/sites",
+          "redirectChain": [
+            "/admin/sites"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "ASSISTANT",
+          "file": "src/app/(app)/admin/telegram/layout.tsx",
+          "line": 4,
+          "href": "/admin/telegram",
+          "ability": "telegram.manage",
+          "parentAllowed": false,
+          "sectionAllowed": false,
+          "destination": "/admin/telegram",
+          "redirectChain": [
+            "/admin/telegram"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "ASSISTANT",
+          "file": "src/app/(app)/admin/users/layout.tsx",
+          "line": 4,
+          "href": "/admin/users",
+          "ability": "users.manage",
+          "parentAllowed": false,
+          "sectionAllowed": false,
+          "destination": "/admin/users",
+          "redirectChain": [
+            "/admin/users"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "MECHANIC",
+          "file": "src/app/(app)/admin/page.tsx",
+          "line": 7,
+          "href": "/admin",
+          "ability": "analytics.read",
+          "parentAllowed": true,
+          "sectionAllowed": false,
+          "destination": "/admin",
+          "redirectChain": [
+            "/admin"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "MECHANIC",
+          "file": "src/app/(app)/admin/analytics/layout.tsx",
+          "line": 4,
+          "href": "/admin/analytics",
+          "ability": "analytics.read",
+          "parentAllowed": true,
+          "sectionAllowed": false,
+          "destination": "/admin/analytics",
+          "redirectChain": [
+            "/admin/analytics"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "MECHANIC",
+          "file": "src/app/(app)/admin/checklists/layout.tsx",
+          "line": 4,
+          "href": "/admin/checklists",
+          "ability": "inspection.perform",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/checklists",
+          "redirectChain": [
+            "/admin/checklists"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/checklists",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "MECHANIC",
+          "file": "src/app/(app)/admin/crews/layout.tsx",
+          "line": 4,
+          "href": "/admin/crews",
+          "ability": "crews.read",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/crews",
+          "redirectChain": [
+            "/admin/crews"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/crews",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "MECHANIC",
+          "file": "src/app/(app)/admin/dictionaries/layout.tsx",
+          "line": 4,
+          "href": "/admin/dictionaries",
+          "ability": "dictionary.manage",
+          "parentAllowed": true,
+          "sectionAllowed": false,
+          "destination": "/admin/dictionaries",
+          "redirectChain": [
+            "/admin/dictionaries"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "MECHANIC",
+          "file": "src/app/(app)/admin/dlq/layout.tsx",
+          "line": 4,
+          "href": "/admin/dlq",
+          "ability": "dlq.manage",
+          "parentAllowed": true,
+          "sectionAllowed": false,
+          "destination": "/admin/dlq",
+          "redirectChain": [
+            "/admin/dlq"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "MECHANIC",
+          "file": "src/app/(app)/admin/equipment/layout.tsx",
+          "line": 4,
+          "href": "/admin/equipment",
+          "ability": "equipment.read",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/equipment",
+          "redirectChain": [
+            "/admin/equipment"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/equipment",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "MECHANIC",
+          "file": "src/app/(app)/admin/incidents/layout.tsx",
+          "line": 4,
+          "href": "/admin/incidents",
+          "ability": "incidents.read",
+          "parentAllowed": true,
+          "sectionAllowed": false,
+          "destination": "/admin/to?view=incidents",
+          "redirectChain": [
+            "/admin/safety?view=incidents",
+            "/admin/to?view=incidents"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "MECHANIC",
+          "file": "src/app/(app)/admin/maintenance/layout.tsx",
+          "line": 4,
+          "href": "/admin/maintenance",
+          "ability": "maintenance.manage",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/maintenance",
+          "redirectChain": [
+            "/admin/maintenance"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/maintenance",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "MECHANIC",
+          "file": "src/app/(app)/admin/piles/layout.tsx",
+          "line": 4,
+          "href": "/admin/piles",
+          "ability": "piles.manage",
+          "parentAllowed": true,
+          "sectionAllowed": false,
+          "destination": "/admin/reports?view=piles",
+          "redirectChain": [
+            "/admin/reports?view=piles"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "MECHANIC",
+          "file": "src/app/(app)/admin/reports/layout.tsx",
+          "line": 4,
+          "href": "/admin/reports",
+          "ability": "reports.read_all",
+          "parentAllowed": true,
+          "sectionAllowed": false,
+          "destination": "/admin/reports",
+          "redirectChain": [
+            "/admin/reports"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "MECHANIC",
+          "file": "src/app/(app)/admin/settings/layout.tsx",
+          "line": 4,
+          "href": "/admin/settings",
+          "ability": "system.read",
+          "parentAllowed": true,
+          "sectionAllowed": false,
+          "destination": "/admin/settings",
+          "redirectChain": [
+            "/admin/settings"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "MECHANIC",
+          "file": "src/app/(app)/admin/sites/layout.tsx",
+          "line": 4,
+          "href": "/admin/sites",
+          "ability": "sites.read_all",
+          "parentAllowed": true,
+          "sectionAllowed": false,
+          "destination": "/admin/sites",
+          "redirectChain": [
+            "/admin/sites"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "MECHANIC",
+          "file": "src/app/(app)/admin/telegram/layout.tsx",
+          "line": 4,
+          "href": "/admin/telegram",
+          "ability": "telegram.manage",
+          "parentAllowed": true,
+          "sectionAllowed": false,
+          "destination": "/admin/telegram",
+          "redirectChain": [
+            "/admin/telegram"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "MECHANIC",
+          "file": "src/app/(app)/admin/users/layout.tsx",
+          "line": 4,
+          "href": "/admin/users",
+          "ability": "users.manage",
+          "parentAllowed": true,
+          "sectionAllowed": false,
+          "destination": "/admin/users",
+          "redirectChain": [
+            "/admin/users"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "FOREMAN",
+          "file": "src/app/(app)/admin/page.tsx",
+          "line": 7,
+          "href": "/admin",
+          "ability": "analytics.read",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin",
+          "redirectChain": [
+            "/admin"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "FOREMAN",
+          "file": "src/app/(app)/admin/analytics/layout.tsx",
+          "line": 4,
+          "href": "/admin/analytics",
+          "ability": "analytics.read",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/analytics",
+          "redirectChain": [
+            "/admin/analytics"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/analytics",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "FOREMAN",
+          "file": "src/app/(app)/admin/checklists/layout.tsx",
+          "line": 4,
+          "href": "/admin/checklists",
+          "ability": "inspection.perform",
+          "parentAllowed": true,
+          "sectionAllowed": false,
+          "destination": "/admin/checklists",
+          "redirectChain": [
+            "/admin/checklists"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "FOREMAN",
+          "file": "src/app/(app)/admin/crews/layout.tsx",
+          "line": 4,
+          "href": "/admin/crews",
+          "ability": "crews.read",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/crews",
+          "redirectChain": [
+            "/admin/crews"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/crews",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "FOREMAN",
+          "file": "src/app/(app)/admin/dictionaries/layout.tsx",
+          "line": 4,
+          "href": "/admin/dictionaries",
+          "ability": "dictionary.manage",
+          "parentAllowed": true,
+          "sectionAllowed": false,
+          "destination": "/admin/dictionaries",
+          "redirectChain": [
+            "/admin/dictionaries"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "FOREMAN",
+          "file": "src/app/(app)/admin/dlq/layout.tsx",
+          "line": 4,
+          "href": "/admin/dlq",
+          "ability": "dlq.manage",
+          "parentAllowed": true,
+          "sectionAllowed": false,
+          "destination": "/admin/dlq",
+          "redirectChain": [
+            "/admin/dlq"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "FOREMAN",
+          "file": "src/app/(app)/admin/equipment/layout.tsx",
+          "line": 4,
+          "href": "/admin/equipment",
+          "ability": "equipment.read",
+          "parentAllowed": true,
+          "sectionAllowed": false,
+          "destination": "/admin/equipment",
+          "redirectChain": [
+            "/admin/equipment"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "FOREMAN",
+          "file": "src/app/(app)/admin/incidents/layout.tsx",
+          "line": 4,
+          "href": "/admin/incidents",
+          "ability": "incidents.read",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/to?view=incidents",
+          "redirectChain": [
+            "/admin/safety?view=incidents",
+            "/admin/to?view=incidents"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/to",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "FOREMAN",
+          "file": "src/app/(app)/admin/maintenance/layout.tsx",
+          "line": 4,
+          "href": "/admin/maintenance",
+          "ability": "maintenance.manage",
+          "parentAllowed": true,
+          "sectionAllowed": false,
+          "destination": "/admin/maintenance",
+          "redirectChain": [
+            "/admin/maintenance"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "FOREMAN",
+          "file": "src/app/(app)/admin/piles/layout.tsx",
+          "line": 4,
+          "href": "/admin/piles",
+          "ability": "piles.manage",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/reports?view=piles",
+          "redirectChain": [
+            "/admin/reports?view=piles"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/reports",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "FOREMAN",
+          "file": "src/app/(app)/admin/reports/layout.tsx",
+          "line": 4,
+          "href": "/admin/reports",
+          "ability": "reports.read_all",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/reports",
+          "redirectChain": [
+            "/admin/reports"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/reports",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "FOREMAN",
+          "file": "src/app/(app)/admin/settings/layout.tsx",
+          "line": 4,
+          "href": "/admin/settings",
+          "ability": "system.read",
+          "parentAllowed": true,
+          "sectionAllowed": false,
+          "destination": "/admin/settings",
+          "redirectChain": [
+            "/admin/settings"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "FOREMAN",
+          "file": "src/app/(app)/admin/sites/layout.tsx",
+          "line": 4,
+          "href": "/admin/sites",
+          "ability": "sites.read_all",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/sites",
+          "redirectChain": [
+            "/admin/sites"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/sites",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "FOREMAN",
+          "file": "src/app/(app)/admin/telegram/layout.tsx",
+          "line": 4,
+          "href": "/admin/telegram",
+          "ability": "telegram.manage",
+          "parentAllowed": true,
+          "sectionAllowed": false,
+          "destination": "/admin/telegram",
+          "redirectChain": [
+            "/admin/telegram"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "FOREMAN",
+          "file": "src/app/(app)/admin/users/layout.tsx",
+          "line": 4,
+          "href": "/admin/users",
+          "ability": "users.manage",
+          "parentAllowed": true,
+          "sectionAllowed": false,
+          "destination": "/admin/users",
+          "redirectChain": [
+            "/admin/users"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "file": "src/app/(app)/admin/page.tsx",
+          "line": 7,
+          "href": "/admin",
+          "ability": "analytics.read",
+          "parentAllowed": true,
+          "sectionAllowed": false,
+          "destination": "/admin",
+          "redirectChain": [
+            "/admin"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "file": "src/app/(app)/admin/analytics/layout.tsx",
+          "line": 4,
+          "href": "/admin/analytics",
+          "ability": "analytics.read",
+          "parentAllowed": true,
+          "sectionAllowed": false,
+          "destination": "/admin/analytics",
+          "redirectChain": [
+            "/admin/analytics"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "file": "src/app/(app)/admin/checklists/layout.tsx",
+          "line": 4,
+          "href": "/admin/checklists",
+          "ability": "inspection.perform",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/checklists",
+          "redirectChain": [
+            "/admin/checklists"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/checklists",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "file": "src/app/(app)/admin/crews/layout.tsx",
+          "line": 4,
+          "href": "/admin/crews",
+          "ability": "crews.read",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/crews",
+          "redirectChain": [
+            "/admin/crews"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/crews",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "file": "src/app/(app)/admin/dictionaries/layout.tsx",
+          "line": 4,
+          "href": "/admin/dictionaries",
+          "ability": "dictionary.manage",
+          "parentAllowed": true,
+          "sectionAllowed": false,
+          "destination": "/admin/dictionaries",
+          "redirectChain": [
+            "/admin/dictionaries"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "file": "src/app/(app)/admin/dlq/layout.tsx",
+          "line": 4,
+          "href": "/admin/dlq",
+          "ability": "dlq.manage",
+          "parentAllowed": true,
+          "sectionAllowed": false,
+          "destination": "/admin/dlq",
+          "redirectChain": [
+            "/admin/dlq"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "file": "src/app/(app)/admin/equipment/layout.tsx",
+          "line": 4,
+          "href": "/admin/equipment",
+          "ability": "equipment.read",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/equipment",
+          "redirectChain": [
+            "/admin/equipment"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/equipment",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "file": "src/app/(app)/admin/incidents/layout.tsx",
+          "line": 4,
+          "href": "/admin/incidents",
+          "ability": "incidents.read",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/to?view=incidents",
+          "redirectChain": [
+            "/admin/safety?view=incidents",
+            "/admin/to?view=incidents"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/to",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "file": "src/app/(app)/admin/maintenance/layout.tsx",
+          "line": 4,
+          "href": "/admin/maintenance",
+          "ability": "maintenance.manage",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/maintenance",
+          "redirectChain": [
+            "/admin/maintenance"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/maintenance",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "file": "src/app/(app)/admin/piles/layout.tsx",
+          "line": 4,
+          "href": "/admin/piles",
+          "ability": "piles.manage",
+          "parentAllowed": true,
+          "sectionAllowed": false,
+          "destination": "/admin/reports?view=piles",
+          "redirectChain": [
+            "/admin/reports?view=piles"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "file": "src/app/(app)/admin/reports/layout.tsx",
+          "line": 4,
+          "href": "/admin/reports",
+          "ability": "reports.read_all",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/reports",
+          "redirectChain": [
+            "/admin/reports"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/reports",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "file": "src/app/(app)/admin/settings/layout.tsx",
+          "line": 4,
+          "href": "/admin/settings",
+          "ability": "system.read",
+          "parentAllowed": true,
+          "sectionAllowed": false,
+          "destination": "/admin/settings",
+          "redirectChain": [
+            "/admin/settings"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "file": "src/app/(app)/admin/sites/layout.tsx",
+          "line": 4,
+          "href": "/admin/sites",
+          "ability": "sites.read_all",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/sites",
+          "redirectChain": [
+            "/admin/sites"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/sites",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "file": "src/app/(app)/admin/telegram/layout.tsx",
+          "line": 4,
+          "href": "/admin/telegram",
+          "ability": "telegram.manage",
+          "parentAllowed": true,
+          "sectionAllowed": false,
+          "destination": "/admin/telegram",
+          "redirectChain": [
+            "/admin/telegram"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "file": "src/app/(app)/admin/users/layout.tsx",
+          "line": 4,
+          "href": "/admin/users",
+          "ability": "users.manage",
+          "parentAllowed": true,
+          "sectionAllowed": false,
+          "destination": "/admin/users",
+          "redirectChain": [
+            "/admin/users"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "Mobile Chrome",
+      "status": "passed",
+      "guards": [
+        {
+          "file": "src/app/(app)/admin/page.tsx",
+          "line": 7,
+          "href": "/admin",
+          "ability": "analytics.read"
+        },
+        {
+          "file": "src/app/(app)/admin/analytics/layout.tsx",
+          "line": 4,
+          "href": "/admin/analytics",
+          "ability": "analytics.read"
+        },
+        {
+          "file": "src/app/(app)/admin/checklists/layout.tsx",
+          "line": 4,
+          "href": "/admin/checklists",
+          "ability": "inspection.perform"
+        },
+        {
+          "file": "src/app/(app)/admin/crews/layout.tsx",
+          "line": 4,
+          "href": "/admin/crews",
+          "ability": "crews.read"
+        },
+        {
+          "file": "src/app/(app)/admin/dictionaries/layout.tsx",
+          "line": 4,
+          "href": "/admin/dictionaries",
+          "ability": "dictionary.manage"
+        },
+        {
+          "file": "src/app/(app)/admin/dlq/layout.tsx",
+          "line": 4,
+          "href": "/admin/dlq",
+          "ability": "dlq.manage"
+        },
+        {
+          "file": "src/app/(app)/admin/equipment/layout.tsx",
+          "line": 4,
+          "href": "/admin/equipment",
+          "ability": "equipment.read"
+        },
+        {
+          "file": "src/app/(app)/admin/incidents/layout.tsx",
+          "line": 4,
+          "href": "/admin/incidents",
+          "ability": "incidents.read"
+        },
+        {
+          "file": "src/app/(app)/admin/maintenance/layout.tsx",
+          "line": 4,
+          "href": "/admin/maintenance",
+          "ability": "maintenance.manage"
+        },
+        {
+          "file": "src/app/(app)/admin/piles/layout.tsx",
+          "line": 4,
+          "href": "/admin/piles",
+          "ability": "piles.manage"
+        },
+        {
+          "file": "src/app/(app)/admin/reports/layout.tsx",
+          "line": 4,
+          "href": "/admin/reports",
+          "ability": "reports.read_all"
+        },
+        {
+          "file": "src/app/(app)/admin/settings/layout.tsx",
+          "line": 4,
+          "href": "/admin/settings",
+          "ability": "system.read"
+        },
+        {
+          "file": "src/app/(app)/admin/sites/layout.tsx",
+          "line": 4,
+          "href": "/admin/sites",
+          "ability": "sites.read_all"
+        },
+        {
+          "file": "src/app/(app)/admin/telegram/layout.tsx",
+          "line": 4,
+          "href": "/admin/telegram",
+          "ability": "telegram.manage"
+        },
+        {
+          "file": "src/app/(app)/admin/users/layout.tsx",
+          "line": 4,
+          "href": "/admin/users",
+          "ability": "users.manage"
+        }
+      ],
+      "rows": [
+        {
+          "role": "ADMIN",
+          "file": "src/app/(app)/admin/page.tsx",
+          "line": 7,
+          "href": "/admin",
+          "ability": "analytics.read",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin",
+          "redirectChain": [
+            "/admin"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "ADMIN",
+          "file": "src/app/(app)/admin/analytics/layout.tsx",
+          "line": 4,
+          "href": "/admin/analytics",
+          "ability": "analytics.read",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/analytics",
+          "redirectChain": [
+            "/admin/analytics"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/analytics",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "ADMIN",
+          "file": "src/app/(app)/admin/checklists/layout.tsx",
+          "line": 4,
+          "href": "/admin/checklists",
+          "ability": "inspection.perform",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/checklists",
+          "redirectChain": [
+            "/admin/checklists"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/checklists",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "ADMIN",
+          "file": "src/app/(app)/admin/crews/layout.tsx",
+          "line": 4,
+          "href": "/admin/crews",
+          "ability": "crews.read",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/crews",
+          "redirectChain": [
+            "/admin/crews"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/crews",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "ADMIN",
+          "file": "src/app/(app)/admin/dictionaries/layout.tsx",
+          "line": 4,
+          "href": "/admin/dictionaries",
+          "ability": "dictionary.manage",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/dictionaries",
+          "redirectChain": [
+            "/admin/dictionaries"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/dictionaries",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "ADMIN",
+          "file": "src/app/(app)/admin/dlq/layout.tsx",
+          "line": 4,
+          "href": "/admin/dlq",
+          "ability": "dlq.manage",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/dlq",
+          "redirectChain": [
+            "/admin/dlq"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/dlq",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "ADMIN",
+          "file": "src/app/(app)/admin/equipment/layout.tsx",
+          "line": 4,
+          "href": "/admin/equipment",
+          "ability": "equipment.read",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/equipment",
+          "redirectChain": [
+            "/admin/equipment"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/equipment",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "ADMIN",
+          "file": "src/app/(app)/admin/incidents/layout.tsx",
+          "line": 4,
+          "href": "/admin/incidents",
+          "ability": "incidents.read",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/to?view=incidents",
+          "redirectChain": [
+            "/admin/safety?view=incidents",
+            "/admin/to?view=incidents"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/to",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "ADMIN",
+          "file": "src/app/(app)/admin/maintenance/layout.tsx",
+          "line": 4,
+          "href": "/admin/maintenance",
+          "ability": "maintenance.manage",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/maintenance",
+          "redirectChain": [
+            "/admin/maintenance"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/maintenance",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "ADMIN",
+          "file": "src/app/(app)/admin/piles/layout.tsx",
+          "line": 4,
+          "href": "/admin/piles",
+          "ability": "piles.manage",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/reports?view=piles",
+          "redirectChain": [
+            "/admin/reports?view=piles"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/reports",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "ADMIN",
+          "file": "src/app/(app)/admin/reports/layout.tsx",
+          "line": 4,
+          "href": "/admin/reports",
+          "ability": "reports.read_all",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/reports",
+          "redirectChain": [
+            "/admin/reports"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/reports",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "ADMIN",
+          "file": "src/app/(app)/admin/settings/layout.tsx",
+          "line": 4,
+          "href": "/admin/settings",
+          "ability": "system.read",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/settings",
+          "redirectChain": [
+            "/admin/settings"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/settings",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "ADMIN",
+          "file": "src/app/(app)/admin/sites/layout.tsx",
+          "line": 4,
+          "href": "/admin/sites",
+          "ability": "sites.read_all",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/sites",
+          "redirectChain": [
+            "/admin/sites"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/sites",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "ADMIN",
+          "file": "src/app/(app)/admin/telegram/layout.tsx",
+          "line": 4,
+          "href": "/admin/telegram",
+          "ability": "telegram.manage",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/telegram",
+          "redirectChain": [
+            "/admin/telegram"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/telegram",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "ADMIN",
+          "file": "src/app/(app)/admin/users/layout.tsx",
+          "line": 4,
+          "href": "/admin/users",
+          "ability": "users.manage",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/users",
+          "redirectChain": [
+            "/admin/users"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/users",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "DISPATCHER",
+          "file": "src/app/(app)/admin/page.tsx",
+          "line": 7,
+          "href": "/admin",
+          "ability": "analytics.read",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin",
+          "redirectChain": [
+            "/admin"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "DISPATCHER",
+          "file": "src/app/(app)/admin/analytics/layout.tsx",
+          "line": 4,
+          "href": "/admin/analytics",
+          "ability": "analytics.read",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/analytics",
+          "redirectChain": [
+            "/admin/analytics"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/analytics",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "DISPATCHER",
+          "file": "src/app/(app)/admin/checklists/layout.tsx",
+          "line": 4,
+          "href": "/admin/checklists",
+          "ability": "inspection.perform",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/checklists",
+          "redirectChain": [
+            "/admin/checklists"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/checklists",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "DISPATCHER",
+          "file": "src/app/(app)/admin/crews/layout.tsx",
+          "line": 4,
+          "href": "/admin/crews",
+          "ability": "crews.read",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/crews",
+          "redirectChain": [
+            "/admin/crews"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/crews",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "DISPATCHER",
+          "file": "src/app/(app)/admin/dictionaries/layout.tsx",
+          "line": 4,
+          "href": "/admin/dictionaries",
+          "ability": "dictionary.manage",
+          "parentAllowed": true,
+          "sectionAllowed": false,
+          "destination": "/admin/dictionaries",
+          "redirectChain": [
+            "/admin/dictionaries"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "DISPATCHER",
+          "file": "src/app/(app)/admin/dlq/layout.tsx",
+          "line": 4,
+          "href": "/admin/dlq",
+          "ability": "dlq.manage",
+          "parentAllowed": true,
+          "sectionAllowed": false,
+          "destination": "/admin/dlq",
+          "redirectChain": [
+            "/admin/dlq"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "DISPATCHER",
+          "file": "src/app/(app)/admin/equipment/layout.tsx",
+          "line": 4,
+          "href": "/admin/equipment",
+          "ability": "equipment.read",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/equipment",
+          "redirectChain": [
+            "/admin/equipment"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/equipment",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "DISPATCHER",
+          "file": "src/app/(app)/admin/incidents/layout.tsx",
+          "line": 4,
+          "href": "/admin/incidents",
+          "ability": "incidents.read",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/to?view=incidents",
+          "redirectChain": [
+            "/admin/safety?view=incidents",
+            "/admin/to?view=incidents"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/to",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "DISPATCHER",
+          "file": "src/app/(app)/admin/maintenance/layout.tsx",
+          "line": 4,
+          "href": "/admin/maintenance",
+          "ability": "maintenance.manage",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/maintenance",
+          "redirectChain": [
+            "/admin/maintenance"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/maintenance",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "DISPATCHER",
+          "file": "src/app/(app)/admin/piles/layout.tsx",
+          "line": 4,
+          "href": "/admin/piles",
+          "ability": "piles.manage",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/reports?view=piles",
+          "redirectChain": [
+            "/admin/reports?view=piles"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/reports",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "DISPATCHER",
+          "file": "src/app/(app)/admin/reports/layout.tsx",
+          "line": 4,
+          "href": "/admin/reports",
+          "ability": "reports.read_all",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/reports",
+          "redirectChain": [
+            "/admin/reports"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/reports",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "DISPATCHER",
+          "file": "src/app/(app)/admin/settings/layout.tsx",
+          "line": 4,
+          "href": "/admin/settings",
+          "ability": "system.read",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/settings",
+          "redirectChain": [
+            "/admin/settings"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/settings",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "DISPATCHER",
+          "file": "src/app/(app)/admin/sites/layout.tsx",
+          "line": 4,
+          "href": "/admin/sites",
+          "ability": "sites.read_all",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/sites",
+          "redirectChain": [
+            "/admin/sites"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/sites",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "DISPATCHER",
+          "file": "src/app/(app)/admin/telegram/layout.tsx",
+          "line": 4,
+          "href": "/admin/telegram",
+          "ability": "telegram.manage",
+          "parentAllowed": true,
+          "sectionAllowed": false,
+          "destination": "/admin/telegram",
+          "redirectChain": [
+            "/admin/telegram"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "DISPATCHER",
+          "file": "src/app/(app)/admin/users/layout.tsx",
+          "line": 4,
+          "href": "/admin/users",
+          "ability": "users.manage",
+          "parentAllowed": true,
+          "sectionAllowed": false,
+          "destination": "/admin/users",
+          "redirectChain": [
+            "/admin/users"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "OPERATOR",
+          "file": "src/app/(app)/admin/page.tsx",
+          "line": 7,
+          "href": "/admin",
+          "ability": "analytics.read",
+          "parentAllowed": false,
+          "sectionAllowed": false,
+          "destination": "/admin",
+          "redirectChain": [
+            "/admin"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "OPERATOR",
+          "file": "src/app/(app)/admin/analytics/layout.tsx",
+          "line": 4,
+          "href": "/admin/analytics",
+          "ability": "analytics.read",
+          "parentAllowed": false,
+          "sectionAllowed": false,
+          "destination": "/admin/analytics",
+          "redirectChain": [
+            "/admin/analytics"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "OPERATOR",
+          "file": "src/app/(app)/admin/checklists/layout.tsx",
+          "line": 4,
+          "href": "/admin/checklists",
+          "ability": "inspection.perform",
+          "parentAllowed": false,
+          "sectionAllowed": true,
+          "destination": "/admin/checklists",
+          "redirectChain": [
+            "/admin/checklists"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "OPERATOR",
+          "file": "src/app/(app)/admin/crews/layout.tsx",
+          "line": 4,
+          "href": "/admin/crews",
+          "ability": "crews.read",
+          "parentAllowed": false,
+          "sectionAllowed": false,
+          "destination": "/admin/crews",
+          "redirectChain": [
+            "/admin/crews"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "OPERATOR",
+          "file": "src/app/(app)/admin/dictionaries/layout.tsx",
+          "line": 4,
+          "href": "/admin/dictionaries",
+          "ability": "dictionary.manage",
+          "parentAllowed": false,
+          "sectionAllowed": false,
+          "destination": "/admin/dictionaries",
+          "redirectChain": [
+            "/admin/dictionaries"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "OPERATOR",
+          "file": "src/app/(app)/admin/dlq/layout.tsx",
+          "line": 4,
+          "href": "/admin/dlq",
+          "ability": "dlq.manage",
+          "parentAllowed": false,
+          "sectionAllowed": false,
+          "destination": "/admin/dlq",
+          "redirectChain": [
+            "/admin/dlq"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "OPERATOR",
+          "file": "src/app/(app)/admin/equipment/layout.tsx",
+          "line": 4,
+          "href": "/admin/equipment",
+          "ability": "equipment.read",
+          "parentAllowed": false,
+          "sectionAllowed": false,
+          "destination": "/admin/equipment",
+          "redirectChain": [
+            "/admin/equipment"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "OPERATOR",
+          "file": "src/app/(app)/admin/incidents/layout.tsx",
+          "line": 4,
+          "href": "/admin/incidents",
+          "ability": "incidents.read",
+          "parentAllowed": false,
+          "sectionAllowed": false,
+          "destination": "/admin/to?view=incidents",
+          "redirectChain": [
+            "/admin/safety?view=incidents",
+            "/admin/to?view=incidents"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "OPERATOR",
+          "file": "src/app/(app)/admin/maintenance/layout.tsx",
+          "line": 4,
+          "href": "/admin/maintenance",
+          "ability": "maintenance.manage",
+          "parentAllowed": false,
+          "sectionAllowed": false,
+          "destination": "/admin/maintenance",
+          "redirectChain": [
+            "/admin/maintenance"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "OPERATOR",
+          "file": "src/app/(app)/admin/piles/layout.tsx",
+          "line": 4,
+          "href": "/admin/piles",
+          "ability": "piles.manage",
+          "parentAllowed": false,
+          "sectionAllowed": false,
+          "destination": "/admin/reports?view=piles",
+          "redirectChain": [
+            "/admin/reports?view=piles"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "OPERATOR",
+          "file": "src/app/(app)/admin/reports/layout.tsx",
+          "line": 4,
+          "href": "/admin/reports",
+          "ability": "reports.read_all",
+          "parentAllowed": false,
+          "sectionAllowed": false,
+          "destination": "/admin/reports",
+          "redirectChain": [
+            "/admin/reports"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "OPERATOR",
+          "file": "src/app/(app)/admin/settings/layout.tsx",
+          "line": 4,
+          "href": "/admin/settings",
+          "ability": "system.read",
+          "parentAllowed": false,
+          "sectionAllowed": false,
+          "destination": "/admin/settings",
+          "redirectChain": [
+            "/admin/settings"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "OPERATOR",
+          "file": "src/app/(app)/admin/sites/layout.tsx",
+          "line": 4,
+          "href": "/admin/sites",
+          "ability": "sites.read_all",
+          "parentAllowed": false,
+          "sectionAllowed": false,
+          "destination": "/admin/sites",
+          "redirectChain": [
+            "/admin/sites"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "OPERATOR",
+          "file": "src/app/(app)/admin/telegram/layout.tsx",
+          "line": 4,
+          "href": "/admin/telegram",
+          "ability": "telegram.manage",
+          "parentAllowed": false,
+          "sectionAllowed": false,
+          "destination": "/admin/telegram",
+          "redirectChain": [
+            "/admin/telegram"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "OPERATOR",
+          "file": "src/app/(app)/admin/users/layout.tsx",
+          "line": 4,
+          "href": "/admin/users",
+          "ability": "users.manage",
+          "parentAllowed": false,
+          "sectionAllowed": false,
+          "destination": "/admin/users",
+          "redirectChain": [
+            "/admin/users"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "ASSISTANT",
+          "file": "src/app/(app)/admin/page.tsx",
+          "line": 7,
+          "href": "/admin",
+          "ability": "analytics.read",
+          "parentAllowed": false,
+          "sectionAllowed": false,
+          "destination": "/admin",
+          "redirectChain": [
+            "/admin"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "ASSISTANT",
+          "file": "src/app/(app)/admin/analytics/layout.tsx",
+          "line": 4,
+          "href": "/admin/analytics",
+          "ability": "analytics.read",
+          "parentAllowed": false,
+          "sectionAllowed": false,
+          "destination": "/admin/analytics",
+          "redirectChain": [
+            "/admin/analytics"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "ASSISTANT",
+          "file": "src/app/(app)/admin/checklists/layout.tsx",
+          "line": 4,
+          "href": "/admin/checklists",
+          "ability": "inspection.perform",
+          "parentAllowed": false,
+          "sectionAllowed": false,
+          "destination": "/admin/checklists",
+          "redirectChain": [
+            "/admin/checklists"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "ASSISTANT",
+          "file": "src/app/(app)/admin/crews/layout.tsx",
+          "line": 4,
+          "href": "/admin/crews",
+          "ability": "crews.read",
+          "parentAllowed": false,
+          "sectionAllowed": false,
+          "destination": "/admin/crews",
+          "redirectChain": [
+            "/admin/crews"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "ASSISTANT",
+          "file": "src/app/(app)/admin/dictionaries/layout.tsx",
+          "line": 4,
+          "href": "/admin/dictionaries",
+          "ability": "dictionary.manage",
+          "parentAllowed": false,
+          "sectionAllowed": false,
+          "destination": "/admin/dictionaries",
+          "redirectChain": [
+            "/admin/dictionaries"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "ASSISTANT",
+          "file": "src/app/(app)/admin/dlq/layout.tsx",
+          "line": 4,
+          "href": "/admin/dlq",
+          "ability": "dlq.manage",
+          "parentAllowed": false,
+          "sectionAllowed": false,
+          "destination": "/admin/dlq",
+          "redirectChain": [
+            "/admin/dlq"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "ASSISTANT",
+          "file": "src/app/(app)/admin/equipment/layout.tsx",
+          "line": 4,
+          "href": "/admin/equipment",
+          "ability": "equipment.read",
+          "parentAllowed": false,
+          "sectionAllowed": false,
+          "destination": "/admin/equipment",
+          "redirectChain": [
+            "/admin/equipment"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "ASSISTANT",
+          "file": "src/app/(app)/admin/incidents/layout.tsx",
+          "line": 4,
+          "href": "/admin/incidents",
+          "ability": "incidents.read",
+          "parentAllowed": false,
+          "sectionAllowed": false,
+          "destination": "/admin/to?view=incidents",
+          "redirectChain": [
+            "/admin/safety?view=incidents",
+            "/admin/to?view=incidents"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "ASSISTANT",
+          "file": "src/app/(app)/admin/maintenance/layout.tsx",
+          "line": 4,
+          "href": "/admin/maintenance",
+          "ability": "maintenance.manage",
+          "parentAllowed": false,
+          "sectionAllowed": false,
+          "destination": "/admin/maintenance",
+          "redirectChain": [
+            "/admin/maintenance"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "ASSISTANT",
+          "file": "src/app/(app)/admin/piles/layout.tsx",
+          "line": 4,
+          "href": "/admin/piles",
+          "ability": "piles.manage",
+          "parentAllowed": false,
+          "sectionAllowed": false,
+          "destination": "/admin/reports?view=piles",
+          "redirectChain": [
+            "/admin/reports?view=piles"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "ASSISTANT",
+          "file": "src/app/(app)/admin/reports/layout.tsx",
+          "line": 4,
+          "href": "/admin/reports",
+          "ability": "reports.read_all",
+          "parentAllowed": false,
+          "sectionAllowed": false,
+          "destination": "/admin/reports",
+          "redirectChain": [
+            "/admin/reports"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "ASSISTANT",
+          "file": "src/app/(app)/admin/settings/layout.tsx",
+          "line": 4,
+          "href": "/admin/settings",
+          "ability": "system.read",
+          "parentAllowed": false,
+          "sectionAllowed": false,
+          "destination": "/admin/settings",
+          "redirectChain": [
+            "/admin/settings"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "ASSISTANT",
+          "file": "src/app/(app)/admin/sites/layout.tsx",
+          "line": 4,
+          "href": "/admin/sites",
+          "ability": "sites.read_all",
+          "parentAllowed": false,
+          "sectionAllowed": false,
+          "destination": "/admin/sites",
+          "redirectChain": [
+            "/admin/sites"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "ASSISTANT",
+          "file": "src/app/(app)/admin/telegram/layout.tsx",
+          "line": 4,
+          "href": "/admin/telegram",
+          "ability": "telegram.manage",
+          "parentAllowed": false,
+          "sectionAllowed": false,
+          "destination": "/admin/telegram",
+          "redirectChain": [
+            "/admin/telegram"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "ASSISTANT",
+          "file": "src/app/(app)/admin/users/layout.tsx",
+          "line": 4,
+          "href": "/admin/users",
+          "ability": "users.manage",
+          "parentAllowed": false,
+          "sectionAllowed": false,
+          "destination": "/admin/users",
+          "redirectChain": [
+            "/admin/users"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "MECHANIC",
+          "file": "src/app/(app)/admin/page.tsx",
+          "line": 7,
+          "href": "/admin",
+          "ability": "analytics.read",
+          "parentAllowed": true,
+          "sectionAllowed": false,
+          "destination": "/admin",
+          "redirectChain": [
+            "/admin"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "MECHANIC",
+          "file": "src/app/(app)/admin/analytics/layout.tsx",
+          "line": 4,
+          "href": "/admin/analytics",
+          "ability": "analytics.read",
+          "parentAllowed": true,
+          "sectionAllowed": false,
+          "destination": "/admin/analytics",
+          "redirectChain": [
+            "/admin/analytics"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "MECHANIC",
+          "file": "src/app/(app)/admin/checklists/layout.tsx",
+          "line": 4,
+          "href": "/admin/checklists",
+          "ability": "inspection.perform",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/checklists",
+          "redirectChain": [
+            "/admin/checklists"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/checklists",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "MECHANIC",
+          "file": "src/app/(app)/admin/crews/layout.tsx",
+          "line": 4,
+          "href": "/admin/crews",
+          "ability": "crews.read",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/crews",
+          "redirectChain": [
+            "/admin/crews"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/crews",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "MECHANIC",
+          "file": "src/app/(app)/admin/dictionaries/layout.tsx",
+          "line": 4,
+          "href": "/admin/dictionaries",
+          "ability": "dictionary.manage",
+          "parentAllowed": true,
+          "sectionAllowed": false,
+          "destination": "/admin/dictionaries",
+          "redirectChain": [
+            "/admin/dictionaries"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "MECHANIC",
+          "file": "src/app/(app)/admin/dlq/layout.tsx",
+          "line": 4,
+          "href": "/admin/dlq",
+          "ability": "dlq.manage",
+          "parentAllowed": true,
+          "sectionAllowed": false,
+          "destination": "/admin/dlq",
+          "redirectChain": [
+            "/admin/dlq"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "MECHANIC",
+          "file": "src/app/(app)/admin/equipment/layout.tsx",
+          "line": 4,
+          "href": "/admin/equipment",
+          "ability": "equipment.read",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/equipment",
+          "redirectChain": [
+            "/admin/equipment"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/equipment",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "MECHANIC",
+          "file": "src/app/(app)/admin/incidents/layout.tsx",
+          "line": 4,
+          "href": "/admin/incidents",
+          "ability": "incidents.read",
+          "parentAllowed": true,
+          "sectionAllowed": false,
+          "destination": "/admin/to?view=incidents",
+          "redirectChain": [
+            "/admin/safety?view=incidents",
+            "/admin/to?view=incidents"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "MECHANIC",
+          "file": "src/app/(app)/admin/maintenance/layout.tsx",
+          "line": 4,
+          "href": "/admin/maintenance",
+          "ability": "maintenance.manage",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/maintenance",
+          "redirectChain": [
+            "/admin/maintenance"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/maintenance",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "MECHANIC",
+          "file": "src/app/(app)/admin/piles/layout.tsx",
+          "line": 4,
+          "href": "/admin/piles",
+          "ability": "piles.manage",
+          "parentAllowed": true,
+          "sectionAllowed": false,
+          "destination": "/admin/reports?view=piles",
+          "redirectChain": [
+            "/admin/reports?view=piles"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "MECHANIC",
+          "file": "src/app/(app)/admin/reports/layout.tsx",
+          "line": 4,
+          "href": "/admin/reports",
+          "ability": "reports.read_all",
+          "parentAllowed": true,
+          "sectionAllowed": false,
+          "destination": "/admin/reports",
+          "redirectChain": [
+            "/admin/reports"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "MECHANIC",
+          "file": "src/app/(app)/admin/settings/layout.tsx",
+          "line": 4,
+          "href": "/admin/settings",
+          "ability": "system.read",
+          "parentAllowed": true,
+          "sectionAllowed": false,
+          "destination": "/admin/settings",
+          "redirectChain": [
+            "/admin/settings"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "MECHANIC",
+          "file": "src/app/(app)/admin/sites/layout.tsx",
+          "line": 4,
+          "href": "/admin/sites",
+          "ability": "sites.read_all",
+          "parentAllowed": true,
+          "sectionAllowed": false,
+          "destination": "/admin/sites",
+          "redirectChain": [
+            "/admin/sites"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "MECHANIC",
+          "file": "src/app/(app)/admin/telegram/layout.tsx",
+          "line": 4,
+          "href": "/admin/telegram",
+          "ability": "telegram.manage",
+          "parentAllowed": true,
+          "sectionAllowed": false,
+          "destination": "/admin/telegram",
+          "redirectChain": [
+            "/admin/telegram"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "MECHANIC",
+          "file": "src/app/(app)/admin/users/layout.tsx",
+          "line": 4,
+          "href": "/admin/users",
+          "ability": "users.manage",
+          "parentAllowed": true,
+          "sectionAllowed": false,
+          "destination": "/admin/users",
+          "redirectChain": [
+            "/admin/users"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "FOREMAN",
+          "file": "src/app/(app)/admin/page.tsx",
+          "line": 7,
+          "href": "/admin",
+          "ability": "analytics.read",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin",
+          "redirectChain": [
+            "/admin"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "FOREMAN",
+          "file": "src/app/(app)/admin/analytics/layout.tsx",
+          "line": 4,
+          "href": "/admin/analytics",
+          "ability": "analytics.read",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/analytics",
+          "redirectChain": [
+            "/admin/analytics"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/analytics",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "FOREMAN",
+          "file": "src/app/(app)/admin/checklists/layout.tsx",
+          "line": 4,
+          "href": "/admin/checklists",
+          "ability": "inspection.perform",
+          "parentAllowed": true,
+          "sectionAllowed": false,
+          "destination": "/admin/checklists",
+          "redirectChain": [
+            "/admin/checklists"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "FOREMAN",
+          "file": "src/app/(app)/admin/crews/layout.tsx",
+          "line": 4,
+          "href": "/admin/crews",
+          "ability": "crews.read",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/crews",
+          "redirectChain": [
+            "/admin/crews"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/crews",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "FOREMAN",
+          "file": "src/app/(app)/admin/dictionaries/layout.tsx",
+          "line": 4,
+          "href": "/admin/dictionaries",
+          "ability": "dictionary.manage",
+          "parentAllowed": true,
+          "sectionAllowed": false,
+          "destination": "/admin/dictionaries",
+          "redirectChain": [
+            "/admin/dictionaries"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "FOREMAN",
+          "file": "src/app/(app)/admin/dlq/layout.tsx",
+          "line": 4,
+          "href": "/admin/dlq",
+          "ability": "dlq.manage",
+          "parentAllowed": true,
+          "sectionAllowed": false,
+          "destination": "/admin/dlq",
+          "redirectChain": [
+            "/admin/dlq"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "FOREMAN",
+          "file": "src/app/(app)/admin/equipment/layout.tsx",
+          "line": 4,
+          "href": "/admin/equipment",
+          "ability": "equipment.read",
+          "parentAllowed": true,
+          "sectionAllowed": false,
+          "destination": "/admin/equipment",
+          "redirectChain": [
+            "/admin/equipment"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "FOREMAN",
+          "file": "src/app/(app)/admin/incidents/layout.tsx",
+          "line": 4,
+          "href": "/admin/incidents",
+          "ability": "incidents.read",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/to?view=incidents",
+          "redirectChain": [
+            "/admin/safety?view=incidents",
+            "/admin/to?view=incidents"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/to",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "FOREMAN",
+          "file": "src/app/(app)/admin/maintenance/layout.tsx",
+          "line": 4,
+          "href": "/admin/maintenance",
+          "ability": "maintenance.manage",
+          "parentAllowed": true,
+          "sectionAllowed": false,
+          "destination": "/admin/maintenance",
+          "redirectChain": [
+            "/admin/maintenance"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "FOREMAN",
+          "file": "src/app/(app)/admin/piles/layout.tsx",
+          "line": 4,
+          "href": "/admin/piles",
+          "ability": "piles.manage",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/reports?view=piles",
+          "redirectChain": [
+            "/admin/reports?view=piles"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/reports",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "FOREMAN",
+          "file": "src/app/(app)/admin/reports/layout.tsx",
+          "line": 4,
+          "href": "/admin/reports",
+          "ability": "reports.read_all",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/reports",
+          "redirectChain": [
+            "/admin/reports"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/reports",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "FOREMAN",
+          "file": "src/app/(app)/admin/settings/layout.tsx",
+          "line": 4,
+          "href": "/admin/settings",
+          "ability": "system.read",
+          "parentAllowed": true,
+          "sectionAllowed": false,
+          "destination": "/admin/settings",
+          "redirectChain": [
+            "/admin/settings"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "FOREMAN",
+          "file": "src/app/(app)/admin/sites/layout.tsx",
+          "line": 4,
+          "href": "/admin/sites",
+          "ability": "sites.read_all",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/sites",
+          "redirectChain": [
+            "/admin/sites"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/sites",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "FOREMAN",
+          "file": "src/app/(app)/admin/telegram/layout.tsx",
+          "line": 4,
+          "href": "/admin/telegram",
+          "ability": "telegram.manage",
+          "parentAllowed": true,
+          "sectionAllowed": false,
+          "destination": "/admin/telegram",
+          "redirectChain": [
+            "/admin/telegram"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "FOREMAN",
+          "file": "src/app/(app)/admin/users/layout.tsx",
+          "line": 4,
+          "href": "/admin/users",
+          "ability": "users.manage",
+          "parentAllowed": true,
+          "sectionAllowed": false,
+          "destination": "/admin/users",
+          "redirectChain": [
+            "/admin/users"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "file": "src/app/(app)/admin/page.tsx",
+          "line": 7,
+          "href": "/admin",
+          "ability": "analytics.read",
+          "parentAllowed": true,
+          "sectionAllowed": false,
+          "destination": "/admin",
+          "redirectChain": [
+            "/admin"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "file": "src/app/(app)/admin/analytics/layout.tsx",
+          "line": 4,
+          "href": "/admin/analytics",
+          "ability": "analytics.read",
+          "parentAllowed": true,
+          "sectionAllowed": false,
+          "destination": "/admin/analytics",
+          "redirectChain": [
+            "/admin/analytics"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "file": "src/app/(app)/admin/checklists/layout.tsx",
+          "line": 4,
+          "href": "/admin/checklists",
+          "ability": "inspection.perform",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/checklists",
+          "redirectChain": [
+            "/admin/checklists"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/checklists",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "file": "src/app/(app)/admin/crews/layout.tsx",
+          "line": 4,
+          "href": "/admin/crews",
+          "ability": "crews.read",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/crews",
+          "redirectChain": [
+            "/admin/crews"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/crews",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "file": "src/app/(app)/admin/dictionaries/layout.tsx",
+          "line": 4,
+          "href": "/admin/dictionaries",
+          "ability": "dictionary.manage",
+          "parentAllowed": true,
+          "sectionAllowed": false,
+          "destination": "/admin/dictionaries",
+          "redirectChain": [
+            "/admin/dictionaries"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "file": "src/app/(app)/admin/dlq/layout.tsx",
+          "line": 4,
+          "href": "/admin/dlq",
+          "ability": "dlq.manage",
+          "parentAllowed": true,
+          "sectionAllowed": false,
+          "destination": "/admin/dlq",
+          "redirectChain": [
+            "/admin/dlq"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "file": "src/app/(app)/admin/equipment/layout.tsx",
+          "line": 4,
+          "href": "/admin/equipment",
+          "ability": "equipment.read",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/equipment",
+          "redirectChain": [
+            "/admin/equipment"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/equipment",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "file": "src/app/(app)/admin/incidents/layout.tsx",
+          "line": 4,
+          "href": "/admin/incidents",
+          "ability": "incidents.read",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/to?view=incidents",
+          "redirectChain": [
+            "/admin/safety?view=incidents",
+            "/admin/to?view=incidents"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/to",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "file": "src/app/(app)/admin/maintenance/layout.tsx",
+          "line": 4,
+          "href": "/admin/maintenance",
+          "ability": "maintenance.manage",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/maintenance",
+          "redirectChain": [
+            "/admin/maintenance"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/maintenance",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "file": "src/app/(app)/admin/piles/layout.tsx",
+          "line": 4,
+          "href": "/admin/piles",
+          "ability": "piles.manage",
+          "parentAllowed": true,
+          "sectionAllowed": false,
+          "destination": "/admin/reports?view=piles",
+          "redirectChain": [
+            "/admin/reports?view=piles"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "file": "src/app/(app)/admin/reports/layout.tsx",
+          "line": 4,
+          "href": "/admin/reports",
+          "ability": "reports.read_all",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/reports",
+          "redirectChain": [
+            "/admin/reports"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/reports",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "file": "src/app/(app)/admin/settings/layout.tsx",
+          "line": 4,
+          "href": "/admin/settings",
+          "ability": "system.read",
+          "parentAllowed": true,
+          "sectionAllowed": false,
+          "destination": "/admin/settings",
+          "redirectChain": [
+            "/admin/settings"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "file": "src/app/(app)/admin/sites/layout.tsx",
+          "line": 4,
+          "href": "/admin/sites",
+          "ability": "sites.read_all",
+          "parentAllowed": true,
+          "sectionAllowed": true,
+          "destination": "/admin/sites",
+          "redirectChain": [
+            "/admin/sites"
+          ],
+          "expected": "allowed",
+          "actualPath": "/admin/sites",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "file": "src/app/(app)/admin/telegram/layout.tsx",
+          "line": 4,
+          "href": "/admin/telegram",
+          "ability": "telegram.manage",
+          "parentAllowed": true,
+          "sectionAllowed": false,
+          "destination": "/admin/telegram",
+          "redirectChain": [
+            "/admin/telegram"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "file": "src/app/(app)/admin/users/layout.tsx",
+          "line": 4,
+          "href": "/admin/users",
+          "ability": "users.manage",
+          "parentAllowed": true,
+          "sectionAllowed": false,
+          "destination": "/admin/users",
+          "redirectChain": [
+            "/admin/users"
+          ],
+          "expected": "denied",
+          "actualPath": "/no-access",
+          "apiErrors": [],
+          "scope": "page guard only; CRUD and loaded data are separate checks"
+        }
+      ],
+      "errors": []
+    }
+  ],
+  "collection": {
+    "current": {
+      "tests": 393,
+      "files": 30,
+      "exit": 0
+    },
+    "base": {
+      "tests": 318,
+      "files": 28,
+      "exit": 0
+    }
+  },
+  "cleanup": {
+    "exit": 0,
+    "seconds": 40,
+    "cleanup": true,
+    "cleanupErrors": []
+  },
+  "freshCleanup": {
+    "exit": 0,
+    "seconds": 891,
+    "cleanup": true,
+    "cleanupErrors": []
+  }
+}

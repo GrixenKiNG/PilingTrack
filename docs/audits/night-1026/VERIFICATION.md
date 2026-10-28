@@ -1,5 +1,8 @@
 # Текущие проверки UI и сквозных цепочек, 28 октября 2026
 
+
+Прямые15разделов×7ролей×3браузера:3passed/0failed/0skipped,315наблюдений с точным конечнымURL и родительскимadmin guard. DIRECT-URL-MATRIX.md/json. Последние tsc0/18с,lint0/81с без предупреждений;list393/30 против BASE318/28,обаexit0. Все detailURLs/CRUD этим не покрыты.
+
 Прикладная сборка: **44126b987c9dd02b0bbefe28e8094f282b94aaf0**. Unit/type/lint выполнялись в worktree86358ae3; последующие изменения — только E2E и отчёты. Пустой git diff прикладных src/prisma/package*/next.config.ts подтверждён перед повторным использованием сборки. Это не новая сборка позднего тестового SHA.
 
 | Команда / сценарий | Exit | Passed / failed / skipped | Время |
@@ -220,3 +223,11 @@ Chromium, совершенно свежие собственные PG18/два R
 На восстановленном индексе detect(scope=all) для нового механического теста/отчётов:exit0,LOW; compare(BASEefd95008):exit0,HIGH,7затронутых потоков OperatorDashboardV3 (FetchWithTimeout,Cleanup,GetCurrentResetTimeout,FormatEntry,ShouldLog,IsSensitiveKey,GetMinLevel). HIGH заранее сообщён владельцу перед последующими изменениями. Это уже существующая правка CSS вV3,покрытая9браузерными сценариями на44126b98;все отказные ветви этим не доказаны. Последнее изменение добавляет тесты/отчёты. Impact узла файла E2E остаётсяUNKNOWN0:текст подтверждает динамический вход через playwright.night.config.ts и nightly-e2e.yml;тест не удаляется и не считается неиспользуемым.
 
 Полные ответы detect-mechanic-fresh.json/compare-mechanic-fresh.json:partial=false,truncated=false. Ограничение самого построения процессов сохраняется:2 567candidate entrypoints не вошли в1 225flows,часть обходов ограничена глубиной/ветвлением. Отсутствующий flow не означает отсутствие кода. Реальная проверка зависимостей дополнена исходниками/SQL/HTTP и тестами, а не числом0. Анализ не менял AGENTS/CLAUDE или прикладные файлы.
+
+## GitNexus перед коммитом
+
+Индекс полностью перестроен: node .gitnexus/run.cjs analyze --index-only --force,exit0/138с. Context requirePageAbility имеет правильный UID/путь и15действительных callers;они совпали с текстом. Исходный File-impact нового сценария UNKNOWN/0 не считался отсутствием влияния: динамический запуск подтверждён playwright.night.config.ts и nightly-e2e.yml. Тела исходных21тестов не менялись.
+
+Полные detect(all) и compare(BASE):exit0,partial/truncated не возвращены. До staging двух новых отчётов all={"changed_count":15,"affected_count":0,"changed_files":7,"risk_level":"low"}; compare={"changed_count":172,"affected_count":7,"changed_files":57,"risk_level":"high"}. После последнего изменения отчётов и staging выполняется ещё один полный detect перед коммитом; точные финальные счётчики — detect-direct-staged.json/compare-direct-staged.json. Сравнение всей ветки HIGH:семь ранее известных потоков OperatorDashboardV3 → FetchWithTimeout/Cleanup/GetCurrentResetTimeout/FormatEntry/ShouldLog/IsSensitiveKey/GetMinLevel. Пользователь предупреждён перед последующими правками отчёта. Все9V3 UIсценариев зелёные на44126, но каждый отказной путь ими не объявляется проверенным.
+
+Логи context-direct-final.log,detect-direct-final.log,compare-direct-final.log и direct-final-graph-results.json сохранены полностью во внешней evidence-папке. Глобальный бюджет execution flows индексатора ограничен: это не доказательство отсутствия непройденных связей. Прежние повреждённые инкрементальные снимки остаются историей и не используются для вывода о безопасности.

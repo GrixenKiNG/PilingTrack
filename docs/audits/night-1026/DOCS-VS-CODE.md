@@ -50,6 +50,7 @@
 |41|src/app/operator/v7/page.tsx:12–14 — «Действий не выполняет»|src/components/piling/operator-mobile/v7/operator-v7-app.tsx:26,157–165,348–417 — компонент содержит sendCommand, приёмку, выработку, инцидент, закрытие и useOfflineQueue|ПРОТИВОРЕЧИТ|Комментарий маршрута устарел. v7 нельзя исключать из полного цикла как экран только для чтения. Код не менять под комментарий.|
 
 |42|AGENTS.md:59 — «Vitest does not load .env»|vitest.config.ts:19–25,33 — dbEnvFromDotenv читает .env при его наличии, но переносит только DATABASE_URL_POSTGRES и DATABASE_URL_APP_ROLE|ПРОТИВОРЕЧИТ|Уточнить AGENTS/CLAUDE. Для этого аудита файл .env отсутствовал; реальные INTEGRATION_DATABASE_URL_OWNER/APP и CODEX_STAND_URL задавались явно. Это не повод ослаблять запрет чтения .env агентом.|
+|43|src/app/(app)/admin/incidents/page.tsx:4–9 и src/components/piling/to/readiness-reference-ui.tsx:207–210 описывают происшествия в модуле ОТ|src/components/piling/to/readiness/module-tab-list.tsx:38–40 — решение владельца10.10 переносит их в техготовность; to-module-config.ts:107–108 и to-module.tsx:154–160 доводят старый alias до /admin/to?view=incidents; браузерная матрица подтвердила|УСТАРЕЛО|Исправить описание при отдельной правке; промежуточный совместимый alias самовольно не удалять и не менять процесс.|
 
 ## Схема, роли, контейнеры и команды
 

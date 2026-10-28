@@ -1,6 +1,6 @@
 # Изменённые файлы ветки
 
-База efd95008eac3bc846c89003c4b7766f2eb5c1c9b. Код/тесты по fcc5b0d6cda4b55490076016708edfb338fc1187; текущие отчёты включены. Сам перечень исключён. Конечный пустой элемент не считается строкой. Удалений нет. Все удаления строк внутри файлов — diff, а не удаление файлов; новые helpers/exports ради чистки не удалялись.
+База efd95008eac3bc846c89003c4b7766f2eb5c1c9b. Код/тесты по 34227a48b77e79a262d1b4d5e480c6249e2ba351; текущие отчёты включены. Сам перечень исключён. Конечный пустой элемент не считается строкой. Удалений нет. Все удаления строк внутри файлов — diff, а не удаление файлов; новые helpers/exports ради чистки не удалялись.
 
 | Файл | Было | Стало |
 |---|---:|---:|
@@ -10,7 +10,9 @@
 |docs/audits/night-1026/CLEARANCE-MATRIX.md|—|30|
 |docs/audits/night-1026/CROSS-ROLE.json|—|10820|
 |docs/audits/night-1026/CROSS-ROLE.md|—|49|
-|docs/audits/night-1026/DOCS-VS-CODE.md|—|85|
+|docs/audits/night-1026/DIRECT-URL-MATRIX.json|—|5787|
+|docs/audits/night-1026/DIRECT-URL-MATRIX.md|—|46|
+|docs/audits/night-1026/DOCS-VS-CODE.md|—|86|
 |docs/audits/night-1026/IMAGES.md|—|36|
 |docs/audits/night-1026/INTEGRATION-RUN.md|—|314|
 |docs/audits/night-1026/LONG-FILES.json|—|197|
@@ -26,21 +28,21 @@
 |docs/audits/night-1026/QA-RUN.md|—|53|
 |docs/audits/night-1026/REVIEW.md|—|32|
 |docs/audits/night-1026/ROLES-OBSERVATIONS.json|—|4452|
-|docs/audits/night-1026/ROLES-WALKTHROUGH.md|—|183|
+|docs/audits/night-1026/ROLES-WALKTHROUGH.md|—|186|
 |docs/audits/night-1026/SKIP-REGISTRY.json|—|3139|
-|docs/audits/night-1026/SUMMARY.md|—|92|
+|docs/audits/night-1026/SUMMARY.md|—|96|
 |docs/audits/night-1026/V2-FOOTER.md|—|28|
 |docs/audits/night-1026/V3-LEGACY.json|—|122|
 |docs/audits/night-1026/V3-LEGACY.md|—|40|
 |docs/audits/night-1026/V3-SELECTOR.md|—|25|
 |docs/audits/night-1026/V5-VIEWPORT.md|—|17|
-|docs/audits/night-1026/VERIFICATION.md|—|222|
+|docs/audits/night-1026/VERIFICATION.md|—|233|
 |docs/audits/night-1026/WHOLE-RUN-MATCH.json|—|46|
 |e2e/README.md|122|122|
 |e2e/fixtures/disposable-qa.mjs|121|122|
 |e2e/inspection-to-flow.spec.ts|157|306|
 |e2e/night-operator-cycle.spec.ts|—|476|
-|e2e/night-role-walkthrough.spec.ts|—|201|
+|e2e/night-role-walkthrough.spec.ts|—|334|
 |e2e/qa-ac/write-flows.spec.ts|212|216|
 |e2e/release-critical-path.spec.ts|172|232|
 |playwright.night.config.ts|—|26|
