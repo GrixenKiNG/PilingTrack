@@ -396,10 +396,13 @@ test('equipment access: operator cannot read an unassigned rig by direct id', as
   const fixture = await createRoleAuditFixture();
   const db = await owner();
   const equipmentId = randomUUID();
+  const secondAssignedId = randomUUID();
   const marker = 'QA-private-' + randomUUID();
   const observations: Array<Record<string, unknown>> = [];
   try {
     await db.query('INSERT INTO "Equipment" (id,name,model,"tenantId",vin,"updatedAt") VALUES ($1,$2,$3,$4,$5,now())', [equipmentId, marker, 'QA unassigned', fixture.tenantId, marker]);
+    await db.query('INSERT INTO "Equipment" (id,name,"tenantId","updatedAt") VALUES ($1,$2,$3,now())', [secondAssignedId, 'QA second assigned', fixture.tenantId]);
+    await db.query('INSERT INTO "Crew" (id,name,"operatorId","equipmentId","siteId","updatedAt") VALUES ($1,$2,$3,$4,$5,now())', [randomUUID(), 'QA second crew', fixture.users.OPERATOR.id, secondAssignedId, fixture.siteId]);
     expect((await db.query('SELECT id FROM "Crew" WHERE "equipmentId"=$1 AND "operatorId"=$2 AND "isActive"=true', [equipmentId, fixture.users.OPERATOR.id])).rowCount).toBe(0);
     await login(page, fixture.users.OPERATOR.email, fixture.password);
     const me = await page.request.get('/api/auth/me');
@@ -410,12 +413,15 @@ test('equipment access: operator cannot read an unassigned rig by direct id', as
     const listed = (await list.json()).data as Array<{ id: string }>;
     expect(listed.some(row => row.id === fixture.equipmentId)).toBe(true);
     expect(listed.some(row => row.id === equipmentId)).toBe(false);
+    expect(listed.some(row => row.id === secondAssignedId)).toBe(true);
     const own = await page.request.get('/api/equipment/' + fixture.equipmentId);
     expect(own.status()).toBe(200);
+    const secondAssigned = await page.request.get('/api/equipment/' + secondAssignedId);
+    expect(secondAssigned.status()).toBe(200);
     const details = await page.request.get('/api/equipment/' + equipmentId + '/details');
     const direct = await page.request.get('/api/equipment/' + equipmentId);
     const text = await direct.text();
-    observations.push({ operatorId: fixture.users.OPERATOR.id, tenantId: fixture.tenantId, assignedEquipmentId: fixture.equipmentId, unassignedEquipmentId: equipmentId, unassignedMarker: marker, listedEquipmentIds: listed.map(row => row.id), ownStatus: own.status(), compositeDetailsStatus: details.status(), directStatus: direct.status(), directIncludesUnassignedMarker: text.includes(marker), directResponse: text });
+    observations.push({ operatorId: fixture.users.OPERATOR.id, tenantId: fixture.tenantId, assignedEquipmentId: fixture.equipmentId, unassignedEquipmentId: equipmentId, unassignedMarker: marker, listedEquipmentIds: listed.map(row => row.id), ownStatus: own.status(), secondAssignedId, secondAssignedStatus: secondAssigned.status(), compositeDetailsStatus: details.status(), directStatus: direct.status(), directIncludesUnassignedMarker: text.includes(marker), directResponse: text });
     expect(details.status()).toBe(403);
     expect([403, 404], 'operator must not bypass the assignment filter by using a direct equipment id').toContain(direct.status());
     expect(text).not.toContain(marker);

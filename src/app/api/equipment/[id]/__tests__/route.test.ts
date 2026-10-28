@@ -15,6 +15,7 @@ import { NextRequest } from 'next/server';
 const {
   requireAuthMock,
   findFirstEquipmentMock,
+  findFirstCrewMock,
   updateEquipmentMock,
   getEquipmentByIdOrThrowMock,
   deleteEquipmentMock,
@@ -23,6 +24,7 @@ const {
 } = vi.hoisted(() => ({
   requireAuthMock: vi.fn(),
   findFirstEquipmentMock: vi.fn(),
+  findFirstCrewMock: vi.fn(),
   updateEquipmentMock: vi.fn(),
   getEquipmentByIdOrThrowMock: vi.fn(),
   deleteEquipmentMock: vi.fn(),
@@ -33,7 +35,7 @@ const {
 vi.mock('@/lib/auth', () => ({ requireAuth: requireAuthMock }));
 vi.mock('@/lib/csrf-protection', () => ({ withCsrf: () => null }));
 vi.mock('@/services/auth/authorization-service', () => ({ assertCan: vi.fn() }));
-vi.mock('@/lib/db', () => ({ db: { equipment: { findFirst: findFirstEquipmentMock } } }));
+vi.mock('@/lib/db', () => ({ db: { equipment: { findFirst: findFirstEquipmentMock }, crew: { findFirst: findFirstCrewMock } } }));
 vi.mock('@/lib/logger', () => ({
   logger: { error: loggerErrorMock, warn: vi.fn(), info: vi.fn(), debug: vi.fn() },
 }));
@@ -46,7 +48,7 @@ vi.mock('@/modules/equipment', () => ({
   canDecreaseMeter: vi.fn().mockReturnValue(true),
 }));
 
-import { PUT, DELETE } from '../route';
+import { GET, PUT, DELETE } from '../route';
 
 const ADMIN = { id: 'admin-1', name: 'Админ А.', role: 'ADMIN', tenantId: 'tenant-a' };
 
@@ -198,4 +200,51 @@ it('PUT передаёт предусловие и возвращает 409 бе
   expect(res.status).toBe(409);
   expect(updateEquipmentMock).toHaveBeenCalledWith(expect.objectContaining({tenantId:'tenant-a',expectedUpdatedAt:'2026-10-03T00:00:00.000Z'}));
   expect(recordAuditEventMock).not.toHaveBeenCalled();
+});
+
+
+describe('GET /api/equipment/[id] — назначение оператора', () => {
+  const OPERATOR = { id: 'operator-1', role: 'OPERATOR', tenantId: 'tenant-a' };
+  const CARD = { id: 'eq-1', tenantId: 'tenant-a', name: 'Закреплённая установка', vin: 'PRIVATE-VIN' };
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+    requireAuthMock.mockResolvedValue({ user: OPERATOR, error: null });
+    getEquipmentByIdOrThrowMock.mockResolvedValue(CARD);
+    findFirstCrewMock.mockResolvedValue(null);
+  });
+
+  it('не выдаёт паспорт оператору без активного назначения', async () => {
+    const response = await GET(new NextRequest('http://localhost/api/equipment/eq-1'), params());
+    expect(response.status).toBe(404);
+    expect(await response.text()).not.toContain(CARD.vin);
+    expect(getEquipmentByIdOrThrowMock).toHaveBeenCalledWith('eq-1', 'tenant-a');
+    expect(findFirstCrewMock).toHaveBeenCalledWith({
+      where: { operatorId: OPERATOR.id, equipmentId: 'eq-1', isActive: true, equipment: { tenantId: 'tenant-a' } },
+      select: { id: true },
+    });
+  });
+
+  it('сохраняет чтение назначенной установки', async () => {
+    findFirstCrewMock.mockResolvedValue({ id: 'active-crew' });
+    const response = await GET(new NextRequest('http://localhost/api/equipment/eq-1'), params());
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ equipment: CARD });
+  });
+
+  it.each(['ADMIN', 'DISPATCHER', 'MECHANIC', 'SAFETY_ENGINEER'])('не добавляет ограничение бригады для %s', async role => {
+    requireAuthMock.mockResolvedValue({ user: { ...ADMIN, role }, error: null });
+    const response = await GET(new NextRequest('http://localhost/api/equipment/eq-1'), params());
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ equipment: CARD });
+    expect(findFirstCrewMock).not.toHaveBeenCalled();
+  });
+
+  it('не читает установку без входа', async () => {
+    requireAuthMock.mockResolvedValue({ user: null, error: new Response('{}', { status: 401 }) });
+    const response = await GET(new NextRequest('http://localhost/api/equipment/eq-1'), params());
+    expect(response.status).toBe(401);
+    expect(getEquipmentByIdOrThrowMock).not.toHaveBeenCalled();
+    expect(findFirstCrewMock).not.toHaveBeenCalled();
+  });
 });
