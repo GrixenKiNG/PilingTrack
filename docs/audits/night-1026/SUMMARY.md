@@ -1,10 +1,10 @@
 # Доказательная ночь 26–28 октября 2026
 
-Ветка codex/night-evidence-1026, база origin/main **efd95008eac3bc846c89003c4b7766f2eb5c1c9b**. Актуальная прикладная сборка **00ac751f**; предыдущие операторские/ремонтные/бригадные/механические доказательства явно относятся к44126b98. Свежие users/UI,build и fullunit00ac — USERS-LIFECYCLE.md. Ничего не отправлялось и не вливалось.
+Ветка codex/night-evidence-1026, база origin/main **efd95008eac3bc846c89003c4b7766f2eb5c1c9b**. Текущая проверенная прикладная сборка **451acce2**. Новый прогон:48браузерных случаев и полный unit5783/0/0. Исторические осмотры механика,бригады,матрицаURL и общий обход ролей относятся к44126; старые users/fullunit00ac сохранены отдельно. Границы каждого SHA указаны в разделах. Ничего не отправлялось и не вливалось.
 
 | Задача | Статус | Что доказано |
 |---|---|---|
-|1. Повтор241пропуска|Готово|Все241 прошли в полном5776/0/0,512файлов|
+|1. Повтор241пропуска|Готово|Все 241 повторены в свежем полном5783/0/0 на451,512файлов|
 |2. Отказы outbox|Готово|Пять PG-сценариев, crash/replay, точечный canonical tenant guard; retry/DLQ сохранены|
 |3. Матрица допуска|Готово|10случаев×5путей, решения совпали; разные предупреждения оставлены|
 |4. Образы и smoke|Готово|Точный main efd95008:app0/360с,workers0/43с,workerssmoke0/9с,prod:smoke13/13exit0. Это образы main, не ночной ветки|
@@ -16,7 +16,7 @@
 
 | Приоритет | Дефект | Исправление |
 |---|---|---|
-|P2|OPERATOR получает паспорт неназначенной установки по прямому id, хотя список её скрывает, а details запрещён|Новый RED:0/1/0,exit1/39с. EQUIPMENT-ACCESS-RED.md. Разрешён точечный GET-guard, ещё не применён|
+|P2|OPERATOR получает паспорт неназначенной установки по прямому id, хотя список её скрывает, а details запрещён|RED1daa696a → fix451acce2: согласованные девять строк;3случая доступа+30циклов+9V3+6users и полный unit5783/0/0. EQUIPMENT-ACCESS-FIX.md|
 |P2|ASSISTANT403 в «ТБ и допуски»|0e3e2c9a: личный экран без расширения прав|
 |P2|Outbox без tenantId доходил доhandler|48aa4689: разрешённый guard;старые записи требуют разбора|
 |P2|Гонка20approval:23505legacy UNIQUE(scope,key),воспроизведена наmain|f51b0f30:ровно разрешённое ON CONFLICT DO NOTHING.37проверок+10гонок+полный5776/0/0|
@@ -28,6 +28,10 @@
 |P3|После create пользователя SQL содержит запись, обычный GET и UI остаются со старым списком|30634acf (RED) → 00ac751f: четыре строки инвалидации; шесть UI-тестов и свежий полный unit прошли. USERS-LIFECYCLE.md|
 
 ## Проверки
+
+На SHA 451acce2 новый прогон завершён: доступ к установкам 3/0/0,полные операторские циклы 30/0/0 (30CLOSED/30 уникальных отчётов), V39/0/0,пользователи 6/0/0;всего 48 passed/0 failed/0 skipped/0 flaky. Build exit 0/151 с;свежий полный unit 5783/0/0,512 файлов,все 241 исторических случая заново найдены и прошли. Коллекция 402/30 противBASE318/28,обаexit 0. EQUIPMENT-ACCESS-FIX.md/json.
+
+Следующие ранние результаты сохраняются как история с собственными SHA.
 
 Build44126:exit0/143с;tsc0/19с;lint0/65с/zero warnings. Свежий полный unit: **5776passed/0failed/0skipped**,512файлов,831,50с Vitest/873с wrapper. Все241 исторических найдены и прошли. Playwright collection:384/30 против BASE318/28,обаexit0. Последующие E2E-only проверки и новые сквозные цепочки — CROSS-ROLE.md;точные команды,exits,время и последняя коллекция — VERIFICATION.md.
 
@@ -108,3 +112,5 @@ V3: **9passed/0failed/0skipped** (6legacy+3selector). Отчёт сохраня�
 - 30634acf6c611574434dcd7a3ab784e67000d809 test(users): reproduce stale cached list after committed creation
 - 00ac751ffa4c22cb2117a189474ce7bcc73410cc fix(users): invalidate catalogue responses after successful writes
 - 81de80872bb503bd86e20027b0cd12c0d082d09f test(users): verify lifecycle after catalogue cache invalidation
+- 1daa696a287c83de626909128bf7c662fcc2d094 test(equipment): reproduce operator access to an unassigned rig
+- 451acce2b30e5130a9055e9d966edcf4a413ff67 fix(equipment): restrict operator cards to active rig assignments

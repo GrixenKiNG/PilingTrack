@@ -38,3 +38,8 @@ v3-six-final фактически собрал9тестов:6legacy и3суще�
 ## Итог на едином приложении44126b98
 
 v3-nine-final-2:9passed/0failed/0skipped/0flaky,exit0/168с wrapper (165.73сPW),scenarioUnchanged=true. Шесть настоящих legacy-отчётов×три браузера×single/multiple и три selector-check. Во всехшестиphaseIDENTITYдо/после,Shift=null,Report.shiftId=null;report/auditcreated/outbox/analytics/диспетчерпрошли. Поимённые результаты V3-LEGACY.json. Это подтверждённый legacy-путь всех трёх браузеров,а не канонический цикл смены. Старый8/1/0RED и5повторовегоharnessдиагнозасохранены.
+
+
+## Повтор на451acce2
+
+9passed/0failed/0skipped/0flaky,exit0/190с;equipment-v3-nine-raw. В шести реальных legacy-отчётах status=submitted,shiftId=null,phaseIDENTITYдо/после. Три selector доступны. Канонический цикл не добавлен,вопрос№9 не снимается.

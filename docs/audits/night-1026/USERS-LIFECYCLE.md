@@ -66,3 +66,8 @@
 До staging новых отчётов: all {"changed_count":12,"affected_count":0,"changed_files":6,"risk_level":"low"}; сравнение с BASE {"changed_count":218,"affected_count":7,"changed_files":65,"risk_level":"high"}. Все команды exit 0, partial/truncated не возвращены. HIGH заранее сообщён пользователю; семь имён потоков V3 совпали с предыдущим снимком. Они перечислены в compare-users-final.json; девять старых V3-сценариев относятся к44126, а не к00ac. Ограничения общего бюджета execution flows остаются и не доказывают отсутствие других связей.
 
 После окончательного редактирования и staging выполняется ещё один полный all/compare. Его реальные финальные ответы сохраняются в detect-users-staged.json и compare-users-staged.json; это последний анализ перед коммитом. Индекс, контекст и полные логи сохранены во внешней evidence-папке. Новый whole-branch review не повторялся.
+
+
+## Повтор на451acce2
+
+Весь файл снова6passed/0failed/0skipped/0flaky,exit0/249с. Сценарий85941e8b4f111cc3849ad24d31336c35d560d92da5788a670fb4472d10ea3207 не менялся. Все три полных user/document/session пути,24точных события аудита и прежние responsive-чтения повторены. Новый полный unit5783/0/0/all241 относится к451; исходные5776/0/0 выше остаются00ac. Сырьё equipment-users-raw;общие проверки EQUIPMENT-ACCESS-FIX.md/json.

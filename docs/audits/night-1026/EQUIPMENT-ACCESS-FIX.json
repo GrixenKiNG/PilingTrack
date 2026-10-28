@@ -1,0 +1,688 @@
+{
+  "status": "verified-scope-complete-task6-still-partial",
+  "sourceSha": "451acce2b30e5130a9055e9d966edcf4a413ff67",
+  "redCommit": "1daa696a",
+  "approvedApplicationAddedLines": 9,
+  "ownerPermission": "Разрешаю этот GET и тесты",
+  "build": {
+    "command": "npm run build",
+    "sourceSha": "451acce2b30e5130a9055e9d966edcf4a413ff67",
+    "exit": 0,
+    "seconds": 151
+  },
+  "focusedUnit": {
+    "command": "vitest run existing equipment route test",
+    "exit": 0,
+    "seconds": 4,
+    "passed": 14,
+    "failed": 0,
+    "skipped": 0
+  },
+  "point": {
+    "stats": {
+      "startTime": "2026-10-28T19:51:02.413Z",
+      "duration": 15698.373000000001,
+      "expected": 3,
+      "skipped": 0,
+      "unexpected": 0,
+      "flaky": 0
+    },
+    "run": {
+      "exit": 0,
+      "seconds": 47,
+      "cleanup": true,
+      "cleanupErrors": []
+    },
+    "cases": [
+      {
+        "browser": "chromium",
+        "status": "passed",
+        "evidence": {
+          "observations": [
+            {
+              "operatorId": "cmvsj52rk0004d4w5bv4mq3wl",
+              "tenantId": "cmvsj52ix0000d4w5uuk90ehy",
+              "assignedEquipmentId": "cmvsj531e0009d4w5czz5109b",
+              "unassignedEquipmentId": "cfd41984-fe2a-4716-9976-b0081cc64547",
+              "unassignedMarker": "QA-private-80b89864-1886-44d0-a804-856131eac942",
+              "listedEquipmentIds": [
+                "b30b9953-2fda-4c61-8539-dc79f86551a2",
+                "cmvsj531e0009d4w5czz5109b"
+              ],
+              "ownStatus": 200,
+              "secondAssignedId": "b30b9953-2fda-4c61-8539-dc79f86551a2",
+              "secondAssignedStatus": 200,
+              "compositeDetailsStatus": 403,
+              "directStatus": 404,
+              "directIncludesUnassignedMarker": false,
+              "directResponse": "{\"error\":\"Установка не найдена\"}"
+            }
+          ]
+        }
+      },
+      {
+        "browser": "Mobile Safari",
+        "status": "passed",
+        "evidence": {
+          "observations": [
+            {
+              "operatorId": "cmvsj56lv000458w5101xmyuo",
+              "tenantId": "cmvsj56d0000058w53gfzfq7f",
+              "assignedEquipmentId": "cmvsj56vg000958w5b5n6ksvi",
+              "unassignedEquipmentId": "6abe71bb-fe20-4c46-a67c-cca3569e6495",
+              "unassignedMarker": "QA-private-393049dd-6650-4278-bdb1-0b8f688ca54d",
+              "listedEquipmentIds": [
+                "f5453109-e29f-48b8-a7c9-e700815f02e6",
+                "cmvsj56vg000958w5b5n6ksvi"
+              ],
+              "ownStatus": 200,
+              "secondAssignedId": "f5453109-e29f-48b8-a7c9-e700815f02e6",
+              "secondAssignedStatus": 200,
+              "compositeDetailsStatus": 403,
+              "directStatus": 404,
+              "directIncludesUnassignedMarker": false,
+              "directResponse": "{\"error\":\"Установка не найдена\"}"
+            }
+          ]
+        }
+      },
+      {
+        "browser": "Mobile Chrome",
+        "status": "passed",
+        "evidence": {
+          "observations": [
+            {
+              "operatorId": "cmvsj5b1y0004zcw5jfzh0l4f",
+              "tenantId": "cmvsj5ata0000zcw5egsqupda",
+              "assignedEquipmentId": "cmvsj5bbs0009zcw5118iw8g6",
+              "unassignedEquipmentId": "f640ec70-31b5-4316-99e0-2a4aabc4ee33",
+              "unassignedMarker": "QA-private-5c663b0e-e2ba-4001-a695-24188cc70025",
+              "listedEquipmentIds": [
+                "fcb54d92-3cd9-4375-b19f-1a89e9cea092",
+                "cmvsj5bbs0009zcw5118iw8g6"
+              ],
+              "ownStatus": 200,
+              "secondAssignedId": "fcb54d92-3cd9-4375-b19f-1a89e9cea092",
+              "secondAssignedStatus": 200,
+              "compositeDetailsStatus": 403,
+              "directStatus": 404,
+              "directIncludesUnassignedMarker": false,
+              "directResponse": "{\"error\":\"Установка не найдена\"}"
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "pipelineAtPointProof": {
+    "sourceSha": "451acce2b30e5130a9055e9d966edcf4a413ff67",
+    "complete": false,
+    "scenarios": {
+      "e2e/night-operator-cycle.spec.ts": "5e77d580ba7e5e60984cb59bd0e993886c9d6b5785b5508a381d5c85653b9e24",
+      "e2e/release-critical-path.spec.ts": "f1cda0eb57743f7884543869cf1ccfdd55ab1403cf6a02f651467bc3e4771924",
+      "e2e/admin-users.spec.ts": "85941e8b4f111cc3849ad24d31336c35d560d92da5788a670fb4472d10ea3207"
+    },
+    "scenarioUnchanged": true,
+    "results": [
+      {
+        "id": "equipment-access-fixed",
+        "args": [
+          "D:\\PillingR\\night-logs\\night-evidence-1026/equipment-access-fixed-fresh-stand.cjs"
+        ],
+        "exit": 0,
+        "seconds": 47
+      }
+    ]
+  },
+  "remaining": "Every CRUD/page/role/resource combination, real external delivery and physical equipment are not exhausted",
+  "worktreeSha": "451acce2b30e5130a9055e9d966edcf4a413ff67",
+  "pipeline": {
+    "sourceSha": "451acce2b30e5130a9055e9d966edcf4a413ff67",
+    "complete": true,
+    "scenarios": {
+      "e2e/night-operator-cycle.spec.ts": "5e77d580ba7e5e60984cb59bd0e993886c9d6b5785b5508a381d5c85653b9e24",
+      "e2e/release-critical-path.spec.ts": "f1cda0eb57743f7884543869cf1ccfdd55ab1403cf6a02f651467bc3e4771924",
+      "e2e/admin-users.spec.ts": "85941e8b4f111cc3849ad24d31336c35d560d92da5788a670fb4472d10ea3207"
+    },
+    "scenarioUnchanged": true,
+    "results": [
+      {
+        "id": "equipment-access-fixed",
+        "args": [
+          "D:\\PillingR\\night-logs\\night-evidence-1026/equipment-access-fixed-fresh-stand.cjs"
+        ],
+        "exit": 0,
+        "seconds": 47
+      },
+      {
+        "id": "equipment-canonical-thirty",
+        "args": [
+          "D:\\PillingR\\night-logs\\night-evidence-1026/timed-night-pw.cjs",
+          "equipment-canonical-thirty",
+          "--grep",
+          "real admission"
+        ],
+        "exit": 0,
+        "seconds": 1277
+      },
+      {
+        "id": "equipment-v3-nine",
+        "args": [
+          "D:\\PillingR\\night-logs\\night-evidence-1026/timed-release-pw.cjs",
+          "equipment-v3-nine",
+          "--grep",
+          "v3:"
+        ],
+        "exit": 0,
+        "seconds": 190
+      },
+      {
+        "id": "equipment-users",
+        "args": [
+          "D:\\PillingR\\night-logs\\night-evidence-1026/equipment-users-fresh-stand.cjs"
+        ],
+        "exit": 0,
+        "seconds": 249
+      },
+      {
+        "id": "equipment-final-gates",
+        "args": [
+          "D:\\PillingR\\night-logs\\night-evidence-1026/equipment-final-gates.cjs",
+          "451acce2b30e5130a9055e9d966edcf4a413ff67"
+        ],
+        "exit": 0,
+        "seconds": 1003
+      },
+      {
+        "id": "equipment-final-validate",
+        "args": [
+          "D:\\PillingR\\night-logs\\night-evidence-1026/equipment-final-validate.cjs",
+          "451acce2b30e5130a9055e9d966edcf4a413ff67"
+        ],
+        "exit": 0,
+        "seconds": 0
+      }
+    ]
+  },
+  "gates": {
+    "sourceSha": "451acce2b30e5130a9055e9d966edcf4a413ff67",
+    "worktreeSha": "451acce2b30e5130a9055e9d966edcf4a413ff67",
+    "complete": true,
+    "results": [
+      {
+        "id": "equipment-final-tsc",
+        "exe": "C:/Program Files/Git/bin/bash.exe",
+        "args": [
+          "-c",
+          "npx tsc --noEmit"
+        ],
+        "exit": 0,
+        "seconds": 15
+      },
+      {
+        "id": "equipment-final-lint",
+        "exe": "C:/Program Files/Git/bin/bash.exe",
+        "args": [
+          "-c",
+          "npm run lint"
+        ],
+        "exit": 0,
+        "seconds": 65
+      },
+      {
+        "id": "equipment-final-unit-wrapper",
+        "exe": "C:\\Program Files\\nodejs\\node.exe",
+        "args": [
+          "D:/PillingR/night-logs/night-evidence-1026/unit-equipment-run-stand.cjs"
+        ],
+        "exit": 0,
+        "seconds": 884
+      },
+      {
+        "id": "equipment-final-pw-list-wrapper",
+        "exe": "C:\\Program Files\\nodejs\\node.exe",
+        "args": [
+          "D:/PillingR/night-logs/night-evidence-1026/qa-fresh-stand.cjs",
+          "--list-default"
+        ],
+        "exit": 0,
+        "seconds": 39
+      }
+    ]
+  },
+  "validated": {
+    "wholeRun": "full-unit-equipment-final",
+    "sourceSha": "451acce2b30e5130a9055e9d966edcf4a413ff67",
+    "unitExit": 0,
+    "gatesComplete": true,
+    "passed": 5783,
+    "failed": 0,
+    "skipped": 0,
+    "files": 512,
+    "historicalTotal": 241,
+    "historicalMatched": 241,
+    "historicalPassed": 241,
+    "historicalNotPassed": [],
+    "failedTests": []
+  },
+  "collection": {
+    "tests": 402,
+    "files": 30,
+    "baseTests": 318,
+    "baseFiles": 28
+  },
+  "canonical": {
+    "stats": {
+      "startTime": "2026-10-28T19:51:23.077Z",
+      "duration": 1275820.175,
+      "expected": 30,
+      "skipped": 0,
+      "unexpected": 0,
+      "flaky": 0
+    },
+    "closed": 30,
+    "uniqueReports": 30,
+    "cases": [
+      {
+        "title": "v7: real admission, inspections, offline replay, production and closed report (single rig)",
+        "browser": "chromium",
+        "status": "passed",
+        "phase": "CLOSED",
+        "shiftId": "93ca60ff-45a4-455d-b264-8300133baf84",
+        "reportId": "RM-93ca60ff-2026-10-28"
+      },
+      {
+        "title": "v7: real admission, inspections, offline replay, production and closed report (multiple rigs)",
+        "browser": "chromium",
+        "status": "passed",
+        "phase": "CLOSED",
+        "shiftId": "7f7d2d99-d912-45a4-83f2-b2ce34121393",
+        "reportId": "RM-7f7d2d99-2026-10-28"
+      },
+      {
+        "title": "v10: real admission, inspections, offline replay, production and closed report (single rig)",
+        "browser": "chromium",
+        "status": "passed",
+        "phase": "CLOSED",
+        "shiftId": "6de7a129-e272-4d25-9cba-8ccd6f3077e1",
+        "reportId": "RM-6de7a129-2026-10-28"
+      },
+      {
+        "title": "v10: real admission, inspections, offline replay, production and closed report (multiple rigs)",
+        "browser": "chromium",
+        "status": "passed",
+        "phase": "CLOSED",
+        "shiftId": "bedd7941-8593-45d5-8fb6-b064c4d99e2d",
+        "reportId": "RM-bedd7941-2026-10-28"
+      },
+      {
+        "title": "operator: real admission, inspections, offline replay, production and closed report (single rig)",
+        "browser": "chromium",
+        "status": "passed",
+        "phase": "CLOSED",
+        "shiftId": "9fbe4921-00fc-44bf-b034-82eb9826814a",
+        "reportId": "RM-9fbe4921-2026-10-28"
+      },
+      {
+        "title": "operator: real admission, inspections, offline replay, production and closed report (multiple rigs)",
+        "browser": "chromium",
+        "status": "passed",
+        "phase": "CLOSED",
+        "shiftId": "c63e079b-e1a0-4868-be03-8005c49926bf",
+        "reportId": "RM-c63e079b-2026-10-28"
+      },
+      {
+        "title": "v5: real admission, inspections, offline replay, production and closed report (single rig)",
+        "browser": "chromium",
+        "status": "passed",
+        "phase": "CLOSED",
+        "shiftId": "6a176218-dc71-4db7-b948-ba672b588780",
+        "reportId": "RM-6a176218-2026-10-28"
+      },
+      {
+        "title": "v5: real admission, inspections, offline replay, production and closed report (multiple rigs)",
+        "browser": "chromium",
+        "status": "passed",
+        "phase": "CLOSED",
+        "shiftId": "7964c2ca-b39f-487c-9519-3b3b54786be0",
+        "reportId": "RM-7964c2ca-2026-10-28"
+      },
+      {
+        "title": "v2: real admission, inspections, offline replay, production and closed report (single rig)",
+        "browser": "chromium",
+        "status": "passed",
+        "phase": "CLOSED",
+        "shiftId": "944f3f81-0eb5-4d18-b3e2-8e1b031af8fc",
+        "reportId": "RM-944f3f81-2026-10-28"
+      },
+      {
+        "title": "v2: real admission, inspections, offline replay, production and closed report (multiple rigs)",
+        "browser": "chromium",
+        "status": "passed",
+        "phase": "CLOSED",
+        "shiftId": "d89ca782-4dfa-4167-ac79-594cefad61ac",
+        "reportId": "RM-d89ca782-2026-10-28"
+      },
+      {
+        "title": "v7: real admission, inspections, offline replay, production and closed report (single rig)",
+        "browser": "Mobile Safari",
+        "status": "passed",
+        "phase": "CLOSED",
+        "shiftId": "57423031-cb53-494c-85e1-ad636cbc2dc5",
+        "reportId": "RM-57423031-2026-10-28"
+      },
+      {
+        "title": "v7: real admission, inspections, offline replay, production and closed report (multiple rigs)",
+        "browser": "Mobile Safari",
+        "status": "passed",
+        "phase": "CLOSED",
+        "shiftId": "feade2e0-e5c9-4773-829f-b1519282b533",
+        "reportId": "RM-feade2e0-2026-10-28"
+      },
+      {
+        "title": "v10: real admission, inspections, offline replay, production and closed report (single rig)",
+        "browser": "Mobile Safari",
+        "status": "passed",
+        "phase": "CLOSED",
+        "shiftId": "c13546a9-9b7f-48f3-8e25-628cc3a810ca",
+        "reportId": "RM-c13546a9-2026-10-28"
+      },
+      {
+        "title": "v10: real admission, inspections, offline replay, production and closed report (multiple rigs)",
+        "browser": "Mobile Safari",
+        "status": "passed",
+        "phase": "CLOSED",
+        "shiftId": "68c5bd07-f992-4913-ae06-d429de8b0572",
+        "reportId": "RM-68c5bd07-2026-10-28"
+      },
+      {
+        "title": "operator: real admission, inspections, offline replay, production and closed report (single rig)",
+        "browser": "Mobile Safari",
+        "status": "passed",
+        "phase": "CLOSED",
+        "shiftId": "6dc40427-0b89-40bd-b4fb-174a5ef70ae0",
+        "reportId": "RM-6dc40427-2026-10-28"
+      },
+      {
+        "title": "operator: real admission, inspections, offline replay, production and closed report (multiple rigs)",
+        "browser": "Mobile Safari",
+        "status": "passed",
+        "phase": "CLOSED",
+        "shiftId": "1b551575-9444-4b1b-b017-81e4459ff961",
+        "reportId": "RM-1b551575-2026-10-28"
+      },
+      {
+        "title": "v5: real admission, inspections, offline replay, production and closed report (single rig)",
+        "browser": "Mobile Safari",
+        "status": "passed",
+        "phase": "CLOSED",
+        "shiftId": "e0c03b34-7e1d-409a-9f22-d98c01452f1e",
+        "reportId": "RM-e0c03b34-2026-10-28"
+      },
+      {
+        "title": "v5: real admission, inspections, offline replay, production and closed report (multiple rigs)",
+        "browser": "Mobile Safari",
+        "status": "passed",
+        "phase": "CLOSED",
+        "shiftId": "219dfabc-d09e-44aa-aae7-0a1ed3904372",
+        "reportId": "RM-219dfabc-2026-10-28"
+      },
+      {
+        "title": "v2: real admission, inspections, offline replay, production and closed report (single rig)",
+        "browser": "Mobile Safari",
+        "status": "passed",
+        "phase": "CLOSED",
+        "shiftId": "99050bd7-dea6-46ab-bbb3-90197d2611e5",
+        "reportId": "RM-99050bd7-2026-10-28"
+      },
+      {
+        "title": "v2: real admission, inspections, offline replay, production and closed report (multiple rigs)",
+        "browser": "Mobile Safari",
+        "status": "passed",
+        "phase": "CLOSED",
+        "shiftId": "6fa612f1-a96c-4d6d-ae5e-a7bb325555fe",
+        "reportId": "RM-6fa612f1-2026-10-28"
+      },
+      {
+        "title": "v7: real admission, inspections, offline replay, production and closed report (single rig)",
+        "browser": "Mobile Chrome",
+        "status": "passed",
+        "phase": "CLOSED",
+        "shiftId": "716f940c-e033-4bab-b60f-133d006bd511",
+        "reportId": "RM-716f940c-2026-10-28"
+      },
+      {
+        "title": "v7: real admission, inspections, offline replay, production and closed report (multiple rigs)",
+        "browser": "Mobile Chrome",
+        "status": "passed",
+        "phase": "CLOSED",
+        "shiftId": "a2184e10-5ce8-4da7-b859-378f56366619",
+        "reportId": "RM-a2184e10-2026-10-28"
+      },
+      {
+        "title": "v10: real admission, inspections, offline replay, production and closed report (single rig)",
+        "browser": "Mobile Chrome",
+        "status": "passed",
+        "phase": "CLOSED",
+        "shiftId": "2c7159ed-9091-4ab4-a8bc-8f2a5ba5d037",
+        "reportId": "RM-2c7159ed-2026-10-28"
+      },
+      {
+        "title": "v10: real admission, inspections, offline replay, production and closed report (multiple rigs)",
+        "browser": "Mobile Chrome",
+        "status": "passed",
+        "phase": "CLOSED",
+        "shiftId": "379b32e8-a52a-418a-a234-28a731226f22",
+        "reportId": "RM-379b32e8-2026-10-28"
+      },
+      {
+        "title": "operator: real admission, inspections, offline replay, production and closed report (single rig)",
+        "browser": "Mobile Chrome",
+        "status": "passed",
+        "phase": "CLOSED",
+        "shiftId": "cb3b4fae-9e7a-4f9a-ac7f-da6a9e9aa11c",
+        "reportId": "RM-cb3b4fae-2026-10-28"
+      },
+      {
+        "title": "operator: real admission, inspections, offline replay, production and closed report (multiple rigs)",
+        "browser": "Mobile Chrome",
+        "status": "passed",
+        "phase": "CLOSED",
+        "shiftId": "6195df52-5720-4d7b-9718-0028f6ecdb22",
+        "reportId": "RM-6195df52-2026-10-28"
+      },
+      {
+        "title": "v5: real admission, inspections, offline replay, production and closed report (single rig)",
+        "browser": "Mobile Chrome",
+        "status": "passed",
+        "phase": "CLOSED",
+        "shiftId": "151bf860-9d0a-4110-944b-542f9674dcc7",
+        "reportId": "RM-151bf860-2026-10-28"
+      },
+      {
+        "title": "v5: real admission, inspections, offline replay, production and closed report (multiple rigs)",
+        "browser": "Mobile Chrome",
+        "status": "passed",
+        "phase": "CLOSED",
+        "shiftId": "7e3b67a5-0f52-44a2-89ce-675d878cc533",
+        "reportId": "RM-7e3b67a5-2026-10-28"
+      },
+      {
+        "title": "v2: real admission, inspections, offline replay, production and closed report (single rig)",
+        "browser": "Mobile Chrome",
+        "status": "passed",
+        "phase": "CLOSED",
+        "shiftId": "e9a47b9a-31b6-4b65-b656-67979bf2b211",
+        "reportId": "RM-e9a47b9a-2026-10-28"
+      },
+      {
+        "title": "v2: real admission, inspections, offline replay, production and closed report (multiple rigs)",
+        "browser": "Mobile Chrome",
+        "status": "passed",
+        "phase": "CLOSED",
+        "shiftId": "5f7b3c0a-91ab-477c-8d04-ef31b012c79a",
+        "reportId": "RM-5f7b3c0a-2026-10-28"
+      }
+    ]
+  },
+  "v3": {
+    "stats": {
+      "startTime": "2026-10-28T20:12:40.666Z",
+      "duration": 188658.61099999998,
+      "expected": 9,
+      "skipped": 0,
+      "unexpected": 0,
+      "flaky": 0
+    },
+    "legacy": [
+      {
+        "title": "v3: real legacy report reaches dispatcher (single rig)",
+        "browser": "chromium",
+        "reportId": "cmvsjx3kq024t9ow5a7fctder",
+        "status": "submitted",
+        "shiftId": null,
+        "beforePhase": "IDENTITY",
+        "afterPhase": "IDENTITY"
+      },
+      {
+        "title": "v3: real legacy report reaches dispatcher (multiple rigs)",
+        "browser": "chromium",
+        "reportId": "cmvsjxdc302559ow5ymb3nhx3",
+        "status": "submitted",
+        "shiftId": null,
+        "beforePhase": "IDENTITY",
+        "afterPhase": "IDENTITY"
+      },
+      {
+        "title": "v3: real legacy report reaches dispatcher (single rig)",
+        "browser": "Mobile Safari",
+        "reportId": "cmvsjyxfu025i9ow5m27ucu2k",
+        "status": "submitted",
+        "shiftId": null,
+        "beforePhase": "IDENTITY",
+        "afterPhase": "IDENTITY"
+      },
+      {
+        "title": "v3: real legacy report reaches dispatcher (multiple rigs)",
+        "browser": "Mobile Safari",
+        "reportId": "cmvsjzvzk025u9ow57ts98vtz",
+        "status": "submitted",
+        "shiftId": null,
+        "beforePhase": "IDENTITY",
+        "afterPhase": "IDENTITY"
+      },
+      {
+        "title": "v3: real legacy report reaches dispatcher (single rig)",
+        "browser": "Mobile Chrome",
+        "reportId": "cmvsk0cso02679ow5m4qhqqac",
+        "status": "submitted",
+        "shiftId": null,
+        "beforePhase": "IDENTITY",
+        "afterPhase": "IDENTITY"
+      },
+      {
+        "title": "v3: real legacy report reaches dispatcher (multiple rigs)",
+        "browser": "Mobile Chrome",
+        "reportId": "cmvsk0lfh026j9ow5df6yxqdy",
+        "status": "submitted",
+        "shiftId": null,
+        "beforePhase": "IDENTITY",
+        "afterPhase": "IDENTITY"
+      }
+    ]
+  },
+  "users": {
+    "stats": {
+      "startTime": "2026-10-28T20:16:18.589Z",
+      "duration": 216261.57799999998,
+      "expected": 6,
+      "skipped": 0,
+      "unexpected": 0,
+      "flaky": 0
+    },
+    "audit": [
+      {
+        "browser": "chromium",
+        "actions": [
+          "user.created",
+          "user.updated",
+          "user.document.created",
+          "user.document.updated",
+          "user.document.deleted",
+          "user.updated",
+          "user.updated",
+          "user.deleted"
+        ],
+        "actors": [
+          "cmvsk1n9x0002n0w5ajf9hylu"
+        ],
+        "errors": []
+      },
+      {
+        "browser": "Mobile Safari",
+        "actions": [
+          "user.created",
+          "user.updated",
+          "user.document.created",
+          "user.document.updated",
+          "user.document.deleted",
+          "user.updated",
+          "user.updated",
+          "user.deleted"
+        ],
+        "actors": [
+          "cmvsk38iv000270w5wh16pdb9"
+        ],
+        "errors": []
+      },
+      {
+        "browser": "Mobile Chrome",
+        "actions": [
+          "user.created",
+          "user.updated",
+          "user.document.created",
+          "user.document.updated",
+          "user.document.deleted",
+          "user.updated",
+          "user.updated",
+          "user.deleted"
+        ],
+        "actors": [
+          "cmvsk576o0002vow5ps80tvnl"
+        ],
+        "errors": []
+      }
+    ]
+  },
+  "fullRunRoutePassed": 14,
+  "orphanCleanup": {
+    "completed": true,
+    "before": "equipment-orphan-root-before-cleanup.json",
+    "after": "equipment-orphan-root-after-cleanup.json",
+    "reason": "Root processes absent and Docker engine unavailable at02:00; only verified owned containers removed after restoring Docker"
+  },
+  "graphBeforeFinalStaging": {
+    "all": {
+      "changed_count": 30,
+      "affected_count": 0,
+      "changed_files": 12,
+      "risk_level": "low"
+    },
+    "compare": {
+      "changed_count": 246,
+      "affected_count": 7,
+      "changed_files": 74,
+      "risk_level": "high"
+    },
+    "forceIndexSeconds": 211,
+    "knownAffectedV3Flows": [
+      "OperatorDashboardV3 → FetchWithTimeout",
+      "OperatorDashboardV3 → Cleanup",
+      "OperatorDashboardV3 → GetCurrentResetTimeout",
+      "OperatorDashboardV3 → FormatEntry",
+      "OperatorDashboardV3 → ShouldLog",
+      "OperatorDashboardV3 → IsSensitiveKey",
+      "OperatorDashboardV3 → GetMinLevel"
+    ]
+  }
+}

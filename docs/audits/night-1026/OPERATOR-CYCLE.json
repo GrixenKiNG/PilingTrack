@@ -6426,5 +6426,16 @@
         ]
       }
     ]
+  },
+  "latestVerifiedRegression": {
+    "sourceBuildSha": "451acce2b30e5130a9055e9d966edcf4a413ff67",
+    "passed": 30,
+    "failed": 0,
+    "skipped": 0,
+    "flaky": 0,
+    "seconds": 1277,
+    "closedShifts": 30,
+    "uniqueReports": 30,
+    "evidence": "EQUIPMENT-ACCESS-FIX.json canonical; equipment-canonical-thirty-raw"
   }
 }

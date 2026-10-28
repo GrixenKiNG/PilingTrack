@@ -285,3 +285,29 @@ EQUIPMENT-ACCESS-RED.md/json: реальный OPERATOR, один tenant, обы
 Полная переиндексация exit0/139с; контроль requirePageAbility — правильный UID/путь и15callers. All:14changed/0affected/8files,LOW; compare(BASE):231changed/7affected/70files,HIGH. Флаги partial/truncated не возвращены. HIGH заранее сообщён владельцу; имена семи V3-потоков совпадают с предыдущим снимком. После последней правки отчётов выполняется повтор all/compare с полными ответами detect-equipment-red-staged.json/compare-equipment-red-staged.json. Глобальный бюджет execution flows ограничен; нулевой impact не доказывает отсутствие HTTP-потребителей.
 
 Физический сценарий имеет SHA2566ee344b6330f28841f5a37ceeb32a8af1ca6de99139c6a35b436ea4e0c38c275; Git нормализует прежние CRLF в LF (canonicalSHA256db730fa52f2802863f8238c892e65879166dde16cf9b4171558778ba9e9c8e4d). equipment-red-line-ending-proof.json подтвердил: только окончания строк, старый префикс побайтно сохранён, assertions не менялись.
+
+
+## Согласованное исправление GET: новая проверка ещё идёт
+
+Исправление согласованного GET закоммичено451acce2b30e5130a9055e9d966edcf4a413ff67 после RED1daa696a. Добавлены ровно девять строк приложения; прежние tenant-проверки и другие роли сохранены. Целевые unit14/0/0,exit0/4с; tsc0/20с,lint0/66с. Новый build завершился exit0/151с; HTTP health подтвердил451acce2. Точечный GET-сценарий прошёл в трёх браузерах:3/0/0,exit0/47с,обе назначенные200/неназначенная404 без паспорта. Общий последовательный прогон и полный unit нового SHA ещё не завершены. Подробности: EQUIPMENT-ACCESS-FIX.md/json. Предшествующие результаты00ac к451acce2 не приписываются.
+
+Усиленный базовый RED с двумя активными назначениями сохранил200 для обеих и всё ещё выдавал200 для неназначенной; архив equipment-access-multi-red-raw,exit1/40с. Proof source delta и сохранности прежних семи unit bodies: equipment-get-fix-source-proof.json/equipment-get-unit-preservation-proof.json. Перед fix-коммитом полный здоровый graph:all1changed/0affected/3files LOW;compare234changed/7affected/72files HIGH,те же V3;partial/truncated не возвращены. Финальные staged ответы detect-equipment-fix-staged.json/compare-equipment-fix-staged.json.
+
+
+## Завершён новый конвейер на451acce2
+
+На SHA 451acce2 новый прогон завершён: доступ к установкам 3/0/0,полные операторские циклы 30/0/0 (30CLOSED/30 уникальных отчётов), V39/0/0,пользователи 6/0/0;всего 48 passed/0 failed/0 skipped/0 flaky. Build exit 0/151 с;свежий полный unit 5783/0/0,512 файлов,все 241 исторических случая заново найдены и прошли. Коллекция 402/30 противBASE318/28,обаexit 0. EQUIPMENT-ACCESS-FIX.md/json.
+
+|Шаг|Exit|Секунды|
+|---|---:|---:|
+|equipment-final-tsc|0|15|
+|equipment-final-lint|0|65|
+|equipment-final-unit-wrapper|0|884|
+|equipment-final-pw-list-wrapper|0|39|
+
+Sourceguardgitdiffsrc/prisma/package/next.configот451пуст;триscenariohashсовпали. Свежесть unitJSON/публичныйSHA/mtime и241registry проверены заново. Предыдущие пункты «проверка идёт» относятся к промежуточным снимкам; текущий результат — этот раздел. ВсеCRUD/внешние сервисы не объявлены доказанными.
+
+
+## GitNexus перед фиксацией отчёта
+
+Полное перестроение --index-only --force:exit0/211с;requirePageAbility имеет правильные UID/путь и15реальных callers. All:30changed/0affected/12files,LOW;compare(BASE):246changed/7affected/74files,HIGH. Все ответы полные,partial/truncated не возвращены. Имена семи потоков V3 совпали с предыдущим снимком;пользователь предупреждён. Девять V3-сценариев теперь повторены и на451,но все отказные ветви этими девятью случаями не объявляются проверенными. Глобальный бюджет execution flows ограничен и не доказывает отсутствие остальных связей. После окончательной правки и staging повторяютсяall/compare,финальные ответы —detect-equipment-docs-staged.json иcompare-equipment-docs-staged.json. Новый whole-branch review не запускался.
