@@ -150,6 +150,7 @@ test('users and document lifecycle: UI writes, admission, session revocation and
       await page.getByRole('button').filter({ has: page.getByText(email, { exact: true }) }).click();
     };
     await openUser();
+    await page.getByRole('tab', { name: 'Доступ', exact: true }).click();
     await page.getByRole('button', { name: 'Редактировать', exact: true }).click();
     dialog = page.getByRole('dialog', { name: 'Редактировать пользователя', exact: true });
     await field('Имя').fill(name + ' изменён');
@@ -237,6 +238,7 @@ test('users and document lifecycle: UI writes, admission, session revocation and
     await expect(documentConfirm).toHaveCount(0);
     expect(await documentRow()).toBeUndefined();
     expect((await documentCheck()).verdict).toBe('MISSING');
+    await page.getByRole('tab', { name: 'Доступ', exact: true }).click();
     await page.getByRole('button', { name: 'Заблокировать', exact: true }).click();
     const blockConfirm = page.getByRole('alertdialog', { name: 'Заблокировать пользователя?', exact: true });
     await blockConfirm.getByRole('button', { name: 'Отмена', exact: true }).click();

@@ -1,6 +1,6 @@
 # Доказательная ночь 26–28 октября 2026
 
-Ветка codex/night-evidence-1026, база origin/main **efd95008eac3bc846c89003c4b7766f2eb5c1c9b**. Прикладная сборка **44126b98**, последующие изменения — E2E и отчёты. Ничего не отправлялось и не вливалось.
+Ветка codex/night-evidence-1026, база origin/main **efd95008eac3bc846c89003c4b7766f2eb5c1c9b**. Актуальная прикладная сборка **00ac751f**; предыдущие операторские/ремонтные/бригадные/механические доказательства явно относятся к44126b98. Свежие users/UI,build и fullunit00ac — USERS-LIFECYCLE.md. Ничего не отправлялось и не вливалось.
 
 | Задача | Статус | Что доказано |
 |---|---|---|
@@ -24,7 +24,7 @@
 |P3|V5 длинное имя расширялоviewport и мешало нажатиям|46315b0f:локальныйoverflow-wrap,RED→GREEN|
 |P3|V2 нижняя панель перекрывала завершение осмотра;имя расширялоviewport|21dc26ce+7a9dc8a7+95f7c6b8:локальныеCSSклассы;6полныхциклов зелёные|
 |P3|V3 нижняя навигация перекрывала selector объекта|1b0a2663:CSS,3selector зелёные;версия сохранена|
-|P3|После create пользователя SQL содержит запись, обычный GET и UI остаются со старым списком|Новый RED:0/1/0,exit1;USERS-CACHE-RED.md. Отдельная точечная инвалидация готовится|
+|P3|После create пользователя SQL содержит запись, обычный GET и UI остаются со старым списком|30634acf (RED) → 00ac751f: четыре строки инвалидации; шесть UI-тестов и свежий полный unit прошли. USERS-LIFECYCLE.md|
 
 ## Проверки
 
@@ -46,7 +46,7 @@ V3: **9passed/0failed/0skipped** (6legacy+3selector). Отчёт сохраня�
 Бригада через формы во всех3браузерах:3passed/0failed/0skipped. Создание, смена установки/объекта/названия, снятие помощника, отмена/подтверждение softdelete и активация; SQL/аудит/сохранность draftReport, чтение MECHANIC и403 на изменение, options OPERATOR. CREW-LIFECYCLE.md/json. Последние tsc0/17с,lint0/70с без предупреждений;коллекция396/30 против BASE318/28,обаexit0.
 
 
-Новый целевой Playwright-сценарий пользователей сейчас RED:0passed/1failed/0skipped,exit1/45с wrapper. POST201/SQL8,обычный GET7,freshGET8;неисправленный кеш,а не падение старыхunit. tsc0/21с,lint0/136с без предупреждений,коллекция399/30vsBASE318/28,обаexit0/93с,cleanup=true. Документы/блокировка/удаление этого сценария ещё не пройдены. USERS-CACHE-RED.md/json.
+На сборке 00ac751f пользователи и документы: 6 passed / 0 failed / 0 skipped / 0 flaky, exit 0, 279 с; Chromium, Mobile Safari и Mobile Chrome. Создание и правка пользователя, сроки и удаление удостоверения, чтение инженером ОТ, отказы другому оператору, блокировка с отзывом сессии, разблокировка и удаление подтверждены UI/SQL и 24 точными событиями аудита. Build: exit 0, 168 с. Свежий полный unit: 5776 / 0 / 0; все 241 исторических случая повторены. Коллекция 399/30 против BASE 318/28, оба exit 0. Подробности: USERS-LIFECYCLE.md/json. Предыдущие RED сохранены.
 
 ## Что осталось
 
@@ -101,3 +101,6 @@ V3: **9passed/0failed/0skipped** (6legacy+3selector). Отчёт сохраня�
 - fcc5b0d6cda4b55490076016708edfb338fc1187 docs: record final operator and cross-role evidence with coverage limits
 - 34227a48b77e79a262d1b4d5e480c6249e2ba351 test(inspections): prove complete mechanic workflow across browsers
 - f938298c9fcdab0611ff0c1361176be01e1756b8 test(e2e): verify inherited page guards across seven real roles
+- b0001fdb42ea795febc4e5590f2793ec52f413ed test(crews): prove UI lifecycle assignments and actor audit
+- 30634acf6c611574434dcd7a3ab784e67000d809 test(users): reproduce stale cached list after committed creation
+- 00ac751ffa4c22cb2117a189474ce7bcc73410cc fix(users): invalidate catalogue responses after successful writes

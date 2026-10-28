@@ -248,3 +248,26 @@ Chromium, совершенно свежие собственные PG18/два R
 Новый целевой Playwright-сценарий пользователей сейчас RED:0passed/1failed/0skipped,exit1/45с wrapper. POST201/SQL8,обычный GET7,freshGET8;неисправленный кеш,а не падение старыхunit. tsc0/21с,lint0/136с без предупреждений,коллекция399/30vsBASE318/28,обаexit0/93с,cleanup=true. Документы/блокировка/удаление этого сценария ещё не пройдены. USERS-CACHE-RED.md/json.
 
 Код приложения на момент RED —44126b98;currentHEADb0001fdb плюс добавленный E2E. Исходные пять связанных файлов равны BASEefd95008 по Git blob;HTTPBASE отдельно не запускался. Последующие положительныеunit/build не следует понимать как уже выполненную проверку будущей правки. Подробности/команды/сырьё — USERS-CACHE-RED.md/json.
+
+
+## Новый прикладной SHA00ac751f: пользователи и документы
+
+На сборке 00ac751f пользователи и документы: 6 passed / 0 failed / 0 skipped / 0 flaky, exit 0, 279 с; Chromium, Mobile Safari и Mobile Chrome. Создание и правка пользователя, сроки и удаление удостоверения, чтение инженером ОТ, отказы другому оператору, блокировка с отзывом сессии, разблокировка и удаление подтверждены UI/SQL и 24 точными событиями аудита. Build: exit 0, 168 с. Свежий полный unit: 5776 / 0 / 0; все 241 исторических случая повторены. Коллекция 399/30 против BASE 318/28, оба exit 0. Подробности: USERS-LIFECYCLE.md/json. Предыдущие RED сохранены.
+
+|Шаг|Exit|Секунды|
+|---|---:|---:|
+|users-final-tsc|0|22|
+|users-final-lint|0|79|
+|users-final-unit-wrapper|0|966|
+|users-final-pw-list-wrapper|0|41|
+
+Предшествующий раздел RED — исторический снимок44126. Проверка git diff src/prisma/package/next.config относительно00ac пуста; HTTP health подтвердил00ac. Свежесть unit JSON проверена по времени и SHA стенда, все241 случая сопоставлены заново. Старые операторские UI-результаты остались привязаны к44126. Подробности: USERS-LIFECYCLE.md/json.
+
+
+## GitNexus перед фиксацией результата
+
+Полное перестроение --index-only --force: exit 0, 141 с. Context requirePageAbility снова имеет правильный UID Function:src/lib/require-page-ability.ts:requirePageAbility, путь и 15 реальных callers. File-impact изменяемого E2E вернул UNKNOWN/0; динамический запуск подтверждён playwright.night.config.ts и двумя workflow. Это не считалось отсутствием влияния.
+
+До staging новых отчётов: all {"changed_count":12,"affected_count":0,"changed_files":6,"risk_level":"low"}; сравнение с BASE {"changed_count":218,"affected_count":7,"changed_files":65,"risk_level":"high"}. Все команды exit 0, partial/truncated не возвращены. HIGH заранее сообщён пользователю; семь имён потоков V3 совпали с предыдущим снимком. Они перечислены в compare-users-final.json; девять старых V3-сценариев относятся к44126, а не к00ac. Ограничения общего бюджета execution flows остаются и не доказывают отсутствие других связей.
+
+После окончательного редактирования и staging выполняется ещё один полный all/compare. Его реальные финальные ответы сохраняются в detect-users-staged.json и compare-users-staged.json; это последний анализ перед коммитом. Индекс, контекст и полные логи сохранены во внешней evidence-папке. Новый whole-branch review не повторялся.

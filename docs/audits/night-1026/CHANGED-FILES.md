@@ -1,6 +1,6 @@
 # Изменённые файлы ветки
 
-База efd95008eac3bc846c89003c4b7766f2eb5c1c9b. Код/тесты по b0001fdb42ea795febc4e5590f2793ec52f413ed; текущие отчёты включены. Сам перечень исключён. Конечный пустой элемент не считается строкой. Удалений нет. Все удаления строк внутри файлов — diff, а не удаление файлов; новые helpers/exports ради чистки не удалялись.
+База efd95008eac3bc846c89003c4b7766f2eb5c1c9b. Код/тесты по 00ac751ffa4c22cb2117a189474ce7bcc73410cc; текущие отчёты включены. Сам перечень исключён. Конечный пустой элемент не считается строкой. Удалений нет. Все удаления строк внутри файлов — diff, а не удаление файлов; новые helpers/exports ради чистки не удалялись.
 
 | Файл | Было | Стало |
 |---|---:|---:|
@@ -30,20 +30,22 @@
 |docs/audits/night-1026/QA-RUN.md|—|53|
 |docs/audits/night-1026/REVIEW.md|—|32|
 |docs/audits/night-1026/ROLES-OBSERVATIONS.json|—|4452|
-|docs/audits/night-1026/ROLES-WALKTHROUGH.md|—|189|
+|docs/audits/night-1026/ROLES-WALKTHROUGH.md|—|198|
 |docs/audits/night-1026/SKIP-REGISTRY.json|—|3139|
-|docs/audits/night-1026/SUMMARY.md|—|103|
+|docs/audits/night-1026/SUMMARY.md|—|106|
 |docs/audits/night-1026/USERS-CACHE-RED.json|—|71|
-|docs/audits/night-1026/USERS-CACHE-RED.md|—|19|
+|docs/audits/night-1026/USERS-CACHE-RED.md|—|21|
+|docs/audits/night-1026/USERS-LIFECYCLE.json|—|671|
+|docs/audits/night-1026/USERS-LIFECYCLE.md|—|68|
 |docs/audits/night-1026/V2-FOOTER.md|—|28|
 |docs/audits/night-1026/V3-LEGACY.json|—|122|
 |docs/audits/night-1026/V3-LEGACY.md|—|40|
 |docs/audits/night-1026/V3-SELECTOR.md|—|25|
 |docs/audits/night-1026/V5-VIEWPORT.md|—|17|
-|docs/audits/night-1026/VERIFICATION.md|—|250|
+|docs/audits/night-1026/VERIFICATION.md|—|273|
 |docs/audits/night-1026/WHOLE-RUN-MATCH.json|—|46|
 |e2e/README.md|122|122|
-|e2e/admin-users.spec.ts|56|293|
+|e2e/admin-users.spec.ts|56|295|
 |e2e/fixtures/disposable-qa.mjs|121|122|
 |e2e/inspection-to-flow.spec.ts|157|306|
 |e2e/night-operator-cycle.spec.ts|—|476|
@@ -53,6 +55,7 @@
 |playwright.night.config.ts|—|26|
 |src/app/(app)/(safety)/admin/safety/__tests__/page.test.tsx|—|26|
 |src/app/(app)/(safety)/admin/safety/page.tsx|14|20|
+|src/app/api/users/route.ts|169|173|
 |src/app/operator/v5/operator-v5-app.css|177|181|
 |src/components/piling/__tests__/dashboard-attention.test.tsx|65|76|
 |src/components/piling/dashboard-attention.tsx|96|98|
