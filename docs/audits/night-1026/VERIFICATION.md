@@ -242,3 +242,9 @@ Chromium, совершенно свежие собственные PG18/два R
 Полные all/compare до staging новых отчётов:exit0;all={"changed_count":18,"affected_count":0,"changed_files":6,"risk_level":"low"};compare={"changed_count":189,"affected_count":7,"changed_files":59,"risk_level":"high"}. Флагов partial/truncated нет. Список семи HIGH-потоков побайтно сопоставлен по именам с предыдущим снимком:OperatorDashboardV3 → FetchWithTimeout/Cleanup/GetCurrentResetTimeout/FormatEntry/ShouldLog/IsSensitiveKey/GetMinLevel. Пользователь предупреждён перед последующими правками отчёта. Девять V3-сценариев зелёные на44126, все ветви отказа не доказаны. Глобальные ограничения обхода execution flows не являются доказательством отсутствия остальных связей. Повреждённые старые incremental-снимки не используются.
 
 После последнего изменения отчётов и staging выполняется ещё один полный all/compare перед коммитом; реальные финальные счётчики — detect-crew-staged.json/compare-crew-staged.json. Полные логи/JSON и crew-final-graph-results.json сохранены во внешней evidence-папке.
+
+## Новый RED: response cache списка пользователей
+
+Новый целевой Playwright-сценарий пользователей сейчас RED:0passed/1failed/0skipped,exit1/45с wrapper. POST201/SQL8,обычный GET7,freshGET8;неисправленный кеш,а не падение старыхunit. tsc0/21с,lint0/136с без предупреждений,коллекция399/30vsBASE318/28,обаexit0/93с,cleanup=true. Документы/блокировка/удаление этого сценария ещё не пройдены. USERS-CACHE-RED.md/json.
+
+Код приложения на момент RED —44126b98;currentHEADb0001fdb плюс добавленный E2E. Исходные пять связанных файлов равны BASEefd95008 по Git blob;HTTPBASE отдельно не запускался. Последующие положительныеunit/build не следует понимать как уже выполненную проверку будущей правки. Подробности/команды/сырьё — USERS-CACHE-RED.md/json.

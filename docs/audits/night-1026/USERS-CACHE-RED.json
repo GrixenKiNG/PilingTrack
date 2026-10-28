@@ -1,0 +1,71 @@
+{
+  "sourceBuildSha": "44126b987c9dd02b0bbefe28e8094f282b94aaf0",
+  "worktreeSha": "b0001fdb42ea795febc4e5590f2793ec52f413ed",
+  "scenario": {
+    "sourceBuildSha": "44126b987c9dd02b0bbefe28e8094f282b94aaf0",
+    "scenarioHash": "57866e2233ea68906b3ba51e9cf1f8ac2aa3d642069fb61131502a2d122581b7"
+  },
+  "stats": {
+    "startTime": "2026-10-28T05:45:56.737Z",
+    "duration": 9389.067,
+    "expected": 0,
+    "skipped": 0,
+    "unexpected": 1,
+    "flaky": 0
+  },
+  "run": {
+    "exit": 1,
+    "seconds": 45,
+    "cleanup": true,
+    "cleanupErrors": []
+  },
+  "evidence": {
+    "observations": [
+      {
+        "step": "read-after-create: cache and authoritative response",
+        "user": {
+          "id": "cmvroyell0001tgw5hq5b6yps",
+          "tenantId": "cmvroya580000vgw5p9ygx9pg",
+          "name": "Пользователь QA 7205eb35-e7f7-4c38-972e-b8f042f1945c",
+          "email": "7205eb35-e7f7-4c38-972e-b8f042f1945c@users-night.test",
+          "phone": "+79990001122",
+          "role": "OPERATOR",
+          "isActive": true
+        },
+        "cachedCount": 7,
+        "freshCount": 8,
+        "cachedHasCreatedUser": false,
+        "freshHasCreatedUser": true
+      }
+    ],
+    "errors": []
+  },
+  "baselineSourceFingerprints": [
+    {
+      "file": "src/app/api/users/route.ts",
+      "baseBlob": "a312e7e70f043020bc2f19578a0834f8d733df32",
+      "currentBlob": "a312e7e70f043020bc2f19578a0834f8d733df32"
+    },
+    {
+      "file": "src/modules/users/user-service.ts",
+      "baseBlob": "472251b7739aacfc94ca7f1c09ed8bd6c4852ab8",
+      "currentBlob": "472251b7739aacfc94ca7f1c09ed8bd6c4852ab8"
+    },
+    {
+      "file": "src/core/api-wrapper.ts",
+      "baseBlob": "870dd942fd9d47ce647f462d68780a0809ef9179",
+      "currentBlob": "870dd942fd9d47ce647f462d68780a0809ef9179"
+    },
+    {
+      "file": "src/core/cache/response-cache.ts",
+      "baseBlob": "c7e25a3cce8b94bc0847db476874e276ccf69551",
+      "currentBlob": "c7e25a3cce8b94bc0847db476874e276ccf69551"
+    },
+    {
+      "file": "src/components/piling/admin-users/use-users-list.ts",
+      "baseBlob": "5fb191ba2f477c693aaac74efbd5b41f1a51e7cf",
+      "currentBlob": "5fb191ba2f477c693aaac74efbd5b41f1a51e7cf"
+    }
+  ],
+  "runtimeOnBaseNotRun": true
+}
