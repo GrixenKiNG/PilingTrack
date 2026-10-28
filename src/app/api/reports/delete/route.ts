@@ -16,6 +16,9 @@ export const runtime = 'nodejs';
 
 const schema = z.object({ reportId: z.string().min(1) });
 
+const PASSPORTS_BLOCK_MESSAGE =
+  'Нельзя удалить отчёт: в нём есть паспорта свай. Исправляйте записи через журнал свай.';
+
 /**
  * Что уничтожается вместе с отчётом (F-R34-1). Отдельный тип, а не вывод
  * из запроса: снимок уходит и в доменное событие, и в запись аудита, и его
@@ -69,6 +72,7 @@ export const DELETE = withMutation(
     // что и удаление: иначе между чтением и удалением остаётся окно, в котором
     // след описывает уже не то состояние.
     let deleted: DeletedReportSnapshot | null = null;
+    let hasPassports = false;
     try {
       deleted = await db.$transaction(async (tx) => {
         const report = await tx.report.findFirst({
@@ -82,12 +86,26 @@ export const DELETE = withMutation(
             version: true,
             site: { select: { name: true } },
             user: { select: { name: true } },
-            piles: { select: { count: true, pileGrade: { select: { lengthMm: true } } } },
+            piles: {
+              select: {
+                count: true,
+                pileGrade: { select: { lengthMm: true } },
+                passport: { select: { id: true } },
+              },
+            },
             drillings: { select: { meters: true } },
             downtimes: { select: { duration: true } },
           },
         });
         if (!report) return null;
+
+        // Паспорт сваи — исполнительный документ: вместе с отчётом он
+        // исчез бы безвозвратно, а след хранит только суммы дня. Ту же
+        // границу держит внешний ключ PilePassport → PileWork (RESTRICT).
+        if (report.piles.some((pile) => pile.passport)) {
+          hasPassports = true;
+          return null;
+        }
 
         const before: DeletedReportSnapshot = {
           reportId: report.reportId,
@@ -139,10 +157,18 @@ export const DELETE = withMutation(
       }, DEFAULT_TX_OPTIONS);
     } catch (err) {
       const message = err instanceof Error ? err.message : '';
+      // Паспорт появился между проверкой и удалением: остановила база.
+      if ((err as { code?: string }).code === 'P2003') {
+        return NextResponse.json({ error: PASSPORTS_BLOCK_MESSAGE }, { status: 409 });
+      }
       if (message.includes('Record to delete') || message.includes('not found')) {
         return NextResponse.json({ error: 'Отчёт не найден' }, { status: 404 });
       }
       throw err;
+    }
+
+    if (hasPassports) {
+      return NextResponse.json({ error: PASSPORTS_BLOCK_MESSAGE }, { status: 409 });
     }
 
     if (!deleted) {

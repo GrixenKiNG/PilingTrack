@@ -129,6 +129,70 @@ describe('DELETE /api/reports/delete — tenant scoping', () => {
   });
 });
 
+describe('DELETE /api/reports/delete — паспорта свай не удаляются (ПТО, шаг 1)', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    requireAuthMock.mockResolvedValue({ user: ADMIN, error: null });
+  });
+
+  const withPassport = {
+    ...REPORT_ROW,
+    piles: [
+      { count: 1, pileGrade: { lengthMm: 12000 }, passport: { id: 'passport-1' } },
+      { count: 8, pileGrade: { lengthMm: null }, passport: null },
+    ],
+  };
+
+  it('отвечает 409 и ничего не удаляет, если у отчёта есть паспорт сваи', async () => {
+    findFirstMock.mockResolvedValue(withPassport);
+
+    const res = await DELETE(deleteReq('report-1'));
+
+    expect(res.status).toBe(409);
+    expect((await res.json()).error).toContain('паспорт');
+    expect(deleteMock).not.toHaveBeenCalled();
+    expect(outboxCreateMock).not.toHaveBeenCalled();
+    expect(feedbackCreateMock).not.toHaveBeenCalled();
+  });
+
+  it('просит у базы признак паспорта у каждой строки выработки', async () => {
+    findFirstMock.mockResolvedValue(REPORT_ROW);
+    deleteMock.mockResolvedValue({ id: 'internal-1' });
+
+    await DELETE(deleteReq('report-1'));
+
+    const { select } = findFirstMock.mock.calls[0][0];
+    expect(select.piles.select.passport).toEqual({ select: { id: true } });
+  });
+
+  it('по-прежнему удаляет отчёт, где паспортов нет', async () => {
+    findFirstMock.mockResolvedValue({
+      ...REPORT_ROW,
+      piles: [{ count: 5, pileGrade: { lengthMm: 12000 }, passport: null }],
+    });
+    deleteMock.mockResolvedValue({ id: 'internal-1' });
+
+    const res = await DELETE(deleteReq('report-1'));
+
+    expect(res.status).toBe(200);
+    expect(deleteMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('отвечает 409, а не 500, если базу остановил RESTRICT на паспорте (гонка)', async () => {
+    findFirstMock.mockResolvedValue(REPORT_ROW);
+    deleteMock.mockRejectedValue(
+      Object.assign(new Error('Foreign key constraint violated: `PilePassport_pileWorkId_fkey`'), {
+        code: 'P2003',
+      })
+    );
+
+    const res = await DELETE(deleteReq('report-1'));
+
+    expect(res.status).toBe(409);
+    expect(outboxCreateMock).not.toHaveBeenCalled();
+  });
+});
+
 describe('DELETE /api/reports/delete — след удаления (F-R34-1)', () => {
   beforeEach(() => {
     vi.resetAllMocks();
