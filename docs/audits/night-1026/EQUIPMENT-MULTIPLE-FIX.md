@@ -1,0 +1,13 @@
+# Вторая назначенная установка: RED до исправления
+
+Новая ветка codex/equipment-multiple-1029 отmain **17f235e54d4bb25bbde047929005a8fd612e685f**. Точечное разрешение: D:/PillingR/night-logs/for-codex/TASK-EQUIPMENT-MULTIPLE-APPROVED.md. Код приложения пока не изменён.
+
+Baseline: существующие query/meter/mutation-audit тесты83passed/0failed/0skipped,exit0/5с. Добавлено23проверки в тех же трёх файлах:RED88passed/18failed/0skipped,exit1. Все прежние83случая найдены и по-прежнему passed(red-preservation.json);18падений относятся только к новому optional equipmentId/аргументу guard. Причина: текущий query игнорирует третий аргумент,обаguardпередают только два.
+
+В query-тестах Reflect.apply позволяет сначала проверить новый runtime-контракт без преждевременного изменения TypeScript-сигнатуры или ts-ignore. Проверяются пять role/actingAs сочетаний, пустой equipmentId, явный undefined; прежние тесты двухаргументного запроса сохранены. Route-контракты покрывают GET/POST, назначенныйid,отсутствующую/другуюбригаду без read/write/audit и прежнийADMINbypass. Старые тела тестов не переписывались, изменена только проводка дополнительных mocks/imports. Новых test-файлов нет.
+
+Vitest: node node_modules/vitest/vitest.mjs run src/modules/crews/application/queries/__tests__/crew-query.service.test.ts src/app/api/equipment/[id]/meter-readings/__tests__/route.test.ts src/app/api/__tests__/mutation-audit.test.ts --maxWorkers=1 --no-file-parallelism --reporter=default --reporter=json --outputFile=<внешний red-targeted.json>. Actualexit1 сохранён вred-targeted-result.json;логи и полный JSONвD:/PillingR/night-logs/equipment-multiple-1029. Полный unit/браузер/build этого нового задания ещё не запускались.
+
+Impact до изменений:HIGHдляgetCrewForOperator,6символов/2guard/4GETPOST/28flowhits. ЛокальныеguardLOW/2обработчикакаждый. HIGHзаранее сообщён. Динамический/api/crews/myподтверждёнпоиском(callers.txt),небудетизменяться. Чистыйdetectдоtestизменений0. Свежий индексmain17f;егообщийбюджетflowsограничен,нулевыеcallersнеобъявленыбезопасными. ПередэтимREDкоммитомполныйforce/context/all/compareбезpartial/truncated,артефактыred-precommit-result.json/red-detect.json/red-compare.json.
+
+Установка:первыйnpmciexit1наpostinstall/dbgenerateиз-заотсутствияDATABASE_URL_POSTGRES;затемnpmci --ignore-scriptsexit0(748пакетов,audit0),отдельныйdbgenerateexit0сранее разрешённымодноразовымзначениемтольковenvкоманды,значениенесохранено,.envнечитались. Правка документов/audit.updated не входит в разрешение и не делается. Следующий шаг — отдельный коммит только согласованных строк трёх файлов, затем реальный браузер, новая сборка и полные последовательные проверки с новым SHA.

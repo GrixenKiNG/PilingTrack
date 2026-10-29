@@ -71,3 +71,40 @@ describe('getCrewForOperator — исполняемая роль', () => {
     }));
   });
 });
+
+describe('getCrewForOperator — optional equipment filter', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockDb.crew.findFirst.mockResolvedValue(null);
+  });
+
+  it.each([
+    ['OPERATOR', undefined, 'actor-1'],
+    ['ASSISTANT', undefined, 'actor-1'],
+    ['ADMIN', 'OPERATOR', 'actor-1'],
+    ['ADMIN', undefined, 'other-operator'],
+    ['DISPATCHER', undefined, 'other-operator'],
+  ])('role=%s actingAs=%s combines requested rig with the existing user OR', async (role, actingAs, expectedId) => {
+    await Reflect.apply(getCrewForOperator, undefined, [{ id: 'actor-1', role, actingAs }, 'other-operator', 'rig-2']);
+    expect(mockDb.crew.findFirst).toHaveBeenCalledWith(expect.objectContaining({
+      where: {
+        equipmentId: 'rig-2',
+        OR: [{ operatorId: expectedId }, { assistants: { some: { userId: expectedId } } }],
+      },
+    }));
+  });
+
+  it('keeps the original query when the third argument is undefined', async () => {
+    await Reflect.apply(getCrewForOperator, undefined, [{ id: 'actor-1', role: 'OPERATOR' }, null, undefined]);
+    expect(mockDb.crew.findFirst).toHaveBeenCalledWith(expect.objectContaining({
+      where: { OR: [{ operatorId: 'actor-1' }, { assistants: { some: { userId: 'actor-1' } } }] },
+    }));
+  });
+
+  it('does not drop an explicitly empty equipment id', async () => {
+    await Reflect.apply(getCrewForOperator, undefined, [{ id: 'actor-1', role: 'OPERATOR' }, null, '']);
+    expect(mockDb.crew.findFirst).toHaveBeenCalledWith(expect.objectContaining({
+      where: { equipmentId: '', OR: [{ operatorId: 'actor-1' }, { assistants: { some: { userId: 'actor-1' } } }] },
+    }));
+  });
+});
