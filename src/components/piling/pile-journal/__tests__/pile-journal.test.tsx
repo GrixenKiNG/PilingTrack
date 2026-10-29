@@ -346,6 +346,29 @@ describe('карточка сваи: замеры с запятой (R129 #5)', 
     expect(screen.getByText('1,8 мм/уд')).toBeInTheDocument();
     expect(screen.queryByText('11.5 м')).toBeNull();
   });
+
+  /**
+   * Обход ПТО 30.10.2026: отметка головы −1,25 м печаталась как «−1,3 м», а в
+   * строке журнала и в форме 4.1 стояла −1,25. Отметки берут нивелиром с
+   * точностью до сантиметра — карточка не должна округлять их до дециметра.
+   */
+  it('отметки головы, высота подъёма и отказ сохраняют сотые', async () => {
+    mocks.authFetch.mockImplementation(async (url: string) => {
+      if (url.startsWith('/api/sites/all')) return json({ sites: [] });
+      return json({
+        data: [pileRow({ actualHeadLevelM: -1.25, designHeadLevelM: -1.2, dropHeightM: 1.25, refusalMm: 2.83 })],
+        header,
+        truncated: false,
+      });
+    });
+    render(<PileJournal />);
+    fireEvent.click(await screen.findByText('С-130'));
+
+    expect(await screen.findByText('-1,25 м')).toBeInTheDocument();
+    expect(screen.getByText('-1,2 м')).toBeInTheDocument();
+    expect(screen.getByText('1,25 м')).toBeInTheDocument();
+    expect(screen.getByText('2,83 мм/уд')).toBeInTheDocument();
+  });
 });
 
 /**

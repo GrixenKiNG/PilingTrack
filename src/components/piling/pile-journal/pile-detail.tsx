@@ -86,20 +86,20 @@ export function PileDetail({ row, busy, onDecide }: {
       ) : null}
 
       <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-2xs sm:grid-cols-3">
-        <Fact label="Отказ фактический" value={fmt(row.refusalMm, ' мм/уд')} strong={alarming} />
+        <Fact label="Отказ фактический" value={fmt(row.refusalMm, ' мм/уд', 2)} strong={alarming} />
         <Fact label="Отказ проектный" value={fmt(row.designRefusalMm, ' мм/уд')} />
         <Fact label="Марка сваи" value={`${row.pileGradeName}${row.pileSection ? ` · ${row.pileSection}` : ''}`} />
         <Fact label="Длина сваи" value={fmt(row.pileLengthM, ' м')} />
         <Fact label="Глубина погружения" value={fmt(row.drivenDepthM, ' м')} />
-        <Fact label="Отметка головы факт." value={fmt(row.actualHeadLevelM, ' м')} />
-        <Fact label="Отметка головы проект." value={fmt(row.designHeadLevelM, ' м')} />
+        <Fact label="Отметка головы факт." value={fmt(row.actualHeadLevelM, ' м', 2)} />
+        <Fact label="Отметка головы проект." value={fmt(row.designHeadLevelM, ' м', 2)} />
         <Fact label="Ударов всего" value={fmt(row.totalBlows)} />
         <Fact label="На последний метр" value={fmt(row.blowsLastMeter)} />
         <Fact label="Отклонение в плане" value={fmt(row.planDeviationMm, ' мм')} />
         <Fact label="От вертикали" value={fmt(row.tiltPercent, ' %')} />
         <Fact label="Молот" value={row.hammerType ?? '—'} />
         <Fact label="Энергия удара" value={fmt(row.hammerEnergyKj, ' кДж')} />
-        <Fact label="Высота подъёма" value={fmt(row.dropHeightM, ' м')} />
+        <Fact label="Высота подъёма" value={fmt(row.dropHeightM, ' м', 2)} />
         <Fact
           label="Отметки"
           value={[
@@ -163,8 +163,9 @@ export function PileDetail({ row, busy, onDecide }: {
   );
 }
 
-function fmt(value: number | null, unit = ''): string {
-  return value === null ? '—' : `${formatNumber(value, 1)}${unit}`;
+/** Замеры точнее десятой (отметки, высота подъёма, отказ) печатаются с сотыми. */
+function fmt(value: number | null, unit = '', digits = 1): string {
+  return value === null ? '—' : `${formatNumber(value, digits)}${unit}`;
 }
 
 function Fact({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
