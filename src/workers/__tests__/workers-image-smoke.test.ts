@@ -128,3 +128,13 @@ describe('защита ручной выкладки', () => {
     expect(deploy).not.toContain('ssh-keyscan');
   });
 });
+
+it('нативный загрузчик Vitest собирает список файлов без bundler', () => {
+  const result = spawnSync(process.execPath, [
+    path.join(root, 'node_modules/vitest/vitest.mjs'),
+    'list', '--configLoader', 'native', '--filesOnly',
+  ], { cwd: root, encoding: 'utf8', timeout: 25_000, windowsHide: true });
+  expect(result.error).toBeUndefined();
+  expect(result.status, result.stderr).toBe(0);
+  expect(result.stdout.replaceAll('\\', '/')).toContain('src/workers/__tests__/workers-image-smoke.test.ts');
+}, 30_000);
