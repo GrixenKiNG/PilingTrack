@@ -8,7 +8,7 @@
  * правит, удаляет. Всё созданное — удаляется или архивируется здесь же.
  */
 import { expect, test } from '@playwright/test';
-import { login, matrix, must } from '../qa/helpers';
+import { login, matrix, must, qaAccount, qaSelect } from '../qa/helpers';
 import { RUN_SUF, api, pause, sweepAcqa, writeRunJson } from './util';
 
 const ADMIN = must(matrix.roles.find((r) => r.role === 'ADMIN'), 'роль ADMIN').email;
@@ -133,7 +133,11 @@ test('C3: отчёт — диспетчер создаёт на AC-QA объек
   const siteId = (await siteResp.json()).site.id as string;
   // Владелец отчёта должен быть закреплён за объектом (иначе запись отчёта — 403).
   const users = (await (await api(page).get('/api/users')).json()).users as Array<{ id: string; email: string; name: string }>;
-  const ka = users.find((u) => u.email === matrix.operatorVersions[0].operator);
+  // The read-only catalogue intentionally hides contacts from dispatchers.
+  const fixtureEmail = qaAccount(matrix.operatorVersions[0].operator).replaceAll("'", "''");
+  const kaId = qaSelect(`SELECT id FROM "User" WHERE email='${fixtureEmail}'`);
+  expect(users.every((u) => u.email === ''), 'контакты скрыты от диспетчера').toBe(true);
+  const ka = users.find((u) => u.id === kaId);
   expect(ka, 'оператор ka найден').toBeTruthy();
   const assign = await api(page).post(`/api/sites/${siteId}/assign`, { data: { userId: must(ka, 'оператор ka').id } });
   expect(assign.status(), 'оператор закреплён за AC-QA объектом').toBe(200);

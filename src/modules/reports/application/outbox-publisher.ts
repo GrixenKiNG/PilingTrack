@@ -128,6 +128,7 @@ async function consumeOutboxEvents(
     // wins the atomic updateMany below. Duplicate side effects are not
     // prevented here — they're absorbed by handler idempotency.
     try {
+      if (!outboxEvent.tenantId) throw new Error('Outbox event tenantId is required');
       // Reconstruct the domain event from outbox columns. Some writers store
       // the full event in `payload`, others store only `event.data`. We treat
       // `payload` as a partial source and override the routing fields with
@@ -157,7 +158,7 @@ async function consumeOutboxEvents(
       //
       // Контекст заводится на каждое событие отдельно: в одной пачке идут
       // события разных тенантов, и общий на всю пачку контекст смешал бы их.
-      // Строки без тенанта (написанные до появления колонки) идут как раньше.
+      // Строки без тенанта требуют разбора/backfill и не доходят до обработчика.
       await runWithTenantContext(async () => {
         setRequestTenantId(outboxEvent.tenantId ?? null);
         await handler(event);

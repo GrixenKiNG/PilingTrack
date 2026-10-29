@@ -24,7 +24,7 @@ async function assertOperatorOwnsEquipment(
   equipmentId: string,
 ): Promise<void> {
   if (user.role !== 'OPERATOR') return;
-  const crew = await getCrewForOperator(user, null);
+  const crew = await getCrewForOperator(user, null, equipmentId);
   if (!crew || crew.equipmentId !== equipmentId) {
     throw new ServiceError('Установка не закреплена за вашим экипажем', 403);
   }

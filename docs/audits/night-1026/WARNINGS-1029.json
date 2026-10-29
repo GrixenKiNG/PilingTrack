@@ -1,0 +1,973 @@
+{
+  "branch": "codex/warnings-1029",
+  "base": "17f235e54d4bb25bbde047929005a8fd612e685f",
+  "redCommit": "c924500d6b7b8ff5f7cbee03fb9ca0c62d6d06b6",
+  "fixCommit": "42a2c9346f804b31c7b4ef86931c83a05df9434f",
+  "nativeFixCommit": "dba76f2c3fdd6bda27d5f43e61a307658578bfa1",
+  "setup": {
+    "checks": [
+      {
+        "id": "npm-ci",
+        "args": [
+          "-c",
+          "npm ci --ignore-scripts"
+        ],
+        "exit": 0,
+        "seconds": 97
+      },
+      {
+        "id": "db-generate",
+        "args": [
+          "-c",
+          "npm run db:generate"
+        ],
+        "exit": 0,
+        "seconds": 4
+      },
+      {
+        "id": "initial-index",
+        "args": [
+          "C:/Users/PC/.pnpm-store/v11/links/@/gitnexus/1.6.12/517bd3ec813b3480a38495d348b3b4357d5f7d23af984d219cfbe39fed175b79/node_modules/gitnexus/dist/cli/index.js",
+          "analyze",
+          "--index-only"
+        ],
+        "exit": 0,
+        "seconds": 143
+      },
+      {
+        "id": "initial-detect",
+        "args": [
+          "D:/PillingR/night-logs/warnings-1029/graph.mjs",
+          "detect"
+        ],
+        "exit": 0,
+        "seconds": 2
+      }
+    ],
+    "complete": true,
+    "envFilesPresent": false
+  },
+  "baselineUnit": {
+    "passed": 6029,
+    "failed": 0,
+    "skipped": 0,
+    "files": 529
+  },
+  "afterUnit": {
+    "passed": 6030,
+    "failed": 0,
+    "skipped": 0,
+    "files": 529
+  },
+  "oldCasesPreserved": true,
+  "finalUnit": {
+    "passed": 6030,
+    "failed": 0,
+    "skipped": 0,
+    "files": 529
+  },
+  "final": {
+    "sourceSha": "42a2c9346f804b31c7b4ef86931c83a05df9434f",
+    "complete": true,
+    "results": [
+      {
+        "id": "final-build",
+        "args": [
+          "-c",
+          "npm run build"
+        ],
+        "exit": 0,
+        "seconds": 151
+      },
+      {
+        "id": "final-gates-wrapper",
+        "args": [
+          "D:\\PillingR\\night-logs\\warnings-1029/final-gates.cjs",
+          "42a2c9346f804b31c7b4ef86931c83a05df9434f"
+        ],
+        "exit": 0,
+        "seconds": 958
+      }
+    ]
+  },
+  "gates": {
+    "sourceSha": "42a2c9346f804b31c7b4ef86931c83a05df9434f",
+    "worktreeSha": "42a2c9346f804b31c7b4ef86931c83a05df9434f",
+    "complete": true,
+    "results": [
+      {
+        "id": "final-tsc",
+        "exe": "C:/Program Files/Git/bin/bash.exe",
+        "args": [
+          "-c",
+          "npx tsc --noEmit"
+        ],
+        "exit": 0,
+        "seconds": 16
+      },
+      {
+        "id": "final-lint",
+        "exe": "C:/Program Files/Git/bin/bash.exe",
+        "args": [
+          "-c",
+          "npm run lint"
+        ],
+        "exit": 0,
+        "seconds": 70
+      },
+      {
+        "id": "final-unit-wrapper",
+        "exe": "C:\\Program Files\\nodejs\\node.exe",
+        "args": [
+          "D:/PillingR/night-logs/warnings-1029/unit-run-stand.cjs"
+        ],
+        "exit": 0,
+        "seconds": 840
+      },
+      {
+        "id": "final-pw-list-wrapper",
+        "exe": "C:\\Program Files\\nodejs\\node.exe",
+        "args": [
+          "D:/PillingR/night-logs/warnings-1029/qa-fresh-stand.cjs",
+          "--list-default"
+        ],
+        "exit": 0,
+        "seconds": 32
+      }
+    ]
+  },
+  "measurement": {
+    "sourceSha": "17f235e54d4bb25bbde047929005a8fd612e685f",
+    "appPid": 6388,
+    "workload": {
+      "sourceSha": "17f235e54d4bb25bbde047929005a8fd612e685f",
+      "baseURL": "http://127.0.0.1:59265",
+      "startedAt": "2026-10-29T12:53:58.494Z",
+      "durationSeconds": 1800,
+      "workers": 4,
+      "requests": 31327,
+      "status": {
+        "200": 30568
+      },
+      "aborts": 1564,
+      "errors": {
+        "ECONNRESET": 538
+      },
+      "samples": [
+        {
+          "elapsedSeconds": 60,
+          "requests": 1022,
+          "aborts": 50,
+          "status": {
+            "200": 996
+          },
+          "errors": {
+            "ECONNRESET": 18
+          }
+        },
+        {
+          "elapsedSeconds": 120,
+          "requests": 2064,
+          "aborts": 101,
+          "status": {
+            "200": 2012
+          },
+          "errors": {
+            "ECONNRESET": 32
+          }
+        },
+        {
+          "elapsedSeconds": 180,
+          "requests": 3109,
+          "aborts": 153,
+          "status": {
+            "200": 3035
+          },
+          "errors": {
+            "ECONNRESET": 54
+          }
+        },
+        {
+          "elapsedSeconds": 240,
+          "requests": 4157,
+          "aborts": 207,
+          "status": {
+            "200": 4053
+          },
+          "errors": {
+            "ECONNRESET": 68
+          }
+        },
+        {
+          "elapsedSeconds": 300,
+          "requests": 5196,
+          "aborts": 258,
+          "status": {
+            "200": 5069
+          },
+          "errors": {
+            "ECONNRESET": 85
+          }
+        },
+        {
+          "elapsedSeconds": 360,
+          "requests": 6239,
+          "aborts": 310,
+          "status": {
+            "200": 6081
+          },
+          "errors": {
+            "ECONNRESET": 97
+          }
+        },
+        {
+          "elapsedSeconds": 420,
+          "requests": 7284,
+          "aborts": 362,
+          "status": {
+            "200": 7103
+          },
+          "errors": {
+            "ECONNRESET": 117
+          }
+        },
+        {
+          "elapsedSeconds": 480,
+          "requests": 8325,
+          "aborts": 416,
+          "status": {
+            "200": 8112
+          },
+          "errors": {
+            "ECONNRESET": 130
+          }
+        },
+        {
+          "elapsedSeconds": 540,
+          "requests": 9365,
+          "aborts": 467,
+          "status": {
+            "200": 9129
+          },
+          "errors": {
+            "ECONNRESET": 147
+          }
+        },
+        {
+          "elapsedSeconds": 600,
+          "requests": 10405,
+          "aborts": 518,
+          "status": {
+            "200": 10143
+          },
+          "errors": {
+            "ECONNRESET": 162
+          }
+        },
+        {
+          "elapsedSeconds": 660,
+          "requests": 11445,
+          "aborts": 570,
+          "status": {
+            "200": 11155
+          },
+          "errors": {
+            "ECONNRESET": 179
+          }
+        },
+        {
+          "elapsedSeconds": 720,
+          "requests": 12485,
+          "aborts": 621,
+          "status": {
+            "200": 12169
+          },
+          "errors": {
+            "ECONNRESET": 196
+          }
+        },
+        {
+          "elapsedSeconds": 780,
+          "requests": 13533,
+          "aborts": 675,
+          "status": {
+            "200": 13194
+          },
+          "errors": {
+            "ECONNRESET": 217
+          }
+        },
+        {
+          "elapsedSeconds": 840,
+          "requests": 14577,
+          "aborts": 727,
+          "status": {
+            "200": 14215
+          },
+          "errors": {
+            "ECONNRESET": 237
+          }
+        },
+        {
+          "elapsedSeconds": 900,
+          "requests": 15620,
+          "aborts": 778,
+          "status": {
+            "200": 15232
+          },
+          "errors": {
+            "ECONNRESET": 253
+          }
+        },
+        {
+          "elapsedSeconds": 960,
+          "requests": 16667,
+          "aborts": 832,
+          "status": {
+            "200": 16253
+          },
+          "errors": {
+            "ECONNRESET": 272
+          }
+        },
+        {
+          "elapsedSeconds": 1020,
+          "requests": 17713,
+          "aborts": 884,
+          "status": {
+            "200": 17269
+          },
+          "errors": {
+            "ECONNRESET": 288
+          }
+        },
+        {
+          "elapsedSeconds": 1080,
+          "requests": 18758,
+          "aborts": 935,
+          "status": {
+            "200": 18289
+          },
+          "errors": {
+            "ECONNRESET": 306
+          }
+        },
+        {
+          "elapsedSeconds": 1140,
+          "requests": 19807,
+          "aborts": 989,
+          "status": {
+            "200": 19312
+          },
+          "errors": {
+            "ECONNRESET": 324
+          }
+        },
+        {
+          "elapsedSeconds": 1200,
+          "requests": 20858,
+          "aborts": 1041,
+          "status": {
+            "200": 20341
+          },
+          "errors": {
+            "ECONNRESET": 346
+          }
+        },
+        {
+          "elapsedSeconds": 1260,
+          "requests": 21903,
+          "aborts": 1094,
+          "status": {
+            "200": 21362
+          },
+          "errors": {
+            "ECONNRESET": 362
+          }
+        },
+        {
+          "elapsedSeconds": 1320,
+          "requests": 22955,
+          "aborts": 1146,
+          "status": {
+            "200": 22388
+          },
+          "errors": {
+            "ECONNRESET": 378
+          }
+        },
+        {
+          "elapsedSeconds": 1380,
+          "requests": 24001,
+          "aborts": 1198,
+          "status": {
+            "200": 23408
+          },
+          "errors": {
+            "ECONNRESET": 393
+          }
+        },
+        {
+          "elapsedSeconds": 1440,
+          "requests": 25044,
+          "aborts": 1251,
+          "status": {
+            "200": 24428
+          },
+          "errors": {
+            "ECONNRESET": 414
+          }
+        },
+        {
+          "elapsedSeconds": 1500,
+          "requests": 26094,
+          "aborts": 1303,
+          "status": {
+            "200": 25455
+          },
+          "errors": {
+            "ECONNRESET": 438
+          }
+        },
+        {
+          "elapsedSeconds": 1560,
+          "requests": 27140,
+          "aborts": 1354,
+          "status": {
+            "200": 26479
+          },
+          "errors": {
+            "ECONNRESET": 458
+          }
+        },
+        {
+          "elapsedSeconds": 1620,
+          "requests": 28187,
+          "aborts": 1407,
+          "status": {
+            "200": 27503
+          },
+          "errors": {
+            "ECONNRESET": 479
+          }
+        },
+        {
+          "elapsedSeconds": 1680,
+          "requests": 29235,
+          "aborts": 1460,
+          "status": {
+            "200": 28526
+          },
+          "errors": {
+            "ECONNRESET": 497
+          }
+        },
+        {
+          "elapsedSeconds": 1740,
+          "requests": 30284,
+          "aborts": 1512,
+          "status": {
+            "200": 29547
+          },
+          "errors": {
+            "ECONNRESET": 515
+          }
+        },
+        {
+          "elapsedSeconds": 1800,
+          "requests": 31327,
+          "aborts": 1564,
+          "status": {
+            "200": 30568
+          },
+          "errors": {
+            "ECONNRESET": 538
+          }
+        }
+      ],
+      "complete": true,
+      "authenticatedRoles": [
+        "ADMIN",
+        "OPERATOR"
+      ],
+      "actualSeconds": 1800,
+      "finishedAt": "2026-10-29T13:23:58.749Z"
+    },
+    "measurement": {
+      "file": "D:\\PillingR\\night-logs\\warnings-1029/listeners-6388.jsonl",
+      "sha256": "e7cbbaa890c738423f0b13cbc08c737e9107166c60d243e9fc8e758dffbcdc0b",
+      "sampleIntervalSeconds": 60,
+      "noForcedGC": true,
+      "weakReferences": true,
+      "sampledObjectMaxNotContinuousPeak": true,
+      "extraObservers": {
+        "response": [
+          "one finish observer",
+          "one close observer"
+        ],
+        "process": [
+          "one warning observer",
+          "one exit observer"
+        ]
+      }
+    },
+    "windowSamples": 32,
+    "maxWarningCount": 0,
+    "warnings": [
+      {
+        "at": "2026-10-29T12:53:59.179Z",
+        "pid": 6388,
+        "kind": "warning",
+        "name": "DeprecationWarning",
+        "message": "Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.",
+        "stack": "DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.\n    at Client.__apm$wrapped (D:\\PillingR\\wt-warnings-1029\\node_modules\\pg\\lib\\client.js:702:11)\n    at __apm$traced (D:\\PillingR\\wt-warnings-1029\\node_modules\\pg\\lib\\client.js:708:28)\n    at D:\\PillingR\\wt-warnings-1029\\node_modules\\pg\\lib\\client.js:715:25\n    at Channel.runStores (node:diagnostics_channel:203:12)\n    at Client.query (D:\\PillingR\\wt-warnings-1029\\node_modules\\pg\\lib\\client.js:713:36)\n    at F.performIO (D:\\PillingR\\wt-warnings-1029\\.next\\server\\chunks\\6241.js:139:61335)\n    at F.queryRaw (D:\\PillingR\\wt-warnings-1029\\.next\\server\\chunks\\6241.js:139:58474)\n    at D:\\PillingR\\wt-warnings-1029\\node_modules\\@prisma\\client\\runtime\\client.js:11:70523\n    at D:\\PillingR\\wt-warnings-1029\\.next\\server\\instrumentation.js:17:85572\n    at o (D:\\PillingR\\wt-warnings-1029\\.next\\server\\instrumentation.js:17:85617)"
+      }
+    ],
+    "points": [
+      {
+        "minute": 0,
+        "at": "2026-10-29T12:54:26.884Z",
+        "requests": 481,
+        "finished": 465,
+        "closed": 481,
+        "processListeners": {
+          "newListener": 1,
+          "removeListener": 1,
+          "warning": 2,
+          "exit": 1,
+          "unhandledRejection": 1,
+          "SIGINT": 1,
+          "SIGTERM": 1,
+          "rejectionHandled": 1,
+          "uncaughtException": 3,
+          "beforeExit": 4
+        },
+        "responseObjects": 480,
+        "responseCloseTotal": 670,
+        "responseCloseMax": 2,
+        "server": {
+          "objects": 1,
+          "totals": {
+            "request": 1,
+            "connection": 1,
+            "listening": 2,
+            "upgrade": 1,
+            "error": 1
+          },
+          "max": {
+            "request": 1,
+            "connection": 1,
+            "listening": 2,
+            "upgrade": 1,
+            "error": 1
+          }
+        },
+        "heapUsed": 229487896,
+        "rss": 444428288
+      },
+      {
+        "minute": 5,
+        "at": "2026-10-29T12:59:26.895Z",
+        "requests": 5689,
+        "finished": 5503,
+        "closed": 5689,
+        "processListeners": {
+          "newListener": 1,
+          "removeListener": 1,
+          "warning": 2,
+          "exit": 1,
+          "unhandledRejection": 1,
+          "SIGINT": 1,
+          "SIGTERM": 1,
+          "rejectionHandled": 1,
+          "uncaughtException": 3,
+          "beforeExit": 4
+        },
+        "responseObjects": 379,
+        "responseCloseTotal": 536,
+        "responseCloseMax": 2,
+        "server": {
+          "objects": 1,
+          "totals": {
+            "request": 1,
+            "connection": 1,
+            "listening": 2,
+            "upgrade": 1,
+            "error": 1
+          },
+          "max": {
+            "request": 1,
+            "connection": 1,
+            "listening": 2,
+            "upgrade": 1,
+            "error": 1
+          }
+        },
+        "heapUsed": 209204336,
+        "rss": 506347520
+      },
+      {
+        "minute": 10,
+        "at": "2026-10-29T13:04:26.913Z",
+        "requests": 10903,
+        "finished": 10543,
+        "closed": 10903,
+        "processListeners": {
+          "newListener": 1,
+          "removeListener": 1,
+          "warning": 2,
+          "exit": 1,
+          "unhandledRejection": 1,
+          "SIGINT": 1,
+          "SIGTERM": 1,
+          "rejectionHandled": 1,
+          "uncaughtException": 3,
+          "beforeExit": 4
+        },
+        "responseObjects": 414,
+        "responseCloseTotal": 580,
+        "responseCloseMax": 2,
+        "server": {
+          "objects": 1,
+          "totals": {
+            "request": 1,
+            "connection": 1,
+            "listening": 2,
+            "upgrade": 1,
+            "error": 1
+          },
+          "max": {
+            "request": 1,
+            "connection": 1,
+            "listening": 2,
+            "upgrade": 1,
+            "error": 1
+          }
+        },
+        "heapUsed": 222873088,
+        "rss": 443867136
+      },
+      {
+        "minute": 15,
+        "at": "2026-10-29T13:09:26.943Z",
+        "requests": 16122,
+        "finished": 15592,
+        "closed": 16121,
+        "processListeners": {
+          "newListener": 1,
+          "removeListener": 1,
+          "warning": 2,
+          "exit": 1,
+          "unhandledRejection": 1,
+          "SIGINT": 1,
+          "SIGTERM": 1,
+          "rejectionHandled": 1,
+          "uncaughtException": 3,
+          "beforeExit": 4
+        },
+        "responseObjects": 971,
+        "responseCloseTotal": 1367,
+        "responseCloseMax": 9,
+        "server": {
+          "objects": 1,
+          "totals": {
+            "request": 1,
+            "connection": 1,
+            "listening": 2,
+            "upgrade": 1,
+            "error": 1
+          },
+          "max": {
+            "request": 1,
+            "connection": 1,
+            "listening": 2,
+            "upgrade": 1,
+            "error": 1
+          }
+        },
+        "heapUsed": 338605248,
+        "rss": 587677696
+      },
+      {
+        "minute": 20,
+        "at": "2026-10-29T13:14:26.961Z",
+        "requests": 21357,
+        "finished": 20660,
+        "closed": 21356,
+        "processListeners": {
+          "newListener": 1,
+          "removeListener": 1,
+          "warning": 2,
+          "exit": 1,
+          "unhandledRejection": 1,
+          "SIGINT": 1,
+          "SIGTERM": 1,
+          "rejectionHandled": 1,
+          "uncaughtException": 3,
+          "beforeExit": 4
+        },
+        "responseObjects": 1233,
+        "responseCloseTotal": 1737,
+        "responseCloseMax": 8,
+        "server": {
+          "objects": 1,
+          "totals": {
+            "request": 1,
+            "connection": 1,
+            "listening": 2,
+            "upgrade": 1,
+            "error": 1
+          },
+          "max": {
+            "request": 1,
+            "connection": 1,
+            "listening": 2,
+            "upgrade": 1,
+            "error": 1
+          }
+        },
+        "heapUsed": 386875296,
+        "rss": 647204864
+      },
+      {
+        "minute": 25,
+        "at": "2026-10-29T13:19:26.977Z",
+        "requests": 26590,
+        "finished": 25726,
+        "closed": 26590,
+        "processListeners": {
+          "newListener": 1,
+          "removeListener": 1,
+          "warning": 2,
+          "exit": 1,
+          "unhandledRejection": 1,
+          "SIGINT": 1,
+          "SIGTERM": 1,
+          "rejectionHandled": 1,
+          "uncaughtException": 3,
+          "beforeExit": 4
+        },
+        "responseObjects": 416,
+        "responseCloseTotal": 585,
+        "responseCloseMax": 2,
+        "server": {
+          "objects": 1,
+          "totals": {
+            "request": 1,
+            "connection": 1,
+            "listening": 2,
+            "upgrade": 1,
+            "error": 1
+          },
+          "max": {
+            "request": 1,
+            "connection": 1,
+            "listening": 2,
+            "upgrade": 1,
+            "error": 1
+          }
+        },
+        "heapUsed": 204607592,
+        "rss": 445571072
+      },
+      {
+        "minute": 30,
+        "at": "2026-10-29T13:24:26.994Z",
+        "requests": 31331,
+        "finished": 30319,
+        "closed": 31331,
+        "processListeners": {
+          "newListener": 1,
+          "removeListener": 1,
+          "warning": 2,
+          "exit": 1,
+          "unhandledRejection": 1,
+          "SIGINT": 1,
+          "SIGTERM": 1,
+          "rejectionHandled": 1,
+          "uncaughtException": 3,
+          "beforeExit": 4
+        },
+        "responseObjects": 83,
+        "responseCloseTotal": 119,
+        "responseCloseMax": 2,
+        "server": {
+          "objects": 1,
+          "totals": {
+            "request": 1,
+            "connection": 1,
+            "listening": 2,
+            "upgrade": 1,
+            "error": 1
+          },
+          "max": {
+            "request": 1,
+            "connection": 1,
+            "listening": 2,
+            "upgrade": 1,
+            "error": 1
+          }
+        },
+        "heapUsed": 135613976,
+        "rss": 538619904
+      },
+      {
+        "minute": 40,
+        "at": "2026-10-29T13:34:27.057Z",
+        "requests": 31331,
+        "finished": 30319,
+        "closed": 31331,
+        "processListeners": {
+          "newListener": 1,
+          "removeListener": 1,
+          "warning": 2,
+          "exit": 1,
+          "unhandledRejection": 1,
+          "SIGINT": 1,
+          "SIGTERM": 1,
+          "rejectionHandled": 1,
+          "uncaughtException": 3,
+          "beforeExit": 4
+        },
+        "responseObjects": 9,
+        "responseCloseTotal": 11,
+        "responseCloseMax": 2,
+        "server": {
+          "objects": 1,
+          "totals": {
+            "request": 1,
+            "connection": 1,
+            "listening": 2,
+            "upgrade": 1,
+            "error": 1
+          },
+          "max": {
+            "request": 1,
+            "connection": 1,
+            "listening": 2,
+            "upgrade": 1,
+            "error": 1
+          }
+        },
+        "heapUsed": 119830128,
+        "rss": 296407040
+      },
+      {
+        "minute": 60,
+        "at": "2026-10-29T13:54:27.215Z",
+        "requests": 31331,
+        "finished": 30319,
+        "closed": 31331,
+        "processListeners": {
+          "newListener": 1,
+          "removeListener": 1,
+          "warning": 2,
+          "exit": 1,
+          "unhandledRejection": 1,
+          "SIGINT": 1,
+          "SIGTERM": 1,
+          "rejectionHandled": 1,
+          "uncaughtException": 3,
+          "beforeExit": 4
+        },
+        "responseObjects": 9,
+        "responseCloseTotal": 11,
+        "responseCloseMax": 2,
+        "server": {
+          "objects": 1,
+          "totals": {
+            "request": 1,
+            "connection": 1,
+            "listening": 2,
+            "upgrade": 1,
+            "error": 1
+          },
+          "max": {
+            "request": 1,
+            "connection": 1,
+            "listening": 2,
+            "upgrade": 1,
+            "error": 1
+          }
+        },
+        "heapUsed": 128312152,
+        "rss": 298332160
+      }
+    ],
+    "windowHeap": {
+      "min": 91544448,
+      "max": 386875296
+    },
+    "windowResponseObjects": {
+      "min": 1,
+      "max": 1233
+    },
+    "sampledCloseMax": 9
+  },
+  "configProof": {
+    "baseline": {
+      "passed": 6029,
+      "failed": 0,
+      "skipped": 0,
+      "files": 529
+    },
+    "after": {
+      "passed": 6030,
+      "failed": 0,
+      "skipped": 0,
+      "files": 529
+    },
+    "missingOldCases": [],
+    "addedCases": [
+      {
+        "key": "D:/PillingR/wt-warnings-1029/src/workers/__tests__/workers-image-smoke.test.ts\u0000нативный загрузчик Vitest собирает список файлов без bundler",
+        "status": "passed"
+      }
+    ],
+    "hashes": {
+      "vitest.config.mts": "fb721203e219805f6b1bc9febf8a29a853f469d0181b37901cf847e30b37a3ce",
+      "next.config.ts": "b030db1833436245377a38293eb923f3c6533685cfc7f8b5ce2a39155cd64797",
+      "tsconfig.json": "ece5237f30f47684e54a9290f87fd0a85df79f4815e0437837726998912f827a",
+      "src/workers/__tests__/workers-image-smoke.test.ts": "5f625cffec5a2434ce0db92a38c23e99c4739202d80e724efee0e3a86a7074cb"
+    },
+    "complete": true
+  },
+  "scope": "Vitest ES module config + three necessary path references + regression in existing test file; no application behavior or dependency changes",
+  "collection": {
+    "tests": 411,
+    "files": 30
+  },
+  "changedFiles": [
+    [
+      "vitest.config.ts → vitest.config.mts",
+      95,
+      97
+    ],
+    [
+      "next.config.ts",
+      184,
+      184
+    ],
+    [
+      "tsconfig.json",
+      63,
+      63
+    ],
+    [
+      ".dockerignore",
+      110,
+      110
+    ],
+    [
+      "src/workers/__tests__/workers-image-smoke.test.ts",
+      130,
+      140
+    ]
+  ],
+  "generationLiteralCorrection": {
+    "temporaryExternalSetupLiteral": true,
+    "removed": true,
+    "remainingMatchesInSetupGenerationLogAndGeneratedClient": [],
+    "envFilesReadOrCreated": false
+  }
+}

@@ -41,6 +41,7 @@ const operatorVersions = [
   ['v5', '/operator/v5', 'mag@piling.ru', 'kn@piling.ru', 'Kopernik Jint-SD20A'],
   ['v7', '/operator/v7', 'r0mix0n@mail.ru', 'qa-hermes-assistant-2@piling.test', 'Banut 655'],
   ['v10', '/operator/v10', 'ivv@piling.ru', 'qa-hermes-assistant-1@piling.test', 'Woltman-PVE 50PR'],
+  ['v3', '/operator/v3', 'night-v3-operator@example.invalid', 'night-v3-assistant@example.invalid', 'Synthetic retained v3 rig'],
 ].map(([version, route, operator, assistant, equipment]) => ({ version, path: route, operator: account('OPERATOR', operator), assistant: account('ASSISTANT', assistant), equipment }));
 account('OPERATOR', 'qa-audit-1014-operator@piling.test');
 account('ASSISTANT', 'qa-audit-1014-assistant@piling.test');

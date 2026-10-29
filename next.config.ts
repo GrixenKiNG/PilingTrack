@@ -74,7 +74,7 @@ const nextConfig: NextConfig = {
       "Dockerfile*",
       "Caddyfile",
       "components.json",
-      "vitest.config.ts",
+      "vitest.config.mts",
       "playwright.config.ts",
       "tsconfig*.json",
     ],

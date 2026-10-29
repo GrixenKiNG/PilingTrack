@@ -1,0 +1,562 @@
+{
+  "sourceBuildSha": "121675510f59d60454924226b5b63dd054c946f3",
+  "worktreeSha": "f077be3d65fbe5ecd6301f06a5bf8cd477cfb5ee",
+  "testFile": "e2e/release-critical-path.spec.ts",
+  "oldTestPrefixBytePreserved": true,
+  "master": {
+    "sourceSha": "121675510f59d60454924226b5b63dd054c946f3",
+    "complete": true,
+    "scenarioHash": "e063f87e8c6c095d86dee425caa5851be16ec42100aa69de55d8d95dd3f6cee8",
+    "scenarioUnchanged": true,
+    "results": [
+      {
+        "id": "equipment-documents-three",
+        "args": [
+          "D:\\PillingR\\night-logs\\night-evidence-1026/equipment-documents-three-fresh-stand.cjs"
+        ],
+        "exit": 0,
+        "seconds": 147
+      },
+      {
+        "id": "equipment-documents-gates",
+        "args": [
+          "D:\\PillingR\\night-logs\\night-evidence-1026/equipment-documents-final-gates.cjs"
+        ],
+        "exit": 0,
+        "seconds": 110
+      }
+    ]
+  },
+  "focused": {
+    "exit": 0,
+    "seconds": 45,
+    "cleanup": true,
+    "cleanupErrors": []
+  },
+  "stats": {
+    "startTime": "2026-10-29T04:04:43.762Z",
+    "duration": 118269.649,
+    "expected": 3,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  },
+  "result": {
+    "exit": 0,
+    "seconds": 146,
+    "cleanup": true,
+    "cleanupErrors": []
+  },
+  "gates": {
+    "sourceBuildSha": "121675510f59d60454924226b5b63dd054c946f3",
+    "complete": true,
+    "results": [
+      {
+        "id": "equipment-documents-final-tsc",
+        "exit": 0,
+        "seconds": 14
+      },
+      {
+        "id": "equipment-documents-final-lint",
+        "exit": 0,
+        "seconds": 62
+      },
+      {
+        "id": "equipment-documents-final-list",
+        "exit": 0,
+        "seconds": 34
+      }
+    ]
+  },
+  "collection": {
+    "tests": 411,
+    "files": 30
+  },
+  "baseCollection": {
+    "tests": 318,
+    "files": 28
+  },
+  "rows": [
+    {
+      "project": "chromium",
+      "status": "passed",
+      "observations": [
+        {
+          "step": "UI create expired metadata; no file upload",
+          "documents": [
+            {
+              "id": "cmvt0s1f9000140w5unxxwff9",
+              "equipmentId": "cmvt0ryun0009ngw5bb1456k1",
+              "tenantId": "cmvt0ryd10000ngw5an5pb9re",
+              "type": "PASSPORT",
+              "title": "Паспорт QA 7e3b9320-f557-4da9-af49-680b13228808",
+              "issuedAt": "2020-01-01T00:00:00.000Z",
+              "expiresAt": "2020-01-02T00:00:00.000Z",
+              "notes": "QA исходные реквизиты",
+              "mediaId": null
+            }
+          ],
+          "audit": [
+            {
+              "action": "equipment.document.created",
+              "actorId": "cmvt0rygn0002ngw5kwgyiasi",
+              "metadata": {
+                "name": "Паспорт QA 7e3b9320-f557-4da9-af49-680b13228808",
+                "after": {
+                  "type": "PASSPORT",
+                  "issuedAt": "2020-01-01T00:00:00.000Z",
+                  "expiresAt": "2020-01-02T00:00:00.000Z"
+                },
+                "equipmentId": "cmvt0ryun0009ngw5bb1456k1"
+              }
+            }
+          ]
+        },
+        {
+          "step": "UI extend expiry then clear it; reload persists null",
+          "documents": [
+            {
+              "id": "cmvt0s1f9000140w5unxxwff9",
+              "equipmentId": "cmvt0ryun0009ngw5bb1456k1",
+              "tenantId": "cmvt0ryd10000ngw5an5pb9re",
+              "type": "PASSPORT",
+              "title": "Паспорт QA 7e3b9320-f557-4da9-af49-680b13228808 обновлён",
+              "issuedAt": "2020-01-01T00:00:00.000Z",
+              "expiresAt": null,
+              "notes": "QA срок продлён",
+              "mediaId": null
+            }
+          ],
+          "audit": [
+            {
+              "action": "equipment.document.created",
+              "actorId": "cmvt0rygn0002ngw5kwgyiasi",
+              "metadata": {
+                "name": "Паспорт QA 7e3b9320-f557-4da9-af49-680b13228808",
+                "after": {
+                  "type": "PASSPORT",
+                  "issuedAt": "2020-01-01T00:00:00.000Z",
+                  "expiresAt": "2020-01-02T00:00:00.000Z"
+                },
+                "equipmentId": "cmvt0ryun0009ngw5bb1456k1"
+              }
+            }
+          ]
+        },
+        {
+          "step": "wrong parent404; mechanic reads and POST/PUT/DELETE403 leave SQL and audit unchanged",
+          "documents": [
+            {
+              "id": "cmvt0s1f9000140w5unxxwff9",
+              "equipmentId": "cmvt0ryun0009ngw5bb1456k1",
+              "tenantId": "cmvt0ryd10000ngw5an5pb9re",
+              "type": "PASSPORT",
+              "title": "Паспорт QA 7e3b9320-f557-4da9-af49-680b13228808 обновлён",
+              "issuedAt": "2020-01-01T00:00:00.000Z",
+              "expiresAt": null,
+              "notes": "QA срок продлён",
+              "mediaId": null
+            }
+          ],
+          "audit": [
+            {
+              "action": "equipment.document.created",
+              "actorId": "cmvt0rygn0002ngw5kwgyiasi",
+              "metadata": {
+                "name": "Паспорт QA 7e3b9320-f557-4da9-af49-680b13228808",
+                "after": {
+                  "type": "PASSPORT",
+                  "issuedAt": "2020-01-01T00:00:00.000Z",
+                  "expiresAt": "2020-01-02T00:00:00.000Z"
+                },
+                "equipmentId": "cmvt0ryun0009ngw5bb1456k1"
+              }
+            }
+          ]
+        },
+        {
+          "step": "UI delete cancel has no mutation; confirm removes own metadata, audit keeps snapshot",
+          "documents": [],
+          "audit": [
+            {
+              "action": "equipment.document.created",
+              "actorId": "cmvt0rygn0002ngw5kwgyiasi",
+              "metadata": {
+                "name": "Паспорт QA 7e3b9320-f557-4da9-af49-680b13228808",
+                "after": {
+                  "type": "PASSPORT",
+                  "issuedAt": "2020-01-01T00:00:00.000Z",
+                  "expiresAt": "2020-01-02T00:00:00.000Z"
+                },
+                "equipmentId": "cmvt0ryun0009ngw5bb1456k1"
+              }
+            },
+            {
+              "action": "equipment.document.deleted",
+              "actorId": "cmvt0rygn0002ngw5kwgyiasi",
+              "metadata": {
+                "name": "QA КБУРГ",
+                "before": {
+                  "type": "PASSPORT",
+                  "title": "Паспорт QA 7e3b9320-f557-4da9-af49-680b13228808 обновлён",
+                  "expiresAt": null
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "mutations": [
+        {
+          "method": "POST",
+          "path": "/api/equipment/cmvt0ryun0009ngw5bb1456k1/documents"
+        },
+        {
+          "method": "PUT",
+          "path": "/api/equipment/cmvt0ryun0009ngw5bb1456k1/documents/cmvt0s1f9000140w5unxxwff9"
+        },
+        {
+          "method": "PUT",
+          "path": "/api/equipment/cmvt0ryun0009ngw5bb1456k1/documents/cmvt0s1f9000140w5unxxwff9"
+        },
+        {
+          "method": "DELETE",
+          "path": "/api/equipment/cmvt0ryun0009ngw5bb1456k1/documents/cmvt0s1f9000140w5unxxwff9"
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "Mobile Safari",
+      "status": "passed",
+      "observations": [
+        {
+          "step": "UI create expired metadata; no file upload",
+          "documents": [
+            {
+              "id": "cmvt0tauf000940w57hfzw825",
+              "equipmentId": "cmvt0t6l50009m8w5uvmr70p0",
+              "tenantId": "cmvt0t63k0000m8w5c1za8hun",
+              "type": "PASSPORT",
+              "title": "Паспорт QA f29f9c8a-801a-45d0-9d8a-0673d528209a",
+              "issuedAt": "2020-01-01T00:00:00.000Z",
+              "expiresAt": "2020-01-02T00:00:00.000Z",
+              "notes": "QA исходные реквизиты",
+              "mediaId": null
+            }
+          ],
+          "audit": [
+            {
+              "action": "equipment.document.created",
+              "actorId": "cmvt0t67e0002m8w5n0uox3dg",
+              "metadata": {
+                "name": "Паспорт QA f29f9c8a-801a-45d0-9d8a-0673d528209a",
+                "after": {
+                  "type": "PASSPORT",
+                  "issuedAt": "2020-01-01T00:00:00.000Z",
+                  "expiresAt": "2020-01-02T00:00:00.000Z"
+                },
+                "equipmentId": "cmvt0t6l50009m8w5uvmr70p0"
+              }
+            }
+          ]
+        },
+        {
+          "step": "UI extend expiry then clear it; reload persists null",
+          "documents": [
+            {
+              "id": "cmvt0tauf000940w57hfzw825",
+              "equipmentId": "cmvt0t6l50009m8w5uvmr70p0",
+              "tenantId": "cmvt0t63k0000m8w5c1za8hun",
+              "type": "PASSPORT",
+              "title": "Паспорт QA f29f9c8a-801a-45d0-9d8a-0673d528209a обновлён",
+              "issuedAt": "2020-01-01T00:00:00.000Z",
+              "expiresAt": null,
+              "notes": "QA срок продлён",
+              "mediaId": null
+            }
+          ],
+          "audit": [
+            {
+              "action": "equipment.document.created",
+              "actorId": "cmvt0t67e0002m8w5n0uox3dg",
+              "metadata": {
+                "name": "Паспорт QA f29f9c8a-801a-45d0-9d8a-0673d528209a",
+                "after": {
+                  "type": "PASSPORT",
+                  "issuedAt": "2020-01-01T00:00:00.000Z",
+                  "expiresAt": "2020-01-02T00:00:00.000Z"
+                },
+                "equipmentId": "cmvt0t6l50009m8w5uvmr70p0"
+              }
+            }
+          ]
+        },
+        {
+          "step": "wrong parent404; mechanic reads and POST/PUT/DELETE403 leave SQL and audit unchanged",
+          "documents": [
+            {
+              "id": "cmvt0tauf000940w57hfzw825",
+              "equipmentId": "cmvt0t6l50009m8w5uvmr70p0",
+              "tenantId": "cmvt0t63k0000m8w5c1za8hun",
+              "type": "PASSPORT",
+              "title": "Паспорт QA f29f9c8a-801a-45d0-9d8a-0673d528209a обновлён",
+              "issuedAt": "2020-01-01T00:00:00.000Z",
+              "expiresAt": null,
+              "notes": "QA срок продлён",
+              "mediaId": null
+            }
+          ],
+          "audit": [
+            {
+              "action": "equipment.document.created",
+              "actorId": "cmvt0t67e0002m8w5n0uox3dg",
+              "metadata": {
+                "name": "Паспорт QA f29f9c8a-801a-45d0-9d8a-0673d528209a",
+                "after": {
+                  "type": "PASSPORT",
+                  "issuedAt": "2020-01-01T00:00:00.000Z",
+                  "expiresAt": "2020-01-02T00:00:00.000Z"
+                },
+                "equipmentId": "cmvt0t6l50009m8w5uvmr70p0"
+              }
+            }
+          ]
+        },
+        {
+          "step": "UI delete cancel has no mutation; confirm removes own metadata, audit keeps snapshot",
+          "documents": [],
+          "audit": [
+            {
+              "action": "equipment.document.created",
+              "actorId": "cmvt0t67e0002m8w5n0uox3dg",
+              "metadata": {
+                "name": "Паспорт QA f29f9c8a-801a-45d0-9d8a-0673d528209a",
+                "after": {
+                  "type": "PASSPORT",
+                  "issuedAt": "2020-01-01T00:00:00.000Z",
+                  "expiresAt": "2020-01-02T00:00:00.000Z"
+                },
+                "equipmentId": "cmvt0t6l50009m8w5uvmr70p0"
+              }
+            },
+            {
+              "action": "equipment.document.deleted",
+              "actorId": "cmvt0t67e0002m8w5n0uox3dg",
+              "metadata": {
+                "name": "QA КБУРГ",
+                "before": {
+                  "type": "PASSPORT",
+                  "title": "Паспорт QA f29f9c8a-801a-45d0-9d8a-0673d528209a обновлён",
+                  "expiresAt": null
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "mutations": [
+        {
+          "method": "POST",
+          "path": "/api/equipment/cmvt0t6l50009m8w5uvmr70p0/documents"
+        },
+        {
+          "method": "PUT",
+          "path": "/api/equipment/cmvt0t6l50009m8w5uvmr70p0/documents/cmvt0tauf000940w57hfzw825"
+        },
+        {
+          "method": "PUT",
+          "path": "/api/equipment/cmvt0t6l50009m8w5uvmr70p0/documents/cmvt0tauf000940w57hfzw825"
+        },
+        {
+          "method": "DELETE",
+          "path": "/api/equipment/cmvt0t6l50009m8w5uvmr70p0/documents/cmvt0tauf000940w57hfzw825"
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "Mobile Chrome",
+      "status": "passed",
+      "observations": [
+        {
+          "step": "UI create expired metadata; no file upload",
+          "documents": [
+            {
+              "id": "cmvt0u8ur000h40w5x5zfu47z",
+              "equipmentId": "cmvt0u6za0009ysw5svn8ggu2",
+              "tenantId": "cmvt0u6h90000ysw5ufbei0ae",
+              "type": "PASSPORT",
+              "title": "Паспорт QA 8f0f6331-0a70-468c-9f25-b800abab09d5",
+              "issuedAt": "2020-01-01T00:00:00.000Z",
+              "expiresAt": "2020-01-02T00:00:00.000Z",
+              "notes": "QA исходные реквизиты",
+              "mediaId": null
+            }
+          ],
+          "audit": [
+            {
+              "action": "equipment.document.created",
+              "actorId": "cmvt0u6ld0002ysw5atgb015z",
+              "metadata": {
+                "name": "Паспорт QA 8f0f6331-0a70-468c-9f25-b800abab09d5",
+                "after": {
+                  "type": "PASSPORT",
+                  "issuedAt": "2020-01-01T00:00:00.000Z",
+                  "expiresAt": "2020-01-02T00:00:00.000Z"
+                },
+                "equipmentId": "cmvt0u6za0009ysw5svn8ggu2"
+              }
+            }
+          ]
+        },
+        {
+          "step": "UI extend expiry then clear it; reload persists null",
+          "documents": [
+            {
+              "id": "cmvt0u8ur000h40w5x5zfu47z",
+              "equipmentId": "cmvt0u6za0009ysw5svn8ggu2",
+              "tenantId": "cmvt0u6h90000ysw5ufbei0ae",
+              "type": "PASSPORT",
+              "title": "Паспорт QA 8f0f6331-0a70-468c-9f25-b800abab09d5 обновлён",
+              "issuedAt": "2020-01-01T00:00:00.000Z",
+              "expiresAt": null,
+              "notes": "QA срок продлён",
+              "mediaId": null
+            }
+          ],
+          "audit": [
+            {
+              "action": "equipment.document.created",
+              "actorId": "cmvt0u6ld0002ysw5atgb015z",
+              "metadata": {
+                "name": "Паспорт QA 8f0f6331-0a70-468c-9f25-b800abab09d5",
+                "after": {
+                  "type": "PASSPORT",
+                  "issuedAt": "2020-01-01T00:00:00.000Z",
+                  "expiresAt": "2020-01-02T00:00:00.000Z"
+                },
+                "equipmentId": "cmvt0u6za0009ysw5svn8ggu2"
+              }
+            }
+          ]
+        },
+        {
+          "step": "wrong parent404; mechanic reads and POST/PUT/DELETE403 leave SQL and audit unchanged",
+          "documents": [
+            {
+              "id": "cmvt0u8ur000h40w5x5zfu47z",
+              "equipmentId": "cmvt0u6za0009ysw5svn8ggu2",
+              "tenantId": "cmvt0u6h90000ysw5ufbei0ae",
+              "type": "PASSPORT",
+              "title": "Паспорт QA 8f0f6331-0a70-468c-9f25-b800abab09d5 обновлён",
+              "issuedAt": "2020-01-01T00:00:00.000Z",
+              "expiresAt": null,
+              "notes": "QA срок продлён",
+              "mediaId": null
+            }
+          ],
+          "audit": [
+            {
+              "action": "equipment.document.created",
+              "actorId": "cmvt0u6ld0002ysw5atgb015z",
+              "metadata": {
+                "name": "Паспорт QA 8f0f6331-0a70-468c-9f25-b800abab09d5",
+                "after": {
+                  "type": "PASSPORT",
+                  "issuedAt": "2020-01-01T00:00:00.000Z",
+                  "expiresAt": "2020-01-02T00:00:00.000Z"
+                },
+                "equipmentId": "cmvt0u6za0009ysw5svn8ggu2"
+              }
+            }
+          ]
+        },
+        {
+          "step": "UI delete cancel has no mutation; confirm removes own metadata, audit keeps snapshot",
+          "documents": [],
+          "audit": [
+            {
+              "action": "equipment.document.created",
+              "actorId": "cmvt0u6ld0002ysw5atgb015z",
+              "metadata": {
+                "name": "Паспорт QA 8f0f6331-0a70-468c-9f25-b800abab09d5",
+                "after": {
+                  "type": "PASSPORT",
+                  "issuedAt": "2020-01-01T00:00:00.000Z",
+                  "expiresAt": "2020-01-02T00:00:00.000Z"
+                },
+                "equipmentId": "cmvt0u6za0009ysw5svn8ggu2"
+              }
+            },
+            {
+              "action": "equipment.document.deleted",
+              "actorId": "cmvt0u6ld0002ysw5atgb015z",
+              "metadata": {
+                "name": "QA КБУРГ",
+                "before": {
+                  "type": "PASSPORT",
+                  "title": "Паспорт QA 8f0f6331-0a70-468c-9f25-b800abab09d5 обновлён",
+                  "expiresAt": null
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "mutations": [
+        {
+          "method": "POST",
+          "path": "/api/equipment/cmvt0u6za0009ysw5svn8ggu2/documents"
+        },
+        {
+          "method": "PUT",
+          "path": "/api/equipment/cmvt0u6za0009ysw5svn8ggu2/documents/cmvt0u8ur000h40w5x5zfu47z"
+        },
+        {
+          "method": "PUT",
+          "path": "/api/equipment/cmvt0u6za0009ysw5svn8ggu2/documents/cmvt0u8ur000h40w5x5zfu47z"
+        },
+        {
+          "method": "DELETE",
+          "path": "/api/equipment/cmvt0u6za0009ysw5svn8ggu2/documents/cmvt0u8ur000h40w5x5zfu47z"
+        }
+      ],
+      "errors": []
+    }
+  ],
+  "unitAndBuild": {
+    "rerun": false,
+    "reason": "Only existing E2E file and reports changed; application source still121",
+    "fullUnit": {
+      "wholeRun": "full-unit-equipment-cache-final",
+      "sourceSha": "121675510f59d60454924226b5b63dd054c946f3",
+      "unitExit": 0,
+      "gatesComplete": true,
+      "passed": 5783,
+      "failed": 0,
+      "skipped": 0,
+      "files": 512,
+      "historicalTotal": 241,
+      "historicalMatched": 241,
+      "historicalPassed": 241,
+      "historicalNotPassed": [],
+      "failedTests": []
+    },
+    "build": {
+      "command": "npm run build",
+      "sourceSha": "121675510f59d60454924226b5b63dd054c946f3",
+      "exit": 0,
+      "seconds": 156
+    }
+  },
+  "scope": {
+    "documentTypes": [
+      "PASSPORT"
+    ],
+    "mediaUpload": false,
+    "s3Verified": false,
+    "readinessProjectionVerified": false,
+    "auditUpdateEventObserved": false
+  }
+}

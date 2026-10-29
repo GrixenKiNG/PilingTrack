@@ -93,7 +93,7 @@ export function OperatorDashboardV3() {
   const openReport = (target?: string) => router.push(target ? `/operator/v3/report#${target}` : '/operator/v3/report');
 
   return (
-    <div className="mx-auto max-w-xl space-y-5 p-4 pb-28 sm:p-5">
+    <div className="mx-auto max-w-xl space-y-5 p-4 pb-28 sm:p-5 sm:pb-28">
       <header className="flex items-center justify-between">
         <div>
           <p className="text-2xl font-bold text-slate-900">Оператор</p>

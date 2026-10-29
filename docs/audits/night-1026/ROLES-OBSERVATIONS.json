@@ -1,0 +1,4452 @@
+{
+  "run": "roles-v3-final",
+  "sourceBuildSha": "1b0a2663d19c5d9f77e22f64882ba59c306bbf8c",
+  "stats": {
+    "startTime": "2026-10-27T07:10:23.889Z",
+    "duration": 659597.5380000001,
+    "expected": 21,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  },
+  "exit": 0,
+  "secondsWrapper": 661,
+  "cases": [
+    {
+      "role": "ADMIN",
+      "project": "chromium",
+      "outcome": "expected",
+      "rows": [
+        {
+          "step": "login",
+          "role": "ADMIN",
+          "path": "/admin"
+        },
+        {
+          "role": "ADMIN",
+          "path": "/admin",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "9+",
+            "Выйти",
+            "Весь период",
+            "Сегодня",
+            "7 дней",
+            "Период",
+            "",
+            "Все объекты›",
+            "QA КБУРГКБУРГНет данныхQA полигоннет данных за сегодняQA OPERATOR · QA бригада",
+            "Все установки›",
+            "QA полигон — отставание плана0% свай",
+            "QA КБУРГ — нет отчётов более 3 днейQA полигон",
+            ""
+          ]
+        },
+        {
+          "role": "ADMIN",
+          "path": "/monitoring",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "9+",
+            "Выйти",
+            " Печать",
+            "Сегодня",
+            "7 дней",
+            "30 дней",
+            "Установка",
+            "Сваи, шт. / м.п.↓",
+            "Бурение, шт. / м.п.",
+            "Отчётов",
+            "Утилизация",
+            "Простой",
+            "Топливо",
+            "QA КБУРГЗабивная установка0 шт. / 0 м.п.0 шт. / 0 м.п.00% (0/30 дн)0 ч—Нет источника · недостаточно данных—",
+            ""
+          ]
+        },
+        {
+          "role": "ADMIN",
+          "path": "/admin/sites",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "9+",
+            "Выйти",
+            "Новый объект",
+            "Активные",
+            "Неактивные",
+            "Все",
+            "Отставание",
+            "Без бригад",
+            "Без отчётов",
+            "С простоем",
+            "QA полигон1 бригада · QA КБУРГ0 / 1000%0—Нет отчётов",
+            "Редактировать",
+            "Назначить пользователей",
+            "Выполнен",
+            "Деактивировать",
+            "Удалить навсегда",
+            "Добавить свайное поле"
+          ]
+        },
+        {
+          "role": "ADMIN",
+          "path": "/admin/reports",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "9+",
+            "Выйти",
+            "Отчёты смен",
+            "Журнал забивки",
+            "Печать",
+            "CSV",
+            "Excel",
+            "Новый отчёт",
+            "Все",
+            "Сегодня",
+            "Вчера",
+            "7 дней",
+            "Черновики",
+            "Сданные",
+            "С простоем",
+            "С фото",
+            "Изменены вручную",
+            "Применить",
+            "Дата↓",
+            "Объект / установка",
+            "Оператор",
+            "Сваи",
+            "Бурение",
+            "Простой"
+          ]
+        },
+        {
+          "role": "ADMIN",
+          "path": "/admin/equipment",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "9+",
+            "Выйти",
+            " Добавить установку",
+            " Плитки",
+            " Таблица",
+            " Конструктор"
+          ]
+        },
+        {
+          "role": "ADMIN",
+          "path": "/admin/to",
+          "tab": "Центр готовности",
+          "step": "tab opened"
+        },
+        {
+          "role": "ADMIN",
+          "path": "/admin/to",
+          "tab": "Готовность парка",
+          "step": "tab opened"
+        },
+        {
+          "role": "ADMIN",
+          "path": "/admin/to",
+          "tab": "Смены",
+          "step": "tab opened"
+        },
+        {
+          "role": "ADMIN",
+          "path": "/admin/to",
+          "tab": "Обслуживание ТО",
+          "step": "tab opened"
+        },
+        {
+          "role": "ADMIN",
+          "path": "/admin/to",
+          "tab": "Отчёты",
+          "step": "tab opened"
+        },
+        {
+          "role": "ADMIN",
+          "path": "/admin/to",
+          "tab": "Происшествия",
+          "step": "tab opened"
+        },
+        {
+          "role": "ADMIN",
+          "path": "/admin/to",
+          "tab": "Настройки",
+          "step": "tab opened"
+        },
+        {
+          "role": "ADMIN",
+          "path": "/admin/to",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "9+",
+            "Выйти",
+            "Правила готовности",
+            "Чек-листы",
+            "Роли и доступы",
+            "Справочники",
+            "Уведомления",
+            "Интеграции",
+            "Аудит",
+            "История изменений",
+            "Открыть полную матрицу ",
+            "Опубликовать правила",
+            "Сохранить черновик",
+            "Пересчитать по свежим данным"
+          ]
+        },
+        {
+          "role": "ADMIN",
+          "path": "/admin/crews",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "9+",
+            "Выйти",
+            "Добавить бригаду",
+            "Все",
+            "Активные",
+            "Неактивные",
+            "Без помощников",
+            "QA бригадаQA полигонQA OPERATOR1 помощникQA КБУРГАктивна",
+            "Редактировать",
+            "Деактивировать"
+          ]
+        },
+        {
+          "role": "ADMIN",
+          "path": "/admin/safety",
+          "tab": "Мой допуск",
+          "step": "tab opened"
+        },
+        {
+          "role": "ADMIN",
+          "path": "/admin/safety",
+          "tab": "Обзор",
+          "step": "tab opened"
+        },
+        {
+          "role": "ADMIN",
+          "path": "/admin/safety",
+          "tab": "Сотрудники",
+          "step": "tab opened"
+        },
+        {
+          "role": "ADMIN",
+          "path": "/admin/safety",
+          "tab": "Журнал инструктажей",
+          "step": "tab opened"
+        },
+        {
+          "role": "ADMIN",
+          "path": "/admin/safety",
+          "tab": "Инструкции и регламенты",
+          "step": "tab opened"
+        },
+        {
+          "role": "ADMIN",
+          "path": "/admin/safety",
+          "tab": "Проверка знаний",
+          "step": "tab opened"
+        },
+        {
+          "role": "ADMIN",
+          "path": "/admin/safety",
+          "tab": "Документы",
+          "step": "tab opened"
+        },
+        {
+          "role": "ADMIN",
+          "path": "/admin/safety",
+          "tab": "Наряд-допуски",
+          "step": "tab opened"
+        },
+        {
+          "role": "ADMIN",
+          "path": "/admin/safety",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "9+",
+            "Выйти",
+            "Сбросить",
+            "Экспорт",
+            "+ Создать наряд",
+            "Заблокированы0",
+            "Все",
+            "Действующие",
+            "На согласовании",
+            "Просроченные (0)",
+            "Заблокированные (0)",
+            "Закрытые (0)",
+            "Инженер ОТ или механикСоздаёт наряд-допуск•Описывает состав и границы работ•Отправляет на согласование",
+            "ДиспетчерПроверяет условия•Согласовывает наряд•Отказ фиксируется в журнале",
+            "АдминистраторВторое решение при повышенном риске•Свой наряд согласовать нельзя•Отзыв прекращает действие"
+          ]
+        },
+        {
+          "role": "ADMIN",
+          "path": "/admin/analytics",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "9+",
+            "Выйти",
+            "Операторы",
+            "Тренды по объектам",
+            "Надёжность ТО"
+          ]
+        },
+        {
+          "role": "ADMIN",
+          "path": "/admin/dictionaries",
+          "tab": "Сваи",
+          "step": "tab opened"
+        },
+        {
+          "role": "ADMIN",
+          "path": "/admin/dictionaries",
+          "tab": "Бурение",
+          "step": "tab opened"
+        },
+        {
+          "role": "ADMIN",
+          "path": "/admin/dictionaries",
+          "tab": "Простои",
+          "step": "tab opened"
+        },
+        {
+          "role": "ADMIN",
+          "path": "/admin/dictionaries",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "9+",
+            "Выйти",
+            "Добавить причину простоя",
+            "Сортаменты свай1активных0архивныхИспользуются в 0 объектах",
+            "Типы бурения1активных0архивныхИспользуются в 0 объектах",
+            "Причины простоев1активных0архивныхИспользуются в 0 объектах",
+            "",
+            "",
+            ""
+          ]
+        },
+        {
+          "role": "ADMIN",
+          "path": "/admin/users",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "9+",
+            "Выйти",
+            "Виды документов",
+            "Новый пользователь",
+            "Все",
+            "Операторы",
+            "Помощники",
+            "Диспетчеры",
+            "Администраторы",
+            "Заблокированные",
+            "Без объекта",
+            "Без бригады",
+            "Нет активности 30 дней",
+            "QA ADMINadmin@role-audit-cd1eb09c406f.testАдминистраторQA полигонНе назначена27.10.2026, 10:10ВходДоступ включён",
+            "QA ASSISTANTassistant@role-audit-cd1eb09c406f.testПомощникQA полигонQA бригадаQA КБУРГ27.10.2026, 10:10ПрофильДоступ включён",
+            "QA DISPATCHERdispatcher@role-audit-cd1eb09c406f.testДиспетчерQA полигонНе назначена27.10.2026, 10:10ПрофильДоступ включён",
+            "QA FOREMANforeman@role-audit-cd1eb09c406f.testМастерQA полигонНе назначена27.10.2026, 10:10ПрофильДоступ включён",
+            "QA MECHANICmechanic@role-audit-cd1eb09c406f.testМеханикQA полигонНе назначена27.10.2026, 10:10ПрофильДоступ включён",
+            "QA OPERATORoperator@role-audit-cd1eb09c406f.testОператорQA полигонQA бригадаQA КБУРГ27.10.2026, 10:10ПрофильДоступ включён",
+            "QA SAFETY_ENGINEERsafety_engineer@role-audit-cd1eb09c406f.testИнженер ОТQA полигонНе назначена27.10.2026, 10:10ПрофильДоступ включён"
+          ]
+        },
+        {
+          "role": "ADMIN",
+          "path": "/admin/settings",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "9+",
+            "Выйти",
+            "Рабочее пространство",
+            "Пользователи и роли",
+            "Уведомления",
+            "Шаблоны плиток",
+            "Telegram",
+            "Очередь (DLQ)",
+            "Редактировать",
+            "Настроить",
+            "Открыть",
+            "Открыть редактор"
+          ]
+        },
+        {
+          "role": "ADMIN",
+          "step": "direct users API",
+          "expected": 200,
+          "actual": 200
+        },
+        {
+          "role": "ADMIN",
+          "step": "logout",
+          "actual": 200,
+          "afterLogout": 401
+        },
+        {
+          "role": "ADMIN",
+          "step": "session replacement",
+          "nextRole": "OPERATOR"
+        }
+      ],
+      "errors": []
+    },
+    {
+      "role": "DISPATCHER",
+      "project": "chromium",
+      "outcome": "expected",
+      "rows": [
+        {
+          "step": "login",
+          "role": "DISPATCHER",
+          "path": "/admin"
+        },
+        {
+          "role": "DISPATCHER",
+          "path": "/admin",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "9+",
+            "Выйти",
+            "Весь период",
+            "Сегодня",
+            "7 дней",
+            "Период",
+            "",
+            "Все объекты›",
+            "QA КБУРГКБУРГНет данныхQA полигоннет данных за сегодняQA OPERATOR · QA бригада",
+            "Все установки›",
+            "QA полигон — отставание плана0% свай",
+            "QA КБУРГ — нет отчётов более 3 днейQA полигон",
+            ""
+          ]
+        },
+        {
+          "role": "DISPATCHER",
+          "path": "/monitoring",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "9+",
+            "Выйти",
+            " Печать",
+            "Сегодня",
+            "7 дней",
+            "30 дней",
+            "Установка",
+            "Сваи, шт. / м.п.↓",
+            "Бурение, шт. / м.п.",
+            "Отчётов",
+            "Утилизация",
+            "Простой",
+            "Топливо",
+            "QA КБУРГЗабивная установка0 шт. / 0 м.п.0 шт. / 0 м.п.00% (0/30 дн)0 ч—Нет источника · недостаточно данных—",
+            ""
+          ]
+        },
+        {
+          "role": "DISPATCHER",
+          "path": "/admin/sites",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "9+",
+            "Выйти",
+            "Новый объект",
+            "Активные",
+            "Неактивные",
+            "Все",
+            "Отставание",
+            "Без бригад",
+            "Без отчётов",
+            "С простоем",
+            "QA полигон1 бригада · QA КБУРГ0 / 1000%0—Нет отчётов",
+            "Редактировать",
+            "Назначить пользователей",
+            "Выполнен",
+            "Деактивировать",
+            "Удалить навсегда",
+            "Добавить свайное поле"
+          ]
+        },
+        {
+          "role": "DISPATCHER",
+          "path": "/admin/reports",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "9+",
+            "Выйти",
+            "Отчёты смен",
+            "Журнал забивки",
+            "Печать",
+            "Новый отчёт",
+            "Все",
+            "Сегодня",
+            "Вчера",
+            "7 дней",
+            "Черновики",
+            "Сданные",
+            "С простоем",
+            "С фото",
+            "Изменены вручную",
+            "Применить",
+            "Дата↓",
+            "Объект / установка",
+            "Оператор",
+            "Сваи",
+            "Бурение",
+            "Простой"
+          ]
+        },
+        {
+          "role": "DISPATCHER",
+          "path": "/admin/equipment",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "9+",
+            "Выйти",
+            " Плитки",
+            " Таблица",
+            " Конструктор"
+          ]
+        },
+        {
+          "role": "DISPATCHER",
+          "path": "/admin/to",
+          "tab": "Центр готовности",
+          "step": "tab opened"
+        },
+        {
+          "role": "DISPATCHER",
+          "path": "/admin/to",
+          "tab": "Готовность парка",
+          "step": "tab opened"
+        },
+        {
+          "role": "DISPATCHER",
+          "path": "/admin/to",
+          "tab": "Смены",
+          "step": "tab opened"
+        },
+        {
+          "role": "DISPATCHER",
+          "path": "/admin/to",
+          "tab": "Обслуживание ТО",
+          "step": "tab opened"
+        },
+        {
+          "role": "DISPATCHER",
+          "path": "/admin/to",
+          "tab": "Отчёты",
+          "step": "tab opened"
+        },
+        {
+          "role": "DISPATCHER",
+          "path": "/admin/to",
+          "tab": "Происшествия",
+          "step": "tab opened"
+        },
+        {
+          "role": "DISPATCHER",
+          "path": "/admin/to",
+          "tab": "Настройки",
+          "step": "tab opened"
+        },
+        {
+          "role": "DISPATCHER",
+          "path": "/admin/to",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "9+",
+            "Выйти",
+            "Правила готовности",
+            "Чек-листы",
+            "Роли и доступы",
+            "Справочники",
+            "Уведомления",
+            "Интеграции",
+            "Аудит",
+            "История изменений",
+            "Открыть полную матрицу ",
+            "Опубликовать правила",
+            "Сохранить черновик",
+            "Пересчитать по свежим данным"
+          ]
+        },
+        {
+          "role": "DISPATCHER",
+          "path": "/admin/crews",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "9+",
+            "Выйти",
+            "Добавить бригаду",
+            "Все",
+            "Активные",
+            "Неактивные",
+            "Без помощников",
+            "QA бригадаQA полигонQA OPERATOR1 помощникQA КБУРГАктивна",
+            "Редактировать",
+            "Деактивировать"
+          ]
+        },
+        {
+          "role": "DISPATCHER",
+          "path": "/admin/safety",
+          "tab": "Мой допуск",
+          "step": "tab opened"
+        },
+        {
+          "role": "DISPATCHER",
+          "path": "/admin/safety",
+          "tab": "Обзор",
+          "step": "tab opened"
+        },
+        {
+          "role": "DISPATCHER",
+          "path": "/admin/safety",
+          "tab": "Сотрудники",
+          "step": "tab opened"
+        },
+        {
+          "role": "DISPATCHER",
+          "path": "/admin/safety",
+          "tab": "Журнал инструктажей",
+          "step": "tab opened"
+        },
+        {
+          "role": "DISPATCHER",
+          "path": "/admin/safety",
+          "tab": "Инструкции и регламенты",
+          "step": "tab opened"
+        },
+        {
+          "role": "DISPATCHER",
+          "path": "/admin/safety",
+          "tab": "Проверка знаний",
+          "step": "tab opened"
+        },
+        {
+          "role": "DISPATCHER",
+          "path": "/admin/safety",
+          "tab": "Документы",
+          "step": "tab opened"
+        },
+        {
+          "role": "DISPATCHER",
+          "path": "/admin/safety",
+          "tab": "Наряд-допуски",
+          "step": "tab opened"
+        },
+        {
+          "role": "DISPATCHER",
+          "path": "/admin/safety",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "9+",
+            "Выйти",
+            "Сбросить",
+            "Экспорт",
+            "+ Создать наряд",
+            "Заблокированы0",
+            "Все",
+            "Действующие",
+            "На согласовании",
+            "Просроченные (0)",
+            "Заблокированные (0)",
+            "Закрытые (0)",
+            "Инженер ОТ или механикСоздаёт наряд-допуск•Описывает состав и границы работ•Отправляет на согласование",
+            "ДиспетчерПроверяет условия•Согласовывает наряд•Отказ фиксируется в журнале",
+            "АдминистраторВторое решение при повышенном риске•Свой наряд согласовать нельзя•Отзыв прекращает действие"
+          ]
+        },
+        {
+          "role": "DISPATCHER",
+          "path": "/admin/analytics",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "9+",
+            "Выйти",
+            "Операторы",
+            "Тренды по объектам",
+            "Надёжность ТО"
+          ]
+        },
+        {
+          "role": "DISPATCHER",
+          "path": "/admin/settings",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "9+",
+            "Выйти",
+            "Рабочее пространство",
+            "Пользователи и роли",
+            "Уведомления",
+            "Шаблоны плиток",
+            "Открыть редактор"
+          ]
+        },
+        {
+          "role": "DISPATCHER",
+          "step": "direct users API",
+          "expected": 200,
+          "actual": 200
+        },
+        {
+          "role": "DISPATCHER",
+          "step": "forbidden create user",
+          "actual": 403
+        },
+        {
+          "role": "DISPATCHER",
+          "step": "logout",
+          "actual": 200,
+          "afterLogout": 401
+        },
+        {
+          "role": "DISPATCHER",
+          "step": "session replacement",
+          "nextRole": "OPERATOR"
+        }
+      ],
+      "errors": []
+    },
+    {
+      "role": "OPERATOR",
+      "project": "chromium",
+      "outcome": "expected",
+      "rows": [
+        {
+          "step": "login",
+          "role": "OPERATOR",
+          "path": "/operator"
+        },
+        {
+          "role": "OPERATOR",
+          "path": "/operator",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "",
+            "",
+            "✓Документы (0)виды документов не заведены",
+            "Проверить средства защиты",
+            "Допуск",
+            "ТБ4",
+            "",
+            "Техника",
+            "Ещё"
+          ]
+        },
+        {
+          "role": "OPERATOR",
+          "path": "/admin/safety",
+          "tab": "Мой допуск",
+          "step": "tab opened"
+        },
+        {
+          "role": "OPERATOR",
+          "path": "/admin/safety",
+          "tab": "Наряд-допуски",
+          "step": "tab opened"
+        },
+        {
+          "role": "OPERATOR",
+          "path": "/admin/safety",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "1",
+            "",
+            "Сбросить",
+            "Экспорт",
+            "+ Создать наряд",
+            "Заблокированы0",
+            "Все",
+            "Действующие",
+            "На согласовании",
+            "Просроченные (0)",
+            "Заблокированные (0)",
+            "Закрытые (0)",
+            "Инженер ОТ или механикСоздаёт наряд-допуск•Описывает состав и границы работ•Отправляет на согласование",
+            "ДиспетчерПроверяет условия•Согласовывает наряд•Отказ фиксируется в журнале",
+            "АдминистраторВторое решение при повышенном риске•Свой наряд согласовать нельзя•Отзыв прекращает действие"
+          ]
+        },
+        {
+          "role": "OPERATOR",
+          "path": "/history",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "",
+            ""
+          ]
+        },
+        {
+          "role": "OPERATOR",
+          "step": "direct users API",
+          "expected": 403,
+          "actual": 403
+        },
+        {
+          "role": "OPERATOR",
+          "step": "forbidden create user",
+          "actual": 403
+        },
+        {
+          "role": "OPERATOR",
+          "step": "logout",
+          "actual": 200,
+          "afterLogout": 401
+        },
+        {
+          "role": "OPERATOR",
+          "step": "session replacement",
+          "nextRole": "ASSISTANT"
+        }
+      ],
+      "errors": []
+    },
+    {
+      "role": "ASSISTANT",
+      "project": "chromium",
+      "outcome": "expected",
+      "rows": [
+        {
+          "step": "login",
+          "role": "ASSISTANT",
+          "path": "/assistant"
+        },
+        {
+          "role": "ASSISTANT",
+          "path": "/assistant",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "",
+            "",
+            "Пройти инструктаж",
+            "Пройти проверку",
+            "Сообщить о неисправности"
+          ]
+        },
+        {
+          "role": "ASSISTANT",
+          "path": "/admin/safety",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "",
+            "",
+            "Обновить"
+          ]
+        },
+        {
+          "role": "ASSISTANT",
+          "path": "/history",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "",
+            ""
+          ]
+        },
+        {
+          "role": "ASSISTANT",
+          "step": "direct users API",
+          "expected": 403,
+          "actual": 403
+        },
+        {
+          "role": "ASSISTANT",
+          "step": "forbidden create user",
+          "actual": 403
+        },
+        {
+          "role": "ASSISTANT",
+          "step": "logout",
+          "actual": 200,
+          "afterLogout": 401
+        },
+        {
+          "role": "ASSISTANT",
+          "step": "session replacement",
+          "nextRole": "OPERATOR"
+        }
+      ],
+      "errors": []
+    },
+    {
+      "role": "MECHANIC",
+      "project": "chromium",
+      "outcome": "expected",
+      "rows": [
+        {
+          "step": "login",
+          "role": "MECHANIC",
+          "path": "/admin/to"
+        },
+        {
+          "role": "MECHANIC",
+          "path": "/admin/to",
+          "tab": "Центр готовности",
+          "step": "tab opened"
+        },
+        {
+          "role": "MECHANIC",
+          "path": "/admin/to",
+          "tab": "Готовность парка",
+          "step": "tab opened"
+        },
+        {
+          "role": "MECHANIC",
+          "path": "/admin/to",
+          "tab": "Смены",
+          "step": "tab opened"
+        },
+        {
+          "role": "MECHANIC",
+          "path": "/admin/to",
+          "tab": "Обслуживание ТО",
+          "step": "tab opened"
+        },
+        {
+          "role": "MECHANIC",
+          "path": "/admin/to",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "1",
+            "Выйти",
+            "Показать закрытые",
+            "+ Зафиксировать дефект",
+            "Все",
+            "Критические",
+            "В работе",
+            "Плановые"
+          ]
+        },
+        {
+          "role": "MECHANIC",
+          "path": "/admin/equipment",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "1",
+            "Выйти",
+            " Плитки",
+            " Таблица",
+            " Конструктор"
+          ]
+        },
+        {
+          "role": "MECHANIC",
+          "path": "/admin/maintenance",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "1",
+            "Выйти",
+            "Все",
+            "Требуют ТО",
+            "Просрочено",
+            "В ремонте",
+            "Без ответственного",
+            "С замечаниями",
+            " Задача ТО",
+            "‹",
+            "1",
+            "›"
+          ]
+        },
+        {
+          "role": "MECHANIC",
+          "path": "/admin/crews",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "1",
+            "Выйти",
+            "Все",
+            "Активные",
+            "Неактивные",
+            "Без помощников",
+            "QA бригадаQA полигонQA OPERATOR1 помощникQA КБУРГАктивна"
+          ]
+        },
+        {
+          "role": "MECHANIC",
+          "path": "/admin/safety",
+          "tab": "Мой допуск",
+          "step": "tab opened"
+        },
+        {
+          "role": "MECHANIC",
+          "path": "/admin/safety",
+          "tab": "Наряд-допуски",
+          "step": "tab opened"
+        },
+        {
+          "role": "MECHANIC",
+          "path": "/admin/safety",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "2",
+            "Выйти",
+            "Сбросить",
+            "Экспорт",
+            "+ Создать наряд",
+            "Заблокированы0",
+            "Все",
+            "Действующие",
+            "На согласовании",
+            "Просроченные (0)",
+            "Заблокированные (0)",
+            "Закрытые (0)",
+            "Инженер ОТ или механикСоздаёт наряд-допуск•Описывает состав и границы работ•Отправляет на согласование",
+            "ДиспетчерПроверяет условия•Согласовывает наряд•Отказ фиксируется в журнале",
+            "АдминистраторВторое решение при повышенном риске•Свой наряд согласовать нельзя•Отзыв прекращает действие"
+          ]
+        },
+        {
+          "role": "MECHANIC",
+          "step": "direct users API",
+          "expected": 403,
+          "actual": 403
+        },
+        {
+          "role": "MECHANIC",
+          "step": "forbidden create user",
+          "actual": 403
+        },
+        {
+          "role": "MECHANIC",
+          "step": "logout",
+          "actual": 200,
+          "afterLogout": 401
+        },
+        {
+          "role": "MECHANIC",
+          "step": "session replacement",
+          "nextRole": "OPERATOR"
+        }
+      ],
+      "errors": []
+    },
+    {
+      "role": "FOREMAN",
+      "project": "chromium",
+      "outcome": "expected",
+      "rows": [
+        {
+          "step": "login",
+          "role": "FOREMAN",
+          "path": "/admin"
+        },
+        {
+          "role": "FOREMAN",
+          "path": "/admin",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "",
+            "Выйти",
+            "Весь период",
+            "Сегодня",
+            "7 дней",
+            "Период",
+            "",
+            "Все объекты›",
+            "QA полигон — отставание плана0% свай",
+            "QA КБУРГ — нет отчётов более 3 днейQA полигон",
+            ""
+          ]
+        },
+        {
+          "role": "FOREMAN",
+          "path": "/monitoring",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "",
+            "Выйти",
+            " Печать",
+            "Сегодня",
+            "7 дней",
+            "30 дней",
+            "Установка",
+            "Сваи, шт. / м.п.↓",
+            "Бурение, шт. / м.п.",
+            "Отчётов",
+            "Утилизация",
+            "Простой",
+            "Топливо",
+            "QA КБУРГЗабивная установка0 шт. / 0 м.п.0 шт. / 0 м.п.00% (0/30 дн)0 ч—Нет источника · недостаточно данных—",
+            ""
+          ]
+        },
+        {
+          "role": "FOREMAN",
+          "path": "/admin/sites",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "",
+            "Выйти",
+            "Активные",
+            "Неактивные",
+            "Все",
+            "Отставание",
+            "Без бригад",
+            "Без отчётов",
+            "С простоем",
+            "QA полигон1 бригада · QA КБУРГ0 / 1000%0—Нет отчётов"
+          ]
+        },
+        {
+          "role": "FOREMAN",
+          "path": "/admin/to",
+          "tab": "Центр готовности",
+          "step": "tab opened"
+        },
+        {
+          "role": "FOREMAN",
+          "path": "/admin/to",
+          "tab": "Готовность парка",
+          "step": "tab opened"
+        },
+        {
+          "role": "FOREMAN",
+          "path": "/admin/to",
+          "tab": "Смены",
+          "step": "tab opened"
+        },
+        {
+          "role": "FOREMAN",
+          "path": "/admin/to",
+          "tab": "Обслуживание ТО",
+          "step": "tab opened"
+        },
+        {
+          "role": "FOREMAN",
+          "path": "/admin/to",
+          "tab": "Отчёты",
+          "step": "tab opened"
+        },
+        {
+          "role": "FOREMAN",
+          "path": "/admin/to",
+          "tab": "Происшествия",
+          "step": "tab opened"
+        },
+        {
+          "role": "FOREMAN",
+          "path": "/admin/to",
+          "tab": "Настройки",
+          "step": "tab opened"
+        },
+        {
+          "role": "FOREMAN",
+          "path": "/admin/to",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "1",
+            "Выйти",
+            "Правила готовности",
+            "Чек-листы",
+            "Роли и доступы",
+            "Справочники",
+            "Уведомления",
+            "Интеграции",
+            "Аудит",
+            "История изменений",
+            "Открыть полную матрицу ",
+            "Опубликовать правила",
+            "Сохранить черновик",
+            "Пересчитать по свежим данным"
+          ]
+        },
+        {
+          "role": "FOREMAN",
+          "path": "/admin/crews",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "1",
+            "Выйти",
+            "Все",
+            "Активные",
+            "Неактивные",
+            "Без помощников",
+            "QA бригадаQA полигонQA OPERATOR1 помощникQA КБУРГАктивна"
+          ]
+        },
+        {
+          "role": "FOREMAN",
+          "path": "/admin/safety",
+          "tab": "Мой допуск",
+          "step": "tab opened"
+        },
+        {
+          "role": "FOREMAN",
+          "path": "/admin/safety",
+          "tab": "Наряд-допуски",
+          "step": "tab opened"
+        },
+        {
+          "role": "FOREMAN",
+          "path": "/admin/safety",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "2",
+            "Выйти",
+            "Сбросить",
+            "Экспорт",
+            "+ Создать наряд",
+            "Заблокированы0",
+            "Все",
+            "Действующие",
+            "На согласовании",
+            "Просроченные (0)",
+            "Заблокированные (0)",
+            "Закрытые (0)",
+            "Инженер ОТ или механикСоздаёт наряд-допуск•Описывает состав и границы работ•Отправляет на согласование",
+            "ДиспетчерПроверяет условия•Согласовывает наряд•Отказ фиксируется в журнале",
+            "АдминистраторВторое решение при повышенном риске•Свой наряд согласовать нельзя•Отзыв прекращает действие"
+          ]
+        },
+        {
+          "role": "FOREMAN",
+          "path": "/admin/reports",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "2",
+            "Выйти",
+            "Отчёты смен",
+            "Журнал забивки",
+            "Печать",
+            "Все",
+            "Сегодня",
+            "Вчера",
+            "7 дней",
+            "Черновики",
+            "Сданные",
+            "С простоем",
+            "С фото",
+            "Изменены вручную",
+            "Применить",
+            "Дата↓",
+            "Объект / установка",
+            "Оператор",
+            "Сваи",
+            "Бурение",
+            "Простой"
+          ]
+        },
+        {
+          "role": "FOREMAN",
+          "path": "/admin/analytics",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "2",
+            "Выйти",
+            "Операторы",
+            "Тренды по объектам",
+            "Надёжность ТО"
+          ]
+        },
+        {
+          "role": "FOREMAN",
+          "step": "direct users API",
+          "expected": 200,
+          "actual": 200
+        },
+        {
+          "role": "FOREMAN",
+          "step": "forbidden create user",
+          "actual": 403
+        },
+        {
+          "role": "FOREMAN",
+          "step": "logout",
+          "actual": 200,
+          "afterLogout": 401
+        },
+        {
+          "role": "FOREMAN",
+          "step": "session replacement",
+          "nextRole": "OPERATOR"
+        }
+      ],
+      "errors": []
+    },
+    {
+      "role": "SAFETY_ENGINEER",
+      "project": "chromium",
+      "outcome": "expected",
+      "rows": [
+        {
+          "step": "login",
+          "role": "SAFETY_ENGINEER",
+          "path": "/admin/safety"
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "path": "/admin/safety",
+          "tab": "Мой допуск",
+          "step": "tab opened"
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "path": "/admin/safety",
+          "tab": "Обзор",
+          "step": "tab opened"
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "path": "/admin/safety",
+          "tab": "Сотрудники",
+          "step": "tab opened"
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "path": "/admin/safety",
+          "tab": "Журнал инструктажей",
+          "step": "tab opened"
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "path": "/admin/safety",
+          "tab": "Инструкции и регламенты",
+          "step": "tab opened"
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "path": "/admin/safety",
+          "tab": "Проверка знаний",
+          "step": "tab opened"
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "path": "/admin/safety",
+          "tab": "Документы",
+          "step": "tab opened"
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "path": "/admin/safety",
+          "tab": "Наряд-допуски",
+          "step": "tab opened"
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "path": "/admin/safety",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "1",
+            "Выйти",
+            "Сбросить",
+            "Экспорт",
+            "+ Создать наряд",
+            "Заблокированы0",
+            "Все",
+            "Действующие",
+            "На согласовании",
+            "Просроченные (0)",
+            "Заблокированные (0)",
+            "Закрытые (0)",
+            "Инженер ОТ или механикСоздаёт наряд-допуск•Описывает состав и границы работ•Отправляет на согласование",
+            "ДиспетчерПроверяет условия•Согласовывает наряд•Отказ фиксируется в журнале",
+            "АдминистраторВторое решение при повышенном риске•Свой наряд согласовать нельзя•Отзыв прекращает действие"
+          ]
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "path": "/admin/to",
+          "tab": "Центр готовности",
+          "step": "tab opened"
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "path": "/admin/to",
+          "tab": "Готовность парка",
+          "step": "tab opened"
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "path": "/admin/to",
+          "tab": "Смены",
+          "step": "tab opened"
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "path": "/admin/to",
+          "tab": "Обслуживание ТО",
+          "step": "tab opened"
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "path": "/admin/to",
+          "tab": "Отчёты",
+          "step": "tab opened"
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "path": "/admin/to",
+          "tab": "Происшествия",
+          "step": "tab opened"
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "path": "/admin/to",
+          "tab": "Настройки",
+          "step": "tab opened"
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "path": "/admin/to",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "2",
+            "Выйти",
+            "Правила готовности",
+            "Чек-листы",
+            "Роли и доступы",
+            "Справочники",
+            "Уведомления",
+            "Интеграции",
+            "Аудит",
+            "История изменений",
+            "Открыть полную матрицу ",
+            "Опубликовать правила",
+            "Сохранить черновик",
+            "Пересчитать по свежим данным"
+          ]
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "path": "/admin/sites",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "2",
+            "Выйти",
+            "Активные",
+            "Неактивные",
+            "Все",
+            "Отставание",
+            "Без бригад",
+            "Без отчётов",
+            "С простоем",
+            "QA полигон1 бригада · QA КБУРГ0 / 1000%0—Нет отчётов"
+          ]
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "path": "/admin/reports",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "2",
+            "Выйти",
+            "Печать",
+            "Все",
+            "Сегодня",
+            "Вчера",
+            "7 дней",
+            "Черновики",
+            "Сданные",
+            "С простоем",
+            "С фото",
+            "Изменены вручную",
+            "Применить",
+            "Дата↓",
+            "Объект / установка",
+            "Оператор",
+            "Сваи",
+            "Бурение",
+            "Простой"
+          ]
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "step": "direct users API",
+          "expected": 200,
+          "actual": 200
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "step": "forbidden create user",
+          "actual": 403
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "step": "logout",
+          "actual": 200,
+          "afterLogout": 401
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "step": "session replacement",
+          "nextRole": "OPERATOR"
+        }
+      ],
+      "errors": []
+    },
+    {
+      "role": "ADMIN",
+      "project": "Mobile Safari",
+      "outcome": "expected",
+      "rows": [
+        {
+          "step": "login",
+          "role": "ADMIN",
+          "path": "/admin"
+        },
+        {
+          "role": "ADMIN",
+          "path": "/admin",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "",
+            "9+",
+            "Весь период",
+            "Сегодня",
+            "7 дней",
+            "Период",
+            "",
+            "Все объекты›",
+            "QA КБУРГКБУРГНет данныхQA полигоннет данных за сегодняQA OPERATOR · QA бригада",
+            "Все установки›",
+            "QA полигон — отставание плана0% свай",
+            "QA КБУРГ — нет отчётов более 3 днейQA полигон"
+          ]
+        },
+        {
+          "role": "ADMIN",
+          "path": "/monitoring",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "",
+            "9+",
+            " Печать",
+            "Сегодня",
+            "7 дней",
+            "30 дней",
+            "QA КБУРГЗабивная установкаСваи0 шт. / 0 м.п.Бурение0 шт. / 0 м.п.Отчётов0Утилизация0% / 0/30 днПростой0 чТопливо— · Нет источника · недостаточно данных"
+          ]
+        },
+        {
+          "role": "ADMIN",
+          "path": "/admin/sites",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "",
+            "9+",
+            "Новый объект",
+            "Активные",
+            "Неактивные",
+            "Все",
+            "Отставание",
+            "Без бригад",
+            "Без отчётов",
+            "С простоем",
+            "QA полигон1 бригада · QA КБУРГ0 / 1000%0—Нет отчётов",
+            "Редактировать",
+            "Назначить пользователей",
+            "Выполнен",
+            "Деактивировать",
+            "Удалить навсегда",
+            "Добавить свайное поле"
+          ]
+        },
+        {
+          "role": "ADMIN",
+          "path": "/admin/reports",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "",
+            "9+",
+            "Отчёты смен",
+            "Журнал забивки",
+            "Печать",
+            "CSV",
+            "Excel",
+            "Новый отчёт",
+            "Все",
+            "Сегодня",
+            "Вчера",
+            "7 дней",
+            "Черновики",
+            "Сданные",
+            "С простоем",
+            "С фото",
+            "Изменены вручную",
+            "Применить"
+          ]
+        },
+        {
+          "role": "ADMIN",
+          "path": "/admin/equipment",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "",
+            "9+",
+            " Добавить установку",
+            " Плитки",
+            " Таблица",
+            " Конструктор"
+          ]
+        },
+        {
+          "role": "ADMIN",
+          "path": "/admin/to",
+          "tab": "Центр готовности",
+          "step": "tab opened"
+        },
+        {
+          "role": "ADMIN",
+          "path": "/admin/to",
+          "tab": "Готовность парка",
+          "step": "tab opened"
+        },
+        {
+          "role": "ADMIN",
+          "path": "/admin/to",
+          "tab": "Смены",
+          "step": "tab opened"
+        },
+        {
+          "role": "ADMIN",
+          "path": "/admin/to",
+          "tab": "Обслуживание ТО",
+          "step": "tab opened"
+        },
+        {
+          "role": "ADMIN",
+          "path": "/admin/to",
+          "tab": "Отчёты",
+          "step": "tab opened"
+        },
+        {
+          "role": "ADMIN",
+          "path": "/admin/to",
+          "tab": "Происшествия",
+          "step": "tab opened"
+        },
+        {
+          "role": "ADMIN",
+          "path": "/admin/to",
+          "tab": "Настройки",
+          "step": "tab opened"
+        },
+        {
+          "role": "ADMIN",
+          "path": "/admin/to",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "",
+            "9+",
+            "Правила готовности",
+            "Чек-листы",
+            "Роли и доступы",
+            "Справочники",
+            "Уведомления",
+            "Интеграции",
+            "Аудит",
+            "История изменений",
+            "Открыть полную матрицу ",
+            "Опубликовать правила",
+            "Сохранить черновик",
+            "Пересчитать по свежим данным"
+          ]
+        },
+        {
+          "role": "ADMIN",
+          "path": "/admin/crews",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "",
+            "9+",
+            "Добавить бригаду",
+            "Все",
+            "Активные",
+            "Неактивные",
+            "Без помощников",
+            "QA бригадаQA полигонQA OPERATOR1 помощникQA КБУРГАктивна",
+            "Редактировать",
+            "Деактивировать"
+          ]
+        },
+        {
+          "role": "ADMIN",
+          "path": "/admin/safety",
+          "tab": "Мой допуск",
+          "step": "tab opened"
+        },
+        {
+          "role": "ADMIN",
+          "path": "/admin/safety",
+          "tab": "Обзор",
+          "step": "tab opened"
+        },
+        {
+          "role": "ADMIN",
+          "path": "/admin/safety",
+          "tab": "Сотрудники",
+          "step": "tab opened"
+        },
+        {
+          "role": "ADMIN",
+          "path": "/admin/safety",
+          "tab": "Журнал инструктажей",
+          "step": "tab opened"
+        },
+        {
+          "role": "ADMIN",
+          "path": "/admin/safety",
+          "tab": "Инструкции и регламенты",
+          "step": "tab opened"
+        },
+        {
+          "role": "ADMIN",
+          "path": "/admin/safety",
+          "tab": "Проверка знаний",
+          "step": "tab opened"
+        },
+        {
+          "role": "ADMIN",
+          "path": "/admin/safety",
+          "tab": "Документы",
+          "step": "tab opened"
+        },
+        {
+          "role": "ADMIN",
+          "path": "/admin/safety",
+          "tab": "Наряд-допуски",
+          "step": "tab opened"
+        },
+        {
+          "role": "ADMIN",
+          "path": "/admin/safety",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "",
+            "9+",
+            "Сбросить",
+            "Экспорт",
+            "+ Создать наряд",
+            "Заблокированы0",
+            "Все",
+            "Действующие",
+            "На согласовании",
+            "Просроченные (0)",
+            "Заблокированные (0)",
+            "Закрытые (0)",
+            "Инженер ОТ или механикСоздаёт наряд-допуск•Описывает состав и границы работ•Отправляет на согласование",
+            "ДиспетчерПроверяет условия•Согласовывает наряд•Отказ фиксируется в журнале",
+            "АдминистраторВторое решение при повышенном риске•Свой наряд согласовать нельзя•Отзыв прекращает действие"
+          ]
+        },
+        {
+          "role": "ADMIN",
+          "path": "/admin/analytics",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "",
+            "9+",
+            "Операторы",
+            "Тренды по объектам",
+            "Надёжность ТО"
+          ]
+        },
+        {
+          "role": "ADMIN",
+          "path": "/admin/dictionaries",
+          "tab": "Сваи",
+          "step": "tab opened"
+        },
+        {
+          "role": "ADMIN",
+          "path": "/admin/dictionaries",
+          "tab": "Бурение",
+          "step": "tab opened"
+        },
+        {
+          "role": "ADMIN",
+          "path": "/admin/dictionaries",
+          "tab": "Простои",
+          "step": "tab opened"
+        },
+        {
+          "role": "ADMIN",
+          "path": "/admin/dictionaries",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "",
+            "9+",
+            "Добавить причину простоя",
+            "Сортаменты свай1активных0архивныхИспользуются в 0 объектах",
+            "Типы бурения1активных0архивныхИспользуются в 0 объектах",
+            "Причины простоев1активных0архивныхИспользуются в 0 объектах",
+            "QA ожиданиеАктивенОтчёты0Планы0Обновлено27.10.2026Открыть сведения",
+            "Переименовать",
+            "В архив",
+            "Удалить"
+          ]
+        },
+        {
+          "role": "ADMIN",
+          "path": "/admin/users",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "",
+            "9+",
+            "Виды документов",
+            "Новый пользователь",
+            "Все",
+            "Операторы",
+            "Помощники",
+            "Диспетчеры",
+            "Администраторы",
+            "Заблокированные",
+            "Без объекта",
+            "Без бригады",
+            "Нет активности 30 дней",
+            "QA ADMINadmin@role-audit-99a1ac3b7a4c.testАдминистраторQA полигонНе назначена27.10.2026, 10:12ВходДоступ включён",
+            "QA ASSISTANTassistant@role-audit-99a1ac3b7a4c.testПомощникQA полигонQA бригадаQA КБУРГ27.10.2026, 10:12ПрофильДоступ включён",
+            "QA DISPATCHERdispatcher@role-audit-99a1ac3b7a4c.testДиспетчерQA полигонНе назначена27.10.2026, 10:12ПрофильДоступ включён",
+            "QA FOREMANforeman@role-audit-99a1ac3b7a4c.testМастерQA полигонНе назначена27.10.2026, 10:12ПрофильДоступ включён",
+            "QA MECHANICmechanic@role-audit-99a1ac3b7a4c.testМеханикQA полигонНе назначена27.10.2026, 10:12ПрофильДоступ включён",
+            "QA OPERATORoperator@role-audit-99a1ac3b7a4c.testОператорQA полигонQA бригадаQA КБУРГ27.10.2026, 10:12ПрофильДоступ включён",
+            "QA SAFETY_ENGINEERsafety_engineer@role-audit-99a1ac3b7a4c.testИнженер ОТQA полигонНе назначена27.10.2026, 10:12ПрофильДоступ включён"
+          ]
+        },
+        {
+          "role": "ADMIN",
+          "path": "/admin/settings",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "",
+            "9+",
+            "Рабочее пространство",
+            "Пользователи и роли",
+            "Уведомления",
+            "Шаблоны плиток",
+            "Telegram",
+            "Очередь (DLQ)",
+            "Редактировать",
+            "Настроить",
+            "Открыть",
+            "Открыть редактор"
+          ]
+        },
+        {
+          "role": "ADMIN",
+          "step": "direct users API",
+          "expected": 200,
+          "actual": 200
+        },
+        {
+          "role": "ADMIN",
+          "step": "logout",
+          "actual": 200,
+          "afterLogout": 401
+        },
+        {
+          "role": "ADMIN",
+          "step": "session replacement",
+          "nextRole": "OPERATOR"
+        }
+      ],
+      "errors": []
+    },
+    {
+      "role": "DISPATCHER",
+      "project": "Mobile Safari",
+      "outcome": "expected",
+      "rows": [
+        {
+          "step": "login",
+          "role": "DISPATCHER",
+          "path": "/admin"
+        },
+        {
+          "role": "DISPATCHER",
+          "path": "/admin",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "",
+            "9+",
+            "Весь период",
+            "Сегодня",
+            "7 дней",
+            "Период",
+            "",
+            "Все объекты›",
+            "QA КБУРГКБУРГНет данныхQA полигоннет данных за сегодняQA OPERATOR · QA бригада",
+            "Все установки›",
+            "QA полигон — отставание плана0% свай",
+            "QA КБУРГ — нет отчётов более 3 днейQA полигон"
+          ]
+        },
+        {
+          "role": "DISPATCHER",
+          "path": "/monitoring",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "",
+            "9+",
+            " Печать",
+            "Сегодня",
+            "7 дней",
+            "30 дней",
+            "QA КБУРГЗабивная установкаСваи0 шт. / 0 м.п.Бурение0 шт. / 0 м.п.Отчётов0Утилизация0% / 0/30 днПростой0 чТопливо— · Нет источника · недостаточно данных"
+          ]
+        },
+        {
+          "role": "DISPATCHER",
+          "path": "/admin/sites",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "",
+            "9+",
+            "Новый объект",
+            "Активные",
+            "Неактивные",
+            "Все",
+            "Отставание",
+            "Без бригад",
+            "Без отчётов",
+            "С простоем",
+            "QA полигон1 бригада · QA КБУРГ0 / 1000%0—Нет отчётов",
+            "Редактировать",
+            "Назначить пользователей",
+            "Выполнен",
+            "Деактивировать",
+            "Удалить навсегда",
+            "Добавить свайное поле"
+          ]
+        },
+        {
+          "role": "DISPATCHER",
+          "path": "/admin/reports",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "",
+            "9+",
+            "Отчёты смен",
+            "Журнал забивки",
+            "Печать",
+            "Новый отчёт",
+            "Все",
+            "Сегодня",
+            "Вчера",
+            "7 дней",
+            "Черновики",
+            "Сданные",
+            "С простоем",
+            "С фото",
+            "Изменены вручную",
+            "Применить"
+          ]
+        },
+        {
+          "role": "DISPATCHER",
+          "path": "/admin/equipment",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "",
+            "9+",
+            " Плитки",
+            " Таблица",
+            " Конструктор"
+          ]
+        },
+        {
+          "role": "DISPATCHER",
+          "path": "/admin/to",
+          "tab": "Центр готовности",
+          "step": "tab opened"
+        },
+        {
+          "role": "DISPATCHER",
+          "path": "/admin/to",
+          "tab": "Готовность парка",
+          "step": "tab opened"
+        },
+        {
+          "role": "DISPATCHER",
+          "path": "/admin/to",
+          "tab": "Смены",
+          "step": "tab opened"
+        },
+        {
+          "role": "DISPATCHER",
+          "path": "/admin/to",
+          "tab": "Обслуживание ТО",
+          "step": "tab opened"
+        },
+        {
+          "role": "DISPATCHER",
+          "path": "/admin/to",
+          "tab": "Отчёты",
+          "step": "tab opened"
+        },
+        {
+          "role": "DISPATCHER",
+          "path": "/admin/to",
+          "tab": "Происшествия",
+          "step": "tab opened"
+        },
+        {
+          "role": "DISPATCHER",
+          "path": "/admin/to",
+          "tab": "Настройки",
+          "step": "tab opened"
+        },
+        {
+          "role": "DISPATCHER",
+          "path": "/admin/to",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "",
+            "9+",
+            "Правила готовности",
+            "Чек-листы",
+            "Роли и доступы",
+            "Справочники",
+            "Уведомления",
+            "Интеграции",
+            "Аудит",
+            "История изменений",
+            "Открыть полную матрицу ",
+            "Опубликовать правила",
+            "Сохранить черновик",
+            "Пересчитать по свежим данным"
+          ]
+        },
+        {
+          "role": "DISPATCHER",
+          "path": "/admin/crews",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "",
+            "9+",
+            "Добавить бригаду",
+            "Все",
+            "Активные",
+            "Неактивные",
+            "Без помощников",
+            "QA бригадаQA полигонQA OPERATOR1 помощникQA КБУРГАктивна",
+            "Редактировать",
+            "Деактивировать"
+          ]
+        },
+        {
+          "role": "DISPATCHER",
+          "path": "/admin/safety",
+          "tab": "Мой допуск",
+          "step": "tab opened"
+        },
+        {
+          "role": "DISPATCHER",
+          "path": "/admin/safety",
+          "tab": "Обзор",
+          "step": "tab opened"
+        },
+        {
+          "role": "DISPATCHER",
+          "path": "/admin/safety",
+          "tab": "Сотрудники",
+          "step": "tab opened"
+        },
+        {
+          "role": "DISPATCHER",
+          "path": "/admin/safety",
+          "tab": "Журнал инструктажей",
+          "step": "tab opened"
+        },
+        {
+          "role": "DISPATCHER",
+          "path": "/admin/safety",
+          "tab": "Инструкции и регламенты",
+          "step": "tab opened"
+        },
+        {
+          "role": "DISPATCHER",
+          "path": "/admin/safety",
+          "tab": "Проверка знаний",
+          "step": "tab opened"
+        },
+        {
+          "role": "DISPATCHER",
+          "path": "/admin/safety",
+          "tab": "Документы",
+          "step": "tab opened"
+        },
+        {
+          "role": "DISPATCHER",
+          "path": "/admin/safety",
+          "tab": "Наряд-допуски",
+          "step": "tab opened"
+        },
+        {
+          "role": "DISPATCHER",
+          "path": "/admin/safety",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "",
+            "9+",
+            "Сбросить",
+            "Экспорт",
+            "+ Создать наряд",
+            "Заблокированы0",
+            "Все",
+            "Действующие",
+            "На согласовании",
+            "Просроченные (0)",
+            "Заблокированные (0)",
+            "Закрытые (0)",
+            "Инженер ОТ или механикСоздаёт наряд-допуск•Описывает состав и границы работ•Отправляет на согласование",
+            "ДиспетчерПроверяет условия•Согласовывает наряд•Отказ фиксируется в журнале",
+            "АдминистраторВторое решение при повышенном риске•Свой наряд согласовать нельзя•Отзыв прекращает действие"
+          ]
+        },
+        {
+          "role": "DISPATCHER",
+          "path": "/admin/analytics",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "",
+            "9+",
+            "Операторы",
+            "Тренды по объектам",
+            "Надёжность ТО"
+          ]
+        },
+        {
+          "role": "DISPATCHER",
+          "path": "/admin/settings",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "",
+            "9+",
+            "Рабочее пространство",
+            "Пользователи и роли",
+            "Уведомления",
+            "Шаблоны плиток",
+            "Открыть редактор"
+          ]
+        },
+        {
+          "role": "DISPATCHER",
+          "step": "direct users API",
+          "expected": 200,
+          "actual": 200
+        },
+        {
+          "role": "DISPATCHER",
+          "step": "forbidden create user",
+          "actual": 403
+        },
+        {
+          "role": "DISPATCHER",
+          "step": "logout",
+          "actual": 200,
+          "afterLogout": 401
+        },
+        {
+          "role": "DISPATCHER",
+          "step": "session replacement",
+          "nextRole": "OPERATOR"
+        }
+      ],
+      "errors": []
+    },
+    {
+      "role": "OPERATOR",
+      "project": "Mobile Safari",
+      "outcome": "expected",
+      "rows": [
+        {
+          "step": "login",
+          "role": "OPERATOR",
+          "path": "/operator"
+        },
+        {
+          "role": "OPERATOR",
+          "path": "/operator",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "",
+            "",
+            "✓Документы (0)виды документов не заведены",
+            "Проверить средства защиты",
+            "Допуск",
+            "ТБ4",
+            "",
+            "Техника",
+            "Ещё"
+          ]
+        },
+        {
+          "role": "OPERATOR",
+          "path": "/admin/safety",
+          "tab": "Мой допуск",
+          "step": "tab opened"
+        },
+        {
+          "role": "OPERATOR",
+          "path": "/admin/safety",
+          "tab": "Наряд-допуски",
+          "step": "tab opened"
+        },
+        {
+          "role": "OPERATOR",
+          "path": "/admin/safety",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "1",
+            "",
+            "Сбросить",
+            "Экспорт",
+            "+ Создать наряд",
+            "Заблокированы0",
+            "Все",
+            "Действующие",
+            "На согласовании",
+            "Просроченные (0)",
+            "Заблокированные (0)",
+            "Закрытые (0)",
+            "Инженер ОТ или механикСоздаёт наряд-допуск•Описывает состав и границы работ•Отправляет на согласование",
+            "ДиспетчерПроверяет условия•Согласовывает наряд•Отказ фиксируется в журнале",
+            "АдминистраторВторое решение при повышенном риске•Свой наряд согласовать нельзя•Отзыв прекращает действие"
+          ]
+        },
+        {
+          "role": "OPERATOR",
+          "path": "/history",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "",
+            ""
+          ]
+        },
+        {
+          "role": "OPERATOR",
+          "step": "direct users API",
+          "expected": 403,
+          "actual": 403
+        },
+        {
+          "role": "OPERATOR",
+          "step": "forbidden create user",
+          "actual": 403
+        },
+        {
+          "role": "OPERATOR",
+          "step": "logout",
+          "actual": 200,
+          "afterLogout": 401
+        },
+        {
+          "role": "OPERATOR",
+          "step": "session replacement",
+          "nextRole": "ASSISTANT"
+        }
+      ],
+      "errors": []
+    },
+    {
+      "role": "ASSISTANT",
+      "project": "Mobile Safari",
+      "outcome": "expected",
+      "rows": [
+        {
+          "step": "login",
+          "role": "ASSISTANT",
+          "path": "/assistant"
+        },
+        {
+          "role": "ASSISTANT",
+          "path": "/assistant",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "",
+            "",
+            "Пройти инструктаж",
+            "Пройти проверку",
+            "Сообщить о неисправности"
+          ]
+        },
+        {
+          "role": "ASSISTANT",
+          "path": "/admin/safety",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "",
+            "",
+            "Обновить"
+          ]
+        },
+        {
+          "role": "ASSISTANT",
+          "path": "/history",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "",
+            ""
+          ]
+        },
+        {
+          "role": "ASSISTANT",
+          "step": "direct users API",
+          "expected": 403,
+          "actual": 403
+        },
+        {
+          "role": "ASSISTANT",
+          "step": "forbidden create user",
+          "actual": 403
+        },
+        {
+          "role": "ASSISTANT",
+          "step": "logout",
+          "actual": 200,
+          "afterLogout": 401
+        },
+        {
+          "role": "ASSISTANT",
+          "step": "session replacement",
+          "nextRole": "OPERATOR"
+        }
+      ],
+      "errors": []
+    },
+    {
+      "role": "MECHANIC",
+      "project": "Mobile Safari",
+      "outcome": "expected",
+      "rows": [
+        {
+          "step": "login",
+          "role": "MECHANIC",
+          "path": "/admin/to"
+        },
+        {
+          "role": "MECHANIC",
+          "path": "/admin/to",
+          "tab": "Центр готовности",
+          "step": "tab opened"
+        },
+        {
+          "role": "MECHANIC",
+          "path": "/admin/to",
+          "tab": "Готовность парка",
+          "step": "tab opened"
+        },
+        {
+          "role": "MECHANIC",
+          "path": "/admin/to",
+          "tab": "Смены",
+          "step": "tab opened"
+        },
+        {
+          "role": "MECHANIC",
+          "path": "/admin/to",
+          "tab": "Обслуживание ТО",
+          "step": "tab opened"
+        },
+        {
+          "role": "MECHANIC",
+          "path": "/admin/to",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "",
+            "1",
+            "Показать закрытые",
+            "+ Зафиксировать дефект",
+            "Все",
+            "Критические",
+            "В работе",
+            "Плановые"
+          ]
+        },
+        {
+          "role": "MECHANIC",
+          "path": "/admin/equipment",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "",
+            "1",
+            " Плитки",
+            " Таблица",
+            " Конструктор"
+          ]
+        },
+        {
+          "role": "MECHANIC",
+          "path": "/admin/maintenance",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "",
+            "1",
+            "Все",
+            "Требуют ТО",
+            "Просрочено",
+            "В ремонте",
+            "Без ответственного",
+            "С замечаниями",
+            " Задача ТО",
+            "‹",
+            "1",
+            "›"
+          ]
+        },
+        {
+          "role": "MECHANIC",
+          "path": "/admin/crews",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "",
+            "1",
+            "Все",
+            "Активные",
+            "Неактивные",
+            "Без помощников",
+            "QA бригадаQA полигонQA OPERATOR1 помощникQA КБУРГАктивна"
+          ]
+        },
+        {
+          "role": "MECHANIC",
+          "path": "/admin/safety",
+          "tab": "Мой допуск",
+          "step": "tab opened"
+        },
+        {
+          "role": "MECHANIC",
+          "path": "/admin/safety",
+          "tab": "Наряд-допуски",
+          "step": "tab opened"
+        },
+        {
+          "role": "MECHANIC",
+          "path": "/admin/safety",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "",
+            "2",
+            "Сбросить",
+            "Экспорт",
+            "+ Создать наряд",
+            "Заблокированы0",
+            "Все",
+            "Действующие",
+            "На согласовании",
+            "Просроченные (0)",
+            "Заблокированные (0)",
+            "Закрытые (0)",
+            "Инженер ОТ или механикСоздаёт наряд-допуск•Описывает состав и границы работ•Отправляет на согласование",
+            "ДиспетчерПроверяет условия•Согласовывает наряд•Отказ фиксируется в журнале",
+            "АдминистраторВторое решение при повышенном риске•Свой наряд согласовать нельзя•Отзыв прекращает действие"
+          ]
+        },
+        {
+          "role": "MECHANIC",
+          "step": "direct users API",
+          "expected": 403,
+          "actual": 403
+        },
+        {
+          "role": "MECHANIC",
+          "step": "forbidden create user",
+          "actual": 403
+        },
+        {
+          "role": "MECHANIC",
+          "step": "logout",
+          "actual": 200,
+          "afterLogout": 401
+        },
+        {
+          "role": "MECHANIC",
+          "step": "session replacement",
+          "nextRole": "OPERATOR"
+        }
+      ],
+      "errors": []
+    },
+    {
+      "role": "FOREMAN",
+      "project": "Mobile Safari",
+      "outcome": "expected",
+      "rows": [
+        {
+          "step": "login",
+          "role": "FOREMAN",
+          "path": "/admin"
+        },
+        {
+          "role": "FOREMAN",
+          "path": "/admin",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "",
+            "",
+            "Весь период",
+            "Сегодня",
+            "7 дней",
+            "Период",
+            "",
+            "Все объекты›",
+            "QA полигон — отставание плана0% свай",
+            "QA КБУРГ — нет отчётов более 3 днейQA полигон"
+          ]
+        },
+        {
+          "role": "FOREMAN",
+          "path": "/monitoring",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "",
+            "",
+            " Печать",
+            "Сегодня",
+            "7 дней",
+            "30 дней",
+            "QA КБУРГЗабивная установкаСваи0 шт. / 0 м.п.Бурение0 шт. / 0 м.п.Отчётов0Утилизация0% / 0/30 днПростой0 чТопливо— · Нет источника · недостаточно данных"
+          ]
+        },
+        {
+          "role": "FOREMAN",
+          "path": "/admin/sites",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "",
+            "",
+            "Активные",
+            "Неактивные",
+            "Все",
+            "Отставание",
+            "Без бригад",
+            "Без отчётов",
+            "С простоем",
+            "QA полигон1 бригада · QA КБУРГ0 / 1000%0—Нет отчётов"
+          ]
+        },
+        {
+          "role": "FOREMAN",
+          "path": "/admin/to",
+          "tab": "Центр готовности",
+          "step": "tab opened"
+        },
+        {
+          "role": "FOREMAN",
+          "path": "/admin/to",
+          "tab": "Готовность парка",
+          "step": "tab opened"
+        },
+        {
+          "role": "FOREMAN",
+          "path": "/admin/to",
+          "tab": "Смены",
+          "step": "tab opened"
+        },
+        {
+          "role": "FOREMAN",
+          "path": "/admin/to",
+          "tab": "Обслуживание ТО",
+          "step": "tab opened"
+        },
+        {
+          "role": "FOREMAN",
+          "path": "/admin/to",
+          "tab": "Отчёты",
+          "step": "tab opened"
+        },
+        {
+          "role": "FOREMAN",
+          "path": "/admin/to",
+          "tab": "Происшествия",
+          "step": "tab opened"
+        },
+        {
+          "role": "FOREMAN",
+          "path": "/admin/to",
+          "tab": "Настройки",
+          "step": "tab opened"
+        },
+        {
+          "role": "FOREMAN",
+          "path": "/admin/to",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "",
+            "1",
+            "Правила готовности",
+            "Чек-листы",
+            "Роли и доступы",
+            "Справочники",
+            "Уведомления",
+            "Интеграции",
+            "Аудит",
+            "История изменений",
+            "Открыть полную матрицу ",
+            "Опубликовать правила",
+            "Сохранить черновик",
+            "Пересчитать по свежим данным"
+          ]
+        },
+        {
+          "role": "FOREMAN",
+          "path": "/admin/crews",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "",
+            "1",
+            "Все",
+            "Активные",
+            "Неактивные",
+            "Без помощников",
+            "QA бригадаQA полигонQA OPERATOR1 помощникQA КБУРГАктивна"
+          ]
+        },
+        {
+          "role": "FOREMAN",
+          "path": "/admin/safety",
+          "tab": "Мой допуск",
+          "step": "tab opened"
+        },
+        {
+          "role": "FOREMAN",
+          "path": "/admin/safety",
+          "tab": "Наряд-допуски",
+          "step": "tab opened"
+        },
+        {
+          "role": "FOREMAN",
+          "path": "/admin/safety",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "",
+            "2",
+            "Сбросить",
+            "Экспорт",
+            "+ Создать наряд",
+            "Заблокированы0",
+            "Все",
+            "Действующие",
+            "На согласовании",
+            "Просроченные (0)",
+            "Заблокированные (0)",
+            "Закрытые (0)",
+            "Инженер ОТ или механикСоздаёт наряд-допуск•Описывает состав и границы работ•Отправляет на согласование",
+            "ДиспетчерПроверяет условия•Согласовывает наряд•Отказ фиксируется в журнале",
+            "АдминистраторВторое решение при повышенном риске•Свой наряд согласовать нельзя•Отзыв прекращает действие"
+          ]
+        },
+        {
+          "role": "FOREMAN",
+          "path": "/admin/reports",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "",
+            "2",
+            "Отчёты смен",
+            "Журнал забивки",
+            "Печать",
+            "Все",
+            "Сегодня",
+            "Вчера",
+            "7 дней",
+            "Черновики",
+            "Сданные",
+            "С простоем",
+            "С фото",
+            "Изменены вручную",
+            "Применить"
+          ]
+        },
+        {
+          "role": "FOREMAN",
+          "path": "/admin/analytics",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "",
+            "2",
+            "Операторы",
+            "Тренды по объектам",
+            "Надёжность ТО"
+          ]
+        },
+        {
+          "role": "FOREMAN",
+          "step": "direct users API",
+          "expected": 200,
+          "actual": 200
+        },
+        {
+          "role": "FOREMAN",
+          "step": "forbidden create user",
+          "actual": 403
+        },
+        {
+          "role": "FOREMAN",
+          "step": "logout",
+          "actual": 200,
+          "afterLogout": 401
+        },
+        {
+          "role": "FOREMAN",
+          "step": "session replacement",
+          "nextRole": "OPERATOR"
+        }
+      ],
+      "errors": []
+    },
+    {
+      "role": "SAFETY_ENGINEER",
+      "project": "Mobile Safari",
+      "outcome": "expected",
+      "rows": [
+        {
+          "step": "login",
+          "role": "SAFETY_ENGINEER",
+          "path": "/admin/safety"
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "path": "/admin/safety",
+          "tab": "Мой допуск",
+          "step": "tab opened"
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "path": "/admin/safety",
+          "tab": "Обзор",
+          "step": "tab opened"
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "path": "/admin/safety",
+          "tab": "Сотрудники",
+          "step": "tab opened"
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "path": "/admin/safety",
+          "tab": "Журнал инструктажей",
+          "step": "tab opened"
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "path": "/admin/safety",
+          "tab": "Инструкции и регламенты",
+          "step": "tab opened"
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "path": "/admin/safety",
+          "tab": "Проверка знаний",
+          "step": "tab opened"
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "path": "/admin/safety",
+          "tab": "Документы",
+          "step": "tab opened"
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "path": "/admin/safety",
+          "tab": "Наряд-допуски",
+          "step": "tab opened"
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "path": "/admin/safety",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "",
+            "1",
+            "Сбросить",
+            "Экспорт",
+            "+ Создать наряд",
+            "Заблокированы0",
+            "Все",
+            "Действующие",
+            "На согласовании",
+            "Просроченные (0)",
+            "Заблокированные (0)",
+            "Закрытые (0)",
+            "Инженер ОТ или механикСоздаёт наряд-допуск•Описывает состав и границы работ•Отправляет на согласование",
+            "ДиспетчерПроверяет условия•Согласовывает наряд•Отказ фиксируется в журнале",
+            "АдминистраторВторое решение при повышенном риске•Свой наряд согласовать нельзя•Отзыв прекращает действие"
+          ]
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "path": "/admin/to",
+          "tab": "Центр готовности",
+          "step": "tab opened"
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "path": "/admin/to",
+          "tab": "Готовность парка",
+          "step": "tab opened"
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "path": "/admin/to",
+          "tab": "Смены",
+          "step": "tab opened"
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "path": "/admin/to",
+          "tab": "Обслуживание ТО",
+          "step": "tab opened"
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "path": "/admin/to",
+          "tab": "Отчёты",
+          "step": "tab opened"
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "path": "/admin/to",
+          "tab": "Происшествия",
+          "step": "tab opened"
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "path": "/admin/to",
+          "tab": "Настройки",
+          "step": "tab opened"
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "path": "/admin/to",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "",
+            "2",
+            "Правила готовности",
+            "Чек-листы",
+            "Роли и доступы",
+            "Справочники",
+            "Уведомления",
+            "Интеграции",
+            "Аудит",
+            "История изменений",
+            "Открыть полную матрицу ",
+            "Опубликовать правила",
+            "Сохранить черновик",
+            "Пересчитать по свежим данным"
+          ]
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "path": "/admin/sites",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "",
+            "2",
+            "Активные",
+            "Неактивные",
+            "Все",
+            "Отставание",
+            "Без бригад",
+            "Без отчётов",
+            "С простоем",
+            "QA полигон1 бригада · QA КБУРГ0 / 1000%0—Нет отчётов"
+          ]
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "path": "/admin/reports",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "",
+            "2",
+            "Печать",
+            "Все",
+            "Сегодня",
+            "Вчера",
+            "7 дней",
+            "Черновики",
+            "Сданные",
+            "С простоем",
+            "С фото",
+            "Изменены вручную",
+            "Применить"
+          ]
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "step": "direct users API",
+          "expected": 200,
+          "actual": 200
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "step": "forbidden create user",
+          "actual": 403
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "step": "logout",
+          "actual": 200,
+          "afterLogout": 401
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "step": "session replacement",
+          "nextRole": "OPERATOR"
+        }
+      ],
+      "errors": []
+    },
+    {
+      "role": "ADMIN",
+      "project": "Mobile Chrome",
+      "outcome": "expected",
+      "rows": [
+        {
+          "step": "login",
+          "role": "ADMIN",
+          "path": "/admin"
+        },
+        {
+          "role": "ADMIN",
+          "path": "/admin",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "",
+            "9+",
+            "Весь период",
+            "Сегодня",
+            "7 дней",
+            "Период",
+            "",
+            "Все объекты›",
+            "QA КБУРГКБУРГНет данныхQA полигоннет данных за сегодняQA OPERATOR · QA бригада",
+            "Все установки›",
+            "QA полигон — отставание плана0% свай",
+            "QA КБУРГ — нет отчётов более 3 днейQA полигон"
+          ]
+        },
+        {
+          "role": "ADMIN",
+          "path": "/monitoring",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "",
+            "9+",
+            " Печать",
+            "Сегодня",
+            "7 дней",
+            "30 дней",
+            "QA КБУРГЗабивная установкаСваи0 шт. / 0 м.п.Бурение0 шт. / 0 м.п.Отчётов0Утилизация0% / 0/30 днПростой0 чТопливо— · Нет источника · недостаточно данных"
+          ]
+        },
+        {
+          "role": "ADMIN",
+          "path": "/admin/sites",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "",
+            "9+",
+            "Новый объект",
+            "Активные",
+            "Неактивные",
+            "Все",
+            "Отставание",
+            "Без бригад",
+            "Без отчётов",
+            "С простоем",
+            "QA полигон1 бригада · QA КБУРГ0 / 1000%0—Нет отчётов",
+            "Редактировать",
+            "Назначить пользователей",
+            "Выполнен",
+            "Деактивировать",
+            "Удалить навсегда",
+            "Добавить свайное поле"
+          ]
+        },
+        {
+          "role": "ADMIN",
+          "path": "/admin/reports",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "",
+            "9+",
+            "Отчёты смен",
+            "Журнал забивки",
+            "Печать",
+            "CSV",
+            "Excel",
+            "Новый отчёт",
+            "Все",
+            "Сегодня",
+            "Вчера",
+            "7 дней",
+            "Черновики",
+            "Сданные",
+            "С простоем",
+            "С фото",
+            "Изменены вручную",
+            "Применить"
+          ]
+        },
+        {
+          "role": "ADMIN",
+          "path": "/admin/equipment",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "",
+            "9+",
+            " Добавить установку",
+            " Плитки",
+            " Таблица",
+            " Конструктор"
+          ]
+        },
+        {
+          "role": "ADMIN",
+          "path": "/admin/to",
+          "tab": "Центр готовности",
+          "step": "tab opened"
+        },
+        {
+          "role": "ADMIN",
+          "path": "/admin/to",
+          "tab": "Готовность парка",
+          "step": "tab opened"
+        },
+        {
+          "role": "ADMIN",
+          "path": "/admin/to",
+          "tab": "Смены",
+          "step": "tab opened"
+        },
+        {
+          "role": "ADMIN",
+          "path": "/admin/to",
+          "tab": "Обслуживание ТО",
+          "step": "tab opened"
+        },
+        {
+          "role": "ADMIN",
+          "path": "/admin/to",
+          "tab": "Отчёты",
+          "step": "tab opened"
+        },
+        {
+          "role": "ADMIN",
+          "path": "/admin/to",
+          "tab": "Происшествия",
+          "step": "tab opened"
+        },
+        {
+          "role": "ADMIN",
+          "path": "/admin/to",
+          "tab": "Настройки",
+          "step": "tab opened"
+        },
+        {
+          "role": "ADMIN",
+          "path": "/admin/to",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "",
+            "9+",
+            "Правила готовности",
+            "Чек-листы",
+            "Роли и доступы",
+            "Справочники",
+            "Уведомления",
+            "Интеграции",
+            "Аудит",
+            "История изменений",
+            "Открыть полную матрицу ",
+            "Опубликовать правила",
+            "Сохранить черновик",
+            "Пересчитать по свежим данным"
+          ]
+        },
+        {
+          "role": "ADMIN",
+          "path": "/admin/crews",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "",
+            "9+",
+            "Добавить бригаду",
+            "Все",
+            "Активные",
+            "Неактивные",
+            "Без помощников",
+            "QA бригадаQA полигонQA OPERATOR1 помощникQA КБУРГАктивна",
+            "Редактировать",
+            "Деактивировать"
+          ]
+        },
+        {
+          "role": "ADMIN",
+          "path": "/admin/safety",
+          "tab": "Мой допуск",
+          "step": "tab opened"
+        },
+        {
+          "role": "ADMIN",
+          "path": "/admin/safety",
+          "tab": "Обзор",
+          "step": "tab opened"
+        },
+        {
+          "role": "ADMIN",
+          "path": "/admin/safety",
+          "tab": "Сотрудники",
+          "step": "tab opened"
+        },
+        {
+          "role": "ADMIN",
+          "path": "/admin/safety",
+          "tab": "Журнал инструктажей",
+          "step": "tab opened"
+        },
+        {
+          "role": "ADMIN",
+          "path": "/admin/safety",
+          "tab": "Инструкции и регламенты",
+          "step": "tab opened"
+        },
+        {
+          "role": "ADMIN",
+          "path": "/admin/safety",
+          "tab": "Проверка знаний",
+          "step": "tab opened"
+        },
+        {
+          "role": "ADMIN",
+          "path": "/admin/safety",
+          "tab": "Документы",
+          "step": "tab opened"
+        },
+        {
+          "role": "ADMIN",
+          "path": "/admin/safety",
+          "tab": "Наряд-допуски",
+          "step": "tab opened"
+        },
+        {
+          "role": "ADMIN",
+          "path": "/admin/safety",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "",
+            "9+",
+            "Сбросить",
+            "Экспорт",
+            "+ Создать наряд",
+            "Заблокированы0",
+            "Все",
+            "Действующие",
+            "На согласовании",
+            "Просроченные (0)",
+            "Заблокированные (0)",
+            "Закрытые (0)",
+            "Инженер ОТ или механикСоздаёт наряд-допуск•Описывает состав и границы работ•Отправляет на согласование",
+            "ДиспетчерПроверяет условия•Согласовывает наряд•Отказ фиксируется в журнале",
+            "АдминистраторВторое решение при повышенном риске•Свой наряд согласовать нельзя•Отзыв прекращает действие"
+          ]
+        },
+        {
+          "role": "ADMIN",
+          "path": "/admin/analytics",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "",
+            "9+",
+            "Операторы",
+            "Тренды по объектам",
+            "Надёжность ТО"
+          ]
+        },
+        {
+          "role": "ADMIN",
+          "path": "/admin/dictionaries",
+          "tab": "Сваи",
+          "step": "tab opened"
+        },
+        {
+          "role": "ADMIN",
+          "path": "/admin/dictionaries",
+          "tab": "Бурение",
+          "step": "tab opened"
+        },
+        {
+          "role": "ADMIN",
+          "path": "/admin/dictionaries",
+          "tab": "Простои",
+          "step": "tab opened"
+        },
+        {
+          "role": "ADMIN",
+          "path": "/admin/dictionaries",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "",
+            "9+",
+            "Добавить причину простоя",
+            "Сортаменты свай1активных0архивныхИспользуются в 0 объектах",
+            "Типы бурения1активных0архивныхИспользуются в 0 объектах",
+            "Причины простоев1активных0архивныхИспользуются в 0 объектах",
+            "QA ожиданиеАктивенОтчёты0Планы0Обновлено27.10.2026Открыть сведения",
+            "Переименовать",
+            "В архив",
+            "Удалить"
+          ]
+        },
+        {
+          "role": "ADMIN",
+          "path": "/admin/users",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "",
+            "9+",
+            "Виды документов",
+            "Новый пользователь",
+            "Все",
+            "Операторы",
+            "Помощники",
+            "Диспетчеры",
+            "Администраторы",
+            "Заблокированные",
+            "Без объекта",
+            "Без бригады",
+            "Нет активности 30 дней",
+            "QA ADMINadmin@role-audit-c9214c0961d6.testАдминистраторQA полигонНе назначена27.10.2026, 10:18ВходДоступ включён",
+            "QA ASSISTANTassistant@role-audit-c9214c0961d6.testПомощникQA полигонQA бригадаQA КБУРГ27.10.2026, 10:17ПрофильДоступ включён",
+            "QA DISPATCHERdispatcher@role-audit-c9214c0961d6.testДиспетчерQA полигонНе назначена27.10.2026, 10:17ПрофильДоступ включён",
+            "QA FOREMANforeman@role-audit-c9214c0961d6.testМастерQA полигонНе назначена27.10.2026, 10:17ПрофильДоступ включён",
+            "QA MECHANICmechanic@role-audit-c9214c0961d6.testМеханикQA полигонНе назначена27.10.2026, 10:17ПрофильДоступ включён",
+            "QA OPERATORoperator@role-audit-c9214c0961d6.testОператорQA полигонQA бригадаQA КБУРГ27.10.2026, 10:17ПрофильДоступ включён",
+            "QA SAFETY_ENGINEERsafety_engineer@role-audit-c9214c0961d6.testИнженер ОТQA полигонНе назначена27.10.2026, 10:17ПрофильДоступ включён"
+          ]
+        },
+        {
+          "role": "ADMIN",
+          "path": "/admin/settings",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "",
+            "9+",
+            "Рабочее пространство",
+            "Пользователи и роли",
+            "Уведомления",
+            "Шаблоны плиток",
+            "Telegram",
+            "Очередь (DLQ)",
+            "Редактировать",
+            "Настроить",
+            "Открыть",
+            "Открыть редактор"
+          ]
+        },
+        {
+          "role": "ADMIN",
+          "step": "direct users API",
+          "expected": 200,
+          "actual": 200
+        },
+        {
+          "role": "ADMIN",
+          "step": "logout",
+          "actual": 200,
+          "afterLogout": 401
+        },
+        {
+          "role": "ADMIN",
+          "step": "session replacement",
+          "nextRole": "OPERATOR"
+        }
+      ],
+      "errors": []
+    },
+    {
+      "role": "DISPATCHER",
+      "project": "Mobile Chrome",
+      "outcome": "expected",
+      "rows": [
+        {
+          "step": "login",
+          "role": "DISPATCHER",
+          "path": "/admin"
+        },
+        {
+          "role": "DISPATCHER",
+          "path": "/admin",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "",
+            "9+",
+            "Весь период",
+            "Сегодня",
+            "7 дней",
+            "Период",
+            "",
+            "Все объекты›",
+            "QA КБУРГКБУРГНет данныхQA полигоннет данных за сегодняQA OPERATOR · QA бригада",
+            "Все установки›",
+            "QA полигон — отставание плана0% свай",
+            "QA КБУРГ — нет отчётов более 3 днейQA полигон"
+          ]
+        },
+        {
+          "role": "DISPATCHER",
+          "path": "/monitoring",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "",
+            "9+",
+            " Печать",
+            "Сегодня",
+            "7 дней",
+            "30 дней",
+            "QA КБУРГЗабивная установкаСваи0 шт. / 0 м.п.Бурение0 шт. / 0 м.п.Отчётов0Утилизация0% / 0/30 днПростой0 чТопливо— · Нет источника · недостаточно данных"
+          ]
+        },
+        {
+          "role": "DISPATCHER",
+          "path": "/admin/sites",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "",
+            "9+",
+            "Новый объект",
+            "Активные",
+            "Неактивные",
+            "Все",
+            "Отставание",
+            "Без бригад",
+            "Без отчётов",
+            "С простоем",
+            "QA полигон1 бригада · QA КБУРГ0 / 1000%0—Нет отчётов",
+            "Редактировать",
+            "Назначить пользователей",
+            "Выполнен",
+            "Деактивировать",
+            "Удалить навсегда",
+            "Добавить свайное поле"
+          ]
+        },
+        {
+          "role": "DISPATCHER",
+          "path": "/admin/reports",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "",
+            "9+",
+            "Отчёты смен",
+            "Журнал забивки",
+            "Печать",
+            "Новый отчёт",
+            "Все",
+            "Сегодня",
+            "Вчера",
+            "7 дней",
+            "Черновики",
+            "Сданные",
+            "С простоем",
+            "С фото",
+            "Изменены вручную",
+            "Применить"
+          ]
+        },
+        {
+          "role": "DISPATCHER",
+          "path": "/admin/equipment",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "",
+            "9+",
+            " Плитки",
+            " Таблица",
+            " Конструктор"
+          ]
+        },
+        {
+          "role": "DISPATCHER",
+          "path": "/admin/to",
+          "tab": "Центр готовности",
+          "step": "tab opened"
+        },
+        {
+          "role": "DISPATCHER",
+          "path": "/admin/to",
+          "tab": "Готовность парка",
+          "step": "tab opened"
+        },
+        {
+          "role": "DISPATCHER",
+          "path": "/admin/to",
+          "tab": "Смены",
+          "step": "tab opened"
+        },
+        {
+          "role": "DISPATCHER",
+          "path": "/admin/to",
+          "tab": "Обслуживание ТО",
+          "step": "tab opened"
+        },
+        {
+          "role": "DISPATCHER",
+          "path": "/admin/to",
+          "tab": "Отчёты",
+          "step": "tab opened"
+        },
+        {
+          "role": "DISPATCHER",
+          "path": "/admin/to",
+          "tab": "Происшествия",
+          "step": "tab opened"
+        },
+        {
+          "role": "DISPATCHER",
+          "path": "/admin/to",
+          "tab": "Настройки",
+          "step": "tab opened"
+        },
+        {
+          "role": "DISPATCHER",
+          "path": "/admin/to",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "",
+            "9+",
+            "Правила готовности",
+            "Чек-листы",
+            "Роли и доступы",
+            "Справочники",
+            "Уведомления",
+            "Интеграции",
+            "Аудит",
+            "История изменений",
+            "Открыть полную матрицу ",
+            "Опубликовать правила",
+            "Сохранить черновик",
+            "Пересчитать по свежим данным"
+          ]
+        },
+        {
+          "role": "DISPATCHER",
+          "path": "/admin/crews",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "",
+            "9+",
+            "Добавить бригаду",
+            "Все",
+            "Активные",
+            "Неактивные",
+            "Без помощников",
+            "QA бригадаQA полигонQA OPERATOR1 помощникQA КБУРГАктивна",
+            "Редактировать",
+            "Деактивировать"
+          ]
+        },
+        {
+          "role": "DISPATCHER",
+          "path": "/admin/safety",
+          "tab": "Мой допуск",
+          "step": "tab opened"
+        },
+        {
+          "role": "DISPATCHER",
+          "path": "/admin/safety",
+          "tab": "Обзор",
+          "step": "tab opened"
+        },
+        {
+          "role": "DISPATCHER",
+          "path": "/admin/safety",
+          "tab": "Сотрудники",
+          "step": "tab opened"
+        },
+        {
+          "role": "DISPATCHER",
+          "path": "/admin/safety",
+          "tab": "Журнал инструктажей",
+          "step": "tab opened"
+        },
+        {
+          "role": "DISPATCHER",
+          "path": "/admin/safety",
+          "tab": "Инструкции и регламенты",
+          "step": "tab opened"
+        },
+        {
+          "role": "DISPATCHER",
+          "path": "/admin/safety",
+          "tab": "Проверка знаний",
+          "step": "tab opened"
+        },
+        {
+          "role": "DISPATCHER",
+          "path": "/admin/safety",
+          "tab": "Документы",
+          "step": "tab opened"
+        },
+        {
+          "role": "DISPATCHER",
+          "path": "/admin/safety",
+          "tab": "Наряд-допуски",
+          "step": "tab opened"
+        },
+        {
+          "role": "DISPATCHER",
+          "path": "/admin/safety",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "",
+            "9+",
+            "Сбросить",
+            "Экспорт",
+            "+ Создать наряд",
+            "Заблокированы0",
+            "Все",
+            "Действующие",
+            "На согласовании",
+            "Просроченные (0)",
+            "Заблокированные (0)",
+            "Закрытые (0)",
+            "Инженер ОТ или механикСоздаёт наряд-допуск•Описывает состав и границы работ•Отправляет на согласование",
+            "ДиспетчерПроверяет условия•Согласовывает наряд•Отказ фиксируется в журнале",
+            "АдминистраторВторое решение при повышенном риске•Свой наряд согласовать нельзя•Отзыв прекращает действие"
+          ]
+        },
+        {
+          "role": "DISPATCHER",
+          "path": "/admin/analytics",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "",
+            "9+",
+            "Операторы",
+            "Тренды по объектам",
+            "Надёжность ТО"
+          ]
+        },
+        {
+          "role": "DISPATCHER",
+          "path": "/admin/settings",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "",
+            "9+",
+            "Рабочее пространство",
+            "Пользователи и роли",
+            "Уведомления",
+            "Шаблоны плиток",
+            "Открыть редактор"
+          ]
+        },
+        {
+          "role": "DISPATCHER",
+          "step": "direct users API",
+          "expected": 200,
+          "actual": 200
+        },
+        {
+          "role": "DISPATCHER",
+          "step": "forbidden create user",
+          "actual": 403
+        },
+        {
+          "role": "DISPATCHER",
+          "step": "logout",
+          "actual": 200,
+          "afterLogout": 401
+        },
+        {
+          "role": "DISPATCHER",
+          "step": "session replacement",
+          "nextRole": "OPERATOR"
+        }
+      ],
+      "errors": []
+    },
+    {
+      "role": "OPERATOR",
+      "project": "Mobile Chrome",
+      "outcome": "expected",
+      "rows": [
+        {
+          "step": "login",
+          "role": "OPERATOR",
+          "path": "/operator"
+        },
+        {
+          "role": "OPERATOR",
+          "path": "/operator",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "",
+            "",
+            "✓Документы (0)виды документов не заведены",
+            "Проверить средства защиты",
+            "Допуск",
+            "ТБ4",
+            "",
+            "Техника",
+            "Ещё"
+          ]
+        },
+        {
+          "role": "OPERATOR",
+          "path": "/admin/safety",
+          "tab": "Мой допуск",
+          "step": "tab opened"
+        },
+        {
+          "role": "OPERATOR",
+          "path": "/admin/safety",
+          "tab": "Наряд-допуски",
+          "step": "tab opened"
+        },
+        {
+          "role": "OPERATOR",
+          "path": "/admin/safety",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "1",
+            "",
+            "Сбросить",
+            "Экспорт",
+            "+ Создать наряд",
+            "Заблокированы0",
+            "Все",
+            "Действующие",
+            "На согласовании",
+            "Просроченные (0)",
+            "Заблокированные (0)",
+            "Закрытые (0)",
+            "Инженер ОТ или механикСоздаёт наряд-допуск•Описывает состав и границы работ•Отправляет на согласование",
+            "ДиспетчерПроверяет условия•Согласовывает наряд•Отказ фиксируется в журнале",
+            "АдминистраторВторое решение при повышенном риске•Свой наряд согласовать нельзя•Отзыв прекращает действие"
+          ]
+        },
+        {
+          "role": "OPERATOR",
+          "path": "/history",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "",
+            ""
+          ]
+        },
+        {
+          "role": "OPERATOR",
+          "step": "direct users API",
+          "expected": 403,
+          "actual": 403
+        },
+        {
+          "role": "OPERATOR",
+          "step": "forbidden create user",
+          "actual": 403
+        },
+        {
+          "role": "OPERATOR",
+          "step": "logout",
+          "actual": 200,
+          "afterLogout": 401
+        },
+        {
+          "role": "OPERATOR",
+          "step": "session replacement",
+          "nextRole": "ASSISTANT"
+        }
+      ],
+      "errors": []
+    },
+    {
+      "role": "ASSISTANT",
+      "project": "Mobile Chrome",
+      "outcome": "expected",
+      "rows": [
+        {
+          "step": "login",
+          "role": "ASSISTANT",
+          "path": "/assistant"
+        },
+        {
+          "role": "ASSISTANT",
+          "path": "/assistant",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "",
+            "",
+            "Пройти инструктаж",
+            "Пройти проверку",
+            "Сообщить о неисправности"
+          ]
+        },
+        {
+          "role": "ASSISTANT",
+          "path": "/admin/safety",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "",
+            "",
+            "Обновить"
+          ]
+        },
+        {
+          "role": "ASSISTANT",
+          "path": "/history",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "",
+            ""
+          ]
+        },
+        {
+          "role": "ASSISTANT",
+          "step": "direct users API",
+          "expected": 403,
+          "actual": 403
+        },
+        {
+          "role": "ASSISTANT",
+          "step": "forbidden create user",
+          "actual": 403
+        },
+        {
+          "role": "ASSISTANT",
+          "step": "logout",
+          "actual": 200,
+          "afterLogout": 401
+        },
+        {
+          "role": "ASSISTANT",
+          "step": "session replacement",
+          "nextRole": "OPERATOR"
+        }
+      ],
+      "errors": []
+    },
+    {
+      "role": "MECHANIC",
+      "project": "Mobile Chrome",
+      "outcome": "expected",
+      "rows": [
+        {
+          "step": "login",
+          "role": "MECHANIC",
+          "path": "/admin/to"
+        },
+        {
+          "role": "MECHANIC",
+          "path": "/admin/to",
+          "tab": "Центр готовности",
+          "step": "tab opened"
+        },
+        {
+          "role": "MECHANIC",
+          "path": "/admin/to",
+          "tab": "Готовность парка",
+          "step": "tab opened"
+        },
+        {
+          "role": "MECHANIC",
+          "path": "/admin/to",
+          "tab": "Смены",
+          "step": "tab opened"
+        },
+        {
+          "role": "MECHANIC",
+          "path": "/admin/to",
+          "tab": "Обслуживание ТО",
+          "step": "tab opened"
+        },
+        {
+          "role": "MECHANIC",
+          "path": "/admin/to",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "",
+            "1",
+            "Показать закрытые",
+            "+ Зафиксировать дефект",
+            "Все",
+            "Критические",
+            "В работе",
+            "Плановые"
+          ]
+        },
+        {
+          "role": "MECHANIC",
+          "path": "/admin/equipment",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "",
+            "1",
+            " Плитки",
+            " Таблица",
+            " Конструктор"
+          ]
+        },
+        {
+          "role": "MECHANIC",
+          "path": "/admin/maintenance",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "",
+            "1",
+            "Все",
+            "Требуют ТО",
+            "Просрочено",
+            "В ремонте",
+            "Без ответственного",
+            "С замечаниями",
+            " Задача ТО",
+            "‹",
+            "1",
+            "›"
+          ]
+        },
+        {
+          "role": "MECHANIC",
+          "path": "/admin/crews",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "",
+            "1",
+            "Все",
+            "Активные",
+            "Неактивные",
+            "Без помощников",
+            "QA бригадаQA полигонQA OPERATOR1 помощникQA КБУРГАктивна"
+          ]
+        },
+        {
+          "role": "MECHANIC",
+          "path": "/admin/safety",
+          "tab": "Мой допуск",
+          "step": "tab opened"
+        },
+        {
+          "role": "MECHANIC",
+          "path": "/admin/safety",
+          "tab": "Наряд-допуски",
+          "step": "tab opened"
+        },
+        {
+          "role": "MECHANIC",
+          "path": "/admin/safety",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "",
+            "2",
+            "Сбросить",
+            "Экспорт",
+            "+ Создать наряд",
+            "Заблокированы0",
+            "Все",
+            "Действующие",
+            "На согласовании",
+            "Просроченные (0)",
+            "Заблокированные (0)",
+            "Закрытые (0)",
+            "Инженер ОТ или механикСоздаёт наряд-допуск•Описывает состав и границы работ•Отправляет на согласование",
+            "ДиспетчерПроверяет условия•Согласовывает наряд•Отказ фиксируется в журнале",
+            "АдминистраторВторое решение при повышенном риске•Свой наряд согласовать нельзя•Отзыв прекращает действие"
+          ]
+        },
+        {
+          "role": "MECHANIC",
+          "step": "direct users API",
+          "expected": 403,
+          "actual": 403
+        },
+        {
+          "role": "MECHANIC",
+          "step": "forbidden create user",
+          "actual": 403
+        },
+        {
+          "role": "MECHANIC",
+          "step": "logout",
+          "actual": 200,
+          "afterLogout": 401
+        },
+        {
+          "role": "MECHANIC",
+          "step": "session replacement",
+          "nextRole": "OPERATOR"
+        }
+      ],
+      "errors": []
+    },
+    {
+      "role": "FOREMAN",
+      "project": "Mobile Chrome",
+      "outcome": "expected",
+      "rows": [
+        {
+          "step": "login",
+          "role": "FOREMAN",
+          "path": "/admin"
+        },
+        {
+          "role": "FOREMAN",
+          "path": "/admin",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "",
+            "",
+            "Весь период",
+            "Сегодня",
+            "7 дней",
+            "Период",
+            "",
+            "Все объекты›",
+            "QA полигон — отставание плана0% свай",
+            "QA КБУРГ — нет отчётов более 3 днейQA полигон"
+          ]
+        },
+        {
+          "role": "FOREMAN",
+          "path": "/monitoring",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "",
+            "",
+            " Печать",
+            "Сегодня",
+            "7 дней",
+            "30 дней",
+            "QA КБУРГЗабивная установкаСваи0 шт. / 0 м.п.Бурение0 шт. / 0 м.п.Отчётов0Утилизация0% / 0/30 днПростой0 чТопливо— · Нет источника · недостаточно данных"
+          ]
+        },
+        {
+          "role": "FOREMAN",
+          "path": "/admin/sites",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "",
+            "",
+            "Активные",
+            "Неактивные",
+            "Все",
+            "Отставание",
+            "Без бригад",
+            "Без отчётов",
+            "С простоем",
+            "QA полигон1 бригада · QA КБУРГ0 / 1000%0—Нет отчётов"
+          ]
+        },
+        {
+          "role": "FOREMAN",
+          "path": "/admin/to",
+          "tab": "Центр готовности",
+          "step": "tab opened"
+        },
+        {
+          "role": "FOREMAN",
+          "path": "/admin/to",
+          "tab": "Готовность парка",
+          "step": "tab opened"
+        },
+        {
+          "role": "FOREMAN",
+          "path": "/admin/to",
+          "tab": "Смены",
+          "step": "tab opened"
+        },
+        {
+          "role": "FOREMAN",
+          "path": "/admin/to",
+          "tab": "Обслуживание ТО",
+          "step": "tab opened"
+        },
+        {
+          "role": "FOREMAN",
+          "path": "/admin/to",
+          "tab": "Отчёты",
+          "step": "tab opened"
+        },
+        {
+          "role": "FOREMAN",
+          "path": "/admin/to",
+          "tab": "Происшествия",
+          "step": "tab opened"
+        },
+        {
+          "role": "FOREMAN",
+          "path": "/admin/to",
+          "tab": "Настройки",
+          "step": "tab opened"
+        },
+        {
+          "role": "FOREMAN",
+          "path": "/admin/to",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "",
+            "1",
+            "Правила готовности",
+            "Чек-листы",
+            "Роли и доступы",
+            "Справочники",
+            "Уведомления",
+            "Интеграции",
+            "Аудит",
+            "История изменений",
+            "Открыть полную матрицу ",
+            "Опубликовать правила",
+            "Сохранить черновик",
+            "Пересчитать по свежим данным"
+          ]
+        },
+        {
+          "role": "FOREMAN",
+          "path": "/admin/crews",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "",
+            "1",
+            "Все",
+            "Активные",
+            "Неактивные",
+            "Без помощников",
+            "QA бригадаQA полигонQA OPERATOR1 помощникQA КБУРГАктивна"
+          ]
+        },
+        {
+          "role": "FOREMAN",
+          "path": "/admin/safety",
+          "tab": "Мой допуск",
+          "step": "tab opened"
+        },
+        {
+          "role": "FOREMAN",
+          "path": "/admin/safety",
+          "tab": "Наряд-допуски",
+          "step": "tab opened"
+        },
+        {
+          "role": "FOREMAN",
+          "path": "/admin/safety",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "",
+            "2",
+            "Сбросить",
+            "Экспорт",
+            "+ Создать наряд",
+            "Заблокированы0",
+            "Все",
+            "Действующие",
+            "На согласовании",
+            "Просроченные (0)",
+            "Заблокированные (0)",
+            "Закрытые (0)",
+            "Инженер ОТ или механикСоздаёт наряд-допуск•Описывает состав и границы работ•Отправляет на согласование",
+            "ДиспетчерПроверяет условия•Согласовывает наряд•Отказ фиксируется в журнале",
+            "АдминистраторВторое решение при повышенном риске•Свой наряд согласовать нельзя•Отзыв прекращает действие"
+          ]
+        },
+        {
+          "role": "FOREMAN",
+          "path": "/admin/reports",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "",
+            "2",
+            "Отчёты смен",
+            "Журнал забивки",
+            "Печать",
+            "Все",
+            "Сегодня",
+            "Вчера",
+            "7 дней",
+            "Черновики",
+            "Сданные",
+            "С простоем",
+            "С фото",
+            "Изменены вручную",
+            "Применить"
+          ]
+        },
+        {
+          "role": "FOREMAN",
+          "path": "/admin/analytics",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "",
+            "2",
+            "Операторы",
+            "Тренды по объектам",
+            "Надёжность ТО"
+          ]
+        },
+        {
+          "role": "FOREMAN",
+          "step": "direct users API",
+          "expected": 200,
+          "actual": 200
+        },
+        {
+          "role": "FOREMAN",
+          "step": "forbidden create user",
+          "actual": 403
+        },
+        {
+          "role": "FOREMAN",
+          "step": "logout",
+          "actual": 200,
+          "afterLogout": 401
+        },
+        {
+          "role": "FOREMAN",
+          "step": "session replacement",
+          "nextRole": "OPERATOR"
+        }
+      ],
+      "errors": []
+    },
+    {
+      "role": "SAFETY_ENGINEER",
+      "project": "Mobile Chrome",
+      "outcome": "expected",
+      "rows": [
+        {
+          "step": "login",
+          "role": "SAFETY_ENGINEER",
+          "path": "/admin/safety"
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "path": "/admin/safety",
+          "tab": "Мой допуск",
+          "step": "tab opened"
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "path": "/admin/safety",
+          "tab": "Обзор",
+          "step": "tab opened"
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "path": "/admin/safety",
+          "tab": "Сотрудники",
+          "step": "tab opened"
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "path": "/admin/safety",
+          "tab": "Журнал инструктажей",
+          "step": "tab opened"
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "path": "/admin/safety",
+          "tab": "Инструкции и регламенты",
+          "step": "tab opened"
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "path": "/admin/safety",
+          "tab": "Проверка знаний",
+          "step": "tab opened"
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "path": "/admin/safety",
+          "tab": "Документы",
+          "step": "tab opened"
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "path": "/admin/safety",
+          "tab": "Наряд-допуски",
+          "step": "tab opened"
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "path": "/admin/safety",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "",
+            "1",
+            "Сбросить",
+            "Экспорт",
+            "+ Создать наряд",
+            "Заблокированы0",
+            "Все",
+            "Действующие",
+            "На согласовании",
+            "Просроченные (0)",
+            "Заблокированные (0)",
+            "Закрытые (0)",
+            "Инженер ОТ или механикСоздаёт наряд-допуск•Описывает состав и границы работ•Отправляет на согласование",
+            "ДиспетчерПроверяет условия•Согласовывает наряд•Отказ фиксируется в журнале",
+            "АдминистраторВторое решение при повышенном риске•Свой наряд согласовать нельзя•Отзыв прекращает действие"
+          ]
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "path": "/admin/to",
+          "tab": "Центр готовности",
+          "step": "tab opened"
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "path": "/admin/to",
+          "tab": "Готовность парка",
+          "step": "tab opened"
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "path": "/admin/to",
+          "tab": "Смены",
+          "step": "tab opened"
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "path": "/admin/to",
+          "tab": "Обслуживание ТО",
+          "step": "tab opened"
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "path": "/admin/to",
+          "tab": "Отчёты",
+          "step": "tab opened"
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "path": "/admin/to",
+          "tab": "Происшествия",
+          "step": "tab opened"
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "path": "/admin/to",
+          "tab": "Настройки",
+          "step": "tab opened"
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "path": "/admin/to",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "",
+            "2",
+            "Правила готовности",
+            "Чек-листы",
+            "Роли и доступы",
+            "Справочники",
+            "Уведомления",
+            "Интеграции",
+            "Аудит",
+            "История изменений",
+            "Открыть полную матрицу ",
+            "Опубликовать правила",
+            "Сохранить черновик",
+            "Пересчитать по свежим данным"
+          ]
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "path": "/admin/sites",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "",
+            "2",
+            "Активные",
+            "Неактивные",
+            "Все",
+            "Отставание",
+            "Без бригад",
+            "Без отчётов",
+            "С простоем",
+            "QA полигон1 бригада · QA КБУРГ0 / 1000%0—Нет отчётов"
+          ]
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "path": "/admin/reports",
+          "step": "page opened",
+          "apiErrors": [],
+          "actions": [
+            "",
+            "2",
+            "Печать",
+            "Все",
+            "Сегодня",
+            "Вчера",
+            "7 дней",
+            "Черновики",
+            "Сданные",
+            "С простоем",
+            "С фото",
+            "Изменены вручную",
+            "Применить"
+          ]
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "step": "direct users API",
+          "expected": 200,
+          "actual": 200
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "step": "forbidden create user",
+          "actual": 403
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "step": "logout",
+          "actual": 200,
+          "afterLogout": 401
+        },
+        {
+          "role": "SAFETY_ENGINEER",
+          "step": "session replacement",
+          "nextRole": "OPERATOR"
+        }
+      ],
+      "errors": []
+    }
+  ]
+}

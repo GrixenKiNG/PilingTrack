@@ -12,7 +12,7 @@ const m = vi.hoisted(() => ({
   deleteTemplate: vi.fn(), activateTemplate: vi.fn(), saveAnswers: vi.fn(), createDocument: vi.fn(), addFuel: vi.fn(),
   createPlan: vi.fn(), review: vi.fn(),
   retry: vi.fn(), discard: vi.fn(), findMedia: vi.fn(), deleteMedia: vi.fn(), accessMedia: vi.fn(),
-  crew: vi.fn(),
+  crew: vi.fn(), listFuel: vi.fn(), fuelSummary: vi.fn(),
 }));
 vi.mock('@/lib/auth', () => ({ requireAuth: m.auth }));
 vi.mock('@/services/auth/authorization-service', () => ({ assertCan: m.can, can: () => true }));
@@ -29,6 +29,7 @@ vi.mock('@/modules/inspections', () => ({
 }));
 vi.mock('@/modules/equipment', () => ({
   createEquipmentDocument: m.createDocument, addFuelEntry: m.addFuel, createMaintenancePlan: m.createPlan,
+  listFuelLog: m.listFuel, getFuelSummary: m.fuelSummary,
 }));
 vi.mock('@/modules/crews', () => ({ getCrewForOperator: m.crew }));
 vi.mock('@/lib/db', () => ({
@@ -43,7 +44,7 @@ import { PUT as updateTemplate, DELETE as deleteTemplate } from '../checklist-te
 import { POST as activateTemplate } from '../checklist-templates/[id]/activate/route';
 import { PUT as saveAnswers } from '../inspections/[id]/route';
 import { POST as createDocument } from '../equipment/[id]/documents/route';
-import { POST as addFuel } from '../equipment/[id]/fuel/route';
+import { GET as listFuel, POST as addFuel } from '../equipment/[id]/fuel/route';
 import { POST as createPlan } from '../maintenance-plans/route';
 import { POST as reviewIncident } from '../admin/incidents/route';
 import { POST as dlq } from '../admin/dlq/route';
@@ -192,3 +193,37 @@ it.each(cases.filter((entry) => ![dlq, deleteMedia].some((handler) => handler ==
     expect(entry.mock).not.toHaveBeenCalled();
     expect(m.audit).not.toHaveBeenCalled();
   });
+
+describe('fuel ownership — requested equipment contract', () => {
+  const operator = { ...actor, id: 'operator-1', role: 'OPERATOR' };
+  beforeEach(() => {
+    m.auth.mockResolvedValue({ user: operator, error: null });
+    m.crew.mockResolvedValue({ equipmentId: 'entity-1' });
+    m.listFuel.mockResolvedValue([]);
+    m.fuelSummary.mockResolvedValue({});
+    m.addFuel.mockResolvedValue({ id: 'fuel-1', recordedAt: new Date('2026-10-29T00:00:00.000Z') });
+  });
+  const call = (method: string) => (method === 'GET' ? listFuel : addFuel)(
+    request(method, method === 'POST' ? { litersAdded: 10, tankPercent: 80 } : undefined), context,
+  );
+  it.each(['GET', 'POST'])('%s looks up the requested rig rather than an arbitrary first crew', async method => {
+    expect((await call(method)).status).toBe(method === 'GET' ? 200 : 201);
+    expect(m.crew).toHaveBeenCalledWith(operator, null, 'entity-1');
+  });
+  it.each([
+    ['GET', null], ['POST', null],
+    ['GET', { equipmentId: 'other-rig' }], ['POST', { equipmentId: 'other-rig' }],
+  ])('%s denies a missing or mismatched crew without reading or writing fuel', async (method, crew) => {
+    m.crew.mockResolvedValue(crew);
+    expect((await call(String(method))).status).toBe(403);
+    expect(m.crew).toHaveBeenCalledWith(operator, null, 'entity-1');
+    expect(m.addFuel).not.toHaveBeenCalled();
+    expect(m.listFuel).not.toHaveBeenCalled();
+    expect(m.audit).not.toHaveBeenCalled();
+  });
+  it.each(['GET', 'POST'])('%s keeps the existing ADMIN bypass', async method => {
+    m.auth.mockResolvedValue({ user: actor, error: null });
+    expect((await call(method)).status).toBe(method === 'GET' ? 200 : 201);
+    expect(m.crew).not.toHaveBeenCalled();
+  });
+});

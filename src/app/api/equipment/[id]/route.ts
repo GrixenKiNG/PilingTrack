@@ -51,6 +51,15 @@ export const GET = withApi(
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     const tenantId = requireTenantId(user!);
     const equipment = await getEquipmentByIdOrThrow(id, tenantId);
+    if (user?.role === 'OPERATOR') {
+      const assignedCrew = await db.crew.findFirst({
+        where: { operatorId: user.id, equipmentId: id, isActive: true, equipment: { tenantId } },
+        select: { id: true },
+      });
+      if (!assignedCrew) {
+        return NextResponse.json({ error: 'Установка не найдена' }, { status: 404 });
+      }
+    }
     return NextResponse.json({ equipment });
   },
   { domain: 'equipment' }

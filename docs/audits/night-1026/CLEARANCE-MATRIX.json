@@ -1,0 +1,166 @@
+[
+  {
+    "case": "missing required document",
+    "decisions": {
+      "users": false,
+      "usersQuery": false,
+      "safetyOverview": false,
+      "safetySelf": false,
+      "mobile": false
+    },
+    "usersWarnings": [],
+    "usersDays": null,
+    "mobileVerdict": "MISSING",
+    "mobileDays": null
+  },
+  {
+    "case": "perpetual document",
+    "decisions": {
+      "users": true,
+      "usersQuery": true,
+      "safetyOverview": true,
+      "safetySelf": true,
+      "mobile": true
+    },
+    "usersWarnings": [],
+    "usersDays": null,
+    "mobileVerdict": "VALID",
+    "mobileDays": null
+  },
+  {
+    "case": "required expiry in future",
+    "decisions": {
+      "users": true,
+      "usersQuery": true,
+      "safetyOverview": true,
+      "safetySelf": true,
+      "mobile": true
+    },
+    "usersWarnings": [],
+    "usersDays": 60,
+    "mobileVerdict": "VALID",
+    "mobileDays": 60
+  },
+  {
+    "case": "required expiry in past",
+    "decisions": {
+      "users": false,
+      "usersQuery": false,
+      "safetyOverview": false,
+      "safetySelf": false,
+      "mobile": false
+    },
+    "usersWarnings": [],
+    "usersDays": -1,
+    "mobileVerdict": "EXPIRED",
+    "mobileDays": -1
+  },
+  {
+    "case": "optional expired date is reminder only",
+    "decisions": {
+      "users": true,
+      "usersQuery": true,
+      "safetyOverview": true,
+      "safetySelf": true,
+      "mobile": true
+    },
+    "usersWarnings": [
+      {
+        "typeId": "codex-8c0abc06a280-a-matrix-type",
+        "typeName": "Night matrix document",
+        "reason": "expired",
+        "daysLeft": -1,
+        "label": "Просрочен: Night matrix document — 1 день"
+      }
+    ],
+    "usersDays": -1,
+    "mobileVerdict": "VALID",
+    "mobileDays": null
+  },
+  {
+    "case": "warning boundary at 30.5 days",
+    "decisions": {
+      "users": true,
+      "usersQuery": true,
+      "safetyOverview": true,
+      "safetySelf": true,
+      "mobile": true
+    },
+    "usersWarnings": [],
+    "usersDays": 31,
+    "mobileVerdict": "EXPIRING",
+    "mobileDays": 30
+  },
+  {
+    "case": "expiry is same instant across UTC and Moscow",
+    "decisions": {
+      "users": true,
+      "usersQuery": true,
+      "safetyOverview": true,
+      "safetySelf": true,
+      "mobile": true
+    },
+    "usersWarnings": [
+      {
+        "typeId": "codex-8c0abc06a280-a-matrix-type",
+        "typeName": "Night matrix document",
+        "reason": "expiring",
+        "daysLeft": 0,
+        "label": "Истекает: Night matrix document — через 0 дней"
+      }
+    ],
+    "usersDays": 0,
+    "mobileVerdict": "EXPIRING",
+    "mobileDays": 0
+  },
+  {
+    "case": "one second expired across UTC and Moscow",
+    "decisions": {
+      "users": false,
+      "usersQuery": false,
+      "safetyOverview": false,
+      "safetySelf": false,
+      "mobile": false
+    },
+    "usersWarnings": [],
+    "usersDays": -1,
+    "mobileVerdict": "EXPIRED",
+    "mobileDays": -1
+  },
+  {
+    "case": "optional future date remains advisory",
+    "decisions": {
+      "users": true,
+      "usersQuery": true,
+      "safetyOverview": true,
+      "safetySelf": true,
+      "mobile": true
+    },
+    "usersWarnings": [
+      {
+        "typeId": "codex-8c0abc06a280-a-matrix-type",
+        "typeName": "Night matrix document",
+        "reason": "expiring",
+        "daysLeft": 1,
+        "label": "Истекает: Night matrix document — через 1 день"
+      }
+    ],
+    "usersDays": 1,
+    "mobileVerdict": "VALID",
+    "mobileDays": null
+  },
+  {
+    "case": "optional expiry does not make the document optional",
+    "decisions": {
+      "users": false,
+      "usersQuery": false,
+      "safetyOverview": false,
+      "safetySelf": false,
+      "mobile": false
+    },
+    "usersWarnings": [],
+    "usersDays": null,
+    "mobileVerdict": "MISSING",
+    "mobileDays": null
+  }
+]

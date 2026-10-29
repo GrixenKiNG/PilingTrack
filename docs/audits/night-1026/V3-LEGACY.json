@@ -1,0 +1,122 @@
+{
+  "appBuildSha": "44126b987c9dd02b0bbefe28e8094f282b94aaf0",
+  "testCommit": "86358ae362686ec2655bf525267059a41908a57b",
+  "exit": 0,
+  "seconds": 167,
+  "stats": {
+    "startTime": "2026-10-27T17:20:46.158Z",
+    "duration": 165732.98200000002,
+    "expected": 9,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  },
+  "scenarioHash": "dd6becf3c3c170c9d42f0280f2c4d4c9486ed7a89ed0d5cca55d80818a0cbf18",
+  "scenarioUnchanged": true,
+  "scope": "6 legacy report journeys plus 3 existing site-selector checks; not canonical shift cycles",
+  "raw": "D:/PillingR/night-logs/night-evidence-1026/v3-nine-final-2-raw/playwright.json",
+  "legacyCases": [
+    {
+      "title": "v3: real legacy report reaches dispatcher (single rig)",
+      "project": "chromium",
+      "status": "passed",
+      "report": {
+        "id": "cmvqyc62802bkysw59v9cbt3h",
+        "reportId": "2aae16bd-5876-4baf-8640-19e8565125ff",
+        "status": "submitted",
+        "shiftId": null
+      },
+      "beforePhase": "IDENTITY",
+      "afterPhase": "IDENTITY",
+      "beforeShift": null,
+      "afterShift": null,
+      "canonicalNextControls": 0,
+      "inputBeforeAdd": "2"
+    },
+    {
+      "title": "v3: real legacy report reaches dispatcher (multiple rigs)",
+      "project": "chromium",
+      "status": "passed",
+      "report": {
+        "id": "cmvqycz3602bwysw5lji9mmfr",
+        "reportId": "00f2c639-634a-450d-a8b6-9f47a52821d4",
+        "status": "submitted",
+        "shiftId": null
+      },
+      "beforePhase": "IDENTITY",
+      "afterPhase": "IDENTITY",
+      "beforeShift": null,
+      "afterShift": null,
+      "canonicalNextControls": 0,
+      "inputBeforeAdd": "2"
+    },
+    {
+      "title": "v3: real legacy report reaches dispatcher (single rig)",
+      "project": "Mobile Safari",
+      "status": "passed",
+      "report": {
+        "id": "cmvqydgnf02c9ysw523malw7b",
+        "reportId": "863208e4-1322-4e32-8923-71d09b0b7051",
+        "status": "submitted",
+        "shiftId": null
+      },
+      "beforePhase": "IDENTITY",
+      "afterPhase": "IDENTITY",
+      "beforeShift": null,
+      "afterShift": null,
+      "canonicalNextControls": 0,
+      "inputBeforeAdd": "2"
+    },
+    {
+      "title": "v3: real legacy report reaches dispatcher (multiple rigs)",
+      "project": "Mobile Safari",
+      "status": "passed",
+      "report": {
+        "id": "cmvqydzrc02clysw52erh08ip",
+        "reportId": "91e16265-7338-4985-be04-331f0bc77f6b",
+        "status": "submitted",
+        "shiftId": null
+      },
+      "beforePhase": "IDENTITY",
+      "afterPhase": "IDENTITY",
+      "beforeShift": null,
+      "afterShift": null,
+      "canonicalNextControls": 0,
+      "inputBeforeAdd": "2"
+    },
+    {
+      "title": "v3: real legacy report reaches dispatcher (single rig)",
+      "project": "Mobile Chrome",
+      "status": "passed",
+      "report": {
+        "id": "cmvqyehjf02cyysw5x2dugqtk",
+        "reportId": "0782ba95-307a-4893-9c1f-87f90eb69d07",
+        "status": "submitted",
+        "shiftId": null
+      },
+      "beforePhase": "IDENTITY",
+      "afterPhase": "IDENTITY",
+      "beforeShift": null,
+      "afterShift": null,
+      "canonicalNextControls": 0,
+      "inputBeforeAdd": "2"
+    },
+    {
+      "title": "v3: real legacy report reaches dispatcher (multiple rigs)",
+      "project": "Mobile Chrome",
+      "status": "passed",
+      "report": {
+        "id": "cmvqyew9l02daysw58nrjv9qn",
+        "reportId": "00b2c0d0-7362-42e0-bb57-4065745bc2c5",
+        "status": "submitted",
+        "shiftId": null
+      },
+      "beforePhase": "IDENTITY",
+      "afterPhase": "IDENTITY",
+      "beforeShift": null,
+      "afterShift": null,
+      "canonicalNextControls": 0,
+      "inputBeforeAdd": "2"
+    }
+  ]
+}

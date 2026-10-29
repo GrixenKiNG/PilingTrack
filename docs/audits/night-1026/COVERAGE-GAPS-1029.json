@@ -1,0 +1,386 @@
+{
+  "baseSha": "17f235e54d4bb25bbde047929005a8fd612e685f",
+  "testCommit": "b3cebcb8d6b8a9deef52ef6135a7d70026a4ba38",
+  "branch": "codex/coverage-gaps-1029",
+  "applicationChanged": false,
+  "scopeAndPreservation": {
+    "base": "17f235e54d4bb25bbde047929005a8fd612e685f",
+    "changedPaths": [
+      "src/app/api/telemetry/__tests__/ingest-validation.test.ts",
+      "src/lib/__tests__/pdf-data.test.ts",
+      "src/modules/operator-mobile/application/commands/__tests__/production.test.ts",
+      "src/modules/reports/application/__tests__/daily-summary.test.ts",
+      "src/services/telemetry/__tests__/telemetry-ingestion-service.batch-limit.test.ts"
+    ],
+    "onlyTests": true,
+    "applicationSchemaDependenciesUnchanged": true,
+    "noPreexistingLinesDeleted": true,
+    "baselinePassed": 218,
+    "baselineFailed": 0,
+    "baselineSkipped": 0,
+    "afterPassed": 266,
+    "afterFailed": 0,
+    "afterSkipped": 0,
+    "oldCasesPreserved": true,
+    "newCases": 48,
+    "files": [
+      {
+        "path": "src/app/api/telemetry/__tests__/ingest-validation.test.ts",
+        "sha256": "bf427f0e4ddb51410cdf76294dd6af43ebc4162b85788c96b39efcb3b4611f98"
+      },
+      {
+        "path": "src/lib/__tests__/pdf-data.test.ts",
+        "sha256": "9fab754666315d09c168ebf41ad9f74a6a797f5a795ab1621fea03dac954420d"
+      },
+      {
+        "path": "src/modules/operator-mobile/application/commands/__tests__/production.test.ts",
+        "sha256": "d92b7d4017bb4a724a442b25453441abf764b9949315879e323170dd666c4675"
+      },
+      {
+        "path": "src/modules/reports/application/__tests__/daily-summary.test.ts",
+        "sha256": "710ce5d0a79fa0e2d73f6fdafce6d23342a75d0e686951aa37b3efbbd5a8b233"
+      },
+      {
+        "path": "src/services/telemetry/__tests__/telemetry-ingestion-service.batch-limit.test.ts",
+        "sha256": "b3e76e0e5b06508d0479ce82006f09036cb64bc7bfa2c89e19434d1eb6e00f39"
+      }
+    ]
+  },
+  "coverage": [
+    {
+      "path": "src/modules/operator-mobile/application/commands/production.ts",
+      "before": {
+        "lines": {
+          "total": 100,
+          "covered": 69,
+          "skipped": 0,
+          "pct": 69
+        },
+        "functions": {
+          "total": 9,
+          "covered": 7,
+          "skipped": 0,
+          "pct": 77.77
+        },
+        "statements": {
+          "total": 108,
+          "covered": 71,
+          "skipped": 0,
+          "pct": 65.74
+        },
+        "branches": {
+          "total": 172,
+          "covered": 76,
+          "skipped": 0,
+          "pct": 44.18
+        }
+      },
+      "after": {
+        "lines": {
+          "total": 100,
+          "covered": 87,
+          "skipped": 0,
+          "pct": 87
+        },
+        "functions": {
+          "total": 9,
+          "covered": 7,
+          "skipped": 0,
+          "pct": 77.77
+        },
+        "statements": {
+          "total": 108,
+          "covered": 92,
+          "skipped": 0,
+          "pct": 85.18
+        },
+        "branches": {
+          "total": 172,
+          "covered": 141,
+          "skipped": 0,
+          "pct": 81.97
+        }
+      }
+    },
+    {
+      "path": "src/modules/reports/application/event-handlers.ts",
+      "before": {
+        "lines": {
+          "total": 176,
+          "covered": 148,
+          "skipped": 0,
+          "pct": 84.09
+        },
+        "functions": {
+          "total": 34,
+          "covered": 30,
+          "skipped": 0,
+          "pct": 88.23
+        },
+        "statements": {
+          "total": 191,
+          "covered": 158,
+          "skipped": 0,
+          "pct": 82.72
+        },
+        "branches": {
+          "total": 168,
+          "covered": 118,
+          "skipped": 0,
+          "pct": 70.23
+        }
+      },
+      "after": {
+        "lines": {
+          "total": 176,
+          "covered": 167,
+          "skipped": 0,
+          "pct": 94.88
+        },
+        "functions": {
+          "total": 34,
+          "covered": 32,
+          "skipped": 0,
+          "pct": 94.11
+        },
+        "statements": {
+          "total": 191,
+          "covered": 179,
+          "skipped": 0,
+          "pct": 93.71
+        },
+        "branches": {
+          "total": 168,
+          "covered": 127,
+          "skipped": 0,
+          "pct": 75.59
+        }
+      }
+    },
+    {
+      "path": "src/lib/pdf-data.ts",
+      "before": {
+        "lines": {
+          "total": 58,
+          "covered": 14,
+          "skipped": 0,
+          "pct": 24.13
+        },
+        "functions": {
+          "total": 19,
+          "covered": 4,
+          "skipped": 0,
+          "pct": 21.05
+        },
+        "statements": {
+          "total": 59,
+          "covered": 14,
+          "skipped": 0,
+          "pct": 23.72
+        },
+        "branches": {
+          "total": 56,
+          "covered": 8,
+          "skipped": 0,
+          "pct": 14.28
+        }
+      },
+      "after": {
+        "lines": {
+          "total": 58,
+          "covered": 54,
+          "skipped": 0,
+          "pct": 93.1
+        },
+        "functions": {
+          "total": 19,
+          "covered": 19,
+          "skipped": 0,
+          "pct": 100
+        },
+        "statements": {
+          "total": 59,
+          "covered": 55,
+          "skipped": 0,
+          "pct": 93.22
+        },
+        "branches": {
+          "total": 56,
+          "covered": 45,
+          "skipped": 0,
+          "pct": 80.35
+        }
+      }
+    },
+    {
+      "path": "src/services/telemetry/telemetry-ingestion-service.ts",
+      "before": {
+        "lines": {
+          "total": 89,
+          "covered": 41,
+          "skipped": 0,
+          "pct": 46.06
+        },
+        "functions": {
+          "total": 20,
+          "covered": 11,
+          "skipped": 0,
+          "pct": 55
+        },
+        "statements": {
+          "total": 102,
+          "covered": 47,
+          "skipped": 0,
+          "pct": 46.07
+        },
+        "branches": {
+          "total": 71,
+          "covered": 22,
+          "skipped": 0,
+          "pct": 30.98
+        }
+      },
+      "after": {
+        "lines": {
+          "total": 89,
+          "covered": 51,
+          "skipped": 0,
+          "pct": 57.3
+        },
+        "functions": {
+          "total": 20,
+          "covered": 12,
+          "skipped": 0,
+          "pct": 60
+        },
+        "statements": {
+          "total": 102,
+          "covered": 59,
+          "skipped": 0,
+          "pct": 57.84
+        },
+        "branches": {
+          "total": 71,
+          "covered": 31,
+          "skipped": 0,
+          "pct": 43.66
+        }
+      }
+    }
+  ],
+  "coverageScope": "Same 15 selected caller test files before; same 15 plus one new PDF builder file after. Four production modules included; not whole-project coverage.",
+  "build": {
+    "command": "npm run build",
+    "sourceSha": "b3cebcb8d6b8a9deef52ef6135a7d70026a4ba38",
+    "exit": 0,
+    "seconds": 219
+  },
+  "gates": {
+    "sourceSha": "b3cebcb8d6b8a9deef52ef6135a7d70026a4ba38",
+    "worktreeSha": "b3cebcb8d6b8a9deef52ef6135a7d70026a4ba38",
+    "complete": true,
+    "results": [
+      {
+        "id": "final-tsc",
+        "exe": "C:/Program Files/Git/bin/bash.exe",
+        "args": [
+          "-c",
+          "npx tsc --noEmit"
+        ],
+        "exit": 0,
+        "seconds": 54
+      },
+      {
+        "id": "final-lint",
+        "exe": "C:/Program Files/Git/bin/bash.exe",
+        "args": [
+          "-c",
+          "npm run lint"
+        ],
+        "exit": 0,
+        "seconds": 63
+      },
+      {
+        "id": "final-unit-wrapper",
+        "exe": "C:\\Program Files\\nodejs\\node.exe",
+        "args": [
+          "D:/PillingR/night-logs/coverage-gaps-1029/unit-run-stand.cjs"
+        ],
+        "exit": 0,
+        "seconds": 849
+      },
+      {
+        "id": "final-pw-list-wrapper",
+        "exe": "C:\\Program Files\\nodejs\\node.exe",
+        "args": [
+          "D:/PillingR/night-logs/coverage-gaps-1029/qa-fresh-stand.cjs",
+          "--list-default"
+        ],
+        "exit": 0,
+        "seconds": 31
+      }
+    ]
+  },
+  "full": {
+    "passed": 6077,
+    "failed": 0,
+    "skipped": 0,
+    "files": 530
+  },
+  "targetedConfirmedInFull": 266,
+  "collection": {
+    "tests": 411,
+    "files": 30
+  },
+  "versionIntegration": [
+    {
+      "name": "E3 real concurrent report saves один победитель, второй 409; данные победителя сохранены",
+      "status": "passed"
+    },
+    {
+      "name": "E3 real concurrent report saves X6: web report snapshots only accepted engine hours, preserving a rejected decrease",
+      "status": "passed"
+    },
+    {
+      "name": "E3 real concurrent report saves сохраняет мобильную поправку через веб-форму и защищает её исходную запись",
+      "status": "passed"
+    }
+  ],
+  "initialTestCorrections": {
+    "initialRun": "expanded",
+    "initialFailed": 3,
+    "classification": "New-test expectation errors; not reproduced application defects",
+    "sourceEvidence": [
+      {
+        "path": "src/app/api/telemetry/ingest/route.ts",
+        "lines": [
+          63,
+          84
+        ],
+        "contract": "missing header 401; invalid/revoked key 403",
+        "change": "correct invalid-key status and add both missing-key cases; keep no-write assertions"
+      },
+      {
+        "path": "src/modules/reports/application/domain-events.ts",
+        "lines": [
+          156,
+          169
+        ],
+        "contract": "single rejected handler throws its original error; only multiple failures are wrapped",
+        "change": "replace assumed AggregateError message with stronger object identity assertion"
+      }
+    ],
+    "applicationChanged": false
+  },
+  "initialTypeCorrections": {
+    "firstTscExit": 2,
+    "errors": [
+      "TS18046: r is unknown",
+      "TS2571: indexed report is unknown"
+    ],
+    "cause": "PeriodPdfData.reports is unknown[] in the public interface",
+    "change": "Compare the full report array to objectContaining matchers; keep exact one-row and required field assertions; no casts or application/type definition changes",
+    "rerunRequired": true
+  },
+  "evidenceDirectory": "D:\\PillingR\\night-logs\\coverage-gaps-1029"
+}

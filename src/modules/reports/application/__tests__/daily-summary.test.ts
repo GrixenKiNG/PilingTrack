@@ -939,3 +939,66 @@ describe('PDF автозакрытой смены: ссылка на журна�
     expect(caption).not.toContain('view=piles');
   });
 });
+
+
+describe('Telegram enqueue registration contract', () => {
+  const outboxCount = vi.fn();
+  Object.assign(dbClient.outboxEvent, {count: outboxCount});
+  const submitted = (): ReportDomainEvent => ({id: 'coverage-submit-1', type: REPORT_DOMAIN_EVENT_TYPES.REPORT_SUBMITTED, aggregateId: 'report-a', aggregateType: 'Report', occurredAt: '2026-10-29T09:00:00.000Z', siteId: 'site-a', userId: 'operator-a', tenantId: 'tenant-a', data: {}});
+  beforeEach(async () => {
+    // Execute the real registered handlers; only database and delivery I/O are mocked.
+    findUniqueMock.mockReset().mockResolvedValue({siteId: 'site-a', date: '2026-10-29', userId: 'operator-a', tenantId: 'tenant-a', status: 'submitted', piles: [], drillings: [], downtimes: []});
+    findManyMock.mockReset().mockResolvedValue([]); upsertMock.mockReset().mockResolvedValue({}); deleteManyMock.mockReset().mockResolvedValue({count: 0});
+    analyticsUpsertMock.mockReset().mockResolvedValue({}); analyticsUpdateManyMock.mockReset().mockResolvedValue({count: 1});
+    invalidateAnalyticsMock.mockReset().mockResolvedValue(undefined); recordAuditEventMock.mockReset().mockResolvedValue(undefined);
+    userFindFirst.mockReset().mockResolvedValue(null);
+    outboxCreate.mockReset().mockResolvedValue({id: 'pdf-request'}); outboxCount.mockReset().mockResolvedValue(0);
+    isNotifMock.mockReset().mockResolvedValue(true);
+    outboxFindUnique.mockReset().mockResolvedValue({published: false, payload: {}}); outboxUpdate.mockReset().mockResolvedValue({});
+    sendDocument.mockReset().mockResolvedValue(true);
+    const {registerTelegramReportHandler} = await import('../event-handlers'); registerTelegramReportHandler();
+  });
+  it('enqueues a durable delivery with tenant, aggregate and stable event dedupe key', async () => {
+    await emitDomainEvent(submitted());
+    expect(isNotifMock).toHaveBeenCalledWith('tenant-a', 'newReports');
+    expect(outboxCreate).toHaveBeenCalledTimes(1);
+    expect(outboxCreate).toHaveBeenCalledWith({data: expect.objectContaining({type: 'ReportPdfDeliveryRequested', aggregateType: 'Notification', aggregateId: 'report-a', tenantId: 'tenant-a', dedupeKey: 'report-pdf:coverage-submit-1', payload: {autoClosed: false}, projected: true})});
+    expect(sendDocument).not.toHaveBeenCalled();
+  });
+  it('replaying the same event tolerates only the database duplicate constraint', async () => {
+    outboxCreate.mockResolvedValueOnce({id: 'first'}).mockRejectedValueOnce(Object.assign(new Error('duplicate'), {code: 'P2002'}));
+    await emitDomainEvent(submitted()); await expect(emitDomainEvent(submitted())).resolves.toBeUndefined();
+    expect(outboxCreate.mock.calls.map(args => args[0].data.dedupeKey)).toEqual(['report-pdf:coverage-submit-1', 'report-pdf:coverage-submit-1']);
+    expect(sendDocument).not.toHaveBeenCalled();
+  });
+  it('skips an older submitted event when a newer pending event exists', async () => {
+    outboxCount.mockResolvedValueOnce(1);
+    await emitDomainEvent(submitted());
+    expect(outboxCount).toHaveBeenCalledWith(expect.objectContaining({where: expect.objectContaining({aggregateId: 'report-a', published: false, id: {not: 'coverage-submit-1'}})}));
+    expect(outboxCreate).not.toHaveBeenCalled();
+  });
+  it('honors the organization newReports flag before checking or creating delivery jobs', async () => {
+    isNotifMock.mockResolvedValueOnce(false);
+    await emitDomainEvent(submitted());
+    expect(outboxCount).not.toHaveBeenCalled(); expect(outboxCreate).not.toHaveBeenCalled();
+  });
+  it('propagates an enqueue failure so the outbox can retry it', async () => {
+    const error = new Error('queue unavailable'); outboxCreate.mockRejectedValueOnce(error);
+    await expect(emitDomainEvent(submitted())).rejects.toBe(error);
+    expect(outboxCreate).toHaveBeenCalledTimes(1); expect(sendDocument).not.toHaveBeenCalled();
+  });
+  it('rejects delivery without the mandatory event id before reading receipts or sending', async () => {
+    await expect(deliverReportPdf({aggregateId: 'report-a'})).rejects.toThrow('requires the outbox event id');
+    expect(outboxFindUnique).not.toHaveBeenCalled(); expect(sendDocument).not.toHaveBeenCalled();
+  });
+  it('does not send or mark delivery when the report no longer exists', async () => {
+    const {loadSingleReportPdfContext} = await import('@/lib/pdf-data'); vi.mocked(loadSingleReportPdfContext).mockResolvedValueOnce(null);
+    await deliverReportPdf({id: 'missing-report-event', aggregateId: 'missing-report'});
+    expect(outboxFindUnique).not.toHaveBeenCalled(); expect(outboxUpdate).not.toHaveBeenCalled(); expect(sendDocument).not.toHaveBeenCalled();
+  });
+  it('does not send or manufacture a receipt for an absent outbox row', async () => {
+    outboxFindUnique.mockResolvedValueOnce(null);
+    await deliverReportPdf({id: 'missing-outbox-row', aggregateId: 'report-a'});
+    expect(outboxUpdate).not.toHaveBeenCalled(); expect(sendDocument).not.toHaveBeenCalled();
+  });
+});

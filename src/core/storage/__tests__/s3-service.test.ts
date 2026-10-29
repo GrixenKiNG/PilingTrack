@@ -78,14 +78,14 @@ describe('S3-сервис: построение ключей объектов', 
     expect(key).toMatch(/tenant-789\/site-456\/exports\/\d{4}-\d{2}-\d{2}_2026-10-01_2026-10-31\.csv/);
   });
 
-  it.skip('reportPdfKey: пустая организация отказывает (fail closed), а не использует "default"', () => {
+  it('reportPdfKey: пустая организация отказывает (fail closed), а не использует "default"', () => {
     // Дефект: текущая реализация использует 'default' при null/пустом tenantId.
     // Правило fail closed требует бросать ошибку, а не писать в общий префикс.
     expect(() => reportPdfKey('report-123', 'site-456', null, '2026-10')).toThrow('tenantId is required');
     expect(() => reportPdfKey('report-123', 'site-456', '', '2026-10')).toThrow('tenantId is required');
   });
 
-  it.skip('exportCsvKey: пустая организация отказывает (fail closed), а не использует "default"', () => {
+  it('exportCsvKey: пустая организация отказывает (fail closed), а не использует "default"', () => {
     // Дефект: текущая реализация использует 'default' при null/пустом tenantId.
     expect(() => exportCsvKey('site-456', null, '2026-10-01_2026-10-31')).toThrow('tenantId is required');
     expect(() => exportCsvKey('site-456', '', '2026-10-01_2026-10-31')).toThrow('tenantId is required');

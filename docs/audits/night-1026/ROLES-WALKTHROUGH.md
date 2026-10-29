@@ -1,0 +1,221 @@
+# Проход приложения по ролям
+
+
+Бригада через формы во всех3браузерах:3passed/0failed/0skipped. Создание, смена установки/объекта/названия, снятие помощника, отмена/подтверждение softdelete и активация; SQL/аудит/сохранность draftReport, чтение MECHANIC и403 на изменение, options OPERATOR. CREW-LIFECYCLE.md/json. Последние tsc0/17с,lint0/70с без предупреждений;коллекция396/30 против BASE318/28,обаexit0.
+
+
+Прямые15разделов×7ролей×3браузера:3passed/0failed/0skipped,315наблюдений с точным конечнымURL и родительскимadmin guard. DIRECT-URL-MATRIX.md/json. Последние tsc0/18с,lint0/81с без предупреждений;list393/30 против BASE318/28,обаexit0. Все detailURLs/CRUD этим не покрыты.
+
+Статус задачи 6: **частично**. На сборке44126b98 повторены все21 обхода ролей и новые сквозные цепочки. КаждыйCRUD/каждый чужойURL и канонический цикл V3 не объявляются проверенными.
+
+## Текущий повтор на сборке44126b98
+
+21passed/0failed/0skipped,exit0,749с. Сырьё roles-current-21-raw/, данные в CROSS-ROLE.json. Ниже прежние таблицы1b0 — исторический снимок, не текущий прогон.
+
+|Роль|Браузер|Страниц|Вкладок|Ошибок|
+|---|---|---:|---:|---:|
+|ADMIN|chromium|12|18|0|
+|DISPATCHER|chromium|10|15|0|
+|OPERATOR|chromium|3|2|0|
+|ASSISTANT|chromium|3|0|0|
+|MECHANIC|chromium|5|6|0|
+|FOREMAN|chromium|8|9|0|
+|SAFETY_ENGINEER|chromium|4|15|0|
+|ADMIN|Mobile Safari|12|18|0|
+|DISPATCHER|Mobile Safari|10|15|0|
+|OPERATOR|Mobile Safari|3|2|0|
+|ASSISTANT|Mobile Safari|3|0|0|
+|MECHANIC|Mobile Safari|5|6|0|
+|FOREMAN|Mobile Safari|8|9|0|
+|SAFETY_ENGINEER|Mobile Safari|4|15|0|
+|ADMIN|Mobile Chrome|12|18|0|
+|DISPATCHER|Mobile Chrome|10|15|0|
+|OPERATOR|Mobile Chrome|3|2|0|
+|ASSISTANT|Mobile Chrome|3|0|0|
+|MECHANIC|Mobile Chrome|5|6|0|
+|FOREMAN|Mobile Chrome|8|9|0|
+|SAFETY_ENGINEER|Mobile Chrome|4|15|0|
+
+## Стенд и границы доказательств (история1b0)
+
+Исходная база origin/main: efd95008. Runtime — host production build1b0a2663 (exit0,260с), собственные PostgreSQL 18, Redis state/cache и MinIO. Реальные синтетические аккаунты всех семи ролей, без «Действую как». Рабочий стенд :3100 и production не использовались.
+
+Role union и SQL CHECK содержат ADMIN, DISPATCHER, OPERATOR, ASSISTANT, MECHANIC, FOREMAN, SAFETY_ENGINEER. В Prisma поле роли — String; проверка списка есть в CHECK. Мастер и инженер ОТ остаются поддерживаемыми ролями независимо от наличия людей в production.
+
+PERMISSIONS-CODE.json — извлечение AST: 30 общих прав, 17 прав готовности по умолчанию, 45 пунктов меню с учётом повторов по ролям. Это описание кода, не доказательство всех 329 сочетаний «роль × право»: маршруты дополнительно проверяют ресурс, tenant и опубликованную матрицу.
+
+## Фактический обход
+
+Вход; меню (на телефоне открывается панель); каждая страница меню и доступные начальные вкладки; проверка API-ошибок и браузерных исключений; uncaught pageerror наблюдается весь сценарий, console.error — в обычной навигации после загрузки сессии, намеренные отказы/выход проверяются по HTTP, их console-сообщения не объявляются отсутствующими; прямой URL /admin/users; GET /api/users по users.read; запрещённый POST /api/users; выход с 401 на /api/auth/me и вход под другой ролью. OPERATOR/ASSISTANT проверяют общую навигацию на /history: их домашние экраны намеренно имеют собственную.
+
+Исторический результат roles-v3-final на1b0a2663: **21 passed/0failed/0skipped**, exit0,661с wrapper. Предыдущий roles-ui-final на7e также21/0/0,726с; исходные красные прогоны сохранены. Все исходные красные прогоны сохранены.
+
+| Роль | Браузер | Страниц меню | Вкладок открыто | Ошибок JS/console | Итог сценария |
+|---|---|---:|---:|---:|---|
+|ADMIN|chromium|12|18|0|OK|
+|DISPATCHER|chromium|10|15|0|OK|
+|OPERATOR|chromium|3|2|0|OK|
+|ASSISTANT|chromium|3|0|0|OK|
+|MECHANIC|chromium|5|6|0|OK|
+|FOREMAN|chromium|8|9|0|OK|
+|SAFETY_ENGINEER|chromium|4|15|0|OK|
+|ADMIN|Mobile Safari|12|18|0|OK|
+|DISPATCHER|Mobile Safari|10|15|0|OK|
+|OPERATOR|Mobile Safari|3|2|0|OK|
+|ASSISTANT|Mobile Safari|3|0|0|OK|
+|MECHANIC|Mobile Safari|5|6|0|OK|
+|FOREMAN|Mobile Safari|8|9|0|OK|
+|SAFETY_ENGINEER|Mobile Safari|4|15|0|OK|
+|ADMIN|Mobile Chrome|12|18|0|OK|
+|DISPATCHER|Mobile Chrome|10|15|0|OK|
+|OPERATOR|Mobile Chrome|3|2|0|OK|
+|ASSISTANT|Mobile Chrome|3|0|0|OK|
+|MECHANIC|Mobile Chrome|5|6|0|OK|
+|FOREMAN|Mobile Chrome|8|9|0|OK|
+|SAFETY_ENGINEER|Mobile Chrome|4|15|0|OK|
+
+## Роль × страница
+
+Каждая строка ниже реально открыта в Chromium в исходном общем прогоне. Состояния других проектов и точные наблюдения — в ROLES-OBSERVATIONS.json. Кнопки записаны как инвентаризация, их присутствие не считается выполнением действия.
+
+| Роль | Адрес из меню | API-ошибки при обходе |
+|---|---|---|
+|ADMIN|/admin|Нет|
+|ADMIN|/monitoring|Нет|
+|ADMIN|/admin/sites|Нет|
+|ADMIN|/admin/reports|Нет|
+|ADMIN|/admin/equipment|Нет|
+|ADMIN|/admin/to|Нет|
+|ADMIN|/admin/crews|Нет|
+|ADMIN|/admin/safety|Нет|
+|ADMIN|/admin/analytics|Нет|
+|ADMIN|/admin/dictionaries|Нет|
+|ADMIN|/admin/users|Нет|
+|ADMIN|/admin/settings|Нет|
+|DISPATCHER|/admin|Нет|
+|DISPATCHER|/monitoring|Нет|
+|DISPATCHER|/admin/sites|Нет|
+|DISPATCHER|/admin/reports|Нет|
+|DISPATCHER|/admin/equipment|Нет|
+|DISPATCHER|/admin/to|Нет|
+|DISPATCHER|/admin/crews|Нет|
+|DISPATCHER|/admin/safety|Нет|
+|DISPATCHER|/admin/analytics|Нет|
+|DISPATCHER|/admin/settings|Нет|
+|OPERATOR|/operator|Нет|
+|OPERATOR|/admin/safety|Нет|
+|OPERATOR|/history|Нет|
+|ASSISTANT|/assistant|Нет|
+|ASSISTANT|/admin/safety|Нет|
+|ASSISTANT|/history|Нет|
+|MECHANIC|/admin/to|Нет|
+|MECHANIC|/admin/equipment|Нет|
+|MECHANIC|/admin/maintenance|Нет|
+|MECHANIC|/admin/crews|Нет|
+|MECHANIC|/admin/safety|Нет|
+|FOREMAN|/admin|Нет|
+|FOREMAN|/monitoring|Нет|
+|FOREMAN|/admin/sites|Нет|
+|FOREMAN|/admin/to|Нет|
+|FOREMAN|/admin/crews|Нет|
+|FOREMAN|/admin/safety|Нет|
+|FOREMAN|/admin/reports|Нет|
+|FOREMAN|/admin/analytics|Нет|
+|SAFETY_ENGINEER|/admin/safety|Нет|
+|SAFETY_ENGINEER|/admin/to|Нет|
+|SAFETY_ENGINEER|/admin/sites|Нет|
+|SAFETY_ENGINEER|/admin/reports|Нет|
+
+## Проверки запретов и сеанса
+
+| Роль | GET /api/users: ожидание | POST /api/users | Прямой /admin/users | Выход и смена роли |
+|---|---:|---|---|---|
+|ADMIN|200|Создание в этом сценарии не проверяется|Открывается|200 logout → 401 me → другая роль|
+|DISPATCHER|200|403|/no-access|200 logout → 401 me → другая роль|
+|OPERATOR|403|403|/no-access|200 logout → 401 me → другая роль|
+|ASSISTANT|403|403|/no-access|200 logout → 401 me → другая роль|
+|MECHANIC|403|403|/no-access|200 logout → 401 me → другая роль|
+|FOREMAN|200|403|/no-access|200 logout → 401 me → другая роль|
+|SAFETY_ENGINEER|200|403|/no-access|200 logout → 401 me → другая роль|
+
+Отдельные реальные HTTP-интеграции: 159 IDOR-сценариев и 3 гонки отчёта на собственной БД ранее прошли без пропусков; построчный реестр — INTEGRATION-RUN.md. Их нельзя выдавать за браузерный обход каждого чужого URL. Полный повтор unit/integration по ветке рассматривается отдельно в SUMMARY.md.
+
+## Найденные дефекты
+
+- ASSISTANT: /admin/safety открывал общий workspace парка и получал 403 readiness/bootstrap. Исправлено личным MyClearanceScreen, без расширения прав; отдельные red/green unit и настоящий browser green сохранены.
+- FOREMAN: DashboardAttention вызывал /api/user-documents/control без права чтения документов, получал 403. Исправлен выбор источника по useAbility; права не изменены. В последующих ролевых обходах API-отказ исчез.
+
+## Красные прогоны и проблемы тестового обхода
+
+- night-broad-final: exit 1; 106 passed / 14 failed / 9 skipped, 1293 с. Все 14 падений нового теста — требование видимости имени пользователя, которое оболочка намеренно скрывает на телефонах. Условия доступа не ослаблялись: теперь имя подтверждает загрузку store через attached, а меню действительно раскрывается и проверяется на visible.
+- roles-responsive-final: exit 1; 16 passed / 5 failed / 0 skipped, 1054 с. Все страницы/вкладки/запреты пройдены, но пять офисных ролей Mobile Safari дали pageerror при RSC-prefetch: «due to access control checks». Нельзя считать весь набор зелёным. Сырые сообщения не отфильтрованы. Последующий roles-ui-final подтвердил реальную Link-навигацию, сброс вкладок без hard reload и штатный выход через UI: 21/0/0, exit0. Ошибки не фильтровались. API-only logout оставлял живой shell с незавершённым запросом сессии; исправлен только порядок действий проверочного harness.
+- Девять пропусков общего набора существовали до работы: два rate-limit запуска только в Chromium; шесть повторов трёх пишущих critical-path в mobile-проектах; один monitoring tile editor в WebKit. Это не успешные проверки.
+
+## Действия и сквозные цепочки
+
+Общий набор реально проверил: UI-форму отчёта; диспетчерскую отправку → SiteDailySummary → analytics API → PDF от worker; создание/приёмку наряда; удаление куста с подтверждением; начало ТО и сохранение черновика; справочники и чтения других ролей. Отдельные случаи с подменой ответа (например Telegram Test) доказывают UI-контракт, не внешнюю доставку.
+
+Полный набор CRUD для каждого права и каждой роли ещё не доказан. Реестр кнопок содержит и неисполненные действия. Цепочки «дефект осмотра → ремонт механика → готовность» и «инцидент → инженер ОТ → доставка» нельзя объявлять браузерно проверенными из посещения вкладок; реальные транзакционные тесты source→outbox→snapshot перечислены отдельно в INTEGRATION-RUN.md.
+
+## Все шесть экранов оператора
+
+Новый canonical-thirty-final на приложении44126b987c9dd02b0bbefe28e8094f282b94aaf0:30passed/0failed/0skipped,exit0/1178с.30закрытых смен и30уникальных отчётов. Все пять канонических экранов проверены заново на одномSHA; старые1b0/f51доказательства не приписываются новой сборке.
+
+| Экран | Факт на44126b98 | Граница |
+|---|---|---|
+|/operator|6/0/0,три браузера×одна/две установки,полный цикл/offline/replay/SQL/диспетчер|ПрочиеCRUD и все цепочки отдельно|
+|/operator/v2|6/0/0,тот же полный цикл; строгая ширина≤375; наложение footer и переполнение имени исправлены послеRED|V2-FOOTER.md; отдельные первые неудачные исправления сохранены|
+|/operator/v3|Отдельная legacy-форма:9/0/0на44126b98,шестьотчётов+триselector|Reportsubmitted безShift,phaseIDENTITYдо/после. Canonicalциклнеподтверждён;V3-LEGACY.md,вопрос№9|
+|/operator/v5|6/0/0,тот же полный цикл; имя переносится внутри375px|V5-VIEWPORT.md; первая6/0/0на463тоже сохранена|
+|/operator/v7|6/0/0,тот же полный цикл|Паспорт сваи и остальныеCRUD отдельно|
+|/operator/v10|6/0/0,тот же полный цикл|Приmulti принимается показанная установкапоумолчанию; другогоchooserнет|
+
+Прежний вывод Codex «v7 только для чтения» был ошибкой: комментарий маршрута устарел, фактический компонент выполняет команды. В DOCS-VS-CODE.md это строка 41. Комментарий не является основанием снять экран с проверки.
+
+## Не проверено
+
+Физическое оборудование, датчики, MQTT, реальный Telegram и доставка конкретному человеку, все действия всех ролей, canonical-циклV3, каждый прямой чужой URL. Синтетические осмотры не подтверждают состояние реальной машины.
+
+Логи и скриншоты: D:/PillingR/night-logs/night-evidence-1026/roles-v3-final* и night-broad-final*. JSON наблюдений и статическая матрица сохраняются в репозитории.
+
+
+## Новые цепочки между ролями
+
+Полный v2 → диспетчер видит точные данные в отчёте/мониторинге/аналитике → инженер ОТ записывает разбор → проверена очередь уведомления:Chromium2/0/0вместе с ремонтом. Осмотр оператора → дефект/автоматический ремонт → механик/DONE → ADMIN/accept → механик/CLOSED → новый readiness snapshot:три браузера3/0/0. Авторство/версии аудита/ссылка на осмотр подтвержденыSQL. CROSS-ROLE.md/json. Прежние пункты «цепочки не проверены» выше относятся к истории.
+
+
+## Полный EO механика на44126b98
+
+MECHANIC-INSPECTION.md/json:12passed/0failed/0skipped (3новых механических пути +9прежних регрессий),три браузера,exit0/246с. Механик создаёт/сохраняет/подписывает;реальные PNG bytes проходят собственный MinIO;SQL подтверждает выполненный наряд,автора,101моточас/одну историю и аудит. Worker пересчитывает готовность;replay не повторяет историю/аудит. Диспетчер видит тот же осмотр;назначенный на установку оператор получает404 на чужого исполнителя,помощник403;прямые URL не показывают примечание. Это отдельный Inspection,не OperatorChecklistExecution.
+
+
+## Пользователи/документы: реальный lifecycle на00ac751f
+
+На сборке 00ac751f пользователи и документы: 6 passed / 0 failed / 0 skipped / 0 flaky, exit 0, 279 с; Chromium, Mobile Safari и Mobile Chrome. Создание и правка пользователя, сроки и удаление удостоверения, чтение инженером ОТ, отказы другому оператору, блокировка с отзывом сессии, разблокировка и удаление подтверждены UI/SQL и 24 точными событиями аудита. Build: exit 0, 168 с. Свежий полный unit: 5776 / 0 / 0; все 241 исторических случая повторены. Коллекция 399/30 против BASE 318/28, оба exit 0. Подробности: USERS-LIFECYCLE.md/json. Предыдущие RED сохранены.
+
+ADMIN через UI создаёт и правит пользователя, создаёт просроченное удостоверение, продлевает и удаляет его. Реальный новый OPERATOR видит состояния MISSING → EXPIRED → VALID → MISSING через state API. SAFETY_ENGINEER читает документ с ответом200; другой OPERATOR получает403 на GET/PUT/DELETE, номер не выдаётся, SQL и бизнес-аудит неизменны.
+
+Отмена блокировки сохраняет сессию200, подтверждение даёт401 прежней сессии и переводит страницу на вход. После разблокировки новый вход даёт200; удаление снова отзывает сессию. Существующие auth/security не менялись. Форма удостоверения работает с метаданными; сканы, сброс пароля и все сочетания tenant/assignment не исчерпаны.
+
+
+## Повтор на451acce2 после GET-guard
+
+На SHA 451acce2 новый прогон завершён: доступ к установкам 3/0/0,полные операторские циклы 30/0/0 (30CLOSED/30 уникальных отчётов), V39/0/0,пользователи 6/0/0;всего 48 passed/0 failed/0 skipped/0 flaky. Build exit 0/151 с;свежий полный unit 5783/0/0,512 файлов,все 241 исторических случая заново найдены и прошли. Коллекция 402/30 противBASE318/28,обаexit 0. EQUIPMENT-ACCESS-FIX.md/json.
+
+Новая проверка API после входа OPERATOR в трёх браузерах:две назначенные установки200,неназначенная404 без паспорта. Это не полный UI CRUD установки. Ранее проведённый общий обход семи ролей/315URL и механические/бригадные цепочки остаются44126,а не приписываются451.
+
+
+## OPERATOR: два назначения, отдельные журналы — новый ДЕФЕКТ
+
+На451acce2 обе назначенные карточки200, но fuel/meter GET/POST работают только на первой (200/201), вторая403. Неназначенная4x403,чужих записейнет. Chromium0passed/1failed/0skipped,exit1/34с; SQL/audit подтверждены. Это API после реального входа, не заявление о нажатии всех UI-кнопок или поломке канонического цикла. EQUIPMENT-MULTIPLE-RED.md/json. Исправление общего query ожидает отдельного разрешения владельца. ВсеCRUD по-прежнему не исчерпаны.
+
+
+29.10,ADMIN:create установки черезUI201 иSQL/passport100моточасов/auditADMIN подтверждены,но новый объект не появляется в парке из-за старогоfleetкеша(обычный1/fresh2). ДЕФЕКТ P3,0/1/0exit1/40с, EQUIPMENT-CACHE-RED.md. Следующие шаги редактирования/списания/механика этим RED ещё не достигнуты.
+
+
+29.10,12167551: Equipment UI lifecycle3/0/0во всехтрёхбраузерах;create→видимость→edit100/110→MECHANICread/PUTDELETE403→ADMINretire/reactivate→API-onlyDELETE409,SQL/audit4ADMIN/readinessrequests2,JSerrors[]. Всеутвержденияэтойцепочкидостигнуты,rawequipment-cache-three-raw. Полныйunit5783/0/0/build156сна121;старыеобщиероли/cyclesимеютсвоиSHA. ОтдельныйmultipleAPIcaseна121остаётся0/1/0.
+
+
+## Документы установки: новый UI-проход на12167551
+
+PASSPORTmetadata:ADMINcreate expired→extend2099→clearDateNULL/reload→MECHANICread/POSTPUTDELETE403→wrongparentADMIN404→deletecancel(noDELETE)→confirm200/SQLgone/auditcreate+deleteADMIN. Новые3браузера:3passed/0failed/0skipped/0flaky,exit0/146с;JSerrors[]. Полные наблюдения/команды/exits: EQUIPMENT-DOCUMENTS.md/json. Нет загрузки скана/S3 или доказанного пересчётаготовности;не все типы/роли. PUT не имеет отдельногоauditupdateсобытия,коднеправился. Аппкод121неизменён, прежниеunit5783/0/0/build156наТОМЖЕSHAнеповторялись.

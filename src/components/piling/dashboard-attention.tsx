@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AlertTriangle } from '@/components/piling/icons/unified-icons';
 import { authFetch } from '@/lib/api';
+import { useAbility } from '@/lib/use-ability';
 import {
   fetchCurrentReadiness, fetchReadinessDefects, fetchReadinessShifts, fetchWorkPermits,
 } from './to/readiness/api/client';
@@ -14,7 +15,7 @@ const MAX_ROWS = 5;
 type Sources = Omit<AttentionInput, 'equipmentName' | 'now'>;
 
 /** Источник, который роли недоступен или не ответил, остаётся `null`: по нему ничего не утверждаем. */
-async function loadSources(): Promise<Sources> {
+async function loadSources(canReadDocuments: boolean): Promise<Sources> {
   const safe = async <T,>(read: () => Promise<T>): Promise<T | null> => {
     try { return await read(); } catch { return null; }
   };
@@ -23,11 +24,11 @@ async function loadSources(): Promise<Sources> {
     safe(() => fetchReadinessShifts()),
     safe(() => fetchCurrentReadiness()),
     safe(() => fetchReadinessDefects()),
-    safe(async () => {
+    canReadDocuments ? safe(async () => {
       const response = await authFetch('/api/user-documents/control');
       if (!response.ok) throw new Error(String(response.status));
       return ((await response.json()).documents ?? []) as DocumentControlRow[];
-    }),
+    }) : Promise.resolve(null),
   ]);
   return { permits, shifts, current, defects, documents };
 }
@@ -42,13 +43,14 @@ export function DashboardAttention({ equipmentName, refreshKey }: {
   refreshKey: number;
 }) {
   const router = useRouter();
+  const canReadDocuments = useAbility('users.documents.read_all');
   const [sources, setSources] = useState<Sources | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    void loadSources().then((next) => { if (!cancelled) setSources(next); });
+    void loadSources(canReadDocuments).then((next) => { if (!cancelled) setSources(next); });
     return () => { cancelled = true; };
-  }, [refreshKey]);
+  }, [refreshKey, canReadDocuments]);
 
   const items = useMemo(
     () => sources ? buildAttentionItems({ ...sources, equipmentName, now: new Date() }) : [],

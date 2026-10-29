@@ -1,5 +1,6 @@
 import { defineConfig } from 'vitest/config';
 import path from 'path';
+import { fileURLToPath } from 'node:url';
 import fs from 'fs';
 import dotenv from 'dotenv';
 import react from '@vitejs/plugin-react';
@@ -14,10 +15,11 @@ import react from '@vitejs/plugin-react';
  * попадает, чтобы юнит-тесты продолжали идти в вакууме. Уже заданное
  * окружение главнее файла: так CI задаёт свои адреса.
  */
+const configDir = path.dirname(fileURLToPath(import.meta.url));
 const DB_ENV_KEYS = ['DATABASE_URL_POSTGRES', 'DATABASE_URL_APP_ROLE'] as const;
 
 function dbEnvFromDotenv(): Record<string, string> {
-  const envPath = path.resolve(__dirname, '.env');
+  const envPath = path.resolve(configDir, '.env');
   if (!fs.existsSync(envPath)) return {};
   const parsed = dotenv.parse(fs.readFileSync(envPath));
   return Object.fromEntries(
@@ -89,7 +91,7 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      '@': path.resolve(__dirname, './src'),
+      '@': path.resolve(configDir, './src'),
     },
   },
 });

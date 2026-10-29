@@ -61,6 +61,7 @@ function createOutboxEvent(overrides = {}) {
     type: 'report.created',
     aggregateId: 'report-1',
     aggregateType: 'Report',
+    tenantId: 'tenant-1',
     payload: { type: 'report.created', aggregateId: 'report-1' },
     published: false,
     attempts: 0,

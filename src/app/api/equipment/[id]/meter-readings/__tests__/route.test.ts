@@ -17,12 +17,16 @@ const {
   addMeterReadingMock,
   canDecreaseMeterMock,
   recordAuditEventMock,
+  getCrewForOperatorMock,
+  listMeterReadingsMock,
 } = vi.hoisted(() => ({
   requireAuthMock: vi.fn(),
   findFirstEquipmentMock: vi.fn(),
   addMeterReadingMock: vi.fn(),
   canDecreaseMeterMock: vi.fn(),
   recordAuditEventMock: vi.fn(),
+  getCrewForOperatorMock: vi.fn(),
+  listMeterReadingsMock: vi.fn(),
 }));
 
 vi.mock('@/lib/auth', () => ({ requireAuth: requireAuthMock }));
@@ -31,12 +35,12 @@ vi.mock('@/lib/db', () => ({ db: { equipment: { findFirst: findFirstEquipmentMoc
 vi.mock('@/modules/equipment', () => ({
   addMeterReading: addMeterReadingMock,
   canDecreaseMeter: canDecreaseMeterMock,
-  listMeterReadings: vi.fn(),
+  listMeterReadings: listMeterReadingsMock,
 }));
-vi.mock('@/modules/crews', () => ({ getCrewForOperator: vi.fn() }));
+vi.mock('@/modules/crews', () => ({ getCrewForOperator: getCrewForOperatorMock }));
 vi.mock('@/modules/audit', () => ({ recordAuditEvent: recordAuditEventMock }));
 
-import { POST } from '../route';
+import { GET, POST } from '../route';
 
 const ADMIN = { id: 'admin-1', name: 'Админ А.', role: 'ADMIN', tenantId: 'tenant-a' };
 
@@ -128,5 +132,43 @@ describe('POST /api/equipment/[id]/meter-readings — след записи по
         metadata: { after: { engineHours: 1234 } },
       }),
     );
+  });
+});
+
+describe('meter ownership — requested equipment contract', () => {
+  const operator = { ...ADMIN, id: 'operator-1', role: 'OPERATOR' };
+  beforeEach(() => {
+    vi.resetAllMocks();
+    requireAuthMock.mockResolvedValue({ user: operator, error: null });
+    getCrewForOperatorMock.mockResolvedValue({ equipmentId: 'eq-1' });
+    findFirstEquipmentMock.mockResolvedValue({ name: 'Rig' });
+    listMeterReadingsMock.mockResolvedValue([]);
+    addMeterReadingMock.mockResolvedValue(RESULT);
+    canDecreaseMeterMock.mockReturnValue(false);
+    recordAuditEventMock.mockResolvedValue(undefined);
+  });
+  const call = (method: string) => method === 'GET'
+    ? GET(new NextRequest('http://localhost/api/equipment/eq-1/meter-readings'), params())
+    : POST(postReq({ engineHours: 1234 }), params());
+
+  it.each(['GET', 'POST'])('%s looks up the requested rig rather than an arbitrary first crew', async method => {
+    expect((await call(method)).status).toBe(method === 'GET' ? 200 : 201);
+    expect(getCrewForOperatorMock).toHaveBeenCalledWith(operator, null, 'eq-1');
+  });
+  it.each([
+    ['GET', null], ['POST', null],
+    ['GET', { equipmentId: 'other-rig' }], ['POST', { equipmentId: 'other-rig' }],
+  ])('%s denies a missing or mismatched crew without touching readings', async (method, crew) => {
+    getCrewForOperatorMock.mockResolvedValue(crew);
+    expect((await call(String(method))).status).toBe(403);
+    expect(getCrewForOperatorMock).toHaveBeenCalledWith(operator, null, 'eq-1');
+    expect(addMeterReadingMock).not.toHaveBeenCalled();
+    expect(listMeterReadingsMock).not.toHaveBeenCalled();
+    expect(recordAuditEventMock).not.toHaveBeenCalled();
+  });
+  it.each(['GET', 'POST'])('%s keeps the existing ADMIN bypass', async method => {
+    requireAuthMock.mockResolvedValue({ user: ADMIN, error: null });
+    expect((await call(method)).status).toBe(method === 'GET' ? 200 : 201);
+    expect(getCrewForOperatorMock).not.toHaveBeenCalled();
   });
 });
