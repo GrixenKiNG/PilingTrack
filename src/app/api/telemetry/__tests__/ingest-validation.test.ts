@@ -76,3 +76,21 @@ describe.each(['POST', 'PATCH'] as const)('%s ingest', (method) => {
     expect(mocks.createMany).toHaveBeenCalledTimes(1);
   });
 });
+
+
+it.each(['POST', 'PATCH'] as const)('%s rejects an unrecognized device key before any telemetry write', async method => {
+  mocks.authenticate.mockResolvedValueOnce(null);
+  const response = await send(method, '{"type":"pressure","value":1}');
+  expect(response.status).toBe(403);
+  expect(mocks.createMany).not.toHaveBeenCalled();
+});
+
+
+it.each(['POST', 'PATCH'] as const)('%s rejects a missing device key as unauthenticated before lookup or write', async method => {
+  const handler = method === 'POST' ? POST : PATCH;
+  const response = await handler(new NextRequest('http://localhost/api/telemetry/ingest', {
+    method, headers: {'content-type': 'application/json'}, body: method === 'POST' ? '{"type":"pressure","value":1}' : '[{"type":"pressure","value":1}]',
+  }));
+  expect(response.status).toBe(401);
+  expect(mocks.authenticate).not.toHaveBeenCalled(); expect(mocks.createMany).not.toHaveBeenCalled();
+});

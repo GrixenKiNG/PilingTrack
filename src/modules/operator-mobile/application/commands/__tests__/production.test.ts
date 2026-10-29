@@ -158,6 +158,9 @@ describe('logProduction — след записи выработки в исто
     equipment: {findFirst: vi.fn()},
     pileGrade: {findFirst: vi.fn()},
     pileWork: {findUnique: vi.fn(), create: vi.fn()},
+    leaderDrilling: {findUnique: vi.fn(), create: vi.fn()},
+    drillingType: {findFirst: vi.fn()},
+    pilePassport: {findUnique: vi.fn(), create: vi.fn()},
     reportAudit: {create: vi.fn()},
     user: {findFirst: vi.fn().mockResolvedValue({name: 'Иванов', role: 'OPERATOR'})},
   };
@@ -190,6 +193,11 @@ describe('logProduction — след записи выработки в исто
     auditTx.safetyIncident.findMany.mockResolvedValue([]);
     auditTx.equipment.findFirst.mockResolvedValue({isActive: true});
     auditTx.pileGrade.findFirst.mockResolvedValue({id: 'grade-1', lengthMm: 12000, name: 'С 120.30', isActive: true, archivedAt: null});
+    auditTx.leaderDrilling.findUnique.mockResolvedValue(null);
+    auditTx.leaderDrilling.create.mockResolvedValue({id: 'drill-1'});
+    auditTx.drillingType.findFirst.mockResolvedValue({id: 'type-1'});
+    auditTx.pilePassport.findUnique.mockResolvedValue(null);
+    auditTx.pilePassport.create.mockResolvedValue({id: 'passport-1'});
     auditTx.pileWork.findUnique.mockResolvedValue(null);
     auditTx.pileWork.create.mockResolvedValue({id: 'pw-1'});
     auditTx.report.upsert.mockResolvedValue({id: 'report-pk-1'});
@@ -234,6 +242,77 @@ describe('logProduction — след записи выработки в исто
     expect(auditTx.reportAudit.create).not.toHaveBeenCalled();
     expect(auditTx.report.update).not.toHaveBeenCalled();
   });
+  it('guards the tenant-filtered missing shift before report or production writes', async () => {
+    auditTx.shift.findFirst.mockResolvedValueOnce(null);
+    await expect(logProduction(pilesInput)).rejects.toThrow('Смена не найдена');
+    expect(auditTx.shift.findFirst).toHaveBeenCalledWith(expect.objectContaining({where: {tenantId: 'tenant-a', id: pilesInput.shiftId}}));
+    expect(auditTx.report.upsert).not.toHaveBeenCalled(); expect(auditTx.pileWork.create).not.toHaveBeenCalled();
+  });
+  it.each(['CLOSED', 'CANCELLED'])('rejects %s shifts without a production row or audit', async state => {
+    auditTx.shift.findFirst.mockResolvedValueOnce({id: pilesInput.shiftId, state, equipmentId: 'equipment-1'});
+    await expect(logProduction(pilesInput)).rejects.toThrow('Смена уже закрыта');
+    expect(auditTx.pileWork.create).not.toHaveBeenCalled(); expect(auditTx.reportAudit.create).not.toHaveBeenCalled();
+  });
+  it('rejects an unassigned rig before creating a report', async () => {
+    auditTx.crew.findFirst.mockResolvedValueOnce(null);
+    await expect(logProduction(pilesInput)).rejects.toThrow('Эта установка за вами не закреплена');
+    expect(auditTx.crew.findFirst).toHaveBeenCalledWith(expect.objectContaining({where: {operatorId: 'operator-a', equipmentId: 'equipment-1', isActive: true, equipment: {tenantId: 'tenant-a'}}}));
+    expect(auditTx.report.upsert).not.toHaveBeenCalled(); expect(auditTx.pileWork.create).not.toHaveBeenCalled();
+  });
+  it('rejects submitted report changes without bumping its version', async () => {
+    auditTx.report.findUnique.mockResolvedValueOnce({status: 'submitted'});
+    await expect(logProduction(pilesInput)).rejects.toThrow('Отчёт по смене уже сдан');
+    expect(auditTx.pileWork.create).not.toHaveBeenCalled(); expect(auditTx.report.update).not.toHaveBeenCalled();
+  });
+  it('requires current piling safety before creating the report', async () => {
+    auditTx.operatorChecklistExecution.findFirst.mockResolvedValueOnce(null);
+    await expect(logProduction(pilesInput)).rejects.toThrow('Подошёл срок чек-листа ТБ по забивке свай');
+    expect(auditTx.report.upsert).not.toHaveBeenCalled(); expect(auditTx.pileWork.create).not.toHaveBeenCalled();
+  });
+  it('refuses production while a critical defect is open', async () => {
+    auditTx.equipmentDefect.findMany.mockResolvedValueOnce([{title: 'Учебный критический дефект', severity: 'CRITICAL'}]);
+    await expect(logProduction(pilesInput)).rejects.toThrow('Работа запрещена');
+    expect(auditTx.pileWork.create).not.toHaveBeenCalled(); expect(auditTx.reportAudit.create).not.toHaveBeenCalled();
+  });
+  it('rejects a pile grade absent from the caller organization', async () => {
+    auditTx.pileGrade.findFirst.mockResolvedValueOnce(null);
+    await expect(logProduction(pilesInput)).rejects.toThrow('Марка сваи не найдена');
+    expect(auditTx.pileGrade.findFirst).toHaveBeenCalledWith(expect.objectContaining({where: {tenantId: 'tenant-a', id: 'grade-1'}}));
+    expect(auditTx.pileWork.create).not.toHaveBeenCalled();
+  });
+  it.each([0, -1])('rejects pile count %s before insert', async count => {
+    await expect(logProduction({...pilesInput, entry: {...pilesInput.entry, count}})).rejects.toThrow('Количество свай должно быть больше нуля');
+    expect(auditTx.pileWork.create).not.toHaveBeenCalled();
+  });
+  it.each([{count: 0, metersPerUnit: 1}, {count: 1, metersPerUnit: 0}, {count: 1, metersPerUnit: -0.25}])('rejects invalid drilling $count × $metersPerUnit before insert', async entry => {
+    await expect(logProduction({...pilesInput, entry: {kind: 'DRILLING', typeId: 'type-1', ...entry}})).rejects.toThrow(/должн[ао] быть больше нуля/);
+    expect(auditTx.leaderDrilling.create).not.toHaveBeenCalled();
+  });
+  it('preserves fractional meters per borehole and records the exact product', async () => {
+    await expect(logProduction({...pilesInput, entry: {kind: 'DRILLING', typeId: 'type-1', count: 2, metersPerUnit: 0.25}})).resolves.toEqual({reportId: 'report-pk-1'});
+    expect(auditTx.leaderDrilling.create).toHaveBeenCalledWith({data: expect.objectContaining({tenantId: 'tenant-a', shiftId: pilesInput.shiftId, count: 2, metersPerUnit: 0.25, meters: 0.5})});
+    expect(auditTx.report.update).toHaveBeenCalledWith({where: {id: 'report-pk-1'}, data: {version: {increment: 1}}});
+  });
+  it('accepts passport depth exactly equal to the pile grade length', async () => {
+    await expect(logProduction({...pilesInput, entry: {kind: 'PILE_PASSPORT', pileGradeId: 'grade-1', passport: {pileNumber: '42', drivenDepthM: 12}}})).resolves.toEqual({reportId: 'report-pk-1'});
+    expect(auditTx.pileWork.create).toHaveBeenCalledWith(expect.objectContaining({data: expect.objectContaining({count: 1, depth: 12})}));
+    expect(auditTx.pilePassport.create).toHaveBeenCalledWith({data: expect.objectContaining({pileNumber: '42', drivenDepthM: 12, followerUsed: false})});
+  });
+  it('rejects depth exceeding pile length without a follower before writing the pile', async () => {
+    await expect(logProduction({...pilesInput, entry: {kind: 'PILE_PASSPORT', pileGradeId: 'grade-1', passport: {pileNumber: '42', drivenDepthM: 12.01}}})).rejects.toThrow('Паспорт заполнен не полностью');
+    expect(auditTx.pileWork.create).not.toHaveBeenCalled(); expect(auditTx.pilePassport.create).not.toHaveBeenCalled();
+  });
+  it('allows depth exceeding pile length when follower use is explicitly recorded', async () => {
+    await expect(logProduction({...pilesInput, entry: {kind: 'PILE_PASSPORT', pileGradeId: 'grade-1', passport: {pileNumber: '42', drivenDepthM: 13, followerUsed: true}}})).resolves.toEqual({reportId: 'report-pk-1'});
+    expect(auditTx.pilePassport.create).toHaveBeenCalledWith({data: expect.objectContaining({drivenDepthM: 13, followerUsed: true})});
+  });
+  it('propagates a report version update failure instead of reporting acceptance or a false audit', async () => {
+    const conflict = Object.assign(new Error('version update failed'), {code: 'P2025'});
+    auditTx.report.update.mockRejectedValueOnce(conflict);
+    await expect(logProduction(pilesInput)).rejects.toBe(conflict);
+    expect(auditTx.reportAudit.create).not.toHaveBeenCalled();
+  });
+
 });
 
 /*
