@@ -4,7 +4,7 @@ import base from './playwright.config';
 // Own disposable fixtures only. The qa/ suites need their separate disposable
 // matrix wrapper and are deliberately not collected by this configuration.
 const specs = [
-  'admin-dictionaries.spec.ts', 'admin-users.spec.ts', 'app.spec.ts',
+  'admin-dictionaries.spec.ts', 'admin-users.spec.ts', 'app.spec.ts', 'roles-gaps.spec.ts',
   'inspection-to-flow.spec.ts', 'monitoring-tile-editor.spec.ts',
   'operator-report-smoke.spec.ts', 'rate-limit-e2e.spec.ts',
   'release-critical-path.spec.ts', 'report-creation-flow.spec.ts',
