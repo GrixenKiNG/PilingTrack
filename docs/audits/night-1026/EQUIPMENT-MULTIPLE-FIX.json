@@ -1,0 +1,716 @@
+{
+  "baseSha": "17f235e54d4bb25bbde047929005a8fd612e685f",
+  "sourceSha": "084b9b25e9ed6aac2961997c7c737e6e447d6861",
+  "redSha": "8b88ccca",
+  "branch": "codex/equipment-multiple-1029",
+  "sourceProof": {
+    "redSha": "8b88ccca4ea58935ef7a6c531ec962da4afbdc91",
+    "files": [
+      {
+        "path": "src/modules/crews/application/queries/crew-query.service.ts",
+        "stripApprovedLinesEqualsRed": true,
+        "before": "8304dd1e0255dfd5272494741c0f1e57ced39691088ef2df778611b25a5a877a",
+        "after": "25b7f95176e3b972a5fd9e08e64d549abadc052a8ea4ca1cd1986d92f68a44ac"
+      },
+      {
+        "path": "src/app/api/equipment/[id]/fuel/route.ts",
+        "replaceThirdArgumentOnly": true,
+        "before": "2aebbe5ca008ac45b70f2b0f1485cb008ccb0e6664fa1906244e1f7bbc17662c",
+        "after": "7444e34fecf02885604c7d9ff56b2fb0c68f03c997f37f1fe04702675f0af116"
+      },
+      {
+        "path": "src/app/api/equipment/[id]/meter-readings/route.ts",
+        "replaceThirdArgumentOnly": true,
+        "before": "b09e38422eb6cf93e6fe48b2c48e057f6be72263ed0bfe05ee58957e32331e7b",
+        "after": "9624a618e8fac298772c8d0abe53afd651bae2a0c8dbf5cc799bc748df34d3b8"
+      }
+    ],
+    "crewsMyUnchanged": true,
+    "permission": "TASK-EQUIPMENT-MULTIPLE-APPROVED.md"
+  },
+  "baselineTargeted": {
+    "args": [
+      "node_modules/vitest/vitest.mjs",
+      "run",
+      "src/modules/crews/application/queries/__tests__/crew-query.service.test.ts",
+      "src/app/api/equipment/[id]/meter-readings/__tests__/route.test.ts",
+      "src/app/api/__tests__/mutation-audit.test.ts",
+      "--maxWorkers=1",
+      "--no-file-parallelism",
+      "--reporter=default",
+      "--reporter=json",
+      "--outputFile=D:/PillingR/night-logs/equipment-multiple-1029/baseline-targeted.json"
+    ],
+    "exit": 0,
+    "seconds": 5
+  },
+  "redTargeted": {
+    "exit": 1,
+    "seconds": 5
+  },
+  "redPreservation": {
+    "baselinePassed": 83,
+    "oldFailuresAfterNewTests": 0,
+    "newPassed": 5,
+    "newFailed": 18,
+    "skipped": 0,
+    "files": [
+      {
+        "path": "D:/PillingR/wt-equipment-multiple-1029/src/app/api/__tests__/mutation-audit.test.ts",
+        "failed": [
+          "fuel ownership — requested equipment contract GET looks up the requested rig rather than an arbitrary first crew",
+          "fuel ownership — requested equipment contract POST looks up the requested rig rather than an arbitrary first crew",
+          "fuel ownership — requested equipment contract GET denies a missing or mismatched crew without reading or writing fuel",
+          "fuel ownership — requested equipment contract POST denies a missing or mismatched crew without reading or writing fuel",
+          "fuel ownership — requested equipment contract GET denies a missing or mismatched crew without reading or writing fuel",
+          "fuel ownership — requested equipment contract POST denies a missing or mismatched crew without reading or writing fuel"
+        ]
+      },
+      {
+        "path": "D:/PillingR/wt-equipment-multiple-1029/src/modules/crews/application/queries/__tests__/crew-query.service.test.ts",
+        "failed": [
+          "getCrewForOperator — optional equipment filter role=OPERATOR actingAs=undefined combines requested rig with the existing user OR",
+          "getCrewForOperator — optional equipment filter role=ASSISTANT actingAs=undefined combines requested rig with the existing user OR",
+          "getCrewForOperator — optional equipment filter role=ADMIN actingAs=OPERATOR combines requested rig with the existing user OR",
+          "getCrewForOperator — optional equipment filter role=ADMIN actingAs=undefined combines requested rig with the existing user OR",
+          "getCrewForOperator — optional equipment filter role=DISPATCHER actingAs=undefined combines requested rig with the existing user OR",
+          "getCrewForOperator — optional equipment filter does not drop an explicitly empty equipment id"
+        ]
+      },
+      {
+        "path": "D:/PillingR/wt-equipment-multiple-1029/src/app/api/equipment/[id]/meter-readings/__tests__/route.test.ts",
+        "failed": [
+          "meter ownership — requested equipment contract GET looks up the requested rig rather than an arbitrary first crew",
+          "meter ownership — requested equipment contract POST looks up the requested rig rather than an arbitrary first crew",
+          "meter ownership — requested equipment contract GET denies a missing or mismatched crew without touching readings",
+          "meter ownership — requested equipment contract POST denies a missing or mismatched crew without touching readings",
+          "meter ownership — requested equipment contract GET denies a missing or mismatched crew without touching readings",
+          "meter ownership — requested equipment contract POST denies a missing or mismatched crew without touching readings"
+        ]
+      }
+    ]
+  },
+  "fixedTargeted": {
+    "args": [
+      "node_modules/vitest/vitest.mjs",
+      "run",
+      "src/modules/crews/application/queries/__tests__/crew-query.service.test.ts",
+      "src/app/api/equipment/[id]/meter-readings/__tests__/route.test.ts",
+      "src/app/api/__tests__/mutation-audit.test.ts",
+      "--maxWorkers=1",
+      "--no-file-parallelism",
+      "--reporter=default",
+      "--reporter=json",
+      "--outputFile=D:/PillingR/night-logs/equipment-multiple-1029/fixed-targeted.json"
+    ],
+    "exit": 0,
+    "seconds": 5
+  },
+  "build": {
+    "command": "npm run build",
+    "sourceSha": "084b9b25e9ed6aac2961997c7c737e6e447d6861",
+    "exit": 0,
+    "seconds": 231
+  },
+  "browser": {
+    "sourceSha": "084b9b25e9ed6aac2961997c7c737e6e447d6861",
+    "stats": {
+      "startTime": "2026-10-29T07:03:02.662Z",
+      "duration": 39392.839,
+      "expected": 3,
+      "skipped": 0,
+      "unexpected": 0,
+      "flaky": 0
+    },
+    "result": {
+      "sourceSha": "084b9b25e9ed6aac2961997c7c737e6e447d6861",
+      "phase": "prod",
+      "args": [
+        "e2e/fixtures/disposable-https.mjs",
+        "node_modules/@playwright/test/cli.js",
+        "test",
+        "--config=playwright.night.config.ts",
+        "e2e/release-critical-path.spec.ts",
+        "--trace=off",
+        "--grep",
+        "equipment multiple:",
+        "--timeout=180000"
+      ],
+      "exit": 0,
+      "seconds": 41
+    },
+    "rows": [
+      {
+        "project": "chromium",
+        "operatorId": "cmvt75a1c00040ow5kcvmd9zz",
+        "tenantId": "cmvt759sb00000ow56ymmzp3u",
+        "assigned": [
+          {
+            "id": "5e46f03c-2fba-471a-b50e-df3b1c8ab2bb",
+            "equipmentId": "e2e4cab3-6e15-4897-af76-0f6be74dcff8"
+          },
+          {
+            "id": "cmvt75ac5000b0ow5vmolic9j",
+            "equipmentId": "cmvt75aap00090ow5umcbkzx3"
+          }
+        ],
+        "outcomes": [
+          {
+            "equipmentId": "cmvt75aap00090ow5umcbkzx3",
+            "resource": "meter-readings",
+            "method": "GET",
+            "status": 200,
+            "body": "{\"readings\":[]}"
+          },
+          {
+            "equipmentId": "cmvt75aap00090ow5umcbkzx3",
+            "resource": "meter-readings",
+            "method": "POST",
+            "status": 201,
+            "body": "{\"reading\":{\"id\":\"cmvt75s1500014cw5xyu6yuli\",\"engineHours\":101,\"recordedAt\":\"2026-10-29T07:03:28.504Z\"},\"warning\":null}"
+          },
+          {
+            "equipmentId": "cmvt75aap00090ow5umcbkzx3",
+            "resource": "fuel",
+            "method": "GET",
+            "status": 200,
+            "body": "{\"entries\":[],\"summary\":{\"tankLiters\":400,\"litersAdded\":0,\"startPercent\":null,\"endPercent\":null,\"engineHoursDelta\":null,\"consumption\":{\"liters\":null,\"source\":\"none\",\"quality\":\"insufficient\"},\"consumedLiters\":null,\"perEngineHour\":null,\"entryCount\":0}}"
+          },
+          {
+            "equipmentId": "cmvt75aap00090ow5umcbkzx3",
+            "resource": "fuel",
+            "method": "POST",
+            "status": 201,
+            "body": "{\"id\":\"cmvt75sbd00044cw5whem3jth\",\"recordedAt\":\"2026-10-29T07:03:28.916Z\"}"
+          },
+          {
+            "equipmentId": "e2e4cab3-6e15-4897-af76-0f6be74dcff8",
+            "resource": "meter-readings",
+            "method": "GET",
+            "status": 200,
+            "body": "{\"readings\":[]}"
+          },
+          {
+            "equipmentId": "e2e4cab3-6e15-4897-af76-0f6be74dcff8",
+            "resource": "meter-readings",
+            "method": "POST",
+            "status": 201,
+            "body": "{\"reading\":{\"id\":\"cmvt75shg00064cw5re0uur2j\",\"engineHours\":101,\"recordedAt\":\"2026-10-29T07:03:29.131Z\"},\"warning\":null}"
+          },
+          {
+            "equipmentId": "e2e4cab3-6e15-4897-af76-0f6be74dcff8",
+            "resource": "fuel",
+            "method": "GET",
+            "status": 200,
+            "body": "{\"entries\":[],\"summary\":{\"tankLiters\":400,\"litersAdded\":0,\"startPercent\":null,\"endPercent\":null,\"engineHoursDelta\":null,\"consumption\":{\"liters\":null,\"source\":\"none\",\"quality\":\"insufficient\"},\"consumedLiters\":null,\"perEngineHour\":null,\"entryCount\":0}}"
+          },
+          {
+            "equipmentId": "e2e4cab3-6e15-4897-af76-0f6be74dcff8",
+            "resource": "fuel",
+            "method": "POST",
+            "status": 201,
+            "body": "{\"id\":\"cmvt75sma00094cw55q9pewse\",\"recordedAt\":\"2026-10-29T07:03:29.309Z\"}"
+          }
+        ],
+        "foreign": [
+          {
+            "equipmentId": "abb81b6f-295b-4481-9a03-45060d260323",
+            "resource": "meter-readings",
+            "method": "GET",
+            "status": 403,
+            "body": "{\"error\":\"Установка не закреплена за вашим экипажем\"}"
+          },
+          {
+            "equipmentId": "abb81b6f-295b-4481-9a03-45060d260323",
+            "resource": "meter-readings",
+            "method": "POST",
+            "status": 403,
+            "body": "{\"error\":\"Установка не закреплена за вашим экипажем\"}"
+          },
+          {
+            "equipmentId": "abb81b6f-295b-4481-9a03-45060d260323",
+            "resource": "fuel",
+            "method": "GET",
+            "status": 403,
+            "body": "{\"error\":\"Установка не закреплена за вашим экипажем\"}"
+          },
+          {
+            "equipmentId": "abb81b6f-295b-4481-9a03-45060d260323",
+            "resource": "fuel",
+            "method": "POST",
+            "status": 403,
+            "body": "{\"error\":\"Установка не закреплена за вашим экипажем\"}"
+          }
+        ],
+        "unassignedId": "abb81b6f-295b-4481-9a03-45060d260323",
+        "meterRows": [
+          {
+            "id": "cmvt75s1500014cw5xyu6yuli",
+            "equipmentId": "cmvt75aap00090ow5umcbkzx3",
+            "recordedById": "cmvt75a1c00040ow5kcvmd9zz",
+            "engineHours": 101
+          },
+          {
+            "id": "cmvt75shg00064cw5re0uur2j",
+            "equipmentId": "e2e4cab3-6e15-4897-af76-0f6be74dcff8",
+            "recordedById": "cmvt75a1c00040ow5kcvmd9zz",
+            "engineHours": 101
+          }
+        ],
+        "fuelRows": [
+          {
+            "id": "cmvt75sbd00044cw5whem3jth",
+            "equipmentId": "cmvt75aap00090ow5umcbkzx3",
+            "recordedById": "cmvt75a1c00040ow5kcvmd9zz",
+            "litersAdded": 10,
+            "tankPercent": 80
+          },
+          {
+            "id": "cmvt75sma00094cw55q9pewse",
+            "equipmentId": "e2e4cab3-6e15-4897-af76-0f6be74dcff8",
+            "recordedById": "cmvt75a1c00040ow5kcvmd9zz",
+            "litersAdded": 10,
+            "tankPercent": 80
+          }
+        ],
+        "auditRows": [
+          {
+            "action": "meter.reading.added",
+            "actorId": "cmvt75a1c00040ow5kcvmd9zz",
+            "targetId": "cmvt75s1500014cw5xyu6yuli"
+          },
+          {
+            "action": "equipment.fuel.created",
+            "actorId": "cmvt75a1c00040ow5kcvmd9zz",
+            "targetId": "cmvt75sbd00044cw5whem3jth"
+          },
+          {
+            "action": "meter.reading.added",
+            "actorId": "cmvt75a1c00040ow5kcvmd9zz",
+            "targetId": "cmvt75shg00064cw5re0uur2j"
+          },
+          {
+            "action": "equipment.fuel.created",
+            "actorId": "cmvt75a1c00040ow5kcvmd9zz",
+            "targetId": "cmvt75sma00094cw55q9pewse"
+          }
+        ]
+      },
+      {
+        "project": "Mobile Safari",
+        "operatorId": "cmvt75uj80004jww5sfmbl9rj",
+        "tenantId": "cmvt75uac0000jww5p6vkat7a",
+        "assigned": [
+          {
+            "id": "bb940418-ff39-4937-a3d3-2ea12f8bdcbe",
+            "equipmentId": "d1696069-25b6-4c19-a20b-9c137842bc9e"
+          },
+          {
+            "id": "cmvt75uu6000bjww5l6n2zwkj",
+            "equipmentId": "cmvt75usr0009jww5zb6iw2ue"
+          }
+        ],
+        "outcomes": [
+          {
+            "equipmentId": "cmvt75usr0009jww5zb6iw2ue",
+            "resource": "meter-readings",
+            "method": "GET",
+            "status": 200,
+            "body": "{\"readings\":[]}"
+          },
+          {
+            "equipmentId": "cmvt75usr0009jww5zb6iw2ue",
+            "resource": "meter-readings",
+            "method": "POST",
+            "status": 201,
+            "body": "{\"reading\":{\"id\":\"cmvt75xa1000c4cw5k758k42w\",\"engineHours\":101,\"recordedAt\":\"2026-10-29T07:03:35.344Z\"},\"warning\":null}"
+          },
+          {
+            "equipmentId": "cmvt75usr0009jww5zb6iw2ue",
+            "resource": "fuel",
+            "method": "GET",
+            "status": 200,
+            "body": "{\"entries\":[],\"summary\":{\"tankLiters\":400,\"litersAdded\":0,\"startPercent\":null,\"endPercent\":null,\"engineHoursDelta\":null,\"consumption\":{\"liters\":null,\"source\":\"none\",\"quality\":\"insufficient\"},\"consumedLiters\":null,\"perEngineHour\":null,\"entryCount\":0}}"
+          },
+          {
+            "equipmentId": "cmvt75usr0009jww5zb6iw2ue",
+            "resource": "fuel",
+            "method": "POST",
+            "status": 201,
+            "body": "{\"id\":\"cmvt75xid000f4cw5c9o4pqax\",\"recordedAt\":\"2026-10-29T07:03:35.646Z\"}"
+          },
+          {
+            "equipmentId": "d1696069-25b6-4c19-a20b-9c137842bc9e",
+            "resource": "meter-readings",
+            "method": "GET",
+            "status": 200,
+            "body": "{\"readings\":[]}"
+          },
+          {
+            "equipmentId": "d1696069-25b6-4c19-a20b-9c137842bc9e",
+            "resource": "meter-readings",
+            "method": "POST",
+            "status": 201,
+            "body": "{\"reading\":{\"id\":\"cmvt75xql000h4cw5ijtikxcc\",\"engineHours\":101,\"recordedAt\":\"2026-10-29T07:03:35.938Z\"},\"warning\":null}"
+          },
+          {
+            "equipmentId": "d1696069-25b6-4c19-a20b-9c137842bc9e",
+            "resource": "fuel",
+            "method": "GET",
+            "status": 200,
+            "body": "{\"entries\":[],\"summary\":{\"tankLiters\":400,\"litersAdded\":0,\"startPercent\":null,\"endPercent\":null,\"engineHoursDelta\":null,\"consumption\":{\"liters\":null,\"source\":\"none\",\"quality\":\"insufficient\"},\"consumedLiters\":null,\"perEngineHour\":null,\"entryCount\":0}}"
+          },
+          {
+            "equipmentId": "d1696069-25b6-4c19-a20b-9c137842bc9e",
+            "resource": "fuel",
+            "method": "POST",
+            "status": 201,
+            "body": "{\"id\":\"cmvt75xw5000k4cw58mjxb8lt\",\"recordedAt\":\"2026-10-29T07:03:36.144Z\"}"
+          }
+        ],
+        "foreign": [
+          {
+            "equipmentId": "369de6ac-7bd9-4856-aad2-2fd2c613d0a0",
+            "resource": "meter-readings",
+            "method": "GET",
+            "status": 403,
+            "body": "{\"error\":\"Установка не закреплена за вашим экипажем\"}"
+          },
+          {
+            "equipmentId": "369de6ac-7bd9-4856-aad2-2fd2c613d0a0",
+            "resource": "meter-readings",
+            "method": "POST",
+            "status": 403,
+            "body": "{\"error\":\"Установка не закреплена за вашим экипажем\"}"
+          },
+          {
+            "equipmentId": "369de6ac-7bd9-4856-aad2-2fd2c613d0a0",
+            "resource": "fuel",
+            "method": "GET",
+            "status": 403,
+            "body": "{\"error\":\"Установка не закреплена за вашим экипажем\"}"
+          },
+          {
+            "equipmentId": "369de6ac-7bd9-4856-aad2-2fd2c613d0a0",
+            "resource": "fuel",
+            "method": "POST",
+            "status": 403,
+            "body": "{\"error\":\"Установка не закреплена за вашим экипажем\"}"
+          }
+        ],
+        "unassignedId": "369de6ac-7bd9-4856-aad2-2fd2c613d0a0",
+        "meterRows": [
+          {
+            "id": "cmvt75xa1000c4cw5k758k42w",
+            "equipmentId": "cmvt75usr0009jww5zb6iw2ue",
+            "recordedById": "cmvt75uj80004jww5sfmbl9rj",
+            "engineHours": 101
+          },
+          {
+            "id": "cmvt75xql000h4cw5ijtikxcc",
+            "equipmentId": "d1696069-25b6-4c19-a20b-9c137842bc9e",
+            "recordedById": "cmvt75uj80004jww5sfmbl9rj",
+            "engineHours": 101
+          }
+        ],
+        "fuelRows": [
+          {
+            "id": "cmvt75xid000f4cw5c9o4pqax",
+            "equipmentId": "cmvt75usr0009jww5zb6iw2ue",
+            "recordedById": "cmvt75uj80004jww5sfmbl9rj",
+            "litersAdded": 10,
+            "tankPercent": 80
+          },
+          {
+            "id": "cmvt75xw5000k4cw58mjxb8lt",
+            "equipmentId": "d1696069-25b6-4c19-a20b-9c137842bc9e",
+            "recordedById": "cmvt75uj80004jww5sfmbl9rj",
+            "litersAdded": 10,
+            "tankPercent": 80
+          }
+        ],
+        "auditRows": [
+          {
+            "action": "meter.reading.added",
+            "actorId": "cmvt75uj80004jww5sfmbl9rj",
+            "targetId": "cmvt75xa1000c4cw5k758k42w"
+          },
+          {
+            "action": "equipment.fuel.created",
+            "actorId": "cmvt75uj80004jww5sfmbl9rj",
+            "targetId": "cmvt75xid000f4cw5c9o4pqax"
+          },
+          {
+            "action": "meter.reading.added",
+            "actorId": "cmvt75uj80004jww5sfmbl9rj",
+            "targetId": "cmvt75xql000h4cw5ijtikxcc"
+          },
+          {
+            "action": "equipment.fuel.created",
+            "actorId": "cmvt75uj80004jww5sfmbl9rj",
+            "targetId": "cmvt75xw5000k4cw58mjxb8lt"
+          }
+        ]
+      },
+      {
+        "project": "Mobile Chrome",
+        "operatorId": "cmvt75zs900047gw5i2ws4z2z",
+        "tenantId": "cmvt75zjn00007gw5hz3s95c6",
+        "assigned": [
+          {
+            "id": "b95805ba-0f7f-48b5-9b48-487b9177f477",
+            "equipmentId": "fcb6ecf6-8ca2-455f-9054-e6af1e9c6681"
+          },
+          {
+            "id": "cmvt7602z000b7gw5wdnmzqv8",
+            "equipmentId": "cmvt7601l00097gw5ggjulewu"
+          }
+        ],
+        "outcomes": [
+          {
+            "equipmentId": "cmvt7601l00097gw5ggjulewu",
+            "resource": "meter-readings",
+            "method": "GET",
+            "status": 200,
+            "body": "{\"readings\":[]}"
+          },
+          {
+            "equipmentId": "cmvt7601l00097gw5ggjulewu",
+            "resource": "meter-readings",
+            "method": "POST",
+            "status": 201,
+            "body": "{\"reading\":{\"id\":\"cmvt761er000n4cw5n7p6yo4h\",\"engineHours\":101,\"recordedAt\":\"2026-10-29T07:03:40.699Z\"},\"warning\":null}"
+          },
+          {
+            "equipmentId": "cmvt7601l00097gw5ggjulewu",
+            "resource": "fuel",
+            "method": "GET",
+            "status": 200,
+            "body": "{\"entries\":[],\"summary\":{\"tankLiters\":400,\"litersAdded\":0,\"startPercent\":null,\"endPercent\":null,\"engineHoursDelta\":null,\"consumption\":{\"liters\":null,\"source\":\"none\",\"quality\":\"insufficient\"},\"consumedLiters\":null,\"perEngineHour\":null,\"entryCount\":0}}"
+          },
+          {
+            "equipmentId": "cmvt7601l00097gw5ggjulewu",
+            "resource": "fuel",
+            "method": "POST",
+            "status": 201,
+            "body": "{\"id\":\"cmvt761m9000q4cw5yk6m4dtp\",\"recordedAt\":\"2026-10-29T07:03:40.972Z\"}"
+          },
+          {
+            "equipmentId": "fcb6ecf6-8ca2-455f-9054-e6af1e9c6681",
+            "resource": "meter-readings",
+            "method": "GET",
+            "status": 200,
+            "body": "{\"readings\":[]}"
+          },
+          {
+            "equipmentId": "fcb6ecf6-8ca2-455f-9054-e6af1e9c6681",
+            "resource": "meter-readings",
+            "method": "POST",
+            "status": 201,
+            "body": "{\"reading\":{\"id\":\"cmvt761t2000s4cw5gjz4dio9\",\"engineHours\":101,\"recordedAt\":\"2026-10-29T07:03:41.213Z\"},\"warning\":null}"
+          },
+          {
+            "equipmentId": "fcb6ecf6-8ca2-455f-9054-e6af1e9c6681",
+            "resource": "fuel",
+            "method": "GET",
+            "status": 200,
+            "body": "{\"entries\":[],\"summary\":{\"tankLiters\":400,\"litersAdded\":0,\"startPercent\":null,\"endPercent\":null,\"engineHoursDelta\":null,\"consumption\":{\"liters\":null,\"source\":\"none\",\"quality\":\"insufficient\"},\"consumedLiters\":null,\"perEngineHour\":null,\"entryCount\":0}}"
+          },
+          {
+            "equipmentId": "fcb6ecf6-8ca2-455f-9054-e6af1e9c6681",
+            "resource": "fuel",
+            "method": "POST",
+            "status": 201,
+            "body": "{\"id\":\"cmvt761z3000v4cw52ncngpl8\",\"recordedAt\":\"2026-10-29T07:03:41.433Z\"}"
+          }
+        ],
+        "foreign": [
+          {
+            "equipmentId": "afc230b1-a86a-4395-be0e-5666a7b6e054",
+            "resource": "meter-readings",
+            "method": "GET",
+            "status": 403,
+            "body": "{\"error\":\"Установка не закреплена за вашим экипажем\"}"
+          },
+          {
+            "equipmentId": "afc230b1-a86a-4395-be0e-5666a7b6e054",
+            "resource": "meter-readings",
+            "method": "POST",
+            "status": 403,
+            "body": "{\"error\":\"Установка не закреплена за вашим экипажем\"}"
+          },
+          {
+            "equipmentId": "afc230b1-a86a-4395-be0e-5666a7b6e054",
+            "resource": "fuel",
+            "method": "GET",
+            "status": 403,
+            "body": "{\"error\":\"Установка не закреплена за вашим экипажем\"}"
+          },
+          {
+            "equipmentId": "afc230b1-a86a-4395-be0e-5666a7b6e054",
+            "resource": "fuel",
+            "method": "POST",
+            "status": 403,
+            "body": "{\"error\":\"Установка не закреплена за вашим экипажем\"}"
+          }
+        ],
+        "unassignedId": "afc230b1-a86a-4395-be0e-5666a7b6e054",
+        "meterRows": [
+          {
+            "id": "cmvt761er000n4cw5n7p6yo4h",
+            "equipmentId": "cmvt7601l00097gw5ggjulewu",
+            "recordedById": "cmvt75zs900047gw5i2ws4z2z",
+            "engineHours": 101
+          },
+          {
+            "id": "cmvt761t2000s4cw5gjz4dio9",
+            "equipmentId": "fcb6ecf6-8ca2-455f-9054-e6af1e9c6681",
+            "recordedById": "cmvt75zs900047gw5i2ws4z2z",
+            "engineHours": 101
+          }
+        ],
+        "fuelRows": [
+          {
+            "id": "cmvt761m9000q4cw5yk6m4dtp",
+            "equipmentId": "cmvt7601l00097gw5ggjulewu",
+            "recordedById": "cmvt75zs900047gw5i2ws4z2z",
+            "litersAdded": 10,
+            "tankPercent": 80
+          },
+          {
+            "id": "cmvt761z3000v4cw52ncngpl8",
+            "equipmentId": "fcb6ecf6-8ca2-455f-9054-e6af1e9c6681",
+            "recordedById": "cmvt75zs900047gw5i2ws4z2z",
+            "litersAdded": 10,
+            "tankPercent": 80
+          }
+        ],
+        "auditRows": [
+          {
+            "action": "meter.reading.added",
+            "actorId": "cmvt75zs900047gw5i2ws4z2z",
+            "targetId": "cmvt761er000n4cw5n7p6yo4h"
+          },
+          {
+            "action": "equipment.fuel.created",
+            "actorId": "cmvt75zs900047gw5i2ws4z2z",
+            "targetId": "cmvt761m9000q4cw5yk6m4dtp"
+          },
+          {
+            "action": "meter.reading.added",
+            "actorId": "cmvt75zs900047gw5i2ws4z2z",
+            "targetId": "cmvt761t2000s4cw5gjz4dio9"
+          },
+          {
+            "action": "equipment.fuel.created",
+            "actorId": "cmvt75zs900047gw5i2ws4z2z",
+            "targetId": "cmvt761z3000v4cw52ncngpl8"
+          }
+        ]
+      }
+    ]
+  },
+  "fullGates": {
+    "sourceSha": "084b9b25e9ed6aac2961997c7c737e6e447d6861",
+    "worktreeSha": "084b9b25e9ed6aac2961997c7c737e6e447d6861",
+    "complete": true,
+    "results": [
+      {
+        "id": "final-tsc",
+        "exe": "C:/Program Files/Git/bin/bash.exe",
+        "args": [
+          "-c",
+          "npx tsc --noEmit"
+        ],
+        "exit": 0,
+        "seconds": 57
+      },
+      {
+        "id": "final-lint",
+        "exe": "C:/Program Files/Git/bin/bash.exe",
+        "args": [
+          "-c",
+          "npm run lint"
+        ],
+        "exit": 0,
+        "seconds": 68
+      },
+      {
+        "id": "final-unit-wrapper",
+        "exe": "C:\\Program Files\\nodejs\\node.exe",
+        "args": [
+          "D:/PillingR/night-logs/equipment-multiple-1029/unit-run-stand.cjs"
+        ],
+        "exit": 0,
+        "seconds": 980
+      },
+      {
+        "id": "final-pw-list-wrapper",
+        "exe": "C:\\Program Files\\nodejs\\node.exe",
+        "args": [
+          "D:/PillingR/night-logs/equipment-multiple-1029/qa-fresh-stand.cjs",
+          "--list-default"
+        ],
+        "exit": 0,
+        "seconds": 81
+      }
+    ]
+  },
+  "unit": {
+    "wholeRun": "full-unit-final",
+    "sourceSha": "084b9b25e9ed6aac2961997c7c737e6e447d6861",
+    "unitExit": 0,
+    "gatesComplete": true,
+    "passed": 6052,
+    "failed": 0,
+    "skipped": 0,
+    "files": 529,
+    "historicalTotal": 241,
+    "historicalMatched": 241,
+    "historicalPassed": 241,
+    "historicalNotPassed": [],
+    "failedTests": []
+  },
+  "collection": {
+    "tests": 411,
+    "files": 30
+  },
+  "devAttempts": {
+    "webpack": "bootstrap health500, no browser execution",
+    "turbopack": {
+      "sourceSha": "084b9b25e9ed6aac2961997c7c737e6e447d6861",
+      "phase": "dev-turbo",
+      "args": [
+        "e2e/fixtures/disposable-https.mjs",
+        "node_modules/@playwright/test/cli.js",
+        "test",
+        "--config=playwright.night.config.ts",
+        "e2e/release-critical-path.spec.ts",
+        "--trace=off",
+        "--grep",
+        "equipment multiple:",
+        "--timeout=180000"
+      ],
+      "exit": 1,
+      "seconds": 208
+    },
+    "stats": {
+      "startTime": "2026-10-29T06:47:12.384Z",
+      "duration": 206862.568,
+      "expected": 0,
+      "skipped": 0,
+      "unexpected": 3,
+      "flaky": 0
+    },
+    "diagnostic": {
+      "sourceSha": "084b9b25e9ed6aac2961997c7c737e6e447d6861",
+      "unauthenticatedReadOnly": true,
+      "status": 200,
+      "csp": "default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https: http://localhost:*; font-src 'self' data:; connect-src 'self' https: ws: wss: http://localhost:*; media-src 'self'; object-src 'none'; frame-ancestors 'self'; base-uri 'self'; form-action 'self'; frame-src 'self' blob:",
+      "hydrated": false,
+      "errors": [],
+      "failures": []
+    }
+  },
+  "orderDeviation": "Development verification was attempted before build, but failed before target APIs. Production build preceded the successful same browser test; no auth/config/test weakening applied."
+}
