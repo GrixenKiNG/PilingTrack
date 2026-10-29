@@ -45,6 +45,7 @@
     "e2e",
     "playwright.config.ts",
     "playwright.qa-disposable.config.ts",
+    "playwright.night.config.ts",
     "zai-provider-extension",
     "scripts",
     "tests",
