@@ -112,6 +112,20 @@ export async function correctProduction(input: {
       });
       const base = await tx.pileWork.findUnique({where: {id: original.id}, select: {count: true}});
       const current = (base?.count ?? 0) + (corrections._sum.count ?? 0);
+      // Паспорт и решение мастера остаются при исходной записи: «нисколько» её
+      // обнулило бы в отчёте, а форма 4.1, ведомость 2.5 и акты продолжили бы
+      // печатать сваю принятой. Паспорт правит мастер в журнале забивки.
+      if (Math.round(input.actual) < 1) {
+        const passport = await tx.pilePassport.findFirst({
+          where: {tenantId: input.tenantId, pileWorkId: original.id}, select: {id: true},
+        });
+        if (passport) {
+          throw new OperatorCommandError(
+            409,
+            'У этой сваи есть паспорт — свести её к нулю нельзя. Исправление вносит мастер в журнале забивки.',
+          );
+        }
+      }
       const delta = Math.round(input.actual) - current;
       if (delta === 0) throw new OperatorCommandError(400, 'Число не изменилось');
       const created = await tx.pileWork.create({

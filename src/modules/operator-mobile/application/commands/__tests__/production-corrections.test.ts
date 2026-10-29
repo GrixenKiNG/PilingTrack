@@ -37,6 +37,7 @@ const tx = {
   crew: {findFirst: vi.fn()},
   report: {findFirst: vi.fn(), findUniqueOrThrow: vi.fn(), update: vi.fn()},
   pileWork: {findUnique: vi.fn(), findFirst: vi.fn(), aggregate: vi.fn(), create: vi.fn()},
+  pilePassport: {findFirst: vi.fn()},
   reportDowntime: {findUnique: vi.fn(), findFirst: vi.fn(), aggregate: vi.fn(), findMany: vi.fn(), create: vi.fn()},
   reportAudit: {create: vi.fn()},
   user: {findFirst: vi.fn().mockResolvedValue({name: 'Иванов', role: 'OPERATOR'})},
@@ -68,6 +69,7 @@ beforeEach(() => {
   // К исходной записи уже была одна поправка на +3.
   tx.pileWork.aggregate.mockResolvedValue({_sum: {count: 3}});
   tx.pileWork.create.mockResolvedValue({id: 'pw-corr-1'});
+  tx.pilePassport.findFirst.mockResolvedValue(null);
   tx.reportDowntime.findUnique.mockResolvedValue(null);
   tx.reportDowntime.findFirst.mockResolvedValue({id: 'dt-1', reportId: 'report-pk-1', reasonId: 'reason-1', duration: 2, correctsId: null});
   tx.reportDowntime.aggregate.mockResolvedValue({_sum: {duration: 0}});
@@ -133,5 +135,46 @@ describe('correctProduction — след поправки в истории от
     await expect(correctProduction(input)).resolves.toEqual({correctionId: 'pw-existing'});
     expect(tx.reportAudit.create).not.toHaveBeenCalled();
     expect(tx.report.update).not.toHaveBeenCalled();
+  });
+});
+
+/*
+  СВАЮ С ПАСПОРТОМ НЕЛЬЗЯ «ПОПРАВИТЬ» ДО НУЛЯ.
+
+  Паспорт и решение мастера остаются при исходной записи, а встречная строка
+  −1 обнуляла итог смены: отчёт говорил «свай 0», тогда как форма 4.1, ведомость
+  2.5 и акты АОСР/АООК продолжали печатать эту сваю принятой (ночной обход ПТО
+  30.10.2026). Число свай с паспортами — нижняя граница поправки; исправление
+  паспорта вносит мастер в журнале забивки, как и для сданного отчёта.
+*/
+describe('correctProduction — свая с паспортом', () => {
+  beforeEach(() => {
+    tx.pilePassport.findFirst.mockResolvedValue({id: 'passport-1'});
+    tx.pileWork.findUnique.mockImplementation(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test: разбор аргументов фиктивного клиента
+      async (args: any) => (args?.where?.id ? {count: 1} : null),
+    );
+    tx.pileWork.aggregate.mockResolvedValue({_sum: {count: 0}});
+  });
+
+  it('отказывает 409 и не пишет встречную строку, когда итог был бы нулём', async () => {
+    await expect(correctProduction({...input, actual: 0})).rejects.toMatchObject({status: 409});
+    expect(tx.pilePassport.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({where: {tenantId: 'tenant-a', pileWorkId: 'pw-1'}}),
+    );
+    expect(tx.pileWork.create).not.toHaveBeenCalled();
+    expect(tx.reportAudit.create).not.toHaveBeenCalled();
+    expect(tx.report.update).not.toHaveBeenCalled();
+  });
+
+  it('число больше нуля проходит: сверх паспортной сваи могли забить ещё', async () => {
+    await expect(correctProduction({...input, actual: 2})).resolves.toMatchObject({was: 1, now: 2});
+    expect(tx.pileWork.create).toHaveBeenCalledWith(expect.objectContaining({data: expect.objectContaining({count: 1})}));
+  });
+
+  it('у записи без паспорта ноль по-прежнему законен', async () => {
+    tx.pilePassport.findFirst.mockResolvedValue(null);
+
+    await expect(correctProduction({...input, actual: 0})).resolves.toMatchObject({now: 0});
   });
 });
