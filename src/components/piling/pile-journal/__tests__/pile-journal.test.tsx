@@ -52,6 +52,7 @@ function pileRow(over: Partial<PilePassportRow> = {}): PilePassportRow {
     refusalMm: 1.8,
     refusalSetsUsed: 3,
     sets: [],
+    joints: [],
     drivingComplete: true,
     totalBlows: null,
     blowsLastMeter: null,

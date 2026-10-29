@@ -37,6 +37,11 @@ export type {
 export { listPilePassports } from './pile-journal-list';
 export { pileJournalHeader } from './pile-journal-totals';
 export { exportPileJournalXlsx } from './pile-journal-export';
+export { exportPileJournalForm41Xlsx } from './pile-journal-form41';
+export { exportPileSvodXlsx } from './pile-journal-svod';
+export { exportPileAosrXlsx } from './pile-journal-aosr';
+export { exportPileAookXlsx } from './pile-journal-aook';
+export { exportPileJointActXlsx } from './pile-journal-joint-acts';
 
 /**
  * Решение мастера по свае.

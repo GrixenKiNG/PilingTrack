@@ -212,7 +212,7 @@ export function PileJournal() {
     }
   };
 
-  const exportJournal = async () => {
+  const exportJournal = async (form?: '4.1' | '2.5' | 'aosr' | 'aook' | 'weld' | 'anticorrosion') => {
     // Пустая выборка давала файл с одним титулом и зелёное «Журнал выгружен»:
     // мастер подшивал пустой документ и решал, что свай нет по ошибке фильтра.
     if (rows && rows.length === 0) {
@@ -222,7 +222,7 @@ export function PileJournal() {
     setExporting(true);
     let objectUrl: string | null = null;
     try {
-      const response = await authFetch(`/api/pile-passports/export?${journalParams(filters).toString()}`);
+      const response = await authFetch(`/api/pile-passports/export?${journalParams(filters).toString()}${form ? `&form=${form}` : ''}`);
       if (!response.ok) {
         // Истёкшая сессия приходит английским «Unauthorized», а ответ прокси
         // без тела — техническим статусом. Человеку нужен русский текст.
@@ -233,7 +233,7 @@ export function PileJournal() {
       objectUrl = URL.createObjectURL(await response.blob());
       const link = document.createElement('a');
       link.href = objectUrl;
-      link.download = `zhurnal-zabivki-svay-${getTodayInTimezone()}.xlsx`;
+      link.download = `${form ? `zhurnal-forma-${form.replace('.', '-')}` : 'zhurnal-zabivki-svay'}-${getTodayInTimezone()}.xlsx`;
       link.click();
       toast.success('Журнал выгружен');
     } catch (exportError) {
@@ -265,6 +265,30 @@ export function PileJournal() {
         <Button size="sm" variant="outline" className="h-11 text-xs sm:h-8" disabled={exporting || dateRangeInvalid}
           onClick={() => void exportJournal()}>
           {exporting ? 'Выгрузка…' : 'Выгрузить журнал (.xlsx)'}
+        </Button>
+        <Button size="sm" variant="outline" className="h-11 text-xs sm:h-8" disabled={exporting || dateRangeInvalid}
+          onClick={() => void exportJournal('4.1')}>
+          Форма 4.1 СП 392 (.xlsx)
+        </Button>
+        <Button size="sm" variant="outline" className="h-11 text-xs sm:h-8" disabled={exporting || dateRangeInvalid}
+          onClick={() => void exportJournal('2.5')}>
+          Сводная ведомость 2.5 (.xlsx)
+        </Button>
+        <Button size="sm" variant="outline" className="h-11 text-xs sm:h-8" disabled={exporting || dateRangeInvalid}
+          onClick={() => void exportJournal('aosr')}>
+          Акт скрытых работ (.xlsx)
+        </Button>
+        <Button size="sm" variant="outline" className="h-11 text-xs sm:h-8" disabled={exporting || dateRangeInvalid}
+          onClick={() => void exportJournal('aook')}>
+          Акт «Свайный фундамент» (.xlsx)
+        </Button>
+        <Button size="sm" variant="outline" className="h-11 text-xs sm:h-8" disabled={exporting || dateRangeInvalid}
+          onClick={() => void exportJournal('weld')}>
+          Акт: сварка стыков (.xlsx)
+        </Button>
+        <Button size="sm" variant="outline" className="h-11 text-xs sm:h-8" disabled={exporting || dateRangeInvalid}
+          onClick={() => void exportJournal('anticorrosion')}>
+          Акт: антикоррозия (.xlsx)
         </Button>
       </header>
 

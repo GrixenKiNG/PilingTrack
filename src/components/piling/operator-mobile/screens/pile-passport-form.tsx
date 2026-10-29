@@ -90,6 +90,34 @@ interface SetDraft {
   dropHeight: string;
 }
 
+/** Черновик стыка составной сваи. */
+interface JointDraft {
+  welder: string;
+  electrode: string;
+  anticorrosion: string;
+}
+
+function emptyJoint(): JointDraft {
+  return {welder: '', electrode: '', anticorrosion: ''};
+}
+
+/** Текстовое поле стыка. */
+function Txt({label, value, onChange, placeholder}: {
+  label: string; value: string; onChange: (value: string) => void; placeholder?: string;
+}) {
+  return (
+    <label className="block">
+      <span className="text-2xs font-medium text-muted-foreground">{label}</span>
+      <input
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder}
+        className="mt-1 h-12 w-full rounded-md border bg-card px-3 text-base shadow-xs"
+      />
+    </label>
+  );
+}
+
 function emptySet(): SetDraft {
   return {blows: String(DEFAULT_SET_BLOWS), penetration: '', dropHeight: ''};
 }
@@ -132,7 +160,7 @@ export function PilePassportForm({grades, busy, error, errorDetails, onSubmit, d
   draftShiftId?: string;
 }) {
   const localDraft = useLocalFormDraft(draftUserId, draftShiftId && `passport:${draftShiftId}`, {
-    pileGradeId: '', pileNumber: '', designHead: '', actualHead: '', depth: '', sets: [emptySet()],
+    pileGradeId: '', pileNumber: '', designHead: '', actualHead: '', depth: '', sets: [emptySet()], joints: [] as JointDraft[],
     designRefusal: '', totalBlows: '', blowsLastMeter: '', planDeviation: '', tilt: '', dropHeight: '',
     redriven: false, followerUsed: false, headCutOff: false, note: '',
   });
@@ -142,6 +170,9 @@ export function PilePassportForm({grades, busy, error, errorDetails, onSubmit, d
   const [actualHead, setActualHead] = localDraft.field('actualHead');
   const [depth, setDepth] = localDraft.field('depth');
   const [sets, setSets] = localDraft.field('sets');
+  // Черновик, сохранённый до появления стыков, поля `joints` не содержит.
+  const [savedJoints, setJoints] = localDraft.field('joints');
+  const joints = savedJoints ?? [];
   const [designRefusal, setDesignRefusal] = localDraft.field('designRefusal');
   const [totalBlows, setTotalBlows] = localDraft.field('totalBlows');
   const [blowsLastMeter, setBlowsLastMeter] = localDraft.field('blowsLastMeter');
@@ -172,7 +203,13 @@ export function PilePassportForm({grades, busy, error, errorDetails, onSubmit, d
     followerUsed,
   }).find((problem) => problem.field === 'drivenDepthM');
 
-  const ready = Boolean(pileGradeId) && pileNumber.trim().length > 0 && !depthProblem;
+  // Стык с одним заполненным полем из двух — не запись: акт без сварщика или
+  // электродов подписать нечем. Полностью пустой стык молча выпадает.
+  const filledJoints = joints.filter((joint) => joint.welder.trim() || joint.electrode.trim() || joint.anticorrosion.trim());
+  const brokenJoint = filledJoints.findIndex((joint) => !joint.welder.trim() || !joint.electrode.trim());
+
+  const ready = Boolean(pileGradeId) && pileNumber.trim().length > 0 && !depthProblem
+    && brokenJoint < 0;
 
   // Серая кнопка молчит, и новичок, заполнивший все замеры, не понимает, чего
   // не хватает. Собираем перечень ровно из тех слагаемых, из которых собран
@@ -181,6 +218,7 @@ export function PilePassportForm({grades, busy, error, errorDetails, onSubmit, d
   if (!pileGradeId) missing.push('марка сваи');
   if (pileNumber.trim().length === 0) missing.push('номер сваи');
   if (depthProblem) missing.push(depthProblem.message);
+  if (brokenJoint >= 0) missing.push(`стык № ${brokenJoint + 1}: сварщик и электроды`);
 
   const submit = async () => {
     if (!ready) return;
@@ -196,6 +234,13 @@ export function PilePassportForm({grades, busy, error, errorDetails, onSubmit, d
         penetrationMm: set.penetrationMm,
         dropHeightM: set.dropHeightM,
       })),
+      joints: filledJoints.length > 0
+        ? filledJoints.map((joint) => ({
+          welderName: joint.welder.trim(),
+          electrode: joint.electrode.trim(),
+          anticorrosionMaterial: joint.anticorrosion.trim() || null,
+        }))
+        : undefined,
       refusalSetPenetrationMm: measuredSets.at(-1)?.penetrationMm ?? null,
       refusalSetBlows: measuredSets.at(-1)?.blows ?? null,
       designRefusalMm: num(designRefusal),
@@ -218,6 +263,7 @@ export function PilePassportForm({grades, busy, error, errorDetails, onSubmit, d
     setActualHead('');
     setDepth('');
     setSets([emptySet()]);
+    setJoints([]);
     setTotalBlows('');
     setBlowsLastMeter('');
     setPlanDeviation('');
@@ -226,7 +272,7 @@ export function PilePassportForm({grades, busy, error, errorDetails, onSubmit, d
     setFollowerUsed(false);
     setHeadCutOff(false);
     setNote('');
-    localDraft.clear({...localDraft.value, pileNumber: '', actualHead: '', depth: '', sets: [emptySet()],
+    localDraft.clear({...localDraft.value, pileNumber: '', actualHead: '', depth: '', sets: [emptySet()], joints: [],
       totalBlows: '', blowsLastMeter: '', planDeviation: '', tilt: '', redriven: false,
       followerUsed: false, headCutOff: false, note: ''});
   };
@@ -353,6 +399,54 @@ export function PilePassportForm({grades, busy, error, errorDetails, onSubmit, d
               : exceeds === false ? ' — в пределах проектного.' : ''}
           </p>
         ) : null}
+      </Panel>
+
+      <Panel>
+        <PanelTitle>Стыки секций</PanelTitle>
+        <p className="mt-1 text-2xs text-muted-foreground">
+          Только для составной сваи: каждый сваренный стык снизу вверх. Время записывается само.
+        </p>
+        <div className="mt-2 space-y-3">
+          {joints.map((joint, index) => (
+            <div key={index} className="rounded-md border bg-muted/40 p-2">
+              <div className="flex items-center justify-between">
+                <span className="text-2xs font-semibold text-muted-foreground">Стык № {index + 1}</span>
+                <button
+                  type="button"
+                  onClick={() => setJoints((current) => current.filter((_, i) => i !== index))}
+                  className="text-2xs font-medium text-muted-foreground underline"
+                >
+                  убрать
+                </button>
+              </div>
+              <div className="mt-2 space-y-2">
+                <Txt
+                  label="Сварщик" value={joint.welder} placeholder="Фамилия И. О."
+                  onChange={(value) => setJoints((current) =>
+                    current.map((item, i) => (i === index ? {...item, welder: value} : item)))}
+                />
+                <Txt
+                  label="Марка электродов" value={joint.electrode} placeholder="УОНИ-13/55"
+                  onChange={(value) => setJoints((current) =>
+                    current.map((item, i) => (i === index ? {...item, electrode: value} : item)))}
+                />
+                <Txt
+                  label="Антикоррозионное покрытие шва" value={joint.anticorrosion}
+                  placeholder="Если уже нанесено"
+                  onChange={(value) => setJoints((current) =>
+                    current.map((item, i) => (i === index ? {...item, anticorrosion: value} : item)))}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+        <button
+          type="button"
+          onClick={() => setJoints((current) => [...current, emptyJoint()])}
+          className="mt-2 h-11 w-full rounded-md border border-dashed text-sm font-semibold text-muted-foreground"
+        >
+          + Добавить стык
+        </button>
       </Panel>
 
       <Panel>

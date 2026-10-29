@@ -2317,6 +2317,8 @@ model PilePassport {
   pileWork PileWork @relation(fields: [pileWorkId], references: [id], onDelete: Restrict)
   /// Залоги — построчная часть журнала забивки.
   sets PileDrivingSet[]
+  /// Стыки секций — только у составных свай.
+  joints PileJoint[]
 
   @@unique([tenantId, clientCommandId])
   @@index([tenantId, pileNumber])
@@ -2347,6 +2349,39 @@ model PileDrivingSet {
   penetrationMm Float
   /// Высота подъёма бойка на этом залоге, м. Машинист меняет её по ходу.
   dropHeightM Float?
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  passport PilePassport @relation(fields: [passportId], references: [id], onDelete: Cascade)
+
+  @@unique([passportId, ordinal])
+  @@index([tenantId, passportId])
+}
+
+/// Стык секций составной сваи: сварка и антикоррозионная обработка шва.
+///
+/// ЗАЧЕМ. Из стыков собираются акты скрытых работ на сварку секций и на
+/// антикоррозионную обработку стыков (СП 48.13330, приложение Б.3, акты 5 и 6).
+/// Секции отдельной таблицей не заводим: число секций — число стыков плюс один,
+/// а длину сваи по-прежнему даёт её марка (`PileGrade.lengthMm`).
+///
+/// КТО ПИШЕТ. Оператор, вместе с паспортом сваи. Обычная свая стыков не имеет.
+model PileJoint {
+  id         String @id @default(cuid())
+  tenantId   String
+  passportId String
+
+  /// № стыка по порядку, с единицы (снизу вверх). Порядок задаёт массив в команде.
+  ordinal Int
+  /// Когда сварен стык.
+  weldedAt DateTime @db.Timestamptz(3)
+  welderName String
+  /// Марка электродов (сварочных материалов).
+  electrode String
+  /// Материал антикоррозионного покрытия шва. Пусто — обработка ещё не выполнена.
+  anticorrosionMaterial String?
+  /// Когда нанесено покрытие. Есть только вместе с материалом.
+  anticorrosionAt DateTime? @db.Timestamptz(3)
 
   createdAt DateTime @default(now()) @db.Timestamptz(3)
 

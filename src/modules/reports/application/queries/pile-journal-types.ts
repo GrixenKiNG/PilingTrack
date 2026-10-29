@@ -52,6 +52,16 @@ export interface PileDrivingSetRow {
   refusalMm: number | null;
 }
 
+/** Стык секций составной сваи; даты — ISO UTC. */
+export interface PileJointRow {
+  ordinal: number;
+  weldedAt: string;
+  welderName: string;
+  electrode: string;
+  anticorrosionMaterial: string | null;
+  anticorrosionAt: string | null;
+}
+
 export interface PilePassportRow {
   /** Ключ строки: паспорт, если он есть, иначе запись выработки. */
   id: string;
@@ -96,6 +106,8 @@ export interface PilePassportRow {
   refusalSetsUsed: number;
   /** Залоги по порядку — построчная часть нормативной формы. */
   sets: PileDrivingSetRow[];
+  /** Стыки секций составной сваи снизу вверх; у обычной сваи пусто. */
+  joints: PileJointRow[];
   /** Три последних залога дали отказ не больше проектного. `null` — нечем судить. */
   drivingComplete: boolean | null;
   totalBlows: number | null;

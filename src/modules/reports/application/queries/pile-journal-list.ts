@@ -85,7 +85,7 @@ export async function listPilePassports(input: PileJournalFilters): Promise<Pile
           status: true,
         },
       },
-      passport: { include: { sets: { orderBy: { ordinal: 'asc' } } } },
+      passport: { include: { sets: { orderBy: { ordinal: 'asc' } }, joints: { orderBy: { ordinal: 'asc' } } } },
     },
   });
 
@@ -186,6 +186,14 @@ export async function listPilePassports(input: PileJournalFilters): Promise<Pile
         penetrationMm: set.penetrationMm,
         dropHeightM: set.dropHeightM,
         refusalMm: setRefusalMm({ blows: set.blows, penetrationMm: set.penetrationMm }),
+      })),
+      joints: (passport?.joints ?? []).map((joint) => ({
+        ordinal: joint.ordinal,
+        weldedAt: joint.weldedAt.toISOString(),
+        welderName: joint.welderName,
+        electrode: joint.electrode,
+        anticorrosionMaterial: joint.anticorrosionMaterial,
+        anticorrosionAt: joint.anticorrosionAt?.toISOString() ?? null,
       })),
       drivingComplete: passport
         ? drivingComplete({ sets, designRefusalMm: passport.designRefusalMm })

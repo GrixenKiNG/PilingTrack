@@ -10,10 +10,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest, NextResponse } from 'next/server';
 
-const { requireAuthMock, assertCanMock, exportMock, rateCheckMock } = vi.hoisted(() => ({
+const { requireAuthMock, assertCanMock, exportMock, form41Mock, rateCheckMock } = vi.hoisted(() => ({
   requireAuthMock: vi.fn(),
   assertCanMock: vi.fn(),
   exportMock: vi.fn(),
+  form41Mock: vi.fn(),
   rateCheckMock: vi.fn(),
 }));
 
@@ -29,6 +30,7 @@ vi.mock('@/lib/rate-limiter', () => ({
 }));
 vi.mock('@/modules/reports/application/queries/pile-passport.service', () => ({
   exportPileJournalXlsx: exportMock,
+  exportPileJournalForm41Xlsx: form41Mock,
 }));
 
 import { GET } from '../route';
@@ -48,6 +50,7 @@ describe('GET /api/pile-passports/export — ограничение частот
     requireAuthMock.mockResolvedValue({ user: admin, error: null });
     rateCheckMock.mockResolvedValue({ allowed: true, remaining: 5 });
     exportMock.mockResolvedValue(Buffer.from('xlsx'));
+    form41Mock.mockResolvedValue(Buffer.from('form41'));
   });
 
   it('names the journal by the production day at midnight', async () => {
@@ -56,6 +59,23 @@ describe('GET /api/pile-passports/export — ограничение частот
     const response = await GET(req());
     expect(response.status).toBe(200);
     expect(response.headers.get('Content-Disposition')).toContain('pile-driving-journal-2026-10-08.xlsx');
+  });
+
+  it('form=4.1 отдаёт печатную форму № 4.1, а не обычный журнал', async () => {
+    const response = await GET(req('form=4.1'));
+
+    expect(response.status).toBe(200);
+    expect(form41Mock).toHaveBeenCalledTimes(1);
+    expect(exportMock).not.toHaveBeenCalled();
+    expect(response.headers.get('Content-Disposition')).toContain('form-4-1');
+  });
+
+  it('неизвестная форма → 400 без сборки файла', async () => {
+    const response = await GET(req('form=9.9'));
+
+    expect(response.status).toBe(400);
+    expect(exportMock).not.toHaveBeenCalled();
+    expect(form41Mock).not.toHaveBeenCalled();
   });
 
   it('обычный запрос отдаёт файл (200)', async () => {

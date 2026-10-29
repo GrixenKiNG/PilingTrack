@@ -93,6 +93,12 @@ const commandSchema = z.discriminatedUnion('command', [
             penetrationMm: z.number().min(0).max(10_000),
             dropHeightM: z.number().min(0).max(20).nullish(),
           })).max(60).optional(),
+          // Стыки составной сваи. Предел в 20 — потолок против мусорной отправки.
+          joints: z.array(z.object({
+            welderName: z.string().trim().min(1).max(120),
+            electrode: z.string().trim().min(1).max(120),
+            anticorrosionMaterial: z.string().trim().max(120).nullish(),
+          })).max(20).optional(),
           // Отметка головы бывает отрицательной: отсчёт от нуля здания.
           designHeadLevelM: z.number().min(-200).max(200).nullish(),
           actualHeadLevelM: z.number().min(-200).max(200).nullish(),

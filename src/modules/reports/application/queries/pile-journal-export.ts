@@ -9,7 +9,7 @@ import { listPilePassports } from './pile-journal-list';
 import { pileJournalHeader } from './pile-journal-totals';
 
 /** День журнала в печатном виде — ДД.ММ.ГГГГ, как требует PRODUCT.md. */
-function printDay(iso: string, timezone: string): string {
+export function printDay(iso: string, timezone: string): string {
   return new Date(iso).toLocaleDateString('ru-RU', {
     day: '2-digit',
     month: '2-digit',

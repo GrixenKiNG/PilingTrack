@@ -72,6 +72,11 @@ export type {
 export {
   decidePilePassport,
   exportPileJournalXlsx,
+  exportPileJournalForm41Xlsx,
+  exportPileSvodXlsx,
+  exportPileAosrXlsx,
+  exportPileAookXlsx,
+  exportPileJointActXlsx,
   listPilePassports,
   pileJournalHeader,
 } from './application/queries/pile-passport.service';

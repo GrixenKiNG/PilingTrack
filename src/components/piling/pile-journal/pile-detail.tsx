@@ -117,6 +117,22 @@ export function PileDetail({ row, busy, onDecide }: {
         <DrivingSets row={row} />
       </section>
 
+      {row.joints.length > 0 ? (
+        <section>
+          <h3 className="mb-1 text-2xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Стыки секций
+          </h3>
+          <ul className="space-y-0.5 text-2xs">
+            {row.joints.map((joint) => (
+              <li key={joint.ordinal}>
+                Стык {joint.ordinal}: сварщик {joint.welderName}, электроды {joint.electrode}
+                {joint.anticorrosionMaterial ? `, покрытие ${joint.anticorrosionMaterial}` : ', покрытие не нанесено'}
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
       {row.note ? <p className="text-2xs text-muted-foreground">Примечание машиниста: {row.note}</p> : null}
       {row.acceptanceNote ? (
         <p className="text-2xs text-muted-foreground">

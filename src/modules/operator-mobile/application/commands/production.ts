@@ -30,6 +30,18 @@ export interface PileDrivingSetEntry {
   dropHeightM?: number | null;
 }
 
+/**
+ * Стык секций составной сваи. Время сварки и нанесения покрытия ставит сервер:
+ * оператор вносит стык по ходу работы, и время с телефона было бы вторым
+ * источником правды.
+ */
+export interface PileJointEntry {
+  welderName: string;
+  electrode: string;
+  /** Пусто — антикоррозионная обработка шва ещё не выполнена. */
+  anticorrosionMaterial?: string | null;
+}
+
 /** Замеры и отметки журнала забивки. Обязателен только номер сваи. */
 export interface PilePassportEntry {
   pileNumber: string;
@@ -40,6 +52,8 @@ export interface PilePassportEntry {
    * присланная нумерация означала бы второй источник правды о порядке.
    */
   sets?: PileDrivingSetEntry[];
+  /** Стыки секций снизу вверх; у обычной сваи их нет. Номер задаёт порядок. */
+  joints?: PileJointEntry[];
   picketId?: string;
   designHeadLevelM?: number | null;
   actualHeadLevelM?: number | null;
@@ -322,6 +336,17 @@ export async function logProduction(input: {
         }
       }
 
+      // Стык без сварщика или электродов не годится для акта скрытых работ:
+      // подписывать его нечем. Покрытие необязательно — его наносят позже.
+      const joints = entry.passport.joints ?? [];
+      for (const [index, joint] of joints.entries()) {
+        if (!joint.welderName?.trim() || !joint.electrode?.trim()) {
+          throw new OperatorCommandError(400, `Стык № ${index + 1} заполнен неверно`, [
+            {field: 'joints', message: 'В стыке нужны сварщик и марка электродов'},
+          ]);
+        }
+      }
+
       // Пикет — только с объекта смены. Форма отчёта проверяет то же самое
       // (validatePicketsBelongToSite): иначе свая чужого объекта попадает в
       // журнал забивки и в выработку по пикетам этого.
@@ -395,6 +420,23 @@ export async function logProduction(input: {
                 penetrationMm: set.penetrationMm,
                 dropHeightM: set.dropHeightM ?? null,
               })),
+            }
+            : undefined,
+          // Стыки пишутся тем же вложенным create: паспорт и стыки одной записью.
+          joints: joints.length > 0
+            ? {
+              create: joints.map((joint, index) => {
+                const material = joint.anticorrosionMaterial?.trim() || null;
+                return {
+                  tenantId: input.tenantId,
+                  ordinal: index + 1,
+                  weldedAt: now,
+                  welderName: joint.welderName.trim(),
+                  electrode: joint.electrode.trim(),
+                  anticorrosionMaterial: material,
+                  anticorrosionAt: material ? now : null,
+                };
+              }),
             }
             : undefined,
         },

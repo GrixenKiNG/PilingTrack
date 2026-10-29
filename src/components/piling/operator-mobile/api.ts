@@ -427,10 +427,19 @@ export interface PileDrivingSetInput {
   dropHeightM?: number | null;
 }
 
+/** Стык секций составной сваи. Время ставит сервер. */
+export interface PileJointInput {
+  welderName: string;
+  electrode: string;
+  anticorrosionMaterial?: string | null;
+}
+
 export interface PilePassportInput {
   pileNumber: string;
   /** Залоги по порядку. Номер задаёт сам массив. */
   sets?: PileDrivingSetInput[];
+  /** Стыки секций снизу вверх; у обычной сваи их нет. */
+  joints?: PileJointInput[];
   picketId?: string;
   designHeadLevelM?: number | null;
   actualHeadLevelM?: number | null;

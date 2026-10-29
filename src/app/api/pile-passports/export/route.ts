@@ -4,10 +4,12 @@ import { requireAuth } from '@/lib/auth';
 import { requireTenantId } from '@/lib/tenant';
 import { assertCan } from '@/services/auth/authorization-service';
 import { rateLimiter, type RateLimitConfig } from '@/lib/rate-limiter';
-import { exportPileJournalXlsx } from '@/modules/reports';
+import { exportPileJournalForm41Xlsx, exportPileAookXlsx, exportPileAosrXlsx, exportPileJointActXlsx, exportPileJournalXlsx, exportPileSvodXlsx } from '@/modules/reports';
 import type { PileAcceptanceValue } from '@/modules/operator-mobile';
 import { getSettings } from '@/modules/settings';
 import { getTodayInTimezone } from '@/lib/timezone';
+
+type JournalFilters = Parameters<typeof exportPileJournalXlsx>[0];
 
 export const runtime = 'nodejs';
 
@@ -74,7 +76,23 @@ export const GET = withApi(
       return NextResponse.json({ error: 'Даты периода задаются как ГГГГ-ММ-ДД' }, { status: 400 });
     }
 
-    const xlsx = await exportPileJournalXlsx({
+    // ?form=4.1 — форма № 4.1 СП 392.1325800.2018; ?form=2.5 — сводная ведомость
+    // забитых свай (форма № 2.5 ВСН 012-88); ?form=aosr — акт скрытых работ на
+    // погружение свай (приложение № 3 к 344/пр); ?form=aook — акт «Свайный фундамент»
+    // (приложение № 4 к 344/пр); ?form=weld и ?form=anticorrosion — акты скрытых работ
+    // по стыкам составных свай вместо обычного журнала.
+    const form = params.get('form');
+    if (form && form !== '4.1' && form !== '2.5' && form !== 'aosr' && form !== 'aook' && form !== 'weld' && form !== 'anticorrosion') {
+      return NextResponse.json({ error: 'Неизвестная форма журнала' }, { status: 400 });
+    }
+    const exporter = form === '4.1' ? exportPileJournalForm41Xlsx
+      : form === '2.5' ? exportPileSvodXlsx
+      : form === 'aosr' ? exportPileAosrXlsx
+      : form === 'aook' ? exportPileAookXlsx
+      : form === 'weld' ? (filters: JournalFilters) => exportPileJointActXlsx(filters, 'WELD')
+      : form === 'anticorrosion' ? (filters: JournalFilters) => exportPileJointActXlsx(filters, 'ANTICORROSION')
+      : exportPileJournalXlsx;
+    const xlsx = await exporter({
       tenantId,
       siteId: params.get('siteId') || undefined,
       acceptance: (acceptanceParam as PileAcceptanceValue | null) ?? undefined,
@@ -88,7 +106,7 @@ export const GET = withApi(
     return new NextResponse(new Uint8Array(xlsx), {
       headers: {
         'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        'Content-Disposition': `attachment; filename="pile-driving-journal-${today}.xlsx"`,
+        'Content-Disposition': `attachment; filename="pile-driving-journal${form ? `-form-${form.replace('.', '-')}` : ''}-${today}.xlsx"`,
       },
     });
   },
