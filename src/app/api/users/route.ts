@@ -3,6 +3,7 @@ import { requireAuth } from '@/lib/auth';
 import { assertCan, can } from '@/services/auth/authorization-service';
 import { createUserSchema, deleteIdSchema, updateUserSchema } from '@/lib/validation-schemas';
 import { withApi, withMutation } from '@/core/api-wrapper';
+import { getResponseCache } from '@/core/cache';
 import { parseCursorPagination } from '@/lib/pagination-cursor';
 
 
@@ -95,6 +96,7 @@ export const POST = withMutation(
       tenantId,
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     }, user!.id);
+    getResponseCache('users').invalidate('GET:/api/users');
     return NextResponse.json({ user: createdUser }, { status: 201 });
   },
   { domain: 'users' }
@@ -129,6 +131,7 @@ export const PUT = withMutation(
     const { updateUser } = await getUsersModule();
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     const updatedUser = await updateUser(tenantId, validation.data, user!.id);
+    getResponseCache('users').invalidate('GET:/api/users');
     return NextResponse.json({ user: updatedUser });
   },
   { domain: 'users' }
@@ -163,6 +166,7 @@ export const DELETE = withMutation(
     const { deleteUser } = await getUsersModule();
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- non-null: requireAuth guarantees the user once the error guard above returned
     const result = await deleteUser(tenantId, user!.id, validation.data.id);
+    getResponseCache('users').invalidate('GET:/api/users');
     return NextResponse.json(result);
   },
   { domain: 'users' }

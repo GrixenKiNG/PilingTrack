@@ -1,0 +1,484 @@
+{
+  "sourceSha": "ff582e7e2d2e6c4c68144ce56d8d677bfffe45a6",
+  "method": "Read-only TypeScript AST extraction. These are defaults, not proof of every route or entity scope.",
+  "sources": [
+    "src/lib/routes.ts",
+    "src/components/piling/icons/role-navigation.ts",
+    "src/core/security/authorization.ts",
+    "src/modules/readiness/domain/capability-defaults.ts"
+  ],
+  "roles": [
+    "ADMIN",
+    "DISPATCHER",
+    "OPERATOR",
+    "ASSISTANT",
+    "MECHANIC",
+    "FOREMAN",
+    "SAFETY_ENGINEER"
+  ],
+  "globalAbilities": {
+    "analytics.read": [
+      "ADMIN",
+      "DISPATCHER",
+      "FOREMAN"
+    ],
+    "reports.read_all": [
+      "ADMIN",
+      "DISPATCHER",
+      "FOREMAN",
+      "SAFETY_ENGINEER"
+    ],
+    "reports.read_cross_user": [
+      "ADMIN",
+      "DISPATCHER",
+      "FOREMAN",
+      "SAFETY_ENGINEER"
+    ],
+    "reports.export": [
+      "ADMIN"
+    ],
+    "reports.manage_all": [
+      "ADMIN",
+      "DISPATCHER"
+    ],
+    "piles.manage": [
+      "ADMIN",
+      "DISPATCHER",
+      "FOREMAN"
+    ],
+    "sites.read_all": [
+      "ADMIN",
+      "DISPATCHER",
+      "FOREMAN",
+      "SAFETY_ENGINEER"
+    ],
+    "sites.manage": [
+      "ADMIN",
+      "DISPATCHER"
+    ],
+    "sites.assign_users": [
+      "ADMIN",
+      "DISPATCHER"
+    ],
+    "sites.manage_hierarchy": [
+      "ADMIN",
+      "DISPATCHER"
+    ],
+    "users.read": [
+      "ADMIN",
+      "DISPATCHER",
+      "FOREMAN",
+      "SAFETY_ENGINEER"
+    ],
+    "users.manage": [
+      "ADMIN"
+    ],
+    "users.documents.read_all": [
+      "ADMIN",
+      "DISPATCHER",
+      "SAFETY_ENGINEER"
+    ],
+    "safety.permits.manage": [
+      "ADMIN",
+      "SAFETY_ENGINEER"
+    ],
+    "equipment.read": [
+      "ADMIN",
+      "DISPATCHER",
+      "MECHANIC",
+      "SAFETY_ENGINEER"
+    ],
+    "equipment.manage": [
+      "ADMIN"
+    ],
+    "maintenance.manage": [
+      "ADMIN",
+      "DISPATCHER",
+      "MECHANIC",
+      "SAFETY_ENGINEER"
+    ],
+    "incidents.read": [
+      "ADMIN",
+      "DISPATCHER",
+      "FOREMAN",
+      "SAFETY_ENGINEER"
+    ],
+    "incidents.review": [
+      "ADMIN",
+      "DISPATCHER",
+      "SAFETY_ENGINEER"
+    ],
+    "inspection.perform": [
+      "ADMIN",
+      "DISPATCHER",
+      "OPERATOR",
+      "MECHANIC",
+      "SAFETY_ENGINEER"
+    ],
+    "meter.record": [
+      "ADMIN",
+      "DISPATCHER",
+      "OPERATOR",
+      "MECHANIC",
+      "SAFETY_ENGINEER"
+    ],
+    "crews.read": [
+      "ADMIN",
+      "DISPATCHER",
+      "MECHANIC",
+      "FOREMAN",
+      "SAFETY_ENGINEER"
+    ],
+    "crews.manage": [
+      "ADMIN",
+      "DISPATCHER"
+    ],
+    "crews.legacy_manage": [
+      "ADMIN"
+    ],
+    "dictionary.manage": [
+      "ADMIN"
+    ],
+    "telegram.manage": [
+      "ADMIN"
+    ],
+    "system.read": [
+      "ADMIN",
+      "DISPATCHER"
+    ],
+    "media.upload": [
+      "ADMIN",
+      "DISPATCHER",
+      "OPERATOR",
+      "FOREMAN",
+      "SAFETY_ENGINEER"
+    ],
+    "dlq.manage": [
+      "ADMIN"
+    ],
+    "projections.rebuild": [
+      "ADMIN"
+    ]
+  },
+  "readinessDefaults": {
+    "ADMIN": [
+      "readiness.read",
+      "readiness.shift.manage",
+      "readiness.handover.prepare",
+      "readiness.handover.decide",
+      "readiness.shift.authorize",
+      "readiness.shift.waive",
+      "readiness.inspection.manage",
+      "readiness.defect.report",
+      "readiness.defect.manage",
+      "readiness.meter.manage",
+      "readiness.maintenance.manage",
+      "readiness.permit.edit",
+      "readiness.permit.approve_dispatcher",
+      "readiness.permit.approve_admin",
+      "readiness.rules.manage",
+      "readiness.audit.read",
+      "readiness.audit.export"
+    ],
+    "DISPATCHER": [
+      "readiness.read",
+      "readiness.defect.report",
+      "readiness.defect.manage",
+      "readiness.handover.decide",
+      "readiness.shift.authorize",
+      "readiness.shift.waive",
+      "readiness.permit.approve_dispatcher",
+      "readiness.audit.read"
+    ],
+    "OPERATOR": [
+      "readiness.read",
+      "readiness.shift.manage",
+      "readiness.shift.authorize",
+      "readiness.handover.prepare",
+      "readiness.handover.decide",
+      "readiness.inspection.manage",
+      "readiness.defect.report"
+    ],
+    "ASSISTANT": [
+      "readiness.defect.report"
+    ],
+    "MECHANIC": [
+      "readiness.read",
+      "readiness.handover.prepare",
+      "readiness.permit.edit",
+      "readiness.inspection.manage",
+      "readiness.defect.report",
+      "readiness.defect.manage",
+      "readiness.meter.manage",
+      "readiness.maintenance.manage"
+    ],
+    "FOREMAN": [
+      "readiness.read",
+      "readiness.defect.report",
+      "readiness.audit.read"
+    ],
+    "SAFETY_ENGINEER": [
+      "readiness.read",
+      "readiness.permit.edit",
+      "readiness.inspection.manage",
+      "readiness.defect.report",
+      "readiness.defect.manage",
+      "readiness.audit.read"
+    ]
+  },
+  "navigation": {
+    "OPERATOR": [
+      {
+        "label": "Смена",
+        "href": "/operator",
+        "icon": "home",
+        "tone": "primary"
+      },
+      {
+        "label": "ТБ и допуски",
+        "href": "/admin/safety",
+        "icon": "accepted"
+      },
+      {
+        "label": "История",
+        "href": "/history",
+        "icon": "history"
+      }
+    ],
+    "ASSISTANT": [
+      {
+        "label": "Допуск",
+        "href": "/assistant",
+        "icon": "home",
+        "tone": "primary"
+      },
+      {
+        "label": "ТБ и допуски",
+        "href": "/admin/safety",
+        "icon": "accepted"
+      },
+      {
+        "label": "История",
+        "href": "/history",
+        "icon": "history"
+      }
+    ],
+    "MECHANIC": [
+      {
+        "label": "Готовность техники",
+        "href": "/admin/to",
+        "icon": "technical-readiness"
+      },
+      {
+        "label": "Установки",
+        "href": "/admin/equipment",
+        "icon": "equipment-rig"
+      },
+      {
+        "label": "Обслуживание",
+        "href": "/admin/maintenance",
+        "icon": "work-order"
+      },
+      {
+        "label": "Бригады",
+        "href": "/admin/crews",
+        "icon": "crew"
+      },
+      {
+        "label": "ТБ и допуски",
+        "href": "/admin/safety",
+        "icon": "accepted"
+      }
+    ],
+    "FOREMAN": [
+      {
+        "label": "Дашборд",
+        "href": "/admin",
+        "icon": "dashboard"
+      },
+      {
+        "label": "Мониторинг",
+        "href": "/monitoring",
+        "icon": "monitoring"
+      },
+      {
+        "label": "Объекты",
+        "href": "/admin/sites",
+        "icon": "site"
+      },
+      {
+        "label": "Готовность техники",
+        "href": "/admin/to",
+        "icon": "technical-readiness"
+      },
+      {
+        "label": "Бригады",
+        "href": "/admin/crews",
+        "icon": "crew"
+      },
+      {
+        "label": "ТБ и допуски",
+        "href": "/admin/safety",
+        "icon": "accepted",
+        "tone": "danger"
+      },
+      {
+        "label": "Отчёты",
+        "href": "/admin/reports",
+        "icon": "reports"
+      },
+      {
+        "label": "Аналитика",
+        "href": "/admin/analytics",
+        "icon": "analytics",
+        "tone": "info"
+      }
+    ],
+    "SAFETY_ENGINEER": [
+      {
+        "label": "ТБ и допуски",
+        "href": "/admin/safety",
+        "icon": "accepted",
+        "tone": "danger"
+      },
+      {
+        "label": "Техготовность",
+        "href": "/admin/to",
+        "icon": "technical-readiness",
+        "tone": "success"
+      },
+      {
+        "label": "Объекты",
+        "href": "/admin/sites",
+        "icon": "site"
+      },
+      {
+        "label": "Отчёты",
+        "href": "/admin/reports",
+        "icon": "reports"
+      }
+    ],
+    "DISPATCHER": [
+      {
+        "label": "Дашборд",
+        "href": "/admin",
+        "icon": "dashboard"
+      },
+      {
+        "label": "Мониторинг",
+        "href": "/monitoring",
+        "icon": "monitoring",
+        "tone": "info"
+      },
+      {
+        "label": "Объекты",
+        "href": "/admin/sites",
+        "icon": "site"
+      },
+      {
+        "label": "Отчёты",
+        "href": "/admin/reports",
+        "icon": "reports"
+      },
+      {
+        "label": "Установки",
+        "href": "/admin/equipment",
+        "icon": "equipment-rig"
+      },
+      {
+        "label": "Техготовность",
+        "href": "/admin/to",
+        "icon": "technical-readiness",
+        "tone": "success"
+      },
+      {
+        "label": "Бригады",
+        "href": "/admin/crews",
+        "icon": "crew"
+      },
+      {
+        "label": "ТБ и допуски",
+        "href": "/admin/safety",
+        "icon": "accepted",
+        "tone": "danger"
+      },
+      {
+        "label": "Аналитика",
+        "href": "/admin/analytics",
+        "icon": "analytics",
+        "tone": "info"
+      },
+      {
+        "label": "Настройки",
+        "href": "/admin/settings",
+        "icon": "settings"
+      }
+    ],
+    "ADMIN": [
+      {
+        "label": "Дашборд",
+        "href": "/admin",
+        "icon": "dashboard"
+      },
+      {
+        "label": "Мониторинг",
+        "href": "/monitoring",
+        "icon": "monitoring",
+        "tone": "info"
+      },
+      {
+        "label": "Объекты",
+        "href": "/admin/sites",
+        "icon": "site"
+      },
+      {
+        "label": "Отчёты",
+        "href": "/admin/reports",
+        "icon": "reports"
+      },
+      {
+        "label": "Установки",
+        "href": "/admin/equipment",
+        "icon": "equipment-rig"
+      },
+      {
+        "label": "Техготовность",
+        "href": "/admin/to",
+        "icon": "technical-readiness",
+        "tone": "success"
+      },
+      {
+        "label": "Бригады",
+        "href": "/admin/crews",
+        "icon": "crew"
+      },
+      {
+        "label": "ТБ и допуски",
+        "href": "/admin/safety",
+        "icon": "accepted",
+        "tone": "danger"
+      },
+      {
+        "label": "Аналитика",
+        "href": "/admin/analytics",
+        "icon": "analytics",
+        "tone": "info"
+      },
+      {
+        "label": "Справочники",
+        "href": "/admin/dictionaries",
+        "icon": "documents"
+      },
+      {
+        "label": "Пользователи",
+        "href": "/admin/users",
+        "icon": "users"
+      },
+      {
+        "label": "Настройки",
+        "href": "/admin/settings",
+        "icon": "settings"
+      }
+    ]
+  }
+}

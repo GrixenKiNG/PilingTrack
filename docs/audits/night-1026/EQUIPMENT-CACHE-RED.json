@@ -1,0 +1,130 @@
+{
+  "status": "CONFIRMED RED / application fix not applied",
+  "sourceSha": "451acce2b30e5130a9055e9d966edcf4a413ff67",
+  "worktreeSha": "ea9a64f2a5893607f4f63b6309a0129b0d9d1f7c",
+  "baselineSha": "efd95008eac3bc846c89003c4b7766f2eb5c1c9b",
+  "baselineHttpRun": false,
+  "sourceProof": [
+    {
+      "path": "src/app/api/equipment/route.ts",
+      "currentBlob": "bb0c88501aa0115cdc4ab2598d94e2bd702e3640",
+      "baseBlob": "bb0c88501aa0115cdc4ab2598d94e2bd702e3640"
+    },
+    {
+      "path": "src/app/api/monitoring/fleet/route.ts",
+      "currentBlob": "589dd2e3bec2616cbb9d8301e34d4edc08280fb3",
+      "baseBlob": "589dd2e3bec2616cbb9d8301e34d4edc08280fb3"
+    },
+    {
+      "path": "src/components/piling/admin-equipment/use-fleet.ts",
+      "currentBlob": "517b77587a508b710a2e667ebdcbc49c051f514c",
+      "baseBlob": "517b77587a508b710a2e667ebdcbc49c051f514c"
+    },
+    {
+      "path": "src/components/piling/admin-equipment/admin-equipment.tsx",
+      "currentBlob": "424629767fcb6f6f1ef4bd54c0f9746ca07387d6",
+      "baseBlob": "424629767fcb6f6f1ef4bd54c0f9746ca07387d6"
+    }
+  ],
+  "result": {
+    "exit": 1,
+    "seconds": 40,
+    "cleanup": true,
+    "cleanupErrors": []
+  },
+  "stats": {
+    "startTime": "2026-10-28T23:49:15.689Z",
+    "duration": 12175.514000000001,
+    "expected": 0,
+    "skipped": 0,
+    "unexpected": 1,
+    "flaky": 0
+  },
+  "observations": {
+    "step": "create visibility diagnostic",
+    "equipmentId": "72719918-c63f-4316-95c6-34b896bc1605",
+    "equipment": {
+      "id": "72719918-c63f-4316-95c6-34b896bc1605",
+      "tenantId": "cmvsrnf9t0000jsw5stqab8r1",
+      "name": "Установка QA a6d77723-aece-4738-a6b3-7d5d988bbfc5",
+      "model": "QA model",
+      "inventoryNumber": "QA-a6d77723-aece-4738-a6b3-7d5d988bbfc5",
+      "vin": "QAa6d77723aece473",
+      "serialNumber": "a6d77723-aece-4738-a6b3-7d5d988bbfc5",
+      "weightTons": 31.5,
+      "maxPileLength": 12,
+      "engineHoursTotal": 100,
+      "fuelTankLiters": 400,
+      "nextMaintenanceAtHours": 150,
+      "isActive": true
+    },
+    "readings": [
+      {
+        "id": "cmvsrnij60002scw51uhiz2jq",
+        "engineHours": 100,
+        "source": "MANUAL",
+        "recordedById": "cmvsrnfdi0002jsw5syczkith",
+        "note": "Правка наработки в карточке установки"
+      }
+    ],
+    "audit": [
+      {
+        "action": "equipment.created",
+        "actorId": "cmvsrnfdi0002jsw5syczkith",
+        "metadata": {
+          "name": "Установка QA a6d77723-aece-4738-a6b3-7d5d988bbfc5",
+          "after": {
+            "qty": 1,
+            "name": "Установка QA a6d77723-aece-4738-a6b3-7d5d988bbfc5",
+            "model": "QA model",
+            "isActive": true
+          }
+        }
+      }
+    ],
+    "normalStatus": 200,
+    "freshStatus": 200,
+    "normalIds": [
+      "cmvsrnfre0009jsw5m97w8jjs"
+    ],
+    "freshIds": [
+      "cmvsrnfre0009jsw5m97w8jjs",
+      "72719918-c63f-4316-95c6-34b896bc1605"
+    ]
+  },
+  "rawArchive": "D:\\PillingR\\night-logs\\night-evidence-1026/equipment-cache-confirmed-red-raw",
+  "gates": {
+    "sourceBuildSha": "451acce2b30e5130a9055e9d966edcf4a413ff67",
+    "complete": true,
+    "results": [
+      {
+        "id": "equipment-cache-red-tsc",
+        "exit": 0,
+        "seconds": 14
+      },
+      {
+        "id": "equipment-cache-red-lint",
+        "exit": 0,
+        "seconds": 62
+      },
+      {
+        "id": "equipment-cache-red-list",
+        "exit": 0,
+        "seconds": 34
+      }
+    ],
+    "currentCollection": [
+      408,
+      30
+    ],
+    "baseCollection": [
+      318,
+      28
+    ]
+  },
+  "currentFix": {
+    "sourceSha": "121675510f59d60454924226b5b63dd054c946f3",
+    "verification": "pending",
+    "report": "EQUIPMENT-CACHE-FIX.md"
+  }
+}

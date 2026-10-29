@@ -1,0 +1,581 @@
+{
+  "sourceBuildSha": "44126b987c9dd02b0bbefe28e8094f282b94aaf0",
+  "verificationWorktreeSha": "f938298c9fcdab0611ff0c1361176be01e1756b8",
+  "scenarioHash": "ac31c348ec2ba07e0ddc27b817db8400fcaa8044d4886b84a762f19614f10470",
+  "originalTestBodiesUnchanged": true,
+  "pipeline": {
+    "sourceBuildSha": "44126b987c9dd02b0bbefe28e8094f282b94aaf0",
+    "worktreeSha": "f938298c9fcdab0611ff0c1361176be01e1756b8",
+    "scenarioHash": "ac31c348ec2ba07e0ddc27b817db8400fcaa8044d4886b84a762f19614f10470",
+    "scenarioUnchanged": true,
+    "complete": true,
+    "results": [
+      {
+        "id": "crew-final-fresh",
+        "exe": "C:\\Program Files\\nodejs\\node.exe",
+        "args": [
+          "D:\\PillingR\\night-logs\\night-evidence-1026/crew-final-fresh-stand.cjs"
+        ],
+        "exit": 0,
+        "seconds": 291
+      },
+      {
+        "id": "crew-final-tsc",
+        "exe": "C:/Program Files/Git/bin/bash.exe",
+        "args": [
+          "-c",
+          "npx tsc --noEmit"
+        ],
+        "exit": 0,
+        "seconds": 17
+      },
+      {
+        "id": "crew-final-lint",
+        "exe": "C:/Program Files/Git/bin/bash.exe",
+        "args": [
+          "-c",
+          "npm run lint"
+        ],
+        "exit": 0,
+        "seconds": 70
+      },
+      {
+        "id": "crew-final-list",
+        "exe": "C:\\Program Files\\nodejs\\node.exe",
+        "args": [
+          "D:\\PillingR\\night-logs\\night-evidence-1026/qa-fresh-stand.cjs",
+          "--list-default"
+        ],
+        "exit": 0,
+        "seconds": 39
+      }
+    ]
+  },
+  "stats": {
+    "startTime": "2026-10-28T05:15:43.154Z",
+    "duration": 258218.895,
+    "expected": 3,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  },
+  "focused": {
+    "exit": 0,
+    "seconds": 105,
+    "cleanup": true,
+    "cleanupErrors": []
+  },
+  "freshCleanup": {
+    "exit": 0,
+    "seconds": 291,
+    "cleanup": true,
+    "cleanupErrors": []
+  },
+  "listCleanup": {
+    "exit": 0,
+    "seconds": 39,
+    "cleanup": true,
+    "cleanupErrors": []
+  },
+  "collection": {
+    "current": {
+      "tests": 396,
+      "files": 30,
+      "exit": 0
+    },
+    "base": {
+      "tests": 318,
+      "files": 28,
+      "exit": 0
+    }
+  },
+  "cases": [
+    {
+      "project": "chromium",
+      "status": "passed",
+      "observations": [
+        {
+          "step": "create and edit through UI",
+          "crewId": "35ff17a1-5afc-4666-a6f1-c212c2994685",
+          "state": {
+            "name": "Бригада QA 7503b72e-40a9-47c6-9dea-a4272754e5f0 изменена",
+            "operatorId": "cmvrnveqp0004s8w58a5iw69q",
+            "equipmentId": "9f127573-0386-4f0d-99cd-b749829d5a70",
+            "siteId": "a42bdbcf-643c-4711-882d-7fd082b1dcbb",
+            "isActive": true
+          },
+          "roster": []
+        },
+        {
+          "step": "mechanic reads; UI and valid direct mutations denied",
+          "state": {
+            "name": "Бригада QA 7503b72e-40a9-47c6-9dea-a4272754e5f0 изменена",
+            "operatorId": "cmvrnveqp0004s8w58a5iw69q",
+            "equipmentId": "9f127573-0386-4f0d-99cd-b749829d5a70",
+            "siteId": "a42bdbcf-643c-4711-882d-7fd082b1dcbb",
+            "isActive": true
+          }
+        },
+        {
+          "step": "confirmed soft delete and reactivation; fixture report retained",
+          "state": {
+            "name": "Бригада QA 7503b72e-40a9-47c6-9dea-a4272754e5f0 изменена",
+            "operatorId": "cmvrnveqp0004s8w58a5iw69q",
+            "equipmentId": "9f127573-0386-4f0d-99cd-b749829d5a70",
+            "siteId": "a42bdbcf-643c-4711-882d-7fd082b1dcbb",
+            "isActive": true
+          },
+          "audit": [
+            {
+              "action": "crew.created",
+              "actorId": "cmvrnvelt0002s8w5biht3b6s",
+              "metadata": {
+                "name": "Бригада QA 7503b72e-40a9-47c6-9dea-a4272754e5f0",
+                "siteId": "cmvrnvf0t000as8w5152nuykd",
+                "isActive": true,
+                "assistants": [
+                  "Бригада QA 7503b72e-40a9-47c6-9dea-a4272754e5f0 помощник"
+                ],
+                "operatorId": "cmvrnveqp0004s8w58a5iw69q",
+                "equipmentId": "bafdd27a-adb1-4637-ac37-1cebfe145bf6"
+              }
+            },
+            {
+              "action": "crew.updated",
+              "actorId": "cmvrnvelt0002s8w5biht3b6s",
+              "metadata": {
+                "after": {
+                  "name": "Бригада QA 7503b72e-40a9-47c6-9dea-a4272754e5f0 изменена",
+                  "siteId": "a42bdbcf-643c-4711-882d-7fd082b1dcbb",
+                  "isActive": true,
+                  "assistants": [],
+                  "operatorId": "cmvrnveqp0004s8w58a5iw69q",
+                  "equipmentId": "9f127573-0386-4f0d-99cd-b749829d5a70"
+                },
+                "before": {
+                  "name": "Бригада QA 7503b72e-40a9-47c6-9dea-a4272754e5f0",
+                  "siteId": "cmvrnvf0t000as8w5152nuykd",
+                  "isActive": true,
+                  "assistants": [
+                    "Бригада QA 7503b72e-40a9-47c6-9dea-a4272754e5f0 помощник"
+                  ],
+                  "operatorId": "cmvrnveqp0004s8w58a5iw69q",
+                  "equipmentId": "bafdd27a-adb1-4637-ac37-1cebfe145bf6"
+                }
+              }
+            },
+            {
+              "action": "crew.deleted",
+              "actorId": "cmvrnvelt0002s8w5biht3b6s",
+              "metadata": {
+                "name": "Бригада QA 7503b72e-40a9-47c6-9dea-a4272754e5f0 изменена",
+                "siteId": "a42bdbcf-643c-4711-882d-7fd082b1dcbb",
+                "isActive": true,
+                "assistants": [],
+                "operatorId": "cmvrnveqp0004s8w58a5iw69q",
+                "deactivated": true,
+                "equipmentId": "9f127573-0386-4f0d-99cd-b749829d5a70"
+              }
+            },
+            {
+              "action": "crew.updated",
+              "actorId": "cmvrnvelt0002s8w5biht3b6s",
+              "metadata": {
+                "after": {
+                  "name": "Бригада QA 7503b72e-40a9-47c6-9dea-a4272754e5f0 изменена",
+                  "siteId": "a42bdbcf-643c-4711-882d-7fd082b1dcbb",
+                  "isActive": true,
+                  "assistants": [],
+                  "operatorId": "cmvrnveqp0004s8w58a5iw69q",
+                  "equipmentId": "9f127573-0386-4f0d-99cd-b749829d5a70"
+                },
+                "before": {
+                  "name": "Бригада QA 7503b72e-40a9-47c6-9dea-a4272754e5f0 изменена",
+                  "siteId": "a42bdbcf-643c-4711-882d-7fd082b1dcbb",
+                  "isActive": false,
+                  "assistants": [],
+                  "operatorId": "cmvrnveqp0004s8w58a5iw69q",
+                  "equipmentId": "9f127573-0386-4f0d-99cd-b749829d5a70"
+                }
+              }
+            }
+          ],
+          "outbox": [
+            {
+              "type": "CrewCreated",
+              "published": true,
+              "projected": true
+            },
+            {
+              "type": "CrewOperatorAssigned",
+              "published": true,
+              "projected": true
+            },
+            {
+              "type": "CrewEquipmentAssigned",
+              "published": true,
+              "projected": true
+            },
+            {
+              "type": "CrewAssigned",
+              "published": true,
+              "projected": true
+            },
+            {
+              "type": "CrewUpdated",
+              "published": true,
+              "projected": true
+            },
+            {
+              "type": "CrewDeactivated",
+              "published": false,
+              "projected": true
+            },
+            {
+              "type": "CrewReactivated",
+              "published": false,
+              "projected": false
+            }
+          ],
+          "retainedReport": [
+            {
+              "id": "04de4f9a-a392-4df4-9d54-b534fa5b1172",
+              "userId": "cmvrnveqp0004s8w58a5iw69q",
+              "equipmentId": "bafdd27a-adb1-4637-ac37-1cebfe145bf6",
+              "siteId": "cmvrnvf0t000as8w5152nuykd",
+              "status": "draft"
+            }
+          ]
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "Mobile Safari",
+      "status": "passed",
+      "observations": [
+        {
+          "step": "create and edit through UI",
+          "crewId": "e3179319-5c35-468b-be2f-a464cf9cc2e1",
+          "state": {
+            "name": "Бригада QA 9902bb96-63a7-431d-8389-7a39f15bb30c изменена",
+            "operatorId": "cmvrnw1wm0004t8w5mueycr1j",
+            "equipmentId": "3a88d953-0d4c-4102-b602-001e577fc33b",
+            "siteId": "3ac34dbd-25e7-45cb-9777-306d50485bb7",
+            "isActive": true
+          },
+          "roster": []
+        },
+        {
+          "step": "mechanic reads; UI and valid direct mutations denied",
+          "state": {
+            "name": "Бригада QA 9902bb96-63a7-431d-8389-7a39f15bb30c изменена",
+            "operatorId": "cmvrnw1wm0004t8w5mueycr1j",
+            "equipmentId": "3a88d953-0d4c-4102-b602-001e577fc33b",
+            "siteId": "3ac34dbd-25e7-45cb-9777-306d50485bb7",
+            "isActive": true
+          }
+        },
+        {
+          "step": "confirmed soft delete and reactivation; fixture report retained",
+          "state": {
+            "name": "Бригада QA 9902bb96-63a7-431d-8389-7a39f15bb30c изменена",
+            "operatorId": "cmvrnw1wm0004t8w5mueycr1j",
+            "equipmentId": "3a88d953-0d4c-4102-b602-001e577fc33b",
+            "siteId": "3ac34dbd-25e7-45cb-9777-306d50485bb7",
+            "isActive": true
+          },
+          "audit": [
+            {
+              "action": "crew.created",
+              "actorId": "cmvrnw1rr0002t8w5w8e8ojnc",
+              "metadata": {
+                "name": "Бригада QA 9902bb96-63a7-431d-8389-7a39f15bb30c",
+                "siteId": "cmvrnw28a000at8w5exkrnues",
+                "isActive": true,
+                "assistants": [
+                  "Бригада QA 9902bb96-63a7-431d-8389-7a39f15bb30c помощник"
+                ],
+                "operatorId": "cmvrnw1wm0004t8w5mueycr1j",
+                "equipmentId": "b10abafc-85a7-4121-993f-3ffc975ecd90"
+              }
+            },
+            {
+              "action": "crew.updated",
+              "actorId": "cmvrnw1rr0002t8w5w8e8ojnc",
+              "metadata": {
+                "after": {
+                  "name": "Бригада QA 9902bb96-63a7-431d-8389-7a39f15bb30c изменена",
+                  "siteId": "3ac34dbd-25e7-45cb-9777-306d50485bb7",
+                  "isActive": true,
+                  "assistants": [],
+                  "operatorId": "cmvrnw1wm0004t8w5mueycr1j",
+                  "equipmentId": "3a88d953-0d4c-4102-b602-001e577fc33b"
+                },
+                "before": {
+                  "name": "Бригада QA 9902bb96-63a7-431d-8389-7a39f15bb30c",
+                  "siteId": "cmvrnw28a000at8w5exkrnues",
+                  "isActive": true,
+                  "assistants": [
+                    "Бригада QA 9902bb96-63a7-431d-8389-7a39f15bb30c помощник"
+                  ],
+                  "operatorId": "cmvrnw1wm0004t8w5mueycr1j",
+                  "equipmentId": "b10abafc-85a7-4121-993f-3ffc975ecd90"
+                }
+              }
+            },
+            {
+              "action": "crew.deleted",
+              "actorId": "cmvrnw1rr0002t8w5w8e8ojnc",
+              "metadata": {
+                "name": "Бригада QA 9902bb96-63a7-431d-8389-7a39f15bb30c изменена",
+                "siteId": "3ac34dbd-25e7-45cb-9777-306d50485bb7",
+                "isActive": true,
+                "assistants": [],
+                "operatorId": "cmvrnw1wm0004t8w5mueycr1j",
+                "deactivated": true,
+                "equipmentId": "3a88d953-0d4c-4102-b602-001e577fc33b"
+              }
+            },
+            {
+              "action": "crew.updated",
+              "actorId": "cmvrnw1rr0002t8w5w8e8ojnc",
+              "metadata": {
+                "after": {
+                  "name": "Бригада QA 9902bb96-63a7-431d-8389-7a39f15bb30c изменена",
+                  "siteId": "3ac34dbd-25e7-45cb-9777-306d50485bb7",
+                  "isActive": true,
+                  "assistants": [],
+                  "operatorId": "cmvrnw1wm0004t8w5mueycr1j",
+                  "equipmentId": "3a88d953-0d4c-4102-b602-001e577fc33b"
+                },
+                "before": {
+                  "name": "Бригада QA 9902bb96-63a7-431d-8389-7a39f15bb30c изменена",
+                  "siteId": "3ac34dbd-25e7-45cb-9777-306d50485bb7",
+                  "isActive": false,
+                  "assistants": [],
+                  "operatorId": "cmvrnw1wm0004t8w5mueycr1j",
+                  "equipmentId": "3a88d953-0d4c-4102-b602-001e577fc33b"
+                }
+              }
+            }
+          ],
+          "outbox": [
+            {
+              "type": "CrewCreated",
+              "published": true,
+              "projected": true
+            },
+            {
+              "type": "CrewOperatorAssigned",
+              "published": true,
+              "projected": true
+            },
+            {
+              "type": "CrewEquipmentAssigned",
+              "published": true,
+              "projected": true
+            },
+            {
+              "type": "CrewAssigned",
+              "published": true,
+              "projected": true
+            },
+            {
+              "type": "CrewUpdated",
+              "published": true,
+              "projected": true
+            },
+            {
+              "type": "CrewDeactivated",
+              "published": true,
+              "projected": true
+            },
+            {
+              "type": "CrewReactivated",
+              "published": false,
+              "projected": false
+            }
+          ],
+          "retainedReport": [
+            {
+              "id": "d2eba367-25e0-4ae0-b7c6-66b7f9e4e6ef",
+              "userId": "cmvrnw1wm0004t8w5mueycr1j",
+              "equipmentId": "b10abafc-85a7-4121-993f-3ffc975ecd90",
+              "siteId": "cmvrnw28a000at8w5exkrnues",
+              "status": "draft"
+            }
+          ]
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "Mobile Chrome",
+      "status": "passed",
+      "observations": [
+        {
+          "step": "create and edit through UI",
+          "crewId": "003859ce-41e3-429d-895d-c247e36e8149",
+          "state": {
+            "name": "Бригада QA e4933340-bc75-4ac4-a39e-06812e4b5d82 изменена",
+            "operatorId": "cmvrnzvnm000470w5eujbwn9c",
+            "equipmentId": "0074e70f-ec60-4624-acfe-2e96c5514125",
+            "siteId": "800e8792-345d-47e5-8d37-5c844d2c13fe",
+            "isActive": true
+          },
+          "roster": []
+        },
+        {
+          "step": "mechanic reads; UI and valid direct mutations denied",
+          "state": {
+            "name": "Бригада QA e4933340-bc75-4ac4-a39e-06812e4b5d82 изменена",
+            "operatorId": "cmvrnzvnm000470w5eujbwn9c",
+            "equipmentId": "0074e70f-ec60-4624-acfe-2e96c5514125",
+            "siteId": "800e8792-345d-47e5-8d37-5c844d2c13fe",
+            "isActive": true
+          }
+        },
+        {
+          "step": "confirmed soft delete and reactivation; fixture report retained",
+          "state": {
+            "name": "Бригада QA e4933340-bc75-4ac4-a39e-06812e4b5d82 изменена",
+            "operatorId": "cmvrnzvnm000470w5eujbwn9c",
+            "equipmentId": "0074e70f-ec60-4624-acfe-2e96c5514125",
+            "siteId": "800e8792-345d-47e5-8d37-5c844d2c13fe",
+            "isActive": true
+          },
+          "audit": [
+            {
+              "action": "crew.created",
+              "actorId": "cmvrnzvid000270w5i5a72ct6",
+              "metadata": {
+                "name": "Бригада QA e4933340-bc75-4ac4-a39e-06812e4b5d82",
+                "siteId": "cmvrnzvxt000a70w5deykus61",
+                "isActive": true,
+                "assistants": [
+                  "Бригада QA e4933340-bc75-4ac4-a39e-06812e4b5d82 помощник"
+                ],
+                "operatorId": "cmvrnzvnm000470w5eujbwn9c",
+                "equipmentId": "3889a272-f5c3-4adb-8216-d3974636d935"
+              }
+            },
+            {
+              "action": "crew.updated",
+              "actorId": "cmvrnzvid000270w5i5a72ct6",
+              "metadata": {
+                "after": {
+                  "name": "Бригада QA e4933340-bc75-4ac4-a39e-06812e4b5d82 изменена",
+                  "siteId": "800e8792-345d-47e5-8d37-5c844d2c13fe",
+                  "isActive": true,
+                  "assistants": [],
+                  "operatorId": "cmvrnzvnm000470w5eujbwn9c",
+                  "equipmentId": "0074e70f-ec60-4624-acfe-2e96c5514125"
+                },
+                "before": {
+                  "name": "Бригада QA e4933340-bc75-4ac4-a39e-06812e4b5d82",
+                  "siteId": "cmvrnzvxt000a70w5deykus61",
+                  "isActive": true,
+                  "assistants": [
+                    "Бригада QA e4933340-bc75-4ac4-a39e-06812e4b5d82 помощник"
+                  ],
+                  "operatorId": "cmvrnzvnm000470w5eujbwn9c",
+                  "equipmentId": "3889a272-f5c3-4adb-8216-d3974636d935"
+                }
+              }
+            },
+            {
+              "action": "crew.deleted",
+              "actorId": "cmvrnzvid000270w5i5a72ct6",
+              "metadata": {
+                "name": "Бригада QA e4933340-bc75-4ac4-a39e-06812e4b5d82 изменена",
+                "siteId": "800e8792-345d-47e5-8d37-5c844d2c13fe",
+                "isActive": true,
+                "assistants": [],
+                "operatorId": "cmvrnzvnm000470w5eujbwn9c",
+                "deactivated": true,
+                "equipmentId": "0074e70f-ec60-4624-acfe-2e96c5514125"
+              }
+            },
+            {
+              "action": "crew.updated",
+              "actorId": "cmvrnzvid000270w5i5a72ct6",
+              "metadata": {
+                "after": {
+                  "name": "Бригада QA e4933340-bc75-4ac4-a39e-06812e4b5d82 изменена",
+                  "siteId": "800e8792-345d-47e5-8d37-5c844d2c13fe",
+                  "isActive": true,
+                  "assistants": [],
+                  "operatorId": "cmvrnzvnm000470w5eujbwn9c",
+                  "equipmentId": "0074e70f-ec60-4624-acfe-2e96c5514125"
+                },
+                "before": {
+                  "name": "Бригада QA e4933340-bc75-4ac4-a39e-06812e4b5d82 изменена",
+                  "siteId": "800e8792-345d-47e5-8d37-5c844d2c13fe",
+                  "isActive": false,
+                  "assistants": [],
+                  "operatorId": "cmvrnzvnm000470w5eujbwn9c",
+                  "equipmentId": "0074e70f-ec60-4624-acfe-2e96c5514125"
+                }
+              }
+            }
+          ],
+          "outbox": [
+            {
+              "type": "CrewCreated",
+              "published": true,
+              "projected": true
+            },
+            {
+              "type": "CrewOperatorAssigned",
+              "published": true,
+              "projected": true
+            },
+            {
+              "type": "CrewEquipmentAssigned",
+              "published": true,
+              "projected": true
+            },
+            {
+              "type": "CrewAssigned",
+              "published": true,
+              "projected": true
+            },
+            {
+              "type": "CrewUpdated",
+              "published": true,
+              "projected": true
+            },
+            {
+              "type": "CrewDeactivated",
+              "published": false,
+              "projected": true
+            },
+            {
+              "type": "CrewReactivated",
+              "published": false,
+              "projected": false
+            }
+          ],
+          "retainedReport": [
+            {
+              "id": "3a04887f-b576-48cc-87db-d1df33465a45",
+              "userId": "cmvrnzvnm000470w5eujbwn9c",
+              "equipmentId": "3889a272-f5c3-4adb-8216-d3974636d935",
+              "siteId": "cmvrnzvxt000a70w5deykus61",
+              "status": "draft"
+            }
+          ]
+        }
+      ],
+      "errors": []
+    }
+  ],
+  "gitLineEndingNormalization": {
+    "file": "e2e/release-critical-path.spec.ts",
+    "runtimeFileSha256": "ac31c348ec2ba07e0ddc27b817db8400fcaa8044d4886b84a762f19614f10470",
+    "gitBlobSha256": "98098fad25e52b1331ad692dec560b24cfd0d3654cf3aab2142498b6e42cd81e",
+    "onlyCRLFNormalization": true,
+    "originalTestPrefixUnchangedInBoth": true
+  }
+}

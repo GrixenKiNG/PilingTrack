@@ -5,6 +5,7 @@ import { assertCan } from '@/services/auth/authorization-service';
 import { canDecreaseMeter, createEquipment, getEquipmentByIdOrThrow, listAllEquipment, updateEquipmentMetadata } from '@/modules/equipment';
 import { createEquipmentSchema } from '@/lib/validation-schemas';
 import { withApi, withMutation, readJsonBody } from '@/core/api-wrapper';
+import { getResponseCache } from '@/core/cache';
 import { parseCursorPagination } from '@/lib/pagination-cursor';
 import { recordAuditEvent } from '@/modules/audit';
 
@@ -96,6 +97,7 @@ export const POST = withMutation(
         : undefined,
     });
 
+    getResponseCache('monitoring').invalidate('GET:/api/monitoring/fleet');
     return NextResponse.json({ equipment: saved }, { status: 201 });
   },
   { domain: 'equipment' }

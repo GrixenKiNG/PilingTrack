@@ -1,0 +1,671 @@
+{
+  "sourceBuildSha": "00ac751ffa4c22cb2117a189474ce7bcc73410cc",
+  "worktreeSha": "00ac751ffa4c22cb2117a189474ce7bcc73410cc",
+  "scenarioHash": "85941e8b4f111cc3849ad24d31336c35d560d92da5788a670fb4472d10ea3207",
+  "stats": {
+    "startTime": "2026-10-28T18:53:43.300Z",
+    "duration": 245603.805,
+    "expected": 6,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  },
+  "run": {
+    "exit": 0,
+    "seconds": 279,
+    "cleanup": true,
+    "cleanupErrors": []
+  },
+  "build": {
+    "command": "npm run build",
+    "sourceSha": "00ac751ffa4c22cb2117a189474ce7bcc73410cc",
+    "exit": 0,
+    "seconds": 168
+  },
+  "gates": {
+    "sourceSha": "00ac751ffa4c22cb2117a189474ce7bcc73410cc",
+    "worktreeSha": "00ac751ffa4c22cb2117a189474ce7bcc73410cc",
+    "complete": true,
+    "results": [
+      {
+        "id": "users-final-tsc",
+        "exe": "C:/Program Files/Git/bin/bash.exe",
+        "args": [
+          "-c",
+          "npx tsc --noEmit"
+        ],
+        "exit": 0,
+        "seconds": 22
+      },
+      {
+        "id": "users-final-lint",
+        "exe": "C:/Program Files/Git/bin/bash.exe",
+        "args": [
+          "-c",
+          "npm run lint"
+        ],
+        "exit": 0,
+        "seconds": 79
+      },
+      {
+        "id": "users-final-unit-wrapper",
+        "exe": "C:\\Program Files\\nodejs\\node.exe",
+        "args": [
+          "D:/PillingR/night-logs/night-evidence-1026/unit-users-run-stand.cjs"
+        ],
+        "exit": 0,
+        "seconds": 966
+      },
+      {
+        "id": "users-final-pw-list-wrapper",
+        "exe": "C:\\Program Files\\nodejs\\node.exe",
+        "args": [
+          "D:/PillingR/night-logs/night-evidence-1026/qa-fresh-stand.cjs",
+          "--list-default"
+        ],
+        "exit": 0,
+        "seconds": 41
+      }
+    ]
+  },
+  "validated": {
+    "wholeRun": "full-unit-users-final",
+    "sourceSha": "00ac751ffa4c22cb2117a189474ce7bcc73410cc",
+    "unitExit": 0,
+    "gatesComplete": true,
+    "passed": 5776,
+    "failed": 0,
+    "skipped": 0,
+    "files": 512,
+    "historicalTotal": 241,
+    "historicalMatched": 241,
+    "historicalPassed": 241,
+    "historicalNotPassed": [],
+    "failedTests": []
+  },
+  "collection": {
+    "currentTests": 399,
+    "currentFiles": 30,
+    "baseTests": 318,
+    "baseFiles": 28
+  },
+  "cases": [
+    {
+      "title": "users and document lifecycle: UI writes, admission, session revocation and audit",
+      "project": "chromium",
+      "status": "passed",
+      "milliseconds": 26301,
+      "evidence": {
+        "observations": [
+          {
+            "step": "read-after-create: cache and authoritative response",
+            "user": {
+              "id": "cmvsh3jq20002sgw5jplozqe7",
+              "tenantId": "cmvsh3g48000018w54l7165yy",
+              "name": "Пользователь QA 27b7c160-a918-4842-a718-055c2644709f",
+              "email": "27b7c160-a918-4842-a718-055c2644709f@users-night.test",
+              "phone": "+79990001122",
+              "role": "OPERATOR",
+              "isActive": true
+            },
+            "cachedCount": 8,
+            "freshCount": 8,
+            "cachedHasCreatedUser": true,
+            "freshHasCreatedUser": true
+          },
+          {
+            "step": "user created and edited; document MISSING to EXPIRED to VALID",
+            "user": {
+              "id": "cmvsh3jq20002sgw5jplozqe7",
+              "tenantId": "cmvsh3g48000018w54l7165yy",
+              "name": "Пользователь QA 27b7c160-a918-4842-a718-055c2644709f изменён",
+              "email": "27b7c160-a918-4842-a718-055c2644709f@users-night.test",
+              "phone": "+79990002233",
+              "role": "OPERATOR",
+              "isActive": true
+            },
+            "document": {
+              "id": "cmvsh3nuk0006sgw5im9rxfl9",
+              "userId": "cmvsh3jq20002sgw5jplozqe7",
+              "tenantId": "cmvsh3g48000018w54l7165yy",
+              "typeId": "e1a7b68f-86b4-4a05-81cf-af07025c99f5",
+              "number": "QA-27b7c160-a918-4842-a718-055c2644709f",
+              "expiresAt": "2027-01-26T00:00:00.000Z"
+            }
+          },
+          {
+            "step": "safety reads; another operator cannot read or mutate this document",
+            "document": {
+              "id": "cmvsh3nuk0006sgw5im9rxfl9",
+              "userId": "cmvsh3jq20002sgw5jplozqe7",
+              "tenantId": "cmvsh3g48000018w54l7165yy",
+              "typeId": "e1a7b68f-86b4-4a05-81cf-af07025c99f5",
+              "number": "QA-27b7c160-a918-4842-a718-055c2644709f",
+              "expiresAt": "2027-01-26T00:00:00.000Z"
+            }
+          },
+          {
+            "step": "document deleted; block revokes old session; unblock and login; confirmed user deletion",
+            "userId": "cmvsh3jq20002sgw5jplozqe7",
+            "documentId": "cmvsh3nuk0006sgw5im9rxfl9",
+            "audit": [
+              {
+                "action": "user.created",
+                "actorId": "cmvsh3g9i000218w58p0vnjnk",
+                "metadata": {
+                  "role": "OPERATOR",
+                  "email": "27b7c160-a918-4842-a718-055c2644709f@users-night.test",
+                  "isActive": true
+                }
+              },
+              {
+                "action": "user.updated",
+                "actorId": "cmvsh3g9i000218w58p0vnjnk",
+                "metadata": {
+                  "after": {
+                    "id": "cmvsh3jq20002sgw5jplozqe7",
+                    "name": "Пользователь QA 27b7c160-a918-4842-a718-055c2644709f изменён",
+                    "role": "OPERATOR",
+                    "email": "27b7c160-a918-4842-a718-055c2644709f@users-night.test",
+                    "phone": "+79990002233",
+                    "isActive": true
+                  },
+                  "before": {
+                    "id": "cmvsh3jq20002sgw5jplozqe7",
+                    "name": "Пользователь QA 27b7c160-a918-4842-a718-055c2644709f",
+                    "role": "OPERATOR",
+                    "email": "27b7c160-a918-4842-a718-055c2644709f@users-night.test",
+                    "phone": "+79990001122",
+                    "isActive": true
+                  }
+                }
+              },
+              {
+                "action": "user.document.created",
+                "actorId": "cmvsh3g9i000218w58p0vnjnk",
+                "metadata": {
+                  "typeId": "e1a7b68f-86b4-4a05-81cf-af07025c99f5",
+                  "expiresAt": "2026-10-27T00:00:00.000Z",
+                  "documentId": "cmvsh3nuk0006sgw5im9rxfl9",
+                  "selfService": false
+                }
+              },
+              {
+                "action": "user.document.updated",
+                "actorId": "cmvsh3g9i000218w58p0vnjnk",
+                "metadata": {
+                  "before": {
+                    "typeId": "e1a7b68f-86b4-4a05-81cf-af07025c99f5",
+                    "expiresAt": "2026-10-27T00:00:00.000Z"
+                  },
+                  "typeId": "e1a7b68f-86b4-4a05-81cf-af07025c99f5",
+                  "expiresAt": "2027-01-26T00:00:00.000Z",
+                  "documentId": "cmvsh3nuk0006sgw5im9rxfl9",
+                  "selfService": false
+                }
+              },
+              {
+                "action": "user.document.deleted",
+                "actorId": "cmvsh3g9i000218w58p0vnjnk",
+                "metadata": {
+                  "typeId": "e1a7b68f-86b4-4a05-81cf-af07025c99f5",
+                  "expiresAt": "2027-01-26T00:00:00.000Z",
+                  "documentId": "cmvsh3nuk0006sgw5im9rxfl9",
+                  "selfService": false
+                }
+              },
+              {
+                "action": "user.updated",
+                "actorId": "cmvsh3g9i000218w58p0vnjnk",
+                "metadata": {
+                  "after": {
+                    "id": "cmvsh3jq20002sgw5jplozqe7",
+                    "name": "Пользователь QA 27b7c160-a918-4842-a718-055c2644709f изменён",
+                    "role": "OPERATOR",
+                    "email": "27b7c160-a918-4842-a718-055c2644709f@users-night.test",
+                    "phone": "+79990002233",
+                    "isActive": false
+                  },
+                  "before": {
+                    "id": "cmvsh3jq20002sgw5jplozqe7",
+                    "name": "Пользователь QA 27b7c160-a918-4842-a718-055c2644709f изменён",
+                    "role": "OPERATOR",
+                    "email": "27b7c160-a918-4842-a718-055c2644709f@users-night.test",
+                    "phone": "+79990002233",
+                    "isActive": true
+                  }
+                }
+              },
+              {
+                "action": "user.updated",
+                "actorId": "cmvsh3g9i000218w58p0vnjnk",
+                "metadata": {
+                  "after": {
+                    "id": "cmvsh3jq20002sgw5jplozqe7",
+                    "name": "Пользователь QA 27b7c160-a918-4842-a718-055c2644709f изменён",
+                    "role": "OPERATOR",
+                    "email": "27b7c160-a918-4842-a718-055c2644709f@users-night.test",
+                    "phone": "+79990002233",
+                    "isActive": true
+                  },
+                  "before": {
+                    "id": "cmvsh3jq20002sgw5jplozqe7",
+                    "name": "Пользователь QA 27b7c160-a918-4842-a718-055c2644709f изменён",
+                    "role": "OPERATOR",
+                    "email": "27b7c160-a918-4842-a718-055c2644709f@users-night.test",
+                    "phone": "+79990002233",
+                    "isActive": false
+                  }
+                }
+              },
+              {
+                "action": "user.deleted",
+                "actorId": "cmvsh3g9i000218w58p0vnjnk",
+                "metadata": {
+                  "role": "OPERATOR",
+                  "email": "27b7c160-a918-4842-a718-055c2644709f@users-night.test"
+                }
+              }
+            ]
+          }
+        ],
+        "errors": []
+      }
+    },
+    {
+      "title": "users and document lifecycle: UI writes, admission, session revocation and audit",
+      "project": "Mobile Safari",
+      "status": "passed",
+      "milliseconds": 153741,
+      "evidence": {
+        "observations": [
+          {
+            "step": "read-after-create: cache and authoritative response",
+            "user": {
+              "id": "cmvsh4ueo000msgw5k16nvcd3",
+              "tenantId": "cmvsh47u300004cw5c9sqsfos",
+              "name": "Пользователь QA 6fae266e-0c13-4c1a-95c2-82177bf58119",
+              "email": "6fae266e-0c13-4c1a-95c2-82177bf58119@users-night.test",
+              "phone": "+79990001122",
+              "role": "OPERATOR",
+              "isActive": true
+            },
+            "cachedCount": 8,
+            "freshCount": 8,
+            "cachedHasCreatedUser": true,
+            "freshHasCreatedUser": true
+          },
+          {
+            "step": "user created and edited; document MISSING to EXPIRED to VALID",
+            "user": {
+              "id": "cmvsh4ueo000msgw5k16nvcd3",
+              "tenantId": "cmvsh47u300004cw5c9sqsfos",
+              "name": "Пользователь QA 6fae266e-0c13-4c1a-95c2-82177bf58119 изменён",
+              "email": "6fae266e-0c13-4c1a-95c2-82177bf58119@users-night.test",
+              "phone": "+79990002233",
+              "role": "OPERATOR",
+              "isActive": true
+            },
+            "document": {
+              "id": "cmvsh5iw6000qsgw5vybin1tj",
+              "userId": "cmvsh4ueo000msgw5k16nvcd3",
+              "tenantId": "cmvsh47u300004cw5c9sqsfos",
+              "typeId": "7db53ac6-9071-4344-990f-fbb43675e9fa",
+              "number": "QA-6fae266e-0c13-4c1a-95c2-82177bf58119",
+              "expiresAt": "2027-01-26T00:00:00.000Z"
+            }
+          },
+          {
+            "step": "safety reads; another operator cannot read or mutate this document",
+            "document": {
+              "id": "cmvsh5iw6000qsgw5vybin1tj",
+              "userId": "cmvsh4ueo000msgw5k16nvcd3",
+              "tenantId": "cmvsh47u300004cw5c9sqsfos",
+              "typeId": "7db53ac6-9071-4344-990f-fbb43675e9fa",
+              "number": "QA-6fae266e-0c13-4c1a-95c2-82177bf58119",
+              "expiresAt": "2027-01-26T00:00:00.000Z"
+            }
+          },
+          {
+            "step": "document deleted; block revokes old session; unblock and login; confirmed user deletion",
+            "userId": "cmvsh4ueo000msgw5k16nvcd3",
+            "documentId": "cmvsh5iw6000qsgw5vybin1tj",
+            "audit": [
+              {
+                "action": "user.created",
+                "actorId": "cmvsh480m00024cw56iszwiya",
+                "metadata": {
+                  "role": "OPERATOR",
+                  "email": "6fae266e-0c13-4c1a-95c2-82177bf58119@users-night.test",
+                  "isActive": true
+                }
+              },
+              {
+                "action": "user.updated",
+                "actorId": "cmvsh480m00024cw56iszwiya",
+                "metadata": {
+                  "after": {
+                    "id": "cmvsh4ueo000msgw5k16nvcd3",
+                    "name": "Пользователь QA 6fae266e-0c13-4c1a-95c2-82177bf58119 изменён",
+                    "role": "OPERATOR",
+                    "email": "6fae266e-0c13-4c1a-95c2-82177bf58119@users-night.test",
+                    "phone": "+79990002233",
+                    "isActive": true
+                  },
+                  "before": {
+                    "id": "cmvsh4ueo000msgw5k16nvcd3",
+                    "name": "Пользователь QA 6fae266e-0c13-4c1a-95c2-82177bf58119",
+                    "role": "OPERATOR",
+                    "email": "6fae266e-0c13-4c1a-95c2-82177bf58119@users-night.test",
+                    "phone": "+79990001122",
+                    "isActive": true
+                  }
+                }
+              },
+              {
+                "action": "user.document.created",
+                "actorId": "cmvsh480m00024cw56iszwiya",
+                "metadata": {
+                  "typeId": "7db53ac6-9071-4344-990f-fbb43675e9fa",
+                  "expiresAt": "2026-10-27T00:00:00.000Z",
+                  "documentId": "cmvsh5iw6000qsgw5vybin1tj",
+                  "selfService": false
+                }
+              },
+              {
+                "action": "user.document.updated",
+                "actorId": "cmvsh480m00024cw56iszwiya",
+                "metadata": {
+                  "before": {
+                    "typeId": "7db53ac6-9071-4344-990f-fbb43675e9fa",
+                    "expiresAt": "2026-10-27T00:00:00.000Z"
+                  },
+                  "typeId": "7db53ac6-9071-4344-990f-fbb43675e9fa",
+                  "expiresAt": "2027-01-26T00:00:00.000Z",
+                  "documentId": "cmvsh5iw6000qsgw5vybin1tj",
+                  "selfService": false
+                }
+              },
+              {
+                "action": "user.document.deleted",
+                "actorId": "cmvsh480m00024cw56iszwiya",
+                "metadata": {
+                  "typeId": "7db53ac6-9071-4344-990f-fbb43675e9fa",
+                  "expiresAt": "2027-01-26T00:00:00.000Z",
+                  "documentId": "cmvsh5iw6000qsgw5vybin1tj",
+                  "selfService": false
+                }
+              },
+              {
+                "action": "user.updated",
+                "actorId": "cmvsh480m00024cw56iszwiya",
+                "metadata": {
+                  "after": {
+                    "id": "cmvsh4ueo000msgw5k16nvcd3",
+                    "name": "Пользователь QA 6fae266e-0c13-4c1a-95c2-82177bf58119 изменён",
+                    "role": "OPERATOR",
+                    "email": "6fae266e-0c13-4c1a-95c2-82177bf58119@users-night.test",
+                    "phone": "+79990002233",
+                    "isActive": false
+                  },
+                  "before": {
+                    "id": "cmvsh4ueo000msgw5k16nvcd3",
+                    "name": "Пользователь QA 6fae266e-0c13-4c1a-95c2-82177bf58119 изменён",
+                    "role": "OPERATOR",
+                    "email": "6fae266e-0c13-4c1a-95c2-82177bf58119@users-night.test",
+                    "phone": "+79990002233",
+                    "isActive": true
+                  }
+                }
+              },
+              {
+                "action": "user.updated",
+                "actorId": "cmvsh480m00024cw56iszwiya",
+                "metadata": {
+                  "after": {
+                    "id": "cmvsh4ueo000msgw5k16nvcd3",
+                    "name": "Пользователь QA 6fae266e-0c13-4c1a-95c2-82177bf58119 изменён",
+                    "role": "OPERATOR",
+                    "email": "6fae266e-0c13-4c1a-95c2-82177bf58119@users-night.test",
+                    "phone": "+79990002233",
+                    "isActive": true
+                  },
+                  "before": {
+                    "id": "cmvsh4ueo000msgw5k16nvcd3",
+                    "name": "Пользователь QA 6fae266e-0c13-4c1a-95c2-82177bf58119 изменён",
+                    "role": "OPERATOR",
+                    "email": "6fae266e-0c13-4c1a-95c2-82177bf58119@users-night.test",
+                    "phone": "+79990002233",
+                    "isActive": false
+                  }
+                }
+              },
+              {
+                "action": "user.deleted",
+                "actorId": "cmvsh480m00024cw56iszwiya",
+                "metadata": {
+                  "role": "OPERATOR",
+                  "email": "6fae266e-0c13-4c1a-95c2-82177bf58119@users-night.test"
+                }
+              }
+            ]
+          }
+        ],
+        "errors": []
+      }
+    },
+    {
+      "title": "users and document lifecycle: UI writes, admission, session revocation and audit",
+      "project": "Mobile Chrome",
+      "status": "passed",
+      "milliseconds": 45700,
+      "evidence": {
+        "observations": [
+          {
+            "step": "read-after-create: cache and authoritative response",
+            "user": {
+              "id": "cmvsh7oxq0016sgw5mxoqmg76",
+              "tenantId": "cmvsh7ljz00005gw5zv5ogzci",
+              "name": "Пользователь QA aadf6831-1fd5-44b6-b74a-ff49c830cec7",
+              "email": "aadf6831-1fd5-44b6-b74a-ff49c830cec7@users-night.test",
+              "phone": "+79990001122",
+              "role": "OPERATOR",
+              "isActive": true
+            },
+            "cachedCount": 8,
+            "freshCount": 8,
+            "cachedHasCreatedUser": true,
+            "freshHasCreatedUser": true
+          },
+          {
+            "step": "user created and edited; document MISSING to EXPIRED to VALID",
+            "user": {
+              "id": "cmvsh7oxq0016sgw5mxoqmg76",
+              "tenantId": "cmvsh7ljz00005gw5zv5ogzci",
+              "name": "Пользователь QA aadf6831-1fd5-44b6-b74a-ff49c830cec7 изменён",
+              "email": "aadf6831-1fd5-44b6-b74a-ff49c830cec7@users-night.test",
+              "phone": "+79990002233",
+              "role": "OPERATOR",
+              "isActive": true
+            },
+            "document": {
+              "id": "cmvsh7t3s001asgw5ecb8s831",
+              "userId": "cmvsh7oxq0016sgw5mxoqmg76",
+              "tenantId": "cmvsh7ljz00005gw5zv5ogzci",
+              "typeId": "1d465e3b-3019-4129-987a-81b9516ecd27",
+              "number": "QA-aadf6831-1fd5-44b6-b74a-ff49c830cec7",
+              "expiresAt": "2027-01-26T00:00:00.000Z"
+            }
+          },
+          {
+            "step": "safety reads; another operator cannot read or mutate this document",
+            "document": {
+              "id": "cmvsh7t3s001asgw5ecb8s831",
+              "userId": "cmvsh7oxq0016sgw5mxoqmg76",
+              "tenantId": "cmvsh7ljz00005gw5zv5ogzci",
+              "typeId": "1d465e3b-3019-4129-987a-81b9516ecd27",
+              "number": "QA-aadf6831-1fd5-44b6-b74a-ff49c830cec7",
+              "expiresAt": "2027-01-26T00:00:00.000Z"
+            }
+          },
+          {
+            "step": "document deleted; block revokes old session; unblock and login; confirmed user deletion",
+            "userId": "cmvsh7oxq0016sgw5mxoqmg76",
+            "documentId": "cmvsh7t3s001asgw5ecb8s831",
+            "audit": [
+              {
+                "action": "user.created",
+                "actorId": "cmvsh7log00025gw51ryfwedl",
+                "metadata": {
+                  "role": "OPERATOR",
+                  "email": "aadf6831-1fd5-44b6-b74a-ff49c830cec7@users-night.test",
+                  "isActive": true
+                }
+              },
+              {
+                "action": "user.updated",
+                "actorId": "cmvsh7log00025gw51ryfwedl",
+                "metadata": {
+                  "after": {
+                    "id": "cmvsh7oxq0016sgw5mxoqmg76",
+                    "name": "Пользователь QA aadf6831-1fd5-44b6-b74a-ff49c830cec7 изменён",
+                    "role": "OPERATOR",
+                    "email": "aadf6831-1fd5-44b6-b74a-ff49c830cec7@users-night.test",
+                    "phone": "+79990002233",
+                    "isActive": true
+                  },
+                  "before": {
+                    "id": "cmvsh7oxq0016sgw5mxoqmg76",
+                    "name": "Пользователь QA aadf6831-1fd5-44b6-b74a-ff49c830cec7",
+                    "role": "OPERATOR",
+                    "email": "aadf6831-1fd5-44b6-b74a-ff49c830cec7@users-night.test",
+                    "phone": "+79990001122",
+                    "isActive": true
+                  }
+                }
+              },
+              {
+                "action": "user.document.created",
+                "actorId": "cmvsh7log00025gw51ryfwedl",
+                "metadata": {
+                  "typeId": "1d465e3b-3019-4129-987a-81b9516ecd27",
+                  "expiresAt": "2026-10-27T00:00:00.000Z",
+                  "documentId": "cmvsh7t3s001asgw5ecb8s831",
+                  "selfService": false
+                }
+              },
+              {
+                "action": "user.document.updated",
+                "actorId": "cmvsh7log00025gw51ryfwedl",
+                "metadata": {
+                  "before": {
+                    "typeId": "1d465e3b-3019-4129-987a-81b9516ecd27",
+                    "expiresAt": "2026-10-27T00:00:00.000Z"
+                  },
+                  "typeId": "1d465e3b-3019-4129-987a-81b9516ecd27",
+                  "expiresAt": "2027-01-26T00:00:00.000Z",
+                  "documentId": "cmvsh7t3s001asgw5ecb8s831",
+                  "selfService": false
+                }
+              },
+              {
+                "action": "user.document.deleted",
+                "actorId": "cmvsh7log00025gw51ryfwedl",
+                "metadata": {
+                  "typeId": "1d465e3b-3019-4129-987a-81b9516ecd27",
+                  "expiresAt": "2027-01-26T00:00:00.000Z",
+                  "documentId": "cmvsh7t3s001asgw5ecb8s831",
+                  "selfService": false
+                }
+              },
+              {
+                "action": "user.updated",
+                "actorId": "cmvsh7log00025gw51ryfwedl",
+                "metadata": {
+                  "after": {
+                    "id": "cmvsh7oxq0016sgw5mxoqmg76",
+                    "name": "Пользователь QA aadf6831-1fd5-44b6-b74a-ff49c830cec7 изменён",
+                    "role": "OPERATOR",
+                    "email": "aadf6831-1fd5-44b6-b74a-ff49c830cec7@users-night.test",
+                    "phone": "+79990002233",
+                    "isActive": false
+                  },
+                  "before": {
+                    "id": "cmvsh7oxq0016sgw5mxoqmg76",
+                    "name": "Пользователь QA aadf6831-1fd5-44b6-b74a-ff49c830cec7 изменён",
+                    "role": "OPERATOR",
+                    "email": "aadf6831-1fd5-44b6-b74a-ff49c830cec7@users-night.test",
+                    "phone": "+79990002233",
+                    "isActive": true
+                  }
+                }
+              },
+              {
+                "action": "user.updated",
+                "actorId": "cmvsh7log00025gw51ryfwedl",
+                "metadata": {
+                  "after": {
+                    "id": "cmvsh7oxq0016sgw5mxoqmg76",
+                    "name": "Пользователь QA aadf6831-1fd5-44b6-b74a-ff49c830cec7 изменён",
+                    "role": "OPERATOR",
+                    "email": "aadf6831-1fd5-44b6-b74a-ff49c830cec7@users-night.test",
+                    "phone": "+79990002233",
+                    "isActive": true
+                  },
+                  "before": {
+                    "id": "cmvsh7oxq0016sgw5mxoqmg76",
+                    "name": "Пользователь QA aadf6831-1fd5-44b6-b74a-ff49c830cec7 изменён",
+                    "role": "OPERATOR",
+                    "email": "aadf6831-1fd5-44b6-b74a-ff49c830cec7@users-night.test",
+                    "phone": "+79990002233",
+                    "isActive": false
+                  }
+                }
+              },
+              {
+                "action": "user.deleted",
+                "actorId": "cmvsh7log00025gw51ryfwedl",
+                "metadata": {
+                  "role": "OPERATOR",
+                  "email": "aadf6831-1fd5-44b6-b74a-ff49c830cec7@users-night.test"
+                }
+              }
+            ]
+          }
+        ],
+        "errors": []
+      }
+    },
+    {
+      "title": "таблица, поиск и правая панель работают на desktop и mobile",
+      "project": "chromium",
+      "status": "passed",
+      "milliseconds": 3908
+    },
+    {
+      "title": "таблица, поиск и правая панель работают на desktop и mobile",
+      "project": "Mobile Safari",
+      "status": "passed",
+      "milliseconds": 7428
+    },
+    {
+      "title": "таблица, поиск и правая панель работают на desktop и mobile",
+      "project": "Mobile Chrome",
+      "status": "passed",
+      "milliseconds": 2687
+    }
+  ],
+  "archives": [
+    "users-create-first-red-raw",
+    "users-cache-confirmed-red-raw",
+    "users-fixed-first-access-red-raw",
+    "users-access-probe-raw",
+    "users-fixed-fresh-raw"
+  ],
+  "limitations": [
+    "Historical operator/crew/inspection runtime on44126 is not proof on00ac",
+    "ADMIN document form edits metadata only; scan UI upload not claimed",
+    "Password reset, every user role/tenant variant and every CRUD are not exhausted",
+    "Real external delivery and hardware not checked"
+  ]
+}

@@ -44,7 +44,7 @@ export class PrismaCommandIdempotencyRepository implements CommandIdempotencyRep
       VALUES
         (${randomUUID()}, ${input.key}, ${storageScope}, 'processing', ${input.expiresAt}, NOW(),
          ${input.tenantId}, ${input.actorId}, ${Buffer.from(input.requestHash)})
-      ON CONFLICT ("tenantId", "scope", "key") DO NOTHING
+      ON CONFLICT DO NOTHING
       RETURNING "id"
     `);
     // При ошибке вставки транзакция прервана и откатится вместе с настройкой.
