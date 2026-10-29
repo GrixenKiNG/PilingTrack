@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-non-null-assertion -- e2e: наличие значений проверяется expect рядом */
 import { test, expect } from './fixtures/disposable.fixture';
 import { createRoleAuditFixture } from './fixtures/role-audit.mjs';
 import { login } from './page-objects/login.page';
