@@ -53,7 +53,8 @@ export async function getCrewById(crewId: string) {
  */
 export async function getCrewForOperator(
   sessionUser: { id: string; role: string; actingAs?: string | null },
-  requestedOperatorId?: string | null
+  requestedOperatorId?: string | null,
+  equipmentId?: string
 ) {
   const lookupUserId = isPrivilegedRole(resolveEffectiveRole(sessionUser.role, sessionUser.actingAs))
     ? requestedOperatorId || sessionUser.id
@@ -67,6 +68,7 @@ export async function getCrewForOperator(
   // assistant (ASSISTANT users have no operator row), so match both.
   const crew = await db.crew.findFirst({
     where: {
+      ...(equipmentId !== undefined ? { equipmentId } : {}),
       OR: [
         { operatorId: lookupUserId },
         { assistants: { some: { userId: lookupUserId } } },
