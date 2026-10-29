@@ -623,3 +623,144 @@ test('equipment lifecycle: UI passport, meter history, retirement and role denia
     await db.end();
   }
 });
+
+test('equipment documents: UI metadata lifecycle, role denials and parent guards', async ({ page }, info) => {
+  test.setTimeout(300_000);
+  const fixture = await createRoleAuditFixture();
+  const db = await owner();
+  const title = 'Паспорт QA ' + randomUUID();
+  const updatedTitle = title + ' обновлён';
+  const wrongEquipment = randomUUID();
+  const observations: Array<Record<string, unknown>> = [];
+  const errors: string[] = [];
+  const mutations: Array<{ method: string; path: string }> = [];
+  const collection = '/api/equipment/' + fixture.equipmentId + '/documents';
+  const observe = () => {
+    page.on('pageerror', error => errors.push(error.message));
+    page.on('request', request => {
+      const path = new URL(request.url()).pathname;
+      if (path.startsWith(collection) && ['POST', 'PUT', 'DELETE'].includes(request.method())) mutations.push({ method: request.method(), path });
+    });
+  };
+  observe();
+  const open = async () => {
+    await page.goto('/admin/equipment/' + fixture.equipmentId + '#documents');
+    await expect(page.locator('#documents')).toBeVisible();
+  };
+  const switchRole = async (role: 'ADMIN' | 'MECHANIC') => {
+    const context = page.context();
+    expect((await page.request.post('/api/auth/logout', { headers: { Origin: new URL(page.url()).origin } })).status()).toBe(200);
+    await page.close();
+    page = await context.newPage();
+    observe();
+    await login(page, fixture.users[role].email, fixture.password);
+    const me = await page.request.get('/api/auth/me');
+    expect(me.status()).toBe(200);
+    expect((await me.json()).user.role).toBe(role);
+    await open();
+  };
+  try {
+    await db.query('INSERT INTO "Equipment" (id,name,"tenantId","updatedAt") VALUES ($1,$2,$3,now())', [wrongEquipment, 'QA wrong document parent', fixture.tenantId]);
+    await login(page, fixture.users.ADMIN.email, fixture.password);
+    await open();
+    await page.locator('#documents').getByRole('button', { name: 'Добавить', exact: true }).click();
+    let dialog = page.getByRole('dialog', { name: 'Новый документ', exact: true });
+    await dialog.getByLabel('Название *', { exact: true }).fill(title);
+    await dialog.getByLabel('Выдан', { exact: true }).fill('2020-01-01');
+    await dialog.getByLabel('Действует до', { exact: true }).fill('2020-01-02');
+    await dialog.getByLabel('Заметки', { exact: true }).fill('QA исходные реквизиты');
+    const creating = page.waitForResponse(r => new URL(r.url()).pathname === collection && r.request().method() === 'POST');
+    await dialog.getByRole('button', { name: 'Добавить', exact: true }).click();
+    const created = await creating;
+    expect(created.status(), await created.text()).toBe(201);
+    const docId = (await created.json()).document.id as string;
+    const path = collection + '/' + docId;
+    const documents = async () => (await db.query('SELECT id,"equipmentId","tenantId",type,title,"issuedAt","expiresAt",notes,"mediaId" FROM "EquipmentDocument" WHERE "equipmentId"=$1 AND "tenantId"=$2 ORDER BY id', [fixture.equipmentId, fixture.tenantId])).rows;
+    const audit = async () => (await db.query('SELECT action,"actorId",metadata FROM "FeedbackEvent" WHERE scope=$1 AND "targetId"=$2 ORDER BY "createdAt",id', ['equipment', docId])).rows;
+    let row = page.locator('#documents li').filter({ hasText: title });
+    await expect(row).toBeVisible();
+    await expect(row.getByText(/^Истёк /)).toBeVisible();
+    const first = await documents();
+    expect(first).toHaveLength(1);
+    expect(first[0]).toEqual(expect.objectContaining({ id: docId, equipmentId: fixture.equipmentId, tenantId: fixture.tenantId, type: 'PASSPORT', title, notes: 'QA исходные реквизиты', mediaId: null }));
+    expect(first[0].issuedAt.toISOString().slice(0, 10)).toBe('2020-01-01');
+    expect(first[0].expiresAt.toISOString().slice(0, 10)).toBe('2020-01-02');
+    observations.push({ step: 'UI create expired metadata; no file upload', documents: first, audit: await audit() });
+    await row.getByRole('button', { name: 'Редактировать документ «' + title + '»', exact: true }).click();
+    dialog = page.getByRole('dialog', { name: 'Редактировать документ', exact: true });
+    await expect(dialog.getByLabel('Название *', { exact: true })).toHaveValue(title);
+    await dialog.getByLabel('Название *', { exact: true }).fill(updatedTitle);
+    await dialog.getByLabel('Действует до', { exact: true }).fill('2099-01-01');
+    await dialog.getByLabel('Заметки', { exact: true }).fill('QA срок продлён');
+    let saving = page.waitForResponse(r => new URL(r.url()).pathname === path && r.request().method() === 'PUT');
+    await dialog.getByRole('button', { name: 'Сохранить', exact: true }).click();
+    let saved = await saving;
+    expect(saved.status(), await saved.text()).toBe(200);
+    row = page.locator('#documents li').filter({ hasText: updatedTitle });
+    await expect(row).toBeVisible();
+    await expect(row.getByText(/^Истёк /)).toHaveCount(0);
+    expect((await documents())[0].expiresAt.toISOString().slice(0, 10)).toBe('2099-01-01');
+    await row.getByRole('button', { name: 'Редактировать документ «' + updatedTitle + '»', exact: true }).click();
+    dialog = page.getByRole('dialog', { name: 'Редактировать документ', exact: true });
+    await dialog.getByLabel('Действует до', { exact: true }).fill('');
+    saving = page.waitForResponse(r => new URL(r.url()).pathname === path && r.request().method() === 'PUT');
+    await dialog.getByRole('button', { name: 'Сохранить', exact: true }).click();
+    saved = await saving;
+    expect(saved.status(), await saved.text()).toBe(200);
+    await expect(dialog).toHaveCount(0);
+    expect((await documents())[0].expiresAt).toBeNull();
+    await page.reload();
+    row = page.locator('#documents li').filter({ hasText: updatedTitle });
+    await expect(row).toBeVisible();
+    await expect(row.getByText(/^до /)).toHaveCount(0);
+    observations.push({ step: 'UI extend expiry then clear it; reload persists null', documents: await documents(), audit: await audit() });
+    const before = await documents();
+    const beforeAudit = await audit();
+    for (const method of ['PUT', 'DELETE']) {
+      const response = await page.request.fetch('/api/equipment/' + wrongEquipment + '/documents/' + docId, { method, headers: { Origin: new URL(page.url()).origin }, ...(method === 'PUT' ? { data: { title: 'FORBIDDEN wrong parent' } } : {}) });
+      expect(response.status()).toBe(404);
+      expect(await documents()).toEqual(before);
+      expect(await audit()).toEqual(beforeAudit);
+    }
+    await switchRole('MECHANIC');
+    row = page.locator('#documents li').filter({ hasText: updatedTitle });
+    await expect(row).toBeVisible();
+    await expect(page.locator('#documents').getByRole('button')).toHaveCount(0);
+    for (const [method, url] of [['POST', collection], ['PUT', path], ['DELETE', path]]) {
+      const response = await page.request.fetch(url, { method, headers: { Origin: new URL(page.url()).origin }, ...(method !== 'DELETE' ? { data: { type: 'PASSPORT', title: 'FORBIDDEN mechanic' } } : {}) });
+      expect(response.status()).toBe(403);
+      expect(await documents()).toEqual(before);
+      expect(await audit()).toEqual(beforeAudit);
+    }
+    observations.push({ step: 'wrong parent404; mechanic reads and POST/PUT/DELETE403 leave SQL and audit unchanged', documents: await documents(), audit: await audit() });
+    await switchRole('ADMIN');
+    row = page.locator('#documents li').filter({ hasText: updatedTitle });
+    await row.getByRole('button', { name: 'Удалить документ «' + updatedTitle + '»', exact: true }).click();
+    let confirmation = page.getByRole('alertdialog', { name: 'Удалить документ?', exact: true });
+    const deletesBeforeCancel = mutations.filter(r => r.method === 'DELETE').length;
+    await confirmation.getByRole('button', { name: 'Отмена', exact: true }).click();
+    await expect(confirmation).toHaveCount(0);
+    expect(mutations.filter(r => r.method === 'DELETE')).toHaveLength(deletesBeforeCancel);
+    expect(await documents()).toEqual(before);
+    expect(await audit()).toEqual(beforeAudit);
+    await row.getByRole('button', { name: 'Удалить документ «' + updatedTitle + '»', exact: true }).click();
+    confirmation = page.getByRole('alertdialog', { name: 'Удалить документ?', exact: true });
+    const deleting = page.waitForResponse(r => new URL(r.url()).pathname === path && r.request().method() === 'DELETE');
+    await confirmation.getByRole('button', { name: 'Удалить документ', exact: true }).click();
+    const deleted = await deleting;
+    expect(deleted.status(), await deleted.text()).toBe(200);
+    await expect(page.locator('#documents').getByText(updatedTitle, { exact: true })).toHaveCount(0);
+    expect(await documents()).toEqual([]);
+    const finalAudit = await audit();
+    expect(finalAudit.filter(r => r.action === 'equipment.document.created')).toHaveLength(1);
+    expect(finalAudit.filter(r => r.action === 'equipment.document.deleted')).toHaveLength(1);
+    expect(finalAudit.every(r => r.actorId === fixture.users.ADMIN.id)).toBe(true);
+    expect(finalAudit.find(r => r.action === 'equipment.document.deleted').metadata.before).toEqual({ type: 'PASSPORT', title: updatedTitle, expiresAt: null });
+    observations.push({ step: 'UI delete cancel has no mutation; confirm removes own metadata, audit keeps snapshot', documents: await documents(), audit: finalAudit });
+    expect(errors).toEqual([]);
+    await page.screenshot({ path: info.outputPath('equipment-documents-deleted.png'), fullPage: true });
+  } finally {
+    await info.attach('equipment-documents-lifecycle', { body: JSON.stringify({ observations, mutations, errors }, null, 2), contentType: 'application/json' });
+    await db.end();
+  }
+});

@@ -63,7 +63,7 @@ V3: **9passed/0failed/0skipped** (6legacy+3selector). Отчёт сохраня�
 
 Очередь уведомлений и6delivery-сценариев на своём HTTP подтверждены; реальный Telegram, датчики, MQTT и железо не проверены. Ненастроенный Telegram даёт retry/DLQ: политика — вопрос№8. Закрытие ремонта не переписывает старый осмотр и само по себе не обещает полностью READY.
 
-Рабочие3100/данные/production не трогались. .env/schema/migrations/dependencies/auth/security/ORION не менялись. Узкие исключения S3/outbox/одна SQL-строка и девять строк GET паспорта установки не расширены. Общая getCrewForOperator и два её guard остаются без правки; отдельное исключение запрошено. Один независимый review выполнен ранее; новый не дублировался, поздние фиксы ему не приписаны. Автоматизации03-15/08-20/13-25/18-30 удалены. Одноразовый запуск02:00 удалён после срабатывания; запуск07:00 сохранён.
+Рабочие3100/данные/production не трогались. .env/schema/migrations/dependencies/auth/security/ORION не менялись. Узкие исключения S3/outbox/одна SQL-строка и девять строк GET паспорта установки не расширены. Общая getCrewForOperator и два её guard остаются без правки; отдельное исключение запрошено. Один независимый review выполнен ранее; новый не дублировался, поздние фиксы ему не приписаны. Автоматизации03-15/08-20/13-25/18-30 удалены. Одноразовый запуск02:00 удалён после срабатывания; одноразовый запуск07:00 также удалён после срабатывания. Новых запланированных запусков нет.
 
 ## Файлы и повтор
 
@@ -75,9 +75,13 @@ V3: **9passed/0failed/0skipped** (6legacy+3selector). Отчёт сохраня�
 
 Новый build0/156с;focused1/0/0 и3browserlifecycle3/0/0(всеflaky0),fullunit5783/0/0/512files,все241passed;collection408/30vsBASE318/28оба0. Отдельныйдругойmultiple-assignmentP3зановореальноRED0/1/0на121,queryнеправился. ПодробностиEQUIPMENT-CACHE-FIX.md/json. Старые451циклы/44126матрицанеперенесенына121. Task6частична.
 
+## Документы установки: дополнительный проход
+
+На том же прикладном12167551:новые3browsermetadataCRUD прошли3/0/0/flaky0,exit0/146с;focused1/0/0exit0/45с. ОчисткаexpiresAt вnull,межролевые403,неверныйparent404,отмена/подтверждениеудаленияиSQL/auditпроверены. ТолькоPASSPORT/две роли,не скан/S3/баллготовности. EQUIPMENT-DOCUMENTS.md/json. Новыеgates:tsc/lint/listпоотдельностиexit0;collection411/30vsBASE318/28. Код приложениянеизменён;unit/buildповторненужен,результаты121сохранены. Task6частична,общийqueryназначенийожидаетточечногоисключения.
+
 ## Коммиты ветки
 
-Список до прикладногоSHA12167551; завершающийкоммитотчётабудетследующим.
+Список до предыдущегоHEAD; завершающийкоммитновогоE2E/отчётовследующий.
 
 ```text
 17fd1277 test(storage): expose tenantless S3 key regression
@@ -127,4 +131,5 @@ b0001fdb test(crews): prove UI lifecycle assignments and actor audit
 ea9a64f2 test(equipment): reproduce denied journals for a second assigned rig
 40525a06 test(equipment): reproduce stale fleet after creating a rig
 12167551 fix(equipment): invalidate fleet snapshot after rig creation
+f077be3d docs: record verified fleet cache fix and remaining assignment defect
 ```

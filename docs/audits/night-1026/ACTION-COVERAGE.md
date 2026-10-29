@@ -37,3 +37,8 @@ C1–C3 повторены на свежем стенде:3/0/0,exit0;точны
 
 
 Продолжение12167551: прежний Equipment create REDисправлендвумяcachelines,весьподготовленныйlifecycleдостигнутв3браузерах(3/0/0). СмEQUIPMENT-CACHE-FIX.md. УдалениесисториейтолькоAPI409;UI-deleteнеизобретён. Readiness—толькосохранённые2requestevents,неподменаprojectionscore. Втораяназначеннаяустановкавотдельныхmeter/fuelAPIпоканедоступна,зановорепродуцированаRED0/1/0на121. Task6неполна.
+
+
+## Документы установки: новый UI-проход на12167551
+
+PASSPORTmetadata:ADMINcreate expired→extend2099→clearDateNULL/reload→MECHANICread/POSTPUTDELETE403→wrongparentADMIN404→deletecancel(noDELETE)→confirm200/SQLgone/auditcreate+deleteADMIN. Новые3браузера:3passed/0failed/0skipped/0flaky,exit0/146с;JSerrors[]. Полные наблюдения/команды/exits: EQUIPMENT-DOCUMENTS.md/json. Нет загрузки скана/S3 или доказанного пересчётаготовности;не все типы/роли. PUT не имеет отдельногоauditupdateсобытия,коднеправился. Аппкод121неизменён, прежниеunit5783/0/0/build156наТОМЖЕSHAнеповторялись.

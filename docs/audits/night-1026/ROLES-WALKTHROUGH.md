@@ -214,3 +214,8 @@ ADMIN через UI создаёт и правит пользователя, с�
 
 
 29.10,12167551: Equipment UI lifecycle3/0/0во всехтрёхбраузерах;create→видимость→edit100/110→MECHANICread/PUTDELETE403→ADMINretire/reactivate→API-onlyDELETE409,SQL/audit4ADMIN/readinessrequests2,JSerrors[]. Всеутвержденияэтойцепочкидостигнуты,rawequipment-cache-three-raw. Полныйunit5783/0/0/build156сна121;старыеобщиероли/cyclesимеютсвоиSHA. ОтдельныйmultipleAPIcaseна121остаётся0/1/0.
+
+
+## Документы установки: новый UI-проход на12167551
+
+PASSPORTmetadata:ADMINcreate expired→extend2099→clearDateNULL/reload→MECHANICread/POSTPUTDELETE403→wrongparentADMIN404→deletecancel(noDELETE)→confirm200/SQLgone/auditcreate+deleteADMIN. Новые3браузера:3passed/0failed/0skipped/0flaky,exit0/146с;JSerrors[]. Полные наблюдения/команды/exits: EQUIPMENT-DOCUMENTS.md/json. Нет загрузки скана/S3 или доказанного пересчётаготовности;не все типы/роли. PUT не имеет отдельногоauditupdateсобытия,коднеправился. Аппкод121неизменён, прежниеunit5783/0/0/build156наТОМЖЕSHAнеповторялись.

@@ -357,3 +357,8 @@ Sourceguardgitdiffsrc/prisma/package/next.configот451пуст;триscenarioha
 |npx playwright test --list и BASE — fresh wrapper|0|35|
 
 Полныйсыройвывод full-unit-equipment-cache-final.json/log,валидаторequipment-cache-final-validated-summary.json,конвейерequipment-cache-verification-result.json.
+
+
+## Документы установки: новый UI-проход на12167551
+
+PASSPORTmetadata:ADMINcreate expired→extend2099→clearDateNULL/reload→MECHANICread/POSTPUTDELETE403→wrongparentADMIN404→deletecancel(noDELETE)→confirm200/SQLgone/auditcreate+deleteADMIN. Новые3браузера:3passed/0failed/0skipped/0flaky,exit0/146с;JSerrors[]. Полные наблюдения/команды/exits: EQUIPMENT-DOCUMENTS.md/json. Нет загрузки скана/S3 или доказанного пересчётаготовности;не все типы/роли. PUT не имеет отдельногоauditupdateсобытия,коднеправился. Аппкод121неизменён, прежниеunit5783/0/0/build156наТОМЖЕSHAнеповторялись.
