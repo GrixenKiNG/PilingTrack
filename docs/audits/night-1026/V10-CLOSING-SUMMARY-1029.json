@@ -1,0 +1,514 @@
+{
+  "branch": "codex/v10-closing-summary-1029",
+  "baseSha": "17f235e54d4bb25bbde047929005a8fd612e685f",
+  "applicationSha": "17f235e54d4bb25bbde047929005a8fd612e685f",
+  "testSha256": "50b7f742357fab1a97056d912fadcc12b1e7346d367b6247a315d66e4ff38671",
+  "applicationUnchanged": true,
+  "browser": {
+    "stats": {
+      "startTime": "2026-10-29T09:21:24.312Z",
+      "duration": 294671.933,
+      "expected": 6,
+      "skipped": 0,
+      "unexpected": 0,
+      "flaky": 0
+    },
+    "cases": [
+      {
+        "project": "chromium",
+        "title": "v10: real admission, inspections, offline replay, production and closed report (single rig) viewport 375",
+        "shiftId": "71f8ae80-12e3-41b6-98ca-c976369e6982",
+        "reportId": "RM-71f8ae80-2026-10-29",
+        "stages": [
+          {
+            "stage": "v10 SQL summary before close",
+            "viewport": {
+              "width": 375,
+              "height": 812
+            },
+            "totals": {
+              "piles": 2,
+              "pileMeters": 24,
+              "drilling": 1,
+              "drillingMeters": 3,
+              "downtime": 0.25
+            },
+            "horizontalOverflow": 0,
+            "navGap": 150.53125
+          },
+          {
+            "stage": "v10 SQL summary long numbers",
+            "viewport": {
+              "width": 375,
+              "height": 812
+            },
+            "totals": {
+              "piles": 1234567890,
+              "pileMeters": 14814814680,
+              "drilling": 1234567890,
+              "drillingMeters": 14814814680.5,
+              "downtime": 0.25
+            },
+            "horizontalOverflow": 0,
+            "navGap": 137.03125
+          },
+          {
+            "stage": "v10 SQL summary restored before close",
+            "viewport": {
+              "width": 375,
+              "height": 812
+            },
+            "totals": {
+              "piles": 2,
+              "pileMeters": 24,
+              "drilling": 1,
+              "drillingMeters": 3,
+              "downtime": 0.25
+            },
+            "horizontalOverflow": 0,
+            "navGap": 188.03125
+          },
+          {
+            "stage": "v10 SQL summary after close",
+            "viewport": {
+              "width": 375,
+              "height": 812
+            },
+            "totals": {
+              "piles": 2,
+              "pileMeters": 24,
+              "drilling": 1,
+              "drillingMeters": 3,
+              "downtime": 0.25
+            },
+            "horizontalOverflow": 0,
+            "navGap": 118.53125
+          }
+        ]
+      },
+      {
+        "project": "chromium",
+        "title": "v10: real admission, inspections, offline replay, production and closed report (single rig) viewport 1440",
+        "shiftId": "7f623a14-fac9-4964-b609-cfaeb67cd639",
+        "reportId": "RM-7f623a14-2026-10-29",
+        "stages": [
+          {
+            "stage": "v10 SQL summary before close",
+            "viewport": {
+              "width": 1440,
+              "height": 1000
+            },
+            "totals": {
+              "piles": 2,
+              "pileMeters": 24,
+              "drilling": 1,
+              "drillingMeters": 3,
+              "downtime": 0.25
+            },
+            "horizontalOverflow": 0,
+            "navGap": 316.90625
+          },
+          {
+            "stage": "v10 SQL summary long numbers",
+            "viewport": {
+              "width": 1440,
+              "height": 1000
+            },
+            "totals": {
+              "piles": 1234567890,
+              "pileMeters": 14814814680,
+              "drilling": 1234567890,
+              "drillingMeters": 14814814680.5,
+              "downtime": 0.25
+            },
+            "horizontalOverflow": 0,
+            "navGap": 386.40625
+          },
+          {
+            "stage": "v10 SQL summary restored before close",
+            "viewport": {
+              "width": 1440,
+              "height": 1000
+            },
+            "totals": {
+              "piles": 2,
+              "pileMeters": 24,
+              "drilling": 1,
+              "drillingMeters": 3,
+              "downtime": 0.25
+            },
+            "horizontalOverflow": 0,
+            "navGap": 386.40625
+          },
+          {
+            "stage": "v10 SQL summary after close",
+            "viewport": {
+              "width": 1440,
+              "height": 1000
+            },
+            "totals": {
+              "piles": 2,
+              "pileMeters": 24,
+              "drilling": 1,
+              "drillingMeters": 3,
+              "downtime": 0.25
+            },
+            "horizontalOverflow": 0,
+            "navGap": 316.90625
+          }
+        ]
+      },
+      {
+        "project": "Mobile Safari",
+        "title": "v10: real admission, inspections, offline replay, production and closed report (single rig) viewport 375",
+        "shiftId": "02c28d0e-5d5c-4b88-9b97-091432abc2d5",
+        "reportId": "RM-02c28d0e-2026-10-29",
+        "stages": [
+          {
+            "stage": "v10 SQL summary before close",
+            "viewport": {
+              "width": 375,
+              "height": 812
+            },
+            "totals": {
+              "piles": 2,
+              "pileMeters": 24,
+              "drilling": 1,
+              "drillingMeters": 3,
+              "downtime": 0.25
+            },
+            "horizontalOverflow": 0,
+            "navGap": 150.28125
+          },
+          {
+            "stage": "v10 SQL summary long numbers",
+            "viewport": {
+              "width": 375,
+              "height": 812
+            },
+            "totals": {
+              "piles": 1234567890,
+              "pileMeters": 14814814680,
+              "drilling": 1234567890,
+              "drillingMeters": 14814814680.5,
+              "downtime": 0.25
+            },
+            "horizontalOverflow": 0,
+            "navGap": 137.03125
+          },
+          {
+            "stage": "v10 SQL summary restored before close",
+            "viewport": {
+              "width": 375,
+              "height": 812
+            },
+            "totals": {
+              "piles": 2,
+              "pileMeters": 24,
+              "drilling": 1,
+              "drillingMeters": 3,
+              "downtime": 0.25
+            },
+            "horizontalOverflow": 0,
+            "navGap": 188.03125
+          },
+          {
+            "stage": "v10 SQL summary after close",
+            "viewport": {
+              "width": 375,
+              "height": 812
+            },
+            "totals": {
+              "piles": 2,
+              "pileMeters": 24,
+              "drilling": 1,
+              "drillingMeters": 3,
+              "downtime": 0.25
+            },
+            "horizontalOverflow": 0,
+            "navGap": 119.28125
+          }
+        ]
+      },
+      {
+        "project": "Mobile Safari",
+        "title": "v10: real admission, inspections, offline replay, production and closed report (single rig) viewport 1440",
+        "shiftId": "12dcd5c1-f0bc-40b5-8efb-e3d73dd1c404",
+        "reportId": "RM-12dcd5c1-2026-10-29",
+        "stages": [
+          {
+            "stage": "v10 SQL summary before close",
+            "viewport": {
+              "width": 1440,
+              "height": 1000
+            },
+            "totals": {
+              "piles": 2,
+              "pileMeters": 24,
+              "drilling": 1,
+              "drillingMeters": 3,
+              "downtime": 0.25
+            },
+            "horizontalOverflow": 0,
+            "navGap": 317.65625
+          },
+          {
+            "stage": "v10 SQL summary long numbers",
+            "viewport": {
+              "width": 1440,
+              "height": 1000
+            },
+            "totals": {
+              "piles": 1234567890,
+              "pileMeters": 14814814680,
+              "drilling": 1234567890,
+              "drillingMeters": 14814814680.5,
+              "downtime": 0.25
+            },
+            "horizontalOverflow": 0,
+            "navGap": 386.40625
+          },
+          {
+            "stage": "v10 SQL summary restored before close",
+            "viewport": {
+              "width": 1440,
+              "height": 1000
+            },
+            "totals": {
+              "piles": 2,
+              "pileMeters": 24,
+              "drilling": 1,
+              "drillingMeters": 3,
+              "downtime": 0.25
+            },
+            "horizontalOverflow": 0,
+            "navGap": 386.40625
+          },
+          {
+            "stage": "v10 SQL summary after close",
+            "viewport": {
+              "width": 1440,
+              "height": 1000
+            },
+            "totals": {
+              "piles": 2,
+              "pileMeters": 24,
+              "drilling": 1,
+              "drillingMeters": 3,
+              "downtime": 0.25
+            },
+            "horizontalOverflow": 0,
+            "navGap": 317.65625
+          }
+        ]
+      },
+      {
+        "project": "Mobile Chrome",
+        "title": "v10: real admission, inspections, offline replay, production and closed report (single rig) viewport 375",
+        "shiftId": "4232cced-ab0d-46c3-804c-21664de85682",
+        "reportId": "RM-4232cced-2026-10-29",
+        "stages": [
+          {
+            "stage": "v10 SQL summary before close",
+            "viewport": {
+              "width": 375,
+              "height": 812
+            },
+            "totals": {
+              "piles": 2,
+              "pileMeters": 24,
+              "drilling": 1,
+              "drillingMeters": 3,
+              "downtime": 0.25
+            },
+            "horizontalOverflow": 0,
+            "navGap": 150.53125
+          },
+          {
+            "stage": "v10 SQL summary long numbers",
+            "viewport": {
+              "width": 375,
+              "height": 812
+            },
+            "totals": {
+              "piles": 1234567890,
+              "pileMeters": 14814814680,
+              "drilling": 1234567890,
+              "drillingMeters": 14814814680.5,
+              "downtime": 0.25
+            },
+            "horizontalOverflow": 0,
+            "navGap": 137.03125
+          },
+          {
+            "stage": "v10 SQL summary restored before close",
+            "viewport": {
+              "width": 375,
+              "height": 812
+            },
+            "totals": {
+              "piles": 2,
+              "pileMeters": 24,
+              "drilling": 1,
+              "drillingMeters": 3,
+              "downtime": 0.25
+            },
+            "horizontalOverflow": 0,
+            "navGap": 188.03125
+          },
+          {
+            "stage": "v10 SQL summary after close",
+            "viewport": {
+              "width": 375,
+              "height": 812
+            },
+            "totals": {
+              "piles": 2,
+              "pileMeters": 24,
+              "drilling": 1,
+              "drillingMeters": 3,
+              "downtime": 0.25
+            },
+            "horizontalOverflow": 0,
+            "navGap": 118.53125
+          }
+        ]
+      },
+      {
+        "project": "Mobile Chrome",
+        "title": "v10: real admission, inspections, offline replay, production and closed report (single rig) viewport 1440",
+        "shiftId": "7372a5b2-cd06-4bfb-8ad2-48cc66c0cec6",
+        "reportId": "RM-7372a5b2-2026-10-29",
+        "stages": [
+          {
+            "stage": "v10 SQL summary before close",
+            "viewport": {
+              "width": 1440,
+              "height": 1000
+            },
+            "totals": {
+              "piles": 2,
+              "pileMeters": 24,
+              "drilling": 1,
+              "drillingMeters": 3,
+              "downtime": 0.25
+            },
+            "horizontalOverflow": 0,
+            "navGap": 316.90625
+          },
+          {
+            "stage": "v10 SQL summary long numbers",
+            "viewport": {
+              "width": 1440,
+              "height": 1000
+            },
+            "totals": {
+              "piles": 1234567890,
+              "pileMeters": 14814814680,
+              "drilling": 1234567890,
+              "drillingMeters": 14814814680.5,
+              "downtime": 0.25
+            },
+            "horizontalOverflow": 0,
+            "navGap": 386.40625
+          },
+          {
+            "stage": "v10 SQL summary restored before close",
+            "viewport": {
+              "width": 1440,
+              "height": 1000
+            },
+            "totals": {
+              "piles": 2,
+              "pileMeters": 24,
+              "drilling": 1,
+              "drillingMeters": 3,
+              "downtime": 0.25
+            },
+            "horizontalOverflow": 0,
+            "navGap": 386.40625
+          },
+          {
+            "stage": "v10 SQL summary after close",
+            "viewport": {
+              "width": 1440,
+              "height": 1000
+            },
+            "totals": {
+              "piles": 2,
+              "pileMeters": 24,
+              "drilling": 1,
+              "drillingMeters": 3,
+              "downtime": 0.25
+            },
+            "horizontalOverflow": 0,
+            "navGap": 316.90625
+          }
+        ]
+      }
+    ]
+  },
+  "build": {
+    "command": "npm run build",
+    "sourceSha": "17f235e54d4bb25bbde047929005a8fd612e685f",
+    "exit": 0,
+    "seconds": 231
+  },
+  "gates": {
+    "sourceSha": "17f235e54d4bb25bbde047929005a8fd612e685f",
+    "worktreeSha": "17f235e54d4bb25bbde047929005a8fd612e685f",
+    "complete": true,
+    "results": [
+      {
+        "id": "final-tsc",
+        "exe": "C:/Program Files/Git/bin/bash.exe",
+        "args": [
+          "-c",
+          "npx tsc --noEmit"
+        ],
+        "exit": 0,
+        "seconds": 49
+      },
+      {
+        "id": "final-lint",
+        "exe": "C:/Program Files/Git/bin/bash.exe",
+        "args": [
+          "-c",
+          "npm run lint"
+        ],
+        "exit": 0,
+        "seconds": 67
+      },
+      {
+        "id": "final-unit-wrapper",
+        "exe": "C:\\Program Files\\nodejs\\node.exe",
+        "args": [
+          "D:/PillingR/night-logs/v10-closing-summary-1029/unit-run-stand.cjs"
+        ],
+        "exit": 0,
+        "seconds": 848
+      },
+      {
+        "id": "final-pw-list-wrapper",
+        "exe": "C:\\Program Files\\nodejs\\node.exe",
+        "args": [
+          "D:/PillingR/night-logs/v10-closing-summary-1029/qa-fresh-stand.cjs",
+          "--list-default"
+        ],
+        "exit": 0,
+        "seconds": 33
+      }
+    ]
+  },
+  "unit": {
+    "passed": 6029,
+    "failed": 0,
+    "skipped": 0,
+    "files": 529
+  },
+  "collection": {
+    "tests": 417,
+    "files": 30
+  },
+  "artifacts": "D:\\PillingR\\night-logs\\v10-closing-summary-1029"
+}

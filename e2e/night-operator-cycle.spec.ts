@@ -52,9 +52,64 @@ async function checklist(page: Page, beforeFinish?: () => Promise<void>) {
   await page.getByRole('button', { name: 'Завершить', exact: true }).click();
 }
 
-for (const version of ['v7', 'v10', 'operator', 'v5', 'v2'] as const) for (const multiple of [false, true]) test(version + ': real admission, inspections, offline replay, production and closed report (' + (multiple ? 'multiple rigs' : 'single rig') + ')', async ({ page, context }, info) => {
+
+async function closingSummary(page: Page, db: Client, tenantId: string, shiftId: string, observed: Array<Record<string, unknown>>, stage: string) {
+  const sql = await db.query('SELECT (SELECT coalesce(sum(p.count),0)::int FROM "PileWork" p WHERE p."tenantId"=$1 AND p."shiftId"=$2) AS piles, (SELECT coalesce(sum(p.count::numeric*g."lengthMm"/1000.0),0)::float FROM "PileWork" p JOIN "PileGrade" g ON g.id=p."pileGradeId" WHERE p."tenantId"=$1 AND p."shiftId"=$2) AS "pileMeters", (SELECT coalesce(sum(d.count),0)::int FROM "LeaderDrilling" d WHERE d."tenantId"=$1 AND d."shiftId"=$2) AS drilling, (SELECT coalesce(sum(d.meters),0)::float FROM "LeaderDrilling" d WHERE d."tenantId"=$1 AND d."shiftId"=$2) AS "drillingMeters", (SELECT coalesce(sum(d.duration),0)::float FROM "ReportDowntime" d WHERE d."tenantId"=$1 AND d."shiftId"=$2 AND d.kind IS DISTINCT FROM $3) AS downtime', [tenantId, shiftId, 'BREAK']);
+  const totals = sql.rows[0];
+  const card = page.locator('.ov10-card').filter({ has: page.getByText('Итог смены', { exact: true }) });
+  await expect(card).toHaveCount(1);
+  const number = (n: number) => new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 1 }).format(n);
+  for (const [label, value] of [
+    ['Сваи выполнено', totals.piles + ' шт · ' + number(totals.pileMeters) + ' м.п.'],
+    ['Бурение', totals.drilling + ' скв · ' + number(totals.drillingMeters) + ' м'],
+    ['Простой', String(Math.round(totals.downtime * 100) / 100).replace('.', ',') + ' ч'],
+  ]) {
+    await expect(card.locator('.ov10-pair').filter({ has: page.getByText(label, { exact: true }) }).locator('.v')).toHaveText(value);
+  }
+  await card.scrollIntoViewIfNeeded();
+  const geometry = await card.evaluate(el => {
+    const rect = (e: Element) => { const r = e.getBoundingClientRect(); return { left: r.left, right: r.right, top: r.top, bottom: r.bottom, width: r.width, height: r.height }; };
+    const box = rect(el), nav = document.querySelector('.ov10-tabs');
+    return { card: box, nav: nav ? rect(nav) : null, scrollWidth: el.scrollWidth, clientWidth: el.clientWidth,
+      rows: Array.from(el.querySelectorAll('.ov10-pair')).map(row => ({ row: rect(row), label: rect(row.querySelector('.k')!), value: rect(row.querySelector('.v')!) })) };
+  });
+  observed.push({ step: 'v10 SQL summary ' + stage, shiftId, totals, viewport: page.viewportSize(), geometry });
+  expect(geometry.scrollWidth, stage + ': card must not overflow horizontally').toBeLessThanOrEqual(geometry.clientWidth + 1);
+  expect(geometry.nav).not.toBeNull();
+  expect(geometry.card.bottom, stage + ': summary must stay above bottom navigation after scrolling').toBeLessThanOrEqual(geometry.nav!.top + 1);
+  for (const row of geometry.rows) {
+    expect(row.value.right).toBeLessThanOrEqual(geometry.card.right + 1);
+    expect(row.value.left).toBeGreaterThanOrEqual(geometry.card.left - 1);
+    const overlaps = row.label.left < row.value.right && row.label.right > row.value.left && row.label.top < row.value.bottom && row.label.bottom > row.value.top;
+    expect(overlaps, stage + ': label and value must not overlap').toBe(false);
+  }
+  return totals;
+}
+
+async function longClosingSummary(page: Page, db: Client, tenantId: string, shiftId: string, observed: Array<Record<string, unknown>>) {
+  const piles = (await db.query('SELECT id,count FROM "PileWork" WHERE "tenantId"=$1 AND "shiftId"=$2', [tenantId, shiftId])).rows;
+  const drillings = (await db.query('SELECT id,count,meters FROM "LeaderDrilling" WHERE "tenantId"=$1 AND "shiftId"=$2', [tenantId, shiftId])).rows;
+  expect(piles).toHaveLength(1);
+  expect(drillings).toHaveLength(1);
+  try {
+    // Synthetic layout stress only; normal values are restored before submitting.
+    await db.query('UPDATE "PileWork" SET count=1234567890 WHERE id=$1 AND "tenantId"=$2', [piles[0].id, tenantId]);
+    await db.query('UPDATE "LeaderDrilling" SET count=1234567890,meters=14814814680.5 WHERE id=$1 AND "tenantId"=$2', [drillings[0].id, tenantId]);
+    await page.reload();
+    await next(page);
+    await closingSummary(page, db, tenantId, shiftId, observed, 'long numbers');
+    await page.screenshot({ path: test.info().outputPath('v10-summary-long.png'), fullPage: true });
+  } finally {
+    for (const row of piles) await db.query('UPDATE "PileWork" SET count=$3 WHERE id=$1 AND "tenantId"=$2', [row.id, tenantId, row.count]);
+    for (const row of drillings) await db.query('UPDATE "LeaderDrilling" SET count=$3,meters=$4 WHERE id=$1 AND "tenantId"=$2', [row.id, tenantId, row.count, row.meters]);
+  }
+  await page.reload();
+  await next(page);
+}
+
+for (const version of ['v7', 'v10', 'operator', 'v5', 'v2'] as const) for (const multiple of [false, true]) for (const width of version === 'v10' ? [375, 1440] : [375]) test(version + ': real admission, inspections, offline replay, production and closed report (' + (multiple ? 'multiple rigs' : 'single rig') + ')' + (version === 'v10' ? ' viewport ' + width : ''), async ({ page, context }, info) => {
   test.setTimeout(600_000);
-  await page.setViewportSize({ width: 375, height: 812 });
+  await page.setViewportSize({ width, height: width > 1000 ? 1000 : 812 });
   const fixture = await createRoleAuditFixture();
   const db = new Client({ connectionString: process.env.INTEGRATION_DATABASE_URL_OWNER });
   await db.connect();
@@ -259,9 +314,24 @@ for (const version of ['v7', 'v10', 'operator', 'v5', 'v2'] as const) for (const
     await checklist(page);
     await expect.poll(async () => (await state(page)).checklists.find(item => item.stage === 'EO_AFTER')?.done).toBe(true);
     await next(page);
+    if (version === 'v10') {
+      const current = await state(page);
+      expect(current.shift?.id).toBeTruthy();
+      const totals = await closingSummary(page, db, fixture.tenantId, current.shift!.id, observed, 'before close');
+      expect(totals).toEqual({ piles: 2, pileMeters: 24, drilling: 1, drillingMeters: 3, downtime: 0.25 });
+      await page.screenshot({ path: info.outputPath('v10-summary-before.png'), fullPage: true });
+      await longClosingSummary(page, db, fixture.tenantId, current.shift!.id, observed);
+      await closingSummary(page, db, fixture.tenantId, current.shift!.id, observed, 'restored before close');
+    }
     await page.getByRole('button', { name: version === 'v10' || mainScreen || v2Screen ? 'Закрыть смену и отправить отчёт' : 'Закрыть смену', exact: true }).click();
     await expect.poll(async () => (await state(page)).phase).toBe('CLOSED');
     const closed = await state(page);
+    if (version === 'v10') {
+      await closingSummary(page, db, fixture.tenantId, closed.shift!.id, observed, 'after close');
+      const receipt = page.locator('.ov10-card').filter({ has: page.getByText('Квитанция', { exact: true }) });
+      await expect(receipt).toContainText(closed.receipt!.reportId);
+      await expect(receipt.getByText('Отправлен', { exact: true })).toBeVisible();
+    }
     expect(closed.receipt?.reportId).toBeTruthy();
     expect(closed.receipt?.submittedAt).toBeTruthy();
     const persisted = await db.query('SELECT r.status, s.state, (SELECT sum(p.count)::int FROM "PileWork" p WHERE p."reportId"=r.id AND p."tenantId"=$1) AS piles FROM "Report" r JOIN "Shift" s ON s.id=r."shiftId" WHERE r."tenantId"=$1 AND r."shiftId"=$2', [fixture.tenantId, closed.shift?.id]);
