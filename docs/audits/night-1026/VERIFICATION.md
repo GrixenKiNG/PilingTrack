@@ -338,3 +338,22 @@ Sourceguardgitdiffsrc/prisma/package/next.configот451пуст;триscenarioha
 Команды отдельно и последовательно: npx tsc --noEmit exit0/14с (предварительно удалён только.next/dev/types,еслибыл); npm run lint exit0/62с без предупреждений; npx playwright test --list черезfreshwrapper exit0/34с,408тестов/30файлов противBASE318/28,обаexit0. Новый UIcase0passed/1failed/0skipped/0flaky exit1/40с. Source451 неизменён; полный unit5783/0/0 иbuild0/151с не повторялись для E2E-only RED,не объявляют новый UI зелёным.
 
 Перед коммитом полнаяforceпереиндексация,контрольUID/callers requirePageAbility,all+compare на точномWT. Полные артефакты equipment-cache-red-graph-results.json / detect-equipment-cache-red.json / compare-equipment-cache-red.json,безpartial/truncated/error. Общий compareHIGHсемиV3 заранее сообщён;это не объявление всего приложения безопасным. Новый reviewer не запускался.
+
+
+## Cachefix12167551: precommit / runtime пока pending
+
+Только2добавленныестрокиPOSTequipment. ExistingPOSTunit2/0/0exit0;tsc0/17с;lint0/62с. Fullforce+context15+all/compare119сexit0;all1changed7affected1fileHIGH,compare270changed14affected80filesHIGH(7POST+7V3),no partial/truncated/error. HIGHсообщён. Sourceproofstrip2equalsRED. Новаясборка/HTTP/полныйunitещёнезавершены;старые451зелёныенеобъявленыдоказательством12167551. EQUIPMENT-CACHE-FIX.md/json.
+
+
+## Последние проверки cachefix12167551
+
+Новый build0/156с;focused1/0/0 и3browserlifecycle3/0/0(всеflaky0),fullunit5783/0/0/512files,все241passed;collection408/30vsBASE318/28оба0. Отдельныйдругойmultiple-assignmentP3зановореальноRED0/1/0на121,queryнеправился. ПодробностиEQUIPMENT-CACHE-FIX.md/json. Старые451циклы/44126матрицанеперенесенына121. Task6частична.
+
+|Команда|Exit|Секунды|
+|---|---:|---:|
+|npx tsc --noEmit|0|14|
+|npm run lint|0|63|
+|npm run test:unit — fresh wrapper, последовательные файлы|0|820|
+|npx playwright test --list и BASE — fresh wrapper|0|35|
+
+Полныйсыройвывод full-unit-equipment-cache-final.json/log,валидаторequipment-cache-final-validated-summary.json,конвейерequipment-cache-verification-result.json.

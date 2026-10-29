@@ -121,5 +121,10 @@
       318,
       28
     ]
+  },
+  "currentFix": {
+    "sourceSha": "121675510f59d60454924226b5b63dd054c946f3",
+    "verification": "pending",
+    "report": "EQUIPMENT-CACHE-FIX.md"
   }
 }

@@ -1,11 +1,11 @@
 # Изменённые файлы ветки
 
-База efd95008eac3bc846c89003c4b7766f2eb5c1c9b. Код/тесты по ea9a64f2a5893607f4f63b6309a0129b0d9d1f7c; текущие отчёты включены. Сам перечень исключён. Конечный пустой элемент не считается строкой. Удалений нет. Все удаления строк внутри файлов — diff, а не удаление файлов; новые helpers/exports ради чистки не удалялись.
+База efd95008eac3bc846c89003c4b7766f2eb5c1c9b. Код/тесты по 121675510f59d60454924226b5b63dd054c946f3; текущие отчёты включены. Сам перечень исключён. Конечный пустой элемент не считается строкой. Удалений нет. Все удаления строк внутри файлов — diff, а не удаление файлов; новые helpers/exports ради чистки не удалялись.
 
 | Файл | Было | Стало |
 |---|---:|---:|
 |docs/DATA-SOURCES.md|51|51|
-|docs/audits/night-1026/ACTION-COVERAGE.md|—|36|
+|docs/audits/night-1026/ACTION-COVERAGE.md|—|39|
 |docs/audits/night-1026/CLEARANCE-MATRIX.json|—|166|
 |docs/audits/night-1026/CLEARANCE-MATRIX.md|—|30|
 |docs/audits/night-1026/CREW-LIFECYCLE.json|—|581|
@@ -19,10 +19,12 @@
 |docs/audits/night-1026/EQUIPMENT-ACCESS-FIX.md|—|57|
 |docs/audits/night-1026/EQUIPMENT-ACCESS-RED.json|—|104|
 |docs/audits/night-1026/EQUIPMENT-ACCESS-RED.md|—|38|
-|docs/audits/night-1026/EQUIPMENT-CACHE-RED.json|—|125|
-|docs/audits/night-1026/EQUIPMENT-CACHE-RED.md|—|30|
-|docs/audits/night-1026/EQUIPMENT-MULTIPLE-RED.json|—|211|
-|docs/audits/night-1026/EQUIPMENT-MULTIPLE-RED.md|—|45|
+|docs/audits/night-1026/EQUIPMENT-CACHE-FIX.json|—|606|
+|docs/audits/night-1026/EQUIPMENT-CACHE-FIX.md|—|66|
+|docs/audits/night-1026/EQUIPMENT-CACHE-RED.json|—|130|
+|docs/audits/night-1026/EQUIPMENT-CACHE-RED.md|—|33|
+|docs/audits/night-1026/EQUIPMENT-MULTIPLE-RED.json|—|356|
+|docs/audits/night-1026/EQUIPMENT-MULTIPLE-RED.md|—|50|
 |docs/audits/night-1026/IMAGES.md|—|36|
 |docs/audits/night-1026/INTEGRATION-RUN.md|—|314|
 |docs/audits/night-1026/LONG-FILES.json|—|197|
@@ -40,9 +42,9 @@
 |docs/audits/night-1026/QA-RUN.md|—|53|
 |docs/audits/night-1026/REVIEW.md|—|32|
 |docs/audits/night-1026/ROLES-OBSERVATIONS.json|—|4452|
-|docs/audits/night-1026/ROLES-WALKTHROUGH.md|—|213|
+|docs/audits/night-1026/ROLES-WALKTHROUGH.md|—|216|
 |docs/audits/night-1026/SKIP-REGISTRY.json|—|3139|
-|docs/audits/night-1026/SUMMARY.md|—|118|
+|docs/audits/night-1026/SUMMARY.md|—|130|
 |docs/audits/night-1026/USERS-CACHE-RED.json|—|71|
 |docs/audits/night-1026/USERS-CACHE-RED.md|—|21|
 |docs/audits/night-1026/USERS-LIFECYCLE.json|—|671|
@@ -52,7 +54,7 @@
 |docs/audits/night-1026/V3-LEGACY.md|—|45|
 |docs/audits/night-1026/V3-SELECTOR.md|—|25|
 |docs/audits/night-1026/V5-VIEWPORT.md|—|17|
-|docs/audits/night-1026/VERIFICATION.md|—|340|
+|docs/audits/night-1026/VERIFICATION.md|—|359|
 |docs/audits/night-1026/WHOLE-RUN-MATCH.json|—|46|
 |e2e/README.md|122|122|
 |e2e/admin-users.spec.ts|56|295|
@@ -67,6 +69,7 @@
 |src/app/(app)/(safety)/admin/safety/page.tsx|14|20|
 |src/app/api/equipment/[id]/__tests__/route.test.ts|201|250|
 |src/app/api/equipment/[id]/route.ts|171|180|
+|src/app/api/equipment/route.ts|102|104|
 |src/app/api/users/route.ts|169|173|
 |src/app/operator/v5/operator-v5-app.css|177|181|
 |src/components/piling/__tests__/dashboard-attention.test.tsx|65|76|

@@ -28,3 +28,6 @@ GitNexus impact точного POST UID — UNKNOWN/0callers, не принят 
 Команды отдельно и последовательно: npx tsc --noEmit exit0/14с (предварительно удалён только.next/dev/types,еслибыл); npm run lint exit0/62с без предупреждений; npx playwright test --list черезfreshwrapper exit0/34с,408тестов/30файлов противBASE318/28,обаexit0. Новый UIcase0passed/1failed/0skipped/0flaky exit1/40с. Source451 неизменён; полный unit5783/0/0 иbuild0/151с не повторялись для E2E-only RED,не объявляют новый UI зелёным.
 
 Перед коммитом полнаяforceпереиндексация,контрольUID/callers requirePageAbility,all+compare на точномWT. Полные артефакты equipment-cache-red-graph-results.json / detect-equipment-cache-red.json / compare-equipment-cache-red.json,безpartial/truncated/error. Общий compareHIGHсемиV3 заранее сообщён;это не объявление всего приложения безопасным. Новый reviewer не запускался.
+
+
+Текущее продолжение: минимальный cachefix12167551 применён отдельнымкоммитом;новаяbuild/runtimeпроверкапокаидёт,успехещёнезаявлен. EQUIPMENT-CACHE-FIX.md/json. ИсторическоеREDсырьё451сохранено.

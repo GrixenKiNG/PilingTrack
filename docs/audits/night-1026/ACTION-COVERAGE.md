@@ -34,3 +34,6 @@ C1–C3 повторены на свежем стенде:3/0/0,exit0;точны
 
 
 29.10: Equipment UI lifecycle покаREDнаcreate:201+SQL/audit есть,списокстарый. Edit/retire/reactivate/mechanic/historyguard в этом сценарии покаНЕПРОВЕРЕНЫ. EQUIPMENT-CACHE-RED.md. Не подменять фактическое прохождение подготовленным кодом.
+
+
+Продолжение12167551: прежний Equipment create REDисправлендвумяcachelines,весьподготовленныйlifecycleдостигнутв3браузерах(3/0/0). СмEQUIPMENT-CACHE-FIX.md. УдалениесисториейтолькоAPI409;UI-deleteнеизобретён. Readiness—толькосохранённые2requestevents,неподменаprojectionscore. Втораяназначеннаяустановкавотдельныхmeter/fuelAPIпоканедоступна,зановорепродуцированаRED0/1/0на121. Task6неполна.

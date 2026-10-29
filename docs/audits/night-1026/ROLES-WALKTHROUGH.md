@@ -211,3 +211,6 @@ ADMIN через UI создаёт и правит пользователя, с�
 
 
 29.10,ADMIN:create установки черезUI201 иSQL/passport100моточасов/auditADMIN подтверждены,но новый объект не появляется в парке из-за старогоfleetкеша(обычный1/fresh2). ДЕФЕКТ P3,0/1/0exit1/40с, EQUIPMENT-CACHE-RED.md. Следующие шаги редактирования/списания/механика этим RED ещё не достигнуты.
+
+
+29.10,12167551: Equipment UI lifecycle3/0/0во всехтрёхбраузерах;create→видимость→edit100/110→MECHANICread/PUTDELETE403→ADMINretire/reactivate→API-onlyDELETE409,SQL/audit4ADMIN/readinessrequests2,JSerrors[]. Всеутвержденияэтойцепочкидостигнуты,rawequipment-cache-three-raw. Полныйunit5783/0/0/build156сна121;старыеобщиероли/cyclesимеютсвоиSHA. ОтдельныйmultipleAPIcaseна121остаётся0/1/0.

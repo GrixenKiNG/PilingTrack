@@ -1,23 +1,23 @@
-# Доказательная ночь 26–28 октября 2026
+# Доказательная ночь 26–29 октября 2026
 
-Ветка codex/night-evidence-1026, база origin/main **efd95008eac3bc846c89003c4b7766f2eb5c1c9b**. Текущая проверенная прикладная сборка **451acce2**. Новый прогон:48браузерных случаев и полный unit5783/0/0. Исторические осмотры механика,бригады,матрицаURL и общий обход ролей относятся к44126; старые users/fullunit00ac сохранены отдельно. Границы каждого SHA указаны в разделах. Ничего не отправлялось и не вливалось.
+Ветка codex/night-evidence-1026, база origin/main **efd95008eac3bc846c89003c4b7766f2eb5c1c9b**. Последний проверенный прикладной SHA **12167551**: новый Equipment lifecycle3/0/0 и полный unit5783/0/0,build0/156с. Отдельный известный multiple-assignment RED0/1/0 сохранён. Предыдущие48браузерных случаев относятсяк451. Исторические осмотры механика,бригады,матрицаURL и общий обход ролей относятся к44126; старые users/fullunit00ac сохранены отдельно. Границы каждого SHA указаны в разделах. Ничего не отправлялось и не вливалось.
 
 | Задача | Статус | Что доказано |
 |---|---|---|
-|1. Повтор241пропуска|Готово|Все 241 повторены в свежем полном5783/0/0 на451,512файлов|
+|1. Повтор241пропуска|Готово|Все 241 повторены в свежем полном5783/0/0 на121,512файлов|
 |2. Отказы outbox|Готово|Пять PG-сценариев, crash/replay, точечный canonical tenant guard; retry/DLQ сохранены|
 |3. Матрица допуска|Готово|10случаев×5путей, решения совпали; разные предупреждения оставлены|
 |4. Образы и smoke|Готово|Точный main efd95008:app0/360с,workers0/43с,workerssmoke0/9с,prod:smoke13/13exit0. Это образы main, не ночной ветки|
 |5. Длинные файлы|Готово|15файлов:7прикладных/8тестовых; только чтение|
-|6. Роли и сквозные цепочки|**Частично**|Пять версий оператора:30полных циклов;V3:9legacy/selector. Цепочки диспетчера, ОТ и ремонта подтверждены. КаждыйCRUD и каждый чужойURL ещё не исчерпаны|
+|6. Роли и сквозные цепочки|**Частично**|На451: пять версий оператора,30полных циклов и9V3;на121:3Equipmentlifecycle. Цепочки диспетчера/ОТ/ремонта имеют отдельныеSHA. КаждыйCRUD и каждый чужойURL ещё не исчерпаны|
 |7. Документы против кода|Готово в заявленном объёме|43утверждения обязательных категорий,9вопросов владельцу. Архивы целиком не объявлены проверенными|
 
 ## ДЕФЕКТЫ
 
 | Приоритет | Дефект | Исправление |
 |---|---|---|
-|P3|После создания установки201/SQL парк и поиск остаются со старым снимком, обычный fleet1 противfresh2|**Открыт**, отдельный реальный UI RED0/1/0 на451. EQUIPMENT-CACHE-RED.md; минимальная инвалидация после POST ещё не применена|
-|P3|Вторая из двух активных назначенных установок: fuel и meter-readings GET/POST возвращают403|**Открыт**, подтверждён HTTP/SQL на451; новый E2E0/1/0. EQUIPMENT-MULTIPLE-RED.md; нужна точечная отмена запрета на общий query|
+|P3|После создания установки201/SQL парк и поиск остаются со старым снимком, обычный fleet1 противfresh2|RED40525a06 → fix12167551: ровно2строки; новые3lifecycle/полный5783unit/build156с прошли. EQUIPMENT-CACHE-FIX.md|
+|P3|Вторая из двух активных назначенных установок: fuel и meter-readings GET/POST возвращают403|**Открыт**, подтверждён HTTP/SQL на451и заново121; E2E0/1/0. EQUIPMENT-MULTIPLE-RED.md; нужна точечная отмена запрета на общий query|
 |P2|OPERATOR получает паспорт неназначенной установки по прямому id, хотя список её скрывает, а details запрещён|RED1daa696a → fix451acce2: согласованные девять строк;3случая доступа+30циклов+9V3+6users и полный unit5783/0/0. EQUIPMENT-ACCESS-FIX.md|
 |P2|ASSISTANT403 в «ТБ и допуски»|0e3e2c9a: личный экран без расширения прав|
 |P2|Outbox без tenantId доходил доhandler|48aa4689: разрешённый guard;старые записи требуют разбора|
@@ -63,56 +63,68 @@ V3: **9passed/0failed/0skipped** (6legacy+3selector). Отчёт сохраня�
 
 Очередь уведомлений и6delivery-сценариев на своём HTTP подтверждены; реальный Telegram, датчики, MQTT и железо не проверены. Ненастроенный Telegram даёт retry/DLQ: политика — вопрос№8. Закрытие ремонта не переписывает старый осмотр и само по себе не обещает полностью READY.
 
-Рабочие3100/данные/production не трогались. .env/schema/migrations/dependencies/auth/security/ORION не менялись. Узкие исключения S3/outbox/однаSQLстрока не расширены. Один независимый review выполнен ранее; новый не дублировался, поздние фиксы ему не приписаны. Автоматизации03-15/08-20/13-25/18-30 удалены.
+Рабочие3100/данные/production не трогались. .env/schema/migrations/dependencies/auth/security/ORION не менялись. Узкие исключения S3/outbox/одна SQL-строка и девять строк GET паспорта установки не расширены. Общая getCrewForOperator и два её guard остаются без правки; отдельное исключение запрошено. Один независимый review выполнен ранее; новый не дублировался, поздние фиксы ему не приписаны. Автоматизации03-15/08-20/13-25/18-30 удалены. Одноразовый запуск02:00 удалён после срабатывания; запуск07:00 сохранён.
 
 ## Файлы и повтор
 
 Подробности: VERIFICATION.md, ROLES-WALKTHROUGH.md, CROSS-ROLE.md, OPERATOR-CYCLE.md, V2-FOOTER.md, V5-VIEWPORT.md, V3-LEGACY.md. Файлы и строки — CHANGED-FILES.md. Сырые логи/JSON/screenshots и RESUME — D:/PillingR/night-logs/night-evidence-1026/. Команды в *-result.json; пароли fixtures не писать в.env/отчёт. Полные detectall/compare перед финальным коммитом приложены отдельно; ограничения графа не трактуются как безопасность.
 
+
+
+## Последние проверки cachefix12167551
+
+Новый build0/156с;focused1/0/0 и3browserlifecycle3/0/0(всеflaky0),fullunit5783/0/0/512files,все241passed;collection408/30vsBASE318/28оба0. Отдельныйдругойmultiple-assignmentP3зановореальноRED0/1/0на121,queryнеправился. ПодробностиEQUIPMENT-CACHE-FIX.md/json. Старые451циклы/44126матрицанеперенесенына121. Task6частична.
+
 ## Коммиты ветки
 
-До текущего тестового снимка; его хеш приведён в итоговом сообщении и внешнем RESUME. Полный список включая него: git log --reverse --format="%H %s" efd95008..HEAD.
+Список до прикладногоSHA12167551; завершающийкоммитотчётабудетследующим.
 
-- 17fd1277d3ee97b49b1f4736fd77aa8318a5097a test(storage): expose tenantless S3 key regression
-- 7ad5d3bd7192b8976ce11113b68b54c93dbfe655 fix(storage): reject tenantless report and CSV keys
-- 9b9cce5f08e1e5f2bd25d6b62e4aa0db3c65706a test(safety): reproduce blocked personal clearance for assistant
-- 0e3e2c9ad87ad85f2948c98ea56cfae21a88021c fix(safety): render personal clearance for assistant without park bootstrap
-- d7c2af5b6df4e7247dc3d9e67719d119c9ea1f16 test(dashboard): reject forbidden document control prefetch
-- befa99f93b878199af8d23eae777e62fe78706fa fix(dashboard): respect document reading permission before fetch
-- 05bc33fc147e58e3f3d36fd9cd3c75f04cb7f74c test(outbox): prove retries crash replay and tenantless processing on PostgreSQL
-- 48aa4689b50e745325decf7ecab0f1b45e5a2d79 fix(outbox): require canonical tenant before invoking handlers
-- 86b5101f5c45f13d03c3a26adb8bb5ae1e2ff7a3 test(safety): verify document clearance matrix across all consumers
-- ac8dc9e58649f843c37458ead687d8e25a037396 test: align real Prisma fixtures with the runtime RLS adapter types
-- 7e3aa7e15833f33a57ce2fa87c8acdd5bd3e318a test(e2e): walk role pages tabs API denials and session replacement
-- 4e77e3667dba5db3ca1816f6e146c6109a3a0018 docs: correct notification source path and disposable browser commands
-- 0653c6e5fea4728f2e3f000da405227458b3eba8 test(e2e): wait for hydrated readiness and include retained v3 fixture
-- ff582e7e2d2e6c4c68144ce56d8d677bfffe45a6 docs(audit): record real integration outbox clearance and code evidence
-- fa0f8c3dd2dc3c841452765adf3e15014dfe765d test(outbox): supply canonical tenants in normal projection fixtures
-- 3f671dae5fd63f5d5329fe838f6945c0865e647a test(outbox): select platform shell for disposable PostgreSQL helpers
-- ea22fd18dea34df804cdc14df60a1780d761000d test(e2e): select dispatcher report fixture by public user id
-- f87c2b5000a2273a5efa56e9cf44b61febd48ffc test(e2e): verify role sessions, full v7 shifts and blocked v3 selector
-- 1b0a2663d19c5d9f77e22f64882ba59c306bbf8c fix(operator-v3): retain bottom spacing above desktop navigation
-- f154f8b400eaa04c789f4096c8da7bab45fe8f62 test: verify complete v10 operator shift on disposable stand
-- 535485522b10c35bdfd49323ade47149bf219b9a docs: preserve night evidence, baseline race and verification limits
-- 58a2b64f7a9437e6badbc1474bfb279ee95c5a18 test: exercise full primary operator shift and offline replay
-- a61aa205bd55817ca342f98b0310889f6f5aaff9 docs: record primary operator evidence and final isolated cleanup
-- f51b0f30465c0273905853d0e1e8bc333a9ee0e5 fix(readiness): handle both idempotency unique constraints
-- a17c07e7132b772118d9b3b780a1c9f3c5781c03 docs: record verified idempotency fix and full green baseline
-- e4b438783fef8e4c36fa685b8e553cf8e7022315 test: reproduce v5 long equipment name overflow
-- 46315b0fa1233b27075c4edb79d604c6c451026c fix(operator-v5): wrap long equipment names within viewport
-- 1d0ff6e99da391207450ffc546f6051875883cda test: reproduce blocked completion in v2 inspection
-- 21dc26ce6046a139e54d0ce8fc19c55e94682b65 fix(operator-v2): keep nested screen footer clear of step dock
-- 7a9dc8a7d7e8064d3af48549592315468e045cf2 fix(operator-v2): reserve space for fixed step navigation
-- 95f7c6b85de1baff9cf2188ce7fc6b449714622b fix(operator-v2): wrap long rig names within the viewport
-- 44126b987c9dd02b0bbefe28e8094f282b94aaf0 test(operator-v3): prove legacy report persistence and dispatcher visibility
-- 86358ae362686ec2655bf525267059a41908a57b test(operator-v3): await select focus restoration before numeric input
-- fa2de8ec394b86dba29eb2861d0252a1416c647c test(e2e): prove dispatcher safety repair and readiness chains
-- fcc5b0d6cda4b55490076016708edfb338fc1187 docs: record final operator and cross-role evidence with coverage limits
-- 34227a48b77e79a262d1b4d5e480c6249e2ba351 test(inspections): prove complete mechanic workflow across browsers
-- f938298c9fcdab0611ff0c1361176be01e1756b8 test(e2e): verify inherited page guards across seven real roles
-- b0001fdb42ea795febc4e5590f2793ec52f413ed test(crews): prove UI lifecycle assignments and actor audit
-- 30634acf6c611574434dcd7a3ab784e67000d809 test(users): reproduce stale cached list after committed creation
-- 00ac751ffa4c22cb2117a189474ce7bcc73410cc fix(users): invalidate catalogue responses after successful writes
-- 81de80872bb503bd86e20027b0cd12c0d082d09f test(users): verify lifecycle after catalogue cache invalidation
-- 1daa696a287c83de626909128bf7c662fcc2d094 test(equipment): reproduce operator access to an unassigned rig
-- 451acce2b30e5130a9055e9d966edcf4a413ff67 fix(equipment): restrict operator cards to active rig assignments
+```text
+17fd1277 test(storage): expose tenantless S3 key regression
+7ad5d3bd fix(storage): reject tenantless report and CSV keys
+9b9cce5f test(safety): reproduce blocked personal clearance for assistant
+0e3e2c9a fix(safety): render personal clearance for assistant without park bootstrap
+d7c2af5b test(dashboard): reject forbidden document control prefetch
+befa99f9 fix(dashboard): respect document reading permission before fetch
+05bc33fc test(outbox): prove retries crash replay and tenantless processing on PostgreSQL
+48aa4689 fix(outbox): require canonical tenant before invoking handlers
+86b5101f test(safety): verify document clearance matrix across all consumers
+ac8dc9e5 test: align real Prisma fixtures with the runtime RLS adapter types
+7e3aa7e1 test(e2e): walk role pages tabs API denials and session replacement
+4e77e366 docs: correct notification source path and disposable browser commands
+0653c6e5 test(e2e): wait for hydrated readiness and include retained v3 fixture
+ff582e7e docs(audit): record real integration outbox clearance and code evidence
+fa0f8c3d test(outbox): supply canonical tenants in normal projection fixtures
+3f671dae test(outbox): select platform shell for disposable PostgreSQL helpers
+ea22fd18 test(e2e): select dispatcher report fixture by public user id
+f87c2b50 test(e2e): verify role sessions, full v7 shifts and blocked v3 selector
+1b0a2663 fix(operator-v3): retain bottom spacing above desktop navigation
+f154f8b4 test: verify complete v10 operator shift on disposable stand
+53548552 docs: preserve night evidence, baseline race and verification limits
+58a2b64f test: exercise full primary operator shift and offline replay
+a61aa205 docs: record primary operator evidence and final isolated cleanup
+f51b0f30 fix(readiness): handle both idempotency unique constraints
+a17c07e7 docs: record verified idempotency fix and full green baseline
+e4b43878 test: reproduce v5 long equipment name overflow
+46315b0f fix(operator-v5): wrap long equipment names within viewport
+1d0ff6e9 test: reproduce blocked completion in v2 inspection
+21dc26ce fix(operator-v2): keep nested screen footer clear of step dock
+7a9dc8a7 fix(operator-v2): reserve space for fixed step navigation
+95f7c6b8 fix(operator-v2): wrap long rig names within the viewport
+44126b98 test(operator-v3): prove legacy report persistence and dispatcher visibility
+86358ae3 test(operator-v3): await select focus restoration before numeric input
+fa2de8ec test(e2e): prove dispatcher safety repair and readiness chains
+fcc5b0d6 docs: record final operator and cross-role evidence with coverage limits
+34227a48 test(inspections): prove complete mechanic workflow across browsers
+f938298c test(e2e): verify inherited page guards across seven real roles
+b0001fdb test(crews): prove UI lifecycle assignments and actor audit
+30634acf test(users): reproduce stale cached list after committed creation
+00ac751f fix(users): invalidate catalogue responses after successful writes
+81de8087 test(users): verify lifecycle after catalogue cache invalidation
+1daa696a test(equipment): reproduce operator access to an unassigned rig
+451acce2 fix(equipment): restrict operator cards to active rig assignments
+816e388a docs: record verified equipment access fix and source-pinned regression gates
+ea9a64f2 test(equipment): reproduce denied journals for a second assigned rig
+40525a06 test(equipment): reproduce stale fleet after creating a rig
+12167551 fix(equipment): invalidate fleet snapshot after rig creation
+```

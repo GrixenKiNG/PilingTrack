@@ -43,3 +43,8 @@ GitNexus привязан к D:/PillingR/wt-night-evidence-1026. Индекс п
 |npx playwright test --list + BASE collection, собственная fresh wrapper|0|37|
 
 Перед tsc удалён только .next/dev/types, если существовал. Lint без предупреждений. Коллекция 405/30 противBASE318/28; обаexit0. Полные unit/build не повторялись для одного E2E-only дополнения; полный5783/0/0 иbuild0/151с проверены на том же прикладном451, но не объявляют новый случай зелёным. Все прежние test bodies сохранены после нормализации прежних CRLF/LF.
+
+
+## Повтор после независимого cachefix12167551
+
+ТотжереальныйHTTP/SQLдефектвоспроизведённа12167551:однаназначеннаяGET200POST201,вторая4x403,неназначенная4x403;SQL1MeterReading+1FuelLog/audit2OP. Новыйfreshrun0passed/1failed/0skipped/0flakyexit1,raw equipment-multiple-known-red-after-cache-raw. Общийquery/guardsнеизменены. Этоотдельныйоткрытыйдефект,необнулёнзелёнымиunit/build/cachelifecycle.
