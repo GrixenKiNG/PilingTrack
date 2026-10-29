@@ -48,7 +48,7 @@
     "zai-provider-extension",
     "scripts",
     "tests",
-    "vitest.config.ts",
+    "vitest.config.mts",
     "check-users.ts",
     "fix-admin.ts",
     "test-comprehensive.ts",

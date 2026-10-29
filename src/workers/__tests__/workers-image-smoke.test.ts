@@ -93,7 +93,7 @@ describe('CI и ручная выкладка workers', () => {
     expect(guard).toBeGreaterThan(unit.indexOf('run: npm run db:generate'));
     expect(unit).not.toMatch(/continue-on-error|passWithNoTests/);
     expect(unit).toContain('cache: npm');
-    const config = fs.readFileSync(path.join(root, 'vitest.config.ts'), 'utf8');
+    const config = fs.readFileSync(path.join(root, 'vitest.config.mts'), 'utf8');
     expect(config).toContain("'src/**/*.test.{ts,tsx}'");
     const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
     expect(pkg.scripts['test:unit']).toBe('vitest run');
