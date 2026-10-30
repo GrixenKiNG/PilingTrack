@@ -88,6 +88,11 @@ function dataRows(rows: ReturnType<typeof form41Rows>) {
 }
 
 describe('form41Rows — форма № 4.1 СП 392', () => {
+  it('считает исключённые сваи в пачке, а не строки выработки', () => {
+    const rows = form41Rows({ ...ctx, rows: [pile({hasPassport: false, count: 5})] });
+    expect(JSON.stringify(rows)).toContain('в форму не включено: 5');
+  });
+
   it('отметка острия = отметка головы минус длина (проект и факт)', () => {
     const [row] = dataRows(form41Rows({ ...ctx, rows: [pile()] }));
     expect(row.slice(7, 11)).toEqual([102.4, 102.42, 90.4, 90.42]);

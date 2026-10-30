@@ -102,7 +102,7 @@ export interface Form41Input {
 export function form41Rows({ rows, header, organisation, truncated, timezone }: Form41Input): XlsxCell[][] {
   const list = (values: (string | number)[]): string => (values.length ? values.join(', ') : BLANK);
   const withPassport = rows.filter((row) => row.hasPassport);
-  const skipped = rows.length - withPassport.length;
+  const skipped = rows.filter((row) => !row.hasPassport).reduce((sum, row) => sum + row.count, 0);
 
   return [
     ['Форма № 4.1 СП 392.1325800.2018'],

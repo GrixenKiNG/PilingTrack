@@ -84,6 +84,16 @@ beforeEach(() => {
 });
 
 describe('logProduction — стыки составной сваи', () => {
+  it('повтор команды после обрыва не пишет второй паспорт и стыки', async () => {
+    const input = command([{welderName: 'Петров', electrode: 'УОНИ'}]);
+    await logProduction(input);
+    tx.pileWork.findUnique.mockResolvedValue({id: 'pw-1'});
+    tx.shift.findFirst.mockRejectedValue(new Error('Смена уже закрыта'));
+    await expect(logProduction(input)).resolves.toEqual({reportId: ''});
+    expect(tx.pilePassport.create).toHaveBeenCalledTimes(1);
+    expect(tx.pileWork.create).toHaveBeenCalledTimes(1);
+  });
+
   it('пишет стыки вместе с паспортом, нумерует по порядку и ставит время сам', async () => {
     await logProduction(command([
       {welderName: ' Петров П. П. ', electrode: 'УОНИ-13/55', anticorrosionMaterial: 'ВЛ-515'},

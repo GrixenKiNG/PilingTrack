@@ -25,7 +25,7 @@ const HEAD: string[] = [
  */
 export function svodRows({ rows, header, organisation, truncated, timezone }: Form41Input): XlsxCell[][] {
   const piles = rows.filter((row) => row.hasPassport);
-  const skipped = rows.length - piles.length;
+  const skipped = rows.filter((row) => !row.hasPassport).reduce((sum, row) => sum + row.count, 0);
   const numbers = piles.map((row) => row.pileNumber).filter((n): n is string => n !== null);
 
   return [
