@@ -4,7 +4,7 @@ import { PILE_JOURNAL_EXPORT_LIMIT, type PileJournalFilters } from './pile-journ
 import { listPilePassports } from './pile-journal-list';
 import { pileJournalHeader } from './pile-journal-totals';
 import { printDay } from './pile-journal-export';
-import { BLANK, type Form41Input } from './pile-journal-form41';
+import { BLANK, sortRowsForPrint, type Form41Input } from './pile-journal-form41';
 
 const SHIFT_TEXT: Record<string, string> = { DAY: 'дневная', NIGHT: 'ночная' };
 
@@ -24,7 +24,7 @@ const HEAD: string[] = [
  * ведомость не входят: у них нет номера и замеров, их число печатаем.
  */
 export function svodRows({ rows, header, organisation, truncated, timezone }: Form41Input): XlsxCell[][] {
-  const piles = rows.filter((row) => row.hasPassport);
+  const piles = sortRowsForPrint(rows.filter((row) => row.hasPassport), timezone);
   const skipped = rows.filter((row) => !row.hasPassport).reduce((sum, row) => sum + row.count, 0);
   const numbers = piles.map((row) => row.pileNumber).filter((n): n is string => n !== null);
 
@@ -74,6 +74,7 @@ export async function exportPileSvodXlsx(filters: PileJournalFilters): Promise<B
     ...filters,
     limit: PILE_JOURNAL_EXPORT_LIMIT,
     timezone,
+    order: 'asc',
   });
   return buildXlsx([
     {

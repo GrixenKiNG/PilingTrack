@@ -68,7 +68,7 @@ export async function listPilePassports(input: PileJournalFilters): Promise<Pile
         ? { OR: [{ occurredAt: bounds }, { occurredAt: null, receivedAt: bounds }] }
         : {}),
     },
-    orderBy: [{ occurredAt: { sort: 'desc', nulls: 'last' } }, { receivedAt: 'desc' }],
+    orderBy: [{ occurredAt: { sort: input.order ?? 'desc', nulls: 'last' } }, { receivedAt: input.order ?? 'desc' }],
     // Лишняя строка — только признак среза: в ответ уйдёт ровно `limit` строк.
     take: limit + 1,
     include: {

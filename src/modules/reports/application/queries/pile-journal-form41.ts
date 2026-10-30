@@ -7,13 +7,34 @@ import {
   type PilePassportRow,
 } from './pile-journal-types';
 import { listPilePassports } from './pile-journal-list';
-import { pileJournalHeader } from './pile-journal-totals';
+import { dayInTimezone, pileJournalHeader } from './pile-journal-totals';
 import { printDay } from './pile-journal-export';
 
 /** Место, которое заполняют от руки: номер журнала, число страниц, подписи. */
 export const BLANK = '________';
 
 const round = (value: number, digits: number): number => Number(value.toFixed(digits));
+
+/**
+ * Строки журнала погружения и сводной ведомости — по порядку забивки: первая
+ * строка — первая забитая свая. Экран журнала отдаёт «новые сверху», поэтому
+ * печатные формы 4.1 и 2.5 переставляют строки сами (экран не трогаем).
+ *
+ * ПОРЯДОК. День по поясу организации (как в графе «Дата забивки»), при равных
+ * днях — номер сваи с числовым сравнением («С-9» раньше «С-10»), затем момент
+ * забивки. Дата забивки у строки есть всегда (нет `occurredAt` — берётся момент
+ * записи), поэтому «без даты в конец» не бывает: свая стоит там, где напечатан её день.
+ */
+export function sortRowsForPrint(rows: PilePassportRow[], timezone: string): PilePassportRow[] {
+  const collator = new Intl.Collator('ru', { numeric: true });
+  return rows
+    .map((row) => ({ row, day: dayInTimezone(row.drivenAt, timezone) }))
+    .sort((a, b) =>
+      a.day.localeCompare(b.day)
+      || collator.compare(a.row.pileNumber ?? '', b.row.pileNumber ?? '')
+      || a.row.drivenAt.localeCompare(b.row.drivenAt))
+    .map(({ row }) => row);
+}
 
 /** Отметка острия = отметка головы минус длина сваи. */
 function tipLevel(headLevelM: number | null, lengthM: number | null): number | '' {
@@ -101,7 +122,7 @@ export interface Form41Input {
  */
 export function form41Rows({ rows, header, organisation, truncated, timezone }: Form41Input): XlsxCell[][] {
   const list = (values: (string | number)[]): string => (values.length ? values.join(', ') : BLANK);
-  const withPassport = rows.filter((row) => row.hasPassport);
+  const withPassport = sortRowsForPrint(rows.filter((row) => row.hasPassport), timezone);
   const skipped = rows.filter((row) => !row.hasPassport).reduce((sum, row) => sum + row.count, 0);
 
   return [
@@ -141,6 +162,7 @@ export async function exportPileJournalForm41Xlsx(filters: PileJournalFilters): 
     ...filters,
     limit: PILE_JOURNAL_EXPORT_LIMIT,
     timezone,
+    order: 'asc',
   });
   return buildXlsx([
     {

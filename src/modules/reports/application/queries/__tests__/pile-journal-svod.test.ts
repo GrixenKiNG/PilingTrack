@@ -68,4 +68,29 @@ describe('svodRows — форма № 2.5 ВСН 012-88', () => {
     expect(text).toContain('без паспорта');
     expect(text).toContain('Показаны первые');
   });
+  describe('порядок строк: от первой забитой сваи к последней', () => {
+    const newestFirst = [
+      pile({ pileNumber: 'С-120', drivenAt: '2026-08-20T08:00:00.000Z' }),
+      pile({ pileNumber: 'С-119', drivenAt: '2026-08-18T09:00:00.000Z' }),
+      pile({ pileNumber: 'С-118', drivenAt: '2026-08-18T08:00:00.000Z' }),
+    ];
+
+    it('строки идут от самой ранней забивки к поздней, № п/п сквозной', () => {
+      const rows = body(svodRows({ ...ctx, rows: newestFirst }));
+      expect(rows.map((row) => [row[0], row[1]])).toEqual([[1, 'С-118'], [2, 'С-119'], [3, 'С-120']]);
+    });
+
+    it('«с № … по №» — первая и последняя свая в этом порядке', () => {
+      const head = svodRows({ ...ctx, rows: newestFirst }).find((row) => row[0] === '(с №');
+      expect(head).toEqual(['(с №', 'С-118', 'по №', 'С-120', ')']);
+    });
+
+    it('при равных датах — по номеру сваи', () => {
+      const sameDay = [
+        pile({ pileNumber: 'С-10', drivenAt: '2026-08-18T07:00:00.000Z' }),
+        pile({ pileNumber: 'С-9', drivenAt: '2026-08-18T15:00:00.000Z' }),
+      ];
+      expect(body(svodRows({ ...ctx, rows: sameDay })).map((row) => row[1])).toEqual(['С-9', 'С-10']);
+    });
+  });
 });
