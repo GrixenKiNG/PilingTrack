@@ -4,6 +4,7 @@ import { PILE_JOURNAL_EXPORT_LIMIT, type PileJournalFilters, type PileJournalHea
 import { listPilePassports } from './pile-journal-list';
 import { pileJournalHeader } from './pile-journal-totals';
 import { BLANK } from './pile-journal-form41';
+import { printDay } from './pile-journal-export';
 
 /** Сколько номеров свай печатаем в акте; остальные — в журнале. */
 const NUMBERS_LIMIT = 50;
@@ -13,6 +14,8 @@ export interface AosrInput {
   header: PileJournalHeader;
   organisation: string;
   inn: string;
+  /** Пояс организации: по нему считаются дни начала и окончания работ. */
+  timezone: string;
   truncated?: boolean;
 }
 
@@ -23,6 +26,29 @@ export const SIGNERS = [
   'Представитель лица, осуществляющего подготовку проектной документации (в случае привлечения для проверки соответствия работ проектной документации)',
   'Представитель лица, выполнившего работы, подлежащие освидетельствованию (в случае выполнения работ по договору с иным лицом)',
 ];
+
+/**
+ * Шапка акта по принятым сваям: объект, копёр, молот и даты работ.
+ *
+ * ПОЧЕМУ НЕ ИЗ ТИТУЛА ЖУРНАЛА. `header` — итог по всем сваям выборки: в нём все
+ * установки, молоты и крайние даты объекта. Акт освидетельствует только принятые
+ * сваи, поэтому машины и даты чужих (не принятых, на добивку) свай в нём лишние.
+ * Принятых нет — акт пустой, остаётся шапка журнала.
+ */
+export function acceptedHeader(accepted: PilePassportRow[], header: PileJournalHeader, timezone: string): PileJournalHeader {
+  if (accepted.length === 0) return header;
+  const unique = (values: (string | null)[]): string[] =>
+    [...new Set(values.filter((value): value is string => !!value))].sort((a, b) => a.localeCompare(b, 'ru'));
+  const moments = accepted.map((row) => row.drivenAt).sort();
+  return {
+    ...header,
+    siteNames: unique(accepted.map((row) => row.siteName)),
+    equipmentNames: unique(accepted.map((row) => row.equipmentName)),
+    hammerTypes: unique(accepted.map((row) => row.hammerType)),
+    dateFrom: printDay(moments[0], timezone),
+    dateTo: printDay(moments[moments.length - 1], timezone),
+  };
+}
 
 /** Шапка акта скрытых работ (приложение № 3 к 344/пр) до пункта 1. */
 export function actHead(site: string, organisation: string, inn: string): XlsxCell[][] {
@@ -74,8 +100,9 @@ export function pileGroups(piles: PilePassportRow[]): string[] {
  * завода, решение о последующих работах и подписанты: справочника участников в
  * приложении нет, это заполняют в файле от руки.
  */
-export function aosrRows({ rows, header, organisation, inn, truncated }: AosrInput): XlsxCell[][] {
+export function aosrRows({ rows, header: journalHeader, organisation, inn, timezone, truncated }: AosrInput): XlsxCell[][] {
   const accepted = rows.filter((row) => row.hasPassport && row.acceptance === 'ACCEPTED');
+  const header = acceptedHeader(accepted, journalHeader, timezone);
   const notAccepted = rows.filter((row) => row.hasPassport && row.acceptance !== 'ACCEPTED').length;
   const numbers = accepted.map((row) => row.pileNumber).filter((n): n is string => n !== null);
   const shown = numbers.slice(0, NUMBERS_LIMIT).join(', ');
@@ -124,6 +151,7 @@ export async function exportPileAosrXlsx(filters: PileJournalFilters): Promise<B
         header: pileJournalHeader(rows, totals, timezone),
         organisation: companyName ?? '',
         inn: inn ?? '',
+        timezone,
         truncated,
       }),
     },
