@@ -229,6 +229,14 @@ export async function logProduction(input: {
       shiftType: shift.type,
     });
 
+    // Пустой upsert в ensureReport не защищает найденный отчёт от удаления.
+    // Держим родителя до записи детей: удаление либо завершилось раньше
+    // (тогда 409), либо дождётся паспорта и будет остановлено его внешним ключом.
+    const lockedReport = await tx.$executeRaw`SELECT 1 FROM "Report" WHERE id = ${reportId} AND "tenantId" = ${input.tenantId} FOR KEY SHARE`;
+    if (lockedReport === 0) {
+      throw new OperatorCommandError(409, 'Отчёт по смене удалён. Обновите экран перед повторной записью.');
+    }
+
     // Сданный отчёт — закрытый документ. В контуре готовности смена после
     // сдачи живёт до передачи машины, и записи продолжали ложиться в уже
     // сданный отчёт: событие «сдан» ушло с одними итогами, а в отчёте — другие.
