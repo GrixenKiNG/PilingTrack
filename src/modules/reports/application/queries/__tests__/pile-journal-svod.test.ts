@@ -68,4 +68,36 @@ describe('svodRows — форма № 2.5 ВСН 012-88', () => {
     expect(text).toContain('без паспорта');
     expect(text).toContain('Показаны первые');
   });
+  describe('«Производитель работ» — мастер, принявший сваи', () => {
+    const producer = (rows: ReturnType<typeof svodRows>) => rows.find((row) => row[0] === 'Производитель работ');
+    const accepted = (acceptedByName: string | null, acceptedAt: string | null, overrides: Partial<PilePassportRow> = {}) =>
+      pile({ acceptance: 'ACCEPTED', acceptedByName, acceptedAt, ...overrides });
+
+    it('один мастер — его ФИО', () => {
+      const row = producer(svodRows({ ...ctx, rows: [accepted('Петрова Д.В.', '2026-08-19T08:00:00.000Z')] }));
+      expect(row?.[1]).toBe('Петрова Д.В.');
+    });
+
+    it('несколько — через запятую, без повторов, в порядке первого принятия', () => {
+      const row = producer(svodRows({
+        ...ctx,
+        rows: [
+          accepted('Сидоров К.Н.', '2026-08-20T08:00:00.000Z', { pileNumber: 'С-3' }),
+          accepted('Петрова Д.В.', '2026-08-19T08:00:00.000Z', { pileNumber: 'С-2' }),
+          accepted('Сидоров К.Н.', '2026-08-19T09:00:00.000Z', { pileNumber: 'С-1' }),
+        ],
+      }));
+      expect(row?.[1]).toBe('Петрова Д.В., Сидоров К.Н.');
+    });
+
+    it('принявших нет — бланк, как раньше', () => {
+      const row = producer(svodRows({ ...ctx, rows: [pile({ acceptance: 'PENDING' }), pile({ acceptance: 'NEEDS_REDRIVE', acceptedByName: 'Петрова Д.В.' })] }));
+      expect(row?.[1]).toBe('________');
+    });
+
+    it('принятая, но без имени (мастера удалили) — бланк, не «null»', () => {
+      const row = producer(svodRows({ ...ctx, rows: [accepted(null, '2026-08-19T08:00:00.000Z')] }));
+      expect(row?.[1]).toBe('________');
+    });
+  });
 });
