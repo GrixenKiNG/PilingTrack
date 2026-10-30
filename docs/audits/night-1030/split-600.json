@@ -1,0 +1,318 @@
+{
+  "task": 6,
+  "testedSourceSha": "d3a0209d332da0df74a51bf813ea98dcc6de82ea",
+  "sourceTree": "005846dcd902d328f94299f15d042590614f7585",
+  "status": "pure-moves-complete-with-size-exceptions",
+  "graph": {
+    "impact": {
+      "symbols": 55,
+      "low": 25,
+      "unknown": 20,
+      "high": 10
+    },
+    "compare": {
+      "changed_count": 88,
+      "affected_count": 9,
+      "changed_files": 14,
+      "risk_level": "high"
+    }
+  },
+  "base": "c204d90e23588177a875cb9449269b89275db671",
+  "branch": "codex/split-600-1030",
+  "steps": [
+    {
+      "id": "settings",
+      "commit": "1214b85b40fa3a4010b65a7caa671148c3bd8340",
+      "files": [
+        "src/components/piling/to/readiness/screens/settings-workspace.tsx",
+        "src/components/piling/to/readiness/screens/settings-workspace-config.ts"
+      ],
+      "declarations": 11,
+      "publicExports": [
+        "SettingsWorkspace"
+      ],
+      "beforeLines": 668,
+      "afterLines": 583,
+      "newLines": 93,
+      "checks": {
+        "pure": 0,
+        "tsc": 0,
+        "targeted": 0,
+        "lint": 0,
+        "index": 0,
+        "detect-cli": 0,
+        "detect-full": 0,
+        "diff-check": 0
+      },
+      "targeted": {
+        "passed": 400,
+        "failed": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "id": "reports-screen",
+      "commit": "c1b471145743f33249bf09f2ee9bc73ffd13f3ed",
+      "files": [
+        "src/components/piling/to/readiness/screens/reports-screen.tsx",
+        "src/components/piling/to/readiness/screens/reports-screen-period.ts"
+      ],
+      "declarations": 11,
+      "publicExports": [
+        "ReportsScreen"
+      ],
+      "beforeLines": 630,
+      "afterLines": 570,
+      "newLines": 63,
+      "checks": {
+        "pure": 0,
+        "tsc": 0,
+        "targeted": 0,
+        "lint": 0,
+        "index": 0,
+        "detect-cli": 0,
+        "detect-full": 0,
+        "diff-check": 0
+      },
+      "targeted": {
+        "passed": 400,
+        "failed": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "id": "briefings",
+      "commit": "6d3ddb16b6ea12d152482cb1c20290ff190627dd",
+      "files": [
+        "src/components/piling/to/readiness/screens/briefings-screen.tsx",
+        "src/components/piling/to/readiness/screens/briefings-screen-format.tsx"
+      ],
+      "declarations": 12,
+      "publicExports": [
+        "BriefingsScreen"
+      ],
+      "beforeLines": 609,
+      "afterLines": 531,
+      "newLines": 77,
+      "checks": {
+        "pure": 0,
+        "tsc": 0,
+        "targeted": 0,
+        "lint": 0,
+        "index": 0,
+        "detect-cli": 0,
+        "detect-full": 0,
+        "diff-check": 0
+      },
+      "targeted": {
+        "passed": 400,
+        "failed": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "id": "dictionaries",
+      "commit": "d19a826a8a1960c4442708690ed6287b33915748",
+      "files": [
+        "src/components/piling/admin-dictionaries.tsx",
+        "src/components/piling/admin-dictionaries-support.ts"
+      ],
+      "declarations": 9,
+      "publicExports": [
+        "AdminDictionaries"
+      ],
+      "beforeLines": 694,
+      "afterLines": 647,
+      "newLines": 54,
+      "checks": {
+        "pure": 0,
+        "tsc": 0,
+        "targeted": 0,
+        "lint": 0,
+        "index": 0,
+        "detect-cli": 0,
+        "detect-full": 0,
+        "diff-check": 0
+      },
+      "targeted": {
+        "passed": 24,
+        "failed": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "id": "admin-reports",
+      "commit": "e9d817baff268c3c8d32e735fe7f8369a2fb1951",
+      "files": [
+        "src/components/piling/admin-reports/admin-reports.tsx",
+        "src/components/piling/admin-reports/report-list-controls.tsx"
+      ],
+      "declarations": 6,
+      "publicExports": [
+        "AdminReports"
+      ],
+      "beforeLines": 630,
+      "afterLines": 576,
+      "newLines": 59,
+      "checks": {
+        "pure": 0,
+        "tsc": 0,
+        "targeted": 0,
+        "lint": 0,
+        "index": 0,
+        "detect-cli": 0,
+        "detect-full": 0,
+        "diff-check": 0
+      },
+      "targeted": {
+        "passed": 70,
+        "failed": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "id": "sites",
+      "commit": "4aca38e2a5cd8e01e738f37244babadef1940c02",
+      "nonBlockingDiffWhitespace": {
+        "exit": 2,
+        "sourceBaseLine": 545,
+        "newFileLine": 142,
+        "spaces": 19,
+        "reason": "Exact pre-existing JSX whitespace preserved; pure/AST pass"
+      },
+      "files": [
+        "src/components/piling/admin-sites/index.tsx",
+        "src/components/piling/admin-sites/site-detail.tsx"
+      ],
+      "declarations": 11,
+      "publicExports": [
+        "AdminSites"
+      ],
+      "beforeLines": 604,
+      "afterLines": 397,
+      "newLines": 201,
+      "checks": {
+        "pure": 0,
+        "tsc": 0,
+        "targeted": 0,
+        "lint": 0,
+        "index": 0,
+        "detect-cli": 0,
+        "detect-full": 0,
+        "diff-check": 2
+      },
+      "targeted": {
+        "passed": 57,
+        "failed": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "id": "events",
+      "commit": "d3a0209d332da0df74a51bf813ea98dcc6de82ea",
+      "files": [
+        "src/modules/reports/application/event-handlers.ts",
+        "src/modules/reports/application/event-handlers-analytics.ts"
+      ],
+      "declarations": 19,
+      "publicExports": [
+        "REPORT_PDF_DELIVERY_EVENT",
+        "deliverReportPdf",
+        "recomputeSiteDailySummary",
+        "registerAlertEventHandler",
+        "registerAllEventHandlers",
+        "registerAnalyticsEventHandler",
+        "registerAuditEventHandler",
+        "registerTelegramReportHandler"
+      ],
+      "beforeLines": 684,
+      "afterLines": 383,
+      "newLines": 307,
+      "checks": {
+        "pure": 0,
+        "tsc": 0,
+        "targeted": 0,
+        "lint": 0,
+        "index": 0,
+        "detect-cli": 0,
+        "detect-full": 0,
+        "diff-check": 0
+      },
+      "targeted": {
+        "passed": 268,
+        "failed": 0,
+        "skipped": 5
+      }
+    }
+  ],
+  "baseline": {
+    "tsc": 0,
+    "lint": 0,
+    "unit": {
+      "exit": 0,
+      "passed": 5856,
+      "failed": 0,
+      "skipped": 281
+    },
+    "list": 0,
+    "build": 1,
+    "targeted": {
+      "exit": 0,
+      "passed": 883,
+      "failed": 0,
+      "skipped": 5
+    }
+  },
+  "final": {
+    "tsc": 0,
+    "lint": 0,
+    "unit": {
+      "exit": 0,
+      "passed": 5856,
+      "failed": 0,
+      "skipped": 281
+    },
+    "list": 0,
+    "build": 1,
+    "targeted": {
+      "exit": 0,
+      "passed": 883,
+      "failed": 0,
+      "skipped": 5
+    },
+    "layout": {
+      "files": 108,
+      "after": 108,
+      "testsPassed": 108,
+      "nonempty": 103,
+      "changed": [],
+      "added": []
+    }
+  },
+  "nonMovedAddedLines": 146,
+  "unchanged": [
+    {
+      "file": "src/components/piling/to/to-module.tsx",
+      "lines": 716,
+      "reason": "One 647-line component; extraction requires changing bodies/parameters"
+    },
+    {
+      "file": "src/components/piling/to/readiness/screens/readiness-centre.tsx",
+      "lines": 776,
+      "reason": "One 745-line component; no top-level blocks left"
+    },
+    {
+      "file": "src/modules/inspections/application/commands/inspection-commands.ts",
+      "lines": 595,
+      "reason": "Already below 600"
+    }
+  ],
+  "remainingLongComponent": {
+    "file": "src/components/piling/admin-dictionaries.tsx",
+    "functionLines": 615
+  },
+  "productionAccess": false,
+  "dependenciesChanged": false,
+  "testFilesChanged": false,
+  "filesDeleted": 0
+}
