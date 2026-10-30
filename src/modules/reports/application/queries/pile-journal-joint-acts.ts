@@ -32,12 +32,6 @@ const WORK_NAME: Record<JointActKind, string> = {
   ANTICORROSION: 'Антикоррозионная обработка сварных стыков секций составных свай',
 };
 
-/** Момент времени — ДД.ММ.ГГГГ ЧЧ:ММ в поясе организации. */
-function moment(iso: string, timezone: string): string {
-  const time = new Date(iso).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', timeZone: timezone });
-  return `${printDay(iso, timezone)} ${time}`;
-}
-
 /**
  * Акт скрытых работ по стыкам составных свай — приложение № 3 к приказу
  * Минстроя России от 16.05.2023 № 344/пр. Документ 5 списка СП 48.13330 (Б.3) —
@@ -75,7 +69,9 @@ export function jointActRows({ kind, rows, header, organisation, inn, timezone, 
         : `покрытие ${joint.anticorrosionMaterial}`;
       if (kind === 'WELD') materials.add(joint.electrode);
       else if (joint.anticorrosionMaterial) materials.add(joint.anticorrosionMaterial);
-      lines.push(`${pile.pileNumber ?? BLANK}, стык ${joint.ordinal} — ${moment(at, timezone)}, ${what}`);
+      // Только дата: время в записи стыка — момент отправки паспорта сваи, а не
+      // сварки или нанесения покрытия, и в акте оно вводило бы в заблуждение.
+      lines.push(`${pile.pileNumber ?? BLANK}, стык ${joint.ordinal} — ${printDay(at, timezone)}, ${what}`);
     }
   }
   stamps.sort();
