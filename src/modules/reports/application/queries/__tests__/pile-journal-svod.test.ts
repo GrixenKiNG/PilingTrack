@@ -15,6 +15,7 @@ const header = {
 function pile(overrides: Partial<PilePassportRow> = {}): PilePassportRow {
   return {
     hasPassport: true,
+    count: 1,
     isDraft: false,
     pileNumber: 'С-117',
     drivenAt: '2026-08-18T08:00:00.000Z',
@@ -35,6 +36,11 @@ const body = (rows: ReturnType<typeof svodRows>) =>
   rows.filter((row) => typeof row[0] === 'number' && typeof row[1] === 'string' && /^С-/.test(row[1]));
 
 describe('svodRows — форма № 2.5 ВСН 012-88', () => {
+  it('считает исключённые сваи в пачке, а не строки выработки', () => {
+    const rows = svodRows({ ...ctx, rows: [pile({hasPassport: false, count: 5})] });
+    expect(JSON.stringify(rows)).toContain('в ведомость не включено: 5');
+  });
+
   it('строка сваи: глубина в см, отказ в см, при забивке', () => {
     const [row] = body(svodRows({ ...ctx, rows: [pile()] }));
     expect(row).toEqual([1, 'С-117', 'С120.35-10', '18.08.2026, дневная', '', 1193, 'СП-75А', 30, 1.1, '', '']);

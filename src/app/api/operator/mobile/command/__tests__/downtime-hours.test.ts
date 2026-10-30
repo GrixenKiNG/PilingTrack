@@ -35,6 +35,34 @@ const post = (entry: Record<string, unknown>) => (POST as unknown as (request: N
   }),
 );
 
+describe('log-production: схема стыков паспорта', () => {
+  const joint = {welderName: 'Петров', electrode: 'УОНИ'};
+  beforeEach(() => {
+    logProductionMock.mockReset().mockResolvedValue({reportId: 'RM-1'});
+    requireAuthMock.mockReset().mockResolvedValue({user: {id: 'op-1', role: 'OPERATOR', tenantId: 'orion'}});
+  });
+
+  it.each([
+    [{...joint, welderName: ' '}],
+    [{...joint, electrode: ''}],
+    [{...joint, welderName: 'X'.repeat(121)}],
+    [{...joint, electrode: 'X'.repeat(121)}],
+    [{...joint, anticorrosionMaterial: 'X'.repeat(121)}],
+    Array.from({length: 21}, () => joint),
+  ])('отклоняет пустые и чрезмерные стыки: %j', async (...joints) => {
+    const response = await post({kind: 'PILE_PASSPORT', pileGradeId: 'grade-1', passport: {pileNumber: 'С-1', joints}});
+    expect(response.status).toBe(400);
+    expect(logProductionMock).not.toHaveBeenCalled();
+  });
+
+  it('не передаёт в команду время сварки, присланное телефоном', async () => {
+    const response = await post({kind: 'PILE_PASSPORT', pileGradeId: 'grade-1', passport: {pileNumber: 'С-1', joints: [{...joint, weldedAt: '2000-01-01T00:00:00Z'}]}});
+    expect(response.status).toBe(200);
+    const input = logProductionMock.mock.calls[0][0];
+    expect(input.entry.passport.joints).toEqual([joint]);
+  });
+});
+
 // Решение владельца 07.10.2026: простой с экрана машиниста — часы, без привязки
 // ко времени. Старая форма (начало и конец) остаётся для очереди офлайна.
 describe('log-production: простой', () => {
