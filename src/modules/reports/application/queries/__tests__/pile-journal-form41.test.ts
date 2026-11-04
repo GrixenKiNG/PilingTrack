@@ -136,4 +136,39 @@ describe('form41Rows — форма № 4.1 СП 392', () => {
     const text = JSON.stringify(form41Rows({ ...ctx, truncated: true, rows: [pile()] }));
     expect(text).toContain('Показаны первые');
   });
+  describe('порядок строк: от первой забитой сваи к последней', () => {
+    const numbers = (rows: ReturnType<typeof form41Rows>) => dataRows(rows).map((row) => row[1]);
+    // На входе — «новые сверху», как отдаёт экран журнала.
+    const newestFirst = [
+      pile({ pileNumber: 'С-120', drivenAt: '2026-08-20T08:00:00.000Z' }),
+      pile({ pileNumber: 'С-119', drivenAt: '2026-08-18T09:00:00.000Z' }),
+      pile({ pileNumber: 'С-118', drivenAt: '2026-08-18T08:00:00.000Z' }),
+    ];
+
+    it('строки идут от самой ранней забивки к поздней', () => {
+      expect(numbers(form41Rows({ ...ctx, rows: newestFirst }))).toEqual(['С-118', 'С-119', 'С-120']);
+    });
+
+    it('при равных датах — по номеру сваи, а не по времени', () => {
+      const sameDay = [
+        pile({ pileNumber: 'С-10', drivenAt: '2026-08-18T07:00:00.000Z' }),
+        pile({ pileNumber: 'С-9', drivenAt: '2026-08-18T15:00:00.000Z' }),
+      ];
+      expect(numbers(form41Rows({ ...ctx, rows: sameDay }))).toEqual(['С-9', 'С-10']);
+    });
+
+    it('день определяется по поясу организации: 00:30 МСК — уже следующий день', () => {
+      const rows = [
+        pile({ pileNumber: 'С-1', drivenAt: '2026-08-18T21:30:00.000Z' }), // 19.08 00:30 МСК
+        pile({ pileNumber: 'С-2', drivenAt: '2026-08-18T10:00:00.000Z' }), // 18.08
+      ];
+      expect(numbers(form41Rows({ ...ctx, rows }))).toEqual(['С-2', 'С-1']);
+    });
+
+    it('входной массив не меняется', () => {
+      const input = [...newestFirst];
+      form41Rows({ ...ctx, rows: input });
+      expect(input.map((row) => row.pileNumber)).toEqual(['С-120', 'С-119', 'С-118']);
+    });
+  });
 });

@@ -1,34 +1,13 @@
 // @vitest-environment node
-import { inflateRawSync } from 'node:zlib';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '@/generated/postgres-client/client';
 import { createFixture, inTenant } from '../../../../../../tests/integration/helpers/disposable-db';
+import { parts } from './pile-journal-xlsx.fixture';
 
 const state = vi.hoisted(() => ({ db: undefined as PrismaClient | undefined }));
 vi.mock('@/lib/db', () => ({ get db() { return state.db; } }));
 vi.mock('@/modules/settings', () => ({ getSettings: async () => ({ timezone: 'Europe/Moscow', companyName: 'Испытательная организация '.repeat(30), inn: '0000000000' }) }));
-
-// Read the ZIP central directory independently of the product writer.
-function parts(buffer: Buffer): Map<string, string> {
-  const end = buffer.lastIndexOf(Buffer.from([0x50, 0x4b, 0x05, 0x06]));
-  expect(end).toBeGreaterThan(0);
-  const files = new Map<string, string>();
-  let cursor = buffer.readUInt32LE(end + 16);
-  for (let i = 0; i < buffer.readUInt16LE(end + 10); i++) {
-    expect(buffer.readUInt32LE(cursor)).toBe(0x02014b50);
-    const method = buffer.readUInt16LE(cursor + 10);
-    const size = buffer.readUInt32LE(cursor + 20);
-    const nameLength = buffer.readUInt16LE(cursor + 28);
-    const name = buffer.subarray(cursor + 46, cursor + 46 + nameLength).toString();
-    const local = buffer.readUInt32LE(cursor + 42);
-    const start = local + 30 + buffer.readUInt16LE(local + 26) + buffer.readUInt16LE(local + 28);
-    const data = buffer.subarray(start, start + size);
-    files.set(name, (method === 8 ? inflateRawSync(data) : data).toString());
-    cursor += 46 + nameLength + buffer.readUInt16LE(cursor + 30) + buffer.readUInt16LE(cursor + 32);
-  }
-  return files;
-}
 
 describe.skipIf(!process.env.INTEGRATION_DATABASE_URL_OWNER)('ПТО: независимые SQL и RLS одноразовой базы', () => {
   let fixture: Awaited<ReturnType<typeof createFixture>>;

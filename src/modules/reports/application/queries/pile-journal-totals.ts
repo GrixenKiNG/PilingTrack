@@ -111,7 +111,7 @@ export async function pileJournalTotals(
  * ПОЧЕМУ НЕ UTC. `drivenAt` — момент времени: свая, забитая в 00:30 МСК 26.09,
  * в UTC ещё 25.09. День документа считается по поясу тенанта (F-R17-1).
  */
-function dayInTimezone(iso: string, timezone: string): string {
+export function dayInTimezone(iso: string, timezone: string): string {
   return new Date(iso).toLocaleDateString('en-CA', { timeZone: timezone });
 }
 
