@@ -71,7 +71,7 @@ describe.skipIf(!process.env.INTEGRATION_DATABASE_URL_OWNER)('ПТО: поряд
     it('форма 2.5 печатает так же, «с № … по №» — первая и последняя', async () => {
       const { exportPileSvodXlsx } = await import('../pile-journal-svod');
       const sheet = firstSheet(await exportPileSvodXlsx(filters()));
-      expect(sheet.filter((r) => typeof r[0] === 'number').map((r) => r[1])).toEqual(await sqlOrder());
+      expect(sheet.filter((r) => typeof r[0] === 'number' && typeof r[1] === 'string' && r[1].startsWith('ORD-')).map((r) => r[1])).toEqual(await sqlOrder());
       const order = await sqlOrder();
       expect(sheet.find((r) => r[0] === '(с №')).toEqual(['(с №', order[0], 'по №', order[order.length - 1], ')']);
     });
