@@ -171,4 +171,31 @@ describe('form41Rows — форма № 4.1 СП 392', () => {
       expect(input.map((row) => row.pileNumber)).toEqual(['С-120', 'С-119', 'С-118']);
     });
   });
+
+  describe('графа 16 «Высота подъёма»: по залогам', () => {
+    const height = (overrides: Partial<PilePassportRow>) => dataRows(form41Rows({ ...ctx, rows: [pile(overrides)] }))[0][15];
+    const set = (ordinal: number, dropHeightM: number | null) => ({ ordinal, blows: 10, penetrationMm: 50, dropHeightM, refusalMm: 5 });
+
+    it('берётся высота залога, а не паспорта', () => {
+      expect(height({ dropHeightM: 2.1, sets: [set(1, 1.2), set(2, 1.2), set(3, 1.2)] })).toBe(1.2);
+    });
+
+    it('залоги с разной высотой — перечислением без повторов', () => {
+      expect(height({ dropHeightM: 2.1, sets: [set(1, 1.2), set(2, 1.5), set(3, 1.2)] })).toBe('1.2, 1.5');
+    });
+
+    it('у залога высоты нет — значение паспорта', () => {
+      expect(height({ dropHeightM: 2.1, sets: [set(1, null), set(2, null)] })).toBe(2.1);
+      expect(height({ dropHeightM: 2.1, sets: [set(1, 1.2), set(2, null)] })).toBe('1.2, 2.1');
+    });
+
+    it('нигде нет — графа пустая, а не 0', () => {
+      expect(height({ dropHeightM: null, sets: [set(1, null)] })).toBe('');
+      expect(height({ dropHeightM: null, sets: [] })).toBe('');
+    });
+
+    it('залогов нет — высота паспорта', () => {
+      expect(height({ dropHeightM: 2.1, sets: [] })).toBe(2.1);
+    });
+  });
 });

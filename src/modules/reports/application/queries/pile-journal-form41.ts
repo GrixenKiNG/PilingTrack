@@ -50,6 +50,18 @@ function setNumbers(ordinals: number[]): string {
     : ordinals.join(', ');
 }
 
+/**
+ * Высота подъёма бабы (графа 16) по залогам: у каждого залога своя высота, у
+ * паспорта — одна общая. Залог без своей высоты берёт значение паспорта; нигде
+ * нет — графа пустая, а не 0. Одинаковые значения сворачиваются в одно число
+ * (как «Число ударов в залоге»), разные — перечислением.
+ */
+function dropHeightCell(row: PilePassportRow): number | string {
+  const heights = row.sets.length > 0 ? row.sets.map((set) => set.dropHeightM ?? row.dropHeightM) : [row.dropHeightM];
+  const known = [...new Set(heights.filter((height): height is number => height !== null))];
+  return known.length === 0 ? '' : known.length === 1 ? known[0] : known.join(', ');
+}
+
 function drivingNote(row: PilePassportRow): string {
   const verdict = row.drivingComplete === null
     ? null
@@ -77,7 +89,7 @@ function pileRow(row: PilePassportRow, timezone: string): XlsxCell[] {
     blows,
     '',
     '',
-    row.dropHeightM,
+    dropHeightCell(row),
     '',
     '',
     row.sets.length ? round(depthMm / 10, 1) : '',

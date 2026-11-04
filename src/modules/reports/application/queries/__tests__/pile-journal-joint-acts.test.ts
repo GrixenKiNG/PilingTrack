@@ -34,16 +34,18 @@ const ctx = { header, organisation: 'ООО «ТрубопроводСтрой»
 const text = (rows: ReturnType<typeof jointActRows>) => JSON.stringify(rows);
 
 describe('jointActRows', () => {
-  it('сварка: стык, сварщик, электроды и время сварки в поясе организации', () => {
+  it('сварка: стык, сварщик, электроды и дата сварки в поясе организации, без времени суток', () => {
     const t = text(jointActRows({ ...ctx, kind: 'WELD', rows: [pile()] }));
     expect(t).toContain('Сварка стыков секций');
     expect(t).toContain('С-117, стык 1');
     expect(t).toContain('Петров П. П.');
     expect(t).toContain('УОНИ-13/55');
-    expect(t).toContain('18.08.2026 14:30');
+    expect(t).toContain('стык 1 — 18.08.2026, сварщик');
+    // Время — момент отправки паспорта, не сварки: в акте его не печатаем.
+    expect(t).not.toMatch(/\d{2}:\d{2}/);
   });
 
-  it('антикоррозия: материал и время нанесения; стыки без покрытия объявлены', () => {
+  it('антикоррозия: материал и дата нанесения; стыки без покрытия объявлены', () => {
     const t = text(jointActRows({
       ...ctx,
       kind: 'ANTICORROSION',
@@ -51,7 +53,8 @@ describe('jointActRows', () => {
     }));
     expect(t).toContain('Антикоррозионная обработка');
     expect(t).toContain('ВЛ-515');
-    expect(t).toContain('18.08.2026 16:00');
+    expect(t).toContain('стык 1 — 18.08.2026, покрытие ВЛ-515');
+    expect(t).not.toMatch(/\d{2}:\d{2}/);
     expect(t).toContain('не выполнена: 1');
   });
 

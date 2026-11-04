@@ -1,6 +1,6 @@
 import { getSettings } from '@/modules/settings';
 import type { XlsxCell } from '@/lib/xlsx-writer';
-import { PILE_JOURNAL_EXPORT_LIMIT, type PileJournalFilters } from './pile-journal-types';
+import { PILE_JOURNAL_EXPORT_LIMIT, type PileJournalFilters, type PilePassportRow } from './pile-journal-types';
 import { listPilePassports } from './pile-journal-list';
 import { pileJournalHeader } from './pile-journal-totals';
 import { printDay } from './pile-journal-export';
@@ -15,6 +15,14 @@ const HEAD: string[] = [
   'Примечания',
 ];
 
+/** Мастера, принявшие сваи ведомости, — без повторов, в порядке первого принятия. */
+function acceptingForemen(piles: PilePassportRow[]): string[] {
+  const names = piles
+    .filter((row) => row.acceptance === 'ACCEPTED' && row.acceptedByName && row.acceptedAt)
+    .sort((a, b) => (a.acceptedAt as string).localeCompare(b.acceptedAt as string));
+  return [...new Set(names.map((row) => row.acceptedByName as string))];
+}
+
 /**
  * Лист формы № 2.5 ВСН 012-88 (часть II) «Сводная ведомость забитых свай».
  *
@@ -22,6 +30,7 @@ const HEAD: string[] = [
  * хранится, колонка остаётся пустой. Отказ свай, добитых повторно, идёт в колонку
  * «при добивке», остальных — «при забивке». Сваи без паспорта (пачкой) в
  * ведомость не входят: у них нет номера и замеров, их число печатаем.
+ * «Производитель работ» — мастер, принявший сваи ведомости; принявших нет — бланк.
  */
 export function svodRows({ rows, header, organisation, truncated, timezone }: Form41Input): XlsxCell[][] {
   const piles = sortRowsForPrint(rows.filter((row) => row.hasPassport), timezone);
@@ -62,7 +71,7 @@ export function svodRows({ rows, header, organisation, truncated, timezone }: Fo
     [],
     ...(skipped > 0 ? [[`Свай без паспорта в ведомость не включено: ${skipped} (записаны пачкой, номеров и замеров нет)`]] : []),
     ...(truncated ? [[`Показаны первые ${PILE_JOURNAL_EXPORT_LIMIT} записей — сузьте период или объект`]] : []),
-    ['Производитель работ', BLANK, '(должность, фамилия, инициалы)', '(подпись)', '(дата)'],
+    ['Производитель работ', acceptingForemen(piles).join(', ') || BLANK, '(должность, фамилия, инициалы)', '(подпись)', '(дата)'],
   ];
 }
 
