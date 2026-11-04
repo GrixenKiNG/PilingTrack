@@ -3,7 +3,7 @@ import { PILE_JOURNAL_EXPORT_LIMIT, type PileJournalFilters } from './pile-journ
 import { listPilePassports } from './pile-journal-list';
 import { pileJournalHeader } from './pile-journal-totals';
 import { BLANK } from './pile-journal-form41';
-import { SIGNERS, pileGroups, type AosrInput } from './pile-journal-aosr';
+import { SIGNERS, acceptedHeader, pileGroups, type AosrInput } from './pile-journal-aosr';
 import type { XlsxCell } from '@/lib/xlsx-writer';
 
 /**
@@ -16,8 +16,9 @@ import type { XlsxCell } from '@/lib/xlsx-writer';
  * Реквизиты заказчика и проектировщика, шифр проекта, сертификаты, испытания и
  * решение (п. 9) тоже заполняют в файле: справочника участников нет.
  */
-export function aookRows({ rows, header, organisation, inn, truncated }: AosrInput): XlsxCell[][] {
+export function aookRows({ rows, header: journalHeader, organisation, inn, timezone, truncated }: AosrInput): XlsxCell[][] {
   const accepted = rows.filter((row) => row.hasPassport && row.acceptance === 'ACCEPTED');
+  const header = acceptedHeader(accepted, journalHeader, timezone);
   const notAccepted = rows.filter((row) => row.hasPassport && row.acceptance !== 'ACCEPTED').length;
   const site = header.siteNames.join(', ') || BLANK;
   const builder = [organisation || BLANK, inn ? `ИНН ${inn}` : null].filter(Boolean).join(', ');
@@ -84,6 +85,7 @@ export async function exportPileAookXlsx(filters: PileJournalFilters): Promise<B
         header: pileJournalHeader(rows, totals, timezone),
         organisation: companyName ?? '',
         inn: inn ?? '',
+        timezone,
         truncated,
       }),
     },

@@ -20,11 +20,15 @@ function pile(overrides: Partial<PilePassportRow> = {}): PilePassportRow {
     pileSection: '350×350',
     pileLengthM: 12,
     acceptance: 'ACCEPTED',
+    siteName: 'НПС-26',
+    equipmentName: 'СП-49Д',
+    hammerType: 'СП-75А',
+    drivenAt: '2026-08-18T08:00:00.000Z',
     ...overrides,
   } as PilePassportRow;
 }
 
-const ctx = { header, organisation: 'ООО «ТрубопроводСтрой»', inn: '7700000000' };
+const ctx = { header, organisation: 'ООО «ТрубопроводСтрой»', inn: '7700000000', timezone: 'Europe/Moscow' };
 const text = (rows: ReturnType<typeof aookRows>) => JSON.stringify(rows);
 
 describe('aookRows — АООК «Свайный фундамент»', () => {
@@ -45,8 +49,8 @@ describe('aookRows — АООК «Свайный фундамент»', () => {
     expect(t).toContain('________');
   });
 
-  it('шапка и даты берутся из журнала, форма названа по приказу', () => {
-    const t = text(aookRows({ ...ctx, rows: [pile()] }));
+  it('шапка и даты берутся из принятых свай, форма названа по приказу', () => {
+    const t = text(aookRows({ ...ctx, rows: [pile(), pile({ pileNumber: 'С-118', drivenAt: '2026-08-22T08:00:00.000Z' })] }));
     for (const part of ['ООО «ТрубопроводСтрой»', '7700000000', 'НПС-26', '18.08.2026', '22.08.2026', 'Приложение № 4']) {
       expect(t).toContain(part);
     }
@@ -56,5 +60,39 @@ describe('aookRows — АООК «Свайный фундамент»', () => {
     const rows = aookRows({ ...ctx, rows: [pile()] });
     expect(rows.filter((row) => row[0] === '(фамилия, инициалы)')).toHaveLength(5);
     expect(text(rows)).toContain('разрешается полное нагружение');
+  });
+  describe('шапка акта считается по принятым сваям, а не по всей выборке', () => {
+    // Агрегат по всем сваям периода — как его отдаёт pileJournalHeader в проде.
+    const wholePeriod = {
+      ...header,
+      siteNames: ['НПС-26', 'Чужой объект'],
+      equipmentNames: ['Banut 655', 'Bauer RTG RM20'],
+      hammerTypes: ['PVE 50PR', 'PVE 7NL'],
+      dateFrom: '28.08.2026',
+      dateTo: '29.10.2026',
+    } as PileJournalHeader;
+    const accepted = pile({ equipmentName: 'Bauer RTG RM20', hammerType: 'PVE 7NL', drivenAt: '2026-10-29T08:00:00.000Z' });
+    const other = pile({ pileNumber: 'С-200', acceptance: 'PENDING', equipmentName: 'Banut 655', hammerType: 'PVE 50PR', drivenAt: '2026-08-28T08:00:00.000Z' });
+
+    it('даты и объект — только принятой сваи', () => {
+      const t = text(aookRows({ ...ctx, header: wholePeriod, rows: [other, accepted] }));
+      expect(t).toContain('29.10.2026');
+      expect(t).toContain('НПС-26');
+      for (const foreign of ['28.08.2026', 'Чужой объект']) expect(t).not.toContain(foreign);
+    });
+
+    it('даты — день по поясу организации, от самой ранней до самой поздней принятой', () => {
+      const early = pile({ pileNumber: 'С-1', drivenAt: '2026-10-27T21:30:00.000Z' }); // 28.10 00:30 МСК
+      const t = text(aookRows({ ...ctx, header: wholePeriod, rows: [accepted, early] }));
+      expect(t).toContain('28.10.2026');
+      expect(t).toContain('29.10.2026');
+    });
+
+    it('принятых нет — шапка из журнала, акт пустой с пометкой «не включено», без ошибки', () => {
+      const t = text(aookRows({ ...ctx, header: wholePeriod, rows: [other] }));
+      expect(t).toContain('не включено: 1');
+      expect(t).toContain('28.08.2026');
+      expect(t).toContain('Чужой объект');
+    });
   });
 });
