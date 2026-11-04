@@ -1,81 +1,30 @@
 'use client';
 
+import { AdminDictionariesView } from './admin-dictionaries-view';
+import { startDictionaryResize } from './admin-dictionaries-panels';
+
+import {type StatusFilter, type HistoryEntry, type FormState, type LengthState, type LengthConfirmState, lengthChangesHistory, useCompactInspector, KINDS} from "./admin-dictionaries-support";
+
+
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useDocumentTitle } from '@/components/piling/ops-shell';
-import { AlertCircle, AlertTriangle, Archive, Clock, Drill, Filter, HardHat, Plus, Ruler, Save, Search, X } from '@/components/piling/icons/unified-icons';
+
 import { toast } from 'sonner';
 import { authFetch } from '@/lib/api';
 import { parseDecimalInput } from '@/lib/parse-decimal';
 import { catchText, extractApiError } from '@/components/piling/admin-crews/crew-messages';
 import { normalizeSearch } from '@/components/piling/to/readiness/shared/text-search';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
+
+
+
+
 import { Skeleton } from '@/components/ui/skeleton';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
-import {
-  DictionaryTable,
-  type DictionaryKind,
-  type RegistryItem,
-} from './admin-dictionaries/dictionary-table';
-import {
-  DictionaryForm,
-  type DictionaryFormValue,
-} from './admin-dictionaries/dictionary-form';
-import { PilingIcon, type PilingIconName } from '@/components/piling/icons';
 
-type StatusFilter = 'active' | 'archived' | 'all';
-interface HistoryEntry {
-  id: string;
-  title: string;
-  at: string;
-  meta: string | null;
-  changes?: Array<{ label: string; before: string; after: string }>;
-}
-interface FormState { mode: 'create' | 'rename'; kind: DictionaryKind; item?: RegistryItem }
-interface LengthState { item: RegistryItem; value: string }
-/** Откуда пришло изменение длины, чтобы после подтверждения довести именно его. */
-interface LengthConfirmState { item: RegistryItem; lengthMm: number; source: 'dialog' | 'panel' }
 
-/*
-  Длина марки у свай одна и истории не имеет — так решено сознательно.
+import { SheetContent } from '@/components/ui/sheet';
+import { type DictionaryKind, type RegistryItem } from './admin-dictionaries/dictionary-table';
+import { type DictionaryFormValue } from './admin-dictionaries/dictionary-form';
 
-  Погонные метры нигде не хранятся: отчёт держит только марку и количество свай,
-  а метры считаются от текущей длины марки каждый раз, когда открывают отчёт,
-  аналитику, сводку за период или печатают PDF. Значит правка длины у уже
-  используемой марки — это не правка справочника, а пересчёт сданных документов
-  за прошлые периоды.
-
-  Версионировать длину не стали: у марки она одна (решение владельца 12.09.2026).
-  Поэтому единственная защита — показать, что именно изменится, и спросить.
-*/
-const lengthChangesHistory = (item: RegistryItem, lengthMm: number) =>
-  (item.reportCount > 0 || item.planCount > 0) && item.lengthMm !== lengthMm;
-
-function useCompactInspector() {
-  const [compact, setCompact] = useState(false);
-
-  useEffect(() => {
-    const media = window.matchMedia('(max-width: 1023px)');
-    const update = () => setCompact(media.matches);
-    update();
-    media.addEventListener('change', update);
-    return () => media.removeEventListener('change', update);
-  }, []);
-
-  return compact;
-}
-
-// `icon` — компактная линейная иконка для вкладок; `pilingIcon` — предметная
-// иконка для плиток сводки (тот же набор и тот же вид, что в дашборде).
-const KINDS: Array<{ kind: DictionaryKind; title: string; summaryTitle: string; addLabel: string; icon: typeof HardHat; pilingIcon: PilingIconName }> = [
-  { kind: 'pileGrade', title: 'Сваи', summaryTitle: 'Сортаменты свай', addLabel: 'Добавить марку сваи', icon: Ruler, pilingIcon: 'pile-group' },
-  { kind: 'drillingType', title: 'Бурение', summaryTitle: 'Типы бурения', addLabel: 'Добавить тип бурения', icon: Drill, pilingIcon: 'drilling-auger' },
-  { kind: 'downtimeReason', title: 'Простои', summaryTitle: 'Причины простоев', addLabel: 'Добавить причину простоя', icon: Clock, pilingIcon: 'downtime' },
-];
 
 export function AdminDictionaries() {
   useDocumentTitle('Справочники');
@@ -302,20 +251,7 @@ export function AdminDictionaries() {
   };
 
   // Drag the panel's left edge to widen it leftward (clamped) — same pattern as admin-equipment.
-  const startResize = (event: React.MouseEvent) => {
-    event.preventDefault();
-    const startX = event.clientX;
-    const startW = panelWidth;
-    const onMove = (moveEvent: MouseEvent) => {
-      setPanelWidth(Math.min(720, Math.max(320, startW + (startX - moveEvent.clientX))));
-    };
-    const onUp = () => {
-      window.removeEventListener('mousemove', onMove);
-      window.removeEventListener('mouseup', onUp);
-    };
-    window.addEventListener('mousemove', onMove);
-    window.addEventListener('mouseup', onUp);
-  };
+  const startResize = (event: React.MouseEvent) => startDictionaryResize(event, panelWidth, setPanelWidth);
 
   const submitForm = async (value: DictionaryFormValue) => {
     if (!form) return;
@@ -442,253 +378,21 @@ export function AdminDictionaries() {
     return <div className="space-y-4 p-4 lg:p-6"><Skeleton className="h-8 w-48" /><Skeleton className="h-72 w-full" /></div>;
   }
 
-  return (
-    <div className="p-4 lg:p-6">
-      <div
-        style={{ '--panel-w': `${panelWidth}px` } as React.CSSProperties}
-        className="grid grid-cols-1 gap-4 lg:[grid-template-columns:minmax(0,1fr)_var(--panel-w)]"
-      >
-      <div className="min-w-0 space-y-4">
-      <header className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div><h1 className="text-3xl font-bold tracking-tight text-foreground">Справочники</h1><p className="mt-1 text-sm text-muted-foreground">Рабочие значения вашей организации для отчётов и планирования</p></div>
-        <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center"><div className="relative min-w-0 sm:w-80"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Поиск по справочникам" aria-label="Поиск по справочникам" className="h-12 pl-9 pr-16" /><kbd className="pointer-events-none absolute right-3 top-1/2 hidden -translate-y-1/2 rounded border border-border bg-muted px-1.5 py-0.5 text-2xs font-medium text-muted-foreground sm:block">Ctrl + K</kbd></div><div className="relative w-full sm:w-auto"><Filter className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><select aria-label="Статус" value={filter} onChange={(event) => setFilter(event.target.value as StatusFilter)} className="h-12 w-full rounded-md border border-border bg-card py-0 pl-9 pr-3 text-sm sm:w-auto"><option value="active">Активные</option><option value="archived">Архив</option><option value="all">Все</option></select></div><Button aria-label={activeDictionary.addLabel} className="h-12 w-full bg-signal text-white hover:bg-signal-strong sm:w-auto" onClick={() => setForm({ mode: 'create', kind: activeKind })}><Plus className="h-4 w-4" />{activeDictionary.addLabel}</Button></div>
-      </header>
-
-      {loadError ? (
-        <Alert variant="destructive">
-          <AlertCircle />
-          <AlertTitle>Не удалось загрузить справочники</AlertTitle>
-          <AlertDescription>
-            <Button size="sm" variant="outline" onClick={() => void loadData()}>Повторить</Button>
-          </AlertDescription>
-        </Alert>
-      ) : (
-        <Tabs value={activeKind} onValueChange={(value) => selectKind(value as DictionaryKind)}>
-          {/* overflow-x-auto: панель вкладок шире 390px и на мобильном распирала
-              страницу горизонтально — теперь прокручивается внутри себя. */}
-          <div className="overflow-x-auto border-b border-border">
-            <TabsList className="h-12 rounded-none bg-transparent p-0">
-              {KINDS.map(({ kind, title, icon: Icon }) => (
-                <TabsTrigger key={kind} value={kind} className="h-12 rounded-none border-b-2 border-transparent px-6 data-[state=active]:border-signal/30 data-[state=active]:bg-card data-[state=active]:shadow-none"><Icon className="mr-1.5 h-4 w-4" />{title}</TabsTrigger>
-              ))}
-            </TabsList>
-          </div>
-
-          <section aria-label="Сводка справочников" className="mt-4 grid gap-3 md:grid-cols-3">
-            {dictionarySummary.map(({ kind, summaryTitle, pilingIcon, active, archived, objects }) => (
-              <button key={kind} type="button" className="rounded-xl border border-border bg-card p-4 text-left transition hover:border-signal/30 hover:shadow-sm" onClick={() => { selectKind(kind); setSearch(''); }}>
-                {/* Иконка во всю высоту плитки + описание — как в дашборде. */}
-                <div className="flex items-stretch gap-4"><span className="relative w-20 shrink-0 self-stretch"><PilingIcon name={pilingIcon} fill decorative className="absolute inset-0" /></span><div><p className="text-sm font-semibold text-foreground">{summaryTitle}</p><div className="mt-2 flex items-end gap-4"><div><p className="text-2xl font-bold text-info-strong">{active}</p><p className="text-xs text-info-strong max-sm:text-sm">активных</p></div><div className="border-l border-border pl-4"><p className="text-lg font-semibold text-muted-foreground">{archived}</p><p className="text-xs text-muted-foreground max-sm:text-sm">архивных</p></div></div></div></div>
-                <p className="mt-3 border-t border-border pt-3 text-xs text-muted-foreground max-sm:text-sm">Используются в {objects} объектах</p>
-              </button>
-            ))}
-          </section>
-
-          {KINDS.map(({ kind, title }) => (
-            <TabsContent key={kind} value={kind} className="mt-3">
-              <DictionaryTable
-                kind={kind}
-                title={title}
-                statusLabel={statusLabel}
-                items={filtered[kind]}
-                onRename={(item) => setForm({ mode: 'rename', kind, item })}
-                onLength={(item) => setLengthState({ item, value: item.lengthMm == null ? '' : String(item.lengthMm / 1000) })}
-                onStatus={(item, isActive) => void setStatus(kind, item, isActive)}
-                onBulkStatus={(items, isActive) => void setStatusBulk(kind, items, isActive)}
-                onDelete={(item) => setConfirmDelete({ kind, item })}
-                onSelect={selectItem}
-                selectedId={selectedKind === kind ? selectedItem?.id : undefined}
-                compact={compactInspector}
-              />
-            </TabsContent>
-          ))}
-        </Tabs>
-      )}
-      </div>
-
-      {/* Desktop: persistent resizable column. Mobile/tablet: focused side sheet. */}
-      <Sheet
-        open={compactInspector && selectedItem !== null}
-        onOpenChange={(open) => {
-          if (!open) selectItem(null);
-        }}
-      >
-      <InspectorShell
-        {...(compactInspector ? { side: 'right' } : {})}
-        className={compactInspector
-          ? 'w-full gap-0 overflow-hidden p-0 sm:max-w-md [&>button]:hidden'
-          : 'relative hidden lg:block'}
-      >
-        {compactInspector && (
-          <SheetTitle className="sr-only">
-            {selectedItem ? `Сведения: ${selectedItem.name}` : 'Сведения из справочника'}
-          </SheetTitle>
-        )}
-        {/* drag handle — widen the panel leftward */}
-        <div
-          onMouseDown={startResize}
-          onKeyDown={(event) => {
-            const step = event.shiftKey ? 40 : 16;
-            if (event.key === 'ArrowLeft') {
-              event.preventDefault();
-              setPanelWidth((width) => Math.min(720, width + step));
-            } else if (event.key === 'ArrowRight') {
-              event.preventDefault();
-              setPanelWidth((width) => Math.max(320, width - step));
-            } else if (event.key === 'Home') {
-              event.preventDefault();
-              setPanelWidth(320);
-            } else if (event.key === 'End') {
-              event.preventDefault();
-              setPanelWidth(720);
-            }
-          }}
-          role="separator"
-          aria-label="Изменить ширину панели сведений"
-          aria-orientation="vertical"
-          aria-valuemin={320}
-          aria-valuemax={720}
-          aria-valuenow={panelWidth}
-          tabIndex={0}
-          title="Потяните, чтобы изменить ширину"
-          className="absolute -left-2.5 top-0 z-10 hidden h-full w-2.5 cursor-col-resize rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-info/30 lg:block"
-        >
-          <div className="mx-auto h-full w-px bg-slate-300 transition-colors" />
-        </div>
-
-        <div className={compactInspector ? 'h-full overflow-y-auto' : 'lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto'}>
-        <div data-testid="dictionary-inspector" data-active-tab={inspectorTab} className={selectedItem ? (compactInspector ? 'flex min-h-full flex-col bg-card p-4' : 'flex min-h-[calc(100vh-7rem)] flex-col rounded-xl border border-border bg-card p-4') : 'flex min-h-[240px] flex-col items-center justify-center rounded-xl border border-dashed border-border bg-muted/50 p-8 text-center'}>
-          {selectedItem ? <><div className="flex items-start justify-between gap-3 pr-1"><div><h2 className="mt-1 text-lg font-semibold text-foreground">{selectedItem.name}</h2></div><div className="flex items-center gap-2"><Badge className={selectedItem.isActive ? 'bg-success/10 text-success-strong hover:bg-success/10' : ''} variant={selectedItem.isActive ? 'default' : 'secondary'}>{selectedItem.isActive ? 'Активный' : 'Архив'}</Badge><button type="button" aria-label="Закрыть панель" className="flex h-11 w-11 items-center justify-center rounded-lg hover:bg-muted" onClick={() => selectItem(null)}><X className="h-4 w-4 text-muted-foreground" /></button></div></div>
-          <div className="mt-3 flex border-b border-border text-sm" role="tablist" aria-label="Сведения о значении"><button type="button" role="tab" aria-selected={inspectorTab === 'general'} onClick={() => setInspectorTab('general')} className={inspectorTab === 'general' ? 'min-h-11 border-b-2 border-signal/30 px-3 font-medium text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-info/30' : 'min-h-11 px-3 text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-info/30'}>Общие</button><button type="button" role="tab" aria-selected={inspectorTab === 'history'} onClick={() => setInspectorTab('history')} className={inspectorTab === 'history' ? 'min-h-11 border-b-2 border-signal/30 px-3 font-medium text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-info/30' : 'min-h-11 px-3 text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-info/30'}>История</button></div>{inspectorTab === 'general' ? <><div className="mt-5 space-y-3 text-sm">
-          <label className="block"><span className="text-muted-foreground">Название</span>
-            <Input aria-label="Название" value={panelDraft?.name ?? ''} disabled={selectedUsed} title={selectedUsed ? 'Используемое значение нельзя переименовать' : undefined} onChange={(event) => setPanelDraft((draft) => draft && ({ ...draft, name: event.target.value }))} className="mt-1 h-11 font-medium" />
-          </label>
-          {selectedKind === 'pileGrade' ? <>
-          <label className="block"><span className="text-muted-foreground">Код/сечение</span>
-            <Input aria-label="Код/сечение" value={panelDraft?.section ?? ''} placeholder="120×120 мм" onChange={(event) => setPanelDraft((draft) => draft && ({ ...draft, section: event.target.value }))} className="mt-1 h-11" />
-          </label>
-          <label className="block"><span className="text-muted-foreground">Длина, м</span>
-            <Input aria-label="Длина, м" value={panelDraft?.length ?? ''} inputMode="decimal" placeholder="35,00" onChange={(event) => setPanelDraft((draft) => draft && ({ ...draft, length: event.target.value }))} className="mt-1 h-11" />
-            <p className="mt-1 text-xs text-muted-foreground max-sm:text-sm">Указываются по проектной длине.</p>
-            {selectedUsed && (
-              <p className="mt-1.5 flex gap-1.5 rounded-md border border-warning/30 bg-warning/10 p-2 text-xs text-warning-strong max-sm:text-sm">
-                <AlertTriangle className="mt-px h-3.5 w-3.5 shrink-0" />
-                <span>Погонные метры считаются от этой длины. Если её изменить, цифры в уже сданных отчётах ({selectedItem.reportCount}) и в аналитике за прошлые периоды станут другими.</span>
-              </p>
-            )}
-          </label>
-          <label className="block"><span className="text-muted-foreground">Примечание</span>
-            <Input aria-label="Примечание" value={panelDraft?.notes ?? ''} maxLength={500} placeholder="Например: для мостовых свай" onChange={(event) => setPanelDraft((draft) => draft && ({ ...draft, notes: event.target.value }))} className="mt-1 h-11" />
-          </label>
-          </> : (selectedItem.code ? <div><span className="text-muted-foreground">Код</span><div className="mt-1 rounded-md border border-border bg-muted p-2 font-medium text-foreground">{selectedItem.code}</div></div> : null)}
-          </div>
-          <div className="mt-5 rounded-lg border border-warning/30 bg-warning/10 p-3 text-sm text-warning-strong">{selectedItem.reportCount || selectedItem.planCount ? <><p className="flex items-center gap-2 font-medium"><AlertTriangle className="h-4 w-4" />Значение используется в отчётах и планах</p><p className="mt-2">Использование: отчётов — {selectedItem.reportCount}, планов — {selectedItem.planCount}.</p><p className="mt-2 font-medium">Можно только архивировать.</p></> : 'Значение не используется: его можно изменить или удалить.'}</div><section className="mt-5 space-y-2 text-sm"><h3 className="font-semibold text-foreground">Использование</h3><p className="flex justify-between border-b border-dashed pb-2 text-muted-foreground"><span>Объекты</span><b>{selectedItem.siteCount}</b></p><p className="flex justify-between border-b border-dashed pb-2 text-muted-foreground"><span>Отчёты</span><b>{selectedItem.reportCount}</b></p><p className="flex justify-between border-b border-dashed pb-2 text-muted-foreground"><span>Планы</span><b>{selectedItem.planCount}</b></p></section>
-          <div className="mt-auto border-t border-border pt-5"><div className="grid grid-cols-2 gap-2"><Button className="min-h-11 bg-signal text-white hover:bg-signal-strong" disabled={saving || !panelDirty} onClick={() => void savePanel()}><Save className="mr-1.5 h-4 w-4" />Сохранить</Button><Button variant="outline" className="min-h-11 border-signal/30 text-signal-strong hover:bg-signal/10" onClick={() => void setStatus(selectedKind, selectedItem, !selectedItem.isActive)}><Archive className="mr-1.5 h-4 w-4" />{selectedItem.isActive ? 'Архивировать' : 'Восстановить'}</Button></div><p className="mt-5 text-xs text-muted-foreground max-sm:text-sm">Подсказка: используемые значения нельзя удалить. Архивированные записи скрываются из активных фильтров.</p></div></> : <div className="mt-4 text-sm text-muted-foreground">
-            {historyFailed ? <div role="alert" className="space-y-2 rounded-lg border border-destructive/30 bg-destructive/5 p-3">
-              <p className="font-medium text-destructive-strong">Журнал изменений не загрузился</p>
-              <p className="text-muted-foreground">История этого значения не показана. Это не значит, что изменений не было.</p>
-              <Button variant="outline" className="min-h-11" onClick={() => setHistoryAttempt((n) => n + 1)}>Повторить</Button>
-            </div>
-              : history === null ? <p className="py-6 text-center text-muted-foreground">Загрузка истории…</p>
-              : history.length === 0 ? <p className="py-6 text-center text-muted-foreground">Записей аудита по элементу нет.</p>
-              : <ul className="space-y-3">
-                  {history.map((entry) => (
-                    <li key={entry.id} className="rounded-lg border border-border p-2.5">
-                      <div className="flex items-baseline justify-between gap-2">
-                        <span className="font-medium text-foreground">{entry.title}</span>
-                        <span className="shrink-0 text-xs text-muted-foreground">{entry.at}</span>
-                      </div>
-                      {entry.meta && <p className="mt-0.5 text-xs text-muted-foreground max-sm:text-sm">{entry.meta}</p>}
-                      {entry.changes && entry.changes.length > 0 && (
-                        <ul className="mt-1.5 space-y-0.5 text-xs text-muted-foreground">
-                          {entry.changes.map((change, index) => (
-                            <li key={index}>{change.label}: <s className="text-muted-foreground">{change.before}</s> → <b className="text-foreground">{change.after}</b></li>
-                          ))}
-                        </ul>
-                      )}
-                    </li>
-                  ))}
-                </ul>}
-          </div>}</> : <><Search className="mx-auto mb-3 h-10 w-10 text-muted-foreground" /><p className="text-sm text-muted-foreground">Выберите запись</p><p className="mt-1 text-xs text-muted-foreground max-sm:text-sm">Сведения откроются здесь, в этом же окне</p></>}
-        </div>
-        </div>
-      </InspectorShell>
-      </Sheet>
-      </div>
-
-      {form && (
-        <DictionaryForm
-          key={`${form.mode}-${form.kind}-${form.item?.id || 'new'}`}
-          mode={form.mode}
-          kind={form.kind}
-          item={form.item}
-          saving={saving}
-          onClose={() => setForm(null)}
-          onSubmit={(value) => void submitForm(value)}
-        />
-      )}
-
-      <Dialog open={lengthState !== null} onOpenChange={(open) => !open && setLengthState(null)}>
-        <DialogContent aria-describedby={undefined} className="max-h-[90vh] overflow-y-auto">
-          <DialogHeader><DialogTitle>Длина сваи — {lengthState?.item.name}</DialogTitle></DialogHeader>
-          <label className="grid gap-1.5 text-sm font-medium text-foreground">
-            Длина, м
-            <Input aria-label="Длина сваи, м" value={lengthState?.value || ''} onChange={(event) => setLengthState((state) => state && ({ ...state, value: event.target.value }))} inputMode="decimal" />
-          </label>
-          {lengthState && (lengthState.item.reportCount > 0 || lengthState.item.planCount > 0) && (
-            <p className="flex gap-2 rounded-lg border border-warning/30 bg-warning/10 p-3 text-sm text-warning-strong">
-              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-              <span>Марка уже используется: отчётов — {lengthState.item.reportCount}, планов — {lengthState.item.planCount}. Погонные метры нигде не хранятся, их считают от длины марки — новая длина изменит цифры и за прошлые периоды.</span>
-            </p>
-          )}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setLengthState(null)}>Отмена</Button>
-            <Button onClick={() => void saveLength()} disabled={saving} className="bg-signal text-white hover:bg-signal-strong">Сохранить</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={lengthConfirm !== null} onOpenChange={(open) => !open && setLengthConfirm(null)}>
-        <DialogContent aria-describedby={undefined} className="max-h-[90vh] overflow-y-auto">
-          <DialogHeader><DialogTitle>Пересчитать прошлые отчёты?</DialogTitle></DialogHeader>
-          <div className="space-y-3 text-sm text-muted-foreground">
-            <p className="text-foreground">
-              «{lengthConfirm?.item.name}»: длина {formatMetres(lengthConfirm?.item.lengthMm) || '—'} м → <b>{formatMetres(lengthConfirm?.lengthMm)} м</b>.
-            </p>
-            <p>
-              Погонные метры нигде не хранятся: их считают от длины марки при каждом открытии отчёта,
-              аналитики, сводки за период и при печати PDF. Новая длина изменит эти цифры и за прошлые
-              периоды: отчётов — {lengthConfirm?.item.reportCount}, планов — {lengthConfirm?.item.planCount}.
-            </p>
-            <p>У марки одна длина: прежнее значение не сохранится, старые отчёты не останутся с прежними метрами.</p>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setLengthConfirm(null)}>Отмена</Button>
-            <Button
-              disabled={saving}
-              className="bg-warning-strong text-white hover:bg-warning-strong"
-              onClick={() => {
-                const source = lengthConfirm?.source;
-                setLengthConfirm(null);
-                if (source === 'panel') void savePanel(true); else void saveLength(true);
-              }}
-            >
-              Изменить длину
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={confirmDelete !== null} onOpenChange={(open) => !open && setConfirmDelete(null)}>
-        <DialogContent aria-describedby={undefined} className="max-h-[90vh] overflow-y-auto">
-          <DialogHeader><DialogTitle>Удалить навсегда?</DialogTitle></DialogHeader>
-          <p className="text-sm text-muted-foreground">Элемент «{confirmDelete?.item.name}» будет удалён без возможности восстановления.</p>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setConfirmDelete(null)}>Отмена</Button>
-            <Button onClick={() => void deleteItem()} className="bg-destructive-strong text-white hover:bg-destructive-strong">Удалить</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
-  );
+  return <AdminDictionariesView
+          panelWidth={panelWidth} search={search} setSearch={setSearch}
+          filter={filter} setFilter={setFilter} activeDictionary={activeDictionary}
+          setForm={setForm} activeKind={activeKind} loadError={loadError}
+          loadData={loadData} selectKind={selectKind} dictionarySummary={dictionarySummary}
+          statusLabel={statusLabel} filtered={filtered} setLengthState={setLengthState}
+          setStatus={setStatus} setStatusBulk={setStatusBulk} setConfirmDelete={setConfirmDelete}
+          selectItem={selectItem} selectedKind={selectedKind} selectedItem={selectedItem}
+          compactInspector={compactInspector} InspectorShell={InspectorShell} startResize={startResize}
+          setPanelWidth={setPanelWidth} inspectorTab={inspectorTab} setInspectorTab={setInspectorTab}
+          panelDraft={panelDraft} selectedUsed={selectedUsed} setPanelDraft={setPanelDraft}
+          saving={saving} panelDirty={panelDirty} savePanel={savePanel}
+          historyFailed={historyFailed} setHistoryAttempt={setHistoryAttempt} history={history}
+          form={form} submitForm={submitForm} lengthState={lengthState}
+          saveLength={saveLength} lengthConfirm={lengthConfirm} setLengthConfirm={setLengthConfirm}
+          formatMetres={formatMetres} confirmDelete={confirmDelete} deleteItem={deleteItem}
+        />;
 }
