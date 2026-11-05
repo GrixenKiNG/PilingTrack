@@ -139,7 +139,7 @@ function SiteCrewBoard({ crews, error }: { crews?: SiteCrew[]; error?: boolean }
             <li key={crew.id} className="flex gap-2.5 border-t pt-2 first:border-t-0 first:pt-0">
               <div className="h-14 w-20 shrink-0 overflow-hidden rounded border border-border bg-muted">
                 {photo ? (
-                   
+
                   <img src={photo} alt={crew.equipment?.name ?? 'Установка'} className="h-full w-full object-cover" />
                 ) : (
                   // Снимка на эту модель нет. Название не повторяем — оно уже
