@@ -7,7 +7,8 @@ import {
   type PilePassportRow,
 } from './pile-journal-types';
 import { listPilePassports } from './pile-journal-list';
-import { dayInTimezone, pileJournalHeader } from './pile-journal-totals';
+import { orderedPrintRows } from './pile-journal-print-page';
+import { pileJournalHeader } from './pile-journal-totals';
 import { printDay } from './pile-journal-export';
 
 /** Место, которое заполняют от руки: номер журнала, число страниц, подписи. */
@@ -26,14 +27,7 @@ const round = (value: number, digits: number): number => Number(value.toFixed(di
  * записи), поэтому «без даты в конец» не бывает: свая стоит там, где напечатан её день.
  */
 export function sortRowsForPrint(rows: PilePassportRow[], timezone: string): PilePassportRow[] {
-  const collator = new Intl.Collator('ru', { numeric: true });
-  return rows
-    .map((row) => ({ row, day: dayInTimezone(row.drivenAt, timezone) }))
-    .sort((a, b) =>
-      a.day.localeCompare(b.day)
-      || collator.compare(a.row.pileNumber ?? '', b.row.pileNumber ?? '')
-      || a.row.drivenAt.localeCompare(b.row.drivenAt))
-    .map(({ row }) => row);
+  return orderedPrintRows(rows, timezone);
 }
 
 /** Отметка острия = отметка головы минус длина сваи. */

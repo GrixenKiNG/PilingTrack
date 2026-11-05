@@ -1,3 +1,5 @@
+import type { Prisma } from '@/generated/postgres-client/client';
+import { firstPrintWorkIds } from './pile-journal-print-page';
 import { db } from '@/lib/db';
 import { ServiceError } from '@/lib/service-error';
 import { pileLengthMeters } from '@/lib/pile-length';
@@ -32,62 +34,69 @@ export async function listPilePassports(input: PileJournalFilters): Promise<Pile
   // Экран просит 500 строк, выгрузка — свой, высокий предел.
   const limit = Math.min(input.limit ?? PILE_JOURNAL_LIMIT, PILE_JOURNAL_EXPORT_LIMIT);
   const acceptance = input.acceptance ?? (input.pendingOnly ? 'PENDING' : undefined);
-  // Пояс нужен только для периода: день фильтра — день тенанта, а не UTC.
-  const bounds = input.dateFrom || input.dateTo
-    ? periodBounds(
-      input.dateFrom,
-      input.dateTo,
-      input.timezone ?? (await getSettings(input.tenantId)).timezone,
-    )
-    : null;
+  const timezone = input.timezone ?? (input.order === 'asc' || input.dateFrom || input.dateTo
+    ? (await getSettings(input.tenantId)).timezone
+    : 'UTC');
+  const bounds = input.dateFrom || input.dateTo ? periodBounds(input.dateFrom, input.dateTo, timezone) : null;
   // Строки журнала — записи выработки: одна строка PileWork (марка, количество,
   // смена, объект, кто записал, дата) = одна строка журнала. Паспорт подключаем
   // к строке по `pileWorkId` ради замеров и решения: сваи, записанные пачкой,
   // паспорта не имеют и всё равно обязаны быть в журнале.
-  const rows = await db.pileWork.findMany({
-    where: {
-      // Организация — строгим равенством: чужой выработки журнал не показывает
-      // (никаких `tenantId IS NULL OR ...` — это отдало бы строки всех тенантов).
-      tenantId: input.tenantId,
-      ...(input.siteId ? { report: { siteId: input.siteId } } : {}),
-      // Решение и номер сваи живут в паспорте: фильтруем по нему, когда он
-      // задан. Сваи без паспорта под эти фильтры не попадают — их нечего решать.
-      ...(acceptance || input.pileNumber
-        ? {
-          passport: {
-            ...(acceptance ? { acceptance } : {}),
-            ...(input.pileNumber
-              ? { pileNumber: { contains: escapeLikePattern(input.pileNumber), mode: 'insensitive' as const } }
-              : {}),
-          },
-        }
-        : {}),
-      // Дата забивки — момент работы, а не момент сохранения отчёта. Строку без
-      // `occurredAt` ставим по `receivedAt`, иначе она выпала бы из любого периода.
-      ...(bounds
-        ? { OR: [{ occurredAt: bounds }, { occurredAt: null, receivedAt: bounds }] }
-        : {}),
-    },
-    orderBy: [{ occurredAt: { sort: input.order ?? 'desc', nulls: 'last' } }, { receivedAt: input.order ?? 'desc' }],
-    // Лишняя строка — только признак среза: в ответ уйдёт ровно `limit` строк.
-    take: limit + 1,
-    include: {
-      pileGrade: { select: { name: true, lengthMm: true, sectionOrDiameter: true } },
-      picket: { select: { name: true, cluster: { select: { name: true } } } },
-      report: {
-        select: {
-          site: { select: { name: true } },
-          user: { select: { name: true } },
-          equipment: { select: { name: true } },
-          crew: { select: { equipment: { select: { name: true } } } },
-          shiftType: true,
-          shiftId: true,
-          status: true,
+  const where: Prisma.PileWorkWhereInput = {
+    // Организация — строгим равенством: чужой выработки журнал не показывает
+    // (никаких `tenantId IS NULL OR ...` — это отдало бы строки всех тенантов).
+    tenantId: input.tenantId,
+    ...(input.siteId ? { report: { siteId: input.siteId } } : {}),
+    // Решение и номер сваи живут в паспорте: фильтруем по нему, когда он
+    // задан. Сваи без паспорта под эти фильтры не попадают — их нечего решать.
+    ...(acceptance || input.pileNumber
+      ? {
+        passport: {
+          ...(acceptance ? { acceptance } : {}),
+          ...(input.pileNumber
+            ? { pileNumber: { contains: escapeLikePattern(input.pileNumber), mode: 'insensitive' as const } }
+            : {}),
         },
+      }
+      : {}),
+    // Дата забивки — момент работы, а не момент сохранения отчёта. Строку без
+    // `occurredAt` ставим по `receivedAt`, иначе она выпала бы из любого периода.
+    ...(bounds
+      ? { OR: [{ occurredAt: bounds }, { occurredAt: null, receivedAt: bounds }] }
+      : {}),
+  };
+  const include = {
+    pileGrade: { select: { name: true, lengthMm: true, sectionOrDiameter: true } },
+    picket: { select: { name: true, cluster: { select: { name: true } } } },
+    report: {
+      select: {
+        site: { select: { name: true } },
+        user: { select: { name: true } },
+        equipment: { select: { name: true } },
+        crew: { select: { equipment: { select: { name: true } } } },
+        shiftType: true,
+        shiftId: true,
+        status: true,
       },
-      passport: { include: { sets: { orderBy: { ordinal: 'asc' } }, joints: { orderBy: { ordinal: 'asc' } } } },
     },
-  });
+    passport: { include: { sets: { orderBy: { ordinal: 'asc' } }, joints: { orderBy: { ordinal: 'asc' } } } },
+  } satisfies Prisma.PileWorkInclude;
+  const take = limit + 1;
+  const rows = input.order === 'asc'
+    ? await db.$transaction(async (tx) => {
+        const ids = await firstPrintWorkIds(tx, where, timezone, take);
+        const works = await tx.pileWork.findMany({ where: { tenantId: input.tenantId, id: { in: ids } }, include });
+        const byId = new Map(works.map((work) => [work.id, work]));
+        return ids.map((id) => {
+          const work = byId.get(id);
+          if (!work) throw new Error('Не удалось прочитать выбранную строку журнала');
+          return work;
+        });
+      }, { isolationLevel: 'RepeatableRead', timeout: 60_000 })
+    : await db.pileWork.findMany({
+        where, include, take,
+        orderBy: [{ occurredAt: { sort: 'desc', nulls: 'last' } }, { receivedAt: 'desc' }],
+      });
 
   // Итоги периода — отдельным агрегатом по ВСЕЙ выборке; титул не срезается
   // вместе со страницей, иначе подшитый документ занижал бы числа.

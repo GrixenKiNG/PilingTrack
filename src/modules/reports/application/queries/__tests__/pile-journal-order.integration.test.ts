@@ -50,9 +50,9 @@ describe.skipIf(!process.env.INTEGRATION_DATABASE_URL_OWNER)('ПТО: поряд
     beforeAll(async () => {
       await seedPile('3', { number: 'ORD-3', occurredAt: new Date('2026-10-20T10:00:00Z') });
       await seedPile('2', { number: 'ORD-2', occurredAt: new Date('2026-10-18T14:00:00Z') });
-      await seedPile('1', { number: 'ORD-1', occurredAt: new Date('2026-10-18T09:00:00Z') });
+      await seedPile('1', { number: 'ORD-1', occurredAt: new Date('2026-10-18T16:00:00Z') });
       // Старая запись без occurredAt: дата забивки — момент записи.
-      await seedPile('4', { number: 'ORD-4', occurredAt: null, receivedAt: new Date('2026-10-25T08:00:00Z') });
+      await seedPile('4', { number: 'ORD-4', occurredAt: null, receivedAt: new Date('2026-10-01T08:00:00Z') });
     });
     const filters = () => ({ tenantId: tenant, siteId: site, pileNumber: 'ORD-' });
     /** Независимый порядок: день по Москве, затем номер сваи — прямо в SQL. */
@@ -64,7 +64,7 @@ describe.skipIf(!process.env.INTEGRATION_DATABASE_URL_OWNER)('ПТО: поряд
     it('форма 4.1 печатает от ранней забивки к поздней', async () => {
       const { exportPileJournalForm41Xlsx } = await import('../pile-journal-form41');
       const printed = firstSheet(await exportPileJournalForm41Xlsx(filters())).map((r) => r[1]).filter((v) => typeof v === 'string' && v.startsWith('ORD-'));
-      expect(await sqlOrder()).toEqual(['ORD-1', 'ORD-2', 'ORD-3', 'ORD-4']);
+      expect(await sqlOrder()).toEqual(['ORD-4', 'ORD-1', 'ORD-2', 'ORD-3']);
       expect(printed).toEqual(await sqlOrder());
     });
 
@@ -79,10 +79,10 @@ describe.skipIf(!process.env.INTEGRATION_DATABASE_URL_OWNER)('ПТО: поряд
     it('экран остаётся «новые сверху» (запись без occurredAt — в конце), срез по пределу отбрасывает самые поздние', async () => {
       const { listPilePassports } = await import('../pile-journal-list');
       const screen = await listPilePassports(filters());
-      expect(screen.rows.map((r) => r.pileNumber)).toEqual(['ORD-3', 'ORD-2', 'ORD-1', 'ORD-4']);
+      expect(screen.rows.map((r) => r.pileNumber)).toEqual(['ORD-3', 'ORD-1', 'ORD-2', 'ORD-4']);
       const cut = await listPilePassports({ ...filters(), order: 'asc', limit: 2 });
       expect(cut.truncated).toBe(true);
-      expect(cut.rows.map((r) => r.pileNumber)).toEqual(['ORD-1', 'ORD-2']);
+      expect(cut.rows.map((r) => r.pileNumber)).toEqual((await sqlOrder()).slice(0, 2));
     });
   });
 });
