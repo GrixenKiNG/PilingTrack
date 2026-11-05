@@ -1,7 +1,7 @@
 import type { Prisma } from '@/generated/postgres-client/client';
 import type { PilePassportRow } from './pile-journal-types';
 
-type PrintKey = Pick<PilePassportRow, 'pileWorkId' | 'drivenAt' | 'pileNumber'>;
+type PrintKey = Pick<PilePassportRow, 'drivenAt' | 'pileNumber'>;
 const numbers = new Intl.Collator('ru', { numeric: true });
 
 /** Один порядок для отбора до лимита и для строк готового листа. */
@@ -10,15 +10,14 @@ export function orderedPrintRows<T extends PrintKey>(rows: T[], timezone: string
   return rows.map((row) => ({ row, day: date.format(new Date(row.drivenAt)) }))
     .sort((a, b) => a.day.localeCompare(b.day)
       || numbers.compare(a.row.pileNumber ?? '', b.row.pileNumber ?? '')
-      || a.row.drivenAt.localeCompare(b.row.drivenAt)
-      || a.row.pileWorkId.localeCompare(b.row.pileWorkId))
+      || a.row.drivenAt.localeCompare(b.row.drivenAt))
     .map(({ row }) => row);
 }
 
 export async function firstPrintWorkIds(
   tx: Prisma.TransactionClient, where: Prisma.PileWorkWhereInput, timezone: string, take: number,
 ): Promise<string[]> {
-  let first: PrintKey[] = [];
+  let first: (PrintKey & { pileWorkId: string })[] = [];
   const batchSize = Math.max(256, take);
   const date = new Intl.DateTimeFormat('en-CA', { timeZone: timezone });
   // Два хронологических потока: новые записи по occurredAt, старые по receivedAt.
