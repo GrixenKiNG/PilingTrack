@@ -42,8 +42,12 @@ function OperatorLayout({ children }: { children: React.ReactNode }) {
   const navItems = ROLE_NAVIGATION[
     resolveEffectiveRole(user?.role || 'OPERATOR', actingAs) as UserRole];
 
+  const isSafetyPage = pathname === '/admin/safety';
   const nav = (
-    <nav className="fixed bottom-0 left-0 right-0 z-30 bg-card/95 backdrop-blur-sm border-t pb-safe">
+    <nav className={cn(
+      'z-30 bg-card/95 backdrop-blur-sm border-t pb-safe',
+      isSafetyPage ? 'shrink-0' : 'fixed bottom-0 left-0 right-0'
+    )}>
       <div className="flex items-center justify-around py-2 px-2">
         {navItems.map((item) => {
           const href = item.href === '/operator' && (pathname === '/operator/v3' || pathname.startsWith('/operator/v3/'))
@@ -83,7 +87,7 @@ function OperatorLayout({ children }: { children: React.ReactNode }) {
   );
 
   return (
-    <div className="min-h-screen bg-muted">
+    <div className={cn('bg-muted', isSafetyPage ? 'flex h-dvh flex-col' : 'min-h-screen')}>
       {/*
         Граница оболочки накрывает только её саму — шапку и нижнюю навигацию.
         Страница (`children`) стоит вне границы: её ошибку ловит маршрутный
@@ -122,7 +126,7 @@ function OperatorLayout({ children }: { children: React.ReactNode }) {
         на главном экране основного пользователя продукта скринридеру не за что
         было зацепиться, чтобы перескочить шапку и нижнюю навигацию.
       */}
-      <main>
+      <main className={isSafetyPage ? 'min-h-0 flex-1 overflow-y-auto' : undefined}>
         <ActingAsBanner />
         <AnimatePresence mode="wait">
           <motion.div

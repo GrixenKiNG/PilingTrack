@@ -118,7 +118,7 @@ test('R78-41 (1/2): инженер проводит инструктаж, у р�
   expect(briefingId, 'запись инструктажа создана и ждёт работника').not.toBe('');
 });
 
-test('R78-41 (2/2): работник подтверждает ту же запись в «Мой допуск»', async ({ page }) => {
+test('R78-41 (2/2): работник подтверждает ту же запись в «Мой допуск»', async ({ page, hasTouch }) => {
   test.setTimeout(180_000);
   test.skip(!briefingId, 'запись инструктажа не создана предыдущим шагом');
   await login(page, WORKER);
@@ -132,9 +132,30 @@ test('R78-41 (2/2): работник подтверждает ту же запи
   const button = page.getByRole('button', { name: /Подтвердить инструктаж/ }).first();
   await expect(button, 'у строки есть кнопка «Подтвердить»').toBeVisible({ timeout: 60_000 });
   await expect(page.getByText(/ждёт вашей отметки/i).first()).toBeVisible();
-  await tap(page, button);
+  const nav = page.getByRole('navigation').filter({ has: page.getByRole('link') }).last();
+  await expect(nav).toBeVisible();
+  await button.evaluate(el => el.scrollIntoView({ block: 'end', behavior: 'instant' }));
+  const bounds = await button.boundingBox();
+  const navBounds = await nav.boundingBox();
+  if (!bounds || !navBounds) throw new Error('Кнопка или навигация скрыта');
+  expect(bounds.y + bounds.height).toBeLessThanOrEqual(navBounds.y + 1);
+
+  const signPath = `/api/briefings/${briefingId}/sign`;
+  const signed: string[] = [];
+  page.on('request', request => {
+    const path = new URL(request.url()).pathname;
+    if (request.method() === 'POST' && /^\/api\/briefings\/[^/]+\/sign$/.test(path)) signed.push(path);
+  });
+  const [response] = await Promise.all([
+    page.waitForResponse(r => new URL(r.url()).pathname === signPath && r.request().method() === 'POST'),
+    hasTouch ? button.tap() : button.click(),
+  ]);
+  expect(response.status()).toBe(200);
   await expect(page.getByText('Отметка поставлена').first(), 'сервер принял отметку').toBeVisible({ timeout: 30_000 });
 
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await expect(page.getByRole('heading', { name: 'Мои инструктажи и проверки знаний' })).toBeVisible();
+  expect(signed).toEqual([signPath]);
   const after = await (await api(page).get('/api/safety/my-clearance')).json() as { history: Array<{ id: string; awaitingEmployeeSignature: boolean; employeeSignedAt: string | null }> };
   const done = after.history.find((item) => item.id === briefingId);
   expect(done?.awaitingEmployeeSignature).toBe(false);
