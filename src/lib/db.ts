@@ -9,7 +9,7 @@
  */
 
 import { PrismaClient, type Prisma as PostgresPrisma, type PrismaClient as PostgresPrismaClient } from '../generated/postgres-client/client';
-import { PrismaPg } from '@prisma/adapter-pg';
+import { SerializedPrismaPg } from '@/core/infrastructure/serialized-prisma-pg';
 import { applyTenantGuc, isRawMethod, wrapRawQuery, wrapTransaction } from '@/core/security/tenant-rls';
 
 const globalForPrisma = globalThis as unknown as {
@@ -61,7 +61,7 @@ function createPrismaClient(): PostgresPrismaClient {
   const poolTimeout = parseInt(process.env.PRISMA_POOL_TIMEOUT || '10', 10);
   const connectionLimit = parseInt(process.env.PRISMA_CONNECTION_LIMIT || '20', 10);
 
-  const adapter = new PrismaPg({
+  const adapter = new SerializedPrismaPg({
     connectionString: url,
     connectionTimeoutMillis: poolTimeout * 1000,
     max: connectionLimit,
