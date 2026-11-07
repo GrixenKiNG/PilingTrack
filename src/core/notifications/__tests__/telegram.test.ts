@@ -58,6 +58,34 @@ describe('telegramNotifier — botToken decryption', () => {
     else process.env.DEFAULT_TENANT_ID = originalDefaultTenantId;
   });
 
+  it('uses a stable proxy delivery key per outbox event and recipient on retry', async () => {
+    const previousBase = process.env.TELEGRAM_API_BASE;
+    process.env.TELEGRAM_API_BASE = 'https://proxy.invalid';
+    findManyMock.mockResolvedValue([
+      { id: 'A', botToken: 'test-a', chatId: 'A', enabled: true },
+      { id: 'B', botToken: 'test-b', chatId: 'B', enabled: true },
+    ]);
+    isEncryptedMock.mockReturnValue(false);
+    fetchMock
+      .mockRejectedValueOnce(new Error('timeout'))
+      .mockResolvedValue({ ok: true, json: async () => ({ ok: true }) });
+    let payload: Prisma.JsonValue = {};
+    const progress = createTelegramDeliveryProgress(payload, async next => { payload = JSON.parse(JSON.stringify(next)); }, 'event-stable');
+    try {
+      expect(await telegramNotifier.sendAlert({ severity: 'high', message: 'alarm' }, progress)).toBe(false);
+      expect(await telegramNotifier.sendAlert({ severity: 'high', message: 'alarm' }, progress)).toBe(true);
+      const keys = fetchMock.mock.calls.map(call => (call[1].headers as Record<string, string>)['X-Telegram-Delivery-Key']);
+      expect(keys).toHaveLength(3);
+      expect(keys[0]).toMatch(/^[a-f0-9]{64}$/);
+      expect(keys[0]).toBe(keys[2]);
+      expect(keys[0]).not.toBe(keys[1]);
+    } finally {
+      if (previousBase === undefined) delete process.env.TELEGRAM_API_BASE;
+      else process.env.TELEGRAM_API_BASE = previousBase;
+    }
+  });
+
+
   it('decrypts enc:-prefixed botToken before calling Telegram API', async () => {
     findManyMock.mockResolvedValue([
       { botToken: 'enc:CIPHERTEXT', chatId: '-100123', enabled: true },

@@ -92,7 +92,7 @@ export async function deliverQueuedAlert(event: {id?: string; tenantId?: string 
       if (!suppressed && !duplicate && !hasSentMarker(row.payload)) {
         const progress = createTelegramDeliveryProgress(row.payload, async payload => {
           await tx.outboxEvent.update({where: {id: row.id}, data: {payload}});
-        });
+        }, row.id);
         const delivered = await telegramNotifier.sendAlert({...alert, message: alert.message + '\nСобытие: ' + event.id}, progress);
         // Commit acknowledged chats before throwing to the outbox retry loop.
         if (!delivered) return false;

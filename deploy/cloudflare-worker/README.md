@@ -1,49 +1,44 @@
 # Telegram API Proxy via Cloudflare Worker
 
-## Зачем
+Прокси пересылает Bot API на api.telegram.org. Для алертов из outbox приложение
+добавляет X-Telegram-Delivery-Key, устойчивый для события и получателя.
 
-Российский хостинг блокирует исходящие соединения к `api.telegram.org`.
-Этот воркер принимает запросы от прод-сервера и пересылает их к Telegram.
-Cloudflare с Telegram нормально общается.
+## Защита от повторной отправки
 
-## Развертывание (5 минут)
+Для запросов POST sendMessage с ключом используется Durable Object TelegramDelivery.
+Один объект обслуживает одного бота. В хранилище находятся ключи и минимальные
+квитанции с message_id. Токены и текст сообщений в него не записываются.
 
-1. **Регистрация Cloudflare** (бесплатно): https://dash.cloudflare.com/sign-up
-2. В дашборде слева → **Workers & Pages** → **Create application** → **Create Worker**
-3. Дайте имя, например `pilingtrack-tg-proxy` → **Deploy**
-4. **Edit code** → удалите содержимое → вставьте `telegram-proxy.js` → **Save and deploy**
-5. Скопируйте URL: `https://pilingtrack-tg-proxy.<your-account>.workers.dev`
+До отправки сохраняется pending. После подтверждения Telegram сохраняется квитанция.
+Параллельные повторы ждут текущую отправку. Последующие повторы получают сохранённую
+квитанцию, в том числе после перезапуска Worker.
 
-## Опциональная защита от чужих запросов
+При обрыве соединения с Telegram или перезапуске между отправкой и сохранением
+квитанции прокси возвращает 409 delivery_unknown. Событие остаётся в очереди
+приложения и при исчерпании повторов попадает в DLQ для проверки доставки.
+Повторная отправка такого события требует выяснить результат предыдущей попытки.
+Подтверждённый отказ Telegram допускает следующую попытку.
 
-В дашборде воркера → **Settings → Variables** → добавьте `SHARED_SECRET` (любая длинная случайная строка). Тогда сервер должен слать заголовок `X-Proxy-Secret`. (В нынешнем коде приложения этот заголовок не отправляется — пока не используем.)
+Запросы без ключа, включая существующие вызовы sendDocument и тестовую отправку,
+проходят обычным проксированием.
 
-## Настройка прода
+## Обновление существующего Worker
 
-```bash
-ssh user@orionpiling.ru
-echo 'TELEGRAM_API_BASE=https://pilingtrack-tg-proxy.<your-account>.workers.dev' >> /opt/pilingtrack/.env.production
-echo 'TELEGRAM_API_BASE=https://pilingtrack-tg-proxy.<your-account>.workers.dev' >> /opt/pilingtrack/.env
+1. Указать имя существующего Worker в wrangler.jsonc или в аргументе --name.
+2. Существующим авторизованным Wrangler выполнить deploy с этим конфигом.
+   Миграция telegram-delivery-v1 создаёт SQLite-backed Durable Object и привязку
+   TELEGRAM_DELIVERIES. Новая зависимость в приложение не добавляется.
+3. Если используется SHARED_SECRET, сохранить его действующее значение.
+4. Сначала выложить Worker с привязкой, затем приложение, отправляющее ключи.
+5. Проверить повтор одного ключа и получение одного message_id.
 
-cd /opt/pilingtrack
-git pull origin main
-docker compose stop app && docker compose rm -f app
-docker rmi pilingtrack-app:latest
-docker compose build app && docker compose up -d app
-```
+SQLite-backed Durable Objects доступны в Cloudflare Workers Free в пределах
+лимитов тарифа. Наличие привязки обязательно для запросов с ключом. При её
+отсутствии прокси возвращает 503 до отправки сообщения.
 
-## Проверка
+В приложении сохраняется существующий TELEGRAM_API_BASE. Выкладка приложения
+выполняется по штатному процессу из docs/runbooks/008-manual-deploy.md.
 
-После рестарта на orionpiling.ru → `/admin/telegram` → «Тест» → должен вернуться 200.
-
-Если не работает:
-```bash
-docker compose exec app sh -c "echo \$TELEGRAM_API_BASE"
-docker compose logs app --since=2m | grep -iE "telegram|error" | tail -20
-```
-
-## Лимиты бесплатного плана Cloudflare
-
-- 100 000 запросов в день — для уведомлений по отчётам это **в сотни раз больше необходимого**.
-- 10 мс CPU на запрос — прокси использует ~1 мс.
-- Если упрётесь — Workers Paid: $5/мес за 10 млн запросов.
+Документация Cloudflare
+https://developers.cloudflare.com/durable-objects/best-practices/rules-of-durable-objects/
+https://developers.cloudflare.com/durable-objects/reference/pricing/

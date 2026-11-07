@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import type { TelegramDeliveryProgress } from './telegram-delivery-progress';
 /**
  * Telegram Notification Service — Production Integration
@@ -254,15 +255,22 @@ async function recordTelegramFailure(config: TelegramBotConfig, status: number, 
 async function sendTelegramMessage(
   config: TelegramBotConfig,
   text: string,
-  parse_mode = 'HTML'
+  parse_mode = 'HTML',
+  deliveryId?: string,
 ): Promise<DeliveryResult> {
   try {
     const url = `${process.env.TELEGRAM_API_BASE || 'https://api.telegram.org'}/bot${config.botToken}/sendMessage`;
 
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (deliveryId && process.env.TELEGRAM_API_BASE) {
+      headers['X-Telegram-Delivery-Key'] = createHash('sha256')
+        .update(JSON.stringify([deliveryId, config.chatId])).digest('hex');
+    }
+
     const response = await fetch(url, {
       signal: AbortSignal.timeout(5000),
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({
         chat_id: config.chatId,
         text,
@@ -376,7 +384,7 @@ export class TelegramNotifier {
 
     const { text, parse_mode } = buildAlertMessage(alert);
     const success = await deliverToAll(configs, (config) =>
-      sendTelegramMessage(config, text, parse_mode), progress,
+      sendTelegramMessage(config, text, parse_mode, progress?.deliveryId), progress,
     );
 
     if (success) {

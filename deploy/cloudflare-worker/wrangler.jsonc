@@ -1,0 +1,13 @@
+{
+  "name": "pilingtrack-tg-proxy",
+  "main": "telegram-proxy.js",
+  "compatibility_date": "2026-11-01",
+  "durable_objects": {
+    "bindings": [
+      { "name": "TELEGRAM_DELIVERIES", "class_name": "TelegramDelivery" }
+    ]
+  },
+  "migrations": [
+    { "tag": "telegram-delivery-v1", "new_sqlite_classes": ["TelegramDelivery"] }
+  ]
+}
