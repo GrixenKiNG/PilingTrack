@@ -69,6 +69,7 @@ describe('Sentry v11 collection policy', () => {
     const options = init.mock.calls[0][0] as BrowserOptions;
     const { default: nextConfig } = await import('../../next.config');
     if (!nextConfig.rewrites) throw new Error('Sentry tunnel rewrite is missing');
+    expect(nextConfig.compress).toBe(false);
     const rewrites = await nextConfig.rewrites();
     const entries = Array.isArray(rewrites) ? rewrites : [...(rewrites.beforeFiles ?? []), ...(rewrites.afterFiles ?? [])];
     expect(entries.some(({ source, destination }) => source === '/_relay(/?)' && destination.includes('/api/:projectid/envelope/'))).toBe(true);

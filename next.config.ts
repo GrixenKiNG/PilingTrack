@@ -4,6 +4,9 @@ import path from "node:path";
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  // Caddy owns gzip/zstd in deploy/Caddyfile.prod. Next compression adds a
+  // close listener that pushes Sentry tunnel responses over Node's limit.
+  compress: false,
   // BullMQ uses ioredis here; its optional GLIDE adapter is not configured.
   // Keep native Node loading so webpack does not resolve the unused adapter.
   serverExternalPackages: ["bullmq"],
