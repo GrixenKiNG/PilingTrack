@@ -14,6 +14,11 @@ const nextConfig: NextConfig = {
   // dirties the tree, which deploy-prod.sh refuses. AGENTS.md is maintained by hand.
   agentRules: false,
   reactStrictMode: true,
+  async rewrites() {
+    return {
+      beforeFiles: [{ source: "/orion", destination: "/orion/site/index.html" }],
+    };
+  },
   // Bake a version into the bundle at build time. Next's `env` config
   // replaces every `process.env.APP_VERSION` reference in compiled code
   // with this literal — including in the standalone runtime (`node
