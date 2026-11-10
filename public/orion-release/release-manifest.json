@@ -1,11 +1,11 @@
 {
   "source": "owner-approved ORION concept 2026-11-09",
-  "baseCommit": "de51a9244258d64c976e8fa198d2c82c23ed0d9c",
+  "baseCommit": "62e03dbd861dc7d01126c84ef8a870c9498b0a63",
   "files": [
     {
       "file": "index.html",
-      "bytes": 162329,
-      "sha256": "9e1458e9c10c0f0ca38568d67bf4ecadefe9e2c05b9a4c1e5208bb76140f9b3d"
+      "bytes": 162306,
+      "sha256": "c099013e03fd4262b263dd2b7730ac635d49a0d423bb68508e2d44bd6f040db0"
     },
     {
       "file": "assets/447c49583b1b735cc6f5.woff2",
@@ -1249,28 +1249,28 @@
     },
     {
       "file": "objects.html",
-      "bytes": 145364,
-      "sha256": "597726cca6adf173cb7cb32a56893737ad4ce4840d7f27bc936f2f250592f8cd"
+      "bytes": 145353,
+      "sha256": "acfe3344f484e0da7cf78344904e62bda8ddf6b56174a7e536cc87540ec294db"
     },
     {
       "file": "fleet.html",
-      "bytes": 145517,
-      "sha256": "38f97d947b8aa7ac4941f840d2a24b866c3b33850ca36c378b3b106e03b85c0d"
+      "bytes": 145506,
+      "sha256": "5c61902525fb0c9a6ea627192d8388b7248254f24e4f032034c5226c60f21f5f"
     },
     {
       "file": "project-school-university.html",
-      "bytes": 151075,
-      "sha256": "5578a0dc041f8b53af6a97244ea27b39497852acd267e0b8112e4086156b921d"
+      "bytes": 151064,
+      "sha256": "bb26b308cf628dd783c0077eee25358935d734d768284392144169de64265590"
     },
     {
       "file": "project-m12.html",
-      "bytes": 153898,
-      "sha256": "db082cab8dac5ab6993ee4ab05aaf2735dfaaee9b2345d2939b5b5f64e1cb0dc"
+      "bytes": 153887,
+      "sha256": "f345a9b645399ab701bbb6ce63f77e62a0815b5ee06fbd6f4f44faef49ae2496"
     },
     {
       "file": "project-microdistrict.html",
-      "bytes": 153054,
-      "sha256": "f1196bd1f542eba221355cea733dd070317bec6f56b49b44df7f77f953773792"
+      "bytes": 153043,
+      "sha256": "03eccb1cfe9627b4d9420f1d93e0126a42a48a3f476664448edaa2d39b1bacc6"
     }
   ]
 }
