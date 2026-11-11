@@ -12,7 +12,7 @@ const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://orionpiling.ru';
 export default function sitemap(): MetadataRoute.Sitemap {
   return [
     {
-      url: `${siteUrl}/orion`,
+      url: `${siteUrl}/`,
       lastModified: new Date(),
       changeFrequency: 'monthly',
       priority: 1,

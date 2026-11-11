@@ -70,7 +70,7 @@ export async function login(page: Page, email: string) {
   if (fs.existsSync(stateFile)) {
     const state = JSON.parse(fs.readFileSync(stateFile, 'utf8'));
     await page.context().addCookies(state.cookies ?? []);
-    await page.goto('/');
+    await page.goto('/orion');
     await page.waitForTimeout(1500);
     if (!onLogin.test(page.url())) return;
     await page.context().clearCookies();

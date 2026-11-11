@@ -49,7 +49,7 @@ test.describe('E2E — Full Application Flow', () => {
 
   test('mobile viewport renders', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 667 });
-    await page.goto('/');
+    await page.goto('/orion');
     const vp = page.locator('meta[name="viewport"]');
     await expect(vp).toHaveAttribute('content', /device-width/);
   });
