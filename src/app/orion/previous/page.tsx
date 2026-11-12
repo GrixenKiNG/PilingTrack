@@ -1,4 +1,4 @@
-import PreviousOrionPage, { metadata as previousMetadata } from '../page';
+import PreviousOrionPage, { metadata as previousMetadata } from '../legacy-site';
 
 export const metadata = {
   ...previousMetadata,

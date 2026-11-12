@@ -12,7 +12,7 @@ test.describe('PilingTrack E2E Tests', () => {
   });
 
   test('login page loads and shows form', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/orion');
     // NB: do NOT waitForLoadState('networkidle') — the app holds an SSE
     // connection (/api/feedback/stream) open, so the network never goes
     // idle and networkidle times out at 30s. Wait for concrete UI instead.
@@ -45,7 +45,7 @@ test.describe('PilingTrack E2E Tests', () => {
 
   test('mobile viewport renders correctly', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 667 });
-    await page.goto('/');
+    await page.goto('/orion');
     
     // Check viewport meta is set
     const viewport = page.locator('meta[name="viewport"]');

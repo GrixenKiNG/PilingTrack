@@ -16,7 +16,7 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   async rewrites() {
     return {
-      beforeFiles: [{ source: "/orion", destination: "/orion/site/index.html" }],
+      beforeFiles: [{ source: "/", destination: "/orion/site/index.html" }],
     };
   },
   // Bake a version into the bundle at build time. Next's `env` config

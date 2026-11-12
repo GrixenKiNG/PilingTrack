@@ -47,10 +47,10 @@ export class LoginPage {
    * wait for the redirect off /login instead of guessing a timeout.
    *
    * Extracted from loginAsAdmin in inspection-to-flow.spec.ts. Navigates to
-   * '/' itself, so callers don't need a preceding page.goto.
+   * '/orion' itself, so callers don't need a preceding page.goto.
    */
   async login(email: string, password: string): Promise<void> {
-    await this.page.goto('/');
+    await this.page.goto('/orion');
     const emailField = this.page.locator('#email');
     const passwordField = this.page.locator('#password');
     await emailField.waitFor({ state: 'visible', timeout: 10000 });

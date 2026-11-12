@@ -1,0 +1,24 @@
+<!DOCTYPE html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Пример сменного отчёта — ОРИОН</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#edf0eb;color:#172126;font:16px/1.55 system-ui,sans-serif}
+main{max-width:860px;margin:40px auto;padding:36px;background:#fff;border-top:6px solid #ff571f}
+a{color:#92341a;text-underline-offset:3px}h1{font-size:clamp(30px,5vw,48px);line-height:1.06;margin:16px 0}h2{font-size:20px;margin:24px 0 8px}
+.sample{padding:12px 16px;background:#f4ede7}.fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:24px 0}
+.fields div{border-top:1px solid #d8dfda;padding-top:8px}dt{font-weight:700}dd{margin:0}
+table{border-collapse:collapse;width:100%;font-size:15px}th,td{text-align:left;padding:10px 8px;border-bottom:1px solid #d8dfda;vertical-align:top}thead{background:#edf0eb}
+button{background:#172126;color:white;padding:10px 16px;border:0;border-radius:4px;font:inherit;cursor:pointer}
+@media(max-width:600px){main{margin:0;padding:20px 16px}th,td{padding:8px 4px}}
+@media print{body{background:#fff}main{margin:0;padding:0}button,nav{display:none}}
+</style></head><body><main>
+<nav><a href="/#control">К производственному учёту ОРИОН</a></nav>
+<h1>Пример сменного отчёта</h1>
+<p class="sample"><strong>Демонстрационный образец.</strong> Площадка, смена и показатели условные. Состав отчётности согласуется по договору.</p>
+<dl class="fields"><div><dt>Объект</dt><dd>Учебная площадка</dd></div><div><dt>Смена</dt><dd>Дневная, 08:00–17:00</dd></div><div><dt>Рабочая зона</dt><dd>Участок А</dd></div><div><dt>Техника</dt><dd>Сваебойная установка</dd></div></dl>
+<h2>Выполнено за смену</h2>
+<table><thead><tr><th scope="col">Работа</th><th scope="col">Количество</th><th scope="col">Метраж</th></tr></thead>
+<tbody><tr><th scope="row">Погружение свай</th><td>8 свай</td><td>64 пог. м</td></tr><tr><th scope="row">Лидерное бурение</th><td>8 скважин</td><td>32 м</td></tr></tbody></table>
+<h2>Простой</h2><p>30 минут. Ожидание подачи свай на рабочую зону.</p>
+<h2>Примечание по смене</h2><p>В учёте зафиксированы позиции А01–А08. При наличии к смене прикладываются фотографии с площадки.</p>
+<button type="button" id="print-report">Распечатать или сохранить в PDF</button>
+</main><script>document.getElementById('print-report').addEventListener('click', () => window.print());</script></body></html>

@@ -3,19 +3,18 @@ import { expect, test } from './fixtures/disposable.fixture';
 test.describe('ORION current public route', () => {
   test('stays usable at mobile width', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 812 });
-    await page.goto('/orion');
-    await expect(page.getByRole('heading', { level: 1 })).toContainText('Основания');
-    await expect(page.getByRole('link', { name: /обсудить объект/i }).first()).toBeVisible();
-    await expect(page.getByText('единиц подтверждённого парка', { exact: true })).toBeVisible();
+    await page.goto('/');
+    await expect(page.getByRole('heading', { level: 1 })).toContainText(/Уверенно держим/);
+    await expect(page.getByRole('link', { name: 'Запросить расчёт работ' })).toBeVisible();
+    await expect(page.locator('.hero-copy')).toContainText('Свайные и шпунтовые работы под ключ');
     const metrics = await page.evaluate(() => ({ clientWidth: document.documentElement.clientWidth, scrollWidth: document.documentElement.scrollWidth }));
     expect(metrics.scrollWidth).toBeLessThanOrEqual(metrics.clientWidth);
   });
 
-  // /orion now renders OrionHandoffSite; the former passport disclosure
-  // is absent. Exercise its live equipment selector instead of a dead control.
+  // The archived site retains its original equipment selector.
   test('switches equipment and exposes technical data on mobile', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 812 });
-    await page.goto('/orion');
+    await page.goto('/orion/previous');
     const tabs = page.getByRole('tablist', { name: 'Установки ОРИОН' }).getByRole('tab');
     await expect(tabs.first()).toBeVisible();
     expect(await tabs.count()).toBeGreaterThan(1);
@@ -30,7 +29,7 @@ test.describe('ORION current public route', () => {
 
   test('keeps content available with reduced motion', async ({ page }) => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
-    await page.goto('/orion');
+    await page.goto('/orion/previous');
     await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
     await expect(page.getByRole('heading', { name: /Инженерная уверенность/ })).toBeVisible();
     await expect(page.getByRole('heading', { name: /Начнём с исходных данных/ })).toBeVisible();
@@ -38,7 +37,7 @@ test.describe('ORION current public route', () => {
 
   test('closes the mobile menu with Escape', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 812 });
-    await page.goto('/orion');
+    await page.goto('/orion/previous');
     await page.getByRole('button', { name: 'Открыть меню' }).click();
     await expect(page.getByRole('button', { name: 'Закрыть меню' })).toBeVisible();
     await page.keyboard.press('Escape');

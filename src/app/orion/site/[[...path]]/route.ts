@@ -6,7 +6,7 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 const pages = new Set([
-  'index.html', 'objects.html', 'fleet.html',
+  'index.html', 'objects.html', 'fleet.html', 'shift-report.html',
   'project-school-university.html', 'project-m12.html', 'project-microdistrict.html',
 ]);
 

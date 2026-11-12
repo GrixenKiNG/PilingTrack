@@ -1,4 +1,4 @@
-# Публичная часть — только сайт компании /orion.
+# Публичный сайт компании начинается с корня домена.
 # Остальное закрыто входом: индексировать страницы, которые отвечают
 # переадресацией на логин, бессмысленно, а перечислять их в выдаче — значит
 # раскрывать структуру системы. Все агенты используют один набор правил.
@@ -8,7 +8,9 @@ User-agent: Bingbot
 User-agent: Twitterbot
 User-agent: facebookexternalhit
 User-agent: *
-Allow: /orion
+Allow: /orion/site/
+Disallow: /orion$
+Disallow: /orion/previous
 Disallow: /admin
 Disallow: /operator
 Disallow: /report
