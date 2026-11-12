@@ -3,6 +3,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import bcrypt from 'bcryptjs';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { createFixture } from './helpers/disposable-db';
+import { DEFAULT_READINESS_RULES } from '../../src/modules/readiness/domain/readiness-rules';
 
 describe.skipIf(!process.env.CODEX_STAND_URL || !process.env.INTEGRATION_DATABASE_URL_OWNER)('E3 real concurrent report saves', () => {
   let fixture: Awaited<ReturnType<typeof createFixture>>;
@@ -13,8 +14,19 @@ describe.skipIf(!process.env.CODEX_STAND_URL || !process.env.INTEGRATION_DATABAS
     base = url.origin;
     fixture = await createFixture(); tenant = fixture.tenants[0]; grade = tenant + '-grade';
     const user = fixture.id(tenant,'User'); const password = randomBytes(20).toString('hex'); const email = tenant + '@example.invalid';
+    const site = fixture.id(tenant, 'Site');
+    const equipment = fixture.id(tenant, 'Equipment');
     await fixture.owner.query('UPDATE "User" SET password=$1 WHERE id=$2',[await bcrypt.hash(password,10),user]);
-    await fixture.owner.query('INSERT INTO "UserSiteAssignment" (id,"userId","siteId","updatedAt") VALUES ($1,$2,$3,now())',[tenant+'-assignment',user,fixture.id(tenant,'Site')]);
+    await fixture.owner.query('INSERT INTO "UserSiteAssignment" (id,"userId","siteId","updatedAt") VALUES ($1,$2,$3,now())',[tenant+'-assignment',user,site]);
+    await fixture.owner.query('INSERT INTO "Crew" (id,"operatorId","siteId","equipmentId","updatedAt") VALUES ($1,$2,$3,$4,now())', [fixture.id(tenant, 'Crew'), user, site, equipment]);
+    await fixture.owner.query('UPDATE "Report" SET "equipmentId"=$2 WHERE id=$1', [fixture.id(tenant, 'Report'), equipment]);
+    await fixture.owner.query('UPDATE "Inspection" SET status=$2,"healthScore"=100 WHERE id=$1', [fixture.id(tenant, 'Inspection'), 'COMPLETED']);
+    const {version, criteria, blockers} = DEFAULT_READINESS_RULES;
+    await fixture.owner.query(
+      `INSERT INTO "ReadinessRuleSet" (id,"tenantId",status,version,criteria,blockers,"publishedAt","updatedAt")
+       VALUES ($1,$2,'PUBLISHED',$3,$4,$5,now(),now())`,
+      [fixture.id(tenant, 'ReadinessRuleSet'), tenant, version, JSON.stringify(criteria), JSON.stringify(blockers)],
+    );
     await fixture.owner.query('INSERT INTO "PileGrade" (id,"tenantId",name,"normalizedName","lengthMm","updatedAt") VALUES ($1,$2,$1,$1,6000,now())',[grade,tenant]);
     const response = await fetch(base+'/api/auth/login',{method:'POST',headers:{Origin:base,'Content-Type':'application/json'},body:JSON.stringify({email,password})});
     expect(response.status).toBe(200);
@@ -27,6 +39,8 @@ describe.skipIf(!process.env.CODEX_STAND_URL || !process.env.INTEGRATION_DATABAS
     await fixture.owner.query('DELETE FROM "Report" WHERE id=$1',[fixture.id(tenant,'Report')]);
     await fixture.owner.query('DELETE FROM "PileGrade" WHERE id=$1',[grade]);
     await fixture.owner.query('DELETE FROM "UserSiteAssignment" WHERE id=$1',[tenant+'-assignment']);
+    await fixture.owner.query('DELETE FROM "Crew" WHERE id=$1', [fixture.id(tenant, 'Crew')]);
+    await fixture.owner.query('DELETE FROM "ReadinessRuleSet" WHERE id=$1', [fixture.id(tenant, 'ReadinessRuleSet')]);
     await fixture.close();
   });
   it('один победитель, второй 409; данные победителя сохранены', async () => {
