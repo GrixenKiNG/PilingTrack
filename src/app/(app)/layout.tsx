@@ -50,14 +50,12 @@ function OperatorLayout({ children }: { children: React.ReactNode }) {
     )}>
       <div className="flex items-center justify-around py-2 px-2">
         {navItems.map((item) => {
-          const href = item.href === '/operator' && (pathname === '/operator/v3' || pathname.startsWith('/operator/v3/'))
-            ? '/operator/v3' : item.href;
-          const isActive = isActivePath(pathname, href);
+          const isActive = isActivePath(pathname, item.href);
 
           return (
             <Link
               key={item.href}
-              href={href}
+              href={item.href}
               aria-current={isActive ? 'page' : undefined}
               className={cn(
                 'flex min-w-[64px] flex-col items-center gap-0.5 rounded-xl px-4 py-1.5 no-underline transition-colors',

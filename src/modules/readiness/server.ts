@@ -7,6 +7,7 @@ export {
   withReadinessSerializableTransaction,
 } from './infrastructure/tenant-transaction';
 export {ReadinessCommandError} from './application/command-pipeline/errors';
+export {previewAuthoritativeShiftStart} from './application/shifts/start-decision';
 export {OPEN_MAINTENANCE} from './application/readiness-score';
 export {createRepairOrderForDefect} from './infrastructure/defects/repair-order';
 export {recordDefectInTx, type RecordDefectInput} from './infrastructure/defects/record-defect';

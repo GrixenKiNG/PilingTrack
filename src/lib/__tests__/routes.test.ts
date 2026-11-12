@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { roleHomeRoute, OPERATOR_HOME_ROUTE, ASSISTANT_HOME_ROUTE } from '../routes';
+import { appPageRoute, roleHomeRoute, OPERATOR_HOME_ROUTE, ASSISTANT_HOME_ROUTE } from '../routes';
 
 describe('roleHomeRoute', () => {
   // Инженер ОТ работает в «ТБ и допуски» — это его первый пункт меню, туда и
@@ -22,8 +22,12 @@ describe('roleHomeRoute', () => {
     expect(roleHomeRoute('ASSISTANT')).toBe(ASSISTANT_HOME_ROUTE);
   });
 
+  it('opens v3 as the main operator workspace', () => {
+    expect(roleHomeRoute('OPERATOR')).toBe('/operator/v3');
+    expect(appPageRoute('operator-dashboard')).toBe('/operator/v3');
+  });
+
   it('falls back to the operator workspace for unknown roles', () => {
-    expect(roleHomeRoute('OPERATOR')).toBe(OPERATOR_HOME_ROUTE);
     expect(roleHomeRoute('SOMETHING')).toBe(OPERATOR_HOME_ROUTE);
   });
 });

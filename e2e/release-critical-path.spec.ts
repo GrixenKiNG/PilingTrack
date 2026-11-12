@@ -1,3 +1,4 @@
+import type { Browser } from '@playwright/test';
 import { test, expect } from './fixtures/disposable.fixture';
 import { TEST_USERS } from './fixtures/auth.fixture';
 import { login } from './page-objects/login.page';
@@ -12,6 +13,31 @@ async function owner() {
   const db = new Client({ connectionString: url.toString() });
   await db.connect();
   return db;
+}
+
+type RoleFixture = Awaited<ReturnType<typeof createRoleAuditFixture>>;
+
+async function publishReadiness(browser: Browser, origin: string, fixture: RoleFixture) {
+  const context = await browser.newContext({baseURL: origin});
+  try {
+    const admin = await context.newPage();
+    await login(admin, fixture.users.ADMIN.email, fixture.password);
+    const published = await admin.request.post('/api/readiness-rules/publish', {headers: {Origin: origin}});
+    expect(published.ok()).toBe(true);
+    expect((await published.json()).publishedInDb).toBe(true);
+  } finally { await context.close(); }
+}
+
+async function completeInspection(db: Client, fixture: RoleFixture) {
+  const templateId = randomUUID();
+  await db.query(
+    'INSERT INTO "ChecklistTemplate" (id,"tenantId",name,level,"createdById","updatedAt") VALUES ($1,$2,$3,$4,$5,now())',
+    [templateId, fixture.tenantId, 'QA v3', 'EO', fixture.users.ADMIN.id],
+  );
+  await db.query(
+    'INSERT INTO "Inspection" (id,"tenantId","equipmentId","templateId",level,"performedById","inspectionDate","healthScore",status,"templateSnapshot","updatedAt") VALUES ($1,$2,$3,$4,$5,$6,now(),100,$7,$8,now())',
+    [randomUUID(), fixture.tenantId, fixture.equipmentId, templateId, 'EO', fixture.users.MECHANIC.id, 'COMPLETED', '{}'],
+  );
 }
 
 test('dispatcher draft, submit, daily projection, KPI and worker PDF', async ({ page }, info) => {
@@ -59,6 +85,82 @@ test('dispatcher draft, submit, daily projection, KPI and worker PDF', async ({ 
     const file = await page.request.get(`/api/reports/single-pdf?jobId=${jobId}&action=download`);
     expect(file.status()).toBe(200);
     expect((await file.body()).subarray(0, 5).toString()).toBe('%PDF-');
+  } finally { await db.end(); }
+});
+
+test('v3 refuses production with unpublished readiness rules in the UI and direct API', async ({page, browser}) => {
+  const fixture = await createRoleAuditFixture();
+  const db = await owner();
+  const date = getTodayInTimezone();
+  try {
+    await login(page, fixture.users.OPERATOR.email, fixture.password);
+    await expect(page).toHaveURL(/\/operator\/v3$/);
+    await page.getByRole('button', {name: /^Начало смены/}).click();
+    await expect(page).toHaveURL(/\/operator\/v3\/report$/);
+    const origin = new URL(page.url()).origin;
+    const payload = {
+      reportId: randomUUID(), siteId: fixture.siteId, equipmentId: fixture.equipmentId, date,
+      piles: [{pileGradeId: fixture.pileId, count: 3}],
+    };
+    const denied = await page.request.post('/api/reports/upsert', {headers: {Origin: origin}, data: payload});
+    expect.soft(denied.status()).toBe(422);
+    expect.soft((await denied.json()).error).toBe('Правила готовности не опубликованы');
+
+    await page.getByRole('combobox', {name: 'Объект', exact: true}).click();
+    await page.getByRole('option', {name: 'QA полигон', exact: true}).click();
+    await page.getByRole('combobox', {name: 'Установка', exact: true}).click();
+    await page.getByRole('option', {name: 'QA КБУРГ', exact: true}).click();
+    await page.getByRole('combobox', {name: 'Марка сваи', exact: true}).click();
+    await page.getByRole('option', {name: /QA C120.30/}).click();
+    await page.getByRole('spinbutton', {name: 'Количество свай, шт.', exact: true}).fill('3');
+    await page.getByRole('button', {name: 'Добавить сваи в отчёт', exact: true}).click();
+    const [saved] = await Promise.all([
+      page.waitForResponse(r => new URL(r.url()).pathname === '/api/reports/upsert' && r.request().method() === 'POST'),
+      page.getByRole('button', {name: 'Отправить отчёт', exact: true}).click(),
+    ]);
+    expect.soft(saved.status()).toBe(422);
+    const stored = await db.query(
+      'SELECT r.status, p.count FROM "Report" r JOIN "PileWork" p ON p."reportId"=r.id AND p."tenantId"=r."tenantId" WHERE r."tenantId"=$1 AND r."userId"=$2',
+      [fixture.tenantId, fixture.users.OPERATOR.id],
+    );
+    expect(stored.rows).toEqual([]);
+
+    const reason = (await db.query('SELECT id FROM "DowntimeReason" WHERE "tenantId"=$1 LIMIT 1', [fixture.tenantId])).rows[0].id;
+    const downtime = await page.request.post('/api/reports/upsert', {
+      headers: {Origin: origin},
+      data: {...payload, reportId: randomUUID(), date: new Date(Date.parse(date) - 86_400_000).toISOString().slice(0, 10),
+        piles: [], downtimes: [{reasonId: reason, duration: 1}]},
+    });
+    expect(downtime.status()).toBe(200);
+
+    await publishReadiness(browser, origin, fixture);
+
+    const missingInspection = await page.request.post('/api/reports/upsert', {headers: {Origin: origin}, data: payload});
+    expect(missingInspection.status()).toBe(422);
+    expect((await missingInspection.json()).error).toBe('Нет осмотра за сегодня');
+    await completeInspection(db, fixture);
+    const allowed = await page.request.post('/api/reports/upsert', {headers: {Origin: origin}, data: payload});
+    expect(allowed.status()).toBe(200);
+    const {report: {report: submitted}} = await allowed.json();
+    expect(submitted.piles.map((row: {count: number}) => row.count)).toEqual([3]);
+
+    await db.query(
+      'INSERT INTO "EquipmentDefect" (id,"tenantId","equipmentId",severity,title,"reportedById","updatedAt") VALUES ($1,$2,$3,$4,$5,$6,now())',
+      [randomUUID(), fixture.tenantId, fixture.equipmentId, 'CRITICAL', 'QA блокирующая неисправность', fixture.users.MECHANIC.id],
+    );
+    const rejectedChange = await page.request.post('/api/reports/upsert', {
+      headers: {Origin: origin},
+      data: {...payload, version: submitted.version, piles: [{pileGradeId: fixture.pileId, count: 4}]},
+    });
+    expect(rejectedChange.status()).toBe(422);
+    const allowedDowntimeEdit = await page.request.post('/api/reports/upsert', {
+      headers: {Origin: origin},
+      data: {...payload, version: submitted.version, downtimes: [{reasonId: reason, duration: 1}]},
+    });
+    expect(allowedDowntimeEdit.status()).toBe(200);
+    const {report: {report: updated}} = await allowedDowntimeEdit.json();
+    expect(updated.piles.map((row: {count: number}) => row.count)).toEqual([3]);
+    expect(updated.downtimes.map((row: {duration: number}) => row.duration)).toEqual([1]);
   } finally { await db.end(); }
 });
 
@@ -172,9 +274,8 @@ test('F7 briefing print opens with no opener and no false blocked toast', async 
   }
 });
 
-for (const multiple of [false, true]) test('v3: real legacy report reaches dispatcher (' + (multiple ? 'multiple rigs' : 'single rig') + ')', async ({ page }, info) => {
+for (const multiple of [false, true]) test('v3: real legacy report reaches dispatcher (' + (multiple ? 'multiple rigs' : 'single rig') + ')', async ({ page, browser }, info) => {
   test.setTimeout(120000);
-  await page.setViewportSize({ width: 375, height: 812 });
   const fixture = await createRoleAuditFixture();
   const db = await owner();
   const equipmentName = 'V3 QA ' + fixture.equipmentId;
@@ -187,9 +288,11 @@ for (const multiple of [false, true]) test('v3: real legacy report reaches dispa
       await db.query('INSERT INTO "Crew" (id,name,"operatorId","equipmentId","siteId","updatedAt") VALUES ($1,$2,$3,$4,$5,now())', [randomUUID(), 'V3 вторая бригада', fixture.users.OPERATOR.id, id, fixture.siteId]);
     }
     await login(page, fixture.users.OPERATOR.email, fixture.password);
+    await expect(page).toHaveURL(/\/operator\/v3$/);
+    await publishReadiness(browser, new URL(page.url()).origin, fixture);
+    await completeInspection(db, fixture);
     const mobile = async () => { const r = await page.request.get('/api/operator/mobile/state'); expect(r.status()).toBe(200); return (await r.json()).data; };
     observed.before = await mobile();
-    await page.goto('/operator/v3');
     await expect(page.getByRole('button', { name: /^Начало смены/ })).toBeEnabled();
     observed.dashboardButtons = await page.getByRole('button').allTextContents();
     observed.canonicalNextControls = await page.getByRole('button', { name: /^Следующий шаг:/ }).count();

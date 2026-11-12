@@ -12,7 +12,7 @@ import type { AppPage } from '@/lib/types';
  * рабочего места означало «поменять в двух и забыть третий» — человек входил на
  * один экран, а по кнопке меню попадал на другой.
  */
-export const OPERATOR_HOME_ROUTE = '/operator';
+export const OPERATOR_HOME_ROUTE = '/operator/v3';
 
 /** Рабочее место помощника машиниста: инструктаж, проверка знаний, допуски. */
 export const ASSISTANT_HOME_ROUTE = '/assistant';
@@ -41,7 +41,7 @@ export function roleHomeRoute(role: string): string {
 
 const PAGE_TO_ROUTE: Record<AppPage, string> = {
   login: '/login',
-  'operator-dashboard': '/operator',
+  'operator-dashboard': OPERATOR_HOME_ROUTE,
   'report-form': '/report',
   'report-history': '/history',
   'admin-dashboard': '/admin',
@@ -57,5 +57,5 @@ const PAGE_TO_ROUTE: Record<AppPage, string> = {
 };
 
 export function appPageRoute(page: AppPage): string {
-  return PAGE_TO_ROUTE[page] ?? '/operator';
+  return PAGE_TO_ROUTE[page] ?? OPERATOR_HOME_ROUTE;
 }

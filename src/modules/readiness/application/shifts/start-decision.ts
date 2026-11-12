@@ -4,30 +4,25 @@ import type {ReadinessTransaction} from '../../infrastructure/tenant-transaction
 import {evaluateAuthoritativeReadiness} from '../readiness-score';
 import {blockerFingerprint, waiverCoversBlockers} from '../../domain/shifts/waiver';
 
-export async function evaluateAuthoritativeShiftStart(input: {
+type ShiftStartInput = {
   tx: ReadinessTransaction;
   tenantId: string;
   equipmentId: string;
   shiftId: string;
   now: Date;
   timezone: string;
-}) {
+};
+
+export async function previewAuthoritativeShiftStart(input: Omit<ShiftStartInput, 'shiftId'> & {shiftId?: string}) {
   const evaluation = await evaluateAuthoritativeReadiness({
     tx: input.tx, tenantId: input.tenantId, equipmentId: input.equipmentId,
     shiftId: input.shiftId, timezone: input.timezone, clock: capturedClock(input.now),
   });
-  const snapshot = await createDeduplicatedSnapshot(input.tx, {
-    tenantId: input.tenantId, equipmentId: input.equipmentId, shiftId: input.shiftId,
-    ruleSetId: evaluation.ruleSetId, triggerType: 'SHIFT_START_DECISION',
-    // A committed command retry is absorbed by the idempotency pipeline, while a
-    // later attempt after corrective work must produce a fresh authoritative decision.
-    triggerId: `${input.shiftId}:start:${input.now.toISOString()}`,
-  }, evaluation);
   // Письменное разрешение диспетчера — единственный законный путь из отказа.
   // Оно покрывает ровно тот набор препятствий, который был на момент выдачи:
   // появилось новое — пуск снова закрыт, и это правильно.
   let waiver: {id: string; reason: string} | null = null;
-  if (!evaluation.allowed) {
+  if (!evaluation.allowed && input.shiftId) {
     const issued = await input.tx.shiftStartWaiver.findFirst({
       where: {tenantId: input.tenantId, shiftId: input.shiftId},
       select: {id: true, reason: true, blockerFingerprint: true},
@@ -36,7 +31,18 @@ export async function evaluateAuthoritativeShiftStart(input: {
       waiver = {id: issued.id, reason: issued.reason};
     }
   }
-  const allowed = evaluation.allowed || waiver !== null;
+  return {evaluation, waiver, allowed: evaluation.allowed || waiver !== null};
+}
+
+export async function evaluateAuthoritativeShiftStart(input: ShiftStartInput) {
+  const {evaluation, waiver, allowed} = await previewAuthoritativeShiftStart(input);
+  const snapshot = await createDeduplicatedSnapshot(input.tx, {
+    tenantId: input.tenantId, equipmentId: input.equipmentId, shiftId: input.shiftId,
+    ruleSetId: evaluation.ruleSetId, triggerType: 'SHIFT_START_DECISION',
+    // A committed command retry is absorbed by the idempotency pipeline, while a
+    // later attempt after corrective work must produce a fresh authoritative decision.
+    triggerId: `${input.shiftId}:start:${input.now.toISOString()}`,
+  }, evaluation);
 
   if (allowed) {
     await input.tx.shift.updateMany({

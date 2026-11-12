@@ -28,6 +28,7 @@ import { ReportAggregate } from '../../domain';
 import { getReportRepository } from '../../infrastructure';
 import { UpsertReportCommand, UpsertReportResult } from './upsert-report.command';
 import { validateReportInput, validateAgainstSitePlans, validatePicketsBelongToSite, validateDowntimeWithinShift } from './report-validation.service';
+import { requireReportProductionReadiness } from './report-production-readiness';
 import {
   writeReportAuditRow,
   recordPostCommitAuditEvent,
@@ -284,6 +285,9 @@ export async function upsertReport(
     applyEntriesToAggregate(aggregate, input, options.actor);
     const state = aggregate.getState();
     validateDowntimeWithinShift(state.shiftStart, state.shiftEnd, state.downtimes);
+    if (options.actor?.role === 'OPERATOR') {
+      await requireReportProductionReadiness(tx, state, existing?.getState());
+    }
 
     // Phase 4: Submit (draft → submitted)
     aggregate.submit(
