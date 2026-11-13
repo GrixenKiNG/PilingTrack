@@ -1,5 +1,6 @@
 <!DOCTYPE html><html lang="ru"><head>
 <meta charset="utf-8">
+<script defer src="/orion-release/metrika.js"></script>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 
 <meta name="description" content="Свайные работы под ключ, лидерное бурение, шпунтовые работы и аренда установок с экипажем. ОРИОН, Чебоксары и объекты по России.">
@@ -304,6 +305,8 @@ document.getElementById('request-download').addEventListener('click',()=>{
     ].filter(Boolean).join('\n');
     status.hidden=false;
     if(message.length>1500){status.textContent='Сократите описание объекта и параметры: суммарно не больше 1500 символов. Сейчас '+message.length+'.';return;}
+    const analyticsGoal=value('service')==='Аренда установки с экипажем'?'orion_lead_rental':'orion_lead_works';
+    const analyticsEligible=!value('website');
     button.disabled=true;button.setAttribute('aria-busy','true');status.textContent='Отправляем заявку…';
     try{
       const response=await fetch('/api/orion/lead',{
@@ -313,6 +316,7 @@ document.getElementById('request-download').addEventListener('click',()=>{
       });
       const result=await response.json();
       if(!response.ok||result.ok!==true)throw new Error(response.status===429?'rate-limit':'request');
+      if(analyticsEligible)window.orionMetric?.(analyticsGoal);
       status.textContent='Заявка принята. Свяжемся с вами по указанному контакту. Чертежи и материалы проекта можно отправить на orion02@bk.ru.';
       request.reset();document.getElementById('selected-machine').hidden=true;request.dataset.machine='';
     }catch(error){
